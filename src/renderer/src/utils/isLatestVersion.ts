@@ -31,37 +31,49 @@ export const getVersionInfoFromString = (
 };
 
 const compareMajorMinorAndPatch = (Lv: ExtendedVersionInfo, Cv: ExtendedVersionInfo) => {
-  if (Lv.major > Cv.major) return false;
-  if (Lv.major < Cv.major) return true;
+  const lMajor = parseInt(Lv.major);
+  const cMajor = parseInt(Cv.major);
+  if (lMajor > cMajor) return -1;
+  if (lMajor < cMajor) return 1;
 
-  if (Lv.minor > Cv.minor) return false;
-  if (Lv.minor < Cv.minor) return true;
+  const lMinor = parseInt(Lv.minor);
+  const cMinor = parseInt(Cv.minor);
+  if (lMinor > cMinor) return -1;
+  if (lMinor < cMinor) return 1;
 
-  if (Lv.patch > Cv.patch) return false;
-  if (Lv.patch < Cv.patch) return true;
+  const lPatch = parseInt(Lv.patch);
+  const cPatch = parseInt(Cv.patch);
+  if (lPatch > cPatch) return -1;
+  if (lPatch < cPatch) return 1;
 
-  return true;
+  return 0;
 };
 
 const isLatestVersion = (latestVersionString: string, currentVersionString: string) => {
   const latestVersion = getVersionInfoFromString(latestVersionString);
   const currentVersion = getVersionInfoFromString(currentVersionString);
 
-  // Lv - Latest Version
-  // Cv - Current Version
   if (latestVersion && currentVersion) {
+    const baseComparison = compareMajorMinorAndPatch(latestVersion, currentVersion);
+    
+    // If base versions differ, rely on that comparison.
+    // -1 means Lv > Cv (needs migration -> false)
+    // 1 means Lv < Cv (up to date -> true)
+    if (baseComparison !== 0) {
+      return baseComparison === 1;
+    }
+
     const { preRelease: LvPreRelease } = latestVersion;
     const { preRelease: CvPreRelease } = currentVersion;
 
-    // console.log('Version details', { latestVersion, currentVersion });
+    if (LvPreRelease === CvPreRelease) return true;
 
-    if (LvPreRelease === CvPreRelease)
-      return compareMajorMinorAndPatch(latestVersion, currentVersion);
+    // If only one has a pre-release, the one WITHOUT pre-release is NEWER.
+    if (LvPreRelease && !CvPreRelease) return true; // Cv is newer (release vs alpha)
+    if (!LvPreRelease && CvPreRelease) return false; // Lv is newer (release vs alpha)
 
-    if (LvPreRelease && !CvPreRelease) return true;
-    if (!LvPreRelease && CvPreRelease) return false;
-    if (LvPreRelease && CvPreRelease && LvPreRelease !== CvPreRelease) return true;
-    return true;
+    // Both are pre-releases. String comparison works for simple cases (alpha.4 vs alpha.5)
+    return LvPreRelease < CvPreRelease;
   }
   return false;
 };

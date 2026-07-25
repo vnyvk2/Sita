@@ -13,7 +13,8 @@ const localStorageMigrationData: MigrationData = {
   },
   '4.0.0-alpha.5': (data) => {
     // Migrate from single queue to multiple queues array
-    if (data.queue && !Array.isArray((data.queue as any).queues)) {
+    // Check if the old queue structure exists (songIds at root)
+    if (data.queue && (data.queue as any).songIds !== undefined) {
       const oldQueue = data.queue as any;
       data.queue = {
         queues: [
@@ -24,6 +25,16 @@ const localStorageMigrationData: MigrationData = {
               ? oldQueue.queueBeforeShuffle
               : undefined,
             metadata: oldQueue.metadata
+          }
+        ],
+        currentQueueIndex: 0
+      };
+    } else if (data.queue && !Array.isArray((data.queue as any).queues)) {
+      data.queue = {
+        queues: [
+          {
+            songIds: [],
+            position: 0,
           }
         ],
         currentQueueIndex: 0
