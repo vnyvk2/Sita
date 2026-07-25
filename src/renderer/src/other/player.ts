@@ -214,7 +214,7 @@ class AudioPlayer {
 
     if (typeof songIdOrData === 'number') {
       // Fetch song data if ID provided
-      songData = await window.api.audioLibraryControls.getSong(songIdOrData);
+      songData = await window.api.audioLibraryControls.getSong(songIdOrData, options?.autoPlay ?? true);
     } else {
       // Use provided song data
       songData = songIdOrData;

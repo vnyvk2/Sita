@@ -166,7 +166,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       addSongsFromFolderStructures(structures)
     );
 
-    ipcMain.handle('app/getSong', (_, id: number) => sendAudioData(id));
+    ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) => sendAudioData(id, updateListeningRate));
 
     ipcMain.handle('app/getSongFromUnknownSource', (_, songPath: string) =>
       sendAudioDataFromPath(songPath)

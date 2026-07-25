@@ -71,7 +71,7 @@ const getArtworkBuffer = async (artworkPath: string) => {
   }
 };
 
-const sendAudioData = async (songId: number): Promise<AudioPlayerData> => {
+const sendAudioData = async (songId: number, updateListeningRate = true): Promise<AudioPlayerData> => {
   logger.debug(`Fetching song data for song id -${songId}-`);
   try {
     const song = await getPlayableSongById(songId);
@@ -109,18 +109,20 @@ const sendAudioData = async (songId: number): Promise<AudioPlayerData> => {
         isBlacklisted
       };
 
-      addSongToPlayHistory(songId);
+      if (updateListeningRate) {
+        addSongToPlayHistory(songId);
 
-      const now = Date.now();
-      setDiscordRpcActivity({
-        details: `Listening to '${data.title}'`,
-        state: `By ${data.artists?.map((artist) => artist.name).join(', ')}`,
-        largeImageKey: 'nora_logo',
-        smallImageKey: 'song_artwork',
-        startTimestamp: now,
-        endTimestamp: now + data.duration * 1000
-      });
-      setCurrentSongPath(song.path);
+        const now = Date.now();
+        setDiscordRpcActivity({
+          details: `Listening to '${data.title}'`,
+          state: `By ${data.artists?.map((artist) => artist.name).join(', ')}`,
+          largeImageKey: 'nora_logo',
+          smallImageKey: 'song_artwork',
+          startTimestamp: now,
+          endTimestamp: now + data.duration * 1000
+        });
+        setCurrentSongPath(song.path);
+      }
 
       return data;
     }
