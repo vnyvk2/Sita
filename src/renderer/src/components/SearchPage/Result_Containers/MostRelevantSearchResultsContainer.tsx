@@ -181,7 +181,8 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                       'artist',
                       false,
                       firstResult.artistId,
-                      true
+                      true,
+                      firstResult.name
                     );
                   return undefined;
                 })
@@ -260,7 +261,8 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                       'album',
                       false,
                       firstResult.albumId,
-                      true
+                      true,
+                      firstResult.title
                     );
                   return undefined;
                 })
@@ -317,7 +319,8 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                       'playlist',
                       false,
                       firstResult.playlistId,
-                      true
+                      true,
+                      firstResult.name
                     );
                   return undefined;
                 })
@@ -356,10 +359,11 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                   if (Array.isArray(songs))
                     return createQueue(
                       songs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-                      'playlist',
+                      'genre',
                       false,
                       firstResult.genreId,
-                      true
+                      true,
+                      firstResult.name
                     );
                   return undefined;
                 })

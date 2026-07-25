@@ -64,10 +64,10 @@ function FavoritesPlaylistInfoPage() {
       const queueSongIds = favoriteSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'favorites', false, '', false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'favorites', false, '', false, t('common.favorites', 'Favorites'));
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, playSong, favoriteSongs]
+    [createQueue, updateQueueData, t, favoriteSongs]
   );
 
   // const clearSongHistory = useCallback(() => {

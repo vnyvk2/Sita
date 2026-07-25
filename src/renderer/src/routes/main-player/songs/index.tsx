@@ -10,7 +10,8 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
 import { songQuery } from '@renderer/queries/songs';
-import { store } from '@renderer/store/store';
+import { store, dispatch } from '@renderer/store/store';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -62,13 +63,16 @@ function SongsPage() {
     playSong,
     toggleMultipleSelections,
     updateContextMenuData,
-    changePromptMenuData
+    changePromptMenuData,
+    updateQueueData
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const {
     scrollTopOffset,
     sortingOrder = songsPageSortingState || 'aToZ',
-    filteringOrder = 'notSelected'
+    filteringOrder = 'notSelected',
+    action,
+    queueIndex
   } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -81,6 +85,19 @@ function SongsPage() {
   useEffect(() => {
     storage.sortingStates.setSortingStates('songsPage', sortingOrder);
   }, [sortingOrder]);
+
+  useEffect(() => {
+    if (action === 'add-to-queue' && !isMultipleSelectionEnabled) {
+      toggleMultipleSelections(true, 'songs');
+    }
+  }, [action, isMultipleSelectionEnabled, toggleMultipleSelections]);
+
+  useEffect(() => {
+    return () => {
+      // Clean up multiple selections state when unmounting
+      toggleMultipleSelections(false, 'songs');
+    };
+  }, [toggleMultipleSelections]);
 
   const addNewSongs = useCallback(() => {
     changePromptMenuData(
@@ -145,10 +162,10 @@ function SongsPage() {
       const queueSongIds = songData
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'songs', false, undefined, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'songs', false, undefined, false, t('common.allSongs', 'All Songs'));
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [songData, createQueue, playSong]
+    [songData, createQueue, updateQueueData, t]
   );
 
   // const parentRef = useRef<HTMLDivElement>(null);
@@ -195,6 +212,48 @@ function SongsPage() {
           </div>
         </div>
         <div className="other-controls-container flex">
+          {action === 'add-to-queue' && (
+            <>
+              <Button
+                key="add-to-queue-btn"
+                className="add-to-queue-btn text-sm md:text-lg bg-background-color-3 dark:bg-dark-background-color-3 px-4 py-1 rounded-full font-semibold mr-2 flex items-center shadow-sm"
+                iconName="add"
+                label={t('currentQueuePage.addSongs', 'Add to Queue')}
+                isDisabled={multipleSelectionsData.multipleSelections.length === 0 || multipleSelectionsData.selectionType !== 'songs'}
+                clickHandler={() => {
+                  const manager = getQueuesManager();
+                  const targetQueueIndex = queueIndex ?? manager.activeQueueIndex;
+                  const targetQueueId = manager.queues[targetQueueIndex]?.id;
+                  
+                  if (targetQueueId) {
+                    manager.addSongsToQueue(targetQueueId, multipleSelectionsData.multipleSelections as number[]);
+                  }
+                  
+                  toggleMultipleSelections(false, 'songs');
+                  navigate({ search: (prev) => ({ ...prev, action: undefined, queueIndex: undefined }) });
+                }}
+              />
+              <Button
+                key="search-btn"
+                className="search-btn text-sm md:text-lg mr-2"
+                iconName="search"
+                tooltipLabel={t('sideBar.search')}
+                clickHandler={() => {
+                  navigate({ to: '/main-player/search', search: { action: 'add-to-queue', queueIndex: queueIndex } });
+                }}
+              />
+              <Button
+                key="cancel-btn"
+                className="cancel-btn text-sm md:text-lg mr-2"
+                iconName="close"
+                tooltipLabel={t('common.cancel', 'Cancel')}
+                clickHandler={() => {
+                  toggleMultipleSelections(false, 'songs');
+                  history.back();
+                }}
+              />
+            </>
+          )}
           <Button
             key={0}
             className="more-options-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"

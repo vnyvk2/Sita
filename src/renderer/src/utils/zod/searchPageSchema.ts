@@ -4,5 +4,7 @@ import { z } from 'zod';
 export const searchPageSchema = z.object({
   keyword: z.string().optional().default(''),
   isSimilaritySearchEnabled: z.boolean().optional(),
-  filterBy: z.enum(searchFilterTypes).optional().default('All')
+  filterBy: z.enum(searchFilterTypes).optional().default('All'),
+  action: z.enum(['add-to-queue']).optional(),
+  queueIndex: z.coerce.number().optional()
 });

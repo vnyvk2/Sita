@@ -62,10 +62,10 @@ function GenreInfoPage() {
       const queueSongIds = genreSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'genre', false, genreData?.genreId, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'genre', false, genreData?.genreId, false, genreData?.name);
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, genreData?.genreId, genreSongs, playSong]
+    [createQueue, updateQueueData, genreData?.genreId, genreData?.name, genreSongs]
   );
 
   return (

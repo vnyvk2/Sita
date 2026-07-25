@@ -53,18 +53,20 @@ function RouteComponent() {
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
 
   // Sync viewingQueueIndex if active queue is deleted or changed externally
+  const prevActiveQueueRef = useRef(queue.currentQueueIndex);
+
   useEffect(() => {
-    if (viewingQueueIndex >= queue.queues.length) {
-      setViewingQueueIndex(queue.queues.length - 1);
+    if (prevActiveQueueRef.current !== queue.currentQueueIndex) {
+      setViewingQueueIndex(queue.currentQueueIndex);
+      prevActiveQueueRef.current = queue.currentQueueIndex;
+    } else if (viewingQueueIndex >= queue.queues.length) {
+      setViewingQueueIndex(Math.max(0, queue.queues.length - 1));
     }
-  }, [queue.queues.length, viewingQueueIndex]);
+  }, [queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
 
-  const currentQueue = useStore(
-    store, 
-    (state) => state.localStorage.queue.queues[viewingQueueIndex]?.songIds || []
-  );
+  const currentQueue = queue.queues[viewingQueueIndex]?.songIds || [];
 
-  const { addNewNotifications, updateContextMenuData, toggleMultipleSelections } =
+  const { addNewNotifications, updateContextMenuData, toggleMultipleSelections, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const { scrollTopOffset } = Route.useSearch();
@@ -91,6 +93,11 @@ function RouteComponent() {
             title: t(data.title ? 'currentQueuePage.folderWithName' : 'common.unknownFolder', {
               name: data.title
             })
+          };
+        if (queue.queues[viewingQueueIndex]?.metadata?.queueType === undefined)
+          return {
+            artworkPath: '',
+            title: queue.queues[viewingQueueIndex]?.metadata?.title || `Queue ${viewingQueueIndex + 1}`
           };
         return data;
       }
@@ -153,7 +160,18 @@ function RouteComponent() {
     updatedQueue.splice(result.destination.index, 0, item);
 
     // Update the currently viewed queue
-    manager.queues[viewingQueueIndex].replaceQueue(updatedQueue, manager.queues[viewingQueueIndex].position, false);
+    const queueToUpdate = manager.queues[viewingQueueIndex];
+    let newPosition = queueToUpdate.position;
+
+    if (result.source.index === newPosition) {
+      newPosition = result.destination.index;
+    } else if (result.source.index < newPosition && result.destination.index >= newPosition) {
+      newPosition -= 1;
+    } else if (result.source.index > newPosition && result.destination.index <= newPosition) {
+      newPosition += 1;
+    }
+
+    queueToUpdate.replaceQueue(updatedQueue, newPosition, false);
     dispatch({ type: 'UPDATE_QUEUE', data: { queues: manager.queues.map(q => q.toJSON()), currentQueueIndex: manager.activeQueueIndex } });
     return undefined;
   };
@@ -212,12 +230,15 @@ function RouteComponent() {
     >
       {queueInfo && (
         <>
-          <QueueTabs viewingQueueIndex={viewingQueueIndex} setViewingQueueIndex={setViewingQueueIndex} />
+          <div className="w-full mb-2 mt-1 pr-4">
+            <QueueTabs viewingQueueIndex={viewingQueueIndex} setViewingQueueIndex={setViewingQueueIndex} />
+          </div>
           <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-2 mb-4 flex items-center justify-between pr-4 text-3xl font-medium">
             <div className="flex items-center gap-4">
-              {viewingQueueIndex === queue.currentQueueIndex
-                ? t('currentQueuePage.queue', 'Currently Playing Queue')
-                : t('currentQueuePage.viewingQueue', 'Viewing Queue')}
+              {queue.queues[viewingQueueIndex]?.metadata?.title || (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'songs' ? 'All Songs' : `Queue ${viewingQueueIndex + 1}`)}
+              {viewingQueueIndex === queue.currentQueueIndex && (
+                 <span className="material-icons-round text-sm text-font-color-highlight dark:text-dark-font-color-highlight ml-2" title="Currently Playing">equalizer</span>
+              )}
               {viewingQueueIndex !== queue.currentQueueIndex && currentQueue.length > 0 && (
                 <Button
                   className="!m-0 flex h-10 w-10 items-center justify-center rounded-full bg-background-color-3 shadow-md hover:scale-105 transition-transform dark:bg-dark-background-color-3"
@@ -293,7 +314,7 @@ function RouteComponent() {
                 className="add-songs-button text-sm"
                 iconName="add"
                 clickHandler={() => {
-                  navigate({ to: '/main-player/songs' });
+                  navigate({ to: '/main-player/songs', search: { action: 'add-to-queue', queueIndex: viewingQueueIndex } });
                 }}
               />
               <Button
@@ -442,6 +463,8 @@ function RouteComponent() {
                                       if (viewingQueueIndex !== manager.activeQueueIndex) {
                                         // Switching queue will trigger autoPlay with the new position
                                         manager.switchQueue(viewingQueueIndex);
+                                      } else {
+                                        playSong(_songId, true);
                                       }
                                     }
                                   }}

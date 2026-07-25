@@ -70,11 +70,12 @@ export const Artist = (props: ArtistProp) => {
               'artist',
               isShuffle,
               props.artistId,
-              true
+              true,
+              props.name
             );
           return undefined;
         }),
-    [createQueue, props.artistId, props.songIds]
+    [createQueue, props.artistId, props.songIds, props.name]
   );
 
   const playArtistSongsForMultipleSelections = useCallback(
@@ -99,7 +100,8 @@ export const Artist = (props: ArtistProp) => {
               'artist',
               isShuffling,
               props.artistId,
-              true
+              true,
+              t('common.selectedArtists', 'Selected Artists')
             );
           }
           return undefined;

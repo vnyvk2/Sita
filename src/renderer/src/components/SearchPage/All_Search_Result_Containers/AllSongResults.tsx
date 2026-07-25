@@ -16,7 +16,7 @@ const AllSongResults = (prop: Props) => {
     (state) => state.localStorage.preferences.isSongIndexingEnabled
   );
 
-  const { createQueue, playSong } = useContext(AppUpdateContext);
+  const { createQueue, playSong, updateQueueData } = useContext(AppUpdateContext);
 
   const { songData, scrollTopOffset = 0 } = prop;
 
@@ -27,10 +27,10 @@ const AllSongResults = (prop: Props) => {
       const queueSongIds = songData
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'songs', false, undefined, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'songs', false, undefined, false, 'Search Results');
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, playSong, songData]
+    [createQueue, updateQueueData, songData]
   );
 
   return (

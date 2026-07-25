@@ -12,14 +12,16 @@ import SearchResultsFilter from '@renderer/components/SearchPage/SearchResultsFi
 import SearchStartPlaceholder from '@renderer/components/SearchPage/SearchStartPlaceholder';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import { searchQuery } from '@renderer/queries/search';
-import { store } from '@renderer/store/store';
+import { store, dispatch } from '@renderer/store/store';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';
 import { useThrottledCallback } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useContext, useEffect } from 'react';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/search/')({
@@ -52,13 +54,35 @@ function SearchPage() {
     (state) => state.localStorage.preferences.isSimilaritySearchEnabled
   );
 
+  const isMultipleSelectionEnabled = useStore(
+    store,
+    (state) => state.multipleSelectionsData.isEnabled
+  );
+  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const { toggleMultipleSelections } = useContext(AppUpdateContext);
+
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
   const {
     keyword,
     isSimilaritySearchEnabled = isSimilaritySearchEnabledInLocalStorage,
-    filterBy
+    filterBy,
+    action,
+    queueIndex
   } = Route.useSearch();
+
+  useEffect(() => {
+    if (action === 'add-to-queue' && !isMultipleSelectionEnabled) {
+      toggleMultipleSelections(true, 'songs');
+    }
+  }, [action, isMultipleSelectionEnabled, toggleMultipleSelections]);
+
+  useEffect(() => {
+    return () => {
+      // Clean up multiple selections state when unmounting
+      toggleMultipleSelections(false, 'songs');
+    };
+  }, [toggleMultipleSelections]);
 
   const searchContainerRef = useRef(null);
   const { width } = useResizeObserver(searchContainerRef);
@@ -169,6 +193,39 @@ function SearchPage() {
           >
             help
           </span>
+          {action === 'add-to-queue' && (
+            <>
+              <Button
+                key="add-to-queue-btn"
+                className="add-to-queue-btn text-sm md:text-lg bg-background-color-3 dark:bg-dark-background-color-3 px-6 py-2 rounded-full font-semibold ml-4 flex items-center shadow-sm"
+                iconName="add"
+                label={t('currentQueuePage.addSongs', 'Add to Queue')}
+                isDisabled={multipleSelectionsData.multipleSelections.length === 0 || multipleSelectionsData.selectionType !== 'songs'}
+                clickHandler={() => {
+                  const manager = getQueuesManager();
+                  const targetQueueIndex = queueIndex ?? manager.activeQueueIndex;
+                  const targetQueueId = manager.queues[targetQueueIndex]?.id;
+                  
+                  if (targetQueueId) {
+                    manager.addSongsToQueue(targetQueueId, multipleSelectionsData.multipleSelections as number[]);
+                  }
+                  
+                  toggleMultipleSelections(false, 'songs');
+                  navigate({ search: (prev) => ({ ...prev, action: undefined, queueIndex: undefined }) });
+                }}
+              />
+              <Button
+                key="cancel-btn"
+                className="cancel-btn text-sm md:text-lg ml-2"
+                iconName="close"
+                tooltipLabel={t('common.cancel', 'Cancel')}
+                clickHandler={() => {
+                  toggleMultipleSelections(false, 'songs');
+                  history.back();
+                }}
+              />
+            </>
+          )}
         </div>
         {/* SEARCH FILTERS */}
         <div className="search-filters-container mb-6">

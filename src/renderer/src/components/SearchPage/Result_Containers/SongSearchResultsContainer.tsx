@@ -25,17 +25,17 @@ const SongSearchResultsContainer = (props: Props) => {
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { toggleMultipleSelections, createQueue, playSong } = useContext(AppUpdateContext);
+  const { toggleMultipleSelections, createQueue, playSong, updateQueueData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
       const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
-      createQueue(queueSongIds, 'songs', false, undefined, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'songs', false, undefined, false, 'Search Results');
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, playSong, songs]
+    [createQueue, updateQueueData, songs]
   );
 
   const songResults = useMemo(

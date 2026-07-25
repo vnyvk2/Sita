@@ -2,6 +2,7 @@
     Represents a queue of songs to be played in the music player.
 */
 class PlayerQueue {
+  id: string;
   songIds: number[];
   position: number;
   queueBeforeShuffle?: number[];
@@ -12,8 +13,10 @@ class PlayerQueue {
     songIds: number[] = [],
     position = 0,
     queueBeforeShuffle?: number[],
-    metadata?: PlayerQueueMetadata
+    metadata?: PlayerQueueMetadata,
+    id?: string
   ) {
+    this.id = id || window.crypto.randomUUID();
     this.songIds = songIds;
     this.position = position;
     this.metadata = metadata;
@@ -710,7 +713,8 @@ class PlayerQueue {
       [...this.songIds],
       this.position,
       this.queueBeforeShuffle ? [...this.queueBeforeShuffle] : undefined,
-      this.metadata ? { ...this.metadata } : undefined
+      this.metadata ? { ...this.metadata } : undefined,
+      window.crypto.randomUUID()
     );
   }
 
@@ -721,6 +725,7 @@ class PlayerQueue {
    */
   toJSON(): PlayerQueueJson {
     return {
+      id: this.id,
       songIds: [...this.songIds],
       position: this.position,
       queueBeforeShuffle: this.queueBeforeShuffle ? [...this.queueBeforeShuffle] : undefined,
@@ -735,6 +740,7 @@ class PlayerQueue {
    * @returns A new PlayerQueue instance
    */
   static fromJSON(json: {
+    id?: string;
     songIds: number[];
     position: number;
     queueBeforeShuffle?: number[];
@@ -744,7 +750,8 @@ class PlayerQueue {
       json.songIds || [],
       json.position || 0,
       json.queueBeforeShuffle,
-      json.metadata
+      json.metadata,
+      json.id
     );
   }
 }

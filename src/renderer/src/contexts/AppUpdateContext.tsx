@@ -37,7 +37,8 @@ export interface AppUpdateContextType {
     queueType: QueueTypes,
     isShuffleQueue?: boolean,
     queueId?: string | number,
-    startPlaying?: boolean
+    startPlaying?: boolean,
+    queueTitle?: string
   ) => void;
   updateQueueData: (
     currentSongIndex?: number,

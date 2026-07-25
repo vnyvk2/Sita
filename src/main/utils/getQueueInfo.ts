@@ -23,8 +23,9 @@ export const getQueueInfo = async (
 ): Promise<QueueInfo | undefined> => {
   switch (queueType) {
     case 'songs': {
-      if (id !== '') {
-        const data = await getSongRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (id !== '' && !isNaN(parsedId)) {
+        const data = await getSongRelatedQueueInfo(parsedId);
         const artworks = data?.artworks.map((a) => a.artwork) || [];
         const artworkData = parseSongArtworks(artworks);
 
@@ -36,35 +37,45 @@ export const getQueueInfo = async (
       return { artworkPath: '', title: 'All Songs' };
     }
     case 'artist': {
-      const data = await getArtistRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (isNaN(parsedId)) return { artworkPath: '', title: '' };
+      const data = await getArtistRelatedQueueInfo(parsedId);
       return {
         artworkPath: addFileUrlToPath(data?.artworks.at(0)?.artwork?.path),
         title: data?.name || ''
       };
     }
     case 'album': {
-      const data = await getAlbumRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (isNaN(parsedId)) return { artworkPath: '', title: '' };
+      const data = await getAlbumRelatedQueueInfo(parsedId);
       return {
         artworkPath: addFileUrlToPath(data?.artworks.at(0)?.artwork?.path),
         title: data?.title || ''
       };
     }
     case 'playlist': {
-      const data = await getPlaylistRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (isNaN(parsedId)) return { artworkPath: '', title: '' };
+      const data = await getPlaylistRelatedQueueInfo(parsedId);
       return {
         artworkPath: addFileUrlToPath(data?.artworks.at(0)?.artwork?.path),
         title: data?.name || ''
       };
     }
     case 'genre': {
-      const data = await getGenreRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (isNaN(parsedId)) return { artworkPath: '', title: '' };
+      const data = await getGenreRelatedQueueInfo(parsedId);
       return {
         artworkPath: addFileUrlToPath(data?.artworks.at(0)?.artwork?.path),
         title: data?.name || ''
       };
     }
     case 'folder': {
-      const data = await getFolderRelatedQueueInfo(Number(id));
+      const parsedId = Number(id);
+      if (isNaN(parsedId)) return { artworkPath: '', title: '' };
+      const data = await getFolderRelatedQueueInfo(parsedId);
       return {
         artworkPath: '',
         title: data?.name || ''

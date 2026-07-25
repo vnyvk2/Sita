@@ -75,13 +75,14 @@ export const Playlist = (props: PlaylistProp) => {
               'playlist',
               isShuffling,
               props.playlistId,
-              true
+              true,
+              props.title
             );
           return undefined;
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, props.playlistId, props.songs]
+    [createQueue, props.playlistId, props.songs, props.title]
   );
 
   const playAllSongsForMultipleSelections = useCallback(

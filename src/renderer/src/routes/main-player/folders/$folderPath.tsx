@@ -26,7 +26,7 @@ function MusicFolderInfoPage() {
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, toggleMultipleSelections, updateContextMenuData, playSong } =
+  const { createQueue, toggleMultipleSelections, updateContextMenuData, playSong, updateQueueData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -40,12 +40,22 @@ function MusicFolderInfoPage() {
   const [folderInfo, setFolderInfo] = useState<MusicFolder>();
   const [folderSongs, setFolderSongs] = useState<SongData[]>([]);
 
+  const { folderName } = useMemo(() => {
+    if (folderInfo) {
+      const { path } = folderInfo;
+      const name = path.split('\\').pop() || path;
+
+      return { folderPath: path, folderName: name };
+    }
+    return { folderPath: undefined, folderName: undefined };
+  }, [folderInfo]);
+
   const fetchFolderInfo = useCallback(() => {
     if (folderPath) {
       window.api.folderData
         .getFolderData([folderPath])
         .then((res) => {
-          if (res) return setFolderInfo(res[0]);
+          if (res && res.length > 0) return setFolderInfo(res[0]);
           return undefined;
         })
         .catch((err) => console.error(err));
@@ -63,6 +73,7 @@ function MusicFolderInfoPage() {
         })
         .catch((err) => console.error(err));
     }
+    return setFolderSongs([]);
   }, [filteringOrder, folderInfo, sortingOrder]);
 
   useEffect(() => {
@@ -117,22 +128,12 @@ function MusicFolderInfoPage() {
       const queueSongIds = folderSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'folder', shuffleQueue, folderInfo?.path, startPlaying);
+      createQueue(queueSongIds, 'folder', shuffleQueue, folderInfo?.path, startPlaying, folderName);
 
-      if (currSongId) playSong(currSongId, true);
+      if (currSongId) updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, folderInfo?.path, folderSongs, playSong]
+    [createQueue, updateQueueData, folderInfo?.path, folderName, folderSongs]
   );
-
-  const { folderName } = useMemo(() => {
-    if (folderInfo) {
-      const { path } = folderInfo;
-      const name = path.split('\\').pop() || path;
-
-      return { folderPath: path, folderName: name };
-    }
-    return { folderPath: undefined, folderName: undefined };
-  }, [folderInfo]);
 
   const otherOptions = useMemo(
     () => [

@@ -70,10 +70,10 @@ function PlaylistInfoPage() {
       const queueSongIds = playlistSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'playlist', false, playlistData.playlistId, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'playlist', false, playlistData.playlistId, false, playlistData.name);
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, playSong, playlistData.playlistId, playlistSongs]
+    [createQueue, updateQueueData, playlistData.playlistId, playlistData.name, playlistSongs]
   );
 
   const clearSongHistory = useCallback(() => {

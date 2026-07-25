@@ -8,12 +8,12 @@ import { getQueuesManager } from '../../other/queuesManager';
 import { dispatch } from '../../store/store';
 
 type Props = { 
-  queueIndex: number; 
+  queueId: string; 
   currentName: string;
 };
 
 const RenameQueuePrompt = (props: Props) => {
-  const { queueIndex, currentName } = props;
+  const { queueId, currentName } = props;
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const manager = getQueuesManager();
@@ -23,19 +23,11 @@ const RenameQueuePrompt = (props: Props) => {
   const renameQueue = useCallback(
     (newName: string) => {
       if (manager && newName.trim()) {
-        manager.renameQueue(queueIndex, newName.trim());
-        // Save changes to store
-        dispatch({ 
-          type: 'UPDATE_QUEUE', 
-          data: { 
-            queues: manager.queues.map(queue => queue.toJSON()), 
-            currentQueueIndex: manager.activeQueueIndex 
-          } 
-        });
+        manager.renameQueue(queueId, newName.trim());
       }
       changePromptMenuData(false);
     },
-    [changePromptMenuData, manager, queueIndex]
+    [changePromptMenuData, manager, queueId]
   );
 
   return (

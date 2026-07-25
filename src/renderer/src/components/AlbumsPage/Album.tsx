@@ -54,12 +54,13 @@ export const Album = (props: AlbumProp) => {
               'album',
               isShuffle,
               props.albumId,
-              true
+              true,
+              props.title
             );
           return undefined;
         });
     },
-    [createQueue, props.albumId, props.songs]
+    [createQueue, props.albumId, props.songs, props.title]
   );
 
   const playAlbumSongsForMultipleSelections = useCallback(
@@ -88,10 +89,11 @@ export const Album = (props: AlbumProp) => {
           if (Array.isArray(songs))
             return createQueue(
               songs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-              'songs',
+              'album',
               isShuffle,
               undefined,
-              true
+              true,
+              t('common.selectedAlbums', 'Selected Albums')
             );
           return undefined;
         })

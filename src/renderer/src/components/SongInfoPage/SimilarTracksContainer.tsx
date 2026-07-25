@@ -37,10 +37,10 @@ const SimilarTracksContainer = (props: Props) => {
       const songs = similarTracks.sortedAvailTracks.map((song) => song.songData!);
       const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
 
-      createQueue(queueSongIds, 'songs', false, undefined, !startSongId);
-      if (startSongId) playSong(startSongId, true);
+      createQueue(queueSongIds, 'songs', false, undefined, !startSongId, t('common.similarTracks', 'Similar Tracks'));
+      if (startSongId) updateQueueData(queueSongIds.indexOf(startSongId), undefined, false, true);
     },
-    [similarTracks.sortedAvailTracks, createQueue, playSong]
+    [similarTracks.sortedAvailTracks, createQueue, updateQueueData, t]
   );
 
   const addSongsToPlayNext = useCallback(() => {

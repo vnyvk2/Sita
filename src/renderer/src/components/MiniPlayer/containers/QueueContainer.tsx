@@ -6,6 +6,7 @@ import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getQueuesManager } from '@renderer/other/queuesManager';
+import { useNavigate } from '@tanstack/react-router';
 
 import DefaultSongCover from '../../../assets/images/webp/song_cover_default.webp';
 import Img from '../../Img';
@@ -22,6 +23,7 @@ const QueueContainer = (props: Props) => {
 
   const { changeQueueCurrentSongIndex } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const listRef = useRef<HTMLDivElement>(null);
   
@@ -215,8 +217,16 @@ const QueueContainer = (props: Props) => {
         {queuedSongs && queuedSongs.length > 0 ? (
           songItems
         ) : (
-          <div className="text-font-color-white/40 flex h-full items-center justify-center text-sm">
+          <div className="text-font-color-white/40 flex h-full items-center justify-center text-sm flex-col gap-4">
             {t('currentQueuePage.empty', 'Queue is empty')}
+            <button 
+              className="text-font-color-highlight dark:text-dark-font-color-highlight border border-font-color-highlight dark:border-dark-font-color-highlight px-4 py-2 rounded-full hover:bg-font-color-highlight hover:text-white transition-colors"
+              onClick={() => {
+                navigate({ to: '/main-player/songs', search: { action: 'add-to-queue', queueIndex: viewingQueueIndex } });
+              }}
+            >
+              {t('currentQueuePage.addSongs', 'Add Songs')}
+            </button>
           </div>
         )}
       </div>

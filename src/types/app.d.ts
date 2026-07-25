@@ -676,6 +676,7 @@ declare global {
   }
 
   interface PlayerQueueJson {
+    id: string;
     songIds: number[];
     position: number;
     queueBeforeShuffle?: number[];

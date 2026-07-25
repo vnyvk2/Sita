@@ -411,7 +411,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     playbackRate: 1.0
   },
   queue: {
-    queues: [{ position: 0, songIds: [] }],
+    queues: [{ id: 'default-queue', position: 0, songIds: [] }],
     currentQueueIndex: 0
   },
   sortingStates: {

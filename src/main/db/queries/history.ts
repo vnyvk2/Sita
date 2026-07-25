@@ -18,89 +18,60 @@ export const getSongPlayHistory = async (songId: number, trx: DB | DBTransaction
   return data;
 };
 
+import { getAllSongs } from './songs';
+import logger from '../../logger';
+
 export const getAllSongsInHistory = async (
   sortType?: SongSortTypes,
   paginatingData?: PaginatingData,
   trx: DB | DBTransaction = db
 ) => {
   const { start = 0, end = 0 } = paginatingData || {};
-
   const limit = end - start === 0 ? undefined : end - start;
+  
+  try {
+    // First, get the ordered song IDs from playHistory with pagination
+    const historyRecords = await trx
+      .select({ songId: playHistory.songId })
+      .from(playHistory)
+      .orderBy(desc(playHistory.createdAt))
+      .limit(limit ?? 1000000)
+      .offset(start);
 
-  const data = await trx.query.songs.findMany({
-    where: (songs, { exists }) =>
-      exists(trx.select().from(playHistory).where(eq(playHistory.songId, songs.id))),
-    with: {
-      artists: {
-        with: {
-          artist: {
-            columns: { id: true, name: true }
-          }
-        }
-      },
-      albums: {
-        with: {
-          album: {
-            columns: { id: true, title: true },
-            with: {
-              artists: {
-                with: {
-                  artist: {
-                    columns: { id: true, name: true }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      genres: {
-        with: {
-          genre: {
-            columns: { id: true, name: true }
-          }
-        }
-      },
-      artworks: {
-        with: {
-          artwork: {
-            with: {
-              palette: {
-                columns: { id: true },
-                with: {
-                  swatches: {}
-                }
-              }
-            }
-          }
-        }
-      },
-      playlists: {
-        with: {
-          playlist: {
-            columns: { id: true, name: true }
-          }
-        }
-      }
-    },
-    orderBy: (songs) => {
-      // Apply sorting based on sortType parameter
-      if (sortType === 'aToZ') return [asc(songs.title)];
-      if (sortType === 'zToA') return [desc(songs.title)];
-      // Add other sort types as needed
-      return [desc(songs.createdAt)]; // Default sorting
-    },
-    limit: limit,
-    offset: start
-  });
+    const songIds = historyRecords.map((r) => r.songId);
 
-  return {
-    data,
-    sortType,
-    filterType: 'notSelected',
-    start,
-    end
-  };
+    if (songIds.length === 0) {
+      return {
+        data: [],
+        sortType: sortType || 'addedOrder',
+        filterType: 'notSelected',
+        start,
+        end
+      };
+    }
+
+    // Then fetch the songs using the existing optimized getAllSongs query
+    const songsResult = await getAllSongs(
+      {
+        start: 0, // We already paginated the IDs, so we fetch all matching songs
+        end: 0,
+        songIds,
+        preserveIdOrder: true
+      },
+      trx
+    );
+
+    return {
+      data: songsResult.data,
+      sortType: sortType || 'addedOrder',
+      filterType: 'notSelected',
+      start,
+      end
+    };
+  } catch (error) {
+    logger.error('[MAIN] getAllSongsInHistory ERROR', { error });
+    throw error;
+  }
 };
 
 export const clearFullSongHistory = async (trx: DB | DBTransaction = db) => {

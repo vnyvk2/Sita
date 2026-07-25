@@ -46,7 +46,7 @@ function ArtistInfoPage() {
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, updateContextMenuData, toggleMultipleSelections, playSong } =
+  const { createQueue, updateContextMenuData, toggleMultipleSelections, playSong, updateQueueData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 
@@ -232,10 +232,10 @@ function ArtistInfoPage() {
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
       const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
-      createQueue(queueSongIds, 'artist', false, artistData?.artistId, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'artist', false, artistData?.artistId, false, artistData?.name);
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [artistData?.artistId, createQueue, playSong, songs]
+    [artistData?.artistId, artistData?.name, createQueue, updateQueueData, songs]
   );
 
   const songComponenets = useMemo(
@@ -481,10 +481,11 @@ function ArtistInfoPage() {
                               songs
                                 .filter((song) => !song.isBlacklisted)
                                 .map((song) => song.songId),
-                              'songs',
+                              'artist',
                               true,
-                              undefined,
-                              true
+                              artistData?.artistId,
+                              true,
+                              artistData?.name
                             )
                         },
                         {
@@ -495,10 +496,11 @@ function ArtistInfoPage() {
                               songs
                                 .filter((song) => !song.isBlacklisted)
                                 .map((song) => song.songId),
-                              'songs',
+                              'artist',
                               false,
-                              undefined,
-                              true
+                              artistData?.artistId,
+                              true,
+                              artistData?.name
                             )
                         },
                         {

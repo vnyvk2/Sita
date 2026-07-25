@@ -63,10 +63,10 @@ function AlbumInfoPage() {
       const queueSongIds = albumSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'album', false, albumData.albumId, false);
-      playSong(currSongId, true);
+      createQueue(queueSongIds, 'album', false, albumData.albumId, false, albumData.title);
+      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [albumData.albumId, createQueue, playSong, albumSongs]
+    [albumData.albumId, createQueue, updateQueueData, albumSongs, albumData.title]
   );
 
   return (
@@ -90,10 +90,11 @@ function AlbumInfoPage() {
             clickHandler: () =>
               createQueue(
                 albumSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-                'songs',
+                'album',
                 true,
                 albumData.albumId,
-                true
+                true,
+                albumData.title
               ),
             isDisabled: !(albumSongs.length > 0)
           },
@@ -125,10 +126,11 @@ function AlbumInfoPage() {
             clickHandler: () =>
               createQueue(
                 albumSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-                'songs',
+                'album',
                 false,
                 albumData.albumId,
-                true
+                true,
+                albumData.title
               ),
             isDisabled: !(albumSongs.length > 0)
           }

@@ -72,12 +72,13 @@ const Genre = (props: GenreProp) => {
               'genre',
               isShuffle,
               genreId,
-              true
+              true,
+              title
             );
           return undefined;
         });
     },
-    [createQueue, genreId, songIds]
+    [createQueue, genreId, songIds, title]
   );
 
   const playGenreSongsForMultipleSelections = useCallback(
