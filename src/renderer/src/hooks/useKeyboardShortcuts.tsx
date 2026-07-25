@@ -2,12 +2,12 @@ import i18n from '@renderer/i18n';
 import { normalizedKeys } from '@renderer/other/appShortcuts';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
-import { useCallback, useEffect, type ReactNode } from 'react';
-import { lazy } from 'react';
+import { lazy, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import storage from '../utils/localStorage';
 import { useAudioPlayer } from './useAudioPlayer';
+import { useOverlayNavigation } from './useOverlayNavigation';
 
 const AppShortcutsPrompt = lazy(() => import('../components/SettingsPage/AppShortcutsPrompt'));
 
@@ -86,6 +86,7 @@ export interface KeyboardShortcutDependencies {
  */
 export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies): void {
   const navigate = useNavigate();
+  const { toggleOverlay } = useOverlayNavigation();
   const { t } = useTranslation();
   const player = useAudioPlayer();
 
@@ -249,10 +250,10 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             navigate({ to: '/main-player/search' });
             break;
           case i18n.t('appShortcutsPrompt.goToLyrics'):
-            navigate({ to: '/main-player/lyrics' });
+            toggleOverlay('/main-player/lyrics');
             break;
           case i18n.t('appShortcutsPrompt.goToQueue'):
-            navigate({ to: '/main-player/queue' });
+            toggleOverlay('/main-player/queue');
             break;
           case i18n.t('appShortcutsPrompt.goHome'):
             navigate({ to: '/main-player/home' });
@@ -318,6 +319,7 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
       addNewNotifications,
       t,
       navigate,
+      toggleOverlay,
       updatePlayerType,
       toggleMultipleSelections,
       changePromptMenuData,

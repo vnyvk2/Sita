@@ -7,6 +7,7 @@ import { lazy, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
 import NavLink from '../NavLink';
 import VolumeSlider from '../VolumeSlider';
@@ -22,6 +23,7 @@ const OtherSongControlsContainer = () => {
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { toggleOverlay } = useOverlayNavigation();
 
   const openOtherSettingsContextMenu = useCallback(
     (pageX: number, pageY: number) => {
@@ -29,22 +31,37 @@ const OtherSongControlsContainer = () => {
         true,
         [
           {
-            label: t('settingsPage.appShortcuts'),
-            iconName: 'trail_length_short',
+            label: t('settings.settings'),
+            iconName: 'settings',
+            iconClassName: 'material-icons-round-outlined mr-2',
+            handlerFunction: () => navigate({ to: '/main-player/settings' })
+          },
+          {
+            label: t('settings.appShortcuts'),
+            iconName: 'keyboard',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () => changePromptMenuData(true, <AppShortcutsPrompt />)
           },
           { label: '', isContextMenuItemSeperator: true, handlerFunction: () => true },
           {
-            label: t('settingsPage.equalizer'),
-            iconName: 'graphic_eq',
+            label: isMuted ? t('player.unmute') : t('player.mute'),
+            iconName: isMuted ? 'volume_off' : 'volume_up',
             iconClassName: 'material-icons-round-outlined mr-2',
-            handlerFunction: () =>
-              navigate({ to: '/main-player/settings', hash: 'equalizer-settings-container' })
+            handlerFunction: () => toggleMutedState()
           },
           {
-            label: t('player.adjustPlaybackSpeed'),
-            iconName: 'avg_pace',
+            label: 'Volume Slider',
+            isCustomContextMenuItem: true,
+            handlerFunction: () => true,
+            customContextMenuItem: (
+              <div className="flex px-4 py-2">
+                <VolumeSlider />
+              </div>
+            )
+          },
+          {
+            label: t('player.audioPlaybackSettings'),
+            iconName: 'tune',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () =>
               navigate({ to: '/main-player/settings', hash: 'audio-playback-settings-container' })
@@ -54,7 +71,7 @@ const OtherSongControlsContainer = () => {
             label: t('player.showCurrentQueue'),
             iconName: 'table_rows',
             iconClassName: 'material-icons-round-outlined mr-2',
-            handlerFunction: () => navigate({ to: '/main-player/queue' })
+            handlerFunction: () => toggleOverlay('/main-player/queue')
           },
           { label: '', isContextMenuItemSeperator: true, handlerFunction: () => true },
           {
@@ -74,13 +91,26 @@ const OtherSongControlsContainer = () => {
         pageY
       );
     },
-    [changePromptMenuData, navigate, t, updateContextMenuData, updatePlayerType]
+    [
+      changePromptMenuData,
+      isMuted,
+      navigate,
+      t,
+      toggleMutedState,
+      toggleOverlay,
+      updateContextMenuData,
+      updatePlayerType
+    ]
   );
 
   return (
     <div className="other-controls-container flex items-center justify-end">
       <NavLink
         to="/main-player/queue"
+        onClick={(e) => {
+          e.preventDefault();
+          toggleOverlay('/main-player/queue');
+        }}
         className={`queue-btn text-font-color-black text-opacity-60 after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight !mr-6 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline lg:hidden dark:bg-transparent dark:hover:bg-transparent ${
           currentlyActivePage.pageTitle === 'CurrentQueue' && 'after:opacity-100'
         }`}

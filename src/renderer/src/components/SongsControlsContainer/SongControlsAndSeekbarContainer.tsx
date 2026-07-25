@@ -4,12 +4,14 @@ import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
 import NavLink from '../NavLink';
 import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
 import SeekBarContainer from './SeekBarContainer';
 
 const SongControlsAndSeekbarContainer = () => {
+  const { toggleOverlay } = useOverlayNavigation();
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const isKnownSource = useStore(store, (state) => state.currentSongData.isKnownSource);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
@@ -101,6 +103,10 @@ const SongControlsAndSeekbarContainer = () => {
 
         <NavLink
           to="/main-player/lyrics"
+          onClick={(e) => {
+            e.preventDefault();
+            toggleOverlay('/main-player/lyrics');
+          }}
           className={`lyrics-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent [&.active]:after:opacity-100`}
           title={t('player.lyrics')}
         >
