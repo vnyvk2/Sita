@@ -28,7 +28,7 @@ export const getFolderStructure = async (
   const result: FolderStructure[] = [];
 
   for (const folder of folders) {
-    const subFolders = await getFolderStructure(folder.id);
+    const subFolders = await getFolderStructure(folder.id, trx);
 
     result.push({
       path: folder.path,

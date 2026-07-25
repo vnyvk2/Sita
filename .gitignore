@@ -1,1 +1,26 @@
 node_modules
+dist
+out
+.DS_Store
+*.log*
+.env
+thunder-tests
+coverage/
+*.m3u
+.npmrc
+.github/plans/
+.idea/
+*.tsbuildinfo
+*.patch
+codeReview.md
+coreTask.md
+currproblems.md
+image-1.png
+image.png
+MusicBeeMiniPlayerLayout.md
+problems.md
+queueUpgrade.md
+task.md
+ter..qupgrade --stat
+todo.md
+totalTasks.md

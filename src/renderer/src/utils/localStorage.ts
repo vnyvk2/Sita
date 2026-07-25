@@ -37,8 +37,6 @@ const migrateLocalStorage = (migrationData: MigrationData, storage: LocalStorage
 
   for (const [migrationVersion, migrationFunction] of Object.entries(migrationData)) {
     const isLocalStorageUpToDate = isLatestVersion(migrationVersion, localStorageVersion);
-    
-    console.log(`[Migration] Checking version: migrationVersion=${migrationVersion}, localStorageVersion=${localStorageVersion}, isUpToDate=${isLocalStorageUpToDate}`);
 
     if (!isLocalStorageUpToDate) {
       log(
