@@ -268,12 +268,18 @@ export class QueuesManager {
             for (let i = 0; i < this.queues.length; i++) {
               const q = this.queues[i];
               const sq = storeQueuesState.queues[i];
+              
+              if (!sq || !Array.isArray(sq.songIds)) {
+                console.error('Invalid queue state restored', sq);
+                continue;
+              }
+
               if (
                 JSON.stringify(q.getAllSongIds()) !== JSON.stringify(sq.songIds) ||
                 q.position !== sq.position ||
                 !!q.queueBeforeShuffle !== !!sq.queueBeforeShuffle
               ) {
-                q.replaceQueue(sq.songIds, sq.position, false, sq.metadata);
+                q.replaceQueue(sq.songIds, sq.position ?? 0, false, sq.metadata);
                 q.queueBeforeShuffle = sq.queueBeforeShuffle;
               }
             }
