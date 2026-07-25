@@ -7,24 +7,16 @@ export const homeQuery = createQueryKeys('home', {
   recentlyPlayedSongs: {
     queryKey: null,
     queryFn: async (): Promise<SongData[]> => {
-      console.log('[HOME QUERY] recentlyPlayedSongs started');
       const start = 0;
       const end = 30;
       const sortType: SongSortTypes = 'dateAddedDescending';
 
-      try {
-        console.log('[HOME QUERY] Calling IPC getAllHistorySongs');
-        const paginatedResult = await window.api.audioLibraryControls.getAllHistorySongs(sortType, {
-          start,
-          end
-        });
-        console.log('[HOME QUERY] IPC getAllHistorySongs resolved:', paginatedResult);
-        const data = Array.isArray(paginatedResult.data) ? paginatedResult.data : [];
-        return data;
-      } catch (error) {
-        console.error('[HOME QUERY] IPC getAllHistorySongs ERROR:', error);
-        throw error;
-      }
+      const paginatedResult = await window.api.audioLibraryControls.getAllHistorySongs(sortType, {
+        start,
+        end
+      });
+      const data = Array.isArray(paginatedResult.data) ? paginatedResult.data : [];
+      return data;
     }
   },
   recentSongArtists: {

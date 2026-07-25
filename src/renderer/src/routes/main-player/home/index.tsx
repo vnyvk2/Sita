@@ -28,17 +28,12 @@ import historyPlaylistCoverImage from '../../../assets/images/webp/history-playl
 export const Route = createFileRoute('/main-player/home/')({
   component: HomePage,
   loader: async () => {
-    console.log('[LOADER] /main-player/home started');
     await queryClient.ensureQueryData(
       songQuery.all({ sortType: 'dateAddedDescending', start: 0, end: 30 })
     );
-    console.log('[LOADER] songQuery.all resolved');
     await queryClient.ensureQueryData(homeQuery.recentlyPlayedSongs);
-    console.log('[LOADER] homeQuery.recentlyPlayedSongs resolved');
     await queryClient.ensureQueryData(homeQuery.recentSongArtists);
-    console.log('[LOADER] homeQuery.recentSongArtists resolved');
     await queryClient.ensureQueryData(homeQuery.mostLovedSongs);
-    console.log('[LOADER] homeQuery.mostLovedSongs resolved');
     await queryClient.ensureQueryData(
       artistQuery.all({
         sortType: 'mostLovedDescending',
@@ -47,7 +42,6 @@ export const Route = createFileRoute('/main-player/home/')({
         end: 30
       })
     );
-    console.log('[LOADER] /main-player/home finished');
   }
 });
 

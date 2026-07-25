@@ -26,11 +26,8 @@ export const getAllSongsInHistory = async (
   paginatingData?: PaginatingData,
   trx: DB | DBTransaction = db
 ) => {
-  logger.info('[MAIN] getAllSongsInHistory executing');
   const { start = 0, end = 0 } = paginatingData || {};
   const limit = end - start === 0 ? undefined : end - start;
-
-  logger.info('[MAIN] Querying playHistory', { limit, start });
   
   try {
     // First, get the ordered song IDs from playHistory with pagination
@@ -40,8 +37,6 @@ export const getAllSongsInHistory = async (
       .orderBy(desc(playHistory.createdAt))
       .limit(limit ?? 1000000)
       .offset(start);
-
-    logger.info('[MAIN] playHistory queried successfully', { count: historyRecords.length });
 
     const songIds = historyRecords.map((r) => r.songId);
 
@@ -55,7 +50,6 @@ export const getAllSongsInHistory = async (
       };
     }
 
-    logger.info('[MAIN] Calling getAllSongs with IDs', { songIdsCount: songIds.length });
     // Then fetch the songs using the existing optimized getAllSongs query
     const songsResult = await getAllSongs(
       {
@@ -66,7 +60,6 @@ export const getAllSongsInHistory = async (
       },
       trx
     );
-    logger.info('[MAIN] getAllSongs completed successfully');
 
     return {
       data: songsResult.data,

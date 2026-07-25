@@ -8,10 +8,8 @@ export const getAllHistorySongs = async (
   sortType?: SongSortTypes,
   paginatingData?: PaginatingData
 ): Promise<PaginatedResult<SongData, SongSortTypes>> => {
-  logger.info('[MAIN] getAllHistorySongs called');
   try {
     const data = await getAllSongsInHistory(sortType, paginatingData);
-    logger.info('[MAIN] getAllSongsInHistory finished', { count: data.data.length });
     const songs = data.data.map((song) => convertToSongData(song));
 
     return {
