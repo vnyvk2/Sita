@@ -33,8 +33,8 @@ export const lyricsQuery = createQueryKeys('lyrics', {
         `lyricsRequestType=${lyricsRequestType}`,
         `saveLyricsAutomatically=${saveLyricsAutomatically}`
       ],
-      queryFn: () =>
-        window.api.lyrics.getSongLyrics(
+      queryFn: async () => {
+        const res = await window.api.lyrics.getSongLyrics(
           {
             songTitle: title,
             songArtists: artists,
@@ -45,7 +45,9 @@ export const lyricsQuery = createQueryKeys('lyrics', {
           lyricsType,
           lyricsRequestType,
           saveLyricsAutomatically
-        )
+        );
+        return res ?? null;
+      }
     };
   }
 });
