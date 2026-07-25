@@ -46,7 +46,7 @@ function ArtistInfoPage() {
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, updateContextMenuData, toggleMultipleSelections, playSong, updateQueueData } =
+  const { createQueue, updateContextMenuData, toggleMultipleSelections, updateQueueData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 
@@ -78,7 +78,7 @@ function ArtistInfoPage() {
   });
 
   const { data: albums = [] } = useQuery({
-    ...albumQuery.all({ albumIds: artistData.albums?.map((album) => album.albumId) || [] }),
+    ...albumQuery.allAlbumInfo({ albumIds: artistData.albums?.map((album) => album.albumId) || [] }),
     enabled: !!artistData?.albums && artistData.albums.length > 0,
     select: (data) => data.data
   });

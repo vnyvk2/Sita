@@ -72,6 +72,10 @@ export const convertToArtist = (artist: GetAllArtistsReturnType[number]) => {
       title: s.song.title,
       songId: s.song.id
     })),
+    albums: artist.albums?.map((a) => ({
+      title: a.album.title,
+      albumId: a.album.id
+    })) ?? [],
     onlineArtworkPaths: parseArtistOnlineArtworks(artworks),
     isAFavorite: artist.isFavorite
   } satisfies Artist;
@@ -86,6 +90,7 @@ export const convertToAlbum = (album: GetAllAlbumsReturnType[number]) => {
     title: album.title,
     artworkPaths: parseAlbumArtworks(artworks),
     artists,
+    year: album.year ?? undefined,
     songs: album.songs.map((s) => ({
       title: s.song.title,
       songId: s.song.id

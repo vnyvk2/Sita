@@ -1,5 +1,5 @@
 import { db } from '@db/db';
-import { asc, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 import { playHistory } from '../schema';
 
