@@ -158,6 +158,12 @@ function AlbumInfoPage() {
         data={albumSongs}
         fixedItemHeight={60}
         scrollTopOffset={scrollTopOffset}
+        onDebouncedScroll={(range) => {
+          navigate({
+            replace: true,
+            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+          });
+        }}
         components={{
           Header: () => <AlbumImgAndInfoContainer albumData={albumData} songsData={albumSongs} />,
           Footer: onlineAlbumInfo

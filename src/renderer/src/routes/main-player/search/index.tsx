@@ -211,7 +211,7 @@ function SearchPage() {
                   }
                   
                   toggleMultipleSelections(false, 'songs');
-                  navigate({ search: (prev) => ({ ...prev, action: undefined, queueIndex: undefined }) });
+                  history.back();
                 }}
               />
               <Button

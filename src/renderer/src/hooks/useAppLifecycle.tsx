@@ -135,7 +135,12 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
         }
       };
 
-      unsubscribeUpNext = activeQueue.on('positionChange', updateUpNext);
+      const unsubPosition = activeQueue.on('positionChange', updateUpNext);
+      const unsubQueue = activeQueue.on('queueChange', updateUpNext);
+      unsubscribeUpNext = () => {
+        unsubPosition();
+        unsubQueue();
+      };
       updateUpNext(); // initial call
     };
 

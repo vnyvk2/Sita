@@ -7,6 +7,12 @@ import { getQueuesManager } from '../other/queuesManager';
 const LOW_RESPONSE_DURATION = 100;
 const DURATION = 1000;
 
+declare global {
+  interface Window {
+    __NORA_AUDIO_PLAYER__?: AudioPlayer | null;
+  }
+}
+
 // Module-level singleton - initialized with queue on first hook call
 let playerInstance: AudioPlayer | null = null;
 
@@ -20,7 +26,14 @@ export function useAudioPlayer() {
   const manager = getQueuesManager();
 
   if (!playerInstance) {
-    playerInstance = new AudioPlayer(manager);
+    if (typeof window !== 'undefined' && window.__NORA_AUDIO_PLAYER__) {
+      playerInstance = window.__NORA_AUDIO_PLAYER__;
+    } else {
+      playerInstance = new AudioPlayer(manager);
+      if (typeof window !== 'undefined') {
+        window.__NORA_AUDIO_PLAYER__ = playerInstance;
+      }
+    }
   }
 
   // Cleanup on unmount is typically not needed for a global singleton player,

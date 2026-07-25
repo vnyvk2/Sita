@@ -163,6 +163,12 @@ function GenreInfoPage() {
         data={genreSongs}
         fixedItemHeight={60}
         scrollTopOffset={scrollTopOffset}
+        onDebouncedScroll={(range) => {
+          navigate({
+            replace: true,
+            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+          });
+        }}
         components={{
           Header: () => <GenreImgAndInfoContainer genreData={genreData} genreSongs={genreSongs} />
         }}

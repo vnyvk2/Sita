@@ -213,6 +213,12 @@ function PlaylistInfoPage() {
         data={playlistSongs}
         fixedItemHeight={60}
         scrollTopOffset={scrollTopOffset}
+        onDebouncedScroll={(range) => {
+          navigate({
+            replace: true,
+            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+          });
+        }}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />

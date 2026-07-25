@@ -230,7 +230,10 @@ function SongsPage() {
                   }
                   
                   toggleMultipleSelections(false, 'songs');
-                  navigate({ search: (prev) => ({ ...prev, action: undefined, queueIndex: undefined }) });
+                  navigate({
+                    to: '/main-player/queue',
+                    search: { queueIndex: targetQueueIndex }
+                  });
                 }}
               />
               <Button
@@ -239,7 +242,11 @@ function SongsPage() {
                 iconName="search"
                 tooltipLabel={t('sideBar.search')}
                 clickHandler={() => {
-                  navigate({ to: '/main-player/search', search: { action: 'add-to-queue', queueIndex: queueIndex } });
+                  navigate({
+                    to: '/main-player/search',
+                    search: { action: 'add-to-queue', queueIndex: queueIndex },
+                    replace: true
+                  });
                 }}
               />
               <Button
@@ -249,7 +256,11 @@ function SongsPage() {
                 tooltipLabel={t('common.cancel', 'Cancel')}
                 clickHandler={() => {
                   toggleMultipleSelections(false, 'songs');
-                  history.back();
+                  const manager = getQueuesManager();
+                  navigate({
+                    to: '/main-player/queue',
+                    search: { queueIndex: queueIndex ?? manager.activeQueueIndex }
+                  });
                 }}
               />
             </>

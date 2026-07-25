@@ -39,7 +39,7 @@ export const Route = createFileRoute('/main-player/queue/')({
 });
 
 function RouteComponent() {
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: Route.fullPath });
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const isMultipleSelectionEnabled = useStore(
     store,
@@ -419,6 +419,12 @@ function RouteComponent() {
                       ref={ListRef}
                       scrollerRef={droppableProvided.innerRef}
                       scrollTopOffset={scrollTopOffset}
+                      onDebouncedScroll={(range) => {
+                        navigate({
+                          replace: true,
+                          search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+                        });
+                      }}
                       components={{
                         Item: ({ children, ...props }: { children?: ReactNode }) => (
                           <div {...props} className="height-preserving-container">

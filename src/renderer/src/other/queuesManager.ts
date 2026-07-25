@@ -28,6 +28,7 @@ export class QueuesManager {
   activeQueueIndex: number;
   private isSettingUpSync = false;
   private isSyncingFromStore = false;
+  private isSyncingToStore = false;
   private listeners: Map<QueuesManagerEvent, Set<QueuesManagerCallback>>;
   private queueListeners: Map<string, (() => void)[]> = new Map();
 
@@ -191,9 +192,6 @@ export class QueuesManager {
     const unsubs: (() => void)[] = [];
 
     const onChange = () => {
-      if (queue === this.getActiveQueue()) {
-        this.emit('activeQueueChanged');
-      }
       this.emit('queuesChanged');
       this.triggerStoreSync();
     };
@@ -214,23 +212,27 @@ export class QueuesManager {
   }
 
   private triggerStoreSync() {
-    if (this.isSyncingFromStore) return;
-
-    store.setState((state) => ({
-      ...state,
-      localStorage: {
-        ...state.localStorage,
-        queue: {
-          queues: this.queues.map((q) => q.toJSON()),
-          currentQueueIndex: this.activeQueueIndex
+    if (this.isSyncingFromStore || this.isSyncingToStore) return;
+    this.isSyncingToStore = true;
+    try {
+      store.setState((state) => ({
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          queue: {
+            queues: this.queues.map((q) => q.toJSON()),
+            currentQueueIndex: this.activeQueueIndex
+          }
         }
-      }
-    }));
+      }));
 
-    storage.queue.setQueue({
-      queues: this.queues.map((q) => q.toJSON()),
-      currentQueueIndex: this.activeQueueIndex
-    });
+      storage.queue.setQueue({
+        queues: this.queues.map((q) => q.toJSON()),
+        currentQueueIndex: this.activeQueueIndex
+      });
+    } finally {
+      this.isSyncingToStore = false;
+    }
   }
 
   private setupStoreSync() {
@@ -238,6 +240,8 @@ export class QueuesManager {
     this.isSettingUpSync = true;
 
     store.subscribe((state) => {
+      if (this.isSyncingToStore || this.isSyncingFromStore) return;
+
       const currentState = getQueueSubscriptionState(state as QueueSubscriptionState);
       const storeQueuesState = currentState.localStorage?.queue;
 
@@ -337,16 +341,33 @@ export class QueuesManager {
   }
 }
 
+declare global {
+  interface Window {
+    __NORA_QUEUES_MANAGER__?: QueuesManager | null;
+  }
+}
+
 let managerInstance: QueuesManager | null = null;
 
 export function initializeQueuesManager(): QueuesManager {
+  if (typeof window !== 'undefined' && window.__NORA_QUEUES_MANAGER__) {
+    managerInstance = window.__NORA_QUEUES_MANAGER__;
+    return managerInstance;
+  }
   if (managerInstance) return managerInstance;
   managerInstance = new QueuesManager();
   managerInstance.initialize();
+  if (typeof window !== 'undefined') {
+    window.__NORA_QUEUES_MANAGER__ = managerInstance;
+  }
   return managerInstance;
 }
 
 export function getQueuesManager(): QueuesManager {
+  if (typeof window !== 'undefined' && window.__NORA_QUEUES_MANAGER__) {
+    managerInstance = window.__NORA_QUEUES_MANAGER__;
+    return managerInstance;
+  }
   if (!managerInstance) {
     return initializeQueuesManager();
   }
@@ -357,5 +378,9 @@ export function resetQueuesManagerForTesting() {
   if (managerInstance) {
     managerInstance.removeAllListeners();
     managerInstance = null;
+  }
+  if (typeof window !== 'undefined' && window.__NORA_QUEUES_MANAGER__) {
+    window.__NORA_QUEUES_MANAGER__.removeAllListeners();
+    window.__NORA_QUEUES_MANAGER__ = null;
   }
 }
