@@ -8,10 +8,7 @@ export const Route = createFileRoute('/')({
   component: RouteComponent,
   pendingComponent: () => <Preloader />,
   loader: async () => {
-    await Promise.all([
-      queryClient.ensureQueryData(settingsQuery.all),
-      router.preloadRoute({ to: '/main-player/home' })
-    ]);
+    await queryClient.ensureQueryData(settingsQuery.all);
   },
   // override pendingMs to 0 to show preloader immediately
   pendingMs: 0,
