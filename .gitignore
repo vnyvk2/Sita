@@ -9,3 +9,20 @@ coverage/
 *.m3u
 .npmrc
 .github/plans/
+MusicBeeMiniPlayerLayout.md
+branch_diff.patch
+codeReview.md
+coreTask.md
+currproblems.md
+image-1.png
+image.png
+lost_commit.patch
+lost_commit_utf8.patch
+problems.md
+queueUpgrade.md
+task.md
+ter..qupgrade --stat
+todo.md
+totalTasks.md
+tsconfig.node.tsbuildinfo
+tsconfig.web.tsbuildinfo
