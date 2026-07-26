@@ -40,7 +40,7 @@ const TitleBarContainer = (props: Props) => {
         } ${!isCurrentSongPlaying ? 'visible! opacity-100!' : ''}`}
       >
         <Button
-          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mt-1! mr-0! rounded-md! border-0! bg-[transparent]! p-2! outline-offset-1 focus-visible:outline! [-webkit-app-region:no-drag]"
+          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mt-1! mr-0! rounded-md! border-0! bg-transparent! p-2! outline-offset-1 focus-visible:outline! [-webkit-app-region:no-drag]"
           tooltipLabel={t('player.goToMainPlayer')}
           iconName="pip_exit"
           iconClassName="material-icons-round-outlined text-xl!"
@@ -50,7 +50,7 @@ const TitleBarContainer = (props: Props) => {
       </div>
       <div className="window-controls-container flex [-webkit-app-region:no-drag]">
         <Button
-          className="minimize-btn m-0! flex h-full items-center justify-center rounded-none! border-0! bg-[transparent]! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
+          className="minimize-btn m-0! flex h-full items-center justify-center rounded-none! border-0! bg-transparent! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
           clickHandler={() => window.api.windowControls.minimizeApp()}
           tooltipLabel={t('titleBar.minimize')}
           iconName="minimize"
@@ -58,7 +58,7 @@ const TitleBarContainer = (props: Props) => {
           removeFocusOnClick
         />
         <Button
-          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full items-center justify-center rounded-none! border-0! bg-[transparent]! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
+          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full items-center justify-center rounded-none! border-0! bg-transparent! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
           clickHandler={() => {
             if (hideWindowOnClose) window.api.windowControls.hideApp();
             else window.api.windowControls.closeApp();

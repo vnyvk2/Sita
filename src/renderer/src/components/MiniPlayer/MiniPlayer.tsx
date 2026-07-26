@@ -359,7 +359,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <SeekBarSlider
           name="mini-player-seek-slider"
           id="miniPlayerSeekSlider"
-          className="seek-slider bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[width,height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-[var(--seek-before-width)] before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
+          className="seek-slider bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[width,height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}
@@ -367,7 +367,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Favorite */}
           {pinnedControls.includes('love') && (
             <Button
-              className={`favorite-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-[transparent]! ${
+              className={`favorite-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                 isAFavorite && 'after:opacity-100'
               }`}
               iconClassName={`text-lg! ${
@@ -390,7 +390,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Repeat */}
           {pinnedControls.includes('repeat') && (
             <Button
-              className={`repeat-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-[transparent]! ${
+              className={`repeat-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                 isRepeating !== 'false' && 'after:opacity-100'
               }`}
               tooltipLabel={t('player.repeat')}
@@ -405,7 +405,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
           {/* Fixed: Skip Backward */}
           <Button
-            className="skip-backward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
+            className="skip-backward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
             tooltipLabel={t('player.prevSong')}
             iconClassName="text-3xl!"
             clickHandler={handleSkipBackwardClickWithParams}
@@ -415,7 +415,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
           {/* Fixed: Play / Pause */}
           <Button
-            className="play-pause-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-0! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
+            className="play-pause-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-0! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
             tooltipLabel={t('player.playPause')}
             iconClassName="text-5xl!"
             clickHandler={() => toggleSongPlayback()}
@@ -425,7 +425,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
           {/* Fixed: Skip Forward */}
           <Button
-            className="skip-forward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
+            className="skip-forward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
             tooltipLabel={t('player.nextSong')}
             iconClassName="text-3xl!"
             clickHandler={handleSkipForwardClickWithParams}
@@ -436,7 +436,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Shuffle */}
           {pinnedControls.includes('shuffle') && (
             <Button
-              className={`shuffle-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-[transparent]! ${
+              className={`shuffle-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                 isShuffling && 'after:opacity-100'
               }`}
               tooltipLabel={t('player.shuffle')}
@@ -452,7 +452,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Stop */}
           {pinnedControls.includes('stop') && (
             <Button
-              className="stop-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
+              className="stop-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
               tooltipLabel={t('player.playPause', 'Stop')}
               iconClassName="material-icons-round-outlined text-lg!"
               clickHandler={() => isCurrentSongPlaying && toggleSongPlayback()}
@@ -464,7 +464,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Lyrics Toggle */}
           {pinnedControls.includes('lyrics') && (
             <button
-              className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 flex items-center justify-center after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-[transparent]! ${
+              className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 flex items-center justify-center after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                 isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
               }`}
               onClick={(e) => {
@@ -487,7 +487,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               onBlur={() => setIsVolumeHovered(false)}
             >
               <Button
-                className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-[transparent]! ${
+                className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                   isMuted && 'after:opacity-100'
                 }`}
                 tooltipLabel={t('player.muteUnmute')}
@@ -506,7 +506,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 <VolumeSlider
                   name="mini-player-volume-slider"
                   id="volumeSlider"
-                  className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight relative float-left m-0 h-6 w-20 appearance-none bg-[transparent]! p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-[var(--volume-before-width)] before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                  className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight relative float-left m-0 h-6 w-20 appearance-none bg-transparent! p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--volume-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
                 />
               </div>
             </div>
@@ -515,7 +515,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Queue Toggle */}
           {pinnedControls.includes('queue') && (
             <Button
-              className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
+              className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
               tooltipLabel={t('player.currentQueue', 'Queue')}
               iconClassName="material-icons-round-outlined text-lg!"
               clickHandler={() => setIsQueueVisible((prev) => !prev)}
