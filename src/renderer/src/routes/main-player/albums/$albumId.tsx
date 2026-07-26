@@ -50,7 +50,7 @@ function AlbumInfoPage() {
   const preferences = useStore(store, (state) => state?.localStorage?.preferences);
   const queue = useStore(store, (state) => state.localStorage.queue);
 
-  const { createQueue, updateQueueData, addNewNotifications, playSong } =
+  const { createQueue, updateQueueData, addNewNotifications } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 

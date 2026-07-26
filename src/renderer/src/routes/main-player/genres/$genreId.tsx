@@ -41,7 +41,7 @@ function GenreInfoPage() {
     (state) => state.localStorage.sortingStates?.genreDetailPage || 'aToZ'
   );
 
-  const { createQueue, updateQueueData, addNewNotifications, playSong } =
+  const { createQueue, updateQueueData, addNewNotifications } =
     useContext(AppUpdateContext);
 
   const { t } = useTranslation();

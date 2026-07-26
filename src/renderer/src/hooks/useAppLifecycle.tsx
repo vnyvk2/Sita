@@ -56,7 +56,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
   const manager = getQueuesManager();
 
   useEffect(() => {
-    const { playback, preferences, queue } = storage.getAllItems();
+    const { playback, queue } = storage.getAllItems();
 
     const syncLocalStorage = () => {
       const allItems = storage.getAllItems();

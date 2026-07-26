@@ -19,7 +19,7 @@ const SimilarTracksContainer = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, playSong, updateQueueData, addNewNotifications } =
+  const { createQueue, updateQueueData, addNewNotifications } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 

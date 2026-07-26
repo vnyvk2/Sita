@@ -25,7 +25,7 @@ const SongSearchResultsContainer = (props: Props) => {
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { toggleMultipleSelections, createQueue, playSong, updateQueueData } = useContext(AppUpdateContext);
+  const { toggleMultipleSelections, createQueue, updateQueueData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
 

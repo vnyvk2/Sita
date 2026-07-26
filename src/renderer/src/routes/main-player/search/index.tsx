@@ -12,7 +12,7 @@ import SearchResultsFilter from '@renderer/components/SearchPage/SearchResultsFi
 import SearchStartPlaceholder from '@renderer/components/SearchPage/SearchStartPlaceholder';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import { searchQuery } from '@renderer/queries/search';
-import { store, dispatch } from '@renderer/store/store';
+import { store } from '@renderer/store/store';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';

@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import { getQueuesManager } from '../../other/queuesManager';
-import { dispatch } from '../../store/store';
 
 type Props = { 
   queueId: string; 

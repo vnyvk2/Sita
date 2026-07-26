@@ -131,6 +131,8 @@
     "shuffle": "Shuffle (Ctrl + S)",
     "repeat": "Repeat (Ctrl + T)",
     "muteUnmute": "Mute/Unmute (Ctrl + M)",
+    "mute": "Mute",
+    "unmute": "Unmute",
     "currentQueue": "Current queue (Ctrl + Q)",
     "adjustPlaybackSpeed": "Adjust playback speed",
     "showCurrentQueue": "Show current queue",
@@ -998,7 +1000,12 @@
 
   "songUnplayableErrorPrompt": {
     "title": "Couldn't play the song",
-    "description": "Seems like we can't play that song. Please check whether the selected song is available in your system and accessible by the app."
+    "description": "Seems like we can't play that song. Please check whether the selected song is available in your system and accessible by the app.",
+    "formatNotSupportedTitle": "Audio format not supported",
+    "formatNotSupportedDescription": "Seems like we can't play that song because its audio format is not supported.",
+    "flacNotSupportedDescription": "Seems like we can't play that song because FLAC is not supported in this environment.",
+    "supportedFormatsLabel": "Supported formats:",
+    "flacConversionHint": "Hint: You can convert FLAC files to MP3, WAV, or OGG to play them in Nora."
   },
 
   "unsupportedFileMessagePrompt": {

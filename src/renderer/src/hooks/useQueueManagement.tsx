@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 
 import { getQueuesManager } from '../other/queuesManager';
 import { dispatch, store } from '../store/store';
-import storage from '../utils/localStorage';
 
 export interface QueueManagementDependencies {
   playSong: (songId: number, isStartPlay?: boolean) => void;

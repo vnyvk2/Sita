@@ -16,7 +16,7 @@ const AllSongResults = (prop: Props) => {
     (state) => state.localStorage.preferences.isSongIndexingEnabled
   );
 
-  const { createQueue, playSong, updateQueueData } = useContext(AppUpdateContext);
+  const { createQueue, updateQueueData } = useContext(AppUpdateContext);
 
   const { songData, scrollTopOffset = 0 } = prop;
 

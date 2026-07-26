@@ -9,7 +9,6 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
-import NavLink from '../NavLink';
 import SongArtist from '../SongsPage/SongArtist';
 
 interface AlbumProp extends Album {

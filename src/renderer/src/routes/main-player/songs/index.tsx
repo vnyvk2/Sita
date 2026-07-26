@@ -10,7 +10,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
 import { songQuery } from '@renderer/queries/songs';
-import { store, dispatch } from '@renderer/store/store';
+import { store } from '@renderer/store/store';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
@@ -60,7 +60,6 @@ function SongsPage() {
 
   const {
     createQueue,
-    playSong,
     toggleMultipleSelections,
     updateContextMenuData,
     changePromptMenuData,

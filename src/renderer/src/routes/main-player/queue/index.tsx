@@ -32,10 +32,15 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type VirtuosoHandle } from 'react-virtuoso';
+import { z } from 'zod';
+
+const queuePageSearchParamsSchema = baseInfoPageSearchParamsSchema.extend({
+  queueIndex: z.coerce.number().optional()
+});
 
 export const Route = createFileRoute('/main-player/queue/')({
   component: RouteComponent,
-  validateSearch: baseInfoPageSearchParamsSchema
+  validateSearch: queuePageSearchParamsSchema
 });
 
 function RouteComponent() {
@@ -50,26 +55,28 @@ function RouteComponent() {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const manager = getQueuesManager();
 
-  const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
+  const { scrollTopOffset, queueIndex } = Route.useSearch();
+  const [viewingQueueIndex, setViewingQueueIndex] = useState(queueIndex ?? queue.currentQueueIndex);
 
   // Sync viewingQueueIndex if active queue is deleted or changed externally
   const prevActiveQueueRef = useRef(queue.currentQueueIndex);
 
   useEffect(() => {
-    if (prevActiveQueueRef.current !== queue.currentQueueIndex) {
+    if (queueIndex !== undefined && queueIndex < queue.queues.length) {
+      setViewingQueueIndex(queueIndex);
+    } else if (prevActiveQueueRef.current !== queue.currentQueueIndex) {
       setViewingQueueIndex(queue.currentQueueIndex);
       prevActiveQueueRef.current = queue.currentQueueIndex;
     } else if (viewingQueueIndex >= queue.queues.length) {
       setViewingQueueIndex(Math.max(0, queue.queues.length - 1));
     }
-  }, [queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
+  }, [queueIndex, queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
 
   const currentQueue = queue.queues[viewingQueueIndex]?.songIds || [];
 
   const { addNewNotifications, updateContextMenuData, toggleMultipleSelections, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { scrollTopOffset } = Route.useSearch();
 
   const { data: queuedSongs } = useQuery({
     ...songQuery.queue(currentQueue),

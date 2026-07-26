@@ -52,7 +52,7 @@ function PlaylistInfoPage() {
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
+  const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const { sortingOrder = playlistSortingState, filteringOrder = 'notSelected' } = Route.useSearch();

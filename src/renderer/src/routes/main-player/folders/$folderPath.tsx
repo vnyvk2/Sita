@@ -26,7 +26,7 @@ function MusicFolderInfoPage() {
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, toggleMultipleSelections, updateContextMenuData, playSong, updateQueueData } =
+  const { createQueue, toggleMultipleSelections, updateContextMenuData, updateQueueData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });

@@ -31,13 +31,13 @@ const OtherSongControlsContainer = () => {
         true,
         [
           {
-            label: t('settings.settings'),
+            label: t('settingsPage.settings'),
             iconName: 'settings',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () => navigate({ to: '/main-player/settings' })
           },
           {
-            label: t('settings.appShortcuts'),
+            label: t('settingsPage.appShortcuts'),
             iconName: 'keyboard',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () => changePromptMenuData(true, <AppShortcutsPrompt />)
@@ -50,17 +50,7 @@ const OtherSongControlsContainer = () => {
             handlerFunction: () => toggleMutedState()
           },
           {
-            label: 'Volume Slider',
-            isCustomContextMenuItem: true,
-            handlerFunction: () => true,
-            customContextMenuItem: (
-              <div className="flex px-4 py-2">
-                <VolumeSlider />
-              </div>
-            )
-          },
-          {
-            label: t('player.audioPlaybackSettings'),
+            label: t('settingsPage.audioPlayback'),
             iconName: 'tune',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () =>
