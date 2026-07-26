@@ -35,6 +35,7 @@ class PlayerQueue {
     } else {
       this.songIds.push(songId);
       this.position = this.songIds.length - 1;
+      this.queueBeforeShuffle = undefined;
     }
   }
 
@@ -271,6 +272,7 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToNext(songIds: number[]): void {
+    this.queueBeforeShuffle = undefined;
     console.log('[PlayerQueue.addSongIdsToNext]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -294,6 +296,7 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToEnd(songIds: number[]): void {
+    this.queueBeforeShuffle = undefined;
     console.log('[PlayerQueue.addSongIdsToEnd]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -317,6 +320,7 @@ class PlayerQueue {
    * @param songId - Song ID to add
    */
   addSongIdToNext(songId: number): void {
+    this.queueBeforeShuffle = undefined;
     this.songIds.splice(this.position + 1, 0, songId);
     this.emit('songAdded', { songId, position: this.position + 1 });
     this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
@@ -328,6 +332,7 @@ class PlayerQueue {
    * @param songId - Song ID to add
    */
   addSongIdToEnd(songId: number): void {
+    this.queueBeforeShuffle = undefined;
     const position = this.songIds.length;
     this.songIds.push(songId);
     this.emit('songAdded', { songId, position });
@@ -349,6 +354,7 @@ class PlayerQueue {
       queueLengthBefore: this.songIds.length
     });
     if (index !== -1) {
+      this.queueBeforeShuffle = undefined;
       this.songIds.splice(index, 1);
       this.emit('songRemoved', { songId, position: index });
       console.log('[PlayerQueue.removeSongId.removed]', {
@@ -388,6 +394,7 @@ class PlayerQueue {
    */
   removeSongAtPosition(position: number): number | null {
     if (position >= 0 && position < this.songIds.length) {
+      this.queueBeforeShuffle = undefined;
       const [removed] = this.songIds.splice(position, 1);
       this.emit('songRemoved', { songId: removed, position });
       // Adjust current position if necessary
