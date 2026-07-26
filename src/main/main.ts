@@ -71,7 +71,6 @@ const MINI_PLAYER_ASPECT_RATIO = 0;
 
 const QUEUE_ITEM_HEIGHT = 52;
 const QUEUE_HEADER_HEIGHT = 44;
-const QUEUE_MIN_VISIBLE_ITEMS = 3;
 const QUEUE_MAX_VISIBLE_ITEMS = 8;
 const abortController = new AbortController();
 const DEFAULT_OPEN_DIALOG_OPTIONS: OpenDialogOptions = {
@@ -798,6 +797,24 @@ async function watchForSystemThemeChanges() {
   else logger.debug(`System theme changed`, { theme });
 }
 
+function ensureWindowIsVisible(window: BrowserWindow) {
+  if (!window) return;
+  const bounds = window.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  
+  const isOffScreen = (
+    bounds.x < display.bounds.x - bounds.width / 2 ||
+    bounds.x > display.bounds.x + display.bounds.width - bounds.width / 2 ||
+    bounds.y < display.bounds.y - bounds.height / 2 ||
+    bounds.y > display.bounds.y + display.bounds.height - bounds.height / 2
+  );
+
+  if (isOffScreen) {
+    logger.info(`Window is off-screen. Centering it. Bounds: ${JSON.stringify(bounds)}, Display: ${JSON.stringify(display.bounds)}`);
+    window.center();
+  }
+}
+
 export async function changePlayerType(type: PlayerTypes) {
   if (mainWindow) {
     logger.debug(`Changed player type.`, { type });
@@ -833,6 +850,7 @@ export async function changePlayerType(type: PlayerTypes) {
 
       if (miniPlayerX !== null && miniPlayerY !== null) {
         mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
+        ensureWindowIsVisible(mainWindow);
       } else {
         mainWindow.center();
         const [x, y] = mainWindow.getPosition();
@@ -851,6 +869,7 @@ export async function changePlayerType(type: PlayerTypes) {
 
       if (mainWindowX !== null && mainWindowY !== null) {
         mainWindow.setPosition(mainWindowX, mainWindowY, true);
+        ensureWindowIsVisible(mainWindow);
       } else {
         mainWindow.center();
         const [x, y] = mainWindow.getPosition();
@@ -873,29 +892,29 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
   if (isExpanded) {
     // Save the compact dimensions before expanding
-    if (!isQueueExpanded) {
+    if (!isQueueExpanded || compactHeight === null || compactY === null) {
       compactHeight = currentHeight;
       compactY = currentY;
       isQueueExpanded = true;
     }
+    const baseHeight = compactHeight;
+    const baseY = compactY;
 
     // Calculate needed queue height based on actual item count
     const visibleItems = Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS);
     const queuePanelHeight = visibleItems * QUEUE_ITEM_HEIGHT + QUEUE_HEADER_HEIGHT;
-    const totalHeight = compactHeight + queuePanelHeight;
+    const totalHeight = baseHeight + queuePanelHeight;
 
     // Determine available screen space using compact boundaries
     const display = screen.getDisplayMatching(mainWindow.getBounds());
     const workArea = display.workArea;
-    const spaceBelow = (workArea.y + workArea.height) - (compactY + compactHeight);
-    const spaceAbove = compactY - workArea.y;
+    const spaceBelow = (workArea.y + workArea.height) - (baseY + baseHeight);
+    const spaceAbove = baseY - workArea.y;
 
     // Decide direction: pick whichever direction can show MORE of the queue.
     // Default to down only when both directions can fully fit.
-    const minSpace = QUEUE_MIN_VISIBLE_ITEMS * QUEUE_ITEM_HEIGHT + QUEUE_HEADER_HEIGHT;
-
     let expandedHeight: number;
-    let expandedY = compactY;
+    let expandedY = baseY;
     let direction: 'down' | 'up' = 'down';
 
     const canFitFullDown = spaceBelow >= queuePanelHeight;
@@ -908,34 +927,22 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     } else if (canFitFullUp) {
       // Full fit upwards
       expandedHeight = totalHeight;
-      expandedY = compactY - (expandedHeight - compactHeight);
       direction = 'up';
-    } else if (spaceBelow >= minSpace || spaceAbove >= minSpace) {
-      // Neither can fully fit — pick whichever has MORE room
-      if (spaceBelow >= spaceAbove) {
-        expandedHeight = compactHeight + spaceBelow;
-        direction = 'down';
-      } else {
-        expandedHeight = compactHeight + spaceAbove;
-        expandedY = compactY - (expandedHeight - compactHeight);
-        direction = 'up';
-      }
     } else {
-      // Very constrained — use whatever space is larger
-      if (spaceBelow >= spaceAbove) {
-        expandedHeight = compactHeight + spaceBelow;
-        direction = 'down';
-      } else {
-        expandedHeight = compactHeight + spaceAbove;
-        expandedY = compactY - (expandedHeight - compactHeight);
-        direction = 'up';
-      }
+      // Neither can fully fit — pick whichever direction has MORE room
+      direction = spaceBelow >= spaceAbove ? 'down' : 'up';
+      const availableSpace = direction === 'down' ? spaceBelow : spaceAbove;
+      expandedHeight = baseHeight + availableSpace;
+    }
+
+    if (direction === 'up') {
+      expandedY = baseY - (expandedHeight - baseHeight);
     }
 
     logger.debug('Expanding mini player queue', {
       queueItemCount,
       direction,
-      compactHeight,
+      compactHeight: baseHeight,
       expandedHeight,
       spaceBelow,
       spaceAbove

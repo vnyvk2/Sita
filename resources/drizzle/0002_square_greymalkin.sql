@@ -1,2 +1,0 @@
-ALTER TABLE "user_settings" ADD COLUMN "tray_single_click_toggles_window" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "user_settings" ADD COLUMN "zoom_factor" double precision DEFAULT 0.8 NOT NULL;

@@ -2,14 +2,14 @@ import Preloader from '@renderer/components/Preloader/Preloader';
 import { settingsQuery } from '@renderer/queries/settings';
 import { createFileRoute, Navigate } from '@tanstack/react-router';
 
-import { queryClient, router } from '..';
+import { queryClient } from '..';
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,
   pendingComponent: () => <Preloader />,
   loader: async () => {
     await queryClient.ensureQueryData(settingsQuery.all);
-  },
+  }, 
   // override pendingMs to 0 to show preloader immediately
   pendingMs: 0,
   // ensure preloader shows for at least 1000ms

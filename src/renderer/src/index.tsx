@@ -29,7 +29,7 @@ export const router = createRouter({
   defaultPreload: 'intent',
   defaultPreloadDelay: 100,
   defaultPreloadStaleTime: 0,
-  defaultViewTransition: true,
+  defaultViewTransition: false,
   defaultPendingMs: 1000, // Show pending component if loader exceeds 1 second
   defaultPendingMinMs: 500, // Ensure pending component is shown for at least 500ms
   // hydrate: (dehydrated) => {

@@ -116,10 +116,14 @@ const sendAudioData = async (songId: number, updateListeningRate = true): Promis
         setDiscordRpcActivity({
           details: `Listening to '${data.title}'`,
           state: `By ${data.artists?.map((artist) => artist.name).join(', ')}`,
-          largeImageKey: 'nora_logo',
-          smallImageKey: 'song_artwork',
-          startTimestamp: now,
-          endTimestamp: now + data.duration * 1000
+          assets: {
+            large_image: 'nora_logo',
+            small_image: 'song_artwork'
+          },
+          timestamps: {
+            start: now,
+            end: now + data.duration * 1000
+          }
         });
         setCurrentSongPath(song.path);
       }

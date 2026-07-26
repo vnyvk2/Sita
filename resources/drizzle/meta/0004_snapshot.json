@@ -1,6 +1,6 @@
 {
-  "id": "7b620427-93f9-4fae-a0ef-f1a96fcda70f",
-  "prevId": "c87ba4a9-09f6-421a-8238-57bb22cd8218",
+  "id": "29aba064-deea-4d99-b2f1-cb85688650f3",
+  "prevId": "82c406e3-bf3e-4ffb-8d7b-c4cde6f41893",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3852,6 +3852,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'::json"
+        },
+        "mini_player_pinned_controls": {
+          "name": "mini_player_pinned_controls",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[\"love\",\"lyrics\",\"volume\"]'::json"
         },
         "custom_lrc_files_save_location": {
           "name": "custom_lrc_files_save_location",

@@ -11,6 +11,13 @@ CREATE TABLE "scrobble_queue" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "songs" ADD COLUMN "skip_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+UPDATE "songs" SET "skip_count" = (
+  SELECT COUNT(*)::integer FROM "skip_events"
+  WHERE "skip_events"."song_id" = "songs"."id"
+);--> statement-breakpoint
+ALTER TABLE "user_settings" ADD COLUMN "tray_single_click_toggles_window" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "scrobble_queue" ADD CONSTRAINT "scrobble_queue_song_id_songs_id_fk" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE set null ON UPDATE cascade;--> statement-breakpoint
 CREATE INDEX "idx_scrobble_queue_status" ON "scrobble_queue" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "idx_scrobble_queue_created_at" ON "scrobble_queue" USING btree ("created_at");
+CREATE INDEX "idx_scrobble_queue_created_at" ON "scrobble_queue" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "idx_songs_skip_count_title" ON "songs" USING btree ("skip_count" DESC NULLS LAST,"title");
