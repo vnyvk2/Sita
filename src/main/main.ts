@@ -873,27 +873,29 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
   if (isExpanded) {
     // Save the compact dimensions before expanding
-    compactHeight = currentHeight;
-    compactY = currentY;
-    isQueueExpanded = true;
+    if (!isQueueExpanded) {
+      compactHeight = currentHeight;
+      compactY = currentY;
+      isQueueExpanded = true;
+    }
 
     // Calculate needed queue height based on actual item count
     const visibleItems = Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS);
     const queuePanelHeight = visibleItems * QUEUE_ITEM_HEIGHT + QUEUE_HEADER_HEIGHT;
-    const totalHeight = currentHeight + queuePanelHeight;
+    const totalHeight = compactHeight + queuePanelHeight;
 
-    // Determine available screen space
+    // Determine available screen space using compact boundaries
     const display = screen.getDisplayMatching(mainWindow.getBounds());
     const workArea = display.workArea;
-    const spaceBelow = (workArea.y + workArea.height) - (currentY + currentHeight);
-    const spaceAbove = currentY - workArea.y;
+    const spaceBelow = (workArea.y + workArea.height) - (compactY + compactHeight);
+    const spaceAbove = compactY - workArea.y;
 
     // Decide direction: pick whichever direction can show MORE of the queue.
     // Default to down only when both directions can fully fit.
     const minSpace = QUEUE_MIN_VISIBLE_ITEMS * QUEUE_ITEM_HEIGHT + QUEUE_HEADER_HEIGHT;
 
     let expandedHeight: number;
-    let expandedY = currentY;
+    let expandedY = compactY;
     let direction: 'down' | 'up' = 'down';
 
     const canFitFullDown = spaceBelow >= queuePanelHeight;
@@ -906,26 +908,26 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     } else if (canFitFullUp) {
       // Full fit upwards
       expandedHeight = totalHeight;
-      expandedY = currentY - (expandedHeight - currentHeight);
+      expandedY = compactY - (expandedHeight - compactHeight);
       direction = 'up';
     } else if (spaceBelow >= minSpace || spaceAbove >= minSpace) {
       // Neither can fully fit — pick whichever has MORE room
       if (spaceBelow >= spaceAbove) {
-        expandedHeight = currentHeight + spaceBelow;
+        expandedHeight = compactHeight + spaceBelow;
         direction = 'down';
       } else {
-        expandedHeight = currentHeight + spaceAbove;
-        expandedY = currentY - (expandedHeight - currentHeight);
+        expandedHeight = compactHeight + spaceAbove;
+        expandedY = compactY - (expandedHeight - compactHeight);
         direction = 'up';
       }
     } else {
       // Very constrained — use whatever space is larger
       if (spaceBelow >= spaceAbove) {
-        expandedHeight = currentHeight + spaceBelow;
+        expandedHeight = compactHeight + spaceBelow;
         direction = 'down';
       } else {
-        expandedHeight = currentHeight + spaceAbove;
-        expandedY = currentY - (expandedHeight - currentHeight);
+        expandedHeight = compactHeight + spaceAbove;
+        expandedY = compactY - (expandedHeight - compactHeight);
         direction = 'up';
       }
     }
