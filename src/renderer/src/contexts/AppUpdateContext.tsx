@@ -23,8 +23,6 @@ export interface AppUpdateContextType {
   updateCurrentSongPlaybackState: (isPlaying: boolean) => void;
   handleSkipBackwardClick: () => void;
   handleSkipForwardClick: (reason: SongSkipReason) => void;
-  showUpNextSongPopup: () => void;
-  registerUpNextPopupFn: (fn: () => void) => void;
   toggleShuffling: (isShuffling?: boolean) => void;
   toggleQueueShuffle: (isShuffle?: boolean | any) => void;
   toggleSongPlayback: () => void;

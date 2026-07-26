@@ -25,7 +25,6 @@ const SongControlsAndSeekbarContainer = () => {
     toggleRepeat,
     toggleSongPlayback,
     handleSkipForwardClick,
-    showUpNextSongPopup,
     handleSkipBackwardClick
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -98,17 +97,6 @@ const SongControlsAndSeekbarContainer = () => {
           iconName="skip_next"
           iconClassName="material-icons-round text-2xl! opacity-60 transition-opacity hover:opacity-80"
           clickHandler={() => handleSkipForwardClick('USER_SKIP')}
-          onMouseEnter={() => {
-            if (hoverTimerRef.current === null) {
-              hoverTimerRef.current = setTimeout(() => showUpNextSongPopup(), 1_000);
-            }
-          }}
-          onMouseLeave={() => {
-            if (hoverTimerRef.current !== null) {
-              clearTimeout(hoverTimerRef.current);
-              hoverTimerRef.current = null;
-            }
-          }}
         />
 
         <Button
