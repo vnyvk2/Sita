@@ -30,6 +30,12 @@ const QueueContainer = (props: Props) => {
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
   
   useEffect(() => {
+    if (viewingQueueIndex !== queue.currentQueueIndex && queue.queues.length <= viewingQueueIndex) {
+      setViewingQueueIndex(queue.currentQueueIndex);
+    }
+  }, [queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
+
+  useEffect(() => {
     setViewingQueueIndex(queue.currentQueueIndex);
   }, [queue.currentQueueIndex]);
 
