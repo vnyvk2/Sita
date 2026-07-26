@@ -16,7 +16,11 @@ class PlayerQueue {
     metadata?: PlayerQueueMetadata,
     id?: string
   ) {
-    this.id = id || window.crypto.randomUUID();
+    this.id =
+      id ||
+      (globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
     this.songIds = songIds;
     this.position = position;
     this.metadata = metadata;
@@ -721,7 +725,9 @@ class PlayerQueue {
       this.position,
       this.queueBeforeShuffle ? [...this.queueBeforeShuffle] : undefined,
       this.metadata ? { ...this.metadata } : undefined,
-      window.crypto.randomUUID()
+      globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     );
   }
 

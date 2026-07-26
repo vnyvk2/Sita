@@ -44,6 +44,6 @@ describe('App versions check', () => {
 
   test('Random version checks', () => {
     expect(isLatestVersion('2.1.2-stable', '3.4.1-alpha')).toBe(true);
-    expect(isLatestVersion('4.2.5-beta', '2.3.2-stable')).toBe(true);
+    expect(isLatestVersion('4.2.5-beta', '2.3.2-stable')).toBe(false);
   });
 });

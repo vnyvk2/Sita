@@ -826,6 +826,7 @@ describe('PlayerQueue', () => {
         const json = queue.toJSON();
 
         expect(json).toEqual({
+          id: queue.id,
           songIds: ['song1', 'song2', 'song3'],
           position: 1,
           queueBeforeShuffle: undefined,
@@ -878,6 +879,7 @@ describe('PlayerQueue', () => {
         const json = queue.toJSON();
 
         expect(json).toEqual({
+          id: queue.id,
           songIds: [],
           position: 0,
           queueBeforeShuffle: undefined,

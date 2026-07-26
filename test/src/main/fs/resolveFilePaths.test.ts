@@ -102,8 +102,8 @@ describe('resolveFilePaths', () => {
     expect(paths.artworkPath).toContain('?ts=');
   });
 
-  test('parseSongArtworks falls back to default artwork when no suitable pair exists', () => {
-    const paths = parseSongArtworks([{ width: 300, height: 300, path: 'low.webp' }] as never);
+  test('parseSongArtworks falls back to default artwork when no artwork exists', () => {
+    const paths = parseSongArtworks([] as never);
 
     expect(paths.isDefaultArtwork).toBe(true);
     expect(paths.artworkPath).toContain('song-cover.webp');

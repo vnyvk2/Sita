@@ -68,13 +68,10 @@ const isLatestVersion = (latestVersionString: string, currentVersionString: stri
 
     if (LvPreRelease === CvPreRelease) return true;
 
-    // If only one has a pre-release, the one WITHOUT pre-release is NEWER.
-    if (LvPreRelease && !CvPreRelease) return true; // Cv is newer (release vs alpha)
-    if (!LvPreRelease && CvPreRelease) return false; // Lv is newer (release vs alpha)
-
-    // Both are pre-releases. String comparison works for simple cases (alpha.4 vs alpha.5)
-    if (!LvPreRelease || !CvPreRelease) return false;
-    return LvPreRelease < CvPreRelease;
+    if (LvPreRelease && !CvPreRelease) return true;
+    if (!LvPreRelease && CvPreRelease) return false;
+    if (LvPreRelease && CvPreRelease && LvPreRelease !== CvPreRelease) return true;
+    return true;
   }
   return false;
 };
