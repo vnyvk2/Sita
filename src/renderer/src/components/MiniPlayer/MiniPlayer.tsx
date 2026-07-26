@@ -120,7 +120,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, []);
 
-  const handleSkipForwardClickWithParams = () => handleSkipForwardClick('USER_SKIP');
+  const handleSkipForwardClickWithParams = () => {
+    console.log('[MiniPlayer] Skip Forward clicked!');
+    handleSkipForwardClick('USER_SKIP');
+  };
+
+  const handleSkipBackwardClickWithParams = () => {
+    console.log('[MiniPlayer] Skip Backward clicked!');
+    handleSkipBackwardClick();
+  };
 
   const handleTogglePinnedControl = useCallback(
     (controlId: string) => {
@@ -355,7 +363,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}
-        <div className="controls-row flex w-full items-center justify-center overflow-hidden pb-2 pt-1">
+        <div className="controls-row relative z-20 flex w-full items-center justify-center overflow-hidden pb-2 pt-1">
           {/* Optional: Favorite */}
           {pinnedControls.includes('love') && (
             <Button
@@ -400,7 +408,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             className="skip-backward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-[transparent]! p-1! outline-offset-1 focus-visible:outline! dark:bg-[transparent]!"
             tooltipLabel={t('player.prevSong')}
             iconClassName="text-3xl!"
-            clickHandler={handleSkipBackwardClick}
+            clickHandler={handleSkipBackwardClickWithParams}
             iconName="skip_previous"
             removeFocusOnClick
           />

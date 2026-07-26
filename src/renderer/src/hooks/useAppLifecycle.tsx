@@ -66,12 +66,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
 
     document.addEventListener('localStorage', syncLocalStorage);
 
-    if (
-      playback?.currentSong?.songId &&
-      preferences?.defaultPageOnStartUp &&
-      window.location.pathname !== `/main-player/${preferences.defaultPageOnStartUp}`
-    ) {
-    }
+
 
     toggleShuffling(playback?.isShuffling);
     toggleRepeat(playback?.isRepeating);

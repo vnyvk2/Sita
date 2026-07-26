@@ -246,3 +246,18 @@ export const deleteFolders = async (folderIds: number[], trx: DB | DBTransaction
   if (folderIds.length === 0) return;
   await trx.delete(musicFolders).where(inArray(musicFolders.id, folderIds));
 };
+
+export const getBlacklistedFolderPaths = async () => {
+  const data = await db.query.musicFolders.findMany({
+    columns: { path: true },
+    where: (f) => eq(f.isBlacklisted, true)
+  });
+  return data.map((folder) => folder.path);
+};
+
+export const removeFoldersFromBlacklist = async (folderIds: number[]) => {
+  await db
+    .update(musicFolders)
+    .set({ isBlacklisted: false, isBlacklistedUpdatedAt: new Date() })
+    .where(inArray(musicFolders.id, folderIds));
+};

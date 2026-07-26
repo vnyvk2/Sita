@@ -68,7 +68,7 @@ import {
   getUserEqualizerPreset,
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
-import { getBlacklistData } from './filesystem';
+import getBlacklistData from './core/getBlacklistData';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import logger, { logFilePath } from './logger';
 import {

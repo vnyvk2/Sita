@@ -55,6 +55,7 @@ class AudioPlayer {
     this.listeners = new Map();
 
     this.audio = new Audio();
+    this.audio.crossOrigin = 'anonymous';
     this.queuesManager = queuesManager;
 
     this.audio.preload = 'auto';
