@@ -415,13 +415,13 @@ function ArtistInfoPage() {
               } mt-1 mb-4 text-2xl`}
               otherItems={[
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' ? (
-                  <p className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  <p key="selectedAlbumCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
                     {t('common.selectionWithCount', {
                       count: multipleSelectionsData.multipleSelections.length
                     })}
                   </p>
                 ) : (
-                  <p className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  <p key="totalAlbumCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
                     {t('common.albumWithCount', { count: albums.length })}{' '}
                     {albums.length > noOfVisibleAlbums &&
                       !isAllAlbumsVisible &&
@@ -469,7 +469,7 @@ function ArtistInfoPage() {
                   : 'text-font-color-black dark:text-font-color-white'
               } mt-1 mb-4 pr-4 text-2xl`}
               otherItems={[
-                <p className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                <p key="appearsInSongsCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
                   {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs'
                     ? t('common.selectionWithCount', {
                         count: multipleSelectionsData.multipleSelections.length
