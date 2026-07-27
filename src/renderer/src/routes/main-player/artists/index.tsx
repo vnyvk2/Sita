@@ -14,7 +14,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { queryClient } from '@renderer/index';
-import { artistQuery } from '@renderer/queries/aritsts';
+import { artistQuery } from '@renderer/queries/artists';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
@@ -59,12 +59,11 @@ function ArtistPage() {
   const sortingStates = useStore(store, (state) => state.localStorage.sortingStates);
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
-  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', keyword } =
+  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', filteringOrder = 'notSelected', keyword } =
     Route.useSearch();
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const [filteringOrder, setFilteringOrder] = useState<ArtistFilterTypes>('notSelected');
   const {
     data: { data: artistsData }
   } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' }));
@@ -95,8 +94,6 @@ function ArtistPage() {
   }, [sortingOrder]);
 
   const selectAllHandler = useSelectAllHandler(artistsData, 'artist', 'artistId');
-
-  console.log('offset', currentlyActivePage?.data);
   return (
     <MainContainer
       className="appear-from-bottom artists-list-container h-full! overflow-hidden pb-0!"
@@ -167,7 +164,12 @@ function ArtistPage() {
                 value={filteringOrder}
                 options={artistFilterOptions}
                 onChange={(e) => {
-                  setFilteringOrder(e.currentTarget.value as ArtistFilterTypes);
+                  navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      filteringOrder: e.currentTarget.value as ArtistFilterTypes
+                    })
+                  });
                 }}
               />
               <Dropdown
@@ -188,7 +190,7 @@ function ArtistPage() {
           </div>
         )}
         <div
-          className={`artists-container flex h-full! flex-wrap ${!(artistsData && artistsData.length > 0) && 'hidden'}`}
+          className={`artists-container flex h-full! flex-wrap ${!(artistsData && artistsData.length > 0) ? 'hidden' : ''}`}
         >
           {artistsData && artistsData.length > 0 && (
             <VirtualizedGrid

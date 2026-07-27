@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import { queryClient } from '..';
 import { albumQuery } from '../queries/albums';
-import { artistQuery } from '../queries/aritsts';
+import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
 import { playlistQuery } from '../queries/playlists';
 import { searchQuery } from '../queries/search';

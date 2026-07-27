@@ -14,7 +14,7 @@ import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
 import { albumQuery } from '@renderer/queries/albums';
-import { artistQuery } from '@renderer/queries/aritsts';
+import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';

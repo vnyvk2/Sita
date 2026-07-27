@@ -59,6 +59,18 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
   const timer = timeStart();
   const query = normalizeQuery(keyword);
 
+  if (!query.normalized) {
+    return {
+      songs: [],
+      artists: [],
+      albums: [],
+      playlists: [],
+      genres: [],
+      availableResults: [],
+      confidence: { songs: 0, artists: 0, albums: 0, playlists: 0, genres: 0 }
+    };
+  }
+
   const engineOptions: import('../../../common/search/MatchTier').SearchEngineOptions = {
     fuzzy: isSimilaritySearchEnabled,
     limit,
@@ -125,17 +137,22 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
   if (updateSearchHistory) {
     if (recentSearchesTimeoutId) clearTimeout(recentSearchesTimeoutId);
     recentSearchesTimeoutId = setTimeout(async () => {
-      const { recentSearches } = await getUserSettings();
+      try {
+        const { recentSearches } = await getUserSettings();
 
-      if (Array.isArray(recentSearches)) {
-        if (recentSearches.length > 10) recentSearches.pop();
-        if (recentSearches.includes(keyword))
-          recentSearches.splice(recentSearches.indexOf(keyword), 1);
-        recentSearches.unshift(keyword);
+        if (Array.isArray(recentSearches)) {
+          if (recentSearches.includes(keyword)) {
+            recentSearches.splice(recentSearches.indexOf(keyword), 1);
+          }
+          recentSearches.unshift(keyword);
+          while (recentSearches.length > 10) recentSearches.pop();
+        }
+
+        await saveUserSettings({ recentSearches });
+        dataUpdateEvent('userData/recentSearches');
+      } catch (err) {
+        logger.error('Failed to update recent searches', err);
       }
-
-      await saveUserSettings({ recentSearches });
-      dataUpdateEvent('userData/recentSearches');
     }, 2000);
   }
 

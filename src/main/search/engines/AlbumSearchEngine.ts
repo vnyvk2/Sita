@@ -11,22 +11,11 @@ import type {
   SearchEngineOptions,
   SearchMatch
 } from '../../../common/search/MatchTier';
+import { computeTier } from '../../../common/search/computeTier';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
-
-function computeTier(text: string, keyword: string): MatchTierValue {
-  const t = normalizeForSearch(text);
-  const k = normalizeForSearch(keyword);
-  if (t === k) return MATCH_TIER.EXACT;
-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
-  return MATCH_TIER.FUZZY;
-}
 
 // ---------------------------------------------------------------------------
 // Album Search Engine

@@ -11,6 +11,7 @@ import type {
   SearchEngineOptions,
   SearchMatch
 } from '../../../common/search/MatchTier';
+import { computeTier } from '../../../common/search/computeTier';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,18 +71,6 @@ const SONG_RELATIONS = {
     }
   }
 } as const;
-
-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
-
-function computeTier(text: string, keyword: string): MatchTierValue {
-  const t = normalizeForSearch(text);
-  const k = normalizeForSearch(keyword);
-  if (t === k) return MATCH_TIER.EXACT;
-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
-  return MATCH_TIER.FUZZY;
-}
 
 // ---------------------------------------------------------------------------
 // Song Search Engine
@@ -150,31 +139,38 @@ export const SongSearchEngine = {
           ? metaConditions[0]
           : sql`(${sql.join(metaConditions, sql` OR `)})`;
 
-      // Lightweight query: just song IDs via joins
-      const metaIdRows = await trx.execute<{ id: number }>(sql`
-        SELECT DISTINCT s.id FROM songs s
-        LEFT JOIN artists_songs ars ON s.id = ars.song_id
-        LEFT JOIN artists a ON ars.artist_id = a.id
-        LEFT JOIN album_songs als ON s.id = als.song_id
-        LEFT JOIN albums al ON als.album_id = al.id
-        WHERE ${metaWhereClause}
-        LIMIT ${remaining + titleMatchIds.size}
-      `);
+      try {
+        // Lightweight query: just song IDs via joins
+        const metaIdRows = await trx.execute<{ id: number }>(sql`
+          SELECT DISTINCT s.id FROM songs s
+          LEFT JOIN artists_songs ars ON s.id = ars.song_id
+          LEFT JOIN artists a ON ars.artist_id = a.id
+          LEFT JOIN album_songs als ON s.id = als.song_id
+          LEFT JOIN albums al ON als.album_id = al.id
+          WHERE ${metaWhereClause}
+          LIMIT ${remaining + titleMatchIds.size}
+        `);
 
-      const newIds = metaIdRows.rows
-        .map((r) => r.id)
-        .filter((id) => !titleMatchIds.has(id))
-        .slice(0, remaining);
+        const newIds = metaIdRows.rows
+          .map((r) => r.id)
+          .filter((id) => !titleMatchIds.has(id))
+          .slice(0, remaining);
 
-      // Fetch full song data for metadata-matched IDs
-      if (newIds.length > 0) {
-        metadataResults = await trx.query.songs.findMany({
-          where: () =>
-            sql`${songs.id} IN (${sql.join(
-              newIds.map((id) => sql`${id}`),
-              sql`, `
-            )})`,
-          with: SONG_RELATIONS
+        // Fetch full song data for metadata-matched IDs
+        if (newIds.length > 0) {
+          metadataResults = await trx.query.songs.findMany({
+            where: () =>
+              sql`${songs.id} IN (${sql.join(
+                newIds.map((id) => sql`${id}`),
+                sql`, `
+              )})`,
+            with: SONG_RELATIONS,
+            limit: newIds.length
+          });
+        }
+      } catch (err) {
+        import('@main/logger').then(({ default: logger }) => {
+          logger.warn('Metadata cross-search failed', { err });
         });
       }
     }

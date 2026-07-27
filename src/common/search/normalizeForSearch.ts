@@ -29,10 +29,9 @@ export function normalizeForSearch(input: string): string {
     .normalize('NFD')
     // 3. Remove diacritics (Combining Diacritical Marks)
     .replace(/[\u0300-\u036f]/g, '')
-    // 4. Remove all punctuation and symbols (everything except letters, numbers, and whitespace)
-    // Note: We also remove underscores which are normally part of \w.
-    .replace(/[.\-/\\'"!?@#$%^&*()_+=,;:<>{}[\]|`~]/g, '')
-    // 5. Collapse whitespace
+    // 4. Remove all punctuation and symbols (leaves letters, numbers, and whitespace)
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    // 5. Collapse multiple whitespaces into a single space
     .replace(/\s+/g, ' ')
     // 6. Trim
     .trim();

@@ -315,10 +315,11 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             label: t('common.addToQueue'),
             iconName: 'queue',
             handlerFunction: () => {
-              queue.queues[queue.currentQueueIndex].songIds.push(
+              const newSongIds = [
+                ...queue.queues[queue.currentQueueIndex].songIds,
                 ...firstResult.songs.map((song) => song.songId)
-              );
-              updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds, false);
+              ];
+              updateQueueData(undefined, newSongIds, false);
               addNewNotifications([
                 {
                   id: 'addedToQueue',
@@ -455,7 +456,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
           } transition-[transform,opacity] ${
             MostRelevantResults.length > 0
               ? 'visible flex translate-y-0 pb-4 opacity-100 [&>div]:hidden [&>div.active]:flex'
-              : 'tranlate-y-8 invisible opacity-0'
+              : 'translate-y-8 invisible opacity-0'
           }`}
           ref={mostRelevantResultContainerRef}
           onWheel={(e) => {

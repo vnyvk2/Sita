@@ -12,7 +12,7 @@ import SecondaryContainer from '@renderer/components/SecondaryContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import { queryClient } from '@renderer/index';
-import { artistQuery } from '@renderer/queries/aritsts';
+import { artistQuery } from '@renderer/queries/artists';
 import { homeQuery } from '@renderer/queries/home';
 import { songQuery } from '@renderer/queries/songs';
 import storage from '@renderer/utils/localStorage';

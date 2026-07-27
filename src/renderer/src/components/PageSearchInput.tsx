@@ -14,11 +14,11 @@ const PageSearchInput = ({ inputRef, value, onChange, className, ...props }: Pag
       className={`search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base ${className ?? ''}`}
       value={value}
       onChange={onChange}
+      {...props}
       onKeyDown={(e) => {
         e.stopPropagation();
         props.onKeyDown?.(e);
       }}
-      {...props}
     />
   );
 };
