@@ -50,7 +50,7 @@ export interface NormalizedQuery {
 // ---------------------------------------------------------------------------
 
 /** Configures which metadata fields the song engine should search. */
-export interface MetadataSearchFields {
+export interface MetadataSearchOptions {
   artist?: boolean;
   album?: boolean;
   // Future: lyrics?: boolean; composer?: boolean; folder?: boolean;
@@ -66,7 +66,7 @@ export interface SearchEngineOptions {
    * Song-engine only: also search by related entity names.
    * Pass an object to control which fields, or undefined to disable.
    */
-  metadata?: MetadataSearchFields;
+  metadata?: MetadataSearchOptions;
 }
 
 // ---------------------------------------------------------------------------

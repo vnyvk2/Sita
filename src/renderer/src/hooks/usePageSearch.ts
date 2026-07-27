@@ -1,12 +1,14 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export const usePageSearch = ({
   keyword,
-  updateSearch
+  updateSearch,
+  debounceMs = 250
 }: {
   keyword?: string;
   updateSearch: (val: string) => void;
+  debounceMs?: number;
 }) => {
   const [searchInput, setSearchInput] = useState(keyword ?? '');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -23,13 +25,16 @@ export const usePageSearch = ({
       if (val === (keyword ?? '')) return;
       updateSearch(val);
     },
-    { wait: 250 }
+    { wait: debounceMs }
   );
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchInput(e.target.value);
-    debouncedSearch(e.target.value);
-  };
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchInput(e.target.value);
+      debouncedSearch(e.target.value);
+    },
+    [debouncedSearch]
+  );
 
-  return { value: searchInput, ref: searchInputRef, onChange };
+  return { value: searchInput, inputRef: searchInputRef, onChange };
 };
