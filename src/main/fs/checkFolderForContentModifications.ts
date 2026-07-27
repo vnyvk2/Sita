@@ -64,7 +64,7 @@ const checkFolderForContentModifications = async (
       if (result) {
         const album = result.newAlbum || result.relevantAlbum;
         if (album) {
-          libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, libraryScheduler));
+          libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, album.title, libraryScheduler));
         }
       }
       return result;

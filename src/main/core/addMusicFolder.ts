@@ -47,8 +47,7 @@ const addMusicFromFolderStructures = async (
 
     // We process metadata using a bounded concurrency queue (Phase 2 Fast Path)
     const MAX_CONCURRENT_PARSES = 8;
-    const albumAssetsToQueue = new Map<number, string>(); // albumId -> sampleSongPath
-
+    const albumAssetsToQueue = new Map<number, { path: string; title: string }>(); // albumId -> data
     let index = 0;
     let hasAborted = false;
 
@@ -77,7 +76,10 @@ const addMusicFromFolderStructures = async (
 
           if (result?.relevantAlbum) {
             if (!albumAssetsToQueue.has(result.relevantAlbum.id)) {
-              albumAssetsToQueue.set(result.relevantAlbum.id, songPathData.songPath);
+              albumAssetsToQueue.set(result.relevantAlbum.id, { 
+                path: songPathData.songPath, 
+                title: result.relevantAlbum.title 
+              });
             }
           }
 
@@ -107,8 +109,8 @@ const addMusicFromFolderStructures = async (
 
     // Enqueue background artwork jobs for all collected unique albums
     if (albumAssetsToQueue.size > 0) {
-      for (const [albumId, sampleSongPath] of albumAssetsToQueue.entries()) {
-        libraryScheduler.enqueue(new ArtworkJob(albumId, sampleSongPath, libraryScheduler));
+      for (const [albumId, data] of albumAssetsToQueue.entries()) {
+        libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
       }
     }
   } else throw new Error('Failed to get song paths from music folders.');

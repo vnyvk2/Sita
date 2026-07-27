@@ -26,6 +26,7 @@ export interface AppReducer {
   appUpdatesState: AppUpdatesState;
   isOnBatteryPower: boolean;
   playerType: PlayerTypes;
+  isLibraryDiagnosticsPanelOpen: boolean;
 }
 
 export type AppReducerStateActions =
@@ -36,6 +37,7 @@ export type AppReducerStateActions =
   | { type: 'PROMPT_MENU_DATA_CHANGE'; data: PromptMenuNavigationHistoryData }
   | { type: 'ADD_NEW_NOTIFICATIONS'; data: AppNotification[] }
   | { type: 'UPDATE_NOTIFICATIONS'; data: AppNotification[] }
+  | { type: 'TOGGLE_LIBRARY_DIAGNOSTICS_PANEL'; data?: boolean }
   | { type: 'CONTEXT_MENU_DATA_CHANGE'; data: ContextMenuData }
   | { type: 'CONTEXT_MENU_VISIBILITY_CHANGE'; data: boolean }
   | { type: 'CURRENT_ACTIVE_PAGE_DATA_UPDATE'; data: PageData }
@@ -140,6 +142,11 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
           ...state.notificationPanelData,
           notifications: action.data || state.notificationPanelData.notifications
         }
+      };
+    case 'TOGGLE_LIBRARY_DIAGNOSTICS_PANEL':
+      return {
+        ...state,
+        isLibraryDiagnosticsPanelOpen: action.data ?? !state.isLibraryDiagnosticsPanelOpen
       };
     case 'CONTEXT_MENU_DATA_CHANGE':
       return {
@@ -700,7 +707,8 @@ export const DEFAULT_REDUCER_DATA: AppReducer = {
   },
   multipleSelectionsData: { isEnabled: false, multipleSelections: [] },
   appUpdatesState: 'UNKNOWN',
-  isOnBatteryPower: false
+  isOnBatteryPower: false,
+  isLibraryDiagnosticsPanelOpen: false
 };
 
 export default reducer;

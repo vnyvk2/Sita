@@ -14,8 +14,7 @@ export class ArtworkJob implements Job {
   state: JobState = 'queued';
   priority: JobPriority;
   retries = 0;
-  
-
+  description: string;
 
   public albumId: number;
   public sampleSongPath: string;
@@ -24,6 +23,7 @@ export class ArtworkJob implements Job {
   constructor(
     albumId: number,
     sampleSongPath: string,
+    albumTitle: string,
     eventBus: EventEmitter,
     priority: JobPriority = 'normal'
   ) {
@@ -32,6 +32,7 @@ export class ArtworkJob implements Job {
     this.eventBus = eventBus;
     this.id = `artwork_${albumId}`;
     this.priority = priority;
+    this.description = `Generating artwork for "${albumTitle}"`;
   }
 
   async execute(): Promise<void> {
@@ -77,7 +78,8 @@ export class ArtworkJob implements Job {
         this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
           albumId: this.albumId,
           artworkId: optimizedArtwork.id,
-          path: optimizedArtwork.path
+          path: optimizedArtwork.path,
+          albumTitle: album.title
         });
       }
     } catch (error) {

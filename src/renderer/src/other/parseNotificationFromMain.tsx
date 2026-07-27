@@ -46,9 +46,18 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
       'PLAYLIST_EXPORT_SUCCESS',
       'PLAYLIST_IMPORT_SUCCESS',
       'PLAYLIST_RENAME_SUCCESS',
-      'SONG_REPARSE_SUCCESS'
+      'SONG_REPARSE_SUCCESS',
+      'LIBRARY_BATCH_COMPLETE'
     ],
-    iconName: 'done'
+    iconName: 'done',
+    update({ data, messageCode }) {
+      if (messageCode === 'LIBRARY_BATCH_COMPLETE') {
+        const jobs = data?.jobsProcessed ?? 0;
+        const secs = data?.durationSeconds ?? 0;
+        this.content = `Library scan completed. Processed ${jobs} assets in ${secs}s.`;
+      }
+      return this;
+    }
   },
   {
     trigger: [

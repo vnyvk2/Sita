@@ -11,21 +11,28 @@ const LibrarySchedulerStatus = memo(() => {
 
   const totalActive = metrics.queuedJobs + metrics.runningJobs;
   
-  if (totalActive === 0) return null;
+  if (totalActive === 0 && metrics.runningJobs === 0) return null;
 
-  // Render a subtle indicator based on the current job type or general processing
-  const label = metrics.currentJobType === 'artwork' 
-    ? t('scheduler.generating_artworks', 'Generating artworks...') 
-    : metrics.currentJobType === 'palette' 
-      ? t('scheduler.generating_palettes', 'Generating palettes...') 
-      : t('scheduler.processing_library_assets', 'Processing library assets...');
+  // Use the first running job description as label if available
+  const currentJob = metrics.runningJobsList && metrics.runningJobsList.length > 0 
+    ? metrics.runningJobsList[0].description 
+    : t('scheduler.processing_library_assets', 'Processing library assets...');
 
   return (
     <ErrorBoundary>
-      <div className="flex w-full items-center justify-between px-6 py-3 mt-4 text-xs text-font-color-highlight dark:text-dark-font-color-highlight opacity-75">
-        <div className="flex flex-col gap-1 overflow-hidden">
-          <span className="truncate" title={label}>{label}</span>
-          <span>{t('scheduler.remaining', '({{totalActive}} remaining)', { totalActive })}</span>
+      <div 
+        className="flex w-full items-center justify-between px-6 py-3 mt-4 text-xs text-font-color-highlight dark:text-dark-font-color-highlight opacity-75 cursor-pointer hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 transition-colors"
+        onClick={() => {
+          import('../../store/store').then(({ dispatch }) => {
+            dispatch({ type: 'TOGGLE_LIBRARY_DIAGNOSTICS_PANEL' });
+          });
+        }}
+      >
+        <div className="flex flex-col gap-1 overflow-hidden w-full pr-2">
+          <span className="truncate" title={currentJob}>{currentJob}</span>
+          <span className="opacity-80">
+            {metrics.runningJobs} active worker{metrics.runningJobs === 1 ? '' : 's'} • {metrics.queuedJobs} queued
+          </span>
         </div>
         <span className="material-symbols-rounded animate-spin text-lg">sync</span>
       </div>

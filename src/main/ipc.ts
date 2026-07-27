@@ -128,19 +128,18 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     registerLibraryChoreography();
   });
 
+  import('./workers/libraryObservability').then(({ libraryObservability }) => {
     const sendSchedulerUpdate = () => {
       import('./main').then(({ sendMessageToRenderer }) => {
         sendMessageToRenderer({
           messageCode: 'LIBRARY_SCHEDULER_UPDATE',
-          data: { metrics: libraryScheduler.getMetrics() }
+          data: { metrics: libraryObservability.getMetrics() }
         });
       });
     };
 
-    libraryScheduler.on('JOB_STARTED', sendSchedulerUpdate);
-    libraryScheduler.on('JOB_COMPLETED', sendSchedulerUpdate);
-    libraryScheduler.on('JOB_FAILED', sendSchedulerUpdate);
-  }
+    libraryObservability.on('METRICS_UPDATED', sendSchedulerUpdate);
+  });
 
   // Fire and forget startup recovery sync
   import('./core/recovery').then(({ recoverLibraryAssets }) => {
@@ -215,8 +214,13 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       libraryScheduler.prioritizeJob(jobId);
     });
 
-    ipcMain.handle('app/getSchedulerMetrics', () => {
-      return libraryScheduler.getMetrics();
+    ipcMain.handle('app/getSchedulerMetrics', async () => {
+      const { libraryObservability } = await import('./workers/libraryObservability');
+      return libraryObservability.getMetrics();
+    });
+
+    ipcMain.handle('app/retryRecoverable', () => {
+      libraryScheduler.retryRecoverableJobs();
     });
 
     ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) =>

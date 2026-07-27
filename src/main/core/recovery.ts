@@ -14,8 +14,8 @@ export const recoverLibraryAssets = async () => {
     }
 
     logger.info(`Found ${albumsToRecover.length} albums missing artwork. Enqueuing jobs...`);
-    for (const { albumId, sampleSongPath } of albumsToRecover) {
-      libraryScheduler.enqueue(new ArtworkJob(albumId, sampleSongPath, libraryScheduler));
+    for (const { albumId, albumTitle, sampleSongPath } of albumsToRecover) {
+      libraryScheduler.enqueue(new ArtworkJob(albumId, sampleSongPath, albumTitle, libraryScheduler));
     }
     
     logger.info('Crash recovery sync completed successfully.');

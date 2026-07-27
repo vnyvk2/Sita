@@ -11,6 +11,7 @@ export class PaletteJob implements Job {
   state: JobState = 'queued';
   priority: JobPriority;
   retries = 0;
+  description: string;
 
   public artworkId: number;
   public artworkPath: string;
@@ -18,12 +19,14 @@ export class PaletteJob implements Job {
   constructor(
     artworkId: number,
     artworkPath: string,
+    albumTitle: string,
     priority: JobPriority = 'normal'
   ) {
     this.artworkId = artworkId;
     this.artworkPath = artworkPath;
     this.id = `palette_${artworkId}`;
     this.priority = priority;
+    this.description = `Generating color palette for "${albumTitle}"`;
   }
 
   async execute(): Promise<void> {

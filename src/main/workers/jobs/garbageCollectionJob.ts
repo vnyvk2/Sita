@@ -7,11 +7,14 @@ export class GarbageCollectionJob implements Job {
   id: string;
   type = 'garbage_collection';
   priority: JobPriority = 'low';
-  state: JobState = 'pending';
+  state: JobState = 'queued'; // Using 'queued' instead of 'pending' as JobState has 'queued'
+  retries = 0;
+  description: string;
   
   // Provide a unique id so that multiple GC jobs don't queue up unnecessarily
   constructor() {
     this.id = 'garbage_collection_job';
+    this.description = 'Collecting orphaned library assets';
   }
 
   async execute(): Promise<void> {

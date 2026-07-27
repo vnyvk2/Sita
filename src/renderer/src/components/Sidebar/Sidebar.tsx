@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import ErrorBoundary from '../ErrorBoundary';
 import SideBarItem from './SideBarItem';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
+import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 
 const Sidebar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
@@ -129,6 +130,7 @@ const Sidebar = memo(() => {
         </ul>
         <LibrarySchedulerStatus />
       </ErrorBoundary>
+      <LibraryDiagnosticsPanel />
     </nav>
   );
 });

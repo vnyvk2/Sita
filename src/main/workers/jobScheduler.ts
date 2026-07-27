@@ -2,20 +2,14 @@ import { EventEmitter } from 'events';
 import type { Job } from './types';
 import log from '../logger';
 
-export interface SchedulerMetrics {
-  runningJobs: number;
-  queuedJobs: number;
-  completedJobs: number;
-  failedJobs: number;
-  avgExecutionTimeMs: number;
-  currentJobType?: string;
-}
+
 
 export class JobScheduler extends EventEmitter {
   private highPriorityQueue: Job[] = [];
   private normalPriorityQueue: Job[] = [];
   private lowPriorityQueue: Job[] = [];
   private runningJobs = new Map<string, Job>();
+  private failedJobsList: Job[] = [];
   
   // To protect against duplicates across all queues and running state
   private activeJobIds = new Set<string>();
@@ -227,6 +221,7 @@ export class JobScheduler extends EventEmitter {
       } else {
         job.state = 'failed';
         this.failedCount++;
+        this.failedJobsList.push(job);
         this.emit('JOB_FAILED', job, error);
       }
     } finally {
@@ -242,26 +237,33 @@ export class JobScheduler extends EventEmitter {
     }
   }
 
-  public getMetrics(): SchedulerMetrics {
-    const avgTime = this.completedCount > 0 ? this.totalExecutionTimeMs / this.completedCount : 0;
-    
-    let currentJobType: string | undefined = undefined;
-    
-    if (this.runningJobs.size > 0) {
-      const firstJob = this.runningJobs.values().next().value;
-      if (firstJob) {
-        currentJobType = firstJob.type;
-      }
-    }
-    
+  public getRunningJobs(): Job[] {
+    return Array.from(this.runningJobs.values());
+  }
+
+  public getRawMetrics() {
     return {
       runningJobs: this.runningJobs.size,
       queuedJobs: this.highPriorityQueue.length + this.normalPriorityQueue.length + this.lowPriorityQueue.length,
       completedJobs: this.completedCount,
       failedJobs: this.failedCount,
-      avgExecutionTimeMs: Math.round(avgTime),
-      currentJobType
+      totalExecutionTimeMs: this.totalExecutionTimeMs,
+      maxWorkers: this.maxConcurrency
     };
+  }
+
+  public getFailedJobs(): Job[] {
+    return [...this.failedJobsList];
+  }
+
+  public retryRecoverableJobs() {
+    const retryable = this.failedJobsList;
+    this.failedJobsList = [];
+    for (const job of retryable) {
+      job.retries = 0;
+      job.state = 'queued';
+      this.enqueue(job);
+    }
   }
 }
 

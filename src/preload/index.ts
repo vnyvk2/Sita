@@ -602,7 +602,8 @@ const utils = {
 
 const libraryMetrics = {
   getSchedulerMetrics: () => ipcRenderer.invoke('app/getSchedulerMetrics'),
-  prioritizeArtworkGeneration: (albumId: number) => ipcRenderer.send('app/prioritizeArtworkGeneration', albumId)
+  prioritizeArtworkGeneration: (albumId: number) => ipcRenderer.send('app/prioritizeArtworkGeneration', albumId),
+  retryRecoverable: () => ipcRenderer.invoke('app/retryRecoverable')
 };
 
 export const api = {

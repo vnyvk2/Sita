@@ -998,21 +998,44 @@ declare global {
     | 'ADDED_SONGS_TO_PLAYLIST'
     | 'ARTWORK_SAVED'
     | 'RESYNC_SUCCESSFUL'
-    | 'LIBRARY_SCHEDULER_UPDATE';
+    | 'LIBRARY_SCHEDULER_UPDATE'
+    | 'LIBRARY_BATCH_COMPLETE';
+
+  interface RunningJobInfo {
+    id: string;
+    type: string;
+    description: string;
+  }
+
+  interface EventTimelineEntry {
+    timestamp: number;
+    message: string;
+  }
 
   interface SchedulerMetrics {
     runningJobs: number;
     queuedJobs: number;
     completedJobs: number;
     failedJobs: number;
-    avgExecutionTimeMs: number;
-    currentJobType?: string;
+    completedLastMinute?: number;
+    averageRuntime?: number;
+    runningWorkers?: number;
+    maxWorkers?: number;
+    runningJobsList?: RunningJobInfo[];
+    timeline?: EventTimelineEntry[];
+    diagnostics?: {
+      peakQueueSize: number;
+      gcRunCount: number;
+      recoveries: number;
+    };
   }
 
   interface MessageToRendererData extends Record<string, unknown> {
     total?: number;
     value?: number;
     metrics?: SchedulerMetrics;
+    jobsProcessed?: number;
+    durationSeconds?: number;
   }
 
   type MessageToRendererProps = {

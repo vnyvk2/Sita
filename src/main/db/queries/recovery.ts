@@ -13,6 +13,7 @@ export const getAlbumsWithoutArtwork = async () => {
   const result = await db
     .select({
       albumId: albums.id,
+      albumTitle: albums.title,
       sampleSongPath: sql<string>`MAX(${songs.path})`,
     })
     .from(albums)

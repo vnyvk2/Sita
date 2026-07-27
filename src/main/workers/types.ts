@@ -32,4 +32,39 @@ export interface Job {
    * or aborted mid-flight.
    */
   cancel?: () => void;
+  
+  /** Human-readable description of the job context (e.g. "Extracting palette for Album XYZ") */
+  description: string;
+}
+
+export interface RunningJobInfo {
+  id: string;
+  type: string;
+  description: string;
+}
+
+export interface EventTimelineEntry {
+  timestamp: number;
+  message: string;
+}
+
+export interface SchedulerMetrics {
+  runningJobs: number;
+  queuedJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  
+  completedLastMinute?: number;
+  averageRuntime?: number;
+  runningWorkers?: number;
+  maxWorkers?: number;
+  
+  runningJobsList?: RunningJobInfo[];
+  timeline?: EventTimelineEntry[];
+  
+  diagnostics?: {
+    peakQueueSize: number;
+    gcRunCount: number;
+    recoveries: number;
+  };
 }
