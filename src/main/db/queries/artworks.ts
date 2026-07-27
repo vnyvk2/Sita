@@ -13,6 +13,7 @@ import {
 
 export const saveArtworks = async (
   data: {
+    hash: string;
     path: string;
     width: number;
     height: number;
@@ -20,7 +21,27 @@ export const saveArtworks = async (
   }[],
   trx: DB | DBTransaction = db
 ) => {
-  const res = await trx.insert(artworks).values(data).returning();
+  const res = await trx
+    .insert(artworks)
+    .values(data)
+    .onConflictDoNothing({ target: artworks.hash })
+    .returning();
+
+  // For rows that conflicted and were skipped, we need to fetch them manually
+  // so the caller still gets the full list of artwork records.
+  if (res.length < data.length) {
+    const hashes = data.map(d => d.hash);
+    const existing = await trx
+      .select()
+      .from(artworks)
+      .where(inArray(artworks.hash, hashes));
+    
+    // Merge inserted and existing records
+    return [
+      ...res,
+      ...existing.filter(e => !res.some(r => r.id === e.id))
+    ];
+  }
 
   return res;
 };

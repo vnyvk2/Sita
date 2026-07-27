@@ -14,6 +14,7 @@ export interface SchedulerMetrics {
 export class JobScheduler extends EventEmitter {
   private highPriorityQueue: Job[] = [];
   private normalPriorityQueue: Job[] = [];
+  private lowPriorityQueue: Job[] = [];
   private runningJobs = new Map<string, Job>();
   
   // To protect against duplicates across all queues and running state
@@ -63,6 +64,8 @@ export class JobScheduler extends EventEmitter {
 
     if (job.priority === 'high') {
       this.highPriorityQueue.push(job);
+    } else if (job.priority === 'low') {
+      this.lowPriorityQueue.push(job);
     } else {
       this.normalPriorityQueue.push(job);
     }
@@ -77,9 +80,19 @@ export class JobScheduler extends EventEmitter {
    * Commonly used for Demand-Driven Prioritization (e.g. user scrolled to album).
    */
   public prioritizeJob(id: string): boolean {
-    const index = this.normalPriorityQueue.findIndex(j => j.id === id);
+    let index = this.normalPriorityQueue.findIndex(j => j.id === id);
     if (index !== -1) {
       const [job] = this.normalPriorityQueue.splice(index, 1);
+      job.priority = 'high';
+      this.highPriorityQueue.push(job);
+      log.debug(`[JobScheduler] Reprioritized job to high: ${id}`);
+      this.processNext();
+      return true;
+    }
+
+    index = this.lowPriorityQueue.findIndex(j => j.id === id);
+    if (index !== -1) {
+      const [job] = this.lowPriorityQueue.splice(index, 1);
       job.priority = 'high';
       this.highPriorityQueue.push(job);
       log.debug(`[JobScheduler] Reprioritized job to high: ${id}`);
@@ -102,7 +115,12 @@ export class JobScheduler extends EventEmitter {
     const initialNormalLen = this.normalPriorityQueue.length;
     this.normalPriorityQueue = this.normalPriorityQueue.filter(filterFn);
 
-    const wasQueued = (initialHighLen !== this.highPriorityQueue.length) || (initialNormalLen !== this.normalPriorityQueue.length);
+    const initialLowLen = this.lowPriorityQueue.length;
+    this.lowPriorityQueue = this.lowPriorityQueue.filter(filterFn);
+
+    const wasQueued = (initialHighLen !== this.highPriorityQueue.length) || 
+                      (initialNormalLen !== this.normalPriorityQueue.length) ||
+                      (initialLowLen !== this.lowPriorityQueue.length);
     
     // 2. Cancel if running
     const runningJob = this.runningJobs.get(id);
@@ -163,6 +181,9 @@ export class JobScheduler extends EventEmitter {
       if (!job) {
         job = this.normalPriorityQueue.shift();
       }
+      if (!job) {
+        job = this.lowPriorityQueue.shift();
+      }
 
       if (!job) break; // Queues are empty
 
@@ -198,6 +219,8 @@ export class JobScheduler extends EventEmitter {
         // Re-enqueue as high priority to try and flush it? Or normal. We'll use existing priority.
         if (job.priority === 'high') {
           this.highPriorityQueue.push(job);
+        } else if (job.priority === 'low') {
+          this.lowPriorityQueue.push(job);
         } else {
           this.normalPriorityQueue.push(job);
         }
@@ -233,7 +256,7 @@ export class JobScheduler extends EventEmitter {
     
     return {
       runningJobs: this.runningJobs.size,
-      queuedJobs: this.highPriorityQueue.length + this.normalPriorityQueue.length,
+      queuedJobs: this.highPriorityQueue.length + this.normalPriorityQueue.length + this.lowPriorityQueue.length,
       completedJobs: this.completedCount,
       failedJobs: this.failedCount,
       avgExecutionTimeMs: Math.round(avgTime),

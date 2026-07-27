@@ -118,6 +118,11 @@ let isSchedulerEventsRegistered = false;
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
   libraryScheduler.start();
+  
+  // Enqueue Garbage Collection on startup
+  import('./workers/jobs/garbageCollectionJob').then(({ GarbageCollectionJob }) => {
+    libraryScheduler.enqueue(new GarbageCollectionJob());
+  });
 
   // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
   if (!isSchedulerEventsRegistered) {
@@ -514,6 +519,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/resyncSongsLibrary', async () => {
       await checkForNewSongs();
       sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
+      
+      import('./workers/jobs/garbageCollectionJob').then(({ GarbageCollectionJob }) => {
+        libraryScheduler.enqueue(new GarbageCollectionJob());
+      });
     });
 
     ipcMain.handle('app/getBlacklistData', getBlacklistData);

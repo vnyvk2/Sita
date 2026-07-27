@@ -36,6 +36,13 @@
       "when": 1785070817960,
       "tag": "0004_harmonized_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785175089606,
+      "tag": "0005_mysterious_santa_claus",
+      "breakpoints": true
     }
   ]
 }

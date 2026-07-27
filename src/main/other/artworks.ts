@@ -84,30 +84,45 @@ const checkForDefaultArtworkSaveLocation = async () => {
   }
 };
 
+import crypto from 'crypto';
+
 export const storeArtworks = async (
   artworkType: QueueTypes,
   artwork?: Buffer | Uint8Array | string,
   trx: DB | DBTransaction = db
 ): Promise<(typeof artworks.$inferSelect)[]> => {
   try {
-    // const start = timeStart();
+    let id = generateRandomId();
+    let isDefault = true;
+    let fullHash = `default-${id}`;
+    let optHash = `default-${id}-opt`;
 
-    const id = generateRandomId();
+    if (artwork) {
+      const hash = crypto.createHash('sha256').update(artwork).digest('hex');
+      id = hash;
+      fullHash = hash;
+      optHash = `${hash}-optimized`;
+      isDefault = false;
+
+      // Lookup existing artwork by hash
+      const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+      if (existing.length > 0) {
+        // If we found the artwork, return it directly to skip duplicate generation
+        return existing;
+      }
+    }
+
     await checkForDefaultArtworkSaveLocation();
-
-    // const start1 = timeEnd(start, 'Time to check for default artwork location');
 
     const result = await createArtworks(id, artworkType, artwork);
     const data = await saveArtworks(
       [
-        { path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
-        { path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
+        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
+        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
       ],
       trx
     );
 
-    // timeEnd(start, 'Time to create artwork');
-    // timeEnd(start1, 'Total time to finish artwork storing process');
     return data;
   } catch (error) {
     logger.error(`Failed to store song artwork.`, { error });
@@ -121,24 +136,37 @@ export const updateArtworkData = async (
   trx: DB | DBTransaction = db
 ): Promise<(typeof artworks.$inferSelect)[]> => {
   try {
-    // const start = timeStart();
+    let id = generateRandomId();
+    let isDefault = true;
+    let fullHash = `default-${id}`;
+    let optHash = `default-${id}-opt`;
 
-    const id = generateRandomId();
+    if (artwork) {
+      const hash = crypto.createHash('sha256').update(artwork).digest('hex');
+      id = hash;
+      fullHash = hash;
+      optHash = `${hash}-optimized`;
+      isDefault = false;
+
+      // Lookup existing artwork by hash
+      const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+      if (existing.length > 0) {
+        // If we found the artwork, return it directly to skip duplicate generation
+        return existing;
+      }
+    }
+
     await checkForDefaultArtworkSaveLocation();
-
-    // const start1 = timeEnd(start, 'Time to check for default artwork location');
 
     const result = await createArtworks(id, artworkType, artwork);
     const data = await saveArtworks(
       [
-        { path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
-        { path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
+        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
+        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
       ],
       trx
     );
 
-    // timeEnd(start, 'Time to create artwork');
-    // timeEnd(start1, 'Total time to finish artwork storing process');
     return data;
   } catch (error) {
     logger.error(`Failed to store song artwork.`, { error });

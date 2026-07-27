@@ -183,6 +183,7 @@ export const artworks = pgTable(
   'artworks',
   {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    hash: text('hash').notNull().unique(),
     path: text('path').notNull(),
     source: artworkSourceEnum('source').notNull().default('LOCAL'),
     width: integer('width').notNull(),
