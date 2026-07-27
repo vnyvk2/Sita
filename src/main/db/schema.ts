@@ -188,6 +188,7 @@ export const artworks = pgTable(
     source: artworkSourceEnum('source').notNull().default('LOCAL'),
     width: integer('width').notNull(),
     height: integer('height').notNull(),
+    isOptimized: boolean('is_optimized').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },

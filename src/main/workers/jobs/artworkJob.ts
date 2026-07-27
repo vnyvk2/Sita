@@ -71,7 +71,7 @@ export class ArtworkJob implements Job {
         );
 
         // Find the optimized artwork specifically intended for palette generation
-        const optimizedArtwork = artworkData.find((a) => a.hash.endsWith('-optimized')) || artworkData[0];
+        const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
         
         // 5. Emit business event with a structured payload
         this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {

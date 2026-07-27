@@ -1,0 +1,1 @@
+ALTER TABLE "artworks" ADD COLUMN "is_optimized" boolean DEFAULT false NOT NULL;

@@ -117,8 +117,8 @@ export const storeArtworks = async (
     const result = await createArtworks(id, artworkType, artwork);
     const data = await saveArtworks(
       [
-        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
-        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
+        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
+        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
       ],
       trx
     );
@@ -161,8 +161,8 @@ export const updateArtworkData = async (
     const result = await createArtworks(id, artworkType, artwork);
     const data = await saveArtworks(
       [
-        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, source: 'LOCAL' }, // Full resolution song artwork
-        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, source: 'LOCAL' } // Optimized song artwork
+        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
+        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
       ],
       trx
     );
