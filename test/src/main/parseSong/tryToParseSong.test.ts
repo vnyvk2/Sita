@@ -202,29 +202,6 @@ describe('tryToParseSong', () => {
       expect(logger.debug).toHaveBeenCalledWith('song added to the library.', { songPath });
     });
 
-    test('should call generatePalettes when flag is true', async () => {
-      vi.useFakeTimers();
-      const songPath = '/test/song7.mp3';
-      const { generatePalettes } = await import('../../../../src/main/other/generatePalette');
-
-      await tryToParseSong(songPath, undefined, false, true);
-
-      // Advance timers to trigger setTimeout
-      vi.advanceTimersByTime(1500);
-
-      expect(generatePalettes).toHaveBeenCalled();
-
-      vi.useRealTimers();
-    });
-
-    test('should not call generatePalettes when flag is false', async () => {
-      const songPath = '/test/song8.mp3';
-      const { generatePalettes } = await import('../../../../src/main/other/generatePalette');
-
-      await tryToParseSong(songPath, undefined, false, false);
-
-      expect(generatePalettes).not.toHaveBeenCalled();
-    });
 
     test('should pass folderId to parseSong', async () => {
       const songPath = '/test/song9.mp3';

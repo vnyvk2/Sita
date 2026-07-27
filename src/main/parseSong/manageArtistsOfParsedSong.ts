@@ -6,7 +6,7 @@ const manageArtistsOfParsedSong = async (
   data: {
     songId: number;
     songArtists: string[];
-    artworkId: number;
+    artworkId?: number;
   },
   trx: DBTransaction
 ) => {
@@ -29,7 +29,9 @@ const manageArtistsOfParsedSong = async (
       } else {
         const artist = await createArtist({ name: newArtistName }, trx);
 
-        await linkArtworksToArtist([{ artistId: artist.id, artworkId: artworkId }], trx);
+        if (artworkId) {
+          await linkArtworksToArtist([{ artistId: artist.id, artworkId: artworkId }], trx);
+        }
         await linkSongToArtist(artist.id, songId, trx);
 
         relevantArtists.push(artist);

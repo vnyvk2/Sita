@@ -42,30 +42,70 @@ const addMusicFromFolderStructures = async (
 
   if (songPathsData) {
     const startTime = timeStart();
-    for (let i = 0; i < songPathsData.length; i += 1) {
-      if (abortSignal?.aborted) {
-        logger.warn('Parsing songs in music folders aborted by an abortController signal.', {
-          reason: abortSignal?.reason
-        });
-        break;
-      }
 
-      const songPathData = songPathsData[i];
-      try {
-        await tryToParseSong(songPathData.songPath, songPathData.folder.id, false, false, i >= 10);
-        sendMessageToRenderer({
-          messageCode: 'AUDIO_PARSING_PROCESS_UPDATE',
-          data: { total: songPathsData.length, value: i + 1 }
-        });
-      } catch (error) {
-        logger.error(`Failed to parse '${path.basename(songPathData.songPath)}'.`, {
-          error,
-          songPath: songPathData.songPath
-        });
+    // We process metadata using a bounded concurrency queue (Phase 2 Fast Path)
+    const MAX_CONCURRENT_PARSES = 8;
+    const albumAssetsToQueue = new Map<number, string>(); // albumId -> sampleSongPath
+
+    let index = 0;
+    let hasAborted = false;
+
+    const worker = async () => {
+      while (true) {
+        if (hasAborted || index >= songPathsData.length) break;
+        
+        if (abortSignal?.aborted) {
+          hasAborted = true;
+          logger.warn('Parsing songs in music folders aborted by an abortController signal.', {
+            reason: abortSignal?.reason
+          });
+          break;
+        }
+
+        const currentIndex = index++;
+        const songPathData = songPathsData[currentIndex];
+        
+        try {
+          const result = await tryToParseSong(
+            songPathData.songPath, 
+            songPathData.folder.id, 
+            false, 
+            false, 
+            currentIndex >= 10
+          );
+
+          if (result?.relevantAlbum) {
+            if (!albumAssetsToQueue.has(result.relevantAlbum.id)) {
+              albumAssetsToQueue.set(result.relevantAlbum.id, songPathData.songPath);
+            }
+          }
+
+          sendMessageToRenderer({
+            messageCode: 'AUDIO_PARSING_PROCESS_UPDATE',
+            data: { total: songPathsData.length, value: currentIndex + 1 }
+          });
+        } catch (error) {
+          logger.error(`Failed to parse '${path.basename(songPathData.songPath)}'.`, {
+            error,
+            songPath: songPathData.songPath
+          });
+        }
       }
+    };
+
+    // Kick off the initial workers
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < Math.min(MAX_CONCURRENT_PARSES, songPathsData.length); i++) {
+      workers.push(worker());
     }
+
+    // Wait for all workers to finish
+    await Promise.all(workers);
+
     timeEnd(startTime, 'Time to parse the whole folder');
-    setTimeout(generatePalettes, 1500);
+
+    // For Phase 3, we will enqueue background artwork jobs here using albumAssetsToQueue
+    // libraryScheduler.enqueue(new ArtworkJob(...))
   } else throw new Error('Failed to get song paths from music folders.');
 
   logger.debug(

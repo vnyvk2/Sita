@@ -111,8 +111,22 @@ import getTranslatedLyrics from './utils/getTranslatedLyrics';
 import resetLyrics from './utils/resetLyrics';
 import romanizeLyrics from './utils/romanizeLyrics';
 import { compare } from './utils/safeStorage';
+import { libraryScheduler } from './workers/jobScheduler';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
+  // Start the Library Builder Scheduler
+  libraryScheduler.start();
+  
+  // Ensure we gracefully drain on shutdown only once
+  let isShuttingDown = false;
+  app.on('before-quit', async (e) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    e.preventDefault();
+    await libraryScheduler.stop();
+    app.exit();
+  });
+
   if (mainWindow) {
     ipcMain.on('app/close', () => app.quit());
 
@@ -165,6 +179,12 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/addSongsFromFolderStructures', (_, structures: FolderStructure[]) =>
       addSongsFromFolderStructures(structures)
     );
+
+    ipcMain.on('app/prioritizeAsset', (_, assetType: string, assetId: string) => {
+      // E.g., job id 'ARTWORK_123'
+      const jobId = `${assetType.toUpperCase()}_${assetId}`;
+      libraryScheduler.prioritizeJob(jobId);
+    });
 
     ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) =>
       sendAudioData(id, updateListeningRate)

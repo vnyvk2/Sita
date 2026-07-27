@@ -506,42 +506,5 @@ describe('parseSong Concurrency and State Management', () => {
     });
   });
 
-  describe('Concurrent Artwork Processing', () => {
-    test('should handle concurrent artwork storage for different songs', async () => {
-      const paths = ['/artwork/song1.mp3', '/artwork/song2.mp3', '/artwork/song3.mp3'];
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
 
-      const promises = paths.map((path) => parseSong(path));
-
-      await Promise.all(promises);
-
-      // Each song should store artworks
-      expect(storeArtworks).toHaveBeenCalledTimes(3);
-    });
-
-    test('should not mix up artwork data between concurrent parses', async () => {
-      const songPath1 = '/artwork/unique1.mp3';
-      const songPath2 = '/artwork/unique2.mp3';
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
-
-      // Create distinct artwork data for each song
-      const artwork1 = createMockArtworkData();
-      artwork1[0].id = 100;
-      const artwork2 = createMockArtworkData();
-      artwork2[0].id = 200;
-
-      vi.mocked(storeArtworks)
-        .mockResolvedValueOnce(artwork1 as any)
-        .mockResolvedValueOnce(artwork2 as any);
-
-      const [result1, result2] = await Promise.all([parseSong(songPath1), parseSong(songPath2)]);
-
-      // Each parse should get its own artwork data
-      const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
-      const calls = vi.mocked(linkArtworksToSong).mock.calls;
-
-      expect(calls[0][0][0].artworkId).toBe(100);
-      expect(calls[1][0][0].artworkId).toBe(200);
-    });
-  });
 });

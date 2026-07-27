@@ -4,13 +4,11 @@ import path from 'path';
 import { db } from '@main/db/db';
 import { linkArtworksToSong } from '@main/db/queries/artworks';
 import { isSongWithPathAvailable, saveSong } from '@main/db/queries/songs';
-import type { songs } from '@main/db/schema';
+import type { albums, artists, genres, songs } from '@main/db/schema';
 import { File } from 'node-taglib-sharp';
 
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { storeArtworks } from '../other/artworks';
-import { generatePalettes } from '../other/generatePalette';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -19,6 +17,18 @@ import manageGenresOfParsedSong from './manageGenresOfParsedSong';
 
 const pathsQueue = new Set<string>();
 export const ARTIST_SEPARATOR_REGEX = /[,&]/gm;
+
+export interface ParseSongResult {
+  songData: typeof songs.$inferSelect;
+  relevantAlbum: typeof albums.$inferSelect | undefined;
+  newAlbum: typeof albums.$inferSelect | undefined;
+  newArtists: typeof artists.$inferSelect[];
+  relevantArtists: typeof artists.$inferSelect[];
+  newGenres: typeof genres.$inferSelect[];
+  relevantGenres: typeof genres.$inferSelect[];
+  relevantAlbumArtists: string[];
+  newAlbumArtists: string[];
+}
 
 export const tryToParseSong = (
   songPath: string,
@@ -36,14 +46,14 @@ export const tryToParseSong = (
   if (!isSongInPathsQueue) {
     pathsQueue.add(songPath);
 
-    const tryParseSong = async (errRetryCount = 0): Promise<void> => {
+    const tryParseSong = async (errRetryCount = 0): Promise<ParseSongResult | undefined> => {
       try {
-        await parseSong(songPath, folderId, reparseToSync, noRendererMessages);
+        const result = await parseSong(songPath, folderId, reparseToSync, noRendererMessages);
         logger.debug(`song added to the library.`, { songPath });
-        if (generatePalettesAfterParsing) setTimeout(generatePalettes, 1500);
 
         dataUpdateEvent('songs/newSong');
         pathsQueue.delete(songPath);
+        return result;
       } catch (error) {
         if (errRetryCount < 5) {
           // THIS ERROR OCCURRED WHEN THE APP STARTS READING DATA WHILE THE SONG IS STILL WRITING TO THE DISK. POSSIBLE SOLUTION IS TO SET A TIMEOUT AND REDO THE PROCESS.
@@ -51,11 +61,12 @@ export const tryToParseSong = (
           logger.debug('Failed to parse song data. Retrying in 5 seconds. (error: read error)', {
             error
           });
-          timeOutId = setTimeout(() => {
-            tryParseSong(errRetryCount + 1).catch(() => {
-              // Error will be handled in the recursive call
-            });
-          }, 5000);
+          // Note: using a Promise wrapper to allow the recursive call to return its result
+          return new Promise((resolve, reject) => {
+            timeOutId = setTimeout(() => {
+              tryParseSong(errRetryCount + 1).then(resolve).catch(reject);
+            }, 5000);
+          });
         } else {
           logger.debug(
             `Failed to parse a newly added song while the app is open. Failed 5 of 5 retry efforts.`,
@@ -89,7 +100,7 @@ export const parseSong = async (
   folderId?: number,
   reparseToSync = false,
   noRendererMessages = false
-): Promise<SongData | undefined> => {
+): Promise<ParseSongResult | undefined> => {
   // const start = timeStart();
   logger.debug(`Starting the parsing process of song '${path.basename(absoluteFilePath)}'.`);
 
@@ -177,26 +188,11 @@ export const parseSong = async (
       const res = await db.transaction(async (trx) => {
         const songData = await saveSong(songInfo, trx);
 
-        const artworkData = await storeArtworks(
-          'songs',
-          metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined,
-          trx
-        );
-
-        const linkedArtworks = await linkArtworksToSong(
-          artworkData.map((artwork) => ({
-            songId: songData.id,
-            artworkId: artwork.id
-          })),
-          trx
-        );
-
         // const start8 = timeEnd(start6, 'Time to create songInfo basic object');
 
         const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
           {
             songId: songData.id,
-            artworkId: artworkData[0].id,
             songYear: songData.year,
             artists: artistsData,
             albumArtists: albumArtistsData,
@@ -218,7 +214,6 @@ export const parseSong = async (
         // );
         const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
           {
-            artworkId: artworkData[0].id,
             songId: songData.id,
             songArtists: artistsData
           },
@@ -238,7 +233,6 @@ export const parseSong = async (
 
         const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
           {
-            artworkId: artworkData[0].id,
             songId: songData.id,
             songGenres: genresData
           },
@@ -247,7 +241,6 @@ export const parseSong = async (
 
         return {
           songData,
-          linkedArtworks,
           relevantAlbum,
           newAlbum,
           newArtists,
@@ -309,14 +302,7 @@ export const parseSong = async (
         });
       }
 
-      // timeEnd(
-      //   start15,
-      //   'Time to finalize the data events of the parsing process.'
-      // );
-
-      // timeEnd(start, 'Total time taken for the parsing process.');
-
-      return undefined;
+      return res;
     }
     logger.debug('Song not eligable for parsing.', {
       absoluteFilePath,

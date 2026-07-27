@@ -10,7 +10,7 @@ import type { albums } from '@main/db/schema';
 const manageAlbumsOfParsedSong = async (
   data: {
     songId: number;
-    artworkId: number;
+    artworkId?: number;
     songYear?: number | null;
     artists: string[];
     albumArtists: string[];
@@ -45,7 +45,9 @@ const manageAlbumsOfParsedSong = async (
     } else {
       const album = await createAlbum({ title: songAlbumName, year: songYear }, trx);
 
-      await linkArtworksToAlbum([{ albumId: album.id, artworkId }], trx);
+      if (artworkId) {
+        await linkArtworksToAlbum([{ albumId: album.id, artworkId }], trx);
+      }
       await linkSongToAlbum(album.id, songId, trx);
 
       relevantAlbum = album;

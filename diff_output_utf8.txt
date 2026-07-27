@@ -1,0 +1,547 @@
+﻿diff --git a/src/common/search/normalizeForSearch.ts b/src/common/search/normalizeForSearch.ts
+index 935b96af..881d1628 100644
+--- a/src/common/search/normalizeForSearch.ts
++++ b/src/common/search/normalizeForSearch.ts
+@@ -29,10 +29,9 @@ export function normalizeForSearch(input: string): string {
+     .normalize('NFD')
+     // 3. Remove diacritics (Combining Diacritical Marks)
+     .replace(/[\u0300-\u036f]/g, '')
+-    // 4. Remove all punctuation and symbols (everything except letters, numbers, and whitespace)
+-    // Note: We also remove underscores which are normally part of \w.
+-    .replace(/[.\-/\\'"!?@#$%^&*()_+=,;:<>{}[\]|`~]/g, '')
+-    // 5. Collapse whitespace
++    // 4. Remove all punctuation and symbols (leaves letters, numbers, and whitespace)
++    .replace(/[^\p{L}\p{N}\s]/gu, '')
++    // 5. Collapse multiple whitespaces into a single space
+     .replace(/\s+/g, ' ')
+     // 6. Trim
+     .trim();
+diff --git a/src/main/search/coordinator/SearchCoordinator.ts b/src/main/search/coordinator/SearchCoordinator.ts
+index 4d084ad3..a2bd13a4 100644
+--- a/src/main/search/coordinator/SearchCoordinator.ts
++++ b/src/main/search/coordinator/SearchCoordinator.ts
+@@ -59,6 +59,18 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
+   const timer = timeStart();
+   const query = normalizeQuery(keyword);
+ 
++  if (!query.normalized) {
++    return {
++      songs: [],
++      artists: [],
++      albums: [],
++      playlists: [],
++      genres: [],
++      availableResults: [],
++      confidence: { songs: 0, artists: 0, albums: 0, playlists: 0, genres: 0 }
++    };
++  }
++
+   const engineOptions: import('../../../common/search/MatchTier').SearchEngineOptions = {
+     fuzzy: isSimilaritySearchEnabled,
+     limit,
+@@ -125,17 +137,22 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
+   if (updateSearchHistory) {
+     if (recentSearchesTimeoutId) clearTimeout(recentSearchesTimeoutId);
+     recentSearchesTimeoutId = setTimeout(async () => {
+-      const { recentSearches } = await getUserSettings();
+-
+-      if (Array.isArray(recentSearches)) {
+-        if (recentSearches.length > 10) recentSearches.pop();
+-        if (recentSearches.includes(keyword))
+-          recentSearches.splice(recentSearches.indexOf(keyword), 1);
+-        recentSearches.unshift(keyword);
++      try {
++        const { recentSearches } = await getUserSettings();
++
++        if (Array.isArray(recentSearches)) {
++          if (recentSearches.includes(keyword)) {
++            recentSearches.splice(recentSearches.indexOf(keyword), 1);
++          }
++          recentSearches.unshift(keyword);
++          while (recentSearches.length > 10) recentSearches.pop();
++        }
++
++        await saveUserSettings({ recentSearches });
++        dataUpdateEvent('userData/recentSearches');
++      } catch (err) {
++        logger.error('Failed to update recent searches', err);
+       }
+-
+-      await saveUserSettings({ recentSearches });
+-      dataUpdateEvent('userData/recentSearches');
+     }, 2000);
+   }
+ 
+diff --git a/src/main/search/engines/AlbumSearchEngine.ts b/src/main/search/engines/AlbumSearchEngine.ts
+index 042cfeb6..683f73ab 100644
+--- a/src/main/search/engines/AlbumSearchEngine.ts
++++ b/src/main/search/engines/AlbumSearchEngine.ts
+@@ -11,23 +11,12 @@ import type {
+   SearchEngineOptions,
+   SearchMatch
+ } from '../../../common/search/MatchTier';
++import { computeTier } from '../../../common/search/computeTier';
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+-
+-function computeTier(text: string, keyword: string): MatchTierValue {
+-  const t = normalizeForSearch(text);
+-  const k = normalizeForSearch(keyword);
+-  if (t === k) return MATCH_TIER.EXACT;
+-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
+-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
+-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
+-  return MATCH_TIER.FUZZY;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Album Search Engine
+ // ---------------------------------------------------------------------------
+diff --git a/src/main/search/engines/ArtistSearchEngine.ts b/src/main/search/engines/ArtistSearchEngine.ts
+index c0b2be07..8afc9c82 100644
+--- a/src/main/search/engines/ArtistSearchEngine.ts
++++ b/src/main/search/engines/ArtistSearchEngine.ts
+@@ -11,23 +11,12 @@ import type {
+   SearchEngineOptions,
+   SearchMatch
+ } from '../../../common/search/MatchTier';
++import { computeTier } from '../../../common/search/computeTier';
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+-
+-function computeTier(text: string, keyword: string): MatchTierValue {
+-  const t = normalizeForSearch(text);
+-  const k = normalizeForSearch(keyword);
+-  if (t === k) return MATCH_TIER.EXACT;
+-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
+-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
+-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
+-  return MATCH_TIER.FUZZY;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Artist Search Engine
+ // ---------------------------------------------------------------------------
+diff --git a/src/main/search/engines/GenreSearchEngine.ts b/src/main/search/engines/GenreSearchEngine.ts
+index 7e32856f..001f6534 100644
+--- a/src/main/search/engines/GenreSearchEngine.ts
++++ b/src/main/search/engines/GenreSearchEngine.ts
+@@ -11,23 +11,12 @@ import type {
+   SearchEngineOptions,
+   SearchMatch
+ } from '../../../common/search/MatchTier';
++import { computeTier } from '../../../common/search/computeTier';
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+-
+-function computeTier(text: string, keyword: string): MatchTierValue {
+-  const t = normalizeForSearch(text);
+-  const k = normalizeForSearch(keyword);
+-  if (t === k) return MATCH_TIER.EXACT;
+-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
+-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
+-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
+-  return MATCH_TIER.FUZZY;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Genre Search Engine
+ // ---------------------------------------------------------------------------
+diff --git a/src/main/search/engines/PlaylistSearchEngine.ts b/src/main/search/engines/PlaylistSearchEngine.ts
+index 5c178766..003234c4 100644
+--- a/src/main/search/engines/PlaylistSearchEngine.ts
++++ b/src/main/search/engines/PlaylistSearchEngine.ts
+@@ -11,23 +11,12 @@ import type {
+   SearchEngineOptions,
+   SearchMatch
+ } from '../../../common/search/MatchTier';
++import { computeTier } from '../../../common/search/computeTier';
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+-
+-function computeTier(text: string, keyword: string): MatchTierValue {
+-  const t = normalizeForSearch(text);
+-  const k = normalizeForSearch(keyword);
+-  if (t === k) return MATCH_TIER.EXACT;
+-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
+-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
+-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
+-  return MATCH_TIER.FUZZY;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Playlist Search Engine
+ // ---------------------------------------------------------------------------
+diff --git a/src/main/search/engines/SongSearchEngine.ts b/src/main/search/engines/SongSearchEngine.ts
+index aa125412..07b9bbd2 100644
+--- a/src/main/search/engines/SongSearchEngine.ts
++++ b/src/main/search/engines/SongSearchEngine.ts
+@@ -11,6 +11,7 @@ import type {
+   SearchEngineOptions,
+   SearchMatch
+ } from '../../../common/search/MatchTier';
++import { computeTier } from '../../../common/search/computeTier';
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+@@ -71,18 +72,6 @@ const SONG_RELATIONS = {
+   }
+ } as const;
+ 
+-import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+-
+-function computeTier(text: string, keyword: string): MatchTierValue {
+-  const t = normalizeForSearch(text);
+-  const k = normalizeForSearch(keyword);
+-  if (t === k) return MATCH_TIER.EXACT;
+-  if (t.startsWith(k)) return MATCH_TIER.PREFIX;
+-  if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
+-  if (t.includes(k)) return MATCH_TIER.CONTAINS;
+-  return MATCH_TIER.FUZZY;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Song Search Engine
+ // ---------------------------------------------------------------------------
+@@ -150,31 +139,38 @@ export const SongSearchEngine = {
+           ? metaConditions[0]
+           : sql`(${sql.join(metaConditions, sql` OR `)})`;
+ 
+-      // Lightweight query: just song IDs via joins
+-      const metaIdRows = await trx.execute<{ id: number }>(sql`
+-        SELECT DISTINCT s.id FROM songs s
+-        LEFT JOIN artists_songs ars ON s.id = ars.song_id
+-        LEFT JOIN artists a ON ars.artist_id = a.id
+-        LEFT JOIN album_songs als ON s.id = als.song_id
+-        LEFT JOIN albums al ON als.album_id = al.id
+-        WHERE ${metaWhereClause}
+-        LIMIT ${remaining + titleMatchIds.size}
+-      `);
+-
+-      const newIds = metaIdRows.rows
+-        .map((r) => r.id)
+-        .filter((id) => !titleMatchIds.has(id))
+-        .slice(0, remaining);
+-
+-      // Fetch full song data for metadata-matched IDs
+-      if (newIds.length > 0) {
+-        metadataResults = await trx.query.songs.findMany({
+-          where: () =>
+-            sql`${songs.id} IN (${sql.join(
+-              newIds.map((id) => sql`${id}`),
+-              sql`, `
+-            )})`,
+-          with: SONG_RELATIONS
++      try {
++        // Lightweight query: just song IDs via joins
++        const metaIdRows = await trx.execute<{ id: number }>(sql`
++          SELECT DISTINCT s.id FROM songs s
++          LEFT JOIN artists_songs ars ON s.id = ars.song_id
++          LEFT JOIN artists a ON ars.artist_id = a.id
++          LEFT JOIN album_songs als ON s.id = als.song_id
++          LEFT JOIN albums al ON als.album_id = al.id
++          WHERE ${metaWhereClause}
++          LIMIT ${remaining + titleMatchIds.size}
++        `);
++
++        const newIds = metaIdRows.rows
++          .map((r) => r.id)
++          .filter((id) => !titleMatchIds.has(id))
++          .slice(0, remaining);
++
++        // Fetch full song data for metadata-matched IDs
++        if (newIds.length > 0) {
++          metadataResults = await trx.query.songs.findMany({
++            where: () =>
++              sql`${songs.id} IN (${sql.join(
++                newIds.map((id) => sql`${id}`),
++                sql`, `
++              )})`,
++            with: SONG_RELATIONS,
++            limit: newIds.length
++          });
++        }
++      } catch (err) {
++        import('@main/logger').then(({ default: logger }) => {
++          logger.warn('Metadata cross-search failed', { err });
+         });
+       }
+     }
+diff --git a/src/renderer/src/components/PageSearchInput.tsx b/src/renderer/src/components/PageSearchInput.tsx
+index c5ef0e15..ecf0f77d 100644
+--- a/src/renderer/src/components/PageSearchInput.tsx
++++ b/src/renderer/src/components/PageSearchInput.tsx
+@@ -14,11 +14,11 @@ const PageSearchInput = ({ inputRef, value, onChange, className, ...props }: Pag
+       className={`search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base ${className ?? ''}`}
+       value={value}
+       onChange={onChange}
++      {...props}
+       onKeyDown={(e) => {
+         e.stopPropagation();
+         props.onKeyDown?.(e);
+       }}
+-      {...props}
+     />
+   );
+ };
+diff --git a/src/renderer/src/components/SearchPage/Result_Containers/MostRelevantSearchResultsContainer.tsx b/src/renderer/src/components/SearchPage/Result_Containers/MostRelevantSearchResultsContainer.tsx
+index 4e99b885..e8bfea9a 100644
+--- a/src/renderer/src/components/SearchPage/Result_Containers/MostRelevantSearchResultsContainer.tsx
++++ b/src/renderer/src/components/SearchPage/Result_Containers/MostRelevantSearchResultsContainer.tsx
+@@ -315,10 +315,11 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
+             label: t('common.addToQueue'),
+             iconName: 'queue',
+             handlerFunction: () => {
+-              queue.queues[queue.currentQueueIndex].songIds.push(
++              const newSongIds = [
++                ...queue.queues[queue.currentQueueIndex].songIds,
+                 ...firstResult.songs.map((song) => song.songId)
+-              );
+-              updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds, false);
++              ];
++              updateQueueData(undefined, newSongIds, false);
+               addNewNotifications([
+                 {
+                   id: 'addedToQueue',
+@@ -455,7 +456,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
+           } transition-[transform,opacity] ${
+             MostRelevantResults.length > 0
+               ? 'visible flex translate-y-0 pb-4 opacity-100 [&>div]:hidden [&>div.active]:flex'
+-              : 'tranlate-y-8 invisible opacity-0'
++              : 'translate-y-8 invisible opacity-0'
+           }`}
+           ref={mostRelevantResultContainerRef}
+           onWheel={(e) => {
+diff --git a/src/renderer/src/hooks/useDataSync.tsx b/src/renderer/src/hooks/useDataSync.tsx
+index db94e50c..89e70666 100644
+--- a/src/renderer/src/hooks/useDataSync.tsx
++++ b/src/renderer/src/hooks/useDataSync.tsx
+@@ -3,7 +3,7 @@ import { useEffect } from 'react';
+ 
+ import { queryClient } from '..';
+ import { albumQuery } from '../queries/albums';
+-import { artistQuery } from '../queries/aritsts';
++import { artistQuery } from '../queries/artists';
+ import { genreQuery } from '../queries/genres';
+ import { playlistQuery } from '../queries/playlists';
+ import { searchQuery } from '../queries/search';
+diff --git a/src/renderer/src/queries/aritsts.ts b/src/renderer/src/queries/aritsts.ts
+deleted file mode 100644
+index 0b181c52..00000000
+--- a/src/renderer/src/queries/aritsts.ts
++++ /dev/null
+@@ -1,63 +0,0 @@
+-import { createQueryKeys } from '@lukemorales/query-key-factory';
+-import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
+-
+-export const artistQuery = createQueryKeys('artists', {
+-  all: (data: {
+-    sortType: ArtistSortTypes;
+-    filterType?: ArtistFilterTypes;
+-    start?: number;
+-    end?: number;
+-    limit?: number;
+-    keyword?: string;
+-  }) => {
+-    const { sortType = 'aToZ', filterType = 'notSelected', start = 0, end = 0, keyword = '' } = data;
+-
+-    return {
+-      queryKey: [
+-        `sortType=${sortType}`,
+-        `filterType=${filterType}`,
+-        `start=${start}`,
+-        `end=${end}`,
+-        `limit=${end - start}`,
+-        `keyword=${keyword}`
+-      ],
+-      queryFn: async () => {
+-        if (keyword.trim()) {
+-          const res = await window.api.search.query({
+-            filter: 'Artists',
+-            keyword,
+-            limit: SEARCH_LIMITS.PAGE,
+-            updateSearchHistory: false
+-          });
+-          return { data: res.artists, unresolvedData: [] };
+-        }
+-        return window.api.artistsData.getArtistData(
+-          [],
+-          sortType as ArtistSortTypes,
+-          filterType as ArtistFilterTypes,
+-          start,
+-          end
+-        );
+-      }
+-    };
+-  },
+-  single: (data: { artistId: number }) => {
+-    return {
+-      queryKey: [data.artistId],
+-      queryFn: () => window.api.artistsData.getArtistData([data.artistId])
+-    };
+-  },
+-  fetchOnlineInfo: (data: { artistId: number }) => {
+-    return {
+-      queryKey: [data.artistId],
+-      queryFn: async () => (await window.api.artistsData.getArtistArtworks(data.artistId)) ?? null
+-    };
+-  }
+-});
+-
+-export const artistMutations = {
+-  toggleLike: (data: { artistIds: number[]; isLikeArtist?: boolean }) => ({
+-    invalidatingQueryKeys: [['artists']],
+-    mutationFn: () => window.api.artistsData.toggleLikeArtists(data.artistIds, data.isLikeArtist)
+-  })
+-};
+diff --git a/src/renderer/src/queries/search.ts b/src/renderer/src/queries/search.ts
+index 0da9f72f..8612e85d 100644
+--- a/src/renderer/src/queries/search.ts
++++ b/src/renderer/src/queries/search.ts
+@@ -14,9 +14,28 @@ export const searchQuery = createQueryKeys('search', {
+     const { keyword, filter, isSimilaritySearchEnabled = false, updateSearchHistory = true } = data;
+ 
+     return {
+-      queryKey: [{ keyword }, { filter }, { isSimilaritySearchEnabled }, { updateSearchHistory }],
+-      queryFn: () =>
+-        window.api.search.query({ filter, keyword, updateSearchHistory, isSimilaritySearchEnabled })
++      queryKey: [
++        `keyword=${keyword}`,
++        `filter=${filter}`,
++        `isSimilaritySearchEnabled=${isSimilaritySearchEnabled}`,
++        `updateSearchHistory=${updateSearchHistory}`
++      ],
++      queryFn: async () => {
++        try {
++          return await window.api.search.query({ filter, keyword, updateSearchHistory, isSimilaritySearchEnabled });
++        } catch (err) {
++          console.error(err);
++          return {
++            songs: [],
++            artists: [],
++            albums: [],
++            playlists: [],
++            genres: [],
++            availableResults: [],
++            confidence: { songs: 0, artists: 0, albums: 0, playlists: 0, genres: 0 }
++          };
++        }
++      }
+     };
+   }
+ });
+diff --git a/src/renderer/src/routes/main-player/artists/$artistId.tsx b/src/renderer/src/routes/main-player/artists/$artistId.tsx
+index d92670df..3690f51c 100644
+--- a/src/renderer/src/routes/main-player/artists/$artistId.tsx
++++ b/src/renderer/src/routes/main-player/artists/$artistId.tsx
+@@ -14,7 +14,7 @@ import useResizeObserver from '@renderer/hooks/useResizeObserver';
+ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+ import { queryClient } from '@renderer/index';
+ import { albumQuery } from '@renderer/queries/albums';
+-import { artistQuery } from '@renderer/queries/aritsts';
++import { artistQuery } from '@renderer/queries/artists';
+ import { songQuery } from '@renderer/queries/songs';
+ import { store } from '@renderer/store/store';
+ import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
+diff --git a/src/renderer/src/routes/main-player/artists/index.tsx b/src/renderer/src/routes/main-player/artists/index.tsx
+index 14baa4fe..7c0924f1 100644
+--- a/src/renderer/src/routes/main-player/artists/index.tsx
++++ b/src/renderer/src/routes/main-player/artists/index.tsx
+@@ -14,7 +14,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+ import { usePageSearch } from '@renderer/hooks/usePageSearch';
+ import { queryClient } from '@renderer/index';
+-import { artistQuery } from '@renderer/queries/aritsts';
++import { artistQuery } from '@renderer/queries/artists';
+ import { store } from '@renderer/store/store';
+ import storage from '@renderer/utils/localStorage';
+ import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
+@@ -59,12 +59,11 @@ function ArtistPage() {
+   const sortingStates = useStore(store, (state) => state.localStorage.sortingStates);
+ 
+   const { toggleMultipleSelections } = useContext(AppUpdateContext);
+-  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', keyword } =
++  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', filteringOrder = 'notSelected', keyword } =
+     Route.useSearch();
+   const { t } = useTranslation();
+   const navigate = useNavigate({ from: Route.fullPath });
+ 
+-  const [filteringOrder, setFilteringOrder] = useState<ArtistFilterTypes>('notSelected');
+   const {
+     data: { data: artistsData }
+   } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' }));
+@@ -95,8 +94,6 @@ function ArtistPage() {
+   }, [sortingOrder]);
+ 
+   const selectAllHandler = useSelectAllHandler(artistsData, 'artist', 'artistId');
+-
+-  console.log('offset', currentlyActivePage?.data);
+   return (
+     <MainContainer
+       className="appear-from-bottom artists-list-container h-full! overflow-hidden pb-0!"
+@@ -167,7 +164,12 @@ function ArtistPage() {
+                 value={filteringOrder}
+                 options={artistFilterOptions}
+                 onChange={(e) => {
+-                  setFilteringOrder(e.currentTarget.value as ArtistFilterTypes);
++                  navigate({
++                    search: (prev) => ({
++                      ...prev,
++                      filteringOrder: e.currentTarget.value as ArtistFilterTypes
++                    })
++                  });
+                 }}
+               />
+               <Dropdown
+@@ -188,7 +190,7 @@ function ArtistPage() {
+           </div>
+         )}
+         <div
+-          className={`artists-container flex h-full! flex-wrap ${!(artistsData && artistsData.length > 0) && 'hidden'}`}
++          className={`artists-container flex h-full! flex-wrap ${!(artistsData && artistsData.length > 0) ? 'hidden' : ''}`}
+         >
+           {artistsData && artistsData.length > 0 && (
+             <VirtualizedGrid
+diff --git a/src/renderer/src/routes/main-player/home/index.tsx b/src/renderer/src/routes/main-player/home/index.tsx
+index 0d1dedc4..6afc9170 100644
+--- a/src/renderer/src/routes/main-player/home/index.tsx
++++ b/src/renderer/src/routes/main-player/home/index.tsx
+@@ -12,7 +12,7 @@ import SecondaryContainer from '@renderer/components/SecondaryContainer';
+ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+ import useResizeObserver from '@renderer/hooks/useResizeObserver';
+ import { queryClient } from '@renderer/index';
+-import { artistQuery } from '@renderer/queries/aritsts';
++import { artistQuery } from '@renderer/queries/artists';
+ import { homeQuery } from '@renderer/queries/home';
+ import { songQuery } from '@renderer/queries/songs';
+ import storage from '@renderer/utils/localStorage';
+diff --git a/src/renderer/src/routes/main-player/songs/index.tsx b/src/renderer/src/routes/main-player/songs/index.tsx
+index c6cd9ea4..70ea9f6d 100644
+--- a/src/renderer/src/routes/main-player/songs/index.tsx
++++ b/src/renderer/src/routes/main-player/songs/index.tsx
+@@ -473,7 +473,7 @@ function SongsPage() {
+           />
+         )}
+       </div>
+-      {songData === null && (
++      {songData.length === 0 && (
+         <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[8%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
+           <Img src={NoSongsImage} alt="" className="mb-8 w-60" />
+           <span>{t('songsPage.empty')}</span>
+

@@ -163,8 +163,6 @@ describe('parseSong', () => {
       await parseSong(songPath);
 
       const { saveSong } = await import('../../../../src/main/db/queries/songs');
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
-      const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
       const manageAlbumsOfParsedSong = (
         await import('../../../../src/main/parseSong/manageAlbumsOfParsedSong')
       ).default;
@@ -176,8 +174,6 @@ describe('parseSong', () => {
       ).default;
 
       expect(saveSong).toHaveBeenCalled();
-      expect(storeArtworks).toHaveBeenCalled();
-      expect(linkArtworksToSong).toHaveBeenCalled();
       expect(manageAlbumsOfParsedSong).toHaveBeenCalled();
       expect(manageArtistsOfParsedSong).toHaveBeenCalled();
       expect(manageGenresOfParsedSong).toHaveBeenCalled();
@@ -455,63 +451,7 @@ describe('parseSong', () => {
     });
   });
 
-  describe('Artwork Handling', () => {
-    test('should store artwork when present in metadata', async () => {
-      const songPath = '/test/artwork-song.mp3';
-      const mockMetadata = createMockSongMetadata({
-        pictures: [createMockPicture()]
-      });
 
-      const taglib = await import('node-taglib-sharp');
-      vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
-
-      await parseSong(songPath);
-
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
-      expect(storeArtworks).toHaveBeenCalledWith(
-        'songs',
-        expect.any(Uint8Array),
-        expect.anything()
-      );
-    });
-
-    test('should pass undefined when no artwork present', async () => {
-      const songPath = '/test/no-artwork-song.mp3';
-      const mockMetadata = createMockSongMetadata({
-        pictures: []
-      });
-
-      const taglib = await import('node-taglib-sharp');
-      vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
-
-      await parseSong(songPath);
-
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
-      expect(storeArtworks).toHaveBeenCalledWith('songs', undefined, expect.anything());
-    });
-
-    test('should link artworks to song', async () => {
-      const songPath = '/test/link-artwork-song.mp3';
-      const mockSongData = createMockSongData({ id: 42 });
-      const mockArtworkData = createMockArtworkData();
-
-      const { saveSong } = await import('../../../../src/main/db/queries/songs');
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
-      vi.mocked(saveSong).mockResolvedValue(mockSongData as any);
-      vi.mocked(storeArtworks).mockResolvedValue(mockArtworkData as any);
-
-      await parseSong(songPath);
-
-      const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
-      expect(linkArtworksToSong).toHaveBeenCalledWith(
-        [
-          { songId: 42, artworkId: 1 },
-          { songId: 42, artworkId: 2 }
-        ],
-        expect.anything()
-      );
-    });
-  });
 
   describe('Eligibility Checks', () => {
     test('should not parse if song already exists', async () => {
