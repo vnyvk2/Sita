@@ -137,17 +137,42 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             handlerFunction: () =>
               window.api.songUpdates.revealSongInFileExplorer(firstResult.songId)
           },
-          {
-            label: t('common.info'),
-            class: 'info',
-            iconName: 'info',
-            handlerFunction: () =>
-              navigate({
-                to: '/main-player/songs/$songId',
-                params: { songId: String(firstResult.songId) }
-              })
-          }
+          ...(firstResult.album?.albumId || (firstResult.artists && firstResult.artists.length > 0)
+            ? [
+                {
+                  label: t('common.info'),
+                  class: 'info',
+                  iconName: 'info',
+                  handlerFunction: () => {
+                    if (firstResult.album?.albumId) {
+                      navigate({
+                        to: '/main-player/albums/$albumId',
+                        params: { albumId: String(firstResult.album.albumId) }
+                      });
+                    } else if (firstResult.artists && firstResult.artists.length > 0) {
+                      navigate({
+                        to: '/main-player/artists/$artistId',
+                        params: { artistId: String(firstResult.artists[0].artistId) }
+                      });
+                    }
+                  }
+                }
+              ]
+            : [])
         ]}
+        onClick={() => {
+          if (firstResult.album?.albumId) {
+            navigate({
+              to: '/main-player/albums/$albumId',
+              params: { albumId: String(firstResult.album.albumId) }
+            });
+          } else if (firstResult.artists && firstResult.artists.length > 0) {
+            navigate({
+              to: '/main-player/artists/$artistId',
+              params: { artistId: String(firstResult.artists[0].artistId) }
+            });
+          }
+        }}
         highlightText={searchInput}
       />
     );

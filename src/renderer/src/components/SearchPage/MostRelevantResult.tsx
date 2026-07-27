@@ -20,6 +20,8 @@ export interface MostRelevantResultProp {
   contextMenuItems: ContextMenuItem[];
   /** When provided, highlights the matching portion of the title */
   highlightText?: string;
+  /** Optional custom click handler to override default navigation */
+  onClick?: () => void;
 }
 
 export const MostRelevantResult = (props: MostRelevantResultProp) => {
@@ -72,6 +74,7 @@ export const MostRelevantResult = (props: MostRelevantResultProp) => {
         updateContextMenuData(true, contextMenuItems, e.pageX, e.pageY);
       }}
       onClick={() => {
+        if (props.onClick) return props.onClick();
         if (resultType === 'song') return goToSongInfoPage(id);
         if (resultType === 'artist') return goToArtistInfoPage(id);
         if (resultType === 'album') return goToAlbumInfoPage(id);
