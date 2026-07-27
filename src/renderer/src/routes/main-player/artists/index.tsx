@@ -109,7 +109,7 @@ function ArtistPage() {
         if (e.ctrlKey && e.key.toLowerCase() === 'f') {
           e.preventDefault();
           e.stopPropagation();
-          search.ref.current?.focus();
+          search.inputRef.current?.focus();
         }
       }}
     >
@@ -139,9 +139,11 @@ function ArtistPage() {
             </div>
             <div className="other-control-container flex">
               <PageSearchInput
-                inputRef={search.ref}
+                inputRef={search.inputRef}
                 value={search.value}
                 onChange={search.onChange}
+                onCompositionStart={search.onCompositionStart}
+                onCompositionEnd={search.onCompositionEnd}
                 placeholder={t('searchPage.searchPlaceholderArtists', 'Search artists...')}
               />
               {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (

@@ -18,11 +18,12 @@ const HighlightedText = memo(({ text, highlight, className }: Props) => {
 
   const regex = new RegExp(`(${escapeRegex(highlight)})`, 'gi');
   const parts = text.split(regex);
+  const lowerHighlight = highlight.toLowerCase();
 
   return (
     <span className={className}>
       {parts.map((part, i) =>
-        regex.test(part) ? (
+        part.toLowerCase() === lowerHighlight ? (
           <mark
             key={i}
             className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 rounded-sm text-inherit"

@@ -111,7 +111,7 @@ function AlbumsPage() {
         if (e.ctrlKey && e.key.toLowerCase() === 'f') {
           e.preventDefault();
           e.stopPropagation();
-          search.ref.current?.focus();
+          search.inputRef.current?.focus();
         }
       }}
     >
@@ -138,9 +138,11 @@ function AlbumsPage() {
             </div>
             <div className="other-controls-container flex">
               <PageSearchInput
-                inputRef={search.ref}
+                inputRef={search.inputRef}
                 value={search.value}
                 onChange={search.onChange}
+                onCompositionStart={search.onCompositionStart}
+                onCompositionEnd={search.onCompositionEnd}
                 placeholder={t('searchPage.searchPlaceholderAlbums', 'Search albums...')}
               />
               {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' && (

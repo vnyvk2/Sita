@@ -16,9 +16,11 @@ import type {
 // Helpers
 // ---------------------------------------------------------------------------
 
+import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+
 function computeTier(text: string, keyword: string): MatchTierValue {
-  const t = text.toLowerCase();
-  const k = keyword.toLowerCase();
+  const t = normalizeForSearch(text);
+  const k = normalizeForSearch(keyword);
   if (t === k) return MATCH_TIER.EXACT;
   if (t.startsWith(k)) return MATCH_TIER.PREFIX;
   if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
@@ -42,8 +44,8 @@ export const AlbumSearchEngine = {
     const timer = timeStart();
 
     const whereClause = fuzzy
-      ? sql`(${albums.titleCI} ILIKE ${'%' + escaped + '%'} OR ${albums.titleCI} % ${normalized})`
-      : sql`${albums.titleCI} ILIKE ${'%' + escaped + '%'}`;
+      ? sql`(${albums.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${albums.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'} OR ${albums.titleCI} % ${normalized})`
+      : sql`(${albums.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${albums.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`;
 
     const orderByClause = sql`(
       CASE

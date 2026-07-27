@@ -71,9 +71,11 @@ const SONG_RELATIONS = {
   }
 } as const;
 
+import { normalizeForSearch } from '../../../common/search/normalizeForSearch';
+
 function computeTier(text: string, keyword: string): MatchTierValue {
-  const t = text.toLowerCase();
-  const k = keyword.toLowerCase();
+  const t = normalizeForSearch(text);
+  const k = normalizeForSearch(keyword);
   if (t === k) return MATCH_TIER.EXACT;
   if (t.startsWith(k)) return MATCH_TIER.PREFIX;
   if (t.includes(' ' + k)) return MATCH_TIER.WORD_PREFIX;
@@ -106,8 +108,8 @@ export const SongSearchEngine = {
 
     // --- TITLE SEARCH ---
     const titleWhereClause = fuzzy
-      ? sql`(${songs.titleCI} ILIKE ${'%' + escaped + '%'} OR ${songs.titleCI} % ${normalized})`
-      : sql`${songs.titleCI} ILIKE ${'%' + escaped + '%'}`;
+      ? sql`(${songs.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${songs.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'} OR ${songs.titleCI} % ${normalized})`
+      : sql`(${songs.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${songs.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`;
 
     const titleOrderBy = sql`(
       CASE
@@ -137,10 +139,10 @@ export const SongSearchEngine = {
       // Build WHERE conditions based on which metadata fields are enabled
       const metaConditions: ReturnType<typeof sql>[] = [];
       if (metadata.artist) {
-        metaConditions.push(sql`a.name_ci ILIKE ${'%' + escaped + '%'}`);
+        metaConditions.push(sql`(a.name_ci ILIKE ${'%' + escaped + '%'} OR regexp_replace(a.name_ci, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`);
       }
       if (metadata.album) {
-        metaConditions.push(sql`al.title_ci ILIKE ${'%' + escaped + '%'}`);
+        metaConditions.push(sql`(al.title_ci ILIKE ${'%' + escaped + '%'} OR regexp_replace(al.title_ci, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`);
       }
 
       const metaWhereClause =

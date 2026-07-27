@@ -58,6 +58,9 @@ const GENRE_WIDTH = 300;
  * @returns The React element tree for the search page, including controls, filters, and conditional
  *   result containers.
  */
+const DEFAULT_ENTITY_PRIORITY = ['songs', 'artists', 'albums', 'playlists', 'genres'] as const;
+type EntityType = (typeof DEFAULT_ENTITY_PRIORITY)[number];
+
 function SearchPage() {
   const isSimilaritySearchEnabledInLocalStorage = useStore(
     store,
@@ -116,11 +119,15 @@ function SearchPage() {
     }
   );
 
+  const isComposing = useRef(false);
+
   const updateSearchInput = (input: string) => {
     const value = input ?? '';
     setSearchText(value);
 
-    debouncedSetSearch(value);
+    if (!isComposing.current) {
+      debouncedSetSearch(value);
+    }
   };
 
   const { noOfArtists, noOfPlaylists, noOfAlbums, noOfGenres } = useMemo(() => {
@@ -133,8 +140,6 @@ function SearchPage() {
   }, [width]);
 
   // Dynamic section ordering based on confidence scores
-  const DEFAULT_ENTITY_PRIORITY = ['songs', 'artists', 'albums', 'playlists', 'genres'] as const;
-  type EntityType = (typeof DEFAULT_ENTITY_PRIORITY)[number];
 
   const sectionOrder = useMemo((): EntityType[] => {
     if (!searchResults?.confidence) return [...DEFAULT_ENTITY_PRIORITY];
@@ -301,6 +306,13 @@ function SearchPage() {
               placeholder={t('searchPage.searchForAnything')}
               value={searchText}
               onChange={(e) => updateSearchInput(e.currentTarget.value)}
+              onCompositionStart={() => {
+                isComposing.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                isComposing.current = false;
+                debouncedSetSearch(e.currentTarget.value);
+              }}
               onKeyDown={(e) => e.stopPropagation()}
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus

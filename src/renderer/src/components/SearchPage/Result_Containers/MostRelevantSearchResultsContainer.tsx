@@ -23,7 +23,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
   const { playSong, updateQueueData, createQueue, addNewNotifications } =
     useContext(AppUpdateContext);
 
-  const MostRelevantResults: ReactNode[] = [];
+  const mostRelevantItems: { element: ReactNode; confidence: number; index: number }[] = [];
 
   const [isOverScrolling, setIsOverScrolling] = useState(true);
   const mostRelevantResultContainerRef = useRef<HTMLDivElement>(null);
@@ -44,8 +44,11 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
 
   if (searchResults.songs.length > 0) {
     const firstResult = searchResults.songs[0];
-    MostRelevantResults.push(
-      <MostRelevantResult
+    mostRelevantItems.push({
+      confidence: searchResults.confidence?.songs ?? 0,
+      index: 0,
+      element: (
+        <MostRelevantResult
         resultType="song"
         title={firstResult.title}
         key={0}
@@ -175,13 +178,17 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
         }}
         highlightText={searchInput}
       />
-    );
+      )
+    });
   }
 
   if (searchResults.artists.length > 0) {
     const firstResult = searchResults.artists[0];
-    MostRelevantResults.push(
-      <MostRelevantResult
+    mostRelevantItems.push({
+      confidence: searchResults.confidence?.artists ?? 0,
+      index: 1,
+      element: (
+        <MostRelevantResult
         resultType="artist"
         title={firstResult.name}
         key={1}
@@ -254,13 +261,17 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
         ]}
         highlightText={searchInput}
       />
-    );
+      )
+    });
   }
 
   if (searchResults.albums.length > 0) {
     const firstResult = searchResults.albums[0];
-    MostRelevantResults.push(
-      <MostRelevantResult
+    mostRelevantItems.push({
+      confidence: searchResults.confidence?.albums ?? 0,
+      index: 2,
+      element: (
+        <MostRelevantResult
         resultType="album"
         title={firstResult.title}
         key={2}
@@ -326,13 +337,17 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
         ]}
         highlightText={searchInput}
       />
-    );
+      )
+    });
   }
 
   if (searchResults.playlists.length > 0) {
     const firstResult = searchResults.playlists[0];
-    MostRelevantResults.push(
-      <MostRelevantResult
+    mostRelevantItems.push({
+      confidence: searchResults.confidence?.playlists ?? 0,
+      index: 3,
+      element: (
+        <MostRelevantResult
         resultType="playlist"
         title={firstResult.name}
         key={3}
@@ -364,13 +379,17 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
         ]}
         highlightText={searchInput}
       />
-    );
+      )
+    });
   }
 
   if (searchResults.genres.length > 0) {
     const firstResult = searchResults.genres[0];
-    MostRelevantResults.push(
-      <MostRelevantResult
+    mostRelevantItems.push({
+      confidence: searchResults.confidence?.genres ?? 0,
+      index: 4,
+      element: (
+        <MostRelevantResult
         resultType="genre"
         title={firstResult.name}
         key={4}
@@ -408,8 +427,17 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
         ]}
         highlightText={searchInput}
       />
-    );
+      )
+    });
   }
+
+  mostRelevantItems.sort((a, b) => {
+    if (a.confidence !== b.confidence) {
+      return b.confidence - a.confidence;
+    }
+    return a.index - b.index;
+  });
+  const MostRelevantResults = mostRelevantItems.map((item) => item.element);
 
   return (
     <SecondaryContainer

@@ -12,6 +12,7 @@ export const usePageSearch = ({
 }) => {
   const [searchInput, setSearchInput] = useState(keyword ?? '');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const isComposing = useRef(false);
 
   useEffect(() => {
     setSearchInput((prev) => {
@@ -31,10 +32,30 @@ export const usePageSearch = ({
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setSearchInput(e.target.value);
-      debouncedSearch(e.target.value);
+      if (!isComposing.current) {
+        debouncedSearch(e.target.value);
+      }
     },
     [debouncedSearch]
   );
 
-  return { value: searchInput, inputRef: searchInputRef, onChange };
+  const onCompositionStart = useCallback(() => {
+    isComposing.current = true;
+  }, []);
+
+  const onCompositionEnd = useCallback(
+    (e: React.CompositionEvent<HTMLInputElement>) => {
+      isComposing.current = false;
+      debouncedSearch(e.currentTarget.value);
+    },
+    [debouncedSearch]
+  );
+
+  return { 
+    value: searchInput, 
+    inputRef: searchInputRef, 
+    onChange, 
+    onCompositionStart, 
+    onCompositionEnd 
+  };
 };
