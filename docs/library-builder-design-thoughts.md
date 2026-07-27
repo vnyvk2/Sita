@@ -162,6 +162,7 @@ Under the old system, a 12-track album resulted in 12 identical artwork extracti
 Jobs do not just exist in RAM. They have an explicit lifecycle:
 `Queued -> Running -> Completed -> Failed -> Cancelled`
 - **Retries:** Retries use a configurable retry policy with a sensible default (e.g., 3 retries). Someone may later decide to adjust this without changing the architecture.
+  - *Bug Note for Implementation:* The legacy `parseSong.ts` implementation had a bug causing infinite retry loops for unreadable files because it failed to persistently mark them as failed. The new scheduler MUST enforce the retry limit strictly and maintain an in-memory failure cache tied to the file's `mtimeMs` (last modified time). This ensures bad files are definitively skipped and only retried if the user explicitly modifies or replaces them.
 - **Failures:** Failure to generate a derived asset never invalidates successfully imported metadata.
 - **IPC:** Jobs communicate completion through events (e.g. `ARTWORK_READY`) rather than direct UI manipulation.
 
@@ -231,3 +232,10 @@ The scheduler exposes architectural metrics (e.g., `Jobs/sec`, `Queue depth`, `F
 
 ## Final Verdict
 This architecture follows the asynchronous asset-processing patterns used in large-scale media servers. It comfortably supports libraries ranging from a few hundred tracks to hundreds of thousands while remaining infinitely extensible for future features without ever needing another foundational redesign.
+
+---
+
+### Note on Legacy Parser Bug
+> **Note:** In legacy `parseSong.ts`, unreadable/corrupted files or incomplete downloads enter an infinite 5-second retry loop because the error handler deletes the path from the queue and re-triggers parsing on every watcher event or timeout without remembering past failures. This was left unfixed in the earlier version to be resolved during the Library Builder refactor.
+
+
