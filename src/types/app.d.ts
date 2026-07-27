@@ -880,11 +880,11 @@ declare global {
     availableResults: string[];
     /** Best match tier per entity section, used for dynamic section ordering */
     confidence: {
-      songs: import('../main/search/types/MatchTier').MatchTierValue;
-      artists: import('../main/search/types/MatchTier').MatchTierValue;
-      albums: import('../main/search/types/MatchTier').MatchTierValue;
-      playlists: import('../main/search/types/MatchTier').MatchTierValue;
-      genres: import('../main/search/types/MatchTier').MatchTierValue;
+      songs: import('../common/search/MatchTier').MatchTierValue;
+      artists: import('../common/search/MatchTier').MatchTierValue;
+      albums: import('../common/search/MatchTier').MatchTierValue;
+      playlists: import('../common/search/MatchTier').MatchTierValue;
+      genres: import('../common/search/MatchTier').MatchTierValue;
     };
   }
 

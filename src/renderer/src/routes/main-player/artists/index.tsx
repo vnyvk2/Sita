@@ -8,19 +8,20 @@ import Button from '@renderer/components/Button';
 import Dropdown from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
+import PageSearchInput from '@renderer/components/PageSearchInput';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { queryClient } from '@renderer/index';
 import { artistQuery } from '@renderer/queries/aritsts';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
-import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/artists/')({
@@ -68,27 +69,10 @@ function ArtistPage() {
     data: { data: artistsData }
   } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' }));
 
-  const [searchInput, setSearchInput] = useState(keyword ?? '');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setSearchInput((prev) => {
-      const next = keyword ?? '';
-      return prev !== next ? next : prev;
-    });
-  }, [keyword]);
-
-  const debouncedSearch = useDebouncedCallback(
-    (val: string) => {
-      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true });
-    },
-    { wait: 250 }
-  );
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchInput(e.target.value);
-    debouncedSearch(e.target.value);
-  };
+  const search = usePageSearch({
+    keyword,
+    updateSearch: (val) => navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
+  });
   // useEffect(() => {
   //   const manageArtistDataUpdatesInArtistsPage = (e: Event) => {
   //     if ('detail' in e) {
@@ -122,10 +106,10 @@ function ArtistPage() {
           e.stopPropagation();
           selectAllHandler();
         }
-        if (e.ctrlKey && e.key === 'f') {
+        if (e.ctrlKey && e.key.toLowerCase() === 'f') {
           e.preventDefault();
           e.stopPropagation();
-          searchInputRef.current?.focus();
+          search.ref.current?.focus();
         }
       }}
     >
@@ -154,14 +138,11 @@ function ArtistPage() {
               </div>
             </div>
             <div className="other-control-container flex">
-              <input
-                ref={searchInputRef}
-                type="search"
-                className="search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base"
+              <PageSearchInput
+                inputRef={search.ref}
+                value={search.value}
+                onChange={search.onChange}
                 placeholder={t('searchPage.searchPlaceholderArtists', 'Search artists...')}
-                value={searchInput}
-                onChange={handleSearchChange}
-                onKeyDown={(e) => e.stopPropagation()}
               />
               {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
                 <Button

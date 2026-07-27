@@ -9,8 +9,8 @@ import { GenreSearchEngine } from '../engines/GenreSearchEngine';
 import { PlaylistSearchEngine } from '../engines/PlaylistSearchEngine';
 import { SongSearchEngine } from '../engines/SongSearchEngine';
 import { normalizeQuery } from '../normalize/normalizeQuery';
-import { MATCH_TIER } from '../types/MatchTier';
-import type { MatchTierValue, SearchMatch } from '../types/MatchTier';
+import { MATCH_TIER } from '../../../common/search/MatchTier';
+import type { MatchTierValue, SearchMatch } from '../../../common/search/MatchTier';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -59,7 +59,7 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
   const timer = timeStart();
   const query = normalizeQuery(keyword);
 
-  const engineOptions: import('../types/MatchTier').SearchEngineOptions = {
+  const engineOptions: import('../../../common/search/MatchTier').SearchEngineOptions = {
     fuzzy: isSimilaritySearchEnabled,
     limit,
     metadata: typeof metadata === 'boolean'

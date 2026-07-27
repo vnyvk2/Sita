@@ -1,5 +1,5 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { SEARCH_LIMITS } from '../../../main/search/types/MatchTier';
+import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const artistQuery = createQueryKeys('artists', {
   all: (data: {

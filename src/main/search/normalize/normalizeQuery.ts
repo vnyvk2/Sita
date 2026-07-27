@@ -1,4 +1,4 @@
-import type { NormalizedQuery } from '../types/MatchTier';
+import type { NormalizedQuery } from '../../../common/search/MatchTier';
 
 /**
  * Normalize a search query for matching.

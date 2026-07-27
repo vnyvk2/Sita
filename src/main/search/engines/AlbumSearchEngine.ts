@@ -4,13 +4,13 @@ import { convertToAlbum } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
-import { MATCH_TIER, SEARCH_LIMITS } from '../types/MatchTier';
+import { MATCH_TIER, SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
   MatchTierValue,
   NormalizedQuery,
   SearchEngineOptions,
   SearchMatch
-} from '../types/MatchTier';
+} from '../../../common/search/MatchTier';
 
 // ---------------------------------------------------------------------------
 // Helpers
