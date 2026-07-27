@@ -24,6 +24,7 @@ const ArtistsSearchResultsContainer = (props: Props) => {
     store,
     (state) => state.multipleSelectionsData.isEnabled
   );
+
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -35,52 +36,44 @@ const ArtistsSearchResultsContainer = (props: Props) => {
       artists.length > 0
         ? artists
             .map((artist, index) => {
-              if (index < noOfVisibleArtists)
+              if (index < noOfVisibleArtists) {
                 return (
                   <Artist
+                    key={artist.artistId}
                     index={index}
-                    key={`${artist.artistId}-${artist.name}`}
+                    artistId={artist.artistId}
                     name={artist.name}
                     artworkPaths={artist.artworkPaths}
-                    artistId={artist.artistId}
-                    songIds={artist.songs.map((song) => song.songId)}
                     onlineArtworkPaths={artist.onlineArtworkPaths}
-                    className="mb-4"
+                    songIds={artist.songs.map((song) => song.songId)}
                     isAFavorite={artist.isAFavorite}
-                    selectAllHandler={selectAllHandler}
                   />
                 );
+              }
               return undefined;
             })
             .filter((artist) => artist !== undefined)
         : [],
-    [artists, noOfVisibleArtists, selectAllHandler]
+    [artists, noOfVisibleArtists]
   );
 
   return (
     <SecondaryContainer
-      className={`secondary-container artists-list-container mt-4 ${
-        artistResults.length > 0 ? 'active relative' : 'invisible absolute opacity-0'
-      }`}
-      focusable
-      onKeyDown={(e) => {
-        if (e.ctrlKey && e.key === 'a') {
-          e.stopPropagation();
-          selectAllHandler();
-        }
-      }}
+      className={`secondary-container artists-list-container ${artists.length > 0 ? 'mt-4' : ''}`}
     >
       <>
-        <div
-          className={`title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-2xl font-medium ${
-            artistResults.length > 0 && 'visible opacity-100'
-          }`}
-        >
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mb-8 flex items-center pr-4 text-2xl font-medium">
           <div className="container flex">
-            Artists{' '}
-            <div className="other-stats-container ml-12 flex items-center text-xs">
-              {artists && artists.length > 0 && (
-                <span className="no-of-songs">
+            {t('common.artist_other')}{' '}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
+                <span className="no-of-artists">
                   {t(
                     `searchPage.${
                       artists.length > noOfVisibleArtists ? 'resultAndVisibleCount' : 'resultCount'
@@ -92,14 +85,16 @@ const ArtistsSearchResultsContainer = (props: Props) => {
             </div>
           </div>
           <div className="other-controls-container flex">
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
             <Button
-              label={t(
-                `common.${
-                  isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist'
-                    ? 'unselectAll'
-                    : 'select'
-                }`
-              )}
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName={
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist'

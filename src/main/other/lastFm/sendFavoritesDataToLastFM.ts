@@ -50,7 +50,11 @@ const sendFavoritesDataToLastFM = async (method: Method, title: string, artists:
     const isConnectedToInternet = checkIfConnectedToInternet();
 
     if (!isConnectedToInternet) {
-      await insertScrobble({ operationType: method, trackTitle: title, artistNames: artists.join(', ') });
+      await insertScrobble({
+        operationType: method,
+        trackTitle: title,
+        artistNames: artists.join(', ')
+      });
       return logger.debug('Love/Unlove queued for later - offline', { method, title });
     }
 
@@ -83,7 +87,11 @@ const sendFavoritesDataToLastFM = async (method: Method, title: string, artists:
 
     const json: LastFMLoveUnlovePostResponse = await res.json();
 
-    await insertScrobble({ operationType: method, trackTitle: title, artistNames: artists.join(', ') });
+    await insertScrobble({
+      operationType: method,
+      trackTitle: title,
+      artistNames: artists.join(', ')
+    });
     return logger.warn('Failed the request to LastFM about love/unlove song, queued for retry.', {
       json,
       method,
@@ -91,13 +99,20 @@ const sendFavoritesDataToLastFM = async (method: Method, title: string, artists:
       artists
     });
   } catch (error) {
-    await insertScrobble({ operationType: method, trackTitle: title, artistNames: artists.join(', ') }).catch(() => {});
-    return logger.error('Failed to send data about making a song a favorite to LastFM, queued for retry.', {
-      error,
-      method,
-      title,
-      artists
-    });
+    await insertScrobble({
+      operationType: method,
+      trackTitle: title,
+      artistNames: artists.join(', ')
+    }).catch(() => {});
+    return logger.error(
+      'Failed to send data about making a song a favorite to LastFM, queued for retry.',
+      {
+        error,
+        method,
+        title,
+        artists
+      }
+    );
   }
 };
 

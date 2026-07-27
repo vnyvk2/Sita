@@ -159,7 +159,13 @@ export const Playlist = (props: PlaylistProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, queue.queues[queue.currentQueueIndex].songIds, t, updateQueueData]);
+  }, [
+    addNewNotifications,
+    multipleSelectionsData,
+    queue.queues[queue.currentQueueIndex].songIds,
+    t,
+    updateQueueData
+  ]);
 
   const contextMenus: ContextMenuItem[] = useMemo(() => {
     const { multipleSelections: playlistIds } = multipleSelectionsData;

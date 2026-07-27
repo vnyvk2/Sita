@@ -10,7 +10,7 @@ export interface QueueManagementDependencies {
 export function useQueueManagement(dependencies: QueueManagementDependencies) {
   const { playSong } = dependencies;
   const manager = getQueuesManager();
-  
+
   const getActiveQueue = useCallback(() => manager.getActiveQueue(), [manager]);
 
   const createQueue = useCallback(
@@ -51,21 +51,21 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
       restoreAndClearPreviousQueue = false
     ) => {
       const playerQueue = getActiveQueue();
-      
+
       if (queue) {
         playerQueue.replaceQueue(queue, currentSongIndex ?? playerQueue.position, false);
       } else if (currentSongIndex !== undefined) {
         playerQueue.moveToPosition(currentSongIndex);
       }
-      
+
       if (isShuffleQueue) {
         playerQueue.shuffle();
       }
-      
+
       if (restoreAndClearPreviousQueue) {
         playerQueue.clearShuffleHistory();
       }
-      
+
       if (playCurrentSongIndex && playerQueue.currentSongId) {
         playSong(playerQueue.currentSongId, true);
       }

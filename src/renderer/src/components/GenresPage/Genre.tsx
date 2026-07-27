@@ -155,7 +155,13 @@ const Genre = (props: GenreProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, queue.queues[queue.currentQueueIndex].songIds, t, updateQueueData]);
+  }, [
+    addNewNotifications,
+    multipleSelectionsData,
+    queue.queues[queue.currentQueueIndex].songIds,
+    t,
+    updateQueueData
+  ]);
 
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;

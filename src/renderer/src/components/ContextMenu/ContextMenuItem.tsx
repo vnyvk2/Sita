@@ -16,7 +16,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
       <div
         className={`menu-item ${
           props.class || ''
-        } text-font-color-black hover:bg-context-menu-list-hover/75 dark:text-font-color-white dark:hover:bg-dark-context-menu-list-hover/25 flex cursor-pointer flex-row items-center px-4 py-1 text-sm font-light justify-between`}
+        } text-font-color-black hover:bg-context-menu-list-hover/75 dark:text-font-color-white dark:hover:bg-dark-context-menu-list-hover/25 flex cursor-pointer flex-row items-center justify-between px-4 py-1 text-sm font-light`}
         onClick={(e) => {
           e.stopPropagation();
           if (hasInnerMenus) {
@@ -36,7 +36,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
           {props.label}
         </div>
         {hasInnerMenus && (
-          <span className="material-icons-round text-lg ml-4 opacity-50">
+          <span className="material-icons-round ml-4 text-lg opacity-50">
             {isExpanded ? 'expand_less' : 'expand_more'}
           </span>
         )}
@@ -48,7 +48,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
             isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
-          <div className="pl-6 py-1 border-l-2 border-font-color-black/10 dark:border-font-color-white/10 ml-4 my-1">
+          <div className="border-font-color-black/10 dark:border-font-color-white/10 my-1 ml-4 border-l-2 py-1 pl-6">
             {props.innerContextMenus?.map((innerItem, index) => (
               <ContextMenuItem key={`${innerItem.label}-${index}`} {...innerItem} />
             ))}

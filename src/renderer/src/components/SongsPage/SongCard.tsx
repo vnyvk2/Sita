@@ -191,7 +191,9 @@ const SongCard = (props: SongCardProp) => {
         iconName: 'shortcut',
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) {
-            let currentSongIndex = queue.queues[queue.currentQueueIndex].position ?? queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
+            let currentSongIndex =
+              queue.queues[queue.currentQueueIndex].position ??
+              queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
             const duplicateIds: number[] = [];
 
             const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => {
@@ -202,7 +204,8 @@ const SongCard = (props: SongCardProp) => {
             });
 
             for (const duplicateId of duplicateIds) {
-              const duplicateIdPosition = queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
+              const duplicateIdPosition =
+                queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
 
               if (
                 duplicateIdPosition !== -1 &&
@@ -225,13 +228,18 @@ const SongCard = (props: SongCardProp) => {
               }
             ]);
           } else {
-            const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => id !== songId);
+            const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter(
+              (id) => id !== songId
+            );
             newQueue.splice(newQueue.indexOf(currentSongData.songId) + 1 || 0, 0, songId);
 
-            const duplicateSongIndex = queue.queues[queue.currentQueueIndex].songIds.indexOf(songId);
+            const duplicateSongIndex =
+              queue.queues[queue.currentQueueIndex].songIds.indexOf(songId);
 
             const currentSongIndex =
-              queue.queues[queue.currentQueueIndex].position && duplicateSongIndex !== -1 && duplicateSongIndex < queue.queues[queue.currentQueueIndex].position
+              queue.queues[queue.currentQueueIndex].position &&
+              duplicateSongIndex !== -1 &&
+              duplicateSongIndex < queue.queues[queue.currentQueueIndex].position
                 ? queue.queues[queue.currentQueueIndex].position - 1
                 : undefined;
 
@@ -252,7 +260,11 @@ const SongCard = (props: SongCardProp) => {
         iconName: 'queue',
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) {
-            updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...songIds], false);
+            updateQueueData(
+              undefined,
+              [...queue.queues[queue.currentQueueIndex].songIds, ...songIds],
+              false
+            );
             addNewNotifications([
               {
                 id: `${songIds.length}AddedToQueueFromMultiSelection`,
@@ -263,7 +275,11 @@ const SongCard = (props: SongCardProp) => {
               }
             ]);
           } else {
-            updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, songId], false);
+            updateQueueData(
+              undefined,
+              [...queue.queues[queue.currentQueueIndex].songIds, songId],
+              false
+            );
             addNewNotifications([
               {
                 id: `${title}AddedToQueue`,
@@ -559,7 +575,9 @@ const SongCard = (props: SongCardProp) => {
             {typeof queue.queues[queue.currentQueueIndex].position === 'number' &&
               Array.isArray(queue.queues[queue.currentQueueIndex].songIds) &&
               queue.queues[queue.currentQueueIndex].songIds.length > 0 &&
-              queue?.queues[queue.currentQueueIndex]?.songIds?.at(queue.queues[queue.currentQueueIndex].position + 1) === songId && (
+              queue?.queues[queue.currentQueueIndex]?.songIds?.at(
+                queue.queues[queue.currentQueueIndex].position + 1
+              ) === songId && (
                 <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
                   {t('song.playingNext')}
                 </span>
@@ -574,7 +592,9 @@ const SongCard = (props: SongCardProp) => {
                 typeof queue.queues[queue.currentQueueIndex].position === 'number' &&
                 Array.isArray(queue.queues[queue.currentQueueIndex].songIds) &&
                 queue.queues[queue.currentQueueIndex].songIds.length > 0 &&
-                queue?.queues[queue.currentQueueIndex]?.songIds?.at(queue.queues[queue.currentQueueIndex].position + 1) === songId &&
+                queue?.queues[queue.currentQueueIndex]?.songIds?.at(
+                  queue.queues[queue.currentQueueIndex].position + 1
+                ) === songId &&
                 currentSongData.songId === songId
               ) && (
                 <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">

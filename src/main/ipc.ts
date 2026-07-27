@@ -22,6 +22,7 @@ import { getAllHistorySongs } from './core/getAllHistorySongs';
 import getAllSongs from './core/getAllSongs';
 import getArtistInfoFromNet from './core/getArtistInfoFromNet';
 import getArtworksForMultipleArtworksCover from './core/getArtworksForMultipleArtworksCover';
+import getBlacklistData from './core/getBlacklistData';
 import { getArtistDuplicates } from './core/getDuplicates';
 import { getFolderStructures } from './core/getFolderStructures';
 import getGenresInfo from './core/getGenresInfo';
@@ -68,7 +69,6 @@ import {
   getUserEqualizerPreset,
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
-import getBlacklistData from './core/getBlacklistData';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import logger, { logFilePath } from './logger';
 import {
@@ -166,7 +166,9 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       addSongsFromFolderStructures(structures)
     );
 
-    ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) => sendAudioData(id, updateListeningRate));
+    ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) =>
+      sendAudioData(id, updateListeningRate)
+    );
 
     ipcMain.handle('app/getSongFromUnknownSource', (_, songPath: string) =>
       sendAudioDataFromPath(songPath)
@@ -548,10 +550,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/changePlayerType', (_, type: PlayerTypes) => changePlayerType(type));
 
-    ipcMain.on(
-      'app/toggleMiniPlayerQueue',
-      (_, isExpanded: boolean, queueItemCount?: number) =>
-        expandMiniPlayer(isExpanded, queueItemCount)
+    ipcMain.on('app/toggleMiniPlayerQueue', (_, isExpanded: boolean, queueItemCount?: number) =>
+      expandMiniPlayer(isExpanded, queueItemCount)
     );
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>
@@ -560,16 +560,17 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/showMiniPlayerContextMenu', (event, template: any[]) => {
       return new Promise((resolve) => {
-        const buildMenu = (items: any[]): any[] => items.map((item) => {
-          const newItem = { ...item };
-          if (newItem.submenu) {
-            newItem.submenu = buildMenu(newItem.submenu);
-          }
-          if (newItem.id && !newItem.submenu && newItem.type !== 'separator') {
-            newItem.click = () => resolve(newItem.id);
-          }
-          return newItem;
-        });
+        const buildMenu = (items: any[]): any[] =>
+          items.map((item) => {
+            const newItem = { ...item };
+            if (newItem.submenu) {
+              newItem.submenu = buildMenu(newItem.submenu);
+            }
+            if (newItem.id && !newItem.submenu && newItem.type !== 'separator') {
+              newItem.click = () => resolve(newItem.id);
+            }
+            return newItem;
+          });
 
         const menu = Menu.buildFromTemplate(buildMenu(template));
         const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;

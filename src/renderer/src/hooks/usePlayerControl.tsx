@@ -104,7 +104,7 @@ export function usePlayerControl(
               dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: songData });
               storage.playback.setCurrentSongOptions('songId', songData.songId);
               player.src = `${songData.path}?ts=${Date.now()}`;
-              
+
               const trackChangeEvent = new CustomEvent('player/trackchange', {
                 detail: songId
               });

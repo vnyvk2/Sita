@@ -76,7 +76,9 @@ const updateStructure = (
 ): FolderStructure[] => {
   let isFound = false;
 
-  const filteredMusicFolders = musicFolders.filter((folder) => !isSubPath(structure.path, folder.path));
+  const filteredMusicFolders = musicFolders.filter(
+    (folder) => !isSubPath(structure.path, folder.path)
+  );
 
   for (const folder of filteredMusicFolders) {
     if (folder.path === structure.path) {

@@ -10,8 +10,8 @@ import { queryClient } from '@renderer/index';
 import { genreQuery } from '@renderer/queries/genres';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import storage from '@renderer/utils/localStorage';
+import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -27,11 +27,14 @@ export const Route = createFileRoute('/main-player/genres/$genreId')({
 });
 
 /**
- * Renders the Genre Info page for the main player, showing genre details, a virtualized list of songs, and controls for playback, queueing, sorting, and filtering.
+ * Renders the Genre Info page for the main player, showing genre details, a virtualized list of
+ * songs, and controls for playback, queueing, sorting, and filtering.
  *
- * The component persists and initializes the sort order from local storage, provides keyboard selection (Ctrl+A), and exposes actions to play, shuffle, and add genre songs to the queue.
+ * The component persists and initializes the sort order from local storage, provides keyboard
+ * selection (Ctrl+A), and exposes actions to play, shuffle, and add genre songs to the queue.
  *
- * @returns The page element containing the genre header, action buttons and dropdowns, and a virtualized list of songs for the current genre.
+ * @returns The page element containing the genre header, action buttons and dropdowns, and a
+ *   virtualized list of songs for the current genre.
  */
 function GenreInfoPage() {
   const queue = useStore(store, (state) => state.localStorage.queue);
@@ -41,8 +44,7 @@ function GenreInfoPage() {
     (state) => state.localStorage.sortingStates?.genreDetailPage || 'aToZ'
   );
 
-  const { createQueue, updateQueueData, addNewNotifications } =
-    useContext(AppUpdateContext);
+  const { createQueue, updateQueueData, addNewNotifications } = useContext(AppUpdateContext);
 
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -100,7 +102,7 @@ function GenreInfoPage() {
         className="pr-4"
         buttons={[
           {
-            label: t('common.playAll'),
+            tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: () =>
               createQueue(
@@ -113,6 +115,7 @@ function GenreInfoPage() {
             isDisabled: !(genreData && genreSongs.length > 0)
           },
           {
+            tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: () =>
               createQueue(
@@ -125,11 +128,15 @@ function GenreInfoPage() {
             isDisabled: !(genreData && genreSongs.length > 0)
           },
           {
+            tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: () => {
               updateQueueData(
                 undefined,
-                [...queue.queues[queue.currentQueueIndex].songIds, ...genreSongs.map((song) => song.songId)],
+                [
+                  ...queue.queues[queue.currentQueueIndex].songIds,
+                  ...genreSongs.map((song) => song.songId)
+                ],
                 false,
                 false
               );

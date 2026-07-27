@@ -26,7 +26,7 @@ const resolveSongPath = (text: string, m3uDir: string): string | null => {
   if (textLine.startsWith('#') || textLine.length === 0) return null;
 
   const absolutePath = path.isAbsolute(textLine) ? textLine : path.resolve(m3uDir, textLine);
-  
+
   const ext = path.extname(absolutePath).split('.').pop() || '';
   if (appPreferences.supportedMusicExtensions.includes(ext.toLowerCase())) {
     return absolutePath;
@@ -55,11 +55,10 @@ const importPlaylist = async (targetPlaylistId?: number) => {
         const songPathsRaw = textArr
           .map((line) => resolveSongPath(line, m3uDir))
           .filter((line): line is string => line !== null);
-          
+
         const songPaths = Array.from(new Set(songPathsRaw));
 
         if (songPaths.length > 0) {
-
           const availableSongs = await getSongsInPathList(songPaths);
 
           for (const songPath of songPaths) {
@@ -85,9 +84,9 @@ const importPlaylist = async (targetPlaylistId?: number) => {
               messageCode: 'PLAYLIST_IMPORT_FAILED_DUE_TO_SONGS_OUTSIDE_LIBRARY',
               data: { count: unavailableSongPaths.length }
             });
-            
+
             if (availSongIdsForPlaylist.length === 0) {
-               return; // Exit early if NO songs are available, so it doesn't fall through to invalid data
+              return; // Exit early if NO songs are available, so it doesn't fall through to invalid data
             }
           }
 

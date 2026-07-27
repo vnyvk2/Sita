@@ -96,7 +96,7 @@ export class QueuesManager {
     const newQueue = new PlayerQueue(songIds, 0, undefined, { title: queueTitle });
     this.queues.push(newQueue);
     this.bindQueueEvents(newQueue);
-    
+
     this.triggerStoreSync();
     this.emit('queuesChanged');
     return newQueue;
@@ -135,7 +135,7 @@ export class QueuesManager {
 
       this.triggerStoreSync();
       this.emit('queuesChanged');
-      
+
       if (activeQueueChanged) {
         this.emit('activeQueueChanged');
       }
@@ -160,8 +160,10 @@ export class QueuesManager {
 
   reorderQueues(startIndex: number, endIndex: number) {
     if (
-      startIndex >= 0 && startIndex < this.queues.length &&
-      endIndex >= 0 && endIndex < this.queues.length &&
+      startIndex >= 0 &&
+      startIndex < this.queues.length &&
+      endIndex >= 0 &&
+      endIndex < this.queues.length &&
       startIndex !== endIndex
     ) {
       const activeQueueWasReordered = this.activeQueueIndex === startIndex;
@@ -169,7 +171,7 @@ export class QueuesManager {
       const [removed] = result.splice(startIndex, 1);
       result.splice(endIndex, 0, removed);
       this.queues = result;
-      
+
       // Update activeQueueIndex to reflect the shift
       if (activeQueueWasReordered) {
         this.activeQueueIndex = endIndex;
@@ -296,7 +298,7 @@ export class QueuesManager {
               return PlayerQueue.fromJSON(qState);
             });
             this.queues.forEach((q) => this.bindQueueEvents(q));
-            
+
             this.activeQueueIndex = storeQueuesState.currentQueueIndex;
             this.emit('queuesChanged');
             if (indexChanged) {
@@ -307,7 +309,7 @@ export class QueuesManager {
             for (let i = 0; i < this.queues.length; i++) {
               const q = this.queues[i];
               const sq = storeQueuesState.queues[i];
-              
+
               if (!sq || !Array.isArray(sq.songIds)) {
                 console.error('Invalid queue state restored', sq);
                 continue;

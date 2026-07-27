@@ -3,11 +3,11 @@ import { useStore } from '@tanstack/react-store';
 import { useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
 import NavLink from '../NavLink';
-import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
 import SeekBarContainer from './SeekBarContainer';
 
 const SongControlsAndSeekbarContainer = () => {
@@ -123,7 +123,7 @@ const SongControlsAndSeekbarContainer = () => {
         >
           <img
             src={CustomLyricsIcon}
-            className="h-6 w-6 opacity-60 transition-opacity hover:opacity-80 group-[.active]:opacity-100"
+            className="h-6 w-6 opacity-60 transition-opacity group-[.active]:opacity-100 hover:opacity-80"
             alt="Lyrics"
           />
         </NavLink>

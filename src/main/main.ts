@@ -801,16 +801,17 @@ function ensureWindowIsVisible(window: BrowserWindow) {
   if (!window) return;
   const bounds = window.getBounds();
   const display = screen.getDisplayMatching(bounds);
-  
-  const isOffScreen = (
+
+  const isOffScreen =
     bounds.x < display.bounds.x - bounds.width / 2 ||
     bounds.x > display.bounds.x + display.bounds.width - bounds.width / 2 ||
     bounds.y < display.bounds.y - bounds.height / 2 ||
-    bounds.y > display.bounds.y + display.bounds.height - bounds.height / 2
-  );
+    bounds.y > display.bounds.y + display.bounds.height - bounds.height / 2;
 
   if (isOffScreen) {
-    logger.info(`Window is off-screen. Centering it. Bounds: ${JSON.stringify(bounds)}, Display: ${JSON.stringify(display.bounds)}`);
+    logger.info(
+      `Window is off-screen. Centering it. Bounds: ${JSON.stringify(bounds)}, Display: ${JSON.stringify(display.bounds)}`
+    );
     window.center();
   }
 }
@@ -908,7 +909,7 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     // Determine available screen space using compact boundaries
     const display = screen.getDisplayMatching(mainWindow.getBounds());
     const workArea = display.workArea;
-    const spaceBelow = (workArea.y + workArea.height) - (baseY + baseHeight);
+    const spaceBelow = workArea.y + workArea.height - (baseY + baseHeight);
     const spaceAbove = baseY - workArea.y;
 
     // Decide direction: pick whichever direction can show MORE of the queue.

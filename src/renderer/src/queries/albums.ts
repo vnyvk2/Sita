@@ -1,12 +1,7 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
 
 export const albumQuery = createQueryKeys('albums', {
-  all: (data: {
-    sortType?: AlbumSortTypes;
-    start?: number;
-    end?: number;
-    limit?: number;
-  }) => {
+  all: (data: { sortType?: AlbumSortTypes; start?: number; end?: number; limit?: number }) => {
     const { sortType = 'aToZ', start = 0, end = 0 } = data;
 
     return {

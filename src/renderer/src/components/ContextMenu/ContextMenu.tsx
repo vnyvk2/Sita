@@ -67,12 +67,7 @@ const ContextMenu = memo(() => {
                 className="context-menu-item-seperator float-right my-2 h-[1px] w-[95%] bg-[hsla(0deg,0%,57%,0.5)]"
               />
             );
-          return (
-            <ContextMenuItem
-              key={menuItem.label}
-              {...menuItem}
-            />
-          );
+          return <ContextMenuItem key={menuItem.label} {...menuItem} />;
         }),
     [menuItems]
   );

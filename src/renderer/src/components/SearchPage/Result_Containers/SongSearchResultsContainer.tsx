@@ -5,6 +5,7 @@ import { useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
+import useSelectAllHandler from '../../../hooks/useSelectAllHandler';
 import Button from '../../Button';
 import SecondaryContainer from '../../SecondaryContainer';
 import Song from '../../SongsPage/Song';
@@ -23,11 +24,13 @@ const SongSearchResultsContainer = (props: Props) => {
     store,
     (state) => state.multipleSelectionsData.isEnabled
   );
-  const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { toggleMultipleSelections, createQueue, updateQueueData } = useContext(AppUpdateContext);
+  const { createQueue, updateQueueData, toggleMultipleSelections } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const preferences = useStore(store, (state) => state.localStorage.preferences);
   const navigate = useNavigate();
+
+  const selectAllHandler = useSelectAllHandler(songs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
@@ -71,20 +74,20 @@ const SongSearchResultsContainer = (props: Props) => {
 
   return (
     <SecondaryContainer
-      className={`secondary-container songs-list-container ${
-        songResults.length > 0 ? 'active relative mt-8' : 'absolute mt-4'
-      }`}
+      className={`secondary-container songs-list-container ${songs.length > 0 ? 'mt-4' : ''}`}
     >
       <>
-        <div
-          className={`title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-2xl font-medium ${
-            songResults.length > 0 ? 'visible opacity-100' : 'invisible opacity-0'
-          }`}
-        >
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mb-8 flex items-center pr-4 text-2xl font-medium">
           <div className="container flex">
-            Songs{' '}
-            <div className="other-stats-container ml-12 flex items-center text-xs">
-              {songs && songs.length > 0 && (
+            {t('common.song_other')}{' '}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
                 <span className="no-of-songs">
                   {t(
                     `searchPage.${
@@ -97,14 +100,16 @@ const SongSearchResultsContainer = (props: Props) => {
             </div>
           </div>
           <div className="other-controls-container flex">
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
             <Button
-              label={t(
-                `common.${
-                  isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs'
-                    ? 'unselectAll'
-                    : 'select'
-                }`
-              )}
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName={
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs'

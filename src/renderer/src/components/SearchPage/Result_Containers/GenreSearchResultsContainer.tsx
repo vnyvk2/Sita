@@ -58,23 +58,22 @@ const GenreSearchResultsContainer = (props: Props) => {
 
   return (
     <SecondaryContainer
-      className={`secondary-container genres-list-container appear-from=bottom text-font-color-black dark:text-font-color-white mt-4 ${
-        genreResults.length > 0 ? 'active relative' : 'invisible absolute'
+      className={`secondary-container genres-list-container appear-from=bottom text-font-color-black dark:text-font-color-white ${
+        genres.length > 0 ? 'mt-4' : ''
       }`}
-      focusable
-      onKeyDown={(e) => {
-        if (e.ctrlKey && e.key === 'a') {
-          e.stopPropagation();
-          selectAllHandler();
-        }
-      }}
     >
       <>
-        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-2xl font-medium">
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mb-8 flex items-center pr-4 text-2xl font-medium">
           <div className="container flex">
-            Genres
-            <div className="other-stats-container ml-12 flex items-center text-xs">
-              {genres.length > 0 && (
+            {t('common.genre_other')}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
                 <div className="no-of-genres">
                   {t(
                     `searchPage.${
@@ -87,14 +86,16 @@ const GenreSearchResultsContainer = (props: Props) => {
             </div>
           </div>
           <div className="other-controls-container flex">
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
             <Button
-              label={t(
-                `common.${
-                  isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre'
-                    ? 'unselectAll'
-                    : 'select'
-                }`
-              )}
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName={
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre'

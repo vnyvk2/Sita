@@ -71,7 +71,10 @@ const getArtworkBuffer = async (artworkPath: string) => {
   }
 };
 
-const sendAudioData = async (songId: number, updateListeningRate = true): Promise<AudioPlayerData> => {
+const sendAudioData = async (
+  songId: number,
+  updateListeningRate = true
+): Promise<AudioPlayerData> => {
   logger.debug(`Fetching song data for song id -${songId}-`);
   try {
     const song = await getPlayableSongById(songId);

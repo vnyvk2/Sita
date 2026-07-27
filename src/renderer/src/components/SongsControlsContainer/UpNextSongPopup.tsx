@@ -83,9 +83,15 @@ const UpNextSongPopup = (props: Props) => {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     let timeIntervalId: NodeJS.Timeout;
-    if (queue.queues[queue.currentQueueIndex].songIds.length > 1 && queue.queues[queue.currentQueueIndex].position !== null) {
+    if (
+      queue.queues[queue.currentQueueIndex].songIds.length > 1 &&
+      queue.queues[queue.currentQueueIndex].position !== null
+    ) {
       setUpNextSongData(undefined);
-      const nextSongIndex = queue.queues[queue.currentQueueIndex].songIds[queue.queues[queue.currentQueueIndex].position + 1];
+      const nextSongIndex =
+        queue.queues[queue.currentQueueIndex].songIds[
+          queue.queues[queue.currentQueueIndex].position + 1
+        ];
 
       if (nextSongIndex) {
         timeoutId = setTimeout(
@@ -113,7 +119,11 @@ const UpNextSongPopup = (props: Props) => {
       if (timeoutId) clearTimeout(timeoutId);
       if (timeIntervalId) clearInterval(timeIntervalId);
     };
-  }, [queue.queues[queue.currentQueueIndex].position, queue.queues[queue.currentQueueIndex].songIds, showPopup]);
+  }, [
+    queue.queues[queue.currentQueueIndex].position,
+    queue.queues[queue.currentQueueIndex].songIds,
+    showPopup
+  ]);
 
   const showSongInfoPage = useCallback(
     (songId: number) =>

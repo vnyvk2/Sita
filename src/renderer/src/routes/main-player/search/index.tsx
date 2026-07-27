@@ -10,10 +10,11 @@ import SongSearchResultsContainer from '@renderer/components/SearchPage/Result_C
 import { searchFilter } from '@renderer/components/SearchPage/SearchOptions';
 import SearchResultsFilter from '@renderer/components/SearchPage/SearchResultsFilter';
 import SearchStartPlaceholder from '@renderer/components/SearchPage/SearchStartPlaceholder';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { searchQuery } from '@renderer/queries/search';
 import { store } from '@renderer/store/store';
-import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';
 import { useThrottledCallback } from '@tanstack/react-pacer';
@@ -21,7 +22,6 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useMemo, useRef, useState, useContext, useEffect } from 'react';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/search/')({
@@ -51,11 +51,12 @@ const GENRE_WIDTH = 300;
 /**
  * Render the main-player search page with input controls, filters, and result sections.
  *
- * The component displays a search input with a toggle for similarity/predictive search, a set of result filters,
- * and conditionally renders various search result containers (songs, artists, albums, playlists, genres, most relevant)
- * or placeholders based on the current search state.
+ * The component displays a search input with a toggle for similarity/predictive search, a set of
+ * result filters, and conditionally renders various search result containers (songs, artists,
+ * albums, playlists, genres, most relevant) or placeholders based on the current search state.
  *
- * @returns The React element tree for the search page, including controls, filters, and conditional result containers.
+ * @returns The React element tree for the search page, including controls, filters, and conditional
+ *   result containers.
  */
 function SearchPage() {
   const isSimilaritySearchEnabledInLocalStorage = useStore(
@@ -206,26 +207,32 @@ function SearchPage() {
             <>
               <Button
                 key="add-to-queue-btn"
-                className="add-to-queue-btn text-sm md:text-lg bg-background-color-3 dark:bg-dark-background-color-3 px-6 py-2 rounded-full font-semibold ml-4 flex items-center shadow-sm"
+                className="add-to-queue-btn bg-background-color-3 dark:bg-dark-background-color-3 ml-4 flex items-center rounded-full px-6 py-2 text-sm font-semibold shadow-sm md:text-lg"
                 iconName="add"
                 label={t('currentQueuePage.addSongs', 'Add to Queue')}
-                isDisabled={multipleSelectionsData.multipleSelections.length === 0 || multipleSelectionsData.selectionType !== 'songs'}
+                isDisabled={
+                  multipleSelectionsData.multipleSelections.length === 0 ||
+                  multipleSelectionsData.selectionType !== 'songs'
+                }
                 clickHandler={() => {
                   const manager = getQueuesManager();
                   const targetQueueIndex = queueIndex ?? manager.activeQueueIndex;
                   const targetQueueId = manager.queues[targetQueueIndex]?.id;
-                  
+
                   if (targetQueueId) {
-                    manager.addSongsToQueue(targetQueueId, multipleSelectionsData.multipleSelections as number[]);
+                    manager.addSongsToQueue(
+                      targetQueueId,
+                      multipleSelectionsData.multipleSelections as number[]
+                    );
                   }
-                  
+
                   toggleMultipleSelections(false, 'songs');
                   history.back();
                 }}
               />
               <Button
                 key="cancel-btn"
-                className="cancel-btn text-sm md:text-lg ml-2"
+                className="cancel-btn ml-2 text-sm md:text-lg"
                 iconName="close"
                 tooltipLabel={t('common.cancel', 'Cancel')}
                 clickHandler={() => {

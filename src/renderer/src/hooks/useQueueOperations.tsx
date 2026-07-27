@@ -4,7 +4,7 @@ import { getQueuesManager } from '../other/queuesManager';
 
 export function useQueueOperations() {
   const manager = getQueuesManager();
-  
+
   const getActiveQueue = useCallback(() => manager.getActiveQueue(), [manager]);
 
   const addToNext = useCallback(
@@ -29,7 +29,7 @@ export function useQueueOperations() {
   const removeSongs = useCallback(
     (songIds: number[]) => {
       const playerQueue = getActiveQueue();
-      songIds.forEach(id => playerQueue.removeSongId(id));
+      songIds.forEach((id) => playerQueue.removeSongId(id));
       return songIds.length;
     },
     [getActiveQueue]
@@ -43,7 +43,7 @@ export function useQueueOperations() {
   const playNext = useCallback(
     (songIds: number[]) => {
       const playerQueue = getActiveQueue();
-      songIds.forEach(id => playerQueue.removeSongId(id));
+      songIds.forEach((id) => playerQueue.removeSongId(id));
       playerQueue.addSongIdsToNext(songIds);
       return songIds.length;
     },

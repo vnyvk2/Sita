@@ -58,24 +58,21 @@ const AlbumSearchResultsContainer = (props: Props) => {
 
   return (
     <SecondaryContainer
-      className={`secondary-container albums-list-container mt-4 ${
-        albumResults.length > 0 ? 'active relative' : 'invisible absolute opacity-0'
-      }`}
-      focusable
-      onKeyDown={(e) => {
-        if (e.ctrlKey && e.key === 'a') {
-          e.stopPropagation();
-          selectAllHandler();
-        }
-      }}
+      className={`secondary-container albums-list-container ${albums.length > 0 ? 'mt-4' : ''}`}
     >
       <>
-        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-2xl font-medium">
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mb-8 flex items-center pr-4 text-2xl font-medium">
           <div className="container flex">
-            Albums{' '}
-            <div className="other-stats-container ml-12 flex items-center text-xs">
-              {albums && albums.length > 0 && (
-                <span className="no-of-songs">
+            {t('common.album_other')}{' '}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
+                <span className="no-of-albums">
                   {t(
                     `searchPage.${
                       albums.length > noOfVisibleAlbums ? 'resultAndVisibleCount' : 'resultCount'
@@ -87,14 +84,16 @@ const AlbumSearchResultsContainer = (props: Props) => {
             </div>
           </div>
           <div className="other-controls-container flex">
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
             <Button
-              label={t(
-                `common.${
-                  isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album'
-                    ? 'unselectAll'
-                    : 'select'
-                }`
-              )}
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName={
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album'

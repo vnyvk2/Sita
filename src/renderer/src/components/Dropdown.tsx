@@ -19,6 +19,21 @@ export interface DropdownProp<T extends string> {
 function Dropdown<T extends string>(props: DropdownProp<T>) {
   const { className, name, value, onChange, options, isDisabled = false, type = '' } = props;
 
+  const isFilter = name.toLowerCase().includes('filter') || type.toLowerCase().includes('filter');
+  const isSort = name.toLowerCase().includes('sort') || type.toLowerCase().includes('sort');
+  const iconName = isFilter ? 'filter_alt' : isSort ? 'sort' : undefined;
+
+  const selectedOption = useMemo(
+    () => options.find((opt) => opt.value === value),
+    [options, value]
+  );
+  const tooltip = useMemo(() => {
+    if (selectedOption) {
+      return `${type ? `${type} ` : ''}${selectedOption.label}`;
+    }
+    return type ? type.replace(/\s*:\s*$/, '') : name;
+  }, [name, selectedOption, type]);
+
   const optionComponents = useMemo(
     () =>
       options.map((option) => (
@@ -28,11 +43,38 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           disabled={option.isDisabled}
           className="bg-context-menu-background/90! text-font-color-black! dark:bg-dark-context-menu-background/90! dark:text-font-color-white!"
         >
-          {type} {option.label}
+          {iconName ? option.label : `${type ? `${type} ` : ''}${option.label}`}
         </option>
       )),
-    [options, type]
+    [iconName, options, type]
   );
+
+  if (iconName) {
+    return (
+      <div
+        className={`dropdown group border-background-color-2 bg-background-color-2/25 text-font-color-black hover:border-background-color-3 hover:bg-background-color-2/50 focus-within:!border-font-color-highlight-2 focus-within:bg-background-color-2/50 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/25 dark:text-font-color-white dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-2/50 dark:focus-within:!border-dark-font-color-highlight-2 dark:focus-within:bg-dark-background-color-2/50 relative ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-3xl border-[3px] px-4 py-2 text-sm transition-[border,background,color] ease-in-out md:text-lg ${
+          isDisabled &&
+          `border-font-color-dimmed/10! text-opacity-50! dark:border-font-color-dimmed/40! cursor-not-allowed! opacity-50! brightness-90! transition-none!`
+        } ${className}`}
+        title={tooltip}
+      >
+        <span className="material-icons-round icon text-lg !leading-none md:text-xl">
+          {iconName}
+        </span>
+        <select
+          name={name}
+          id={name}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 outline-hidden"
+          value={value}
+          onChange={onChange}
+          disabled={isDisabled}
+          title={tooltip}
+        >
+          {optionComponents}
+        </select>
+      </div>
+    );
+  }
 
   return (
     <select

@@ -11,8 +11,8 @@ import { queryClient } from '@renderer/index';
 import { playlistQuery } from '@renderer/queries/playlists';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import storage from '@renderer/utils/localStorage';
+import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -34,9 +34,12 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
 });
 
 /**
- * Render the playlist detail page with playlist metadata, a virtualized list of songs, and controls for playing, queuing, sorting, filtering, and playlist-specific actions.
+ * Render the playlist detail page with playlist metadata, a virtualized list of songs, and controls
+ * for playing, queuing, sorting, filtering, and playlist-specific actions.
  *
- * The component reads the current playlist ID and search params, persists the chosen sort order, loads playlist and song data, and provides UI handlers for play, shuffle, add-to-queue, clear history, and removing songs from the playlist.
+ * The component reads the current playlist ID and search params, persists the chosen sort order,
+ * loads playlist and song data, and provides UI handlers for play, shuffle, add-to-queue, clear
+ * history, and removing songs from the playlist.
  *
  * @returns The JSX element for the playlist detail page.
  */
@@ -82,7 +85,14 @@ function PlaylistInfoPage() {
       const queueSongIds = playlistSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'playlist', false, playlistData.playlistId, false, playlistData.name);
+      createQueue(
+        queueSongIds,
+        'playlist',
+        false,
+        playlistData.playlistId,
+        false,
+        playlistData.name
+      );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
     [createQueue, updateQueueData, playlistData.playlistId, playlistData.name, playlistSongs]
@@ -130,7 +140,13 @@ function PlaylistInfoPage() {
         })
       }
     ]);
-  }, [addNewNotifications, playlistSongs, queue.queues[queue.currentQueueIndex].songIds, t, updateQueueData]);
+  }, [
+    addNewNotifications,
+    playlistSongs,
+    queue.queues[queue.currentQueueIndex].songIds,
+    t,
+    updateQueueData
+  ]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
@@ -179,7 +195,7 @@ function PlaylistInfoPage() {
             isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
           },
           {
-            label: t('common.playAll'),
+            tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
             isDisabled: !(playlistData.songs && playlistData.songs.length > 0)

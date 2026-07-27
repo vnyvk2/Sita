@@ -85,8 +85,10 @@ export const parseSongArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
-    const lowResImage = artworks.find((artwork) => artwork.width < 500 && artwork.height < 500) || artworks[0];
+    const highResImage =
+      artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
+    const lowResImage =
+      artworks.find((artwork) => artwork.width < 500 && artwork.height < 500) || artworks[0];
 
     return {
       isDefaultArtwork: false,
@@ -141,7 +143,8 @@ export const parseArtistArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
+    const highResImage =
+      artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
 
     return {
       isDefaultArtwork: false,
@@ -221,7 +224,8 @@ export const parseAlbumArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
+    const highResImage =
+      artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
 
     return {
       isDefaultArtwork: false,
@@ -276,7 +280,8 @@ export const parseGenreArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
+    const highResImage =
+      artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
 
     return {
       isDefaultArtwork: false,
@@ -330,7 +335,8 @@ export const parsePlaylistArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
+    const highResImage =
+      artworks.find((artwork) => artwork.width >= 500 && artwork.height >= 500) || artworks[0];
 
     return {
       isDefaultArtwork: false,

@@ -6,6 +6,7 @@ import AllGenreResults from '@renderer/components/SearchPage/All_Search_Result_C
 import AllPlaylistResults from '@renderer/components/SearchPage/All_Search_Result_Containers/AllPlaylistResults';
 import AllSongResults from '@renderer/components/SearchPage/All_Search_Result_Containers/AllSongResults';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
 import { searchQuery } from '@renderer/queries/search';
 import { store } from '@renderer/store/store';
@@ -13,7 +14,7 @@ import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useMemo } from 'react';
+import { useCallback, useContext, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 // eslint-disable-next-line react/only-export-components
@@ -61,8 +62,42 @@ function RouteComponent() {
     return undefined;
   }, [filterBy]);
 
+  const selectAllSongs = useSelectAllHandler(searchResults.songs || [], 'songs', 'songId');
+  const selectAllArtists = useSelectAllHandler(searchResults.artists || [], 'artist', 'artistId');
+  const selectAllPlaylists = useSelectAllHandler(
+    searchResults.playlists || [],
+    'playlist',
+    'playlistId'
+  );
+  const selectAllAlbums = useSelectAllHandler(searchResults.albums || [], 'album', 'albumId');
+  const selectAllGenres = useSelectAllHandler(searchResults.genres || [], 'genre', 'genreId');
+
+  const selectAllHandler = useCallback(() => {
+    if (selectedType === 'songs') selectAllSongs();
+    else if (selectedType === 'artist') selectAllArtists();
+    else if (selectedType === 'playlist') selectAllPlaylists();
+    else if (selectedType === 'album') selectAllAlbums();
+    else if (selectedType === 'genre') selectAllGenres();
+  }, [
+    selectedType,
+    selectAllSongs,
+    selectAllArtists,
+    selectAllPlaylists,
+    selectAllAlbums,
+    selectAllGenres
+  ]);
+
   return (
-    <MainContainer className="main-container all-search-results-container h-full! pb-0!">
+    <MainContainer
+      className="main-container all-search-results-container h-full! pb-0!"
+      focusable
+      onKeyDown={(e) => {
+        if (e.ctrlKey && e.key === 'a') {
+          e.stopPropagation();
+          selectAllHandler();
+        }
+      }}
+    >
       <>
         <div className="title-container text-font-color-black dark:text-font-color-white mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
           <div className="container flex">
@@ -103,8 +138,16 @@ function RouteComponent() {
             />
           </div>
           <div className="other-controls-container flex">
+            {isMultipleSelectionEnabled && selectedType && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
             <Button
-              label={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
               clickHandler={() => {

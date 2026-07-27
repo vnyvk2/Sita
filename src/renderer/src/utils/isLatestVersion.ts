@@ -94,7 +94,7 @@ const isLatestVersion = (latestVersionString: string, currentVersionString: stri
 
   if (latestVersion && currentVersion) {
     const baseComparison = compareMajorMinorAndPatch(latestVersion, currentVersion);
-    
+
     // If base versions differ, rely on that comparison.
     // -1 means Lv > Cv (needs migration -> false)
     // 1 means Lv < Cv (up to date -> true)

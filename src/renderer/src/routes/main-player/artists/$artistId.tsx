@@ -37,11 +37,12 @@ export const Route = createFileRoute('/main-player/artists/$artistId')({
 });
 
 /**
- * Renders the artist detail page with artist metadata, albums, songs, and related online information.
+ * Renders the artist detail page with artist metadata, albums, songs, and related online
+ * information.
  *
- * The component reads the `artistId` from the route, derives the songs sorting order from the URL search,
- * persists sorting state to local storage, and provides UI for liking the artist, multi-selection, queueing,
- * playback controls, and context menus for artwork and song actions.
+ * The component reads the `artistId` from the route, derives the songs sorting order from the URL
+ * search, persists sorting state to local storage, and provides UI for liking the artist,
+ * multi-selection, queueing, playback controls, and context menus for artwork and song actions.
  *
  * @returns The artist detail page React element.
  */
@@ -99,7 +100,9 @@ function ArtistInfoPage() {
   });
 
   const { data: albums = [] } = useQuery({
-    ...albumQuery.allAlbumInfo({ albumIds: artistData.albums?.map((album) => album.albumId) || [] }),
+    ...albumQuery.allAlbumInfo({
+      albumIds: artistData.albums?.map((album) => album.albumId) || []
+    }),
     enabled: !!artistData?.albums && artistData.albums.length > 0,
     select: (data) => data.data
   });
@@ -415,13 +418,19 @@ function ArtistInfoPage() {
               } mt-1 mb-4 text-2xl`}
               otherItems={[
                 isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' ? (
-                  <p key="selectedAlbumCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  <p
+                    key="selectedAlbumCount"
+                    className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm"
+                  >
                     {t('common.selectionWithCount', {
                       count: multipleSelectionsData.multipleSelections.length
                     })}
                   </p>
                 ) : (
-                  <p key="totalAlbumCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  <p
+                    key="totalAlbumCount"
+                    className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm"
+                  >
                     {t('common.albumWithCount', { count: albums.length })}{' '}
                     {albums.length > noOfVisibleAlbums &&
                       !isAllAlbumsVisible &&
@@ -469,7 +478,10 @@ function ArtistInfoPage() {
                   : 'text-font-color-black dark:text-font-color-white'
               } mt-1 mb-4 pr-4 text-2xl`}
               otherItems={[
-                <p key="appearsInSongsCount" className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                <p
+                  key="appearsInSongsCount"
+                  className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm"
+                >
                   {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs'
                     ? t('common.selectionWithCount', {
                         count: multipleSelectionsData.multipleSelections.length
@@ -524,6 +536,16 @@ function ArtistInfoPage() {
                               artistData?.name
                             )
                         },
+                        ...(isMultipleSelectionEnabled &&
+                        multipleSelectionsData.selectionType === 'songs'
+                          ? [
+                              {
+                                iconName: 'select_all',
+                                handlerFunction: () => selectAllHandlerForSongs(),
+                                label: t('common.selectAll')
+                              }
+                            ]
+                          : []),
                         {
                           iconName: isMultipleSelectionEnabled ? 'remove_done' : 'checklist',
                           handlerFunction: () =>

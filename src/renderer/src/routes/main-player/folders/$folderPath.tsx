@@ -196,6 +196,15 @@ function MusicFolderInfoPage() {
                   updateContextMenuData(true, otherOptions, e.pageX, e.pageY);
                 }}
               />
+              {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && (
+                <Button
+                  key="select-all-btn"
+                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                  iconName="select_all"
+                  clickHandler={() => selectAllHandler()}
+                  tooltipLabel={t('common.selectAll')}
+                />
+              )}
               <Button
                 key={1}
                 className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"

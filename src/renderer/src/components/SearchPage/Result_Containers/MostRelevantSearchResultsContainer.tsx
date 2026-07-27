@@ -68,8 +68,12 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             label: t('common.playNext'),
             iconName: 'shortcut',
             handlerFunction: () => {
-              const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => id !== firstResult.songId);
-              const duplicateSongIndex = queue.queues[queue.currentQueueIndex].songIds.indexOf(firstResult.songId);
+              const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter(
+                (id) => id !== firstResult.songId
+              );
+              const duplicateSongIndex = queue.queues[queue.currentQueueIndex].songIds.indexOf(
+                firstResult.songId
+              );
 
               const currentSongIndex =
                 queue.queues[queue.currentQueueIndex].position !== undefined &&
@@ -104,7 +108,10 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             label: t('common.addToQueue'),
             iconName: 'queue',
             handlerFunction: () => {
-              updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, firstResult.songId]);
+              updateQueueData(undefined, [
+                ...queue.queues[queue.currentQueueIndex].songIds,
+                firstResult.songId
+              ]);
               addNewNotifications(
                 [
                   {
@@ -271,7 +278,9 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             label: t('common.addToQueue'),
             iconName: 'queue',
             handlerFunction: () => {
-              queue.queues[queue.currentQueueIndex].songIds.push(...firstResult.songs.map((song) => song.songId));
+              queue.queues[queue.currentQueueIndex].songIds.push(
+                ...firstResult.songs.map((song) => song.songId)
+              );
               updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds, false);
               addNewNotifications([
                 {

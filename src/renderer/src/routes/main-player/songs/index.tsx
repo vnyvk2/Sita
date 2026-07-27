@@ -9,9 +9,9 @@ import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { getQueuesManager } from '@renderer/other/queuesManager';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -161,7 +161,14 @@ function SongsPage() {
       const queueSongIds = songData
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(queueSongIds, 'songs', false, undefined, false, t('common.allSongs', 'All Songs'));
+      createQueue(
+        queueSongIds,
+        'songs',
+        false,
+        undefined,
+        false,
+        t('common.allSongs', 'All Songs')
+      );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
     [songData, createQueue, updateQueueData, t]
@@ -215,19 +222,25 @@ function SongsPage() {
             <>
               <Button
                 key="add-to-queue-btn"
-                className="add-to-queue-btn text-sm md:text-lg bg-background-color-3 dark:bg-dark-background-color-3 px-4 py-1 rounded-full font-semibold mr-2 flex items-center shadow-sm"
+                className="add-to-queue-btn bg-background-color-3 dark:bg-dark-background-color-3 mr-2 flex items-center rounded-full px-4 py-1 text-sm font-semibold shadow-sm md:text-lg"
                 iconName="add"
                 label={t('currentQueuePage.addSongs', 'Add to Queue')}
-                isDisabled={multipleSelectionsData.multipleSelections.length === 0 || multipleSelectionsData.selectionType !== 'songs'}
+                isDisabled={
+                  multipleSelectionsData.multipleSelections.length === 0 ||
+                  multipleSelectionsData.selectionType !== 'songs'
+                }
                 clickHandler={() => {
                   const manager = getQueuesManager();
                   const targetQueueIndex = queueIndex ?? manager.activeQueueIndex;
                   const targetQueueId = manager.queues[targetQueueIndex]?.id;
-                  
+
                   if (targetQueueId) {
-                    manager.addSongsToQueue(targetQueueId, multipleSelectionsData.multipleSelections as number[]);
+                    manager.addSongsToQueue(
+                      targetQueueId,
+                      multipleSelectionsData.multipleSelections as number[]
+                    );
                   }
-                  
+
                   toggleMultipleSelections(false, 'songs');
                   navigate({
                     to: '/main-player/queue',
@@ -237,7 +250,7 @@ function SongsPage() {
               />
               <Button
                 key="search-btn"
-                className="search-btn text-sm md:text-lg mr-2"
+                className="search-btn mr-2 text-sm md:text-lg"
                 iconName="search"
                 tooltipLabel={t('sideBar.search')}
                 clickHandler={() => {
@@ -250,7 +263,7 @@ function SongsPage() {
               />
               <Button
                 key="cancel-btn"
-                className="cancel-btn text-sm md:text-lg mr-2"
+                className="cancel-btn mr-2 text-sm md:text-lg"
                 iconName="close"
                 tooltipLabel={t('common.cancel', 'Cancel')}
                 clickHandler={() => {
@@ -302,6 +315,15 @@ function SongsPage() {
               );
             }}
           />
+          {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && (
+            <Button
+              key="select-all-btn"
+              className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+              iconName="select_all"
+              clickHandler={() => selectAllHandler()}
+              tooltipLabel={t('common.selectAll')}
+            />
+          )}
           <Button
             key={1}
             className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
@@ -332,7 +354,7 @@ function SongsPage() {
           />
           <Button
             key={3}
-            label={t('common.shuffleAndPlay')}
+            tooltipLabel={t('common.shuffleAndPlay')}
             className="shuffle-and-play-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName="shuffle"
             clickHandler={() =>

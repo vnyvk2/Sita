@@ -159,7 +159,11 @@ export const Artist = (props: ArtistProp) => {
                 .map((artist) => artist.songs.map((song) => song.songId))
                 .flat();
               const uniqueSongIds = [...new Set(songIds)];
-              updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...uniqueSongIds], false);
+              updateQueueData(
+                undefined,
+                [...queue.queues[queue.currentQueueIndex].songIds, ...uniqueSongIds],
+                false
+              );
               return addNewNotifications([
                 {
                   id: `${uniqueSongIds.length}AddedToQueueFromMultiSelection`,
@@ -171,7 +175,12 @@ export const Artist = (props: ArtistProp) => {
               ]);
             });
           }
-          updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...props.songIds], false, false);
+          updateQueueData(
+            undefined,
+            [...queue.queues[queue.currentQueueIndex].songIds, ...props.songIds],
+            false,
+            false
+          );
           return addNewNotifications([
             {
               id: 'addSongsToQueue',

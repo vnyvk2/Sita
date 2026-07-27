@@ -12,12 +12,12 @@ import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
 import { songQuery } from '@renderer/queries/songs';
 import { store, dispatch } from '@renderer/store/store';
 import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
 import { baseInfoPageSearchParamsSchema } from '@renderer/utils/zod/baseInfoPageSearchParamsSchema';
-import { getQueuesManager } from '@renderer/other/queuesManager';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -104,7 +104,8 @@ function RouteComponent() {
         if (queue.queues[viewingQueueIndex]?.metadata?.queueType === undefined)
           return {
             artworkPath: '',
-            title: queue.queues[viewingQueueIndex]?.metadata?.title || `Queue ${viewingQueueIndex + 1}`
+            title:
+              queue.queues[viewingQueueIndex]?.metadata?.title || `Queue ${viewingQueueIndex + 1}`
           };
         return data;
       }
@@ -179,7 +180,13 @@ function RouteComponent() {
     }
 
     queueToUpdate.replaceQueue(updatedQueue, newPosition, false);
-    dispatch({ type: 'UPDATE_QUEUE', data: { queues: manager.queues.map(q => q.toJSON()), currentQueueIndex: manager.activeQueueIndex } });
+    dispatch({
+      type: 'UPDATE_QUEUE',
+      data: {
+        queues: manager.queues.map((q) => q.toJSON()),
+        currentQueueIndex: manager.activeQueueIndex
+      }
+    });
     return undefined;
   };
 
@@ -237,18 +244,29 @@ function RouteComponent() {
     >
       {queueInfo && (
         <>
-          <div className="w-full mb-2 mt-1 pr-4">
-            <QueueTabs viewingQueueIndex={viewingQueueIndex} setViewingQueueIndex={setViewingQueueIndex} />
+          <div className="mt-1 mb-2 w-full pr-4">
+            <QueueTabs
+              viewingQueueIndex={viewingQueueIndex}
+              setViewingQueueIndex={setViewingQueueIndex}
+            />
           </div>
           <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-2 mb-4 flex items-center justify-between pr-4 text-3xl font-medium">
             <div className="flex items-center gap-4">
-              {queue.queues[viewingQueueIndex]?.metadata?.title || (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'songs' ? 'All Songs' : `Queue ${viewingQueueIndex + 1}`)}
+              {queue.queues[viewingQueueIndex]?.metadata?.title ||
+                (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'songs'
+                  ? 'All Songs'
+                  : `Queue ${viewingQueueIndex + 1}`)}
               {viewingQueueIndex === queue.currentQueueIndex && (
-                 <span className="material-icons-round text-sm text-font-color-highlight dark:text-dark-font-color-highlight ml-2" title="Currently Playing">equalizer</span>
+                <span
+                  className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight ml-2 text-sm"
+                  title="Currently Playing"
+                >
+                  equalizer
+                </span>
               )}
               {viewingQueueIndex !== queue.currentQueueIndex && currentQueue.length > 0 && (
                 <Button
-                  className="!m-0 flex h-10 w-10 items-center justify-center rounded-full bg-background-color-3 shadow-md hover:scale-105 transition-transform dark:bg-dark-background-color-3"
+                  className="bg-background-color-3 dark:bg-dark-background-color-3 !m-0 flex h-10 w-10 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
                   iconName="play_arrow"
                   iconClassName="text-2xl text-font-color-black dark:text-font-color-black"
                   tooltipLabel={t('common.play', 'Play')}
@@ -276,6 +294,15 @@ function RouteComponent() {
                   updateContextMenuData(true, moreOptionsContextMenuItems, e.pageX, e.pageY);
                 }}
               />
+              {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && (
+                <Button
+                  key="select-all-btn"
+                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                  iconName="select_all"
+                  clickHandler={() => selectAllHandler()}
+                  tooltipLabel={t('common.selectAll')}
+                />
+              )}
               <Button
                 key={1}
                 className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
@@ -302,8 +329,16 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].shuffle();
-                  dispatch({ type: 'UPDATE_QUEUE', data: { queues: manager.queues.map(q => q.toJSON()), currentQueueIndex: manager.activeQueueIndex } });
-                  queryClient.invalidateQueries(songQuery.queue(manager.queues[viewingQueueIndex].songIds));
+                  dispatch({
+                    type: 'UPDATE_QUEUE',
+                    data: {
+                      queues: manager.queues.map((q) => q.toJSON()),
+                      currentQueueIndex: manager.activeQueueIndex
+                    }
+                  });
+                  queryClient.invalidateQueries(
+                    songQuery.queue(manager.queues[viewingQueueIndex].songIds)
+                  );
 
                   addNewNotifications([
                     {
@@ -321,7 +356,10 @@ function RouteComponent() {
                 className="add-songs-button text-sm"
                 iconName="add"
                 clickHandler={() => {
-                  navigate({ to: '/main-player/songs', search: { action: 'add-to-queue', queueIndex: viewingQueueIndex } });
+                  navigate({
+                    to: '/main-player/songs',
+                    search: { action: 'add-to-queue', queueIndex: viewingQueueIndex }
+                  });
                 }}
               />
               <Button
@@ -332,7 +370,13 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].clear();
-                  dispatch({ type: 'UPDATE_QUEUE', data: { queues: manager.queues.map(q => q.toJSON()), currentQueueIndex: manager.activeQueueIndex } });
+                  dispatch({
+                    type: 'UPDATE_QUEUE',
+                    data: {
+                      queues: manager.queues.map((q) => q.toJSON()),
+                      currentQueueIndex: manager.activeQueueIndex
+                    }
+                  });
                   addNewNotifications([
                     {
                       id: 'clearQueue',
@@ -388,126 +432,132 @@ function RouteComponent() {
           <div
             className={`songs-container overflow-auto ${queuedSongs && queuedSongs?.length > 0 ? 'h-full' : 'h-0'}`}
           >
-            {queuedSongs && queuedSongs.length > 0 && (
-              // $ Enabling StrictMode throws an error in the CurrentQueuePage when using react-beautiful-dnd for drag and drop.
+            {queuedSongs &&
+              queuedSongs.length > 0 && (
+                // $ Enabling StrictMode throws an error in the CurrentQueuePage when using react-beautiful-dnd for drag and drop.
 
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable
-                  droppableId="droppable"
-                  mode="virtual"
-                  renderClone={(provided, _, rubric) => {
-                    const data = queuedSongs[rubric.source.index];
-                    return (
-                      <Song
-                        provided={provided}
-                        key={data.songId}
-                        isDraggable
-                        index={rubric.source.index}
-                        ref={provided.innerRef}
-                        isIndexingSongs={preferences?.isSongIndexingEnabled}
-                        title={data.title}
-                        songId={data.songId}
-                        artists={data.artists}
-                        album={data.album}
-                        artworkPaths={data.artworkPaths}
-                        duration={data.duration}
-                        path={data.path}
-                        isAFavorite={data.isAFavorite}
-                        year={data.year}
-                        isBlacklisted={data.isBlacklisted}
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable
+                    droppableId="droppable"
+                    mode="virtual"
+                    renderClone={(provided, _, rubric) => {
+                      const data = queuedSongs[rubric.source.index];
+                      return (
+                        <Song
+                          provided={provided}
+                          key={data.songId}
+                          isDraggable
+                          index={rubric.source.index}
+                          ref={provided.innerRef}
+                          isIndexingSongs={preferences?.isSongIndexingEnabled}
+                          title={data.title}
+                          songId={data.songId}
+                          artists={data.artists}
+                          album={data.album}
+                          artworkPaths={data.artworkPaths}
+                          duration={data.duration}
+                          path={data.path}
+                          isAFavorite={data.isAFavorite}
+                          year={data.year}
+                          isBlacklisted={data.isBlacklisted}
+                        />
+                      );
+                    }}
+                  >
+                    {(droppableProvided) => (
+                      <VirtualizedList
+                        data={queueData}
+                        fixedItemHeight={60}
+                        ref={ListRef}
+                        scrollerRef={droppableProvided.innerRef}
+                        scrollTopOffset={scrollTopOffset}
+                        onDebouncedScroll={(range) => {
+                          navigate({
+                            replace: true,
+                            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+                          });
+                        }}
+                        components={{
+                          Item: ({ children, ...props }: { children?: ReactNode }) => (
+                            <div {...props} className="height-preserving-container">
+                              {children}
+                            </div>
+                          )
+                        }}
+                        itemContent={(index, item) => {
+                          const songId = item.id;
+                          const song = queuedSongs?.find((s) => s.songId === songId);
+                          if (!song) return null;
+
+                          return (
+                            <Draggable
+                              draggableId={`${song.songId}-${index}`}
+                              index={index}
+                              key={`${song.songId}-${index}`}
+                            >
+                              {(provided) => {
+                                const { multipleSelections: selectedSongIds } =
+                                  multipleSelectionsData;
+                                const isMultipleSelectionsEnabled =
+                                  multipleSelectionsData.selectionType === 'songs' &&
+                                  multipleSelectionsData.multipleSelections.length !== 1;
+
+                                return (
+                                  <Song
+                                    provided={provided}
+                                    key={`${song.songId}-${index}`}
+                                    isDraggable
+                                    index={index}
+                                    ref={provided.innerRef}
+                                    isIndexingSongs={preferences?.isSongIndexingEnabled}
+                                    {...song}
+                                    trackNo={undefined}
+                                    selectAllHandler={selectAllHandler}
+                                    onPlayClick={(_songId) => {
+                                      const queueToPlay = manager.queues[viewingQueueIndex];
+                                      if (queueToPlay) {
+                                        // First update position silently or with event
+                                        queueToPlay.moveToPosition(index);
+
+                                        if (viewingQueueIndex !== manager.activeQueueIndex) {
+                                          // Switching queue will trigger autoPlay with the new position
+                                          manager.switchQueue(viewingQueueIndex);
+                                        } else {
+                                          playSong(_songId, true);
+                                        }
+                                      }
+                                    }}
+                                    additionalContextMenuItems={[
+                                      {
+                                        label: t('common.removeFromQueue'),
+                                        iconName: 'remove_circle_outline',
+                                        handlerFunction: () => {
+                                          const updatedQueue = currentQueue.filter((id) =>
+                                            isMultipleSelectionsEnabled
+                                              ? !selectedSongIds.includes(id)
+                                              : id !== song.songId
+                                          );
+                                          const queueToUpdate = manager.queues[viewingQueueIndex];
+                                          queueToUpdate.replaceQueue(
+                                            updatedQueue,
+                                            queueToUpdate.position,
+                                            false
+                                          );
+                                          toggleMultipleSelections(false);
+                                        }
+                                      }
+                                    ]}
+                                  />
+                                );
+                              }}
+                            </Draggable>
+                          );
+                        }}
                       />
-                    );
-                  }}
-                >
-                  {(droppableProvided) => (
-                    <VirtualizedList
-                      data={queueData}
-                      fixedItemHeight={60}
-                      ref={ListRef}
-                      scrollerRef={droppableProvided.innerRef}
-                      scrollTopOffset={scrollTopOffset}
-                      onDebouncedScroll={(range) => {
-                        navigate({
-                          replace: true,
-                          search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                        });
-                      }}
-                      components={{
-                        Item: ({ children, ...props }: { children?: ReactNode }) => (
-                          <div {...props} className="height-preserving-container">
-                            {children}
-                          </div>
-                        )
-                      }}
-                      itemContent={(index, item) => {
-                        const songId = item.id;
-                        const song = queuedSongs?.find((s) => s.songId === songId);
-                        if (!song) return null;
-
-                        return (
-                          <Draggable
-                            draggableId={`${song.songId}-${index}`}
-                            index={index}
-                            key={`${song.songId}-${index}`}
-                          >
-                            {(provided) => {
-                              const { multipleSelections: selectedSongIds } = multipleSelectionsData;
-                              const isMultipleSelectionsEnabled =
-                                multipleSelectionsData.selectionType === 'songs' &&
-                                multipleSelectionsData.multipleSelections.length !== 1;
-
-                              return (
-                                <Song
-                                  provided={provided}
-                                  key={`${song.songId}-${index}`}
-                                  isDraggable
-                                  index={index}
-                                  ref={provided.innerRef}
-                                  isIndexingSongs={preferences?.isSongIndexingEnabled}
-                                  {...song}
-                                  trackNo={undefined}
-                                  selectAllHandler={selectAllHandler}
-                                  onPlayClick={(_songId) => {
-                                    const queueToPlay = manager.queues[viewingQueueIndex];
-                                    if (queueToPlay) {
-                                      // First update position silently or with event
-                                      queueToPlay.moveToPosition(index);
-                                      
-                                      if (viewingQueueIndex !== manager.activeQueueIndex) {
-                                        // Switching queue will trigger autoPlay with the new position
-                                        manager.switchQueue(viewingQueueIndex);
-                                      } else {
-                                        playSong(_songId, true);
-                                      }
-                                    }
-                                  }}
-                                  additionalContextMenuItems={[
-                                    {
-                                      label: t('common.removeFromQueue'),
-                                      iconName: 'remove_circle_outline',
-                                      handlerFunction: () => {
-                                        const updatedQueue = currentQueue.filter((id) =>
-                                          isMultipleSelectionsEnabled
-                                            ? !selectedSongIds.includes(id)
-                                            : id !== song.songId
-                                        );
-                                        const queueToUpdate = manager.queues[viewingQueueIndex];
-                                        queueToUpdate.replaceQueue(updatedQueue, queueToUpdate.position, false);
-                                        toggleMultipleSelections(false);
-                                      }
-                                    }
-                                  ]}
-                                />
-                              );
-                            }}
-                          </Draggable>
-                        );
-                      }}
-                    />
-                  )}
-                </Droppable>
-              </DragDropContext>
-            )}
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              )}
           </div>
           {currentQueue.length === 0 && (
             <div className="no-songs-container flex h-full w-full flex-col items-center justify-center text-center text-2xl text-[#ccc]">
@@ -515,7 +565,7 @@ function RouteComponent() {
               <Button
                 label={t('currentQueuePage.addSongs', 'Add Songs')}
                 iconName="add"
-                className="mt-6 bg-background-color-3! text-font-color-black! dark:bg-dark-background-color-3! dark:text-font-color-black px-8 py-3 text-lg"
+                className="bg-background-color-3! text-font-color-black! dark:bg-dark-background-color-3! dark:text-font-color-black mt-6 px-8 py-3 text-lg"
                 clickHandler={() => navigate({ to: '/main-player/songs' })}
               />
             </div>

@@ -19,7 +19,9 @@ const localStorageMigrationData: MigrationData = {
       data.queue = {
         queues: [
           {
-            id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            id: globalThis.crypto?.randomUUID
+              ? globalThis.crypto.randomUUID()
+              : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             songIds: Array.isArray(oldQueue.songIds) ? oldQueue.songIds : [],
             position: typeof oldQueue.position === 'number' ? oldQueue.position : 0,
             queueBeforeShuffle: Array.isArray(oldQueue.queueBeforeShuffle)
@@ -34,9 +36,11 @@ const localStorageMigrationData: MigrationData = {
       data.queue = {
         queues: [
           {
-            id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            id: globalThis.crypto?.randomUUID
+              ? globalThis.crypto.randomUUID()
+              : `queue-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             songIds: [],
-            position: 0,
+            position: 0
           }
         ],
         currentQueueIndex: 0

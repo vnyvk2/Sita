@@ -9,7 +9,7 @@ export const Route = createFileRoute('/')({
   pendingComponent: () => <Preloader />,
   loader: async () => {
     await queryClient.ensureQueryData(settingsQuery.all);
-  }, 
+  },
   // override pendingMs to 0 to show preloader immediately
   pendingMs: 0,
   // ensure preloader shows for at least 1000ms

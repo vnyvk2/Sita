@@ -136,7 +136,13 @@ export const Album = (props: AlbumProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, queue.queues[queue.currentQueueIndex].songIds, t, updateQueueData]);
+  }, [
+    addNewNotifications,
+    multipleSelectionsData,
+    queue.queues[queue.currentQueueIndex].songIds,
+    t,
+    updateQueueData
+  ]);
 
   const showAlbumInfoPage = useCallback(
     () =>
@@ -220,7 +226,9 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
           else {
-            queue.queues[queue.currentQueueIndex].songIds.push(...props.songs.map((song) => song.songId));
+            queue.queues[queue.currentQueueIndex].songIds.push(
+              ...props.songs.map((song) => song.songId)
+            );
             updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
             addNewNotifications([
               {

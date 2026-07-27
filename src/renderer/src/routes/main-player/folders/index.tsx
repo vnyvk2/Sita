@@ -173,6 +173,16 @@ function MusicFoldersPage() {
             </div>
             {musicFolders.length > 0 && (
               <div className="other-controls-container flex text-sm">
+                {isMultipleSelectionEnabled &&
+                  multipleSelectionsData.selectionType === 'folder' && (
+                    <Button
+                      key="select-all-btn"
+                      className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                      iconName="select_all"
+                      clickHandler={() => selectAllHandler()}
+                      tooltipLabel={t('common.selectAll')}
+                    />
+                  )}
                 <Button
                   className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                   iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}

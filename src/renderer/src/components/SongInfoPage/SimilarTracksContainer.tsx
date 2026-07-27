@@ -19,8 +19,7 @@ const SimilarTracksContainer = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const { createQueue, updateQueueData, addNewNotifications } =
-    useContext(AppUpdateContext);
+  const { createQueue, updateQueueData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const { songId } = props;
@@ -37,7 +36,14 @@ const SimilarTracksContainer = (props: Props) => {
       const songs = similarTracks.sortedAvailTracks.map((song) => song.songData!);
       const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
 
-      createQueue(queueSongIds, 'songs', false, undefined, !startSongId, t('common.similarTracks', 'Similar Tracks'));
+      createQueue(
+        queueSongIds,
+        'songs',
+        false,
+        undefined,
+        !startSongId,
+        t('common.similarTracks', 'Similar Tracks')
+      );
       if (startSongId) updateQueueData(queueSongIds.indexOf(startSongId), undefined, false, true);
     },
     [similarTracks.sortedAvailTracks, createQueue, updateQueueData, t]
@@ -47,7 +53,9 @@ const SimilarTracksContainer = (props: Props) => {
     const songs = similarTracks.sortedAvailTracks.map((song) => song.songData!);
     const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
 
-    let currentSongIndex = queue.queues[queue.currentQueueIndex].position ?? queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
+    let currentSongIndex =
+      queue.queues[queue.currentQueueIndex].position ??
+      queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
     const duplicateIds: number[] = [];
 
     const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => {
@@ -58,7 +66,8 @@ const SimilarTracksContainer = (props: Props) => {
     });
 
     for (const duplicateId of duplicateIds) {
-      const duplicateIdPosition = queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
+      const duplicateIdPosition =
+        queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
 
       if (
         duplicateIdPosition !== -1 &&

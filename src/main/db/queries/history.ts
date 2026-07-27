@@ -18,8 +18,8 @@ export const getSongPlayHistory = async (songId: number, trx: DB | DBTransaction
   return data;
 };
 
-import { getAllSongs } from './songs';
 import logger from '../../logger';
+import { getAllSongs } from './songs';
 
 export const getAllSongsInHistory = async (
   sortType?: SongSortTypes,
@@ -28,7 +28,7 @@ export const getAllSongsInHistory = async (
 ) => {
   const { start = 0, end = 0 } = paginatingData || {};
   const limit = end - start === 0 ? undefined : end - start;
-  
+
   try {
     // First, get the ordered song IDs from playHistory with pagination
     const historyRecords = await trx

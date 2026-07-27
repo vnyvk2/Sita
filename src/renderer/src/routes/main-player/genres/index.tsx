@@ -117,8 +117,17 @@ function GenresPage() {
               </div>
             </div>
             <div className="other-controls-container flex">
+              {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre' && (
+                <Button
+                  key="select-all-btn"
+                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                  iconName="select_all"
+                  clickHandler={() => selectAllHandler()}
+                  tooltipLabel={t('common.selectAll')}
+                />
+              )}
               <Button
-                label={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
+                tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
                 className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                 iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
                 clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'genre')}

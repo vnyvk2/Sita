@@ -3,11 +3,11 @@ import { useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import Button from '../Button';
 import { getQueuesManager } from '../../other/queuesManager';
+import Button from '../Button';
 
-type Props = { 
-  queueId: string; 
+type Props = {
+  queueId: string;
   currentName: string;
 };
 

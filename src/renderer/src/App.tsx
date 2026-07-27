@@ -86,7 +86,11 @@ export default function App() {
       navigate({ to: '/mini-player' });
     } else if (playerType === 'full') {
       navigate({ to: '/fullscreen-player' });
-    } else if (window.location.hash === '#/' || window.location.hash.startsWith('#/mini-player') || window.location.hash.startsWith('#/fullscreen-player')) {
+    } else if (
+      window.location.hash === '#/' ||
+      window.location.hash.startsWith('#/mini-player') ||
+      window.location.hash.startsWith('#/fullscreen-player')
+    ) {
       navigate({ to: '/main-player/home' });
     }
   }, [playerType, navigate]);

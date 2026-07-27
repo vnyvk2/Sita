@@ -11,8 +11,8 @@ import { queryClient } from '@renderer/index';
 import { albumQuery } from '@renderer/queries/albums';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import storage from '@renderer/utils/localStorage';
+import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -28,11 +28,13 @@ export const Route = createFileRoute('/main-player/albums/$albumId')({
 });
 
 /**
- * Render the album detail page with album metadata, a virtualized list of songs, and playback/queue controls.
+ * Render the album detail page with album metadata, a virtualized list of songs, and playback/queue
+ * controls.
  *
- * Reads `albumId` from route parameters and restores the initial sort order from persisted sorting state; it also
- * persists changes to the sort order. Provides actions for play, shuffle, add-to-queue, play-all, and a select-all
- * keyboard shortcut, and shows optional online album information when available.
+ * Reads `albumId` from route parameters and restores the initial sort order from persisted sorting
+ * state; it also persists changes to the sort order. Provides actions for play, shuffle,
+ * add-to-queue, play-all, and a select-all keyboard shortcut, and shows optional online album
+ * information when available.
  *
  * @returns The rendered album detail page element
  */
@@ -50,8 +52,7 @@ function AlbumInfoPage() {
   const preferences = useStore(store, (state) => state?.localStorage?.preferences);
   const queue = useStore(store, (state) => state.localStorage.queue);
 
-  const { createQueue, updateQueueData, addNewNotifications } =
-    useContext(AppUpdateContext);
+  const { createQueue, updateQueueData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -122,7 +123,10 @@ function AlbumInfoPage() {
             clickHandler: () => {
               updateQueueData(
                 undefined,
-                [...queue.queues[queue.currentQueueIndex].songIds, ...albumSongs.map((song) => song.songId)],
+                [
+                  ...queue.queues[queue.currentQueueIndex].songIds,
+                  ...albumSongs.map((song) => song.songId)
+                ],
                 false,
                 false
               );
@@ -139,7 +143,7 @@ function AlbumInfoPage() {
             isDisabled: !(albumSongs.length > 0)
           },
           {
-            label: t('common.playAll'),
+            tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: () =>
               createQueue(

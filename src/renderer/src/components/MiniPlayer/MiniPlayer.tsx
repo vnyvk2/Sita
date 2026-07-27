@@ -6,8 +6,8 @@ import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
+import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
@@ -176,13 +176,48 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         {
           label: t('miniPlayer.panelLayout', 'Panel Layout'),
           submenu: [
-            { id: 'pin_love', label: t('player.likeDislike', 'Love'), type: 'checkbox', checked: pinnedControls.includes('love') },
-            { id: 'pin_lyrics', label: t('player.lyrics', 'Lyrics'), type: 'checkbox', checked: pinnedControls.includes('lyrics') },
-            { id: 'pin_volume', label: t('player.muteUnmute', 'Volume'), type: 'checkbox', checked: pinnedControls.includes('volume') },
-            { id: 'pin_queue', label: t('player.currentQueue', 'Queue'), type: 'checkbox', checked: pinnedControls.includes('queue') },
-            { id: 'pin_shuffle', label: t('player.shuffle', 'Shuffle'), type: 'checkbox', checked: pinnedControls.includes('shuffle') },
-            { id: 'pin_repeat', label: t('player.repeat', 'Repeat'), type: 'checkbox', checked: pinnedControls.includes('repeat') },
-            { id: 'pin_stop', label: t('player.playPause', 'Stop'), type: 'checkbox', checked: pinnedControls.includes('stop') }
+            {
+              id: 'pin_love',
+              label: t('player.likeDislike', 'Love'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('love')
+            },
+            {
+              id: 'pin_lyrics',
+              label: t('player.lyrics', 'Lyrics'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('lyrics')
+            },
+            {
+              id: 'pin_volume',
+              label: t('player.muteUnmute', 'Volume'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('volume')
+            },
+            {
+              id: 'pin_queue',
+              label: t('player.currentQueue', 'Queue'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('queue')
+            },
+            {
+              id: 'pin_shuffle',
+              label: t('player.shuffle', 'Shuffle'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('shuffle')
+            },
+            {
+              id: 'pin_repeat',
+              label: t('player.repeat', 'Repeat'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('repeat')
+            },
+            {
+              id: 'pin_stop',
+              label: t('player.playPause', 'Stop'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('stop')
+            }
           ]
         }
       ];
@@ -277,7 +312,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
         />
         {/* Persistent top drag region */}
-        <div className="absolute top-0 left-0 h-10 w-full z-0 [-webkit-app-region:drag]"></div>
+        <div className="absolute top-0 left-0 z-0 h-10 w-full [-webkit-app-region:drag]"></div>
 
         {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
         <div
@@ -291,8 +326,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         ></div>
       </div>
 
-
-
       {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
       {/* Fades in on hover/focus/paused — same as old behavior.                */}
       <div className="relative z-30 w-full">
@@ -303,13 +336,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
       {/* Song info fades in on hover/focus/paused.                            */}
       <div
-        className={`relative z-10 flex min-h-0 flex-col items-center justify-center overflow-hidden pointer-events-auto ${
+        className={`pointer-events-auto relative z-10 flex min-h-0 flex-col items-center justify-center overflow-hidden ${
           isQueueVisible ? 'flex-none' : 'flex-1'
         }`}
         onContextMenu={handleContextMenu}
       >
         <div
-          className={`song-info-container text-font-color-white flex w-full flex-col items-center justify-center px-4 text-center transition-[visibility,opacity] duration-200 pointer-events-none ${
+          className={`song-info-container text-font-color-white pointer-events-none flex w-full flex-col items-center justify-center px-4 text-center transition-[visibility,opacity] duration-200 ${
             isLyricsVisible
               ? 'invisible opacity-0'
               : showControls
@@ -361,7 +394,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}
-        <div className="controls-row relative z-20 flex w-full items-center justify-center overflow-hidden pb-2 pt-1">
+        <div className="controls-row relative z-20 flex w-full items-center justify-center overflow-hidden pt-1 pb-2">
           {/* Optional: Favorite */}
           {pinnedControls.includes('love') && (
             <Button
@@ -392,9 +425,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 isRepeating !== 'false' && 'after:opacity-100'
               }`}
               tooltipLabel={t('player.repeat')}
-              iconName={isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'}
+              iconName={
+                isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'
+              }
               iconClassName={`text-lg! ${
-                isRepeating !== 'false' ? 'text-dark-background-color-3!' : 'material-icons-round-outlined'
+                isRepeating !== 'false'
+                  ? 'text-dark-background-color-3!'
+                  : 'material-icons-round-outlined'
               }`}
               clickHandler={() => toggleRepeat()}
               removeFocusOnClick
@@ -462,7 +499,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional: Lyrics Toggle */}
           {pinnedControls.includes('lyrics') && (
             <button
-              className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 flex items-center justify-center after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+              className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
                 isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
               }`}
               onClick={(e) => {
@@ -471,7 +508,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }}
               title={t('player.lyrics')}
             >
-              <img src={CustomLyricsIcon} className="h-5 w-5 opacity-80 hover:opacity-100 transition-opacity" alt="Lyrics" />
+              <img
+                src={CustomLyricsIcon}
+                className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100"
+                alt="Lyrics"
+              />
             </button>
           )}
 
@@ -491,7 +532,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 tooltipLabel={t('player.muteUnmute')}
                 iconName={isMuted ? 'volume_off' : 'volume_up'}
                 iconClassName={`material-icons-round text-lg! text-font-color-white opacity-80 transition-opacity hover:opacity-100 dark:text-font-color-white ${
-                  isMuted && 'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
+                  isMuted &&
+                  'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
                 }`}
                 clickHandler={() => toggleMutedState(!isMuted)}
                 removeFocusOnClick

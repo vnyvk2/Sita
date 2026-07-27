@@ -28,7 +28,7 @@ const TitleBarContainer = (props: Props) => {
 
   return (
     <div
-      className={`mini-player-title-bar z-10 flex h-[15%] max-h-[2.25rem] w-full justify-end opacity-0 transition-[visibility,opacity] select-none group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 [-webkit-app-region:drag] ${
+      className={`mini-player-title-bar z-10 flex h-[15%] max-h-[2.25rem] w-full justify-end opacity-0 transition-[visibility,opacity] select-none [-webkit-app-region:drag] group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${
         !isCurrentSongPlaying ? 'visible opacity-100' : ''
       }`}
     >
@@ -40,7 +40,7 @@ const TitleBarContainer = (props: Props) => {
         } ${!isCurrentSongPlaying ? 'visible! opacity-100!' : ''}`}
       >
         <Button
-          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mt-1! mr-0! rounded-md! border-0! bg-transparent! p-2! outline-offset-1 focus-visible:outline! [-webkit-app-region:no-drag]"
+          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mt-1! mr-0! rounded-md! border-0! bg-transparent! p-2! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
           tooltipLabel={t('player.goToMainPlayer')}
           iconName="pip_exit"
           iconClassName="material-icons-round-outlined text-xl!"

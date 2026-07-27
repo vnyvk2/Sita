@@ -556,7 +556,9 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
     >
       <div
         className={`song-cover-and-play-btn-container flex w-[clamp(6rem,15%,9rem)] shrink-0 items-center justify-center ${
-          !isIndexingSongs && 'w-[clamp(4rem,10%,6rem)]!'
+          !isIndexingSongs &&
+          !localStorageData.preferences.showTrackNumberAsSongIndex &&
+          'w-[clamp(4rem,10%,6rem)]!'
         }`}
       >
         {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' ? (
@@ -584,8 +586,7 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
               block
             </span>
           </div>
-        ) : isIndexingSongs ||
-          (trackNo && localStorageData.preferences.showTrackNumberAsSongIndex) ? (
+        ) : isIndexingSongs || localStorageData.preferences.showTrackNumberAsSongIndex ? (
           <div
             className={`bg-background-color-1 text-font-color-highlight group-even:bg-background-color-2/75 group-hover:bg-background-color-1 dark:bg-dark-background-color-1 dark:text-dark-background-color-3 dark:group-even:bg-dark-background-color-2/50 dark:group-hover:bg-dark-background-color-1 relative mx-1 flex items-center justify-center rounded-2xl px-3 py-1 text-center ${
               index < 10
@@ -598,7 +599,7 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
             }`}
           >
             <span className="min-w-2 text-sm leading-tight font-medium">
-              {trackNo ?? index + 1}
+              {trackNo ?? (isIndexingSongs ? index + 1 : '--')}
             </span>
           </div>
         ) : (

@@ -66,8 +66,6 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
 
     document.addEventListener('localStorage', syncLocalStorage);
 
-
-
     toggleShuffling(playback?.isShuffling);
     toggleRepeat(playback?.isRepeating);
 
@@ -115,7 +113,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     const bindUpNext = () => {
       unsubscribeUpNext();
       const activeQueue = manager.getActiveQueue();
-      
+
       const updateUpNext = async () => {
         const nextSongId = activeQueue.nextSongId;
         if (nextSongId) {
@@ -216,7 +214,9 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     window.api.playerControls.skipForwardToNextSong(handleSkipForwardClickListener);
 
     return () => {
-      window.api.unknownSource.removePlaySongFromUnknownSourceEvent(handlePlaySongFromUnknownSource);
+      window.api.unknownSource.removePlaySongFromUnknownSourceEvent(
+        handlePlaySongFromUnknownSource
+      );
       window.api.playerControls.removeTogglePlaybackStateEvent(handleToggleSongPlayback);
       window.api.playerControls.removeSkipBackwardToPreviousSongEvent(handleSkipBackwardClick);
       window.api.playerControls.removeSkipForwardToNextSongEvent(handleSkipForwardClickListener);
