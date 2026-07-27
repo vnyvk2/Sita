@@ -4,6 +4,7 @@ import { getAlbumById } from '@main/db/queries/albums';
 import { linkArtworksToAlbum } from '@main/db/queries/artworks';
 import logger from '@main/logger';
 import { storeArtworks } from '@main/other/artworks';
+import { ASSET_EVENTS } from '../libraryChoreography';
 
 import type { Job, JobPriority, JobState } from '../types';
 
@@ -70,11 +71,10 @@ export class ArtworkJob implements Job {
         );
 
         // Find the optimized artwork specifically intended for palette generation
-        // (currently, storeArtworks generates a 50x50 version alongside the full version)
-        const optimizedArtwork = artworkData.find((a) => a.width === 50) || artworkData[0];
+        const optimizedArtwork = artworkData.find((a) => a.hash.endsWith('-optimized')) || artworkData[0];
         
         // 5. Emit business event with a structured payload
-        this.eventBus.emit('ASSET_CREATED:ARTWORK', {
+        this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
           albumId: this.albumId,
           artworkId: optimizedArtwork.id,
           path: optimizedArtwork.path
