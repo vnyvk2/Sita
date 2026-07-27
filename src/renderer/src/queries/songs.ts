@@ -1,4 +1,5 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { SEARCH_LIMITS } from '../../../main/search/types/MatchTier';
 
 export const songQuery = createQueryKeys('songs', {
   all: (data: {
@@ -7,8 +8,9 @@ export const songQuery = createQueryKeys('songs', {
     start?: number;
     end?: number;
     limit?: number;
+    keyword?: string;
   }) => {
-    const { sortType = 'addedOrder', filterType = 'notSelected', start = 0, end = 0 } = data;
+    const { sortType = 'addedOrder', filterType = 'notSelected', start = 0, end = 0, keyword = '' } = data;
 
     return {
       queryKey: [
@@ -16,13 +18,24 @@ export const songQuery = createQueryKeys('songs', {
         `filterType=${filterType}`,
         `start=${start}`,
         `end=${end}`,
-        `limit=${end - start}`
+        `limit=${end - start}`,
+        `keyword=${keyword}`
       ],
-      queryFn: () =>
-        window.api.audioLibraryControls.getAllSongs(sortType, filterType, {
+      queryFn: async () => {
+        if (keyword.trim()) {
+          const res = await window.api.search.query({
+            filter: 'Songs',
+            keyword,
+            limit: SEARCH_LIMITS.PAGE,
+            updateSearchHistory: false
+          });
+          return { data: res.songs, unresolvedData: [] };
+        }
+        return window.api.audioLibraryControls.getAllSongs(sortType, filterType, {
           start,
           end: end
-        })
+        });
+      }
     };
   },
   allSongInfo: (data: {

@@ -1,12 +1,24 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { SEARCH_LIMITS } from '../../../main/search/types/MatchTier';
 
 export const albumQuery = createQueryKeys('albums', {
-  all: (data: { sortType?: AlbumSortTypes; start?: number; end?: number; limit?: number }) => {
-    const { sortType = 'aToZ', start = 0, end = 0 } = data;
+  all: (data: { sortType?: AlbumSortTypes; start?: number; end?: number; limit?: number; keyword?: string; }) => {
+    const { sortType = 'aToZ', start = 0, end = 0, keyword = '' } = data;
 
     return {
-      queryKey: [`sortType=${sortType}`, `start=${start}`, `end=${end}`, `limit=${end - start}`],
-      queryFn: () => window.api.albumsData.getAlbumData([], sortType as AlbumSortTypes, start, end)
+      queryKey: [`sortType=${sortType}`, `start=${start}`, `end=${end}`, `limit=${end - start}`, `keyword=${keyword}`],
+      queryFn: async () => {
+        if (keyword.trim()) {
+          const res = await window.api.search.query({
+            filter: 'Albums',
+            keyword,
+            limit: SEARCH_LIMITS.PAGE,
+            updateSearchHistory: false
+          });
+          return { data: res.albums, unresolvedData: [] };
+        }
+        return window.api.albumsData.getAlbumData([], sortType as AlbumSortTypes, start, end);
+      }
     };
   },
   allAlbumInfo: (data: {

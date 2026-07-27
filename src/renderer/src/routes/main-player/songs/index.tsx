@@ -14,25 +14,29 @@ import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
+import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect } from 'react';
+import { lazy, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/songs/')({
   validateSearch: songSearchSchema,
   loaderDeps: ({ search }) => ({
     sortingOrder: search.sortingOrder,
-    filteringOrder: search.filteringOrder
+    filteringOrder: search.filteringOrder,
+    keyword: search.keyword
   }),
   loader: async ({ deps }) => {
+    const sortingState = store.state.localStorage.sortingStates.songsPage;
     await queryClient.ensureQueryData(
       songQuery.all({
-        sortType: deps.sortingOrder ?? 'aToZ',
+        sortType: deps.sortingOrder ?? sortingState ?? 'aToZ',
         filterType: deps.filteringOrder ?? 'notSelected',
         start: 0,
-        end: 0
+        end: 0,
+        keyword: deps.keyword ?? ''
       })
     );
   },
@@ -71,14 +75,49 @@ function SongsPage() {
     sortingOrder = songsPageSortingState || 'aToZ',
     filteringOrder = 'notSelected',
     action,
-    queueIndex
+    queueIndex,
+    keyword
   } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
   const {
     data: { data: songData }
   } = useSuspenseQuery(
-    songQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0 })
+    songQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' })
+  );
+
+  const [searchInput, setSearchInput] = useState(keyword ?? '');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSearchInput((prev) => {
+      const next = keyword ?? '';
+      return prev !== next ? next : prev;
+    });
+  }, [keyword]);
+
+  const debouncedSearch = useDebouncedCallback(
+    (val: string) => {
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true });
+    },
+    { wait: 250 }
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+    debouncedSearch(e.target.value);
+  };
+
+  const searchBar = (
+    <input
+      ref={searchInputRef}
+      type="search"
+      className="search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base"
+      placeholder={t('searchPage.searchPlaceholderSongs', 'Search songs...')}
+      value={searchInput}
+      onChange={handleSearchChange}
+      onKeyDown={(e) => e.stopPropagation()}
+    />
   );
 
   useEffect(() => {
@@ -193,6 +232,11 @@ function SongsPage() {
           e.stopPropagation();
           selectAllHandler();
         }
+        if (e.ctrlKey && e.key === 'f') {
+          e.preventDefault();
+          e.stopPropagation();
+          searchInputRef.current?.focus();
+        }
       }}
     >
       <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
@@ -248,19 +292,7 @@ function SongsPage() {
                   });
                 }}
               />
-              <Button
-                key="search-btn"
-                className="search-btn mr-2 text-sm md:text-lg"
-                iconName="search"
-                tooltipLabel={t('sideBar.search')}
-                clickHandler={() => {
-                  navigate({
-                    to: '/main-player/search',
-                    search: { action: 'add-to-queue', queueIndex: queueIndex },
-                    replace: true
-                  });
-                }}
-              />
+              {searchBar}
               <Button
                 key="cancel-btn"
                 className="cancel-btn mr-2 text-sm md:text-lg"
@@ -277,6 +309,7 @@ function SongsPage() {
               />
             </>
           )}
+          {action !== 'add-to-queue' && searchBar}
           <Button
             key={0}
             className="more-options-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"

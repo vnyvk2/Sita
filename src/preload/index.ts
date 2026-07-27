@@ -192,13 +192,8 @@ const fullscreen = {
 
 // $ APP SEARCH
 const search = {
-  search: (
-    filter: SearchFilters,
-    value: string,
-    updateSearchHistory?: boolean,
-    isSimilaritySearchEnabled?: boolean
-  ): Promise<SearchResult> =>
-    ipcRenderer.invoke('app/search', filter, value, updateSearchHistory, isSimilaritySearchEnabled),
+  query: (options: SearchCoordinatorOptions): Promise<SearchResult> =>
+    ipcRenderer.invoke('app/search/query', options),
   clearSearchHistory: (searchText?: string[]): Promise<boolean> =>
     ipcRenderer.invoke('app/clearSearchHistory', searchText)
 };

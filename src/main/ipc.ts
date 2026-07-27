@@ -98,8 +98,8 @@ import scrobbleSong from './other/lastFm/scrobbleSong';
 import sendNowPlayingSongDataToLastFM from './other/lastFm/sendNowPlayingSongDataToLastFM';
 import reParseSong from './parseSong/reParseSong';
 import saveLyricsToSong from './saveLyricsToSong';
-import search from './search/coordinator/SearchCoordinator';
 import updateSongId3Tags, { isMetadataUpdatesPending } from './updateSong/updateSongId3Tags';
+import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
 import convertLyricsToPinyin from './utils/convertToPinyin';
 import convertLyricsToRomaja from './utils/convertToRomaja';
 import {
@@ -277,14 +277,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/getUserSettings', async () => await getUserSettings());
 
     ipcMain.handle(
-      'app/search',
+      'app/search/query',
       (
         _,
-        searchFilters: SearchFilters,
-        value: string,
-        updateSearchHistory?: boolean,
-        isSimilaritySearchEnabled?: boolean
-      ) => search(searchFilters, value, updateSearchHistory, isSimilaritySearchEnabled)
+        options: SearchCoordinatorOptions
+      ) => SearchCoordinator.query(options)
     );
 
     ipcMain.handle(

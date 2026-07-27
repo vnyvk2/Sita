@@ -13,24 +13,28 @@ import { albumQuery } from '@renderer/queries/albums';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { albumSearchSchema } from '@renderer/utils/zod/albumSchema';
+import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/albums/')({
   validateSearch: albumSearchSchema,
   component: AlbumsPage,
   loaderDeps: ({ search }) => ({
-    sortingOrder: search.sortingOrder
+    sortingOrder: search.sortingOrder,
+    keyword: search.keyword
   }),
   loader: async ({ deps }) => {
+    const sortingState = store.state.localStorage.sortingStates.albumsPage;
     await queryClient.ensureQueryData(
       albumQuery.all({
-        sortType: deps.sortingOrder || 'aToZ',
+        sortType: deps.sortingOrder || sortingState || 'aToZ',
         start: 0,
-        end: 0
+        end: 0,
+        keyword: deps.keyword ?? ''
       })
     );
   }
@@ -51,13 +55,42 @@ function AlbumsPage() {
   );
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
-  const { sortingOrder = albumsPageSortingState || 'aToZ' } = Route.useSearch();
+  const { sortingOrder = albumsPageSortingState || 'aToZ', keyword } = Route.useSearch();
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
   const {
     data: { data: albumsData }
-  } = useSuspenseQuery(albumQuery.all({ sortType: sortingOrder }));
+  } = useSuspenseQuery(
+    albumQuery.all({
+      sortType: sortingOrder,
+      start: 0,
+      end: 0,
+      keyword: keyword ?? ''
+    })
+  );
+
+  const [searchInput, setSearchInput] = useState(keyword ?? '');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSearchInput((prev) => {
+      const next = keyword ?? '';
+      return prev !== next ? next : prev;
+    });
+  }, [keyword]);
+
+  const debouncedSearch = useDebouncedCallback(
+    (val: string) => {
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true });
+    },
+    { wait: 250 }
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+    debouncedSearch(e.target.value);
+  };
 
   // useEffect(() => {
   //   const manageDataUpdatesInAlbumsPage = (e: Event) => {
@@ -91,6 +124,11 @@ function AlbumsPage() {
           e.stopPropagation();
           selectAllHandler();
         }
+        if (e.ctrlKey && e.key === 'f') {
+          e.preventDefault();
+          e.stopPropagation();
+          searchInputRef.current?.focus();
+        }
       }}
     >
       <>
@@ -115,6 +153,15 @@ function AlbumsPage() {
               </div>
             </div>
             <div className="other-controls-container flex">
+              <input
+                ref={searchInputRef}
+                type="search"
+                className="search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base"
+                placeholder={t('searchPage.searchPlaceholderAlbums', 'Search albums...')}
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
               {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' && (
                 <Button
                   key="select-all-btn"

@@ -7,7 +7,8 @@ export const songSearchSchema = baseInfoPageSearchParamsSchema.extend({
   sortingOrder: z.enum(songSortTypes).optional(),
   filteringOrder: z.enum(songFilterTypes).optional(),
   action: z.enum(['add-to-queue']).optional(),
-  queueIndex: z.coerce.number().optional()
+  queueIndex: z.coerce.number().optional(),
+  keyword: z.string().optional()
 });
 
 export type SongSearchSchema = z.infer<typeof songSearchSchema>;

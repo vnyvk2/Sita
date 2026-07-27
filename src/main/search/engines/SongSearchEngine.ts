@@ -1,5 +1,5 @@
 import { db } from '@db/db';
-import { albums, albumsSongs, artists, artistsSongs, songs } from '@db/schema';
+import { songs } from '@db/schema';
 import { convertToSongData } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';

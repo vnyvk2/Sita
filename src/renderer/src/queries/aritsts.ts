@@ -1,4 +1,5 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { SEARCH_LIMITS } from '../../../main/search/types/MatchTier';
 
 export const artistQuery = createQueryKeys('artists', {
   all: (data: {
@@ -7,8 +8,9 @@ export const artistQuery = createQueryKeys('artists', {
     start?: number;
     end?: number;
     limit?: number;
+    keyword?: string;
   }) => {
-    const { sortType = 'aToZ', filterType = 'notSelected', start = 0, end = 0 } = data;
+    const { sortType = 'aToZ', filterType = 'notSelected', start = 0, end = 0, keyword = '' } = data;
 
     return {
       queryKey: [
@@ -16,16 +18,27 @@ export const artistQuery = createQueryKeys('artists', {
         `filterType=${filterType}`,
         `start=${start}`,
         `end=${end}`,
-        `limit=${end - start}`
+        `limit=${end - start}`,
+        `keyword=${keyword}`
       ],
-      queryFn: () =>
-        window.api.artistsData.getArtistData(
+      queryFn: async () => {
+        if (keyword.trim()) {
+          const res = await window.api.search.query({
+            filter: 'Artists',
+            keyword,
+            limit: SEARCH_LIMITS.PAGE,
+            updateSearchHistory: false
+          });
+          return { data: res.artists, unresolvedData: [] };
+        }
+        return window.api.artistsData.getArtistData(
           [],
           sortType as ArtistSortTypes,
           filterType as ArtistFilterTypes,
           start,
           end
-        )
+        );
+      }
     };
   },
   single: (data: { artistId: number }) => {

@@ -16,10 +16,11 @@ import { artistQuery } from '@renderer/queries/aritsts';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
+import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/artists/')({
@@ -27,15 +28,18 @@ export const Route = createFileRoute('/main-player/artists/')({
   component: ArtistPage,
   loaderDeps: ({ search }) => ({
     sortingOrder: search.sortingOrder,
-    filteringOrder: search.filteringOrder
+    filteringOrder: search.filteringOrder,
+    keyword: search.keyword
   }),
   loader: async ({ deps }) => {
+    const sortingState = store.state.localStorage.sortingStates.artistsPage;
     await queryClient.ensureQueryData(
       artistQuery.all({
-        sortType: deps.sortingOrder || 'aToZ',
+        sortType: deps.sortingOrder || sortingState || 'aToZ',
         filterType: deps.filteringOrder || 'notSelected',
+        keyword: deps.keyword ?? '',
         start: 0,
-        end: 30
+        end: 0
       })
     );
   }
@@ -54,7 +58,7 @@ function ArtistPage() {
   const sortingStates = useStore(store, (state) => state.localStorage.sortingStates);
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
-  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ' } =
+  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', keyword } =
     Route.useSearch();
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -62,8 +66,29 @@ function ArtistPage() {
   const [filteringOrder, setFilteringOrder] = useState<ArtistFilterTypes>('notSelected');
   const {
     data: { data: artistsData }
-  } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder }));
+  } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' }));
 
+  const [searchInput, setSearchInput] = useState(keyword ?? '');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSearchInput((prev) => {
+      const next = keyword ?? '';
+      return prev !== next ? next : prev;
+    });
+  }, [keyword]);
+
+  const debouncedSearch = useDebouncedCallback(
+    (val: string) => {
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true });
+    },
+    { wait: 250 }
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+    debouncedSearch(e.target.value);
+  };
   // useEffect(() => {
   //   const manageArtistDataUpdatesInArtistsPage = (e: Event) => {
   //     if ('detail' in e) {
@@ -97,6 +122,11 @@ function ArtistPage() {
           e.stopPropagation();
           selectAllHandler();
         }
+        if (e.ctrlKey && e.key === 'f') {
+          e.preventDefault();
+          e.stopPropagation();
+          searchInputRef.current?.focus();
+        }
       }}
     >
       <>
@@ -124,6 +154,15 @@ function ArtistPage() {
               </div>
             </div>
             <div className="other-control-container flex">
+              <input
+                ref={searchInputRef}
+                type="search"
+                className="search-input mr-4 w-48 rounded-full border-[1.5px] border-background-color-2 bg-transparent px-4 py-1 text-sm outline-none transition-colors focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight md:w-64 md:text-base"
+                placeholder={t('searchPage.searchPlaceholderArtists', 'Search artists...')}
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
               {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
                 <Button
                   key="select-all-btn"

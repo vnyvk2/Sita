@@ -172,7 +172,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (artistKeyword.trim()) {
       window.api.search
-        .search('Artists', artistKeyword, false, false)
+        .query({ filter: 'Artists', keyword: artistKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
         .then((res) => {
           console.log(res);
           if (res.artists.length > 0)
@@ -196,7 +196,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (albumKeyword.trim()) {
       window.api.search
-        .search('Albums', albumKeyword, false, false)
+        .query({ filter: 'Albums', keyword: albumKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
         .then((res) => {
           console.log(res);
           if (res.albums.length > 0)
@@ -220,7 +220,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (albumArtistKeyword.trim()) {
       window.api.search
-        .search('Artists', albumArtistKeyword, false, false)
+        .query({ filter: 'Artists', keyword: albumArtistKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
         .then((res) => {
           console.log(res);
           if (res.artists.length > 0)
@@ -244,7 +244,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (genreKeyword.trim()) {
       window.api.search
-        .search('Genres', genreKeyword, false, false)
+        .query({ filter: 'Genres', keyword: genreKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
         .then((res) => {
           console.log(res);
           if (res.genres.length > 0)

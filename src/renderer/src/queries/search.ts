@@ -16,7 +16,7 @@ export const searchQuery = createQueryKeys('search', {
     return {
       queryKey: [{ keyword }, { filter }, { isSimilaritySearchEnabled }, { updateSearchHistory }],
       queryFn: () =>
-        window.api.search.search(filter, keyword, updateSearchHistory, isSimilaritySearchEnabled)
+        window.api.search.query({ filter, keyword, updateSearchHistory, isSimilaritySearchEnabled })
     };
   }
 });

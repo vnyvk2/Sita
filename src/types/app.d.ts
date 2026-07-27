@@ -861,6 +861,15 @@ declare global {
 
   type SearchFilters = 'All' | 'Artists' | 'Albums' | 'Songs' | 'Playlists' | 'Genres';
 
+  interface SearchCoordinatorOptions {
+    filter?: SearchFilters;
+    keyword: string;
+    updateSearchHistory?: boolean;
+    isSimilaritySearchEnabled?: boolean;
+    limit?: number;
+    metadata?: boolean | { artist?: boolean; album?: boolean };
+  }
+
   interface SearchResult {
     songs: SongData[];
     artists: Artist[];

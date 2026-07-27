@@ -43,29 +43,35 @@ let recentSearchesTimeoutId: NodeJS.Timeout;
  * - How results are presented (that's the frontend's job)
  *
  * Usage:
- * - Global search:  `search('All', keyword, true, true)`
- * - Songs page:     `search('Songs', keyword, false, false)`
- * - Artists page:    `search('Artists', keyword, false, false)`
+ * - Global search:  `query({ keyword, filter: 'All', updateSearchHistory: true })`
+ * - Songs page:     `query({ keyword, filter: 'Songs', updateSearchHistory: false, limit: SEARCH_LIMITS.PAGE })`
  */
-const search = async (
-  filter: SearchFilters,
-  keyword: string,
-  updateSearchHistory = true,
-  isSimilaritySearchEnabled = true
-): Promise<SearchResult> => {
+const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> => {
+  const {
+    keyword,
+    filter = 'All',
+    updateSearchHistory = true,
+    isSimilaritySearchEnabled = true,
+    limit,
+    metadata
+  } = options;
+
   const timer = timeStart();
   const query = normalizeQuery(keyword);
 
-  const engineOptions = { fuzzy: isSimilaritySearchEnabled };
+  const engineOptions: import('../types/MatchTier').SearchEngineOptions = {
+    fuzzy: isSimilaritySearchEnabled,
+    limit,
+    metadata: typeof metadata === 'boolean'
+      ? (metadata ? { artist: true, album: true } : undefined)
+      : metadata
+  };
 
   // Run only the engines that match the active filter — in parallel
   const [songMatches, artistMatches, albumMatches, playlistMatches, genreMatches] =
     await Promise.all([
       filter === 'All' || filter === 'Songs'
-        ? SongSearchEngine.search(query, {
-            ...engineOptions,
-            metadata: { artist: true, album: true }
-          })
+        ? SongSearchEngine.search(query, engineOptions)
         : EMPTY_MATCHES,
       filter === 'All' || filter === 'Artists'
         ? ArtistSearchEngine.search(query, engineOptions)
@@ -144,4 +150,4 @@ const search = async (
   };
 };
 
-export default search;
+export const SearchCoordinator = { query };

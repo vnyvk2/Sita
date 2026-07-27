@@ -23,6 +23,8 @@ export type MatchTierValue = (typeof MATCH_TIER)[keyof typeof MATCH_TIER];
 // ---------------------------------------------------------------------------
 
 export const SEARCH_LIMITS = {
+  /** Limit for dedicated page search results (e.g. Songs tab) */
+  PAGE: 250,
   /** Default limit for global search page results per entity */
   GLOBAL: 50,
   /** Limit for cross-metadata song results (artist/album name → songs) */

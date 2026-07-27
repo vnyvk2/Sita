@@ -5,7 +5,8 @@ import { baseInfoPageSearchParamsSchema } from './baseInfoPageSearchParamsSchema
 
 export const artistSearchSchema = baseInfoPageSearchParamsSchema.extend({
   sortingOrder: z.enum(artistSortTypes).optional(),
-  filteringOrder: z.enum(artistFilterTypes).optional()
+  filteringOrder: z.enum(artistFilterTypes).optional(),
+  keyword: z.string().optional()
 });
 
 export type ArtistSearchSchema = z.infer<typeof artistSearchSchema>;
