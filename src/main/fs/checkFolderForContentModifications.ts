@@ -57,7 +57,20 @@ const checkFolderForContentModifications = async (
     const isNewlyAddedSong = dirs.some((dir) => dir === filename) && isSongExtensionSupported;
     const isADeletedSong = await isSongWithPathAvailable(songPath);
 
-    if (isNewlyAddedSong) return tryToParseSong(songPath, folder?.id, false, true);
+    if (isNewlyAddedSong) {
+      const result = await tryToParseSong(songPath, folder?.id, false, true);
+      if (result) {
+        const album = result.newAlbum || result.relevantAlbum;
+        if (album) {
+          import('../workers/jobScheduler').then(({ libraryScheduler }) => {
+            import('../workers/jobs/artworkJob').then(({ ArtworkJob }) => {
+              libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, libraryScheduler));
+            });
+          });
+        }
+      }
+      return result;
+    }
     if (isADeletedSong) return tryToRemoveSongFromLibrary(folderPath, filename, abortSignal);
   }
   return undefined;

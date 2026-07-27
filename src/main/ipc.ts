@@ -127,6 +127,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         libraryScheduler.enqueue(new PaletteJob(payload.artworkId, payload.path));
       });
     });
+
+    // Fire and forget startup recovery sync
+    import('./core/recovery').then(({ resumeUnfinishedImports }) => {
+      resumeUnfinishedImports().catch((err) => logger.error('Recovery failed', { error: err }));
+    });
   }
   
   // Ensure we gracefully drain on shutdown only once

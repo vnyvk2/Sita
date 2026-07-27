@@ -44,28 +44,18 @@ const createArtworks = async (
     const optimizedImgPath = path.join(DEFAULT_ARTWORK_SAVE_LOCATION, `${id}-optimized.webp`);
 
     try {
+      const optimizedTmpPath = `${optimizedImgPath}.tmp`;
       await sharp(artwork)
         .webp({ quality: 50, effort: 0 })
         .resize(50, 50)
-        .toFile(optimizedImgPath)
-        .catch((error) => {
-          logger.error(`Failed to create an optimized song artwork.`, { error, optimizedImgPath });
-          throw error;
-        });
+        .toFile(optimizedTmpPath);
+      await fs.rename(optimizedTmpPath, optimizedImgPath);
 
-      // const start1 = timeEnd(start, 'Time to save optimized artwork.');
-
-      sharp(artwork, { animated: true })
+      const imgTmpPath = `${imgPath}.tmp`;
+      await sharp(artwork, { animated: true })
         .webp()
-        .toFile(imgPath)
-        // .then(() => timeEnd(start1, 'Time to save full-resolution artwork.'))
-        .catch((error) => {
-          logger.error(`Failed to create an full-resolution song artwork.`, {
-            error,
-            optimizedImgPath
-          });
-          throw error;
-        });
+        .toFile(imgTmpPath);
+      await fs.rename(imgTmpPath, imgPath);
 
       return {
         isDefaultArtwork: false,
@@ -234,7 +224,11 @@ export const createTempArtwork = async (artwork: Uint8Array | Buffer | string) =
     await createTempFolder(tempFolder);
 
     const artworkPath = path.resolve(tempFolder, `${generateRandomId()}.webp`);
-    await sharp(artwork).toFile(artworkPath);
+    const tmpArtworkPath = `${artworkPath}.tmp`;
+    
+    await sharp(artwork).toFile(tmpArtworkPath);
+    await fs.rename(tmpArtworkPath, artworkPath);
+    
     return artworkPath;
   } catch (error) {
     logger.error(`Failed to create a temporary artwork.`, { error });
