@@ -9,6 +9,8 @@ import logger from '../logger';
 import { sendMessageToRenderer } from '../main';
 import { tryToParseSong } from '../parseSong/parseSong';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
+import { libraryScheduler } from '../workers/jobScheduler';
+import { ArtworkJob } from '../workers/jobs/artworkJob';
 
 const getFolderDirs = async (folderPath: string) => {
   try {
@@ -62,11 +64,7 @@ const checkFolderForContentModifications = async (
       if (result) {
         const album = result.newAlbum || result.relevantAlbum;
         if (album) {
-          import('../workers/jobScheduler').then(({ libraryScheduler }) => {
-            import('../workers/jobs/artworkJob').then(({ ArtworkJob }) => {
-              libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, libraryScheduler));
-            });
-          });
+          libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, libraryScheduler));
         }
       }
       return result;

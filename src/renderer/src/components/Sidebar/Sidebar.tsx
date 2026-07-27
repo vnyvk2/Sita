@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
 import SideBarItem from './SideBarItem';
+import LibrarySchedulerStatus from './LibrarySchedulerStatus';
 
 const Sidebar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
@@ -126,6 +127,7 @@ const Sidebar = memo(() => {
         <ul className="relative flex h-full! flex-col gap-1 overflow-x-hidden pt-4 pb-2">
           {sideBarItems}
         </ul>
+        <LibrarySchedulerStatus />
       </ErrorBoundary>
     </nav>
   );

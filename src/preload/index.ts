@@ -600,6 +600,11 @@ const utils = {
   }
 };
 
+const libraryMetrics = {
+  getSchedulerMetrics: () => ipcRenderer.invoke('app/getSchedulerMetrics'),
+  prioritizeArtworkGeneration: (albumId: number) => ipcRenderer.send('app/prioritizeArtworkGeneration', albumId)
+};
+
 export const api = {
   properties,
   windowControls,
@@ -630,7 +635,8 @@ export const api = {
   settingsHelpers,
   appControls,
   utils,
-  queue
+  queue,
+  libraryMetrics
 };
 
 contextBridge.exposeInMainWorld('api', api);

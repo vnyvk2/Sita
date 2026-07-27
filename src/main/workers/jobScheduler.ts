@@ -8,6 +8,7 @@ export interface SchedulerMetrics {
   completedJobs: number;
   failedJobs: number;
   avgExecutionTimeMs: number;
+  currentJobType?: string;
 }
 
 export class JobScheduler extends EventEmitter {
@@ -220,12 +221,23 @@ export class JobScheduler extends EventEmitter {
 
   public getMetrics(): SchedulerMetrics {
     const avgTime = this.completedCount > 0 ? this.totalExecutionTimeMs / this.completedCount : 0;
+    
+    let currentJobType: string | undefined = undefined;
+    
+    if (this.runningJobs.size > 0) {
+      const firstJob = this.runningJobs.values().next().value;
+      if (firstJob) {
+        currentJobType = firstJob.type;
+      }
+    }
+    
     return {
       runningJobs: this.runningJobs.size,
       queuedJobs: this.highPriorityQueue.length + this.normalPriorityQueue.length,
       completedJobs: this.completedCount,
       failedJobs: this.failedCount,
       avgExecutionTimeMs: Math.round(avgTime),
+      currentJobType
     };
   }
 }

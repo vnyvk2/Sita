@@ -128,11 +128,24 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       });
     });
 
-    // Fire and forget startup recovery sync
-    import('./core/recovery').then(({ resumeUnfinishedImports }) => {
-      resumeUnfinishedImports().catch((err) => logger.error('Recovery failed', { error: err }));
-    });
+    const sendSchedulerUpdate = () => {
+      import('./main').then(({ sendMessageToRenderer }) => {
+        sendMessageToRenderer({
+          messageCode: 'LIBRARY_SCHEDULER_UPDATE',
+          data: { metrics: libraryScheduler.getMetrics() }
+        });
+      });
+    };
+
+    libraryScheduler.on('JOB_STARTED', sendSchedulerUpdate);
+    libraryScheduler.on('JOB_COMPLETED', sendSchedulerUpdate);
+    libraryScheduler.on('JOB_FAILED', sendSchedulerUpdate);
   }
+
+  // Fire and forget startup recovery sync
+  import('./core/recovery').then(({ recoverLibraryAssets }) => {
+    recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
+  });
   
   // Ensure we gracefully drain on shutdown only once
   let isShuttingDown = false;
@@ -197,10 +210,13 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       addSongsFromFolderStructures(structures)
     );
 
-    ipcMain.on('app/prioritizeAsset', (_, assetType: string, assetId: string) => {
-      // E.g., job id 'ARTWORK_123'
-      const jobId = `${assetType.toUpperCase()}_${assetId}`;
+    ipcMain.on('app/prioritizeArtworkGeneration', (_, albumId: number) => {
+      const jobId = `artwork_${albumId}`;
       libraryScheduler.prioritizeJob(jobId);
+    });
+
+    ipcMain.handle('app/getSchedulerMetrics', () => {
+      return libraryScheduler.getMetrics();
     });
 
     ipcMain.handle('app/getSong', (_, id: number, updateListeningRate?: boolean) =>

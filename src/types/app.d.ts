@@ -70,7 +70,9 @@ declare global {
     | 'app/player/skipForward'
     | 'app/player/skipBackward'
     | 'app/player/toggleSongPlaybackState'
-    | 'app/player/skipBackward';
+    | 'app/player/skipBackward'
+    | 'app/getSchedulerMetrics'
+    | 'app/prioritizeArtworkGeneration';
 
   interface ImageCoverData {
     format: string;
@@ -995,11 +997,22 @@ declare global {
     | 'SONG_REPARSE_SUCCESS'
     | 'ADDED_SONGS_TO_PLAYLIST'
     | 'ARTWORK_SAVED'
-    | 'RESYNC_SUCCESSFUL';
+    | 'RESYNC_SUCCESSFUL'
+    | 'LIBRARY_SCHEDULER_UPDATE';
+
+  interface SchedulerMetrics {
+    runningJobs: number;
+    queuedJobs: number;
+    completedJobs: number;
+    failedJobs: number;
+    avgExecutionTimeMs: number;
+    currentJobType?: string;
+  }
 
   interface MessageToRendererData extends Record<string, unknown> {
     total?: number;
     value?: number;
+    metrics?: SchedulerMetrics;
   }
 
   type MessageToRendererProps = {

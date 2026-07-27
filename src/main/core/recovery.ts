@@ -3,7 +3,7 @@ import { getAlbumsWithoutArtwork } from '../db/queries/recovery';
 import { libraryScheduler } from '../workers/jobScheduler';
 import { ArtworkJob } from '../workers/jobs/artworkJob';
 
-export const resumeUnfinishedImports = async () => {
+export const recoverLibraryAssets = async () => {
   try {
     logger.info('Starting crash recovery sync for unfinished imports...');
     const albumsToRecover = await getAlbumsWithoutArtwork();

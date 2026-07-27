@@ -5,7 +5,6 @@ import { linkArtworksToAlbum } from '@main/db/queries/artworks';
 import logger from '@main/logger';
 import { storeArtworks } from '@main/other/artworks';
 
-import type { artworks } from '@main/db/schema';
 import type { Job, JobPriority, JobState } from '../types';
 
 export class ArtworkJob implements Job {

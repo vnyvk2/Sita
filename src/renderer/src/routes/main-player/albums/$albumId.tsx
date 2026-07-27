@@ -59,6 +59,13 @@ function AlbumInfoPage() {
     storage.sortingStates.setSortingStates('albumDetailPage', sortingOrder);
   }, [sortingOrder]);
 
+  // Request high-priority artwork generation when navigating to this album
+  useEffect(() => {
+    if (albumId !== undefined) {
+      window.api.libraryMetrics.prioritizeArtworkGeneration(albumId);
+    }
+  }, [albumId]);
+
   const { data: albumData } = useSuspenseQuery({
     ...albumQuery.single({ albumId: albumId }),
     select: (data) => data.data[0]
