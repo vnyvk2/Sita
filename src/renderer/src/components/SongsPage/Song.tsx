@@ -34,6 +34,7 @@ import { useQueueOperations } from '../../hooks/useQueueOperations';
 import { store } from '../../store/store';
 import Button from '../Button';
 import NavLink from '../NavLink';
+import HighlightedText from '../SearchPage/HighlightedText';
 import SongArtist from './SongArtist';
 
 interface SongProp {
@@ -57,6 +58,8 @@ interface SongProp {
   isDraggable?: boolean;
   provided?: DraggableProvided;
   selectAllHandler?: (_upToId?: number) => void;
+  /** When provided, highlights the matching portion of the title in search results */
+  highlightText?: string;
 }
 
 const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
@@ -106,7 +109,8 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
     selectAllHandler,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     provided = {} as any,
-    onPlayClick
+    onPlayClick,
+    highlightText
   } = props;
 
   const [isAFavorite, setIsAFavorite] = useState(props.isAFavorite);
@@ -646,7 +650,12 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
           className="song-title truncate text-base font-normal outline-offset-1 transition-none focus-visible:outline!"
           disabled={isMultipleSelectionEnabled}
         >
-          {window.api.properties.isInDevelopment && `(${songId})`} {title}
+          {window.api.properties.isInDevelopment && `(${songId})`}{' '}
+            {highlightText ? (
+              <HighlightedText text={title} highlight={highlightText} />
+            ) : (
+              title
+            )}
         </NavLink>
         <div className="song-artists w-full truncate text-xs font-normal transition-none">
           {songArtists}

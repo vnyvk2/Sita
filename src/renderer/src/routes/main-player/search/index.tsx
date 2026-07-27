@@ -17,11 +17,11 @@ import { searchQuery } from '@renderer/queries/search';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';
-import { useThrottledCallback } from '@tanstack/react-pacer';
+import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useMemo, useRef, useState, useContext, useEffect } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/search/')({
@@ -107,12 +107,12 @@ function SearchPage() {
     enabled: (keyword ?? '').trim().length > 0
   });
 
-  const throttledSetSearch = useThrottledCallback(
+  const debouncedSetSearch = useDebouncedCallback(
     (value) => {
       navigate({ search: (prev) => ({ ...prev, keyword: value }), replace: true });
     },
     {
-      wait: 1000
+      wait: 250
     }
   );
 
@@ -120,7 +120,7 @@ function SearchPage() {
     const value = input ?? '';
     setSearchText(value);
 
-    throttledSetSearch(value);
+    debouncedSetSearch(value);
   };
 
   const { noOfArtists, noOfPlaylists, noOfAlbums, noOfGenres } = useMemo(() => {
@@ -131,6 +131,115 @@ function SearchPage() {
       noOfGenres: Math.floor(width / GENRE_WIDTH) || 3
     };
   }, [width]);
+
+  // Dynamic section ordering based on confidence scores
+  const DEFAULT_ENTITY_PRIORITY = ['songs', 'artists', 'albums', 'playlists', 'genres'] as const;
+  type EntityType = (typeof DEFAULT_ENTITY_PRIORITY)[number];
+
+  const sectionOrder = useMemo((): EntityType[] => {
+    if (!searchResults?.confidence) return [...DEFAULT_ENTITY_PRIORITY];
+
+    const { confidence } = searchResults;
+
+    // Sort by confidence (bestTier), ties broken by default priority
+    const sorted = ([...DEFAULT_ENTITY_PRIORITY] as EntityType[]).sort((a, b) => {
+      const tierDiff = confidence[b] - confidence[a];
+      if (tierDiff !== 0) return tierDiff;
+      return DEFAULT_ENTITY_PRIORITY.indexOf(a) - DEFAULT_ENTITY_PRIORITY.indexOf(b);
+    });
+
+    const defaultFirst = DEFAULT_ENTITY_PRIORITY[0]; // 'songs'
+    const actualFirst = sorted[0];
+
+    // Stability: only reorder if the winner is clearly better (≥2 tiers above default first)
+    if (actualFirst !== defaultFirst && confidence[actualFirst] - confidence[defaultFirst] < 2) {
+      return [...DEFAULT_ENTITY_PRIORITY];
+    }
+
+    return sorted;
+  }, [searchResults?.confidence]);
+
+  const renderSection = useCallback(
+    (section: EntityType) => {
+      // Only render sections matching the active filter
+      if (filterBy && filterBy !== 'All') {
+        const filterMap: Record<string, EntityType> = {
+          Songs: 'songs',
+          Artists: 'artists',
+          Albums: 'albums',
+          Playlists: 'playlists',
+          Genres: 'genres'
+        };
+        if (filterMap[filterBy] !== section) return null;
+      }
+
+      if (!searchResults) return null;
+
+      switch (section) {
+        case 'songs':
+          return (
+            <SongSearchResultsContainer
+              key="songs"
+              songs={searchResults.songs}
+              searchInput={keyword}
+              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
+            />
+          );
+        case 'artists':
+          return (
+            <ArtistsSearchResultsContainer
+              key="artists"
+              artists={searchResults.artists}
+              searchInput={keyword}
+              noOfVisibleArtists={noOfArtists}
+              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
+            />
+          );
+        case 'albums':
+          return (
+            <AlbumSearchResultsContainer
+              key="albums"
+              albums={searchResults.albums}
+              searchInput={keyword}
+              noOfVisibleAlbums={noOfAlbums}
+              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
+            />
+          );
+        case 'playlists':
+          return (
+            <PlaylistSearchResultsContainer
+              key="playlists"
+              playlists={searchResults.playlists}
+              searchInput={keyword}
+              noOfVisiblePlaylists={noOfPlaylists}
+              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
+            />
+          );
+        case 'genres':
+          return (
+            <GenreSearchResultsContainer
+              key="genres"
+              genres={searchResults.genres}
+              searchInput={keyword}
+              noOfVisibleGenres={noOfGenres}
+              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
+            />
+          );
+        default:
+          return null;
+      }
+    },
+    [
+      filterBy,
+      searchResults,
+      keyword,
+      isSimilaritySearchEnabled,
+      noOfArtists,
+      noOfAlbums,
+      noOfPlaylists,
+      noOfGenres
+    ]
+  );
 
   const filters = useMemo(
     () =>
@@ -251,42 +360,12 @@ function SearchPage() {
       <div className="search-results-container relative h-full!">
         {searchResults && (
           <>
-            {/* MOST RELEVANT SEARCH RESULTS */}
-            <MostRelevantSearchResultsContainer searchResults={searchResults} />
-            {/* SONG SEARCH RESULTS */}
-            <SongSearchResultsContainer
-              songs={searchResults.songs}
-              searchInput={keyword}
-              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
-            />
-            {/* ARTIST SEARCH RESULTS */}
-            <ArtistsSearchResultsContainer
-              artists={searchResults.artists}
-              searchInput={keyword}
-              noOfVisibleArtists={noOfArtists}
-              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
-            />
-            {/* ALBUM SEARCH RESULTS */}
-            <AlbumSearchResultsContainer
-              albums={searchResults.albums}
-              searchInput={keyword}
-              noOfVisibleAlbums={noOfAlbums}
-              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
-            />
-            {/* PLAYLIST SEARCH RESULTS */}
-            <PlaylistSearchResultsContainer
-              playlists={searchResults.playlists}
-              searchInput={keyword}
-              noOfVisiblePlaylists={noOfPlaylists}
-              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
-            />
-            {/* GENRE SEARCH RESULTS */}
-            <GenreSearchResultsContainer
-              genres={searchResults.genres}
-              searchInput={keyword}
-              noOfVisibleGenres={noOfGenres}
-              isSimilaritySearchEnabled={isSimilaritySearchEnabled}
-            />
+            {/* MOST RELEVANT SEARCH RESULTS — only shown when filter is 'All' */}
+            {(!filterBy || filterBy === 'All') && (
+              <MostRelevantSearchResultsContainer searchResults={searchResults} searchInput={keyword} />
+            )}
+            {/* DYNAMICALLY ORDERED SEARCH RESULT SECTIONS */}
+            {sectionOrder.map((section) => renderSection(section))}
             {/* NO SEARCH RESULTS PLACEHOLDER */}
             <NoSearchResultsContainer
               searchInput={keyword}

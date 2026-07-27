@@ -1,0 +1,147 @@
+import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
+import logger from '@main/logger';
+import { dataUpdateEvent } from '@main/main';
+import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
+
+import { AlbumSearchEngine } from '../engines/AlbumSearchEngine';
+import { ArtistSearchEngine } from '../engines/ArtistSearchEngine';
+import { GenreSearchEngine } from '../engines/GenreSearchEngine';
+import { PlaylistSearchEngine } from '../engines/PlaylistSearchEngine';
+import { SongSearchEngine } from '../engines/SongSearchEngine';
+import { normalizeQuery } from '../normalize/normalizeQuery';
+import { MATCH_TIER } from '../types/MatchTier';
+import type { MatchTierValue, SearchMatch } from '../types/MatchTier';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const EMPTY_MATCHES: SearchMatch<never>[] = [];
+
+// ---------------------------------------------------------------------------
+// Recent search history
+// ---------------------------------------------------------------------------
+
+let recentSearchesTimeoutId: NodeJS.Timeout;
+
+// ---------------------------------------------------------------------------
+// Search Coordinator
+// ---------------------------------------------------------------------------
+
+/**
+ * Nora's central search coordinator.
+ *
+ * Owns:
+ * - Query normalization
+ * - Engine selection (based on filter)
+ * - Parallel engine execution
+ * - Section confidence computation
+ * - Recent search history management
+ *
+ * Does NOT own:
+ * - How entities are searched (that's the engines' job)
+ * - How results are presented (that's the frontend's job)
+ *
+ * Usage:
+ * - Global search:  `search('All', keyword, true, true)`
+ * - Songs page:     `search('Songs', keyword, false, false)`
+ * - Artists page:    `search('Artists', keyword, false, false)`
+ */
+const search = async (
+  filter: SearchFilters,
+  keyword: string,
+  updateSearchHistory = true,
+  isSimilaritySearchEnabled = true
+): Promise<SearchResult> => {
+  const timer = timeStart();
+  const query = normalizeQuery(keyword);
+
+  const engineOptions = { fuzzy: isSimilaritySearchEnabled };
+
+  // Run only the engines that match the active filter — in parallel
+  const [songMatches, artistMatches, albumMatches, playlistMatches, genreMatches] =
+    await Promise.all([
+      filter === 'All' || filter === 'Songs'
+        ? SongSearchEngine.search(query, {
+            ...engineOptions,
+            metadata: { artist: true, album: true }
+          })
+        : EMPTY_MATCHES,
+      filter === 'All' || filter === 'Artists'
+        ? ArtistSearchEngine.search(query, engineOptions)
+        : EMPTY_MATCHES,
+      filter === 'All' || filter === 'Albums'
+        ? AlbumSearchEngine.search(query, engineOptions)
+        : EMPTY_MATCHES,
+      filter === 'All' || filter === 'Playlists'
+        ? PlaylistSearchEngine.search(query, engineOptions)
+        : EMPTY_MATCHES,
+      filter === 'All' || filter === 'Genres'
+        ? GenreSearchEngine.search(query, engineOptions)
+        : EMPTY_MATCHES
+    ]);
+
+  timeEnd(timer, 'Total Search');
+
+  // Unwrap SearchMatch<T>[] → T[] for the result contract
+  const songs = songMatches.map((m) => m.item);
+  const artists = artistMatches.map((m) => m.item);
+  const albums = albumMatches.map((m) => m.item);
+  const playlists = playlistMatches.map((m) => m.item);
+  const genres = genreMatches.map((m) => m.item);
+
+  // Compute section confidence — coordinator's responsibility, not the engines'
+  const bestTierOf = (matches: SearchMatch<unknown>[]): MatchTierValue =>
+    matches.length > 0 ? matches[0].tier : MATCH_TIER.NONE;
+
+  const confidence = {
+    songs: bestTierOf(songMatches),
+    artists: bestTierOf(artistMatches),
+    albums: bestTierOf(albumMatches),
+    playlists: bestTierOf(playlistMatches),
+    genres: bestTierOf(genreMatches)
+  };
+
+  logger.debug(`Searching for results.`, {
+    keyword,
+    filter,
+    isSimilaritySearchEnabled,
+    totalResults: songs.length + artists.length + albums.length + playlists.length + genres.length,
+    songsResults: songs.length,
+    artistsResults: artists.length,
+    albumsResults: albums.length,
+    playlistsResults: playlists.length,
+    genresResults: genres.length,
+    confidence
+  });
+
+  // Recent search history (debounced — same logic as before)
+  if (updateSearchHistory) {
+    if (recentSearchesTimeoutId) clearTimeout(recentSearchesTimeoutId);
+    recentSearchesTimeoutId = setTimeout(async () => {
+      const { recentSearches } = await getUserSettings();
+
+      if (Array.isArray(recentSearches)) {
+        if (recentSearches.length > 10) recentSearches.pop();
+        if (recentSearches.includes(keyword))
+          recentSearches.splice(recentSearches.indexOf(keyword), 1);
+        recentSearches.unshift(keyword);
+      }
+
+      await saveUserSettings({ recentSearches });
+      dataUpdateEvent('userData/recentSearches');
+    }, 2000);
+  }
+
+  return {
+    songs,
+    artists,
+    albums,
+    playlists,
+    genres,
+    availableResults: [], // @deprecated — no longer needed with improved matching
+    confidence
+  };
+};
+
+export default search;

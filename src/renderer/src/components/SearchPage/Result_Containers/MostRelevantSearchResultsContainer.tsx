@@ -9,10 +9,10 @@ import Img from '../../Img';
 import SecondaryContainer from '../../SecondaryContainer';
 import { MostRelevantResult } from '../MostRelevantResult';
 
-type Props = { searchResults: SearchResult };
+type Props = { searchResults: SearchResult; searchInput?: string };
 
 const MostRelevantSearchResultsContainer = (props: Props) => {
-  const { searchResults } = props;
+  const { searchResults, searchInput } = props;
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const queue = useStore(store, (state) => state.localStorage.queue);
@@ -36,7 +36,6 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
     if (totalResults > 0 && mostRelevantResultContainerRef.current) {
       const { scrollWidth, clientWidth } = mostRelevantResultContainerRef.current;
 
-      console.log({ scrollWidth, clientWidth });
       const isScrollable = scrollWidth > clientWidth;
 
       setIsOverScrolling(isScrollable);
@@ -149,6 +148,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
               })
           }
         ]}
+        highlightText={searchInput}
       />
     );
   }
@@ -227,6 +227,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             }
           }
         ]}
+        highlightText={searchInput}
       />
     );
   }
@@ -298,6 +299,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
             }
           }
         ]}
+        highlightText={searchInput}
       />
     );
   }
@@ -335,6 +337,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                 })
           }
         ]}
+        highlightText={searchInput}
       />
     );
   }
@@ -378,6 +381,7 @@ const MostRelevantSearchResultsContainer = (props: Props) => {
                 })
           }
         ]}
+        highlightText={searchInput}
       />
     );
   }

@@ -867,7 +867,16 @@ declare global {
     albums: Album[];
     playlists: Playlist[];
     genres: Genre[];
+    /** @deprecated No longer populated — kept for backwards compatibility */
     availableResults: string[];
+    /** Best match tier per entity section, used for dynamic section ordering */
+    confidence: {
+      songs: import('../main/search/types/MatchTier').MatchTierValue;
+      artists: import('../main/search/types/MatchTier').MatchTierValue;
+      albums: import('../main/search/types/MatchTier').MatchTierValue;
+      playlists: import('../main/search/types/MatchTier').MatchTierValue;
+      genres: import('../main/search/types/MatchTier').MatchTierValue;
+    };
   }
 
   // ? Prompt menu related types

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
+import HighlightedText from './HighlightedText';
 
 export interface MostRelevantResultProp {
   resultType: 'artist' | 'song' | 'album' | 'playlist' | 'genre';
@@ -17,6 +18,8 @@ export interface MostRelevantResultProp {
   artworkPaths: ArtworkPaths;
   onlineArtworkPath?: string;
   contextMenuItems: ContextMenuItem[];
+  /** When provided, highlights the matching portion of the title */
+  highlightText?: string;
 }
 
 export const MostRelevantResult = (props: MostRelevantResultProp) => {
@@ -32,7 +35,8 @@ export const MostRelevantResult = (props: MostRelevantResultProp) => {
     resultType,
     artworkPaths,
     contextMenuItems,
-    onlineArtworkPath
+    onlineArtworkPath,
+    highlightText
   } = props;
 
   const goToSongInfoPage = useCallback(
@@ -97,7 +101,11 @@ export const MostRelevantResult = (props: MostRelevantResultProp) => {
       </div>
       <div className="result-info-container text-font-color-black group-hover:text-font-color-black dark:text-font-color-white dark:group-hover:text-font-color-black max-w-[50%]">
         <div className="title overflow-hidden text-2xl text-ellipsis whitespace-nowrap">
-          {title}
+          {highlightText ? (
+            <HighlightedText text={title} highlight={highlightText} />
+          ) : (
+            title
+          )}
         </div>
         {infoType1 && (
           <div className="info-type-1 overflow-hidden text-base text-ellipsis whitespace-nowrap">

@@ -63,6 +63,7 @@ const SongSearchResultsContainer = (props: Props) => {
                     year={song.year}
                     isBlacklisted={song.isBlacklisted}
                     onPlayClick={handleSongPlayBtnClick}
+                    highlightText={searchInput}
                   />
                 );
               return undefined;
