@@ -151,7 +151,7 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
         await saveUserSettings({ recentSearches });
         dataUpdateEvent('userData/recentSearches');
       } catch (err) {
-        logger.error('Failed to update recent searches', err);
+        logger.error('Failed to update recent searches', { error: err });
       }
     }, 2000);
   }

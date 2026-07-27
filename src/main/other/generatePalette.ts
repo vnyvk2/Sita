@@ -130,7 +130,7 @@ const generatePalettesForSongs = async () => {
   }
 };
 
-const savePalette = async (
+export const savePalette = async (
   artworkId: number,
   palette: PaletteData | undefined,
   trx: DBTransaction

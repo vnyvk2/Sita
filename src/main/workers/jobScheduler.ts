@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import type { Job, JobState } from './types';
+import type { Job } from './types';
 import log from '../logger';
 
 export interface SchedulerMetrics {
@@ -188,7 +188,7 @@ export class JobScheduler extends EventEmitter {
       // Removed ASSET_CREATED here; the job plugin itself should emit business events.
 
     } catch (error) {
-      log.error(`[JobScheduler] Job failed: ${job.id}`, error);
+      log.error(`[JobScheduler] Job failed: ${job.id}`, { error });
       
       const maxRetries = job.maxRetries ?? 3;
       if (job.retries < maxRetries) {

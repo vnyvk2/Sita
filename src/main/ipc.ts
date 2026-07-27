@@ -113,9 +113,21 @@ import romanizeLyrics from './utils/romanizeLyrics';
 import { compare } from './utils/safeStorage';
 import { libraryScheduler } from './workers/jobScheduler';
 
+let isSchedulerEventsRegistered = false;
+
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
   libraryScheduler.start();
+
+  // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
+  if (!isSchedulerEventsRegistered) {
+    isSchedulerEventsRegistered = true;
+    libraryScheduler.on('ASSET_CREATED:ARTWORK', (payload: { artworkId: number; path: string; albumId: number }) => {
+      import('./workers/jobs/paletteJob').then(({ PaletteJob }) => {
+        libraryScheduler.enqueue(new PaletteJob(payload.artworkId, payload.path));
+      });
+    });
+  }
   
   // Ensure we gracefully drain on shutdown only once
   let isShuttingDown = false;

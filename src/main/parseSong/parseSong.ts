@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
-import { linkArtworksToSong } from '@main/db/queries/artworks';
 import { isSongWithPathAvailable, saveSong } from '@main/db/queries/songs';
 import type { albums, artists, genres, songs } from '@main/db/schema';
 import { File } from 'node-taglib-sharp';
@@ -26,15 +25,14 @@ export interface ParseSongResult {
   relevantArtists: typeof artists.$inferSelect[];
   newGenres: typeof genres.$inferSelect[];
   relevantGenres: typeof genres.$inferSelect[];
-  relevantAlbumArtists: string[];
-  newAlbumArtists: string[];
+  relevantAlbumArtists: typeof artists.$inferSelect[];
+  newAlbumArtists: typeof artists.$inferSelect[];
 }
 
 export const tryToParseSong = (
   songPath: string,
   folderId?: number,
   reparseToSync = false,
-  generatePalettesAfterParsing = false,
   noRendererMessages = false
 ) => {
   let timeOutId: NodeJS.Timeout;

@@ -5,9 +5,11 @@ import parseFolderStructuresForSongPaths, {
 } from '../fs/parseFolderStructuresForSongPaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { generatePalettes } from '../other/generatePalette';
+
 import { tryToParseSong } from '../parseSong/parseSong';
 import { timeEnd, timeStart } from '../utils/measureTimeUsage';
+import { libraryScheduler } from '../workers/jobScheduler';
+import { ArtworkJob } from '../workers/jobs/artworkJob';
 
 const removeAlreadyAvailableStructures = async (structures: FolderStructure[]) => {
   const parents: FolderStructure[] = [];
@@ -70,7 +72,6 @@ const addMusicFromFolderStructures = async (
             songPathData.songPath, 
             songPathData.folder.id, 
             false, 
-            false, 
             currentIndex >= 10
           );
 
@@ -104,8 +105,12 @@ const addMusicFromFolderStructures = async (
 
     timeEnd(startTime, 'Time to parse the whole folder');
 
-    // For Phase 3, we will enqueue background artwork jobs here using albumAssetsToQueue
-    // libraryScheduler.enqueue(new ArtworkJob(...))
+    // Enqueue background artwork jobs for all collected unique albums
+    if (albumAssetsToQueue.size > 0) {
+      for (const [albumId, sampleSongPath] of albumAssetsToQueue.entries()) {
+        libraryScheduler.enqueue(new ArtworkJob(albumId, sampleSongPath, libraryScheduler));
+      }
+    }
   } else throw new Error('Failed to get song paths from music folders.');
 
   logger.debug(
