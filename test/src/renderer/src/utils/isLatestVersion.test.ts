@@ -16,13 +16,13 @@ describe('App versions check', () => {
   });
 
   test('Versions with same release phases and different build metadata', () => {
-    expect(isLatestVersion('2.0.0-stable.20230515', '2.0.0-stable.20230510')).toBe(true);
+    expect(isLatestVersion('2.0.0-stable.20230515', '2.0.0-stable.20230510')).toBe(false);
     expect(isLatestVersion('2.0.0-beta20230510', '2.0.0-beta20230515')).toBe(true);
-    expect(isLatestVersion('2.0.0-alpha.20250101', '2.0.0-alpha.19990509')).toBe(true);
+    expect(isLatestVersion('2.0.0-alpha.20250101', '2.0.0-alpha.19990509')).toBe(false);
   });
 
   test('Versions with different release phases', () => {
-    expect(isLatestVersion('2.0.0-stable', '2.0.0-alpha')).toBe(true);
+    expect(isLatestVersion('2.0.0-stable', '2.0.0-alpha')).toBe(false);
     expect(isLatestVersion('2.0.0-beta', '2.0.0-stable')).toBe(true);
     expect(isLatestVersion('2.0.0-alpha', '2.0.0-beta')).toBe(true);
   });

@@ -75,6 +75,9 @@ export function useDiscordRpc(player: HTMLAudioElement) {
     }
 
     window.api?.playerControls?.setDiscordRpcActivity(activity);
+    // Note: t() is intentionally omitted from dependencies to maintain a stable callback reference for DOM event
+    // listeners. While a language change won't update Discord RPC text until next playback event, this avoids
+    // tearing down and reattaching listeners on language changes or parent re-renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

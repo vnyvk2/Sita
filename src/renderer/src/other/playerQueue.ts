@@ -1,3 +1,10 @@
+const DEBUG_PLAYER_QUEUE = false;
+
+const logQueue = (...args: unknown[]) => {
+  if (!DEBUG_PLAYER_QUEUE) return;
+  console.debug(...args);
+};
+
 /*
     Represents a queue of songs to be played in the music player.
 */
@@ -162,7 +169,7 @@ class PlayerQueue {
     if (this.hasNext) {
       const oldPosition = this.position;
       this.position += 1;
-      console.log('[PlayerQueue.moveToNext]', {
+      logQueue('[PlayerQueue.moveToNext]', {
         oldPosition,
         newPosition: this.position,
         currentSongId: this.currentSongId,
@@ -175,7 +182,7 @@ class PlayerQueue {
       });
       return true;
     }
-    console.log('[PlayerQueue.moveToNext] Already at end, position:', this.position);
+    logQueue('[PlayerQueue.moveToNext] Already at end, position:', this.position);
     return false;
   }
 
@@ -188,7 +195,7 @@ class PlayerQueue {
     if (this.hasPrevious) {
       const oldPosition = this.position;
       this.position -= 1;
-      console.log('[PlayerQueue.moveToPrevious]', {
+      logQueue('[PlayerQueue.moveToPrevious]', {
         oldPosition,
         newPosition: this.position,
         currentSongId: this.currentSongId,
@@ -201,7 +208,7 @@ class PlayerQueue {
       });
       return true;
     }
-    console.log('[PlayerQueue.moveToPrevious] Already at start, position:', this.position);
+    logQueue('[PlayerQueue.moveToPrevious] Already at start, position:', this.position);
     return false;
   }
 
@@ -209,7 +216,7 @@ class PlayerQueue {
   moveToStart(): void {
     const oldPosition = this.position;
     this.position = 0;
-    console.log('[PlayerQueue.moveToStart]', {
+    logQueue('[PlayerQueue.moveToStart]', {
       oldPosition,
       newPosition: this.position,
       currentSongId: this.currentSongId,
@@ -249,7 +256,7 @@ class PlayerQueue {
     if (position >= 0 && position < this.songIds.length) {
       const oldPosition = this.position;
       this.position = position;
-      console.log('[PlayerQueue.moveToPosition]', {
+      logQueue('[PlayerQueue.moveToPosition]', {
         oldPosition,
         newPosition: this.position,
         currentSongId: this.currentSongId,
@@ -262,7 +269,7 @@ class PlayerQueue {
       });
       return true;
     }
-    console.log('[PlayerQueue.moveToPosition] Invalid position:', {
+    logQueue('[PlayerQueue.moveToPosition] Invalid position:', {
       requestedPosition: position,
       currentPosition: this.position,
       queueLength: this.songIds.length
@@ -277,7 +284,7 @@ class PlayerQueue {
    */
   addSongIdsToNext(songIds: number[]): void {
     this.queueBeforeShuffle = undefined;
-    console.log('[PlayerQueue.addSongIdsToNext]', {
+    logQueue('[PlayerQueue.addSongIdsToNext]', {
       addingCount: songIds.length,
       currentPosition: this.position,
       insertPosition: this.position + 1,
@@ -287,7 +294,7 @@ class PlayerQueue {
     songIds.forEach((songId, index) => {
       this.emit('songAdded', { songId, position: this.position + 1 + index });
     });
-    console.log('[PlayerQueue.addSongIdsToNext.done]', {
+    logQueue('[PlayerQueue.addSongIdsToNext.done]', {
       addedCount: songIds.length,
       queueLengthAfter: this.songIds.length
     });
@@ -301,7 +308,7 @@ class PlayerQueue {
    */
   addSongIdsToEnd(songIds: number[]): void {
     this.queueBeforeShuffle = undefined;
-    console.log('[PlayerQueue.addSongIdsToEnd]', {
+    logQueue('[PlayerQueue.addSongIdsToEnd]', {
       addingCount: songIds.length,
       currentPosition: this.position,
       queueLengthBefore: this.songIds.length
@@ -311,7 +318,7 @@ class PlayerQueue {
     songIds.forEach((songId, index) => {
       this.emit('songAdded', { songId, position: startPosition + index });
     });
-    console.log('[PlayerQueue.addSongIdsToEnd.done]', {
+    logQueue('[PlayerQueue.addSongIdsToEnd.done]', {
       addedCount: songIds.length,
       queueLengthAfter: this.songIds.length
     });
@@ -351,7 +358,7 @@ class PlayerQueue {
    */
   removeSongId(songId: number): boolean {
     const index = this.songIds.indexOf(songId);
-    console.log('[PlayerQueue.removeSongId]', {
+    logQueue('[PlayerQueue.removeSongId]', {
       songId,
       foundAtIndex: index,
       currentPosition: this.position,
@@ -361,7 +368,7 @@ class PlayerQueue {
       this.queueBeforeShuffle = undefined;
       this.songIds.splice(index, 1);
       this.emit('songRemoved', { songId, position: index });
-      console.log('[PlayerQueue.removeSongId.removed]', {
+      logQueue('[PlayerQueue.removeSongId.removed]', {
         removedIndex: index,
         newPosition: this.position,
         queueLengthAfter: this.songIds.length
@@ -427,7 +434,7 @@ class PlayerQueue {
 
   /** Clears all songs from the queue */
   clear(): void {
-    console.log('[PlayerQueue.clear]', {
+    logQueue('[PlayerQueue.clear]', {
       queueLengthBefore: this.songIds.length,
       currentPosition: this.position
     });
@@ -437,7 +444,7 @@ class PlayerQueue {
     this.queueBeforeShuffle = undefined;
     this.emit('queueCleared', {});
     this.emit('queueChange', { queue: [], length: 0 });
-    console.log('[PlayerQueue.clear.done]', {
+    logQueue('[PlayerQueue.clear.done]', {
       queueLengthAfter: this.songIds.length,
       position: this.position
     });
@@ -464,7 +471,7 @@ class PlayerQueue {
     clearShuffleHistory = true,
     metadata?: PlayerQueueMetadata
   ): void {
-    console.log('[PlayerQueue.replaceQueue]', {
+    logQueue('[PlayerQueue.replaceQueue]', {
       newQueueLength: songIds.length,
       newPosition,
       oldQueueLength: this.songIds.length,
@@ -482,7 +489,7 @@ class PlayerQueue {
     if (metadata !== undefined) {
       this.metadata = metadata;
     }
-    console.log('[PlayerQueue.replaceQueue.done]', {
+    logQueue('[PlayerQueue.replaceQueue.done]', {
       finalQueueLength: this.songIds.length,
       finalPosition: this.position,
       currentSongId: this.currentSongId
@@ -511,7 +518,7 @@ class PlayerQueue {
    * @returns Object containing the shuffled queue and position mapping
    */
   shuffle(): { shuffledQueue: number[]; positions: number[] } {
-    console.log('[PlayerQueue.shuffle]', {
+    logQueue('[PlayerQueue.shuffle]', {
       queueLength: this.songIds.length,
       currentPosition: this.position,
       currentSongId: this.currentSongId
@@ -540,7 +547,7 @@ class PlayerQueue {
     this.position = 0;
     this.queueBeforeShuffle = positions;
 
-    console.log('[PlayerQueue.shuffle.done]', {
+    logQueue('[PlayerQueue.shuffle.done]', {
       newQueueLength: this.songIds.length,
       newPosition: this.position
     });

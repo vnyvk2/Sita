@@ -49,6 +49,45 @@ const compareMajorMinorAndPatch = (Lv: ExtendedVersionInfo, Cv: ExtendedVersionI
   return 0;
 };
 
+const getPhaseRank = (phase?: string): number => {
+  if (!phase || phase === 'stable') return 3;
+  if (phase === 'rc' || phase === 'beta') return 2;
+  if (phase === 'alpha' || phase === 'dev') return 1;
+  return 0;
+};
+
+const comparePreRelease = (lPre: string, cPre: string): number => {
+  const lRank = getPhaseRank(lPre.split('.')[0]?.replace(/[^a-zA-Z]/gi, ''));
+  const cRank = getPhaseRank(cPre.split('.')[0]?.replace(/[^a-zA-Z]/gi, ''));
+  if (lRank > cRank) return -1;
+  if (lRank < cRank) return 1;
+
+  const lParts = lPre.split('.');
+  const cParts = cPre.split('.');
+  const len = Math.max(lParts.length, cParts.length);
+
+  for (let i = 0; i < len; i++) {
+    const lSeg = lParts[i];
+    const cSeg = cParts[i];
+
+    if (lSeg === undefined) return 1; // shorter pre-release has lower precedence in semver, but here stable has rank 3 already; for alpha.1 vs alpha.1.2, alpha.1.2 > alpha.1
+    if (cSeg === undefined) return -1;
+    if (lSeg === cSeg) continue;
+
+    const lNum = /^\d+$/.test(lSeg) ? parseInt(lSeg, 10) : NaN;
+    const cNum = /^\d+$/.test(cSeg) ? parseInt(cSeg, 10) : NaN;
+
+    if (!isNaN(lNum) && !isNaN(cNum)) {
+      return lNum > cNum ? -1 : 1;
+    }
+    if (!isNaN(lNum) && isNaN(cNum)) return 1; // numeric has lower precedence than string in semver
+    if (isNaN(lNum) && !isNaN(cNum)) return -1;
+
+    return lSeg.localeCompare(cSeg) > 0 ? -1 : 1;
+  }
+  return 0;
+};
+
 const isLatestVersion = (latestVersionString: string, currentVersionString: string) => {
   const latestVersion = getVersionInfoFromString(latestVersionString);
   const currentVersion = getVersionInfoFromString(currentVersionString);
@@ -63,15 +102,13 @@ const isLatestVersion = (latestVersionString: string, currentVersionString: stri
       return baseComparison === 1;
     }
 
-    const { preRelease: LvPreRelease } = latestVersion;
-    const { preRelease: CvPreRelease } = currentVersion;
+    const lPre = latestVersion.preRelease || '';
+    const cPre = currentVersion.preRelease || '';
 
-    if (LvPreRelease === CvPreRelease) return true;
+    if (lPre === cPre) return true;
 
-    if (LvPreRelease && !CvPreRelease) return true;
-    if (!LvPreRelease && CvPreRelease) return false;
-    if (LvPreRelease && CvPreRelease && LvPreRelease !== CvPreRelease) return true;
-    return true;
+    const preReleaseComparison = comparePreRelease(lPre, cPre);
+    return preReleaseComparison !== -1;
   }
   return false;
 };

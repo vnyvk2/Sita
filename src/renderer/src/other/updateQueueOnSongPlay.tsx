@@ -16,7 +16,7 @@ const updateQueueOnSongPlay = (queue: Queue, songId: number, playAsCurrentSongIn
       } else queue.currentSongIndex = queue.songIds.indexOf(songId);
     } else {
       // songId not in the queue
-      console.log(`song with id ${songId} is not present in the queue`);
+      console.debug(`song with id ${songId} is not present in the queue`);
       queue.songIds.push(songId);
 
       if (queue.currentSongIndex !== null) queue.currentSongIndex += 1;

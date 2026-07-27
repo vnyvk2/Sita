@@ -37,13 +37,6 @@ const SongUnplayableErrorPrompt = (props: Props) => {
   const fileExtension = songPath?.split('.').at(-1)?.toLowerCase() ?? '';
   const isFLAC = fileExtension === 'flac';
 
-  console.log('Detected unplayable song error:', {
-    errorMessage,
-    isFormatError,
-    fileExtension,
-    isFLAC
-  });
-
   const supportedExtensionComponents = supportedMusicExtensions.map((ext) => (
     <span className="mx-2" key={ext}>
       &bull; <span className="hover:underline">{ext}</span>

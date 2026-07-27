@@ -15,10 +15,14 @@ import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
 import generateApiRequestBodyForLastFMPostRequests from './generateApiRequestBodyForLastFMPostRequests';
 import getLastFmAuthData from './getLastFMAuthData';
-import { LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
+import { LASTFM_BASE_URL, LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
 
 const FLUSH_BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 1500;
+
+// Note: In Electron's single-threaded main process, this boolean lock guarantees that only one flush job
+// executes at a time. Because concurrent execution is prevented here, claimPendingBatch does not require
+// an explicit database transaction to prevent double-claiming rows.
 let isFlushing = false;
 
 export async function flushScrobbleQueue(): Promise<void> {
@@ -36,7 +40,7 @@ export async function flushScrobbleQueue(): Promise<void> {
 
     await resetStuckSending();
 
-    const url = new URL('https://ws.audioscrobbler.com/2.0/');
+    const url = new URL(LASTFM_BASE_URL);
     url.searchParams.set('format', 'json');
 
     await deleteOldPending();

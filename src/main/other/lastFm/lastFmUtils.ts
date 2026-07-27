@@ -1,4 +1,5 @@
 export const LASTFM_REQUEST_TIMEOUT_MS = 10_000;
+export const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 
 export const fetchWithTimeout = async (
   url: URL,

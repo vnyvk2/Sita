@@ -8,9 +8,7 @@ import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
 import generateApiRequestBodyForLastFMPostRequests from './generateApiRequestBodyForLastFMPostRequests';
 import getLastFmAuthData from './getLastFMAuthData';
-import { LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
-
-const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
+import { LASTFM_BASE_URL, LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
 
 const queueScrobbleForRetry = async (
   songId: number,

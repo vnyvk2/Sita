@@ -10,11 +10,9 @@ import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
 import hashText from '../../utils/hashText';
 import getLastFmAuthData from './getLastFMAuthData';
-import { LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
+import { LASTFM_BASE_URL, LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
 
 type Method = 'track.love' | 'track.unlove';
-
-const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 
 const generateApiSignature = (method: Method, authData: AuthData, params: LoveParams) => {
   const { LAST_FM_API_KEY, LAST_FM_SHARED_SECRET, SESSION_KEY } = authData;

@@ -6,6 +6,13 @@ import { equalizerBandHertzData } from './equalizerData';
 import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
 
+const DEBUG_PLAYER = false;
+
+const logPlayer = (...args: unknown[]) => {
+  if (!DEBUG_PLAYER) return;
+  console.debug(...args);
+};
+
 const AUDIO_FADE_DURATION = 250;
 
 type PlayerEventType =
@@ -91,7 +98,7 @@ class AudioPlayer {
       this.queueEventsUnsubscribe.push(
         queue.on('positionChange', () => {
           const songId = queue.currentSongId;
-          console.log('[AudioPlayer.positionChange]', {
+          logPlayer('[AudioPlayer.positionChange]', {
             position: queue.position,
             songId,
             willLoad: !!songId,
@@ -176,7 +183,7 @@ class AudioPlayer {
    * Auto-resumes playback for the next song.
    */
   private async handleSongEnd() {
-    console.log('[AudioPlayer.handleSongEnd]', { repeatMode: this.repeatMode });
+    logPlayer('[AudioPlayer.handleSongEnd]', { repeatMode: this.repeatMode });
 
     if (this.repeatMode === 'one') {
       this.audio.currentTime = 0;
@@ -222,7 +229,7 @@ class AudioPlayer {
     }
 
     try {
-      console.log('[AudioPlayer.loadSong]', {
+      logPlayer('[AudioPlayer.loadSong]', {
         songId: songData.songId,
         options
       });
@@ -268,7 +275,7 @@ class AudioPlayer {
       this.audio.dispatchEvent(trackChangeEvent);
 
       this.emit('songLoaded', songData);
-      console.log('[AudioPlayer.loadSong.done]', {
+      logPlayer('[AudioPlayer.loadSong.done]', {
         songId: songData.songId,
         title: songData.title
       });
@@ -499,7 +506,7 @@ class AudioPlayer {
     const { autoPlay = true, recordListening = true, onError } = options;
 
     try {
-      console.log('[AudioPlayer.playSongById]', { songId, autoPlay });
+      logPlayer('[AudioPlayer.playSongById]', { songId, autoPlay });
 
       // Fetch song data once
       const songData = await window.api.audioLibraryControls.getSong(songId);
@@ -530,7 +537,7 @@ class AudioPlayer {
    * @param reason - Why the skip occurred ('USER_SKIP' or 'PLAYER_SKIP')
    */
   async skipForward(reason: SongSkipReason = 'USER_SKIP'): Promise<void> {
-    console.log('[AudioPlayer.skipForward]', {
+    logPlayer('[AudioPlayer.skipForward]', {
       reason,
       position: this.queue.position,
       hasNext: this.queue.hasNext,
@@ -556,14 +563,14 @@ class AudioPlayer {
     if (this.queue.hasNext) {
       this.pendingAutoPlay = true; // Auto-play next song on manual skip
       this.queue.moveToNext();
-      console.log('[AudioPlayer.skipForward.moved]', {
+      logPlayer('[AudioPlayer.skipForward.moved]', {
         position: this.queue.position
       });
     } else if (this.repeatMode === 'all' && this.queue.length > 0) {
       this.pendingAutoPlay = true; // Auto-play when restarting queue
       this.queue.moveToStart();
     } else if (this.queue.isEmpty) {
-      console.log('[AudioPlayer.skipForward] Queue is empty.');
+      logPlayer('[AudioPlayer.skipForward] Queue is empty.');
     }
     // else: at end without repeat, do nothing (song ends)
   }
@@ -573,7 +580,7 @@ class AudioPlayer {
    * restarts current song. Otherwise, moves to previous song in queue.
    */
   skipBackward(): void {
-    console.log('[AudioPlayer.skipBackward]', {
+    logPlayer('[AudioPlayer.skipBackward]', {
       currentTime: this.audio.currentTime,
       position: this.queue.position,
       hasPrevious: this.queue.hasPrevious

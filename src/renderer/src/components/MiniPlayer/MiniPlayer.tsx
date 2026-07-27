@@ -121,12 +121,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   }, []);
 
   const handleSkipForwardClickWithParams = () => {
-    console.log('[MiniPlayer] Skip Forward clicked!');
     handleSkipForwardClick('USER_SKIP');
   };
 
   const handleSkipBackwardClickWithParams = () => {
-    console.log('[MiniPlayer] Skip Backward clicked!');
     handleSkipBackwardClick();
   };
 

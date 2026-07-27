@@ -45,11 +45,9 @@ export const clearDiscordRpcActivity = async () => {
     debounceTimer = null;
   }
 
-  // Flush any pending data from the queue before clearing
-  if (latestData) {
-    setDiscordRPC(latestData);
-  }
-
+  // Clear presence directly.
+  // Pending updates are discarded because this function's
+  // intent is to immediately clear Discord Rich Presence.
   latestData = null;
   setDiscordRPC(null);
 };
