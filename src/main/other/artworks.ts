@@ -4,7 +4,9 @@ import path from 'path';
 
 import { db } from '@main/db/db';
 import { deleteArtworks, saveArtworks } from '@main/db/queries/artworks';
-import type { artworks } from '@main/db/schema';
+import { inArray } from 'drizzle-orm';
+
+import { artworks } from '@main/db/schema';
 import { app } from 'electron';
 import sharp from 'sharp';
 

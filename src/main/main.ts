@@ -236,7 +236,7 @@ const createWindow = async () => {
     title: 'Nora',
     webPreferences: {
       zoomFactor: currentWindowZoomFactor,
-      preload: path.resolve(import.meta.dirname, '../preload/index.mjs')
+      preload: path.resolve(import.meta.dirname, '../preload/index.cjs')
     },
     visualEffectState: 'followWindow',
     roundedCorners: true,

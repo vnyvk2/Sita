@@ -1,5 +1,6 @@
 // import path from 'path';
-import { join as joinPath } from 'node:path/posix';
+import { join } from 'node:path/posix';
+const joinPath = (...paths: string[]) => join(...paths).replaceAll('\\', '/');
 import { platform } from 'process';
 
 import { artworks as artworksSchema } from '@db/schema';

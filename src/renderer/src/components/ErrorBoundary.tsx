@@ -5,7 +5,7 @@ import BugImg from '../assets/images/svg/Bug Fixed_Monochromatic.svg';
 import log from '../utils/log';
 import Button from './Button';
 
-const { isInDevelopment } = window.api.properties;
+const isInDevelopment = window.api?.properties?.isInDevelopment ?? false;
 
 interface ErrorBoundaryProps {
   children: ReactNode;

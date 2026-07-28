@@ -24,7 +24,7 @@ export default defineConfig({
     build: {
       sourcemap: true,
       minify: false,
-      rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].mjs' } }
+      rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } }
     }
   },
   renderer: {
