@@ -27,7 +27,7 @@ import {
   getArtistSongIds,
   deleteArtist
 } from '../db/queries/artists';
-import { linkArtworksToSong } from '../db/queries/artworks';
+import { syncSongArtworks } from '../db/queries/artworks';
 import {
   createGenre,
   linkSongToGenre,
@@ -892,8 +892,9 @@ const updateSongId3Tags = async (
 
           if (artworkData && artworkData.length > 0) {
             // Link artwork to song
-            await linkArtworksToSong(
-              artworkData.map((art) => ({ songId, artworkId: art.id })),
+            await syncSongArtworks(
+              songId,
+              artworkData.map((art) => art.id),
               trx
             );
           }

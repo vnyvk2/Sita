@@ -10,8 +10,14 @@ vi.mock('../../../../src/main/parseSong/parseSong', () => ({
 
 vi.mock('../../../../src/main/workers/jobScheduler', () => ({
   libraryScheduler: {
-    enqueue: vi.fn()
+    enqueue: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn()
   }
+}));
+
+vi.mock('../../../../src/main/main', () => ({
+  sendMessageToRenderer: vi.fn()
 }));
 
 vi.mock('../../../../src/main/db/db', () => ({

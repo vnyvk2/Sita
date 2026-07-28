@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
-import { linkArtworksToSong } from '@main/db/queries/artworks';
+import { syncSongArtworks } from '@main/db/queries/artworks';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import type { songs } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
@@ -11,12 +11,11 @@ import { File } from 'node-taglib-sharp';
 import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { removeArtwork, storeArtworks } from '../other/artworks';
+import { storeArtworks } from '../other/artworks';
 import { generatePalettes } from '../other/generatePalette';
 import {
   removeDeletedAlbumDataOfSong,
   removeDeletedArtistDataOfSong,
-  removeDeletedArtworkDataOfSong,
   removeDeletedGenreDataOfSong
 } from '../removeSongsFromLibrary';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
@@ -46,10 +45,6 @@ const reParseSong = async (filePath: string) => {
         metadata.title || path.basename(songPath, path.extname(songPath)) || 'Unknown Title';
 
       if (metadata) {
-        if (isArtworkAvailable && !oldArtworkPaths.isDefaultArtwork) {
-          await removeArtwork(oldArtworkPaths);
-        }
-
         const updatedSong: Partial<typeof songs.$inferInsert> = {
           title: songTitle,
           duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
@@ -75,7 +70,6 @@ const reParseSong = async (filePath: string) => {
           await removeDeletedArtistDataOfSong(song, trx);
           await removeDeletedAlbumDataOfSong(song, trx);
           await removeDeletedGenreDataOfSong(song, trx);
-          await removeDeletedArtworkDataOfSong(song, trx);
 
           // No need to delete playlists, play events, seek events, or skip events as they will be the same even after re-parsing.
 
@@ -87,8 +81,9 @@ const reParseSong = async (filePath: string) => {
             trx
           );
 
-          const linkedArtworks = await linkArtworksToSong(
-            artworkData.map((artwork) => ({ songId: songData.id, artworkId: artwork.id })),
+          const linkedArtworks = await syncSongArtworks(
+            songData.id,
+            artworkData.map((artwork) => artwork.id),
             trx
           );
 

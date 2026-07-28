@@ -92,16 +92,19 @@ const checkForDefaultArtworkSaveLocation = async () => {
 
 import crypto from 'crypto';
 
+// In-memory lock to prevent concurrent identical artwork processing
+const inFlightArtworks = new Map<string, Promise<(typeof artworks.$inferSelect)[]>>();
+
 export const storeArtworks = async (
   artworkType: QueueTypes,
   artwork?: Buffer | Uint8Array | string,
   trx: DB | DBTransaction = db
 ): Promise<(typeof artworks.$inferSelect)[]> => {
-  try {
-    let id = generateRandomId();
+  const processArtwork = async () => {
+    let id = `default-${artworkType}`;
     let isDefault = true;
-    let fullHash = `default-${id}`;
-    let optHash = `default-${id}-opt`;
+    let fullHash = `default-${artworkType}`;
+    let optHash = `default-${artworkType}-opt`;
 
     if (artwork) {
       const hash = crypto.createHash('sha256').update(artwork).digest('hex');
@@ -109,13 +112,13 @@ export const storeArtworks = async (
       fullHash = hash;
       optHash = `${hash}-optimized`;
       isDefault = false;
+    }
 
-      // Lookup existing artwork by hash
-      const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
-      if (existing.length > 0) {
-        // If we found the artwork, return it directly to skip duplicate generation
-        return existing;
-      }
+    // Lookup existing artwork by hash
+    const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+    if (existing.length > 0) {
+      // If we found the artwork, return it directly to skip duplicate generation
+      return existing;
     }
 
     await checkForDefaultArtworkSaveLocation();
@@ -130,55 +133,29 @@ export const storeArtworks = async (
     );
 
     return data;
-  } catch (error) {
-    logger.error(`Failed to store song artwork.`, { error });
-    throw error;
-  }
-};
+  };
 
-export const updateArtworkData = async (
-  artworkType: QueueTypes,
-  artwork?: Buffer | Uint8Array | string,
-  trx: DB | DBTransaction = db
-): Promise<(typeof artworks.$inferSelect)[]> => {
   try {
-    let id = generateRandomId();
-    let isDefault = true;
-    let fullHash = `default-${id}`;
-    let optHash = `default-${id}-opt`;
-
-    if (artwork) {
-      const hash = crypto.createHash('sha256').update(artwork).digest('hex');
-      id = hash;
-      fullHash = hash;
-      optHash = `${hash}-optimized`;
-      isDefault = false;
-
-      // Lookup existing artwork by hash
-      const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
-      if (existing.length > 0) {
-        // If we found the artwork, return it directly to skip duplicate generation
-        return existing;
-      }
+    const hashKey = artwork ? crypto.createHash('sha256').update(artwork).digest('hex') : `default-${artworkType}`;
+    if (inFlightArtworks.has(hashKey)) {
+      return await inFlightArtworks.get(hashKey)!;
     }
-
-    await checkForDefaultArtworkSaveLocation();
-
-    const result = await createArtworks(id, artworkType, artwork);
-    const data = await saveArtworks(
-      [
-        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
-        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
-      ],
-      trx
-    );
-
-    return data;
+    
+    const promise = processArtwork();
+    inFlightArtworks.set(hashKey, promise);
+    
+    const result = await promise;
+    inFlightArtworks.delete(hashKey);
+    return result;
   } catch (error) {
+    const hashKey = artwork ? crypto.createHash('sha256').update(artwork).digest('hex') : `default-${artworkType}`;
+    inFlightArtworks.delete(hashKey);
     logger.error(`Failed to store song artwork.`, { error });
     throw error;
   }
 };
+
+
 
 const manageArtworkRemovalErrors = (error: Error) => {
   if (isAnErrorWithCode(error) && error.code === 'ENOENT')

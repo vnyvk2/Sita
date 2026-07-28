@@ -22,6 +22,10 @@ export class JobScheduler extends EventEmitter {
   private completedCount = 0;
   private failedCount = 0;
   private totalExecutionTimeMs = 0;
+  private readonly MAX_FAILED_JOBS = 100;
+  
+  // Track whether we've already emitted QUEUE_EMPTY to prevent duplicate events
+  private isQueueEmptyState = true;
 
   constructor(options?: { maxConcurrency?: number }) {
     super();
@@ -165,6 +169,40 @@ export class JobScheduler extends EventEmitter {
     log.info('[JobScheduler] Stopped cleanly');
   }
 
+  /**
+   * Completely disposes of the scheduler, cancelling all jobs before unregistering events.
+   */
+  public dispose() {
+    this.isDraining = true;
+    this.isRunning = false;
+    
+    // Clear queues
+    this.highPriorityQueue = [];
+    this.normalPriorityQueue = [];
+    this.lowPriorityQueue = [];
+    
+    // Cancel running jobs
+    for (const [id, job] of this.runningJobs.entries()) {
+      job.state = 'cancelled';
+      if (job.cancel) {
+        try {
+          job.cancel();
+        } catch (e) {
+          log.warn(`[JobScheduler] Error cancelling job ${id} during dispose:`, e);
+        }
+      }
+    }
+    
+    this.runningJobs.clear();
+    this.activeJobIds.clear();
+    this.failedJobsList = [];
+    
+    // Remove listeners last, so cancellation callbacks can still emit if needed
+    this.removeAllListeners();
+    
+    log.info('[JobScheduler] Disposed cleanly');
+  }
+
   private async processNext() {
     if (!this.isRunning || this.isDraining) return;
 
@@ -183,11 +221,24 @@ export class JobScheduler extends EventEmitter {
 
       this.runningJobs.set(job.id, job);
       job.state = 'running';
+      this.isQueueEmptyState = false;
       
       const startTime = Date.now();
+      this.emit('JOB_STARTED', job);
 
       // Execute without blocking the while loop
       this.executeJob(job, startTime);
+    }
+    
+    // Emit QUEUE_EMPTY if no jobs are running and queues are empty
+    if (this.runningJobs.size === 0 && 
+        this.highPriorityQueue.length === 0 && 
+        this.normalPriorityQueue.length === 0 && 
+        this.lowPriorityQueue.length === 0) {
+      if (!this.isQueueEmptyState) {
+        this.isQueueEmptyState = true;
+        this.emit('QUEUE_EMPTY');
+      }
     }
   }
 
@@ -199,12 +250,22 @@ export class JobScheduler extends EventEmitter {
       this.totalExecutionTimeMs += executionTime;
       this.completedCount++;
       
+      // If the job was cancelled while it was executing, don't mark as completed
+      if (job.state === 'cancelled') {
+        return;
+      }
+      
       job.state = 'completed';
-      this.emit('JOB_COMPLETED', job);
+      this.emit('JOB_COMPLETED', job, executionTime);
       // Removed ASSET_CREATED here; the job plugin itself should emit business events.
 
     } catch (error) {
       log.error(`[JobScheduler] Job failed: ${job.id}`, { error });
+      
+      // If cancelled, don't retry or fail it.
+      if (job.state === 'cancelled') {
+        return;
+      }
       
       const maxRetries = job.maxRetries ?? 3;
       if (job.retries < maxRetries) {
@@ -222,13 +283,16 @@ export class JobScheduler extends EventEmitter {
         job.state = 'failed';
         this.failedCount++;
         this.failedJobsList.push(job);
+        if (this.failedJobsList.length > this.MAX_FAILED_JOBS) {
+          this.failedJobsList.shift();
+        }
         this.emit('JOB_FAILED', job, error);
       }
     } finally {
       this.runningJobs.delete(job.id);
       // We explicitly leave it in activeJobIds if it's running/queued, 
       // but remove it once it reaches terminal state (completed/failed/cancelled)
-      if (job.state === 'completed' || job.state === 'failed') {
+      if (job.state === 'completed' || job.state === 'failed' || job.state === 'cancelled') {
         this.activeJobIds.delete(job.id);
       }
       

@@ -19,10 +19,24 @@ export class LibraryObservabilityService extends EventEmitter {
 
   private metricsUpdateTimeout: NodeJS.Timeout | null = null;
   private lastMetricsUpdate = 0;
+  private pruningInterval: NodeJS.Timeout;
 
   constructor() {
     super();
     this.registerSchedulerListeners();
+    // Prune completedTimestamps every minute to prevent memory leak
+    this.pruningInterval = setInterval(() => this.pruneTimestamps(), 60000);
+  }
+
+  public dispose() {
+    this.removeAllListeners();
+    if (this.metricsUpdateTimeout) {
+      clearTimeout(this.metricsUpdateTimeout);
+      this.metricsUpdateTimeout = null;
+    }
+    if (this.pruningInterval) {
+      clearInterval(this.pruningInterval);
+    }
   }
 
   private registerSchedulerListeners() {
@@ -125,6 +139,11 @@ export class LibraryObservabilityService extends EventEmitter {
     return [...this.timeline];
   }
 
+  private pruneTimestamps() {
+    const oneMinuteAgo = Date.now() - 60000;
+    this.completedTimestamps = this.completedTimestamps.filter(t => t > oneMinuteAgo);
+  }
+
   public getMetrics(): SchedulerMetrics {
     const raw = libraryScheduler.getRawMetrics();
     const runningJobsList: RunningJobInfo[] = libraryScheduler.getRunningJobs().map(job => ({
@@ -133,9 +152,7 @@ export class LibraryObservabilityService extends EventEmitter {
       description: job.description
     }));
 
-    // Clean up timestamps older than 1 minute
-    const oneMinuteAgo = Date.now() - 60000;
-    this.completedTimestamps = this.completedTimestamps.filter(t => t > oneMinuteAgo);
+    this.pruneTimestamps();
 
     const averageRuntime = this.totalCompleted > 0 
       ? Math.round(this.totalRuntimeMs / this.totalCompleted) 

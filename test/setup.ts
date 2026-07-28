@@ -13,6 +13,11 @@ vi.mock('electron', () => ({
     whenReady: vi.fn(() => Promise.resolve())
   },
   BrowserWindow: vi.fn(),
+  nativeImage: {
+    createFromPath: vi.fn(() => ({
+      isEmpty: vi.fn(() => false)
+    }))
+  },
   ipcMain: {
     handle: vi.fn(),
     on: vi.fn()

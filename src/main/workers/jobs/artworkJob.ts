@@ -47,17 +47,33 @@ export class ArtworkJob implements Job {
       // If it already has artworks, skip processing
       if (album.artworks && album.artworks.length > 0) {
         logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork.`);
-        this.eventBus.emit('ASSET_CREATED:ARTWORK', this);
+        
+        const optimizedArtwork = album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
+        
+        if (optimizedArtwork) {
+          this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
+            albumId: this.albumId,
+            artworkId: optimizedArtwork.id,
+            path: optimizedArtwork.path,
+            albumTitle: album.title
+          });
+        }
         return;
       }
 
       // 2. Read ID3 tags
       const taglib = await import('node-taglib-sharp');
       const file = taglib.File.createFromPath(this.sampleSongPath);
-      const tag = file.tag;
-      const pictureData = tag?.pictures?.at(0)
-        ? tag.pictures[0].data.toByteArray()
-        : undefined;
+      let pictureData: Uint8Array | undefined;
+      
+      try {
+        const tag = file.tag;
+        pictureData = tag?.pictures?.at(0)
+          ? tag.pictures[0].data.toByteArray()
+          : undefined;
+      } finally {
+        file.dispose();
+      }
 
       // 3. Store artwork (this resizes and saves to disk, then creates DB records)
       const artworkData = await storeArtworks('album', pictureData);

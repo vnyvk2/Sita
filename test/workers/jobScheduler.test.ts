@@ -37,7 +37,7 @@ describe('JobScheduler', () => {
     await promise;
 
     expect(executeMock).toHaveBeenCalledOnce();
-    const metrics = scheduler.getMetrics();
+    const metrics = scheduler.getRawMetrics();
     expect(metrics.completedJobs).toBe(1);
     expect(metrics.runningJobs).toBe(0);
     expect(metrics.queuedJobs).toBe(0);
