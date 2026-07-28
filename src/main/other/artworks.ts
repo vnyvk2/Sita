@@ -189,6 +189,7 @@ export const removeArtwork = async (artworkPaths: ArtworkPaths, type: QueueTypes
  * @throws Throws an error if the removal process fails.
  */
 export const removeArtworks = async (artworkIds: number[], trx: DB | DBTransaction = db) => {
+  if (artworkIds.length === 0) return;
   try {
     const artworks = await deleteArtworks(artworkIds, trx);
 
@@ -201,7 +202,7 @@ export const removeArtworks = async (artworkIds: number[], trx: DB | DBTransacti
     );
   } catch (error) {
     logger.error('Failed to remove artwork.', { error });
-    throw new Error('Error occurred when removing artwork.');
+    throw error;
   }
 };
 

@@ -86,11 +86,11 @@ describe('resolveFilePaths', () => {
     expect(paths.optimizedArtworkPath).toContain('song-cover.webp');
   });
 
-  test('parseSongArtworks picks high and low resolution images when both exist', () => {
+  test('parseSongArtworks picks high resolution and optimized images when both exist', () => {
     const paths = parseSongArtworks(
       [
-        { width: 1000, height: 1000, path: 'high.webp' },
-        { width: 300, height: 300, path: 'low.webp' }
+        { width: 1000, height: 1000, path: 'high.webp', isOptimized: false },
+        { width: 300, height: 300, path: 'low.webp', isOptimized: true }
       ] as never,
       true,
       false

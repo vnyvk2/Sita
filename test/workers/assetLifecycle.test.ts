@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 import { db } from '../../src/main/db/db';
-import { artworks, albumsArtworks } from '../../src/main/db/schema';
+import { albums, artworks, albumsArtworks } from '../../src/main/db/schema';
 import { storeArtworks } from '../../src/main/other/artworks';
 import { collectGarbageArtworks } from '../../src/main/core/garbageCollector';
 import { eq } from 'drizzle-orm';
@@ -26,6 +26,7 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
 
       // Mock Sharp processing simply to avoid actual image manipulation
       vi.mocked(fs.rename).mockResolvedValue(undefined);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // Run storeArtworks twice concurrently
       const [resultA, resultB] = await Promise.all([
@@ -58,9 +59,11 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       const dummyArtworkBuffer = Buffer.from('another dummy image');
       const result = await storeArtworks('songs', dummyArtworkBuffer, db);
       const artworkId = result[0].id;
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Link artwork to album
-      await db.insert(albumsArtworks).values({ albumId: 1, artworkId });
+      const album = await db.insert(albums).values({ title: 'test album' }).returning();
+      await db.insert(albumsArtworks).values({ albumId: album[0].id, artworkId });
 
       // 3. Run GC
       const job = new GarbageCollectionJob();
@@ -81,6 +84,7 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       // Ensure it exists in db
       let dbRows = await db.select().from(artworks).where(eq(artworks.id, artworkId));
       expect(dbRows.length).toBe(1);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Run GC (it has no links in albums_artworks or others)
       const count = await collectGarbageArtworks();

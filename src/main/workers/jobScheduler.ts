@@ -127,9 +127,8 @@ export class JobScheduler extends EventEmitter {
       if (runningJob.cancel) {
         runningJob.cancel();
       }
-      this.runningJobs.delete(id);
-      this.activeJobIds.delete(id);
-      this.processNext();
+      // Do NOT delete from runningJobs/activeJobIds or call processNext here.
+      // Ownership of cleanup remains with executeJob()'s finally block.
       return true;
     }
 
@@ -160,9 +159,15 @@ export class JobScheduler extends EventEmitter {
     this.isDraining = true;
     log.info('[JobScheduler] Draining... waiting for running jobs to finish.');
 
-    // Simple wait until all running jobs complete
-    while (this.runningJobs.size > 0) {
+    // Simple wait until all running jobs complete (with timeout)
+    const timeoutMs = 15000;
+    const start = Date.now();
+    while (this.runningJobs.size > 0 && Date.now() - start < timeoutMs) {
       await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    if (this.runningJobs.size > 0) {
+      log.warn(`[JobScheduler] Timed out waiting for ${this.runningJobs.size} jobs to finish during drain.`);
     }
     
     this.isDraining = false;
