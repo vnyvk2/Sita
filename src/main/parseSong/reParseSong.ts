@@ -12,6 +12,8 @@ import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { storeArtworks } from '../other/artworks';
+import { libraryScheduler } from '../workers/jobScheduler';
+import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
 import { generatePalettes } from '../other/generatePalette';
 import {
   removeDeletedAlbumDataOfSong,
@@ -73,7 +75,7 @@ const reParseSong = async (filePath: string) => {
 
           // No need to delete playlists, play events, seek events, or skip events as they will be the same even after re-parsing.
 
-          updateSongByPath(songPath, updatedSong, trx);
+          await updateSongByPath(songPath, updatedSong, trx);
 
           const artworkData = await storeArtworks(
             'songs',
@@ -131,6 +133,8 @@ const reParseSong = async (filePath: string) => {
             newAlbumArtists
           };
         });
+        
+        libraryScheduler.enqueue(new GarbageCollectionJob());
 
         logger.debug(`Song reparsed successfully.`, {
           songPath: song?.path

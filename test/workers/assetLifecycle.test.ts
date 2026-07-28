@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 import { db } from '../../src/main/db/db';
-import { albums, artworks, albumsArtworks } from '../../src/main/db/schema';
+import { albums, artworks, albumsArtworks, songs, artworksSongs } from '../../src/main/db/schema';
 import { storeArtworks } from '../../src/main/other/artworks';
 import { collectGarbageArtworks } from '../../src/main/core/garbageCollector';
 import { eq } from 'drizzle-orm';
@@ -105,6 +105,68 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       // Run again
       const count = await collectGarbageArtworks();
       expect(count).toBe(0); // Should safely do nothing
+    });
+  });
+
+  describe('Artwork Replacement & Sweep Verification', () => {
+    it('should sweep old artwork when reparsing replaces it', async () => {
+      // 1. Create a song and link it to Artwork A
+      const bufferA = Buffer.from('artwork A');
+      const resultA = await storeArtworks('songs', bufferA, db);
+      const artworkA_Id = resultA[0].id;
+      
+      const song = await db.insert(songs).values({ title: 'test song', path: '/test-reparse.mp3', duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+      await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkA_Id });
+      
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      // 2. Simulate Reparse: create Artwork B and use syncSongArtworks
+      const bufferB = Buffer.from('artwork B');
+      const resultB = await storeArtworks('songs', bufferB, db);
+      const artworkB_Id = resultB[0].id;
+      
+      const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');
+      await syncSongArtworks(song[0].id, [artworkB_Id], db);
+      
+      // 3. Run GC
+      await collectGarbageArtworks();
+      
+      // 4. Verify Artwork A is deleted from DB but Artwork B remains
+      const dbRowsA = await db.select().from(artworks).where(eq(artworks.id, artworkA_Id));
+      expect(dbRowsA.length).toBe(0);
+      
+      const dbRowsB = await db.select().from(artworks).where(eq(artworks.id, artworkB_Id));
+      expect(dbRowsB.length).toBe(1);
+    });
+
+    it('should sweep old artwork when metadata updates replace it', async () => {
+      // 1. Create a song and link it to Artwork X
+      const bufferX = Buffer.from('artwork X');
+      const resultX = await storeArtworks('songs', bufferX, db);
+      const artworkX_Id = resultX[0].id;
+      
+      const song = await db.insert(songs).values({ title: 'test song 2', path: '/test-metadata.mp3', duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+      await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkX_Id });
+      
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      // 2. Simulate Metadata Update: create Artwork Y and use syncSongArtworks
+      const bufferY = Buffer.from('artwork Y');
+      const resultY = await storeArtworks('songs', bufferY, db);
+      const artworkY_Id = resultY[0].id;
+      
+      const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');
+      await syncSongArtworks(song[0].id, [artworkY_Id], db);
+      
+      // 3. Run GC
+      await collectGarbageArtworks();
+      
+      // 4. Verify Artwork X is deleted from DB but Artwork Y remains
+      const dbRowsX = await db.select().from(artworks).where(eq(artworks.id, artworkX_Id));
+      expect(dbRowsX.length).toBe(0);
+      
+      const dbRowsY = await db.select().from(artworks).where(eq(artworks.id, artworkY_Id));
+      expect(dbRowsY.length).toBe(1);
     });
   });
 });

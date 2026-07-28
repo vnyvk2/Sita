@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fsSync from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
@@ -42,7 +43,9 @@ const createArtworks = async (
     artworkPath: defaultPath,
     optimizedArtworkPath: defaultPath,
     realArtworkPath: realDefaultPath,
-    realOptimizedArtworkPath: realDefaultPath
+    realOptimizedArtworkPath: realDefaultPath,
+    width: 250, // Default fallback dimensions
+    height: 250
   };
   // const start = timeStart();
   if (artwork) {
@@ -58,7 +61,7 @@ const createArtworks = async (
       await fs.rename(optimizedTmpPath, optimizedImgPath);
 
       const imgTmpPath = `${imgPath}.tmp`;
-      await sharp(artwork, { animated: true })
+      const info = await sharp(artwork, { animated: true })
         .webp()
         .toFile(imgTmpPath);
       await fs.rename(imgTmpPath, imgPath);
@@ -68,7 +71,9 @@ const createArtworks = async (
         artworkPath: path.join(DEFAULT_FILE_URL, imgPath),
         optimizedArtworkPath: path.join(DEFAULT_FILE_URL, optimizedImgPath),
         realArtworkPath: imgPath,
-        realOptimizedArtworkPath: optimizedImgPath
+        realOptimizedArtworkPath: optimizedImgPath,
+        width: info.width,
+        height: info.height
       };
     } catch (error) {
       logger.error(`Failed to create a song artwork.`, { error });
@@ -78,79 +83,79 @@ const createArtworks = async (
   return defaultArtworkPaths;
 };
 
+let isDefaultArtworkLocationCreated = false;
+
 const checkForDefaultArtworkSaveLocation = async () => {
+  if (isDefaultArtworkLocationCreated) return;
+
   try {
     await fs.stat(DEFAULT_ARTWORK_SAVE_LOCATION);
   } catch (error) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ('code' in (error as any) && (error as any).code === 'ENOENT') {
       await fs.mkdir(DEFAULT_ARTWORK_SAVE_LOCATION);
+      isDefaultArtworkLocationCreated = true;
     } else
       logger.error(`Error occurred when checking for default artwork save location.`, { error });
   }
+  isDefaultArtworkLocationCreated = true;
 };
 
-import crypto from 'crypto';
-
 // In-memory lock to prevent concurrent identical artwork processing
-const inFlightArtworks = new Map<string, Promise<(typeof artworks.$inferSelect)[]>>();
+const inFlightArtworks = new Map<string, Promise<Awaited<ReturnType<typeof createArtworks>>>>();
 
 export const storeArtworks = async (
   artworkType: QueueTypes,
   artwork?: Buffer | Uint8Array | string,
   trx: DB | DBTransaction = db
 ): Promise<(typeof artworks.$inferSelect)[]> => {
-  const processArtwork = async () => {
-    let id = `default-${artworkType}`;
-    let isDefault = true;
-    let fullHash = `default-${artworkType}`;
-    let optHash = `default-${artworkType}-opt`;
+  const hashKey = artwork
+    ? crypto.createHash('sha256').update(artwork).digest('hex')
+    : `default-${artworkType}`;
 
-    if (artwork) {
-      const hash = crypto.createHash('sha256').update(artwork).digest('hex');
-      id = hash;
-      fullHash = hash;
-      optHash = `${hash}-optimized`;
-      isDefault = false;
-    }
+  let id = hashKey;
+  let isDefault = !artwork;
+  let fullHash = hashKey;
+  let optHash = `${hashKey}-optimized`;
 
-    // Lookup existing artwork by hash
-    const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
-    if (existing.length > 0) {
-      // If we found the artwork, return it directly to skip duplicate generation
-      return existing;
-    }
+  // Lookup existing artwork by hash
+  const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+  if (existing.length > 0) {
+    // If we found the artwork, return it directly to skip duplicate generation
+    return existing;
+  }
 
-    await checkForDefaultArtworkSaveLocation();
+  await checkForDefaultArtworkSaveLocation();
 
-    const result = await createArtworks(id, artworkType, artwork);
+  // Deduplicate expensive image processing and file I/O globally
+  let filePromise = inFlightArtworks.get(hashKey);
+  if (!filePromise) {
+    filePromise = createArtworks(id, artworkType, artwork);
+    inFlightArtworks.set(hashKey, filePromise);
+  }
+
+  let result;
+  try {
+    result = await filePromise;
+  } catch (error) {
+    inFlightArtworks.delete(hashKey);
+    logger.error(`Failed to create song artwork files.`, { error });
+    throw error;
+  } finally {
+    inFlightArtworks.delete(hashKey);
+  }
+
+  try {
     const data = await saveArtworks(
       [
-        { hash: fullHash, path: result.realArtworkPath, width: 1000, height: 1000, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
+        { hash: fullHash, path: result.realArtworkPath, width: result.width, height: result.height, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
         { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
       ],
       trx
     );
-
     return data;
-  };
-
-  try {
-    const hashKey = artwork ? crypto.createHash('sha256').update(artwork).digest('hex') : `default-${artworkType}`;
-    if (inFlightArtworks.has(hashKey)) {
-      return await inFlightArtworks.get(hashKey)!;
-    }
-    
-    const promise = processArtwork();
-    inFlightArtworks.set(hashKey, promise);
-    
-    const result = await promise;
-    inFlightArtworks.delete(hashKey);
-    return result;
   } catch (error) {
-    const hashKey = artwork ? crypto.createHash('sha256').update(artwork).digest('hex') : `default-${artworkType}`;
-    inFlightArtworks.delete(hashKey);
-    logger.error(`Failed to store song artwork.`, { error });
+    logger.error(`Failed to store song artwork in database.`, { error });
     throw error;
   }
 };
@@ -195,7 +200,7 @@ export const removeArtworks = async (artworkIds: number[], trx: DB | DBTransacti
 
     await Promise.allSettled(
       artworks.map((artwork) => {
-        fs.unlink(removeDefaultAppProtocolFromFilePath(artwork.path)).catch(
+        return fs.unlink(removeDefaultAppProtocolFromFilePath(artwork.path)).catch(
           manageArtworkRemovalErrors
         );
       })
@@ -220,8 +225,10 @@ export const sweepUnusedArtworks = async (trx: DB | DBTransaction = db) => {
       );
       logger.info(`Swept ${unusedIds.length} unused artworks from the database and disk.`);
     }
+    return unusedIds.length;
   } catch (error) {
     logger.error('Failed to sweep unused artworks.', { error });
+    throw error;
   }
 };
 

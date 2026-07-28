@@ -58,8 +58,11 @@ import {
   updateSongsOutsideLibraryData
 } from '../main';
 import { createTempArtwork, storeArtworks } from '../other/artworks';
-import generatePalette from '../other/generatePalette';
+import { generatePalette, getPaletteData, setPaletteData } from '../other/generatePalette';
 import { isSongBlacklisted } from '../utils/isBlacklisted';
+import { libraryScheduler } from '../workers/jobScheduler';
+import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
+import { getArtistArtworkPath, getSongArtworkPath } from '../utils/getArtworkPath';
 import isPathAWebURL from '../utils/isPathAWebUrl';
 import { withFileHandle } from '../utils/withFileHandle';
 
@@ -597,9 +600,9 @@ const manageArtworkUpdates = async (prevSongData: SavableSongData, newSongData: 
           : palettes.filter((palette) => palette.paletteId !== prevSongData.paletteId);
       const palette = await generatePalette(artworkBuffer);
 
-      const artworkPaths = await storeArtworks(songId, 'songs', artworkBuffer);
-      if (artworkPaths) {
-        prevSongData.isArtworkAvailable = !artworkPaths.isDefaultArtwork;
+      const artworkData = await storeArtworks('songs', artworkBuffer);
+      if (artworkData && artworkData.length > 0) {
+        prevSongData.isArtworkAvailable = !!artworkBuffer;
       }
 
       prevSongData.paletteId = palette?.paletteId;
@@ -1068,6 +1071,8 @@ const updateSongId3Tags = async (
         }
       }
     });
+    
+    libraryScheduler.enqueue(new GarbageCollectionJob());
 
     // Transaction succeeded, now update the file system
     logger.debug('Database transaction completed successfully');

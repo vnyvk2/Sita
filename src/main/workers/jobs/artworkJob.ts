@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 
 import { getAlbumById } from '@main/db/queries/albums';
 import { linkArtworksToAlbum } from '@main/db/queries/artworks';
+import { db } from '@main/db/db';
 import logger from '@main/logger';
 import { storeArtworks } from '@main/other/artworks';
 import { ASSET_EVENTS } from '../libraryChoreography';
@@ -75,17 +76,24 @@ export class ArtworkJob implements Job {
         file.dispose();
       }
 
-      // 3. Store artwork (this resizes and saves to disk, then creates DB records)
-      const artworkData = await storeArtworks('album', pictureData);
+      // 3. Store artwork and link it in a transaction
+      const artworkData = await db.transaction(async (trx) => {
+        const data = await storeArtworks('album', pictureData, trx);
 
-      // 4. Link artwork to album
+        // 4. Link artwork to album
+        if (data && data.length > 0) {
+          await linkArtworksToAlbum(
+            data.map((artwork) => ({
+              albumId: this.albumId,
+              artworkId: artwork.id
+            })),
+            trx
+          );
+        }
+        return data;
+      });
+
       if (artworkData && artworkData.length > 0) {
-        await linkArtworksToAlbum(
-          artworkData.map((artwork) => ({
-            albumId: this.albumId,
-            artworkId: artwork.id
-          }))
-        );
 
         // Find the optimized artwork specifically intended for palette generation
         const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
