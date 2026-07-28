@@ -157,7 +157,7 @@ describe('parseSong', () => {
       );
     });
 
-    test('should create song, artworks, album, artists, and genres', async () => {
+    test('should create song, album, artists, and genres', async () => {
       const songPath = '/test/full-metadata-song.mp3';
 
       await parseSong(songPath);
@@ -177,6 +177,65 @@ describe('parseSong', () => {
       expect(manageAlbumsOfParsedSong).toHaveBeenCalled();
       expect(manageArtistsOfParsedSong).toHaveBeenCalled();
       expect(manageGenresOfParsedSong).toHaveBeenCalled();
+    });
+
+    test('should store and link artworks when embedded artwork exists', async () => {
+      const songPath = '/test/song-with-linked-artwork.mp3';
+      const mockMetadata = createMockSongMetadata({
+        pictures: [createMockPicture()]
+      });
+
+      const taglib = await import('node-taglib-sharp');
+      vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
+
+      await parseSong(songPath);
+
+      const { storeArtworks } = await import('../../../../src/main/other/artworks');
+      const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
+
+      expect(storeArtworks).toHaveBeenCalled();
+      expect(linkArtworksToSong).toHaveBeenCalledWith(
+        [
+          { songId: 1, artworkId: 1 },
+          { songId: 1, artworkId: 2 }
+        ],
+        expect.anything()
+      );
+    });
+
+    test('should pass artworkId to album, artist, and genre managers when embedded artwork exists', async () => {
+      const songPath = '/test/song-with-artwork.mp3';
+      const mockMetadata = createMockSongMetadata({
+        pictures: [createMockPicture()]
+      });
+
+      const taglib = await import('node-taglib-sharp');
+      vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
+
+      await parseSong(songPath);
+
+      const manageAlbumsOfParsedSong = (
+        await import('../../../../src/main/parseSong/manageAlbumsOfParsedSong')
+      ).default;
+      const manageArtistsOfParsedSong = (
+        await import('../../../../src/main/parseSong/manageArtistsOfParsedSong')
+      ).default;
+      const manageGenresOfParsedSong = (
+        await import('../../../../src/main/parseSong/manageGenresOfParsedSong')
+      ).default;
+
+      expect(manageAlbumsOfParsedSong).toHaveBeenCalledWith(
+        expect.objectContaining({ artworkId: 1 }),
+        expect.anything()
+      );
+      expect(manageArtistsOfParsedSong).toHaveBeenCalledWith(
+        expect.objectContaining({ artworkId: 1 }),
+        expect.anything()
+      );
+      expect(manageGenresOfParsedSong).toHaveBeenCalledWith(
+        expect.objectContaining({ artworkId: 1 }),
+        expect.anything()
+      );
     });
 
     test('should send all data update events for new entities', async () => {

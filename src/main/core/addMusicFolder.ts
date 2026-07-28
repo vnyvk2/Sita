@@ -40,7 +40,9 @@ const addMusicFromFolderStructures = async (
   });
 
   const eligableStructures = await removeAlreadyAvailableStructures(structures);
+  logger.info(`After removeAlreadyAvailableStructures`, { eligableStructures: eligableStructures.map(x => x.path) });
   const songPathsData = await parseFolderStructuresForSongPaths(eligableStructures);
+  logger.info(`After parseFolderStructuresForSongPaths`, { songPathsDataLength: songPathsData?.length });
 
   if (songPathsData) {
     const startTime = timeStart();

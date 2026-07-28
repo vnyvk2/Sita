@@ -1,6 +1,11 @@
 // import path from 'path';
 import { join } from 'node:path/posix';
-const joinPath = (...paths: string[]) => join(...paths).replaceAll('\\', '/');
+const joinPath = (...paths: string[]) => {
+  const result = join(...paths).replaceAll('\\', '/');
+  return result.startsWith('nora:/') && !result.startsWith('nora://')
+    ? result.replace('nora:/', 'nora://')
+    : result;
+};
 import { platform } from 'process';
 
 import { artworks as artworksSchema } from '@db/schema';

@@ -8,6 +8,8 @@ import { File } from 'node-taglib-sharp';
 
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
+import { storeArtworks } from '../other/artworks';
+import { linkArtworksToSong } from '@main/db/queries/artworks';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -186,11 +188,23 @@ export const parseSong = async (
       const res = await db.transaction(async (trx) => {
         const songData = await saveSong(songInfo, trx);
 
+        const artworkData = await storeArtworks(
+          'songs',
+          metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined,
+          trx
+        );
+
+        const linkedArtworks = await linkArtworksToSong(
+          artworkData.map((artwork) => ({ songId: songData.id, artworkId: artwork.id })),
+          trx
+        );
+
         // const start8 = timeEnd(start6, 'Time to create songInfo basic object');
 
         const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
           {
             songId: songData.id,
+            artworkId: artworkData[0]?.id,
             songYear: songData.year,
             artists: artistsData,
             albumArtists: albumArtistsData,
@@ -213,6 +227,7 @@ export const parseSong = async (
         const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
           {
             songId: songData.id,
+            artworkId: artworkData[0]?.id,
             songArtists: artistsData
           },
           trx
@@ -232,6 +247,7 @@ export const parseSong = async (
         const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
           {
             songId: songData.id,
+            artworkId: artworkData[0]?.id,
             songGenres: genresData
           },
           trx

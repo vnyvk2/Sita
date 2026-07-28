@@ -11,7 +11,7 @@ const getSongPathsInAFolder = (folderPath: string) => {
   const allFiles = getAllFilePathsFromFolder(folderPath);
 
   const allSongPaths = allFiles.filter((filePath) => {
-    const fileExtension = path.extname(filePath);
+    const fileExtension = path.extname(filePath).toLowerCase();
     return supportedMusicExtensions.includes(fileExtension);
   });
 

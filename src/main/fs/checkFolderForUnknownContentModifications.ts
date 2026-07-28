@@ -29,7 +29,7 @@ const getFullPathsOfFolderDirs = async (folderPath: string) => {
   try {
     const dirs = await fs.readdir(folderPath);
     const supportedDirs = dirs.filter((filePath) =>
-      supportedMusicExtensions.includes(path.extname(filePath))
+      supportedMusicExtensions.includes(path.extname(filePath).toLowerCase())
     );
     const fullPaths = supportedDirs.map((filePath) => path.join(folderPath, filePath));
     return fullPaths;

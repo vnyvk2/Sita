@@ -22,7 +22,7 @@ const deleteSongsFromSystem = async (
   });
 
   const isEveryPathASong = absoluteFilePaths.every((filePath) => {
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     return supportedMusicExtensions.includes(ext);
   });
 
