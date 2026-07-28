@@ -16,7 +16,7 @@ import { seedDatabase } from './seed';
 
 const DB_NAME = 'nora.pglite.db';
 export const DB_PATH = app.getPath('userData') + '/' + DB_NAME;
-const migrationsFolder = path.resolve(import.meta.dirname, '../../resources/drizzle/');
+const migrationsFolder = path.join(app.getAppPath(), 'resources', 'drizzle');
 logger.debug(`Migrations folder: ${migrationsFolder}`);
 
 mkdirSync(DB_PATH, { recursive: true });

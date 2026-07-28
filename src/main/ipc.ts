@@ -112,39 +112,33 @@ import resetLyrics from './utils/resetLyrics';
 import romanizeLyrics from './utils/romanizeLyrics';
 import { compare } from './utils/safeStorage';
 import { libraryScheduler } from './workers/jobScheduler';
+import { GarbageCollectionJob } from './workers/jobs/garbageCollectionJob';
+import { registerLibraryChoreography } from './workers/libraryChoreography';
+import { libraryObservability } from './workers/libraryObservability';
+import { recoverLibraryAssets } from './core/recovery';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
   libraryScheduler.start();
   
   // Enqueue Garbage Collection on startup
-  import('./workers/jobs/garbageCollectionJob').then(({ GarbageCollectionJob }) => {
-    libraryScheduler.enqueue(new GarbageCollectionJob());
-  });
+  libraryScheduler.enqueue(new GarbageCollectionJob());
 
   // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
   // Register background asset generation pipelines (e.g., palettes)
-  import('./workers/libraryChoreography').then(({ registerLibraryChoreography }) => {
-    registerLibraryChoreography();
-  });
+  registerLibraryChoreography();
 
-  import('./workers/libraryObservability').then(({ libraryObservability }) => {
-    const sendSchedulerUpdate = () => {
-      import('./main').then(({ sendMessageToRenderer }) => {
-        sendMessageToRenderer({
-          messageCode: 'LIBRARY_SCHEDULER_UPDATE',
-          data: { metrics: libraryObservability.getMetrics() }
-        });
-      });
-    };
+  const sendSchedulerUpdate = () => {
+    sendMessageToRenderer({
+      messageCode: 'LIBRARY_SCHEDULER_UPDATE',
+      data: { metrics: libraryObservability.getMetrics() }
+    });
+  };
 
-    libraryObservability.on('METRICS_UPDATED', sendSchedulerUpdate);
-  });
+  libraryObservability.on('METRICS_UPDATED', sendSchedulerUpdate);
 
   // Fire and forget startup recovery sync
-  import('./core/recovery').then(({ recoverLibraryAssets }) => {
-    recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
-  });
+  recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
   
   // Ensure we gracefully drain on shutdown only once
   let isShuttingDown = false;
@@ -215,7 +209,6 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     });
 
     ipcMain.handle('app/getSchedulerMetrics', async () => {
-      const { libraryObservability } = await import('./workers/libraryObservability');
       return libraryObservability.getMetrics();
     });
 
@@ -519,9 +512,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       await checkForNewSongs();
       sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
       
-      import('./workers/jobs/garbageCollectionJob').then(({ GarbageCollectionJob }) => {
-        libraryScheduler.enqueue(new GarbageCollectionJob());
-      });
+      libraryScheduler.enqueue(new GarbageCollectionJob());
     });
 
     ipcMain.handle('app/getBlacklistData', getBlacklistData);
