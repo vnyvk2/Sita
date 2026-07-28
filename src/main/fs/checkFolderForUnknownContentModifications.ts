@@ -6,8 +6,7 @@ import { getSongsRelativeToFolder } from '@main/db/queries/songs';
 
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
-import { generatePalettes } from '../other/generatePalette';
-import { tryToParseSong } from '../parseSong/parseSong';
+import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
 import { saveAbortController } from './controlAbortControllers';
 
@@ -57,30 +56,12 @@ const addNewlyAddedSongsToLibrary = async (
 ) => {
   const folder = await getFolderFromPath(folderPath);
 
-  for (let i = 0; i < newlyAddedSongPaths.length; i += 1) {
-    const newlyAddedSongPath = newlyAddedSongPaths[i];
+  const mappedSongs = newlyAddedSongPaths.map(songPath => ({
+    songPath,
+    folderId: folder?.id
+  }));
 
-    if (abortSignal?.aborted) {
-      logger.warn('Parsing songs in the music folder aborted by an abortController signal.', {
-        reason: abortSignal?.reason,
-        newlyAddedSongPath
-      });
-      break;
-    }
-
-    try {
-      await tryToParseSong(newlyAddedSongPath, folder?.id, false, false);
-      logger.debug(`${path.basename(newlyAddedSongPath)} song added.`, {
-        songPath: newlyAddedSongPath
-      });
-    } catch (error) {
-      logger.error(`Failed to parse song added before application launch`, {
-        error,
-        newlyAddedSongPath
-      });
-    }
-  }
-  if (newlyAddedSongPaths.length > 0) setTimeout(generatePalettes, 1500);
+  await processSongsWithWorkerPool(mappedSongs, abortSignal);
 };
 
 const checkFolderForUnknownModifications = async (folderPath: string) => {

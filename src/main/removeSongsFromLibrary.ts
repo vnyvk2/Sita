@@ -1,70 +1,53 @@
 import path from 'path';
 
 import { db } from './db/db';
-import { unlinkSongFromAlbum } from './db/queries/albums';
-import { unlinkSongFromArtist } from './db/queries/artists';
-import { deleteArtworks, getArtworkIdsOfSong } from './db/queries/artworks';
+import { unlinkSongFromAlbum, getAlbumSongIds, deleteAlbum } from './db/queries/albums';
+import { unlinkSongFromArtist, getArtistSongIds, deleteArtist } from './db/queries/artists';
+import { getArtworkIdsOfSong } from './db/queries/artworks';
 import { unlinkSongFromGenre } from './db/queries/genres';
 import { getSongByPath, removeSongById } from './db/queries/songs';
 import logger from './logger';
 import { dataUpdateEvent, sendMessageToRenderer } from './main';
 import { convertToSongData } from './utils/convert';
+import { sweepUnusedArtworks } from './other/artworks';
 
 export const removeDeletedArtistDataOfSong = async (song: SavableSongData, trx: DBTransaction) => {
-  const isArtistRemoved = false;
+  let isArtistRemoved = false;
 
   if (Array.isArray(song.artists) && song.artists.length > 0) {
     for (let i = 0; i < song.artists.length; i += 1) {
       const songArtist = song.artists[i];
+      const artistId = Number(songArtist.artistId);
 
-      await unlinkSongFromArtist(Number(songArtist.artistId), Number(song.songId), trx);
+      await unlinkSongFromArtist(artistId, Number(song.songId), trx);
 
-      // TODO: Check if the artist has any songs left, if not remove the artist from the artists data.
+      const songIds = await getArtistSongIds(artistId, trx);
+      if (songIds.length === 0) {
+        await deleteArtist(artistId, trx);
+        isArtistRemoved = true;
+      }
     }
   }
   return { isArtistRemoved };
 };
 
 export const removeDeletedAlbumDataOfSong = async (song: SavableSongData, trx: DBTransaction) => {
-  const isAlbumRemoved = false;
+  let isAlbumRemoved = false;
 
   const albumId = song.album?.albumId;
   if (albumId == null) return { isAlbumRemoved };
 
-  await unlinkSongFromAlbum(Number(albumId), Number(song.songId), trx);
+  const parsedAlbumId = Number(albumId);
+  await unlinkSongFromAlbum(parsedAlbumId, Number(song.songId), trx);
 
-  // TODO: Check if the album has any songs left, if not remove the album from the albums data.
+  const songIds = await getAlbumSongIds(parsedAlbumId, trx);
+  if (songIds.length === 0) {
+    await deleteAlbum(parsedAlbumId, trx);
+    isAlbumRemoved = true;
+  }
 
   return { isAlbumRemoved };
 };
-
-// export const removeDeletedPlaylistDataOfSong = (song: SavableSongData) => {
-//   let isPlaylistRemoved = false;
-//   if (
-//     Array.isArray(playlists) &&
-//     playlists.length > 0 &&
-//     playlists.some((playlist) => playlist.songs.some((str) => str === song.songId))
-//   ) {
-//     for (let x = 0; x < playlists.length; x += 1) {
-//       if (playlists[x].songs.length > 0 && playlists[x].songs.some((y) => y === song.songId)) {
-//         playlists[x].songs.splice(playlists[x].songs.indexOf(song.songId), 1);
-//         logger.debug(
-//           `Data related to '${song.title}' in playlist '${playlists[x].name}' removed.`,
-//           {
-//             songId: song.songId,
-//             playlistId: playlists[x].playlistId
-//           }
-//         );
-//       } else {
-//         logger.debug(`Playlist '${playlists[x].name}' removed because it doesn't have any songs.`, {
-//           playlistId: playlists[x].playlistId
-//         });
-//         isPlaylistRemoved = true;
-//       }
-//     }
-//   }
-//   return { isPlaylistRemoved };
-// };
 
 export const removeDeletedGenreDataOfSong = async (song: SavableSongData, trx: DBTransaction) => {
   const isGenreRemoved = false;
@@ -78,64 +61,19 @@ export const removeDeletedGenreDataOfSong = async (song: SavableSongData, trx: D
   return { isGenreRemoved };
 };
 
-export const removeDeletedArtworkDataOfSong = async (song: SavableSongData, trx: DBTransaction) => {
-  const artworkIds = await getArtworkIdsOfSong(Number(song.songId), trx);
-
-  if (artworkIds.length === 0) return;
-
-  await deleteArtworks(
-    artworkIds.map((a) => a.artworkId),
-    trx
-  );
-};
-
-// const removeDeletedListeningDataOfSong = async (song: SavableSongData, trx: DBTransaction) => {
-//   await deleteSongPlayEvents(Number(song.songId), trx);
-//   await deleteSongSeekEvents(Number(song.songId), trx);
-//   await deleteSongSkipEvents(Number(song.songId), trx);
-// };
-
 const removeSong = async (song: SavableSongData) => {
   logger.debug(`Started the deletion process of the song '${path.basename(song.path)}'`, {
     songId: song.songId,
     path: song.path
   });
 
-  // # No need to delete associated artist data because of foreign key constraints with ON DELETE CASCADE.
-  // //   ARTIST DATA UPDATES
-  // const updatedArtistData = removeDeletedArtistDataOfSong(artists, song);
-  // isArtistRemoved = updatedArtistData.isArtistRemoved;
-  // artists = updatedArtistData.updatedArtists;
-
-  // # No need to delete associated album data because of foreign key constraints with ON DELETE CASCADE.
-  // //   ALBUM DATA UPDATES
-  // const updatedAlbumData = removeDeletedAlbumDataOfSong(albums, song);
-  // isAlbumRemoved = updatedAlbumData.isAlbumRemoved;
-  // albums = updatedAlbumData.updatedAlbums;
-
-  // # No need to delete associated playlist data because of foreign key constraints with ON DELETE CASCADE.
-  // //   PLAYLIST DATA UPDATES
-  // const updatedPlaylistData = removeDeletedPlaylistDataOfSong(playlists, song);
-  // isPlaylistRemoved = updatedPlaylistData.isPlaylistRemoved;
-  // playlists = updatedPlaylistData.updatedPlaylists;
-
-  // # No need to delete associated genre data because of foreign key constraints with ON DELETE CASCADE.
-  // //   GENRE DATA UPDATES
-  // const updatedGenreData = removeDeletedGenreDataOfSong(genres, song);
-  // isGenreRemoved = updatedGenreData.isGenreRemoved;
-  // genres = updatedGenreData.updatedGenres;
-
-  // # No need to delete associated listening data because of foreign key constraints with ON DELETE CASCADE.
-  // LISTENING DATA UPDATES
-  // const { updatedListeningData } = removeDeletedListeningDataOfSong(listeningData, song);
-  // listeningData = updatedListeningData;
-
-  //   SONG ARTWORK UPDATES
   await db.transaction(async (trx) => {
-    // Artwork data are handled with an associate table with ON DELETE CASCADE, but they won't be deleted from the artworks table.
-    // This is because one song can only have one artwork.
-    await removeDeletedArtworkDataOfSong(song, trx);
+    // Unlink the song from artists and albums first so we can check for empty entities
+    await removeDeletedArtistDataOfSong(song, trx);
+    await removeDeletedAlbumDataOfSong(song, trx);
+    await removeDeletedGenreDataOfSong(song, trx);
 
+    // Delete the song itself. The ON DELETE CASCADE will handle artworksSongs.
     await removeSongById(Number(song.songId), trx);
   });
 
@@ -181,6 +119,10 @@ const removeSongsFromLibrary = async (
   dataUpdateEvent('albums/deletedAlbum');
   dataUpdateEvent('genres/deletedGenre');
   dataUpdateEvent('playlists/deletedPlaylist');
+
+  // Execute the garbage collection sweep once at the end of the batch removal.
+  // This avoids running a sweep for every single song deleted.
+  await sweepUnusedArtworks();
 
   return {
     success: true,

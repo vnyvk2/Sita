@@ -333,7 +333,7 @@ describe('tryToParseSong', () => {
       const songPath = '/test/song14.mp3';
       const { sendMessageToRenderer } = await import('../../../../src/main/main');
 
-      await tryToParseSong(songPath, undefined, false, false, true);
+      await tryToParseSong(songPath, undefined, false, true);
 
       expect(sendMessageToRenderer).not.toHaveBeenCalled();
     });

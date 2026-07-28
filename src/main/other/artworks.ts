@@ -3,7 +3,11 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
-import { deleteArtworks, saveArtworks } from '@main/db/queries/artworks';
+import {
+  deleteArtworks,
+  getUnusedArtworkIds,
+  saveArtworks
+} from '@main/db/queries/artworks';
 import { inArray } from 'drizzle-orm';
 
 import { artworks } from '@main/db/schema';
@@ -221,6 +225,25 @@ export const removeArtworks = async (artworkIds: number[], trx: DB | DBTransacti
   } catch (error) {
     logger.error('Failed to remove artwork.', { error });
     throw new Error('Error occurred when removing artwork.');
+  }
+};
+
+/**
+ * Sweeps the database for any artworks that are no longer referenced by any songs, albums, artists,
+ * genres, or playlists, and removes them from both the database and the filesystem.
+ */
+export const sweepUnusedArtworks = async (trx: DB | DBTransaction = db) => {
+  try {
+    const unusedIds = await getUnusedArtworkIds(trx);
+    if (unusedIds.length > 0) {
+      await removeArtworks(
+        unusedIds.map((a) => a.id),
+        trx
+      );
+      logger.info(`Swept ${unusedIds.length} unused artworks from the database and disk.`);
+    }
+  } catch (error) {
+    logger.error('Failed to sweep unused artworks.', { error });
   }
 };
 

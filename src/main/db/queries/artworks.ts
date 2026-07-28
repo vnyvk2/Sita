@@ -154,3 +154,19 @@ export const getArtworkIdsOfSong = async (songId: number, trx: DB | DBTransactio
 
   return data;
 };
+
+export const getUnusedArtworkIds = async (trx: DB | DBTransaction = db) => {
+  const data = await trx
+    .select({ id: artworks.id })
+    .from(artworks)
+    .where(
+      and(
+        sql`NOT EXISTS (SELECT 1 FROM artworks_songs WHERE artwork_id = ${artworks.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM albums_artworks WHERE artwork_id = ${artworks.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM artists_artworks WHERE artwork_id = ${artworks.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM artworks_genres WHERE artwork_id = ${artworks.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM artworks_playlists WHERE artwork_id = ${artworks.id})`
+      )
+    );
+  return data;
+};

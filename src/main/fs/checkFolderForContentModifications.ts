@@ -7,10 +7,8 @@ import { isSongWithPathAvailable } from '@main/db/queries/songs';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
 import { sendMessageToRenderer } from '../main';
-import { tryToParseSong } from '../parseSong/parseSong';
+import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
-import { libraryScheduler } from '../workers/jobScheduler';
-import { ArtworkJob } from '../workers/jobs/artworkJob';
 
 const getFolderDirs = async (folderPath: string) => {
   try {
@@ -60,14 +58,8 @@ const checkFolderForContentModifications = async (
     const isADeletedSong = await isSongWithPathAvailable(songPath);
 
     if (isNewlyAddedSong) {
-      const result = await tryToParseSong(songPath, folder?.id, false, true);
-      if (result) {
-        const album = result.newAlbum || result.relevantAlbum;
-        if (album) {
-          libraryScheduler.enqueue(new ArtworkJob(album.id, songPath, album.title, libraryScheduler));
-        }
-      }
-      return result;
+      await processSongsWithWorkerPool([{ songPath, folderId: folder?.id }], abortSignal);
+      return;
     }
     if (isADeletedSong) return tryToRemoveSongFromLibrary(folderPath, filename, abortSignal);
   }

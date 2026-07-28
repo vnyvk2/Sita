@@ -7,6 +7,7 @@ vi.mock('electron', () => ({
       if (name === 'userData') return '/mock/user/data';
       return '/mock/path';
     }),
+    getAppPath: vi.fn(() => '/mock/app/path'),
     isPackaged: false,
     on: vi.fn(),
     whenReady: vi.fn(() => Promise.resolve())
