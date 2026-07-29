@@ -27,3 +27,4 @@ totalTasks.md
 tsconfig.node.tsbuildinfo
 tsconfig.web.tsbuildinfo
 .idea/workspace.xml
+chrome/
