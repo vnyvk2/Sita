@@ -44,10 +44,10 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
       data: { addedCount: inserted.length },
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.addSongs',
-      operationInput: { songIds, insertAt },
-      reverseData: {
-        type: 'removeEntries',
-        entryIds: inserted.map(e => e.id)
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.removeSongs',
+        input: { playlistId, entryIds: inserted.map(e => e.id) }
       },
       version: 1,
       affectedSongIds: songIds

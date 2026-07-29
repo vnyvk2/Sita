@@ -7,7 +7,7 @@ export class OperationJournalWriter {
   public async write<T>(
     result: OperationResult<T>, 
     trx: DBTransaction
-  ): Promise<void> {
+  ): Promise<number> {
     const numericKey = getNumericKey(result.collectionId);
     if (numericKey === undefined) {
       throw new Error(`Cannot write journal for collection with non-numeric key: ${result.collectionId.key}`);
@@ -33,8 +33,10 @@ export class OperationJournalWriter {
       operationType: result.operationType,
       direction: 'forward',
       operationInput: result.operationInput,
-      reverseData: result.reverseData,
+      inverseInput: result.inverseInput,
       sequenceNumber: nextSequenceNumber
     });
+
+    return nextSequenceNumber;
   }
 }

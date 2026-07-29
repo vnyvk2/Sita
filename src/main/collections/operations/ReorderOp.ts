@@ -38,11 +38,10 @@ export class ReorderOp implements CollectionOperation<ReorderInput, void> {
         data: undefined,
         collectionId: createCollectionId('local', 'playlist', playlistId),
         operationType: 'playlist.reorder',
-        operationInput: input as unknown as Record<string, unknown>,
-        reverseData: {
-          type: 'reorder',
-          entryId,
-          oldPosition
+        operationInput: { playlistId, entryId, newPosition },
+        inverseInput: {
+          operationType: 'playlist.reorder',
+          input: { playlistId, entryId, newPosition: oldPosition }
         },
         version: 1,
         affectedSongIds: [] // Reordering does not affect membership
@@ -79,11 +78,10 @@ export class ReorderOp implements CollectionOperation<ReorderInput, void> {
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.reorder',
-      operationInput: input as unknown as Record<string, unknown>,
-      reverseData: {
-        type: 'reorder',
-        entryId,
-        oldPosition
+      operationInput: { playlistId, entryId, newPosition },
+      inverseInput: {
+        operationType: 'playlist.reorder',
+        input: { playlistId, entryId, newPosition: oldPosition }
       },
       version: 1,
       affectedSongIds: [] // Reordering does not affect membership

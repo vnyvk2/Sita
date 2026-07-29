@@ -18,7 +18,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type { SmartPlaylistRuleAST, SortDefinition } from '../collections/query/ast';
-import type { OperationReverseData } from '../collections/operations/types';
+import type { OperationInverseInput } from '../collections/operations/types';
 import type { CollectionContextData } from '../collections/context/types';
 
 // ============================================================================
@@ -1285,7 +1285,7 @@ export const operationJournal = pgTable(
     /** The forward operation input (what was requested) */
     operationInput: json('operation_input').$type<Record<string, unknown>>().notNull(),
     /** The reverse operation data (what's needed to undo) */
-    reverseData: json('reverse_data').$type<OperationReverseData>().notNull(),
+    inverseInput: json('inverse_input').$type<OperationInverseInput>().notNull(),
     /** Position in the journal stack (for redo ordering) */
     sequenceNumber: integer('sequence_number').notNull(),
     /** Auto-expires old entries */

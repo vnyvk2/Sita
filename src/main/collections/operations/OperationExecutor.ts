@@ -11,21 +11,32 @@ import type { OperationJournalWriter } from './OperationJournalWriter';
  */
 export class OperationExecutor {
   private readonly journalWriter: OperationJournalWriter;
+  private onJournalWrittenListener?: (collectionId: CollectionId, sequenceNumber: number) => void;
 
   constructor(journalWriter: OperationJournalWriter) {
     this.journalWriter = journalWriter;
   }
 
+  public setOnJournalWritten(listener: (collectionId: CollectionId, sequenceNumber: number) => void) {
+    this.onJournalWrittenListener = listener;
+  }
+
   public async execute<TInput, TResult>(
     operation: CollectionOperation<TInput, TResult>,
     input: TInput,
-    ctx: OperationContext
+    ctx: OperationContext,
+    options?: { writeJournal?: boolean }
   ): Promise<OperationResult<TResult>> {
     // 1. Execute the operation using the provided context (and its transaction)
     const result = await operation.execute(input, ctx);
 
-    // 2. Write the result to the journal within the SAME transaction
-    await this.journalWriter.write(result, ctx.trx);
+    // 2. Write the result to the journal within the SAME transaction (if requested)
+    if (options?.writeJournal !== false) {
+      const seq = await this.journalWriter.write(result, ctx.trx);
+      if (this.onJournalWrittenListener) {
+        this.onJournalWrittenListener(result.collectionId, seq);
+      }
+    }
 
     // 3. Return the result back to the orchestrating engine
     return result;

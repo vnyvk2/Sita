@@ -41,10 +41,10 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
       data: { removedCount: removedEntries.length },
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.removeSongs',
-      operationInput: { entryIds },
-      reverseData: {
-        type: 'insertEntries',
-        entries: removedEntries
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.restoreSongs',
+        input: { playlistId, entries: removedEntries }
       },
       version: 1,
       affectedSongIds

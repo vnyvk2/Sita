@@ -34,10 +34,10 @@ export class RenameOp implements CollectionOperation<RenameInput, void> {
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.rename',
-      operationInput: { newName },
-      reverseData: {
-        type: 'rename',
-        oldName: playlist.name
+      operationInput: { playlistId, newName },
+      inverseInput: {
+        operationType: 'playlist.rename',
+        input: { playlistId, newName: playlist.name }
       },
       version: 1,
       affectedSongIds: [] // renaming doesn't affect membership

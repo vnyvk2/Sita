@@ -6,21 +6,26 @@ export type OperationType =
   | 'playlist.removeSongs'
   | 'playlist.rename'
   | 'playlist.reorder'
-  | 'playlist.delete';
+  | 'playlist.delete'
+  | 'playlist.restore'
+  | 'playlist.restoreSongs';
 
 export interface OperationContext {
   trx: DBTransaction;
   membershipService: MembershipService;
 }
 
-export type OperationReverseData = Record<string, unknown>;
+export interface OperationInverseInput {
+  operationType: OperationType;
+  input: unknown;
+}
 
 export interface OperationResult<T> {
   data: T;
   collectionId: CollectionId;
   operationType: OperationType;
   operationInput: Record<string, unknown>;
-  reverseData: OperationReverseData;
+  inverseInput: OperationInverseInput;
   version: number;
   affectedSongIds: readonly number[];
 }

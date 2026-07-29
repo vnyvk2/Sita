@@ -108,6 +108,15 @@ export class PlaylistRepository {
     return inserted;
   }
 
+  public async restorePlaylistWithId(data: typeof playlists.$inferSelect, trx: DB | DBTransaction = db) {
+    const [inserted] = await trx
+      .insert(playlists)
+      .values(data)
+      .returning();
+      
+    return inserted;
+  }
+
   public async updatePlaylist(playlistId: number, data: Partial<NewPlaylist>, trx: DB | DBTransaction = db) {
     const [updated] = await trx
       .update(playlists)

@@ -37,10 +37,9 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.delete',
       operationInput: { playlistId },
-      reverseData: {
-        type: 'recreatePlaylist',
-        playlist,
-        entries
+      inverseInput: {
+        operationType: 'playlist.restore',
+        input: { playlist, entries: entries.map(e => e.entry) }
       },
       version: 1,
       affectedSongIds
