@@ -21,7 +21,7 @@ import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/artists/')({
@@ -55,7 +55,7 @@ function ArtistPage() {
     (state) => state.multipleSelectionsData.isEnabled
   );
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-  const currentlyActivePage = useStore(store, (state) => state.currentlyActivePage);
+
   const sortingStates = useStore(store, (state) => state.localStorage.sortingStates);
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);

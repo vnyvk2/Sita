@@ -28,8 +28,6 @@ import {
   deleteArtist
 } from '../db/queries/artists';
 import {
-  deleteArtworks,
-  linkArtworksToSong,
   saveArtworks,
   syncSongArtworks
 } from '@main/db/queries/artworks';
@@ -62,7 +60,7 @@ import { createTempArtwork, processArtworkFiles } from '../other/artworks';
 import generatePalette from '../other/generatePalette';
 import { isSongBlacklisted } from '../utils/isBlacklisted';
 import { libraryScheduler } from '../workers/jobScheduler';
-import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
+
 import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import isPathAWebURL from '../utils/isPathAWebUrl';
 import { withFileHandle } from '../utils/withFileHandle';

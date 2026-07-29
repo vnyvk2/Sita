@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useAppUpdates } from './useAppUpdates';
-
 export const useSchedulerMetrics = () => {
   const [metrics, setMetrics] = useState<SchedulerMetrics | null>(null);
 
-  // Listen to IPC broadcasts for metric updates first
-  useAppUpdates('LIBRARY_SCHEDULER_UPDATE', (data) => {
-    if (data?.metrics) {
-      setMetrics(data.metrics as SchedulerMetrics);
-    }
-  });
-
   useEffect(() => {
-    // Then do the initial fetch
+    // Listen to IPC broadcasts for metric updates first
+    const handleMessage = (_event: unknown, messageCode: string, data: any) => {
+      if (messageCode === 'LIBRARY_SCHEDULER_UPDATE' && data?.metrics) {
+        setMetrics(data.metrics as SchedulerMetrics);
+      }
+    };
+
+    window.api.messages.getMessageFromMain(handleMessage);
+
+    // Initial fetch
     window.api.libraryMetrics.getSchedulerMetrics().then((initialMetrics) => {
       setMetrics(initialMetrics);
     });
+
+    return () => {
+      window.api.messages.removeMessageToRendererEventListener(handleMessage);
+    };
   }, []);
 
   return metrics;

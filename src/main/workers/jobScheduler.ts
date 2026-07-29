@@ -233,7 +233,7 @@ export class JobScheduler extends EventEmitter {
     return count;
   }
 
-  private async processNext() {
+  private processNext() {
     if (!this.isRunning || this.isDraining) return;
 
     let startedNewJob = false;

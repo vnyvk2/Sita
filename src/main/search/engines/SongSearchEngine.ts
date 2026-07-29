@@ -6,7 +6,6 @@ import { sql } from 'drizzle-orm';
 
 import { MATCH_TIER, SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
-  MatchTierValue,
   NormalizedQuery,
   SearchEngineOptions,
   SearchMatch

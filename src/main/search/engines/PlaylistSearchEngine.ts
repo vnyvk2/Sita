@@ -4,9 +4,8 @@ import { convertToPlaylist } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
-import { MATCH_TIER, SEARCH_LIMITS } from '../../../common/search/MatchTier';
+import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
-  MatchTierValue,
   NormalizedQuery,
   SearchEngineOptions,
   SearchMatch

@@ -6,8 +6,7 @@ import path from 'path';
 import { db } from '@main/db/db';
 import {
   deleteArtworks,
-  getUnusedArtworkIds,
-  saveArtworks
+  getUnusedArtworkIds
 } from '@main/db/queries/artworks';
 import { inArray } from 'drizzle-orm';
 
@@ -121,10 +120,9 @@ export const processArtworkFiles = async (
     ? crypto.createHash('sha256').update(artwork).digest('hex')
     : `default-${artworkType}`;
 
-  let id = hashKey;
-  let isDefault = !artwork;
-  let fullHash = hashKey;
-  let optHash = `${hashKey}-optimized`;
+  const id = hashKey;
+  const fullHash = hashKey;
+  const optHash = `${hashKey}-optimized`;
 
   // Lookup existing artwork by hash (non-transactional read)
   const existing = await db.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));

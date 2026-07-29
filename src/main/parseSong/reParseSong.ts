@@ -37,7 +37,7 @@ const reParseSong = async (filePath: string) => {
   try {
     if (songData) {
       const song = convertToSongData(songData);
-      const { songId, isArtworkAvailable, artworkPaths: oldArtworkPaths } = song;
+      const { songId } = song;
       const stats = await fs.stat(songPath);
 
       const file = File.createFromPath(songPath);
@@ -73,7 +73,7 @@ const reParseSong = async (filePath: string) => {
           metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined
         );
 
-        const res = await db.transaction(async (trx) => {
+        await db.transaction(async (trx) => {
           await removeDeletedArtistDataOfSong(song, trx);
           await removeDeletedAlbumDataOfSong(song, trx);
           await removeDeletedGenreDataOfSong(song, trx);
@@ -96,7 +96,7 @@ const reParseSong = async (filePath: string) => {
           const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
             {
               songId: songData.id,
-              artworkId: artworkData ? artworkData[0].id : null,
+              artworkId: artworkData ? artworkData[0].id : undefined,
               songYear: songData.year,
               artists: artistsData,
               albumArtists: albumArtistsData,
@@ -107,7 +107,7 @@ const reParseSong = async (filePath: string) => {
 
           const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
             {
-              artworkId: artworkData ? artworkData[0].id : null,
+              artworkId: artworkData ? artworkData[0].id : undefined,
               songId: songData.id,
               songArtists: artistsData
             },
@@ -120,7 +120,7 @@ const reParseSong = async (filePath: string) => {
           );
 
           const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
-            { artworkId: artworkData ? artworkData[0].id : null, songId: songData.id, songGenres: genresData },
+            { artworkId: artworkData ? artworkData[0].id : undefined, songId: songData.id, songGenres: genresData },
             trx
           );
 

@@ -8,7 +8,7 @@ import logger from '../logger';
 import { sendMessageToRenderer } from '../main';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
 import { libraryScheduler } from '../workers/jobScheduler';
-import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
+
 
 const abortController = new AbortController();
 saveAbortController('removeMusicFolder', abortController);

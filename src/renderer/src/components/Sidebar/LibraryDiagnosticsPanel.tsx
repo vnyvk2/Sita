@@ -61,7 +61,7 @@ const LibraryDiagnosticsPanel = memo(() => {
                 <Button
                   label="Retry Recoverable"
                   className="bg-red-500 hover:bg-red-600 text-white !py-2 !px-4"
-                  onClick={() => window.api.libraryMetrics.retryRecoverable()}
+                  clickHandler={() => window.api.libraryMetrics.retryRecoverable()}
                 />
               </div>
             )}

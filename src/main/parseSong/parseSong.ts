@@ -198,7 +198,7 @@ export const parseSong = async (
           artworkData = await saveArtworks(processedArtwork.payloads, trx);
         }
 
-        const linkedArtworks = await linkArtworksToSong(
+        await linkArtworksToSong(
           artworkData && artworkData.length > 0 ? artworkData.map((artwork: any) => ({ songId: songData.id, artworkId: artwork.id })) : [],
           trx
         );
@@ -208,7 +208,7 @@ export const parseSong = async (
         const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
           {
             songId: songData.id,
-            artworkId: artworkData && artworkData.length > 0 ? artworkData[0].id : null,
+            artworkId: artworkData && artworkData.length > 0 ? artworkData[0].id : undefined,
             songYear: songData.year,
             artists: artistsData,
             albumArtists: albumArtistsData,
@@ -231,7 +231,7 @@ export const parseSong = async (
         const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
           {
             songId: songData.id,
-            artworkId: artworkData[0]?.id,
+            artworkId: artworkData?.[0]?.id,
             songArtists: artistsData
           },
           trx
@@ -251,7 +251,7 @@ export const parseSong = async (
         const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
           {
             songId: songData.id,
-            artworkId: artworkData[0]?.id,
+            artworkId: artworkData?.[0]?.id,
             songGenres: genresData
           },
           trx

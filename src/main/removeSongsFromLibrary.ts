@@ -3,7 +3,7 @@ import path from 'path';
 import { db } from './db/db';
 import { unlinkSongFromAlbum, getAlbumSongIds, deleteAlbum } from './db/queries/albums';
 import { unlinkSongFromArtist, getArtistSongIds, deleteArtist } from './db/queries/artists';
-import { getArtworkIdsOfSong } from './db/queries/artworks';
+
 import { unlinkSongFromGenre } from './db/queries/genres';
 import { getSongByPath, removeSongById } from './db/queries/songs';
 import logger from './logger';

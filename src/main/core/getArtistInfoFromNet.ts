@@ -1,4 +1,5 @@
 import { db } from '@main/db/db';
+import crypto from 'crypto';
 import { getArtistById, getArtistsByName } from '@main/db/queries/artists';
 import { linkArtworksToArtist, saveArtworks } from '@main/db/queries/artworks';
 import { default as stringSimilarity, ReturnTypeEnums } from 'didyoumean2';
@@ -171,7 +172,10 @@ const saveArtistOnlineArtworks = async (artistId: number, artistArtworks: Online
 
   await db.transaction(async (trx) => {
     const savedArtworks = await saveArtworks(
-      artworks.map((artwork) => ({ ...artwork, source: 'REMOTE' })),
+      artworks.map((artwork) => {
+        const hash = crypto.createHash('sha256').update(artwork.path).digest('hex');
+        return { ...artwork, source: 'REMOTE', hash };
+      }),
       trx
     );
 
