@@ -2,6 +2,7 @@ import { smartPlaylistRules } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import type { CollectionOperation, OperationContext, OperationResult } from '../types';
 import type { SmartPlaylistDefinition } from '../../query/ast';
+import { DependencyAnalyzer } from '../../engine/DependencyAnalyzer';
 
 export interface UpdateSmartPlaylistInput {
   playlistId: number;
@@ -40,6 +41,7 @@ export class UpdateSmartPlaylistOp implements CollectionOperation<UpdateSmartPla
       .set({
         ruleAst: definition.rule,
         sortDefinition: definition.orderBy,
+        dependencies: DependencyAnalyzer.extractDependencies(definition),
         updatedAt: new Date(),
         ruleVersion: currentRule.ruleVersion + 1
       })

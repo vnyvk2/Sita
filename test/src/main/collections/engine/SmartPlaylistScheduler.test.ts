@@ -1,42 +1,76 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SmartPlaylistScheduler } from '../../../../../src/main/collections/engine/SmartPlaylistScheduler';
+import { libraryEventBus } from '../../../../../src/main/events/LibraryEventBus';
 import { db } from '../../../../../src/main/db/db';
-import { smartPlaylistRules, playlists } from '../../../../../src/main/db/schema';
-import { SmartPlaylistEngine } from '../../../../../src/main/collections/engine/SmartPlaylistEngine';
+import { smartPlaylistRules } from '../../../../../src/main/db/schema';
+import { libraryScheduler } from '../../../../../src/main/workers/jobScheduler';
+
+vi.mock('../../../../../src/main/workers/jobScheduler', () => ({
+  libraryScheduler: {
+    enqueue: vi.fn()
+  }
+}));
+
+// Mock db.select
+vi.mock('../../../../../src/main/db/db', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn().mockResolvedValue([
+        { playlistId: 1, dependencies: ['title'] },
+        { playlistId: 2, dependencies: ['playCount'] }
+      ])
+    }))
+  }
+}));
 
 describe('SmartPlaylistScheduler', () => {
-  const scheduler = new SmartPlaylistScheduler();
+  let scheduler: SmartPlaylistScheduler;
 
-  beforeEach(async () => {
-    await db.delete(smartPlaylistRules);
-    await db.delete(playlists);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    scheduler = new SmartPlaylistScheduler(); // this sets up listeners
   });
 
-  afterEach(async () => {
-    await db.delete(smartPlaylistRules);
-    await db.delete(playlists);
+  afterEach(() => {
+    vi.useRealTimers();
+    libraryEventBus.removeAllListeners();
   });
 
-  it('should trigger regeneration for all smart playlists', async () => {
-    const [pl1] = await db.insert(playlists).values({ name: 'P1', playlistType: 'smart' }).returning({ id: playlists.id });
-    const [pl2] = await db.insert(playlists).values({ name: 'P2', playlistType: 'smart' }).returning({ id: playlists.id });
+  it('should ignore events if dependencies do not match', async () => {
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['artist'] });
+    
+    // Fast-forward debounce
+    await vi.runAllTimersAsync();
+    
+    // Nothing queued because no playlist cares about 'artist'
+    expect(libraryScheduler.enqueue).not.toHaveBeenCalled();
+  });
 
-    await db.insert(smartPlaylistRules).values([
-      { playlistId: pl1.id, ruleAst: {}, sortDefinition: [], ruleVersion: 1 },
-      { playlistId: pl2.id, ruleAst: {}, sortDefinition: [], ruleVersion: 1 },
-    ]);
+  it('should queue jobs for affected playlists', async () => {
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['title'] });
+    
+    // Wait for the async db query to resolve and then timer
+    await Promise.resolve(); // drain microtask queue
+    await vi.runAllTimersAsync();
+    
+    // Playlist 1 cares about title
+    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
+    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(1);
+  });
 
-    const regenerateSpy = vi.spyOn(SmartPlaylistEngine.prototype, 'regenerate').mockResolvedValue(true);
-
-    try {
-      const count = await scheduler.regenerateStalePlaylists();
-      
-      expect(count).toBe(2);
-      expect(regenerateSpy).toHaveBeenCalledTimes(2);
-      expect(regenerateSpy).toHaveBeenCalledWith(pl1.id);
-      expect(regenerateSpy).toHaveBeenCalledWith(pl2.id);
-    } finally {
-      regenerateSpy.mockRestore();
-    }
+  it('should debounce rapid duplicate events and only enqueue once per playlist', async () => {
+    // Fire the same event 3 times rapidly
+    libraryEventBus.emitEvent('SongPlayCountChanged', { songId: 1 });
+    libraryEventBus.emitEvent('SongPlayCountChanged', { songId: 1 });
+    libraryEventBus.emitEvent('SongPlayCountChanged', { songId: 1 });
+    
+    await Promise.resolve(); 
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    
+    // Playlist 2 cares about playCount. Even though 3 events fired, it should only be queued once.
+    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
+    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(2);
   });
 });

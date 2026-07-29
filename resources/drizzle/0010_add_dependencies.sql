@@ -1,0 +1,1 @@
+ALTER TABLE "smart_playlist_rules" ADD COLUMN "dependencies" json;

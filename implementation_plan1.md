@@ -1767,9 +1767,10 @@ All mutations route through the `PlaylistEngine`, which wraps every operation in
 
 | Sub-Phase | Goal | Key Deliverables |
 |:---|:---|:---|
-| **Phase 9** | Smart Playlist Query Engine | `SmartPlaylistRuleAST`, `SmartPlaylistCompiler` (AST → IR → Drizzle SQL), rule editor GUI, hybrid regeneration strategy integrated with `jobScheduler.ts`. |
-| **Phase 10** | Queue Engine | `QueueEngine` with playback awareness, current index tracking, history, repeat/shuffle modes. `QueueProvider` wrapping queue state into a `Collection` view. |
-| **Phase 11** | Sidebar, Graph & Diagnostics | Sidebar pinning API, nested playlist folders, merge/duplicate operations, `RelationshipResolver` (graph traversal), `CollectionDiagnostics` telemetry. |
+| **Phase 9** | Undo/Redo Engine | (Completed) Operation Framework generating inverses. Pointer-based `UndoEngine` handling linear undo/redo without branching. `OperationJournalRepository` for history. |
+| **Phase 10** | Smart Playlist Query Engine | `SmartPlaylistRuleAST`, `SmartPlaylistCompiler` (AST → Drizzle SQL), rules engine, hybrid regeneration strategy (live evaluation vs DB caching). |
+| **Phase 11** | Queue Engine | (Completed) Ephemeral `QueueState` tracking upcoming queue, current index, shuffle permutations, history. Managed by `QueueEngine` outside of the DB-backed Collection subsystem. |
+| **Phase 12** | Sidebar, Graph & Diagnostics | Sidebar pinning API, nested playlist folders, merge/duplicate operations, `RelationshipResolver` (graph traversal), `CollectionDiagnostics` telemetry. |
 
 > [!WARNING]
 > **Foundational Execution Barrier:** Milestones 1 and 2 (Phases 1–6) form the non-negotiable core backend foundation. No renderer/UI migration should begin until Milestones 1 and 2 are fully built, tested, and validated. Each phase must be gated behind feature flags for safe, incremental rollout.
