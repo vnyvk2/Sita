@@ -17,7 +17,7 @@ import {
   varchar
 } from 'drizzle-orm/pg-core';
 
-import type { SmartPlaylistRuleAST, SortDefinition } from '../collections/query/ast';
+import type { SmartPlaylistRuleAST, OrderDefinition } from '../collections/query/ast';
 import type { OperationInverseInput } from '../collections/operations/types';
 import type { CollectionContextData } from '../collections/context/types';
 
@@ -380,7 +380,7 @@ export const smartPlaylistRules = pgTable(
     /** Maximum entries the smart playlist should contain (null = unlimited) */
     maxEntries: integer('max_entries'),
     /** Sort order for the generated results */
-    sortDefinition: json('sort_definition').$type<SortDefinition[]>(),
+    sortDefinition: json('sort_definition').$type<OrderDefinition[]>(),
     /** When the playlist was last regenerated */
     lastGeneratedAt: timestamp('last_generated_at', { withTimezone: false }),
     /** Hash of the rule AST — used to detect if regeneration is needed */

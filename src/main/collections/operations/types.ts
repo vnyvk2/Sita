@@ -8,7 +8,8 @@ export type OperationType =
   | 'playlist.reorder'
   | 'playlist.delete'
   | 'playlist.restore'
-  | 'playlist.restoreSongs';
+  | 'playlist.restoreSongs'
+  | 'playlist.updateSmartRule';
 
 export interface OperationContext {
   trx: DBTransaction;
