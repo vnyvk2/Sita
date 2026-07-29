@@ -53,3 +53,8 @@ export function createCollectionId(
     key
   };
 }
+
+export function getNumericKey(id: CollectionId): number | undefined {
+  const parsed = typeof id.key === 'string' ? parseInt(id.key, 10) : id.key;
+  return isNaN(parsed) ? undefined : parsed;
+}

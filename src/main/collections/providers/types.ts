@@ -15,7 +15,7 @@ export interface EntryQueryOptions {
 }
 
 export interface CollectionProvider {
-  getCollection(id: CollectionId): Promise<Collection>;
+  getCollection(id: CollectionId): Promise<Collection | null>;
   getAllCollections(options: CollectionQueryOptions): Promise<PaginatedResult<Collection, string>>;
   getEntries(
     id: CollectionId,
