@@ -70,6 +70,27 @@ export class PlaylistRepository {
     return result?.count ?? 0;
   }
 
+  public async getPlaylistsForSong(songId: number, trx: DB | DBTransaction = db): Promise<number[]> {
+    const results = await trx
+      .select({ playlistId: playlistEntries.playlistId })
+      .from(playlistEntries)
+      .where(eq(playlistEntries.songId, songId));
+      
+    return results.map(r => r.playlistId);
+  }
+
+  public async getPlaylistsForSongs(songIds: readonly number[], trx: DB | DBTransaction = db): Promise<{ songId: number, playlistId: number }[]> {
+    if (songIds.length === 0) return [];
+
+    return await trx
+      .select({ 
+        songId: playlistEntries.songId,
+        playlistId: playlistEntries.playlistId 
+      })
+      .from(playlistEntries)
+      .where(inArray(playlistEntries.songId, songIds as number[]));
+  }
+
   public async createPlaylist(data: NewPlaylist, trx: DB | DBTransaction = db) {
     const [inserted] = await trx
       .insert(playlists)
