@@ -111,8 +111,8 @@ import getTranslatedLyrics from './utils/getTranslatedLyrics';
 import resetLyrics from './utils/resetLyrics';
 import romanizeLyrics from './utils/romanizeLyrics';
 import { compare } from './utils/safeStorage';
+import { adaptivePolicyEngine } from './workers/adaptivePolicyEngine';
 import { libraryScheduler } from './workers/jobScheduler';
-import { GarbageCollectionJob } from './workers/jobs/garbageCollectionJob';
 import { registerLibraryChoreography } from './workers/libraryChoreography';
 import { libraryObservability } from './workers/libraryObservability';
 import { recoverLibraryAssets } from './core/recovery';
@@ -120,6 +120,7 @@ import { recoverLibraryAssets } from './core/recovery';
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
   libraryScheduler.start();
+  adaptivePolicyEngine.start();
   
   // Enqueue Garbage Collection on startup
   libraryScheduler.requestMaintenance();
@@ -147,6 +148,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     isShuttingDown = true;
     e.preventDefault();
     await libraryScheduler.stop();
+    adaptivePolicyEngine.stop();
     app.exit();
   });
 
@@ -205,7 +207,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.on('app/prioritizeArtworkGeneration', (_, albumId: number) => {
       const jobId = `artwork_${albumId}`;
-      libraryScheduler.prioritizeJob(jobId);
+      libraryScheduler.promoteToInteractive(jobId);
     });
 
     ipcMain.handle('app/getSchedulerMetrics', async () => {

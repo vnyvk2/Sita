@@ -1,4 +1,5 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { CURRENT_ARTWORK_GENERATOR_VERSION } from '../../workers/jobs/artworkJob';
 
 import { db } from '../db';
 import {
@@ -23,7 +24,7 @@ export const saveArtworks = async (
 ) => {
   const res = await trx
     .insert(artworks)
-    .values(data)
+    .values(data.map(d => ({ ...d, generatorVersion: CURRENT_ARTWORK_GENERATOR_VERSION })))
     .onConflictDoNothing({ target: artworks.hash })
     .returning();
 

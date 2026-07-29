@@ -40,7 +40,7 @@ export class LibraryObservabilityService extends EventEmitter {
   }
 
   private registerSchedulerListeners() {
-    libraryScheduler.on('JOB_STARTED', (job: Job) => {
+    libraryScheduler.on('JOB_STARTED', () => {
       this.recordPeakQueue();
       if (!this.isBatchActive) {
         this.isBatchActive = true;
@@ -51,7 +51,7 @@ export class LibraryObservabilityService extends EventEmitter {
       this.throttledEmitMetrics();
     });
 
-    libraryScheduler.on('JOB_COMPLETED', (job: Job, duration: number) => {
+    libraryScheduler.on('JOB_COMPLETED', (_job: Job, duration: number) => {
       this.completedTimestamps.push(Date.now());
       this.totalRuntimeMs += duration;
       this.totalCompleted++;
@@ -166,7 +166,7 @@ export class LibraryObservabilityService extends EventEmitter {
       completedLastMinute: this.completedTimestamps.length,
       averageRuntime,
       runningWorkers: raw.runningJobs,
-      maxWorkers: raw.maxWorkers,
+      maxWorkers: Object.values(raw.concurrencyLimits).reduce((a, b) => a + b, 0),
       runningJobsList,
       timeline: this.getTimeline(),
       diagnostics: {

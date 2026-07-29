@@ -3,13 +3,15 @@ import logger from '@main/logger';
 import generatePalette, { savePalette } from '@main/other/generatePalette';
 import generateCoverBuffer from '@main/parseSong/generateCoverBuffer';
 
-import type { Job, JobPriority, JobState } from '../types';
+import type { Job, JobClass, JobState } from '../types';
+
+export const CURRENT_PALETTE_GENERATOR_VERSION = 1;
 
 export class PaletteJob implements Job {
   id: string;
   type = 'palette';
   state: JobState = 'queued';
-  priority: JobPriority;
+  jobClass: JobClass;
   retries = 0;
   description: string;
 
@@ -20,12 +22,12 @@ export class PaletteJob implements Job {
     artworkId: number,
     artworkPath: string,
     albumTitle: string,
-    priority: JobPriority = 'normal'
+    jobClass: JobClass = 'interactive'
   ) {
     this.artworkId = artworkId;
     this.artworkPath = artworkPath;
     this.id = `palette_${artworkId}`;
-    this.priority = priority;
+    this.jobClass = jobClass;
     this.description = `Generating color palette for "${albumTitle}"`;
   }
 
@@ -36,9 +38,12 @@ export class PaletteJob implements Job {
         where: (p, { eq }) => eq(p.artworkId, this.artworkId)
       });
       
-      if (existing) {
-        logger.debug(`[PaletteJob] Artwork ${this.artworkId} already has a palette.`);
+      if (existing && CURRENT_PALETTE_GENERATOR_VERSION <= existing.generatorVersion) {
+        logger.debug(`[PaletteJob] Artwork ${this.artworkId} already has a palette (up to date).`);
         return;
+      }
+      if (existing) {
+        logger.debug(`[PaletteJob] Artwork ${this.artworkId} palette is outdated. Regenerating.`);
       }
 
       // 2. Generate palette

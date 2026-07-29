@@ -5,6 +5,7 @@ import log from '@main/logger';
 
 export const ASSET_EVENTS = {
   ARTWORK_CREATED: 'ASSET_CREATED:ARTWORK',
+  WAVEFORM_CREATED: 'ASSET_CREATED:WAVEFORM',
 } as const;
 
 const handleArtworkCreated = (payload: { artworkId: number; path: string; albumId: number; albumTitle: string }) => {

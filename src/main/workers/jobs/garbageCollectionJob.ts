@@ -1,12 +1,11 @@
 import { collectGarbageArtworks } from '@main/core/garbageCollector';
-import type { JobScheduler } from '../jobScheduler';
-import type { Job, JobPriority, JobState } from '../types';
+import type { Job, JobClass, JobState } from '../types';
 import logger from '@main/logger';
 
 export class GarbageCollectionJob implements Job {
   id: string;
   type = 'garbage_collection';
-  priority: JobPriority = 'low';
+  jobClass: JobClass = 'maintenance';
   state: JobState = 'queued'; // Using 'queued' instead of 'pending' as JobState has 'queued'
   retries = 0;
   description: string;

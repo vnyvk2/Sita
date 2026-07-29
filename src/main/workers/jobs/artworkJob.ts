@@ -8,13 +8,15 @@ import { processArtworkFiles } from '@main/other/artworks';
 import { saveArtworks } from '@main/db/queries/artworks';
 import { ASSET_EVENTS } from '../libraryChoreography';
 
-import type { Job, JobPriority, JobState } from '../types';
+import type { Job, JobClass, JobState } from '../types';
+
+export const CURRENT_ARTWORK_GENERATOR_VERSION = 1;
 
 export class ArtworkJob implements Job {
   id: string;
   type = 'artwork';
   state: JobState = 'queued';
-  priority: JobPriority;
+  jobClass: JobClass;
   retries = 0;
   description: string;
 
@@ -27,13 +29,13 @@ export class ArtworkJob implements Job {
     sampleSongPath: string,
     albumTitle: string,
     eventBus: EventEmitter,
-    priority: JobPriority = 'normal'
+    jobClass: JobClass = 'interactive'
   ) {
     this.albumId = albumId;
     this.sampleSongPath = sampleSongPath;
     this.eventBus = eventBus;
     this.id = `artwork_${albumId}`;
-    this.priority = priority;
+    this.jobClass = jobClass;
     this.description = `Generating artwork for "${albumTitle}"`;
   }
 
@@ -46,21 +48,22 @@ export class ArtworkJob implements Job {
         return;
       }
 
-      // If it already has artworks, skip processing
+      // If it already has artworks, skip processing if version is up to date
       if (album.artworks && album.artworks.length > 0) {
-        logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork.`);
-        
         const optimizedArtwork = album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
         
-        if (optimizedArtwork) {
+        if (optimizedArtwork && CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion) {
+          logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork (up to date).`);
           this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
             albumId: this.albumId,
             artworkId: optimizedArtwork.id,
             path: optimizedArtwork.path,
             albumTitle: album.title
           });
+          return;
         }
-        return;
+        
+        logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
       // 2. Read ID3 tags

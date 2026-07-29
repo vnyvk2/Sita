@@ -189,6 +189,7 @@ export const artworks = pgTable(
     width: integer('width').notNull(),
     height: integer('height').notNull(),
     isOptimized: boolean('is_optimized').notNull().default(false),
+    generatorVersion: integer('generator_version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
@@ -214,6 +215,7 @@ export const palettes = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
+    generatorVersion: integer('generator_version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
@@ -877,7 +879,10 @@ export const songsRelations = relations(songs, ({ one, many }) => ({
   playHistory: many(playHistory),
   playEvents: many(playEvents),
   seekEvents: many(seekEvents),
-  skipEvents: many(skipEvents)
+  skipEvents: many(skipEvents),
+  waveform: one(waveforms),
+  lyrics: one(lyrics),
+  replayGain: one(replayGain)
 }));
 
 export const artworksRelations = relations(artworks, ({ many, one }) => ({
@@ -1082,5 +1087,96 @@ export const artworksPlaylistsRelations = relations(artworksPlaylists, ({ one })
   playlist: one(playlists, {
     fields: [artworksPlaylists.playlistId],
     references: [playlists.id]
+  })
+}));
+
+// ============================================================================
+// Phase 9 - Derived Assets Tables
+// ============================================================================
+export const lyricsProviderEnum = pgEnum('lyrics_provider', [
+  'MUSIXMATCH',
+  'LRCLIB',
+  'EMBEDDED',
+  'FILESYSTEM'
+]);
+
+export const waveforms = pgTable(
+  'waveforms',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    songId: integer('song_id')
+      .notNull()
+      .unique()
+      .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    path: text('path').notNull(),
+    resolution: integer('resolution').notNull(),
+    generatorVersion: integer('generator_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_waveforms_song_id').on(t.songId)
+  ]
+);
+
+export const lyrics = pgTable(
+  'lyrics',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    songId: integer('song_id')
+      .notNull()
+      .unique()
+      .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    text: text('text').notNull(),
+    isSynced: boolean('is_synced').notNull().default(false),
+    provider: lyricsProviderEnum('provider').notNull(),
+    generatorVersion: integer('generator_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_lyrics_song_id').on(t.songId)
+  ]
+);
+
+export const replayGain = pgTable(
+  'replay_gain',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    songId: integer('song_id')
+      .notNull()
+      .unique()
+      .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    trackGain: doublePrecision('track_gain'),
+    trackPeak: doublePrecision('track_peak'),
+    albumGain: doublePrecision('album_gain'),
+    albumPeak: doublePrecision('album_peak'),
+    generatorVersion: integer('generator_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_replay_gain_song_id').on(t.songId)
+  ]
+);
+
+export const waveformsRelations = relations(waveforms, ({ one }) => ({
+  song: one(songs, {
+    fields: [waveforms.songId],
+    references: [songs.id]
+  })
+}));
+
+export const lyricsRelations = relations(lyrics, ({ one }) => ({
+  song: one(songs, {
+    fields: [lyrics.songId],
+    references: [songs.id]
+  })
+}));
+
+export const replayGainRelations = relations(replayGain, ({ one }) => ({
+  song: one(songs, {
+    fields: [replayGain.songId],
+    references: [songs.id]
   })
 }));

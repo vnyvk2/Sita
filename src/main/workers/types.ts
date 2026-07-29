@@ -1,4 +1,4 @@
-export type JobPriority = 'high' | 'normal' | 'low';
+export type JobClass = 'interactive' | 'background' | 'maintenance';
 
 export type JobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -12,8 +12,8 @@ export interface Job {
   /** Current state of the job */
   state: JobState;
   
-  /** Priority of the job. High priority jobs jump to the front of the queue. */
-  priority: JobPriority;
+  /** Execution class of the job. Dictates resource allocation by AdaptivePolicyEngine. */
+  jobClass: JobClass;
   
   /** The maximum number of retries before a permanent failure. Default: 3 */
   maxRetries?: number;

@@ -3,6 +3,9 @@ import logger from '../logger';
 import { tryToParseSong } from '../parseSong/parseSong';
 import { libraryScheduler } from '../workers/jobScheduler';
 import { ArtworkJob } from '../workers/jobs/artworkJob';
+import { WaveformJob } from '../workers/jobs/waveformJob';
+import { ReplayGainJob } from '../workers/jobs/replayGainJob';
+import { LyricsJob } from '../workers/jobs/lyricsJob';
 
 export interface SongPoolInput {
   songPath: string;
@@ -21,6 +24,7 @@ export const processSongsWithWorkerPool = async (
   maxConcurrency = 8
 ) => {
   const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
+  const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
   let index = 0;
   let hasAborted = false;
 
@@ -57,6 +61,15 @@ export const processSongsWithWorkerPool = async (
           }
         }
 
+        const song = result?.songData;
+        if (song) {
+          songAssetsToQueue.push({
+            id: song.id,
+            path: songData.songPath,
+            title: song.title
+          });
+        }
+
         if (updateProgress) {
           updateProgress(currentIndex + 1, songs.length);
         }
@@ -76,9 +89,19 @@ export const processSongsWithWorkerPool = async (
 
   await Promise.all(workers);
 
-  if (albumAssetsToQueue.size > 0 && !hasAborted) {
-    for (const [albumId, data] of albumAssetsToQueue.entries()) {
-      libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+  if (!hasAborted) {
+    if (albumAssetsToQueue.size > 0) {
+      for (const [albumId, data] of albumAssetsToQueue.entries()) {
+        libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+      }
+    }
+
+    if (songAssetsToQueue.length > 0) {
+      for (const song of songAssetsToQueue) {
+        libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+        libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+        libraryScheduler.enqueue(new LyricsJob(song.id, song.title, 'interactive'));
+      }
     }
   }
 };

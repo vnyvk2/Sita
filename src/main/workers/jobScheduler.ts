@@ -1,13 +1,12 @@
 import { EventEmitter } from 'events';
-import type { Job } from './types';
+import type { Job, JobClass } from './types';
 import log from '../logger';
 
-
-
 export class JobScheduler extends EventEmitter {
-  private highPriorityQueue: Job[] = [];
-  private normalPriorityQueue: Job[] = [];
-  private lowPriorityQueue: Job[] = [];
+  private interactiveQueue: Job[] = [];
+  private backgroundQueue: Job[] = [];
+  private maintenanceQueue: Job[] = [];
+  
   private runningJobs = new Map<string, Job>();
   private failedJobsList: Job[] = [];
   
@@ -16,7 +15,12 @@ export class JobScheduler extends EventEmitter {
 
   private isRunning = false;
   private isDraining = false;
-  private maxConcurrency = 4;
+  
+  private concurrencyLimits: Record<JobClass, number> = {
+    interactive: 4,
+    background: 2,
+    maintenance: 1
+  };
 
   // Metrics state
   private completedCount = 0;
@@ -28,19 +32,18 @@ export class JobScheduler extends EventEmitter {
   private isQueueEmptyState = true;
   private pendingMaintenance = false;
 
-  constructor(options?: { maxConcurrency?: number }) {
+  constructor(options?: { limits?: Record<JobClass, number> }) {
     super();
-    if (options?.maxConcurrency) {
-      this.maxConcurrency = options.maxConcurrency;
+    if (options?.limits) {
+      this.concurrencyLimits = { ...this.concurrencyLimits, ...options.limits };
     }
   }
 
   /**
-   * Defines the maximum number of concurrent jobs.
-   * Can be configured dynamically per job type later if needed.
+   * Defines the maximum number of concurrent jobs per class.
    */
-  public setConcurrency(limit: number) {
-    this.maxConcurrency = limit;
+  public setConcurrency(limits: Partial<Record<JobClass, number>>) {
+    this.concurrencyLimits = { ...this.concurrencyLimits, ...limits };
     this.processNext();
   }
 
@@ -76,40 +79,40 @@ export class JobScheduler extends EventEmitter {
     job.state = 'queued';
     this.activeJobIds.add(job.id);
 
-    if (job.priority === 'high') {
-      this.highPriorityQueue.push(job);
-    } else if (job.priority === 'low') {
-      this.lowPriorityQueue.push(job);
+    if (job.jobClass === 'interactive') {
+      this.interactiveQueue.push(job);
+    } else if (job.jobClass === 'maintenance') {
+      this.maintenanceQueue.push(job);
     } else {
-      this.normalPriorityQueue.push(job);
+      this.backgroundQueue.push(job);
     }
 
-    log.debug(`[JobScheduler] Enqueued ${job.priority} priority job: ${job.id}`);
+    log.debug(`[JobScheduler] Enqueued ${job.jobClass} job: ${job.id}`);
     this.processNext();
     return true;
   }
 
   /**
-   * Allows transitioning an already queued normal priority job to high priority.
+   * Allows transitioning an already queued background/maintenance job to interactive.
    * Commonly used for Demand-Driven Prioritization (e.g. user scrolled to album).
    */
-  public prioritizeJob(id: string): boolean {
-    let index = this.normalPriorityQueue.findIndex(j => j.id === id);
+  public promoteToInteractive(id: string): boolean {
+    let index = this.backgroundQueue.findIndex(j => j.id === id);
     if (index !== -1) {
-      const [job] = this.normalPriorityQueue.splice(index, 1);
-      job.priority = 'high';
-      this.highPriorityQueue.push(job);
-      log.debug(`[JobScheduler] Reprioritized job to high: ${id}`);
+      const [job] = this.backgroundQueue.splice(index, 1);
+      job.jobClass = 'interactive';
+      this.interactiveQueue.push(job);
+      log.debug(`[JobScheduler] Promoted job to interactive: ${id}`);
       this.processNext();
       return true;
     }
 
-    index = this.lowPriorityQueue.findIndex(j => j.id === id);
+    index = this.maintenanceQueue.findIndex(j => j.id === id);
     if (index !== -1) {
-      const [job] = this.lowPriorityQueue.splice(index, 1);
-      job.priority = 'high';
-      this.highPriorityQueue.push(job);
-      log.debug(`[JobScheduler] Reprioritized job to high: ${id}`);
+      const [job] = this.maintenanceQueue.splice(index, 1);
+      job.jobClass = 'interactive';
+      this.interactiveQueue.push(job);
+      log.debug(`[JobScheduler] Promoted job to interactive: ${id}`);
       this.processNext();
       return true;
     }
@@ -123,18 +126,18 @@ export class JobScheduler extends EventEmitter {
     // 1. Remove from queues
     const filterFn = (j: Job) => j.id !== id;
     
-    const initialHighLen = this.highPriorityQueue.length;
-    this.highPriorityQueue = this.highPriorityQueue.filter(filterFn);
+    const initialIntLen = this.interactiveQueue.length;
+    this.interactiveQueue = this.interactiveQueue.filter(filterFn);
     
-    const initialNormalLen = this.normalPriorityQueue.length;
-    this.normalPriorityQueue = this.normalPriorityQueue.filter(filterFn);
+    const initialBgLen = this.backgroundQueue.length;
+    this.backgroundQueue = this.backgroundQueue.filter(filterFn);
 
-    const initialLowLen = this.lowPriorityQueue.length;
-    this.lowPriorityQueue = this.lowPriorityQueue.filter(filterFn);
+    const initialMaintLen = this.maintenanceQueue.length;
+    this.maintenanceQueue = this.maintenanceQueue.filter(filterFn);
 
-    const wasQueued = (initialHighLen !== this.highPriorityQueue.length) || 
-                      (initialNormalLen !== this.normalPriorityQueue.length) ||
-                      (initialLowLen !== this.lowPriorityQueue.length);
+    const wasQueued = (initialIntLen !== this.interactiveQueue.length) || 
+                      (initialBgLen !== this.backgroundQueue.length) ||
+                      (initialMaintLen !== this.maintenanceQueue.length);
     
     // 2. Cancel if running
     const runningJob = this.runningJobs.get(id);
@@ -143,8 +146,6 @@ export class JobScheduler extends EventEmitter {
       if (runningJob.cancel) {
         runningJob.cancel();
       }
-      // Do NOT delete from runningJobs/activeJobIds or call processNext here.
-      // Ownership of cleanup remains with executeJob()'s finally block.
       return true;
     }
 
@@ -198,9 +199,9 @@ export class JobScheduler extends EventEmitter {
     this.isRunning = false;
     
     // Clear queues
-    this.highPriorityQueue = [];
-    this.normalPriorityQueue = [];
-    this.lowPriorityQueue = [];
+    this.interactiveQueue = [];
+    this.backgroundQueue = [];
+    this.maintenanceQueue = [];
     
     // Cancel running jobs
     for (const [id, job] of this.runningJobs.entries()) {
@@ -209,7 +210,7 @@ export class JobScheduler extends EventEmitter {
         try {
           job.cancel();
         } catch (e) {
-          log.warn(`[JobScheduler] Error cancelling job ${id} during dispose:`, e);
+          log.warn(`[JobScheduler] Error cancelling job ${id} during dispose:`, { error: e });
         }
       }
     }
@@ -224,38 +225,49 @@ export class JobScheduler extends EventEmitter {
     log.info('[JobScheduler] Disposed cleanly');
   }
 
+  private getRunningCountByClass(jobClass: JobClass): number {
+    let count = 0;
+    for (const job of this.runningJobs.values()) {
+      if (job.jobClass === jobClass) count++;
+    }
+    return count;
+  }
+
   private async processNext() {
     if (!this.isRunning || this.isDraining) return;
 
-    // Fill all available worker slots
-    while (this.runningJobs.size < this.maxConcurrency) {
-      // Pull from High Priority first
-      let job = this.highPriorityQueue.shift();
-      if (!job) {
-        job = this.normalPriorityQueue.shift();
-      }
-      if (!job) {
-        job = this.lowPriorityQueue.shift();
-      }
-
-      if (!job) break; // Queues are empty
-
-      this.runningJobs.set(job.id, job);
-      job.state = 'running';
-      this.isQueueEmptyState = false;
+    let startedNewJob = false;
+    do {
+      startedNewJob = false;
       
-      const startTime = Date.now();
-      this.emit('JOB_STARTED', job);
+      const intRunning = this.getRunningCountByClass('interactive');
+      if (intRunning < this.concurrencyLimits.interactive && this.interactiveQueue.length > 0) {
+        const job = this.interactiveQueue.shift()!;
+        this.startJob(job);
+        startedNewJob = true;
+      }
+      
+      const bgRunning = this.getRunningCountByClass('background');
+      if (bgRunning < this.concurrencyLimits.background && this.backgroundQueue.length > 0) {
+        const job = this.backgroundQueue.shift()!;
+        this.startJob(job);
+        startedNewJob = true;
+      }
 
-      // Execute without blocking the while loop
-      this.executeJob(job, startTime);
-    }
+      const maintRunning = this.getRunningCountByClass('maintenance');
+      if (maintRunning < this.concurrencyLimits.maintenance && this.maintenanceQueue.length > 0) {
+        const job = this.maintenanceQueue.shift()!;
+        this.startJob(job);
+        startedNewJob = true;
+      }
+
+    } while (startedNewJob);
     
     // Emit QUEUE_EMPTY if no jobs are running and queues are empty
     if (this.runningJobs.size === 0 && 
-        this.highPriorityQueue.length === 0 && 
-        this.normalPriorityQueue.length === 0 && 
-        this.lowPriorityQueue.length === 0) {
+        this.interactiveQueue.length === 0 && 
+        this.backgroundQueue.length === 0 && 
+        this.maintenanceQueue.length === 0) {
       
       if (!this.isQueueEmptyState) {
         this.isQueueEmptyState = true;
@@ -267,6 +279,18 @@ export class JobScheduler extends EventEmitter {
         this.emit('MAINTENANCE_READY');
       }
     }
+  }
+
+  private startJob(job: Job) {
+    this.runningJobs.set(job.id, job);
+    job.state = 'running';
+    this.isQueueEmptyState = false;
+    
+    const startTime = Date.now();
+    this.emit('JOB_STARTED', job);
+
+    // Execute without blocking the loop
+    this.executeJob(job, startTime);
   }
 
   private async executeJob(job: Job, startTime: number) {
@@ -284,7 +308,6 @@ export class JobScheduler extends EventEmitter {
       
       job.state = 'completed';
       this.emit('JOB_COMPLETED', job, executionTime);
-      // Removed ASSET_CREATED here; the job plugin itself should emit business events.
 
     } catch (error) {
       log.error(`[JobScheduler] Job failed: ${job.id}`, { error });
@@ -298,13 +321,13 @@ export class JobScheduler extends EventEmitter {
       if (job.retries < maxRetries) {
         job.retries++;
         job.state = 'queued';
-        // Re-enqueue as high priority to try and flush it? Or normal. We'll use existing priority.
-        if (job.priority === 'high') {
-          this.highPriorityQueue.push(job);
-        } else if (job.priority === 'low') {
-          this.lowPriorityQueue.push(job);
+        // Re-enqueue
+        if (job.jobClass === 'interactive') {
+          this.interactiveQueue.push(job);
+        } else if (job.jobClass === 'maintenance') {
+          this.maintenanceQueue.push(job);
         } else {
-          this.normalPriorityQueue.push(job);
+          this.backgroundQueue.push(job);
         }
       } else {
         job.state = 'failed';
@@ -335,11 +358,11 @@ export class JobScheduler extends EventEmitter {
   public getRawMetrics() {
     return {
       runningJobs: this.runningJobs.size,
-      queuedJobs: this.highPriorityQueue.length + this.normalPriorityQueue.length + this.lowPriorityQueue.length,
+      queuedJobs: this.interactiveQueue.length + this.backgroundQueue.length + this.maintenanceQueue.length,
       completedJobs: this.completedCount,
       failedJobs: this.failedCount,
       totalExecutionTimeMs: this.totalExecutionTimeMs,
-      maxWorkers: this.maxConcurrency
+      concurrencyLimits: this.concurrencyLimits
     };
   }
 

@@ -1,5 +1,6 @@
 import { db } from '@db/db';
 import { and, eq, lte, isNull } from 'drizzle-orm';
+import { CURRENT_PALETTE_GENERATOR_VERSION } from '../../workers/jobs/paletteJob';
 
 import { artworks, palettes, paletteSwatches } from '../schema';
 
@@ -32,7 +33,10 @@ export const createArtworkPalette = async (
   data: { artworkId: number; swatches: Omit<typeof paletteSwatches.$inferInsert, 'paletteId'>[] },
   trx: DBTransaction
 ) => {
-  const palette = await trx.insert(palettes).values({ artworkId: data.artworkId }).returning();
+  const palette = await trx.insert(palettes).values({ 
+    artworkId: data.artworkId,
+    generatorVersion: CURRENT_PALETTE_GENERATOR_VERSION
+  }).returning();
 
   const parsedSwatches = data.swatches.map((swatch) => ({ ...swatch, paletteId: palette[0].id }));
 
