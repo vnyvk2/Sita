@@ -41,7 +41,10 @@ vi.mock('../../../../src/main/main', () => ({
 }));
 
 vi.mock('../../../../src/main/other/artworks', () => ({
-  storeArtworks: vi.fn()
+  processArtworkFiles: vi.fn().mockResolvedValue({
+    payloads: [],
+    existing: []
+  })
 }));
 
 vi.mock('../../../../src/main/other/generatePalette', () => ({
@@ -88,7 +91,7 @@ describe('parseSong Concurrency and State Management', () => {
     const taglib = await import('node-taglib-sharp');
     const { isSongWithPathAvailable, saveSong } =
       await import('../../../../src/main/db/queries/songs');
-    const { storeArtworks } = await import('../../../../src/main/other/artworks');
+    const { processArtworkFiles } = await import('../../../../src/main/other/artworks');
     const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
     const manageAlbumsOfParsedSong = (
       await import('../../../../src/main/parseSong/manageAlbumsOfParsedSong')
@@ -107,7 +110,9 @@ describe('parseSong Concurrency and State Management', () => {
     vi.mocked(taglib.File.createFromPath).mockReturnValue(createMockSongMetadata() as any);
     vi.mocked(isSongWithPathAvailable).mockResolvedValue(false);
     vi.mocked(saveSong).mockResolvedValue(createMockSongData() as any);
-    vi.mocked(storeArtworks).mockResolvedValue(createMockArtworkData() as any);
+    vi.mocked(processArtworkFiles).mockResolvedValue({
+      existing: createMockArtworkData()
+    } as any);
     vi.mocked(linkArtworksToSong).mockResolvedValue([] as any);
     vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue(createMockAlbumManagerResult() as any);
     vi.mocked(manageArtistsOfParsedSong).mockResolvedValue(createMockArtistManagerResult() as any);

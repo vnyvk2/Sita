@@ -28,3 +28,10 @@ tsconfig.node.tsbuildinfo
 tsconfig.web.tsbuildinfo
 .idea/workspace.xml
 chrome/
+
+# Ignore patches, diffs, and untracked files
+*.patch
+*.diff
+.git-rewrite/
+old_miniplayer.txt
+diff_output*.txt
