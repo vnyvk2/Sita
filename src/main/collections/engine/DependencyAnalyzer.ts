@@ -42,9 +42,10 @@ export class DependencyAnalyzer {
   ): boolean {
     if (!cachedDependencies || cachedDependencies.length === 0) return true; // Default safe fallback
 
+    const dependencySet = new Set(cachedDependencies as string[]);
     // If any of the changed fields is in our dependencies, we are affected
     for (const field of changedFields) {
-      if ((cachedDependencies as string[]).includes(field)) {
+      if (dependencySet.has(field)) {
         return true;
       }
     }

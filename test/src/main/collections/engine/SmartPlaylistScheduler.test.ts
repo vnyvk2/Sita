@@ -17,7 +17,8 @@ vi.mock('../../../../../src/main/db/db', () => ({
     select: vi.fn(() => ({
       from: vi.fn().mockResolvedValue([
         { playlistId: 1, dependencies: ['title'] },
-        { playlistId: 2, dependencies: ['playCount'] }
+        { playlistId: 2, dependencies: ['playCount'] },
+        { playlistId: 3, dependencies: ['artist', 'genre'] }
       ])
     }))
   }
@@ -38,12 +39,12 @@ describe('SmartPlaylistScheduler', () => {
   });
 
   it('should ignore events if dependencies do not match', async () => {
-    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['artist'] });
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['year'] });
     
     // Fast-forward debounce
     await vi.runAllTimersAsync();
     
-    // Nothing queued because no playlist cares about 'artist'
+    // Nothing queued because no playlist cares about 'year'
     expect(libraryScheduler.enqueue).not.toHaveBeenCalled();
   });
 
@@ -72,5 +73,29 @@ describe('SmartPlaylistScheduler', () => {
     // Playlist 2 cares about playCount. Even though 3 events fired, it should only be queued once.
     expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
     expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(2);
+  });
+
+  it('should queue playlist when one of its multiple dependencies matches', async () => {
+    // Event changes artist, playlist 3 depends on artist AND genre
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['artist'] });
+    
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    
+    // Playlist 3 cares about artist
+    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
+    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(3);
+  });
+
+  it('should only queue playlist once when it matches multiple changing fields', async () => {
+    // Event changes both artist and genre, playlist 3 depends on both
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['artist', 'genre'] });
+    
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    
+    // Playlist 3 should only be queued once
+    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
+    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(3);
   });
 });
