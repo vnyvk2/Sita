@@ -1,5 +1,5 @@
 import type { CollectionId } from '../../../common/collections/types';
-import type { BatchMembership, CollectionMembership, MembershipOperation, MembershipSource } from './types';
+import type { BatchMembership, CollectionMembership, MembershipSource } from './types';
 import type { MembershipCache } from './MembershipCache';
 
 /**
@@ -85,8 +85,8 @@ export class MembershipService {
     return batch;
   }
 
-  public async batchUpdate(_operations: MembershipOperation[]): Promise<void> {
-    throw new Error('Not implemented: Mutations are handled by the Playlist Engine');
+  public invalidateSongs(songIds: readonly number[]): void {
+    this.cache.invalidateSongs(songIds);
   }
 
   private async fetchCollectionsForSong(songId: number): Promise<readonly CollectionId[]> {

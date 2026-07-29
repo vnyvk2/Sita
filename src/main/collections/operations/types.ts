@@ -22,6 +22,7 @@ export interface OperationResult<T> {
   operationInput: Record<string, unknown>;
   reverseData: OperationReverseData;
   version: number;
+  affectedSongIds: readonly number[];
 }
 
 export interface CollectionOperation<TInput, TResult> {

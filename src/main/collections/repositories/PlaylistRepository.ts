@@ -1,6 +1,6 @@
 import { db } from '@db/db';
 import { playlists, playlistEntries, songs } from '@db/schema';
-import { eq, and, gte, inArray, sql, asc, desc } from 'drizzle-orm';
+import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 
 export type NewPlaylist = typeof playlists.$inferInsert;
 export type NewPlaylistEntry = typeof playlistEntries.$inferInsert;
@@ -28,10 +28,10 @@ export class PlaylistRepository {
 
   public async getEntries(
     playlistId: number,
-    options: { limit: number; offset: number },
+    options: { limit?: number; offset?: number } = {},
     trx: DB | DBTransaction = db
   ) {
-    return await trx
+    let q = trx
       .select({
         entry: playlistEntries,
         song: songs
@@ -40,8 +40,16 @@ export class PlaylistRepository {
       .innerJoin(songs, eq(playlistEntries.songId, songs.id))
       .where(eq(playlistEntries.playlistId, playlistId))
       .orderBy(asc(playlistEntries.position))
-      .limit(options.limit)
-      .offset(options.offset);
+      .$dynamic();
+      
+    if (options.limit !== undefined) {
+      q = q.limit(options.limit);
+    }
+    if (options.offset !== undefined) {
+      q = q.offset(options.offset);
+    }
+    
+    return await q;
   }
 
   public async getMaxPosition(playlistId: number, trx: DB | DBTransaction = db): Promise<number> {
@@ -147,6 +155,26 @@ export class PlaylistRepository {
           gte(playlistEntries.position, startPos)
         )
       );
+  }
+
+  public async shiftPositionsRange(playlistId: number, startPos: number, endPos: number, offset: number, trx: DB | DBTransaction = db) {
+    await trx
+      .update(playlistEntries)
+      .set({ position: sql`${playlistEntries.position} + ${offset}` })
+      .where(
+        and(
+          eq(playlistEntries.playlistId, playlistId),
+          gte(playlistEntries.position, startPos),
+          lte(playlistEntries.position, endPos)
+        )
+      );
+  }
+
+  public async updateEntryPosition(entryId: number, newPosition: number, trx: DB | DBTransaction = db) {
+    await trx
+      .update(playlistEntries)
+      .set({ position: newPosition })
+      .where(eq(playlistEntries.id, entryId));
   }
 
   public async recalculatePlaylistStatistics(playlistId: number, trx: DB | DBTransaction = db) {

@@ -12,11 +12,6 @@ export interface BatchMembership {
   }[];
 }
 
-export interface MembershipOperation {
-  collectionId: CollectionId;
-  songIds: number[];
-  operation: 'add' | 'remove';
-}
 
 export interface MembershipSource {
   getCollectionsForSong(songId: number): Promise<readonly CollectionId[]>;
