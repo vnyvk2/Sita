@@ -16,6 +16,10 @@ import {
   varchar
 } from 'drizzle-orm/pg-core';
 
+import type { SmartPlaylistRuleAST, SortDefinition } from '../collections/query/ast';
+import type { OperationReverseData } from '../collections/operations/types';
+import type { CollectionContextData } from '../collections/context/types';
+
 // ============================================================================
 // Data types
 // ============================================================================
@@ -306,6 +310,15 @@ export const playlists = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     // Generated column: case-insensitive text for searches (using citext type)
     nameCI: citext('name_ci').generatedAlwaysAs((): SQL => sql`${playlists.name}::citext`),
+    description: text('description'),
+    parentId: integer('parent_id').references((): AnyPgColumn => playlists.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade'
+    }),
+    playlistType: varchar('playlist_type', { length: 20 }).notNull().default('standard'),
+    itemCount: integer('item_count').notNull().default(0),
+    totalDuration: decimal('total_duration', { precision: 12, scale: 3 }).notNull().default('0'),
+    sidebarPosition: integer('sidebar_position'),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
@@ -317,7 +330,65 @@ export const playlists = pgTable(
     // GIN index for fuzzy matching with pg_trgm trigram operator
     index('idx_playlists_name_ci_trgm').using('gin', t.nameCI.op('gin_trgm_ops')),
     // Index for creation date sorting
-    index('idx_playlists_created_at').on(t.createdAt.desc())
+    index('idx_playlists_created_at').on(t.createdAt.desc()),
+    index('idx_playlists_parent_id').on(t.parentId),
+    index('idx_playlists_type').on(t.playlistType),
+    index('idx_playlists_sidebar').on(t.sidebarPosition.asc())
+  ]
+);
+
+export const playlistEntries = pgTable(
+  'playlist_entries',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    playlistId: integer('playlist_id')
+      .notNull()
+      .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    songId: integer('song_id')
+      .notNull()
+      .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    /** Explicit ordering. Allows manual reorder + duplicate songs. */
+    position: integer('position').notNull(),
+    addedAt: timestamp('added_at', { withTimezone: false }).defaultNow().notNull(),
+    /** Optional: who or what added this entry */
+    source: varchar('source', { length: 50 }).default('manual'),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_playlist_entries_playlist_id').on(t.playlistId),
+    index('idx_playlist_entries_song_id').on(t.songId),
+    // Critical: enables ORDER BY position queries within a playlist
+    index('idx_playlist_entries_playlist_position').on(t.playlistId, t.position.asc()),
+    index('idx_playlist_entries_added_at').on(t.addedAt.desc())
+  ]
+);
+
+export const smartPlaylistRules = pgTable(
+  'smart_playlist_rules',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    playlistId: integer('playlist_id')
+      .notNull()
+      .unique()
+      .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    /** The rule AST stored as JSON */
+    ruleAst: json('rule_ast').$type<SmartPlaylistRuleAST>().notNull(),
+    /** Version of the rule schema — for forward-compatible deserialization */
+    ruleVersion: integer('rule_version').notNull().default(1),
+    /** Maximum entries the smart playlist should contain (null = unlimited) */
+    maxEntries: integer('max_entries'),
+    /** Sort order for the generated results */
+    sortDefinition: json('sort_definition').$type<SortDefinition[]>(),
+    /** When the playlist was last regenerated */
+    lastGeneratedAt: timestamp('last_generated_at', { withTimezone: false }),
+    /** Hash of the rule AST — used to detect if regeneration is needed */
+    ruleHash: varchar('rule_hash', { length: 64 }),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_smart_playlist_rules_playlist_id').on(t.playlistId)
   ]
 );
 
@@ -1079,6 +1150,24 @@ export const playlistsSongsRelations = relations(playlistsSongs, ({ one }) => ({
   })
 }));
 
+export const playlistEntriesRelations = relations(playlistEntries, ({ one }) => ({
+  playlist: one(playlists, {
+    fields: [playlistEntries.playlistId],
+    references: [playlists.id]
+  }),
+  song: one(songs, {
+    fields: [playlistEntries.songId],
+    references: [songs.id]
+  })
+}));
+
+export const smartPlaylistRulesRelations = relations(smartPlaylistRules, ({ one }) => ({
+  playlist: one(playlists, {
+    fields: [smartPlaylistRules.playlistId],
+    references: [playlists.id]
+  })
+}));
+
 export const artworksPlaylistsRelations = relations(artworksPlaylists, ({ one }) => ({
   artwork: one(artworks, {
     fields: [artworksPlaylists.artworkId],
@@ -1180,3 +1269,47 @@ export const replayGainRelations = relations(replayGain, ({ one }) => ({
     references: [songs.id]
   })
 }));
+
+export const operationJournal = pgTable(
+  'operation_journal',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    /** Which collection this operation targeted */
+    collectionType: varchar('collection_type', { length: 20 }).notNull(),
+    collectionId: integer('collection_id').notNull(),
+    /** What operation was performed */
+    operationType: varchar('operation_type', { length: 50 }).notNull(),
+    /** Direction: 'forward' for original, 'reverse' for undo */
+    direction: varchar('direction', { length: 10 }).notNull().default('forward'),
+    /** The forward operation input (what was requested) */
+    operationInput: json('operation_input').$type<Record<string, unknown>>().notNull(),
+    /** The reverse operation data (what's needed to undo) */
+    reverseData: json('reverse_data').$type<OperationReverseData>().notNull(),
+    /** Position in the journal stack (for redo ordering) */
+    sequenceNumber: integer('sequence_number').notNull(),
+    /** Auto-expires old entries */
+    expiresAt: timestamp('expires_at', { withTimezone: false }),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_journal_collection').on(t.collectionType, t.collectionId),
+    index('idx_journal_sequence').on(t.sequenceNumber.desc()),
+    index('idx_journal_expires').on(t.expiresAt.asc())
+  ]
+);
+
+export const collectionContexts = pgTable(
+  'collection_contexts',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    /** Serialized CollectionId (e.g., "local://playlist/52") */
+    collectionUri: varchar('collection_uri', { length: 255 }).notNull().unique(),
+    /** Persisted UI state */
+    contextData: json('context_data').$type<CollectionContextData>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+  },
+  (t) => [
+    index('idx_collection_contexts_uri').on(t.collectionUri)
+  ]
+);
