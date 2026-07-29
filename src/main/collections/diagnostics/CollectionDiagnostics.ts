@@ -1,6 +1,6 @@
 import { db } from '../../db/db';
-import { playlists, playlistEntries } from '../../db/schema';
-import { eq, isNull, sql } from 'drizzle-orm';
+import { playlists } from '../../db/schema';
+import { sql } from 'drizzle-orm';
 
 export interface DuplicateNameDiagnostic {
   name: string;

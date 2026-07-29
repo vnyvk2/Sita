@@ -23,9 +23,16 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
 
     if (playlistIds.length === 0) {
       return {
-        result: undefined,
-        inverseOp: this,
-        inverseInput: { playlistIds: [], targetParentId: null }
+        data: undefined,
+        collectionId: 'local:playlist:0' as any,
+        operationType: 'playlist.move',
+        operationInput: input as unknown as Record<string, unknown>,
+        inverseInput: {
+          operationType: 'playlist.restoreMove',
+          input: { moves: [] }
+        },
+        version: 1,
+        affectedSongIds: []
       };
     }
 
@@ -67,14 +74,21 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
     };
 
     return {
-      result: undefined,
-      inverseOp: new RestoreMoveOp(),
-      inverseInput: restoreInput
+      data: undefined,
+      collectionId: 'local:playlist:0' as any,
+      operationType: 'playlist.move',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.restoreMove',
+        input: restoreInput
+      },
+      version: 1,
+      affectedSongIds: []
     };
   }
 }
 
-interface RestoreMoveInput {
+export interface RestoreMoveInput {
   moves: { playlistId: number; parentId: number | null }[];
 }
 
@@ -91,10 +105,16 @@ export class RestoreMoveOp implements CollectionOperation<RestoreMoveInput, void
     }
 
     return {
-      result: undefined,
-      // Inverse of restore is not strictly generated here unless we want infinite redo tracking
-      inverseOp: {} as any,
-      inverseInput: {} as any
+      data: undefined,
+      collectionId: 'local:playlist:0' as any,
+      operationType: 'playlist.restoreMove',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.move',
+        input: { playlistIds: [], targetParentId: null } // We don't generate inverse of inverse for now
+      },
+      version: 1,
+      affectedSongIds: []
     };
   }
 }

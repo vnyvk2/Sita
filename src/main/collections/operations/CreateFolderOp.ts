@@ -28,13 +28,19 @@ export class CreateFolderOp implements CollectionOperation<CreateFolderInput, nu
       })
       .returning({ id: playlists.id });
 
-    // Inverse operation is deleting the newly created folder
     const inverse = new DeleteOp(this.repository);
 
     return {
-      result: inserted.id,
-      inverseOp: inverse,
-      inverseInput: { playlistId: inserted.id }
+      data: inserted.id,
+      collectionId: `local:playlist:${inserted.id}` as any, // Temporary cast or import createCollectionId
+      operationType: 'playlist.createFolder',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.delete',
+        input: { playlistId: inserted.id }
+      },
+      version: 1,
+      affectedSongIds: []
     };
   }
 }

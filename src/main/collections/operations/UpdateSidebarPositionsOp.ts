@@ -13,9 +13,16 @@ export class UpdateSidebarPositionsOp implements CollectionOperation<UpdateSideb
   ): Promise<OperationResult<void>> {
     if (input.updates.length === 0) {
       return {
-        result: undefined,
-        inverseOp: this,
-        inverseInput: { updates: [] }
+        data: undefined,
+        collectionId: 'local:playlist:0' as any,
+        operationType: 'playlist.updateSidebarPositions',
+        operationInput: input as unknown as Record<string, unknown>,
+        inverseInput: {
+          operationType: 'playlist.restoreSidebarPositions',
+          input: { updates: [] }
+        },
+        version: 1,
+        affectedSongIds: []
       };
     }
 
@@ -45,9 +52,16 @@ export class UpdateSidebarPositionsOp implements CollectionOperation<UpdateSideb
     }));
 
     return {
-      result: undefined,
-      inverseOp: new UpdateSidebarPositionsOp(),
-      inverseInput: { updates: inverseUpdates }
+      data: undefined,
+      collectionId: 'local:playlist:0' as any,
+      operationType: 'playlist.updateSidebarPositions',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.restoreSidebarPositions',
+        input: { updates: inverseUpdates }
+      },
+      version: 1,
+      affectedSongIds: []
     };
   }
 }

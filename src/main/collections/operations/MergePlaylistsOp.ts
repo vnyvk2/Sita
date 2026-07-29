@@ -2,7 +2,6 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { playlists, playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { eq, inArray } from 'drizzle-orm';
-import { RemoveSongsOp } from './RemoveSongsOp';
 
 export interface MergePlaylistsInput {
   sourcePlaylistIds: number[];
@@ -82,12 +81,16 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
     };
 
     return {
-      result: undefined,
-      inverseOp: new RemoveSongsOp(this.repository) as any,
-      inverseInput: inverseInput as any,
+      data: undefined,
+      collectionId: `local:playlist:${targetPlaylistId}` as any,
       operationType: 'playlist.merge',
-      operationInput: input as any,
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.removeSongs',
+        input: inverseInput
+      },
+      version: 1,
       affectedSongIds: Array.from(newSongIds)
-    } as any;
+    };
   }
 }

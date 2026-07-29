@@ -1,6 +1,6 @@
 import { db } from '../../db/db';
 import { playlists } from '../../db/schema';
-import { eq, inArray, or } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 export interface PlaylistNode {
   id: number;

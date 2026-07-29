@@ -2,11 +2,12 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { RelationshipResolver } from '../engine/RelationshipResolver';
-import { DeleteOp } from './DeleteOp';
 
 export interface DuplicateInput {
   playlistId: number;
 }
+
+const MAX_DEPTH = 50;
 
 export class DuplicateOp implements CollectionOperation<DuplicateInput, number> {
   private resolver: RelationshipResolver;
@@ -51,13 +52,24 @@ export class DuplicateOp implements CollectionOperation<DuplicateInput, number> 
     // We must map oldIds to newIds to maintain the hierarchy.
     const idMap = new Map<number, number>();
     
-    // We sort nodes by parentId so parents are inserted before children
-    // A topological sort based on depth is best. 
-    // Given they are just folders, we can iterate, but we might have to insert one by one or in depth-batches.
-    // For simplicity and safety, we can build a tree and insert level by level.
+    // Build a map of parentId -> children to optimize traversal
+    const childrenMap = new Map<number, typeof rootNode[]>();
+    for (const node of descendants) {
+      if (node.parentId !== null) {
+        const children = childrenMap.get(node.parentId) || [];
+        children.push(node);
+        childrenMap.set(node.parentId, children);
+      }
+    }
+
     let rootNewId: number | null = null;
+    const affectedSongIds = new Set<number>();
     
-    const insertNode = async (node: typeof rootNode, parentId: number | null) => {
+    const insertNode = async (node: typeof rootNode, parentId: number | null, depth: number) => {
+      if (depth > MAX_DEPTH) {
+        throw new Error(`Exceeded maximum folder depth of ${MAX_DEPTH} during duplication.`);
+      }
+
       // Modify identity fields
       const { id, createdAt, updatedAt, ...rest } = node;
       const copyName = node.id === playlistId ? `${node.name} (Copy)` : node.name;
@@ -79,12 +91,15 @@ export class DuplicateOp implements CollectionOperation<DuplicateInput, number> 
         const entries = allEntries.filter(e => e.playlistId === node.id);
         if (entries.length > 0) {
           await ctx.trx.insert(playlistEntries).values(
-            entries.map(e => ({
-              playlistId: inserted.id,
-              songId: e.songId,
-              position: e.position,
-              addedAt: new Date()
-            }))
+            entries.map(e => {
+              affectedSongIds.add(e.songId);
+              return {
+                playlistId: inserted.id,
+                songId: e.songId,
+                position: e.position,
+                addedAt: new Date()
+              };
+            })
           );
         }
       }
@@ -102,20 +117,25 @@ export class DuplicateOp implements CollectionOperation<DuplicateInput, number> 
       }
 
       // Recursively insert children
-      const children = nodesToDuplicate.filter(n => n.parentId === node.id);
+      const children = childrenMap.get(node.id) || [];
       for (const child of children) {
-        await insertNode(child, inserted.id);
+        await insertNode(child, inserted.id, depth + 1);
       }
     };
 
-    await insertNode(rootNode, rootNode.parentId);
+    await insertNode(rootNode, rootNode.parentId, 0);
 
-    // Inverse is deleting the root duplicated node (which cascades down)
-    // Actually we can use a BulkDeleteOp or a simple DeleteOp if DB cascades
     return {
-      result: rootNewId!,
-      inverseOp: new DeleteOp(new (require('../repositories/PlaylistRepository').PlaylistRepository)()) as any,
-      inverseInput: { playlistId: rootNewId! } as any
-    } as any;
+      data: rootNewId!,
+      collectionId: `local:playlist:${rootNewId}` as any,
+      operationType: 'playlist.duplicate',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.delete',
+        input: { playlistId: rootNewId! }
+      },
+      version: 1,
+      affectedSongIds: Array.from(affectedSongIds)
+    };
   }
 }

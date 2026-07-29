@@ -1,8 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { playlists, playlistEntries } from '../../db/schema';
-import { eq } from 'drizzle-orm';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { DeleteOp } from './DeleteOp';
+import { eq } from 'drizzle-orm';
 
 export interface SnapshotSmartPlaylistInput {
   smartPlaylistId: number;
@@ -67,13 +66,17 @@ export class SnapshotSmartPlaylistOp implements CollectionOperation<SnapshotSmar
       await ctx.trx.insert(playlistEntries).values(entriesToInsert);
     }
 
-    // Inverse is deleting the snapshot
-    const deleteOp = new DeleteOp(this.repository);
-
     return {
-      result: inserted.id,
-      inverseOp: deleteOp,
-      inverseInput: { playlistId: inserted.id }
-    } as any;
+      data: inserted.id,
+      collectionId: `local:playlist:${inserted.id}` as any,
+      operationType: 'playlist.snapshot',
+      operationInput: input as unknown as Record<string, unknown>,
+      inverseInput: {
+        operationType: 'playlist.delete',
+        input: { playlistId: inserted.id }
+      },
+      version: 1,
+      affectedSongIds: []
+    };
   }
 }

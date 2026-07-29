@@ -53,3 +53,8 @@ This document will be invaluable for onboarding contributors or returning to the
 ### 3.2 Singleton Enforcement
 **Context:** Core engines like `SmartPlaylistScheduler` rely on event listeners and debouncers.
 **Constraint:** Ensure these classes strictly remain singletons in the production environment. Accidentally instantiating them multiple times in different parts of the application will cause duplicate event subscriptions and memory leaks.
+
+### 3.3 Stable Ordering of Siblings
+**Context:** Folders currently contain children (playlists/folders) without an explicit sort order column (other than sidebarPosition for pinned root items).
+**Issue:** If users eventually want arbitrary manual ordering of children within folders (instead of relying on alphabetical or creation date sorting), the schema will need an explicit sortIndex or position column for sibling groups.
+**Action Item:** This is deferred until it becomes an explicit product requirement, but can be addressed by adding an integer position column to the playlists table scoped by parentId.

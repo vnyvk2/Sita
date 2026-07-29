@@ -9,7 +9,17 @@ export type OperationType =
   | 'playlist.delete'
   | 'playlist.restore'
   | 'playlist.restoreSongs'
-  | 'playlist.updateSmartRule';
+  | 'playlist.updateSmartRule'
+  | 'playlist.createFolder'
+  | 'playlist.move'
+  | 'playlist.restoreMove'
+  | 'playlist.bulkDelete'
+  | 'playlist.bulkRestore'
+  | 'playlist.duplicate'
+  | 'playlist.merge'
+  | 'playlist.snapshot'
+  | 'playlist.updateSidebarPositions'
+  | 'playlist.restoreSidebarPositions';
 
 export interface OperationContext {
   trx: DBTransaction;

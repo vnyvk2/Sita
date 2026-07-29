@@ -59,16 +59,17 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
     }
 
     return {
-      data: undefined as void, // Fix for TypeScript expecting data
+      data: undefined,
+      collectionId: 'local:playlist:0' as any,
       operationType: 'playlist.bulkDelete',
-      operationInput: { playlistIds: idsArray } as any,
+      operationInput: { playlistIds: idsArray } as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.bulkRestore',
         input: { restores: inverseInputs }
       },
       version: 1,
       affectedSongIds: Array.from(allAffectedSongIds)
-    } as any; // Cast for now until types converge
+    };
   }
 }
 
@@ -90,30 +91,48 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
     const restoreOp = new RestorePlaylistOp(this.repository);
     const allAffectedSongIds = new Set<number>();
 
-    // We must restore parent-first (top-down) to avoid FK constraint violations
-    // Sort by parentId: nulls first, then those whose parents exist
-    // A topological sort would be safest. For now, simple sort based on creation order or assuming inputs were bottom-up, so we reverse it.
-    const sortedRestores = [...input.restores].reverse();
+    // 1. Build a map of parentId -> children from the input to perform topological sort
+    const childrenMap = new Map<number | null, RestorePlaylistInput[]>();
+    const allInputIds = new Set(input.restores.map(r => r.playlist.id));
 
-    for (const restore of sortedRestores) {
-      const result = await restoreOp.execute(restore, ctx);
-      if (result.affectedSongIds) {
-        for (const songId of result.affectedSongIds) {
-          allAffectedSongIds.add(songId);
-        }
-      }
+    for (const restore of input.restores) {
+      // If a node's parent is not in this restore batch, treat it as a root for this batch
+      const effectiveParentId = (restore.playlist.parentId !== null && allInputIds.has(restore.playlist.parentId))
+        ? restore.playlist.parentId
+        : null;
+      
+      const children = childrenMap.get(effectiveParentId) || [];
+      children.push(restore);
+      childrenMap.set(effectiveParentId, children);
     }
 
+    // 2. Traverse and execute restores top-down
+    const executeTopDown = async (parentId: number | null) => {
+      const nodes = childrenMap.get(parentId) || [];
+      for (const node of nodes) {
+        const result = await restoreOp.execute(node, ctx);
+        if (result.affectedSongIds) {
+          for (const songId of result.affectedSongIds) {
+            allAffectedSongIds.add(songId);
+          }
+        }
+        await executeTopDown(node.playlist.id);
+      }
+    };
+
+    await executeTopDown(null);
+
     return {
-      data: undefined as void,
+      data: undefined,
+      collectionId: 'local:playlist:0' as any,
       operationType: 'playlist.bulkRestore',
-      operationInput: {} as any,
+      operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.bulkDelete',
         input: { playlistIds: input.restores.map(r => r.playlist.id) }
       },
       version: 1,
       affectedSongIds: Array.from(allAffectedSongIds)
-    } as any;
+    };
   }
 }
