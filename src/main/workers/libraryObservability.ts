@@ -70,14 +70,9 @@ export class LibraryObservabilityService extends EventEmitter {
         const durationSeconds = Math.round((Date.now() - this.batchStartTime) / 1000);
         this.addTimelineEvent(`Library operation completed in ${durationSeconds}s`);
         
-        import('../main').then(({ sendMessageToRenderer }) => {
-          sendMessageToRenderer({
-            messageCode: 'LIBRARY_BATCH_COMPLETE',
-            data: { 
-              jobsProcessed: this.batchJobsProcessed, 
-              durationSeconds
-            }
-          });
+        this.emit('BATCH_COMPLETE', { 
+          jobsProcessed: this.batchJobsProcessed, 
+          durationSeconds
         });
 
         this.isBatchActive = false;

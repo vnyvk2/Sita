@@ -41,6 +41,7 @@ vi.mock('../../../../src/main/main', () => ({
 }));
 
 vi.mock('../../../../src/main/other/artworks', () => ({
+  storeArtworks: vi.fn(),
   processArtworkFiles: vi.fn().mockResolvedValue({
     payloads: [],
     existing: []

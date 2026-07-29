@@ -43,7 +43,11 @@ vi.mock('../../../../src/main/main', () => ({
 }));
 
 vi.mock('../../../../src/main/other/artworks', () => ({
-  storeArtworks: vi.fn()
+  storeArtworks: vi.fn(),
+  processArtworkFiles: vi.fn().mockResolvedValue({
+    payloads: [],
+    existing: []
+  })
 }));
 
 vi.mock('../../../../src/main/other/generatePalette', () => ({
@@ -188,12 +192,17 @@ describe('parseSong', () => {
       const taglib = await import('node-taglib-sharp');
       vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
 
+      const { processArtworkFiles } = await import('../../../../src/main/other/artworks');
+      vi.mocked(processArtworkFiles).mockResolvedValueOnce({
+        payloads: [],
+        existing: [{ id: 1 }, { id: 2 }] as any
+      });
+
       await parseSong(songPath);
 
-      const { storeArtworks } = await import('../../../../src/main/other/artworks');
       const { linkArtworksToSong } = await import('../../../../src/main/db/queries/artworks');
 
-      expect(storeArtworks).toHaveBeenCalled();
+      expect(processArtworkFiles).toHaveBeenCalled();
       expect(linkArtworksToSong).toHaveBeenCalledWith(
         [
           { songId: 1, artworkId: 1 },
@@ -211,6 +220,12 @@ describe('parseSong', () => {
 
       const taglib = await import('node-taglib-sharp');
       vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
+
+      const { processArtworkFiles } = await import('../../../../src/main/other/artworks');
+      vi.mocked(processArtworkFiles).mockResolvedValueOnce({
+        payloads: [],
+        existing: [{ id: 1 }] as any
+      });
 
       await parseSong(songPath);
 

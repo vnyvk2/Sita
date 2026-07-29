@@ -8,7 +8,8 @@ describe('JobScheduler', () => {
   let scheduler: JobScheduler;
 
   beforeEach(() => {
-    scheduler = new JobScheduler({ maxConcurrency: 2 });
+    scheduler = new JobScheduler();
+    scheduler.setConcurrency({ interactive: 2, background: 1, maintenance: 1 });
     scheduler.start();
   });
 
@@ -21,7 +22,7 @@ describe('JobScheduler', () => {
     const job: Job = {
       id: 'test_1',
       type: 'test',
-      priority: 'normal',
+      jobClass: 'interactive',
       state: 'queued',
       retries: 0,
       execute: executeMock,
@@ -51,7 +52,7 @@ describe('JobScheduler', () => {
     const job1: Job = {
       id: 'duplicate_1',
       type: 'test',
-      priority: 'normal',
+      jobClass: 'interactive',
       state: 'queued',
       retries: 0,
       execute: executeMock,
@@ -60,7 +61,7 @@ describe('JobScheduler', () => {
     const job2: Job = {
       id: 'duplicate_1', // SAME ID
       type: 'test',
-      priority: 'normal',
+      jobClass: 'interactive',
       state: 'queued',
       retries: 0,
       execute: executeMock,
@@ -85,7 +86,7 @@ describe('JobScheduler', () => {
     const createJob = (id: string, priority: 'high' | 'normal'): Job => ({
       id,
       type: 'test',
-      priority,
+      jobClass: priority === 'high' ? 'interactive' : 'background',
       state: 'queued',
       retries: 0,
       execute: async () => {
@@ -109,7 +110,7 @@ describe('JobScheduler', () => {
     scheduler.start();
     await promise;
 
-    expect(executionOrder).toEqual(['high_1', 'high_2', 'normal_1', 'normal_2']);
+    expect(executionOrder).toEqual(['high_1', 'normal_1', 'high_2', 'normal_2']);
   });
 
   it('should correctly handle job cancellation (fake 100, cancel 50)', async () => {
@@ -123,7 +124,7 @@ describe('JobScheduler', () => {
       scheduler.enqueue({
         id: `job_${i}`,
         type: 'test',
-        priority: 'normal',
+        jobClass: 'interactive',
         state: 'queued',
         retries: 0,
         execute: executeMock,
@@ -158,7 +159,8 @@ describe('JobScheduler', () => {
     // Stop the running scheduler from beforeEach
     await scheduler.stop();
     // Restart with a strict limit
-    scheduler = new JobScheduler({ maxConcurrency: maxAllowedConcurrency });
+    scheduler = new JobScheduler();
+    scheduler.setConcurrency({ interactive: maxAllowedConcurrency, background: 1, maintenance: 1 });
     scheduler.start();
 
     let maxSimultaneous = 0;
@@ -181,7 +183,7 @@ describe('JobScheduler', () => {
       scheduler.enqueue({
         id: `conc_job_${i}`,
         type: 'test',
-        priority: 'normal',
+        jobClass: 'interactive',
         state: 'queued',
         retries: 0,
         execute: executeMock,

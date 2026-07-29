@@ -59,7 +59,8 @@ export class WaveformJob implements Job {
         logger.debug(`[WaveformJob] Song ${this.songId} waveform is outdated. Regenerating.`);
       }
 
-      // 2. Generate Peaks
+      // 2. Generate waveform binary data
+      // TODO: Replace with real peak extraction algorithm
       const peaks = await this.generatePeaks(this.songPath);
 
       if (this.state === 'cancelled') return;

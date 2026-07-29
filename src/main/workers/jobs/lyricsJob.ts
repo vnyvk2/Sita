@@ -1,6 +1,8 @@
+import { EventEmitter } from 'events';
 import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
 import { db } from '@main/db/db';
+import { ASSET_EVENTS } from '../libraryChoreography';
 import { lyrics } from '@main/db/schema';
 import logger from '@main/logger';
 import { getSongById } from '@main/db/queries/songs';
@@ -20,13 +22,16 @@ export class LyricsJob implements Job {
   description: string;
 
   public songId: number;
+  private eventBus: EventEmitter;
 
   constructor(
     songId: number,
     songTitle: string,
+    eventBus: EventEmitter,
     jobClass: JobClass = 'interactive'
   ) {
     this.songId = songId;
+    this.eventBus = eventBus;
     this.id = `lyrics_${songId}`;
     this.jobClass = jobClass;
     this.description = `Fetching lyrics for "${songTitle}"`;
@@ -71,8 +76,9 @@ export class LyricsJob implements Job {
       // 2. Embedded Tags
       if (!foundLyricsText) {
         const taglib = await import('node-taglib-sharp');
-        const file = taglib.File.createFromPath(song.path);
+        let file;
         try {
+          file = taglib.File.createFromPath(song.path);
           const lyricsFrames = file.tag?.lyrics;
           if (lyricsFrames) {
             foundLyricsText = lyricsFrames;
@@ -82,7 +88,7 @@ export class LyricsJob implements Job {
         } catch (e) {
           // Ignored
         } finally {
-          file.dispose();
+          file?.dispose();
         }
       }
 
@@ -158,6 +164,11 @@ export class LyricsJob implements Job {
         }
       });
 
+      this.eventBus.emit(ASSET_EVENTS.LYRICS_CREATED, {
+        songId: this.songId,
+        provider,
+        isSynced
+      });
     } catch (error) {
       logger.error(`[LyricsJob] Failed to fetch lyrics for song ${this.songId}`, { error });
       throw error;

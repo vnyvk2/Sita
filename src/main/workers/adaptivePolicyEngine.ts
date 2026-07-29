@@ -9,10 +9,14 @@ export class AdaptivePolicyEngine {
   
   // Track state to avoid redundant updates
   private currentPolicyName = '';
+  
+  private readonly boundEvaluatePolicy = () => this.evaluatePolicies('power-event');
+  private readonly boundSuspendPolicy = () => this.evaluatePolicies('suspend');
 
   constructor() {}
 
   public start() {
+    this.stop(); // Prevent duplicate starts
     this.setupEventListeners();
     this.startPolling();
     this.evaluatePolicies('Engine Started');
@@ -24,19 +28,25 @@ export class AdaptivePolicyEngine {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
-    // Note: powerMonitor listeners cannot be easily removed without exact function references, 
-    // but this is a singleton engine so it shouldn't matter.
+
+    powerMonitor.removeListener('on-battery', this.boundEvaluatePolicy);
+    powerMonitor.removeListener('on-ac', this.boundEvaluatePolicy);
+    powerMonitor.removeListener('suspend', this.boundSuspendPolicy);
+    powerMonitor.removeListener('resume', this.boundEvaluatePolicy);
+    powerMonitor.removeListener('lock-screen', this.boundEvaluatePolicy);
+    powerMonitor.removeListener('unlock-screen', this.boundEvaluatePolicy);
+
     log.info('[AdaptivePolicyEngine] Stopped');
   }
 
   private setupEventListeners() {
     // Power Events
-    powerMonitor.on('on-battery', () => this.evaluatePolicies('on-battery'));
-    powerMonitor.on('on-ac', () => this.evaluatePolicies('on-ac'));
-    powerMonitor.on('suspend', () => this.evaluatePolicies('suspend'));
-    powerMonitor.on('resume', () => this.evaluatePolicies('resume'));
-    powerMonitor.on('lock-screen', () => this.evaluatePolicies('lock-screen'));
-    powerMonitor.on('unlock-screen', () => this.evaluatePolicies('unlock-screen'));
+    powerMonitor.on('on-battery', this.boundEvaluatePolicy);
+    powerMonitor.on('on-ac', this.boundEvaluatePolicy);
+    powerMonitor.on('suspend', this.boundSuspendPolicy);
+    powerMonitor.on('resume', this.boundEvaluatePolicy);
+    powerMonitor.on('lock-screen', this.boundEvaluatePolicy);
+    powerMonitor.on('unlock-screen', this.boundEvaluatePolicy);
 
     // Window Events are tricky as windows can be created/destroyed, 
     // but evaluatePolicies polls visibility anyway so it covers gaps.

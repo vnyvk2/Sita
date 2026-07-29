@@ -100,7 +100,7 @@ export const processSongsWithWorkerPool = async (
       for (const song of songAssetsToQueue) {
         libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
         libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
-        libraryScheduler.enqueue(new LyricsJob(song.id, song.title, 'interactive'));
+        libraryScheduler.enqueue(new LyricsJob(song.id, song.title, libraryScheduler, 'interactive'));
       }
     }
   }

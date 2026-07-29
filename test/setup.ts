@@ -9,17 +9,37 @@ vi.mock('electron', () => ({
     }),
     getAppPath: vi.fn(() => process.cwd()),
     isPackaged: false,
+    getVersion: vi.fn(() => '1.0.0'),
+    requestSingleInstanceLock: vi.fn(() => true),
     on: vi.fn(),
     whenReady: vi.fn(() => Promise.resolve())
   },
   BrowserWindow: vi.fn(),
   nativeImage: {
     createFromPath: vi.fn(() => ({
-      isEmpty: vi.fn(() => false)
+      isEmpty: vi.fn(() => false),
+      resize: vi.fn(() => ({}))
     }))
   },
   ipcMain: {
     handle: vi.fn(),
     on: vi.fn()
+  },
+  protocol: {
+    registerSchemesAsPrivileged: vi.fn()
   }
 }));
+
+vi.mock('electron-updater', () => {
+  const mockAutoUpdater = {
+    autoDownload: false,
+    on: vi.fn(),
+    checkForUpdatesAndNotify: vi.fn()
+  };
+  return {
+    default: {
+      autoUpdater: mockAutoUpdater
+    },
+    autoUpdater: mockAutoUpdater
+  };
+});

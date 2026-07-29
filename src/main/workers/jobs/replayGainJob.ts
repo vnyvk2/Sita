@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
 import { db } from '@main/db/db';
+import { ASSET_EVENTS } from '../libraryChoreography';
 import { replayGain } from '@main/db/schema';
 import logger from '@main/logger';
 import { getSongById } from '@main/db/queries/songs';
@@ -56,6 +57,7 @@ export class ReplayGainJob implements Job {
       // 2. Perform EBU R128 loudness analysis
       // Note: Full LUFS analysis requires decoding the audio (e.g. ffmpeg or Web Audio API).
       // For this architectural proof, we simulate the intensive CPU work and return mock LUFS.
+      // TODO: Replace with real LUFS analysis algorithm
       const lufsData = await this.analyzeLoudness(song.path);
 
       if (this.state === 'cancelled') return;
@@ -86,7 +88,7 @@ export class ReplayGainJob implements Job {
       });
 
       // 4. Emit completion event
-      this.eventBus.emit('ASSET_CREATED:REPLAYGAIN', {
+      this.eventBus.emit(ASSET_EVENTS.REPLAYGAIN_CREATED, {
         songId: this.songId,
         trackGain: lufsData.trackGain,
         trackPeak: lufsData.trackPeak
