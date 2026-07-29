@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '../../../../../src/main/db/db';
-import { songs, playlists, smartPlaylistRules, playlistEntries } from '../../../../../src/main/db/schema';
+import { songs, playlists, smartPlaylistRules, playlistEntries, artists, albums, artistsSongs, albumsSongs } from '../../../../../src/main/db/schema';
 import { eq } from 'drizzle-orm';
 import { SmartPlaylistEngine } from '../../../../../src/main/collections/engine/SmartPlaylistEngine';
 import type { SmartPlaylistDefinition } from '../../../../../src/main/collections/query/ast';
@@ -20,6 +20,28 @@ describe('SmartPlaylistEngine', () => {
       { id: 1, title: 'Test Song 1', duration: '120.000', path: '/path/1', fileCreatedAt: new Date(), fileModifiedAt: new Date() },
       { id: 2, title: 'Another Song', duration: '180.000', path: '/path/2', fileCreatedAt: new Date(), fileModifiedAt: new Date() },
       { id: 3, title: 'Test Song 3', duration: '200.000', path: '/path/3', fileCreatedAt: new Date(), fileModifiedAt: new Date() },
+    ]);
+
+    // Insert artists and albums for join testing
+    const insertedArtists = await db.insert(artists).values([
+      { name: 'Artist A' },
+      { name: 'Artist B' }
+    ]).returning({ id: artists.id });
+    const insertedAlbums = await db.insert(albums).values([
+      { title: 'Album X' },
+      { title: 'Album Y' }
+    ]).returning({ id: albums.id });
+
+    // Link songs to artists and albums
+    await db.insert(artistsSongs).values([
+      { artistId: insertedArtists[0].id, songId: 1 }, // Song 1 is by Artist A
+      { artistId: insertedArtists[1].id, songId: 2 }, // Song 2 is by Artist B
+      { artistId: insertedArtists[0].id, songId: 3 }  // Song 3 is by Artist A
+    ]);
+    await db.insert(albumsSongs).values([
+      { albumId: insertedAlbums[0].id, songId: 1 }, // Song 1 is in Album X
+      { albumId: insertedAlbums[1].id, songId: 2 }, // Song 2 is in Album Y
+      { albumId: insertedAlbums[1].id, songId: 3 }  // Song 3 is in Album Y
     ]);
 
     // Create smart playlist
@@ -149,5 +171,39 @@ describe('SmartPlaylistEngine', () => {
     expect(finalEntries).toEqual(initialEntries);
     expect(finalPl.itemCount).toBe(initialPl.itemCount);
     expect(finalPl.totalDuration).toBe(initialPl.totalDuration);
+  });
+
+  it('should successfully evaluate queries requiring multiple joins', async () => {
+    // We want songs by "Artist A" AND in "Album Y".
+    // From our test data:
+    // Song 1: Artist A, Album X
+    // Song 2: Artist B, Album Y
+    // Song 3: Artist A, Album Y (Match!)
+    const def: SmartPlaylistDefinition = {
+      rule: {
+        type: 'group',
+        logicalOperator: 'and',
+        rules: [
+          { type: 'condition', field: 'artist', operator: 'eq', value: 'Artist A' },
+          { type: 'condition', field: 'album', operator: 'eq', value: 'Album Y' }
+        ]
+      },
+      orderBy: []
+    };
+
+    await db.insert(smartPlaylistRules).values({
+      playlistId,
+      ruleAst: def.rule,
+      sortDefinition: def.orderBy
+    });
+
+    const success = await engine.regenerate(playlistId);
+    expect(success).toBe(true);
+
+    const entries = await db.select().from(playlistEntries).where(eq(playlistEntries.playlistId, playlistId));
+    
+    // Should only have Song 3
+    expect(entries.length).toBe(1);
+    expect(entries[0].songId).toBe(3);
   });
 });

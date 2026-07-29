@@ -75,7 +75,7 @@ export class SmartPlaylistCompiler {
     switch (field) {
       case 'title': return songs.title;
       case 'artist': return artists.name;
-      case 'album': return albums.name;
+      case 'album': return albums.title;
       case 'genre': return genres.name;
       case 'year': return songs.year;
       case 'duration': return songs.duration;
