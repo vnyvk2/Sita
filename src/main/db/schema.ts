@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   varchar
 } from 'drizzle-orm/pg-core';
 
@@ -1294,7 +1295,8 @@ export const operationJournal = pgTable(
   (t) => [
     index('idx_journal_collection').on(t.collectionType, t.collectionId),
     index('idx_journal_sequence').on(t.sequenceNumber.desc()),
-    index('idx_journal_expires').on(t.expiresAt.asc())
+    index('idx_journal_expires').on(t.expiresAt.asc()),
+    unique('unique_journal_sequence').on(t.collectionType, t.collectionId, t.sequenceNumber)
   ]
 );
 

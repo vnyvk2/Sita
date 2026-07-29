@@ -1,28 +1,32 @@
-export type OperationReverseData =
-  | { type: 'entries_snapshot'; entries: Array<{ songId: number; position: number }> }
-  | { type: 'name_snapshot'; previousName: string }
-  | { type: 'full_snapshot'; data: Record<string, unknown> };
+import type { MembershipService } from '../membership/MembershipService';
+import type { CollectionId } from '../../../common/collections/types';
 
-export interface CollectionOperation {
-  collectionId: string;
-  operationType: string;
-  input: Record<string, unknown>;
+export type OperationType =
+  | 'playlist.addSongs'
+  | 'playlist.removeSongs'
+  | 'playlist.rename'
+  | 'playlist.reorder'
+  | 'playlist.delete';
+
+export interface OperationContext {
+  trx: DBTransaction;
+  membershipService: MembershipService;
 }
 
-export interface OperationResult {
-  success: boolean;
-  error?: Error;
-}
+export type OperationReverseData = Record<string, unknown>;
 
-export interface JournalEntry {
-  id: number;
-  collectionType: string;
-  collectionId: number;
-  operationType: string;
-  direction: 'forward' | 'reverse';
+export interface OperationResult<T> {
+  data: T;
+  collectionId: CollectionId;
+  operationType: OperationType;
   operationInput: Record<string, unknown>;
   reverseData: OperationReverseData;
-  sequenceNumber: number;
-  expiresAt: Date | null;
-  createdAt: Date;
+  version: number;
+}
+
+export interface CollectionOperation<TInput, TResult> {
+  execute(
+    input: TInput,
+    ctx: OperationContext
+  ): Promise<OperationResult<TResult>>;
 }
