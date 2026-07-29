@@ -116,7 +116,7 @@ const removeMusicFolder = async (folderPath: string): Promise<boolean> => {
     });
     
     // Enqueue GC after folder removal to clean up orphaned artworks/palettes
-    libraryScheduler.enqueue(new GarbageCollectionJob());
+    libraryScheduler.requestMaintenance();
 
     return true;
   }

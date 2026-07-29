@@ -4,7 +4,8 @@ import { getAlbumById } from '@main/db/queries/albums';
 import { linkArtworksToAlbum } from '@main/db/queries/artworks';
 import { db } from '@main/db/db';
 import logger from '@main/logger';
-import { storeArtworks } from '@main/other/artworks';
+import { processArtworkFiles } from '@main/other/artworks';
+import { saveArtworks } from '@main/db/queries/artworks';
 import { ASSET_EVENTS } from '../libraryChoreography';
 
 import type { Job, JobPriority, JobState } from '../types';
@@ -76,11 +77,18 @@ export class ArtworkJob implements Job {
         file.dispose();
       }
 
-      // 3. Store artwork and link it in a transaction
-      const artworkData = await db.transaction(async (trx) => {
-        const data = await storeArtworks('album', pictureData, trx);
+      // 3. Store artwork (process outside transaction)
+      const processedArtwork = await processArtworkFiles('album', pictureData);
 
-        // 4. Link artwork to album
+      // 4. Save and link artwork in a transaction
+      const artworkData = await db.transaction(async (trx) => {
+        let data = processedArtwork.existing;
+        
+        if (!data && processedArtwork.payloads) {
+          data = await saveArtworks(processedArtwork.payloads, trx);
+        }
+
+        // Link artwork to album
         if (data && data.length > 0) {
           await linkArtworksToAlbum(
             data.map((artwork) => ({
@@ -94,6 +102,7 @@ export class ArtworkJob implements Job {
       });
 
       if (artworkData && artworkData.length > 0) {
+        if (this.state === 'cancelled') return;
 
         // Find the optimized artwork specifically intended for palette generation
         const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];

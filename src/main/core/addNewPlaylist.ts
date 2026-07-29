@@ -10,15 +10,20 @@ import { generateLocalArtworkBuffer } from '@main/updateSong/updateSongId3Tags';
 
 import logger from '../logger';
 import { dataUpdateEvent } from '../main';
-import { storeArtworks } from '../other/artworks';
+import { processArtworkFiles } from '../other/artworks';
 import { convertToPlaylist } from '../utils/convert';
+import { saveArtworks } from '@main/db/queries/artworks';
 
 const createNewPlaylist = async (name: string, songIds?: string[], artworkPath?: string) => {
   try {
     const buffer = await generateLocalArtworkBuffer(artworkPath || '');
+    const processedArtwork = await processArtworkFiles('playlist', buffer);
 
     const { playlist: newPlaylist, artworks: newArtworks } = await db.transaction(async (trx) => {
-      const artworks = await storeArtworks('playlist', buffer, trx);
+      let artworks = processedArtwork.existing;
+      if (!artworks && processedArtwork.payloads) {
+        artworks = await saveArtworks(processedArtwork.payloads, trx);
+      }
 
       const playlist = await createPlaylist(name, trx);
 

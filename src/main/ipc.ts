@@ -122,7 +122,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   libraryScheduler.start();
   
   // Enqueue Garbage Collection on startup
-  libraryScheduler.enqueue(new GarbageCollectionJob());
+  libraryScheduler.requestMaintenance();
 
   // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
   // Register background asset generation pipelines (e.g., palettes)
@@ -512,7 +512,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       await checkForNewSongs();
       sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
       
-      libraryScheduler.enqueue(new GarbageCollectionJob());
+      libraryScheduler.requestMaintenance();
     });
 
     ipcMain.handle('app/getBlacklistData', getBlacklistData);

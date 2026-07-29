@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
-import { syncSongArtworks } from '@main/db/queries/artworks';
+import { saveArtworks, syncSongArtworks } from '@main/db/queries/artworks';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import type { songs } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
@@ -11,9 +11,9 @@ import { File } from 'node-taglib-sharp';
 import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { storeArtworks } from '../other/artworks';
+import { processArtworkFiles } from '../other/artworks';
 import { libraryScheduler } from '../workers/jobScheduler';
-import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
+// (GC job will be dispatched by Maintenance orchestrator)
 import { generatePalettes } from '../other/generatePalette';
 import {
   removeDeletedAlbumDataOfSong,
@@ -68,7 +68,12 @@ const reParseSong = async (filePath: string) => {
         const albumData = getAlbumInfoFromSong(metadata.album);
         const genresData = getGenreInfoFromSong(metadata.genres);
 
-        await db.transaction(async (trx) => {
+        const processedArtwork = await processArtworkFiles(
+          'songs',
+          metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined
+        );
+
+        const res = await db.transaction(async (trx) => {
           await removeDeletedArtistDataOfSong(song, trx);
           await removeDeletedAlbumDataOfSong(song, trx);
           await removeDeletedGenreDataOfSong(song, trx);
@@ -77,22 +82,21 @@ const reParseSong = async (filePath: string) => {
 
           await updateSongByPath(songPath, updatedSong, trx);
 
-          const artworkData = await storeArtworks(
-            'songs',
-            metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined,
-            trx
-          );
+          let artworkData = processedArtwork.existing;
+          if (!artworkData && processedArtwork.payloads) {
+            artworkData = await saveArtworks(processedArtwork.payloads, trx);
+          }
 
           const linkedArtworks = await syncSongArtworks(
             songData.id,
-            artworkData.map((artwork) => artwork.id),
+            artworkData ? artworkData.map((artwork) => artwork.id) : [],
             trx
           );
 
           const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
             {
               songId: songData.id,
-              artworkId: artworkData[0].id,
+              artworkId: artworkData ? artworkData[0].id : null,
               songYear: songData.year,
               artists: artistsData,
               albumArtists: albumArtistsData,
@@ -103,7 +107,7 @@ const reParseSong = async (filePath: string) => {
 
           const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
             {
-              artworkId: artworkData[0].id,
+              artworkId: artworkData ? artworkData[0].id : null,
               songId: songData.id,
               songArtists: artistsData
             },
@@ -116,7 +120,7 @@ const reParseSong = async (filePath: string) => {
           );
 
           const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
-            { artworkId: artworkData[0].id, songId: songData.id, songGenres: genresData },
+            { artworkId: artworkData ? artworkData[0].id : null, songId: songData.id, songGenres: genresData },
             trx
           );
 
@@ -134,7 +138,7 @@ const reParseSong = async (filePath: string) => {
           };
         });
         
-        libraryScheduler.enqueue(new GarbageCollectionJob());
+        libraryScheduler.requestMaintenance();
 
         logger.debug(`Song reparsed successfully.`, {
           songPath: song?.path

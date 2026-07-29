@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 import { db } from '../../src/main/db/db';
 import { albums, artworks, albumsArtworks, songs, artworksSongs } from '../../src/main/db/schema';
-import { storeArtworks } from '../../src/main/other/artworks';
+import { processArtworkFiles } from '../../src/main/other/artworks';
+import { saveArtworks } from '../../src/main/db/queries/artworks';
 import { collectGarbageArtworks } from '../../src/main/core/garbageCollector';
 import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
@@ -28,14 +29,17 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       vi.mocked(fs.rename).mockResolvedValue(undefined);
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
-      // Run storeArtworks twice concurrently
-      const [resultA, resultB] = await Promise.all([
-        storeArtworks('songs', dummyArtworkBuffer, db),
-        storeArtworks('songs', dummyArtworkBuffer, db)
+      // Run processArtworkFiles twice concurrently
+      const [processedA, processedB] = await Promise.all([
+        processArtworkFiles('songs', dummyArtworkBuffer),
+        processArtworkFiles('songs', dummyArtworkBuffer)
       ]);
 
+      const resultA = await saveArtworks(processedA.payloads || [], db);
+      const resultB = await saveArtworks(processedB.payloads || [], db);
+
       // Both should return the same rows
-      // Note: storeArtworks returns exactly 2 rows for a single image:
+      // Note: processArtworkFiles creates exactly 2 rows for a single image:
       // 1. Full resolution image (hash: `<sha256>`)
       // 2. Optimized 50x50 thumbnail (hash: `<sha256>-optimized`)
       // This distinct hash naming prevents unique constraint violations.
@@ -57,7 +61,8 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
     it('should preserve referenced artwork during GC', async () => {
       // 1. Insert artwork
       const dummyArtworkBuffer = Buffer.from('another dummy image');
-      const result = await storeArtworks('songs', dummyArtworkBuffer, db);
+      const processed = await processArtworkFiles('songs', dummyArtworkBuffer);
+      const result = await saveArtworks(processed.payloads || [], db);
       const artworkId = result[0].id;
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
@@ -77,7 +82,8 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
     it('should remove orphaned artwork during GC', async () => {
       // 1. Insert artwork
       const dummyArtworkBuffer = Buffer.from('orphan dummy image');
-      const result = await storeArtworks('songs', dummyArtworkBuffer, db);
+      const processed = await processArtworkFiles('songs', dummyArtworkBuffer);
+      const result = await saveArtworks(processed.payloads || [], db);
       const artworkId = result[0].id;
       const optArtworkId = result[1].id;
 
@@ -112,17 +118,19 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
     it('should sweep old artwork when reparsing replaces it', async () => {
       // 1. Create a song and link it to Artwork A
       const bufferA = Buffer.from('artwork A');
-      const resultA = await storeArtworks('songs', bufferA, db);
+      const processedA = await processArtworkFiles('songs', bufferA);
+      const resultA = await saveArtworks(processedA.payloads || [], db);
       const artworkA_Id = resultA[0].id;
       
-      const song = await db.insert(songs).values({ title: 'test song', path: '/test-reparse.mp3', duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+      const song = await db.insert(songs).values({ title: 'test song', path: `/test-reparse-${crypto.randomUUID()}.mp3`, duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
       await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkA_Id });
       
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Simulate Reparse: create Artwork B and use syncSongArtworks
       const bufferB = Buffer.from('artwork B');
-      const resultB = await storeArtworks('songs', bufferB, db);
+      const processedB = await processArtworkFiles('songs', bufferB);
+      const resultB = await saveArtworks(processedB.payloads || [], db);
       const artworkB_Id = resultB[0].id;
       
       const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');
@@ -142,17 +150,19 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
     it('should sweep old artwork when metadata updates replace it', async () => {
       // 1. Create a song and link it to Artwork X
       const bufferX = Buffer.from('artwork X');
-      const resultX = await storeArtworks('songs', bufferX, db);
+      const processedX = await processArtworkFiles('songs', bufferX);
+      const resultX = await saveArtworks(processedX.payloads || [], db);
       const artworkX_Id = resultX[0].id;
       
-      const song = await db.insert(songs).values({ title: 'test song 2', path: '/test-metadata.mp3', duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+      const song = await db.insert(songs).values({ title: 'test song 2', path: `/test-metadata-${crypto.randomUUID()}.mp3`, duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
       await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkX_Id });
       
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Simulate Metadata Update: create Artwork Y and use syncSongArtworks
       const bufferY = Buffer.from('artwork Y');
-      const resultY = await storeArtworks('songs', bufferY, db);
+      const processedY = await processArtworkFiles('songs', bufferY);
+      const resultY = await saveArtworks(processedY.payloads || [], db);
       const artworkY_Id = resultY[0].id;
       
       const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');

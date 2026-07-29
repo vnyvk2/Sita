@@ -104,11 +104,19 @@ const checkForDefaultArtworkSaveLocation = async () => {
 // In-memory lock to prevent concurrent identical artwork processing
 const inFlightArtworks = new Map<string, Promise<Awaited<ReturnType<typeof createArtworks>>>>();
 
-export const storeArtworks = async (
+export type ArtworkPayload = {
+  hash: string;
+  path: string;
+  width: number;
+  height: number;
+  isOptimized: boolean;
+  source: 'LOCAL';
+};
+
+export const processArtworkFiles = async (
   artworkType: QueueTypes,
-  artwork?: Buffer | Uint8Array | string,
-  trx: DB | DBTransaction = db
-): Promise<(typeof artworks.$inferSelect)[]> => {
+  artwork?: Buffer | Uint8Array | string
+): Promise<{ payloads?: ArtworkPayload[]; existing?: (typeof artworks.$inferSelect)[] }> => {
   const hashKey = artwork
     ? crypto.createHash('sha256').update(artwork).digest('hex')
     : `default-${artworkType}`;
@@ -118,11 +126,11 @@ export const storeArtworks = async (
   let fullHash = hashKey;
   let optHash = `${hashKey}-optimized`;
 
-  // Lookup existing artwork by hash
-  const existing = await trx.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+  // Lookup existing artwork by hash (non-transactional read)
+  const existing = await db.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
   if (existing.length > 0) {
     // If we found the artwork, return it directly to skip duplicate generation
-    return existing;
+    return { existing };
   }
 
   await checkForDefaultArtworkSaveLocation();
@@ -145,19 +153,12 @@ export const storeArtworks = async (
     inFlightArtworks.delete(hashKey);
   }
 
-  try {
-    const data = await saveArtworks(
-      [
-        { hash: fullHash, path: result.realArtworkPath, width: result.width, height: result.height, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
-        { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
-      ],
-      trx
-    );
-    return data;
-  } catch (error) {
-    logger.error(`Failed to store song artwork in database.`, { error });
-    throw error;
-  }
+  return {
+    payloads: [
+      { hash: fullHash, path: result.realArtworkPath, width: result.width, height: result.height, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
+      { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
+    ]
+  };
 };
 
 

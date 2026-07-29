@@ -8,8 +8,8 @@ import { File } from 'node-taglib-sharp';
 
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { storeArtworks } from '../other/artworks';
-import { linkArtworksToSong } from '@main/db/queries/artworks';
+import { processArtworkFiles } from '../other/artworks';
+import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -185,17 +185,21 @@ export const parseSong = async (
         folderId
       };
 
+      const processedArtwork = await processArtworkFiles(
+        'songs',
+        metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined
+      );
+
       const res = await db.transaction(async (trx) => {
         const songData = await saveSong(songInfo, trx);
 
-        const artworkData = await storeArtworks(
-          'songs',
-          metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined,
-          trx
-        );
+        let artworkData = processedArtwork.existing;
+        if (!artworkData && processedArtwork.payloads) {
+          artworkData = await saveArtworks(processedArtwork.payloads, trx);
+        }
 
         const linkedArtworks = await linkArtworksToSong(
-          artworkData.map((artwork) => ({ songId: songData.id, artworkId: artwork.id })),
+          artworkData && artworkData.length > 0 ? artworkData.map((artwork: any) => ({ songId: songData.id, artworkId: artwork.id })) : [],
           trx
         );
 
@@ -204,7 +208,7 @@ export const parseSong = async (
         const { relevantAlbum, newAlbum } = await manageAlbumsOfParsedSong(
           {
             songId: songData.id,
-            artworkId: artworkData[0]?.id,
+            artworkId: artworkData && artworkData.length > 0 ? artworkData[0].id : null,
             songYear: songData.year,
             artists: artistsData,
             albumArtists: albumArtistsData,

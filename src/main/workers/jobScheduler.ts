@@ -26,6 +26,7 @@ export class JobScheduler extends EventEmitter {
   
   // Track whether we've already emitted QUEUE_EMPTY to prevent duplicate events
   private isQueueEmptyState = true;
+  private pendingMaintenance = false;
 
   constructor(options?: { maxConcurrency?: number }) {
     super();
@@ -41,6 +42,21 @@ export class JobScheduler extends EventEmitter {
   public setConcurrency(limit: number) {
     this.maxConcurrency = limit;
     this.processNext();
+  }
+
+  /**
+   * Request maintenance (like Garbage Collection) to be scheduled 
+   * once the queue becomes empty.
+   */
+  public requestMaintenance() {
+    this.pendingMaintenance = true;
+    
+    // If the queue is already empty when maintenance is requested, 
+    // emit immediately so it can start without waiting for another job.
+    if (this.isQueueEmptyState && this.runningJobs.size === 0) {
+      this.pendingMaintenance = false;
+      this.emit('MAINTENANCE_READY');
+    }
   }
 
   /**
@@ -240,9 +256,15 @@ export class JobScheduler extends EventEmitter {
         this.highPriorityQueue.length === 0 && 
         this.normalPriorityQueue.length === 0 && 
         this.lowPriorityQueue.length === 0) {
+      
       if (!this.isQueueEmptyState) {
         this.isQueueEmptyState = true;
         this.emit('QUEUE_EMPTY');
+      }
+
+      if (this.pendingMaintenance) {
+        this.pendingMaintenance = false;
+        this.emit('MAINTENANCE_READY');
       }
     }
   }

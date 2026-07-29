@@ -27,7 +27,12 @@ import {
   getArtistSongIds,
   deleteArtist
 } from '../db/queries/artists';
-import { syncSongArtworks } from '../db/queries/artworks';
+import {
+  deleteArtworks,
+  linkArtworksToSong,
+  saveArtworks,
+  syncSongArtworks
+} from '@main/db/queries/artworks';
 import {
   createGenre,
   linkSongToGenre,
@@ -44,11 +49,7 @@ import {
   updateSongBasicFields
 } from '../db/queries/songs';
 import { DEFAULT_FILE_URL } from '../filesystem';
-import {
-  getArtistArtworkPath,
-  getSongArtworkPath,
-  removeDefaultAppProtocolFromFilePath
-} from '../fs/resolveFilePaths';
+import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import {
   dataUpdateEvent,
@@ -57,12 +58,12 @@ import {
   sendMessageToRenderer,
   updateSongsOutsideLibraryData
 } from '../main';
-import { createTempArtwork, storeArtworks } from '../other/artworks';
-import { generatePalette, getPaletteData, setPaletteData } from '../other/generatePalette';
+import { createTempArtwork, processArtworkFiles } from '../other/artworks';
+import generatePalette from '../other/generatePalette';
 import { isSongBlacklisted } from '../utils/isBlacklisted';
 import { libraryScheduler } from '../workers/jobScheduler';
 import { GarbageCollectionJob } from '../workers/jobs/garbageCollectionJob';
-import { getArtistArtworkPath, getSongArtworkPath } from '../utils/getArtworkPath';
+import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import isPathAWebURL from '../utils/isPathAWebUrl';
 import { withFileHandle } from '../utils/withFileHandle';
 
@@ -600,8 +601,8 @@ const manageArtworkUpdates = async (prevSongData: SavableSongData, newSongData: 
           : palettes.filter((palette) => palette.paletteId !== prevSongData.paletteId);
       const palette = await generatePalette(artworkBuffer);
 
-      const artworkData = await storeArtworks('songs', artworkBuffer);
-      if (artworkData && artworkData.length > 0) {
+      const processedArtwork = await processArtworkFiles('songs', artworkBuffer);
+      if (processedArtwork.existing || processedArtwork.payloads) {
         prevSongData.isArtworkAvailable = !!artworkBuffer;
       }
 
@@ -866,6 +867,23 @@ const updateSongId3Tags = async (
     let artworkBuffer: Buffer | undefined;
     let artwork: Picture | undefined;
 
+    const newArtworkPath = tags.artworkPath
+      ? removeDefaultAppProtocolFromFilePath(tags.artworkPath)
+      : undefined;
+
+    let processedArtwork: { existing?: any, payloads?: any } | undefined;
+    if (newArtworkPath) {
+      const buffer = await generateArtworkBuffer(newArtworkPath);
+      artworkBuffer = buffer || undefined;
+
+      if (artworkBuffer) {
+        // Store artwork and generate palette (outside transaction)
+        await generatePalette(artworkBuffer);
+        processedArtwork = await processArtworkFiles('songs', artworkBuffer);
+        artwork = await parseImgDataForNodeID3(getSongArtworkPath(songId, true), artworkBuffer);
+      }
+    }
+
     // Execute all updates in a database transaction
     await db.transaction(async (trx) => {
       // / / / / / SONG BASIC FIELDS / / / / / / /
@@ -880,29 +898,19 @@ const updateSongId3Tags = async (
       );
 
       // / / / / / SONG ARTWORK / / / / / / /
-      const newArtworkPath = tags.artworkPath
-        ? removeDefaultAppProtocolFromFilePath(tags.artworkPath)
-        : undefined;
+      if (processedArtwork) {
+        let artworkData = processedArtwork.existing;
+        if (!artworkData && processedArtwork.payloads) {
+          artworkData = await saveArtworks(processedArtwork.payloads, trx);
+        }
 
-      if (newArtworkPath) {
-        const buffer = await generateArtworkBuffer(newArtworkPath);
-        artworkBuffer = buffer || undefined;
-
-        if (artworkBuffer) {
-          // Store artwork and generate palette
-          await generatePalette(artworkBuffer);
-          const artworkData = await storeArtworks('songs', artworkBuffer, trx);
-
-          if (artworkData && artworkData.length > 0) {
-            // Link artwork to song
-            await syncSongArtworks(
-              songId,
-              artworkData.map((art) => art.id),
-              trx
-            );
-          }
-
-          artwork = await parseImgDataForNodeID3(getSongArtworkPath(songId, true), artworkBuffer);
+        if (artworkData && artworkData.length > 0) {
+          // Link artwork to song
+          await syncSongArtworks(
+            songId,
+            artworkData.map((art: any) => art.id),
+            trx
+          );
         }
       }
 
@@ -1072,7 +1080,7 @@ const updateSongId3Tags = async (
       }
     });
     
-    libraryScheduler.enqueue(new GarbageCollectionJob());
+    libraryScheduler.requestMaintenance();
 
     // Transaction succeeded, now update the file system
     logger.debug('Database transaction completed successfully');
