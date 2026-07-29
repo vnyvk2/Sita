@@ -137,6 +137,26 @@ function MusicFoldersPage() {
     []
   );
 
+  const resyncLibrary = useCallback(
+    (
+      _: unknown,
+      setIsDisabled: (state: boolean) => void,
+      setIsPending: (state: boolean) => void
+    ) => {
+      setIsDisabled(true);
+      setIsPending(true);
+
+      return window.api.audioLibraryControls
+        .resyncSongsLibrary()
+        .finally(() => {
+          setIsDisabled(false);
+          setIsPending(false);
+        })
+        .catch((err) => console.error(err));
+    },
+    []
+  );
+
   return (
     <MainContainer
       className="music-folders-page appear-from-bottom relative h-full! pr-4! pb-0!"
@@ -192,6 +212,13 @@ function MusicFoldersPage() {
                   tooltipLabel={t(
                     `common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`
                   )}
+                />
+                <Button
+                  label={t('settingsPage.resyncLibrary')}
+                  iconName="sync"
+                  pendingAnimationOnDisabled
+                  iconClassName="material-icons-round-outlined"
+                  clickHandler={resyncLibrary}
                 />
                 <Button
                   label={t('foldersPage.addFolder')}
