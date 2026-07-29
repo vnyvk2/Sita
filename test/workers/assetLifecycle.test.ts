@@ -15,6 +15,7 @@ vi.mock('../../src/main/logger');
 describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.mocked(fs.readdir).mockResolvedValue([]);
     // Clean up DB for these tests
     await db.delete(albumsArtworks);
     await db.delete(artworks);

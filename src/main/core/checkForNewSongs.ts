@@ -9,7 +9,7 @@ const checkForNewSongs = async () => {
   if (folders.length > 0) {
     for (const folder of folders) {
       try {
-        return await checkFolderForUnknownModifications(folder.path);
+        await checkFolderForUnknownModifications(folder.path);
       } catch (error) {
         logger.error(`Failed to check for unknown modifications of a path.`, {
           error,
@@ -17,10 +17,11 @@ const checkForNewSongs = async () => {
         });
       }
     }
+  } else {
+    logger.error(`Failed to read music folders array in user data. it was possibly empty.`, {
+      folders
+    });
   }
-  logger.error(`Failed to read music folders array in user data. it was possibly empty.`, {
-    folders
-  });
 };
 
 export default checkForNewSongs;
