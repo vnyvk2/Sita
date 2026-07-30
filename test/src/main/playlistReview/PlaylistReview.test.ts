@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { PlaylistReviewService } from '@main/playlistReview/services/PlaylistReviewService';
 import { ReviewValidator } from '@main/playlistReview/validator/ReviewValidator';
 import { PlanRegenerator } from '@main/playlistReview/services/PlanRegenerator';
+import { OverrideApplier } from '@main/playlistReview/services/OverrideApplier';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 
 describe('Phase 13 — Interactive Review & Decision Framework Refinements', () => {
-  it('should create a review session and derive effective plan via PlanRegenerator', () => {
+  it('should create a review session and derive effective plan via OverrideApplier & PlanRegenerator', () => {
     const validator = new ReviewValidator();
-    const regenerator = new PlanRegenerator();
+    const applier = new OverrideApplier();
+    const regenerator = new PlanRegenerator(applier);
     const service = new PlaylistReviewService(validator, regenerator);
 
     const initialPlan: PlaylistImportPlan = {
@@ -67,7 +69,8 @@ describe('Phase 13 — Interactive Review & Decision Framework Refinements', () 
 
   it('should support FORCE_SKIP user overrides and derive effective plan', () => {
     const validator = new ReviewValidator();
-    const regenerator = new PlanRegenerator();
+    const applier = new OverrideApplier();
+    const regenerator = new PlanRegenerator(applier);
     const service = new PlaylistReviewService(validator, regenerator);
 
     const initialPlan: PlaylistImportPlan = {
