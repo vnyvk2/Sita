@@ -6,5 +6,5 @@ export interface ImportStatistics {
   notInLibraryEntries: number;
   invalidEntries: number;
   warningCount: number;
-  successPercentage: number;
+  plannedImportPercentage: number;
 }

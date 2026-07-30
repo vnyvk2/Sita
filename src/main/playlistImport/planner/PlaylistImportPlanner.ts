@@ -60,14 +60,14 @@ export class PlaylistImportPlanner {
       }
 
       planEntries.push({
-        decision,
-        libraryEntry: entry
+        source: entry,
+        decision
       });
     }
 
     const totalEntries = playlist.entries.length;
     const skippedEntries = missingEntries + notInLibraryEntries + invalidEntries;
-    const successPercentage = totalEntries > 0 ? Math.round((importedEntries / totalEntries) * 100) : 0;
+    const plannedImportPercentage = totalEntries > 0 ? Math.round((importedEntries / totalEntries) * 100) : 0;
 
     const statistics: ImportStatistics = {
       totalEntries,
@@ -77,7 +77,7 @@ export class PlaylistImportPlanner {
       notInLibraryEntries,
       invalidEntries,
       warningCount: warnings.length,
-      successPercentage
+      plannedImportPercentage
     };
 
     return {

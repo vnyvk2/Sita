@@ -64,6 +64,7 @@ describe('PlaylistImportPlanner', () => {
 
     expect(plan.playlistName).toBe('Road Trip');
     expect(plan.entries).toHaveLength(4);
+    expect(plan.entries[0].source).toEqual(resolvedPlaylist.entries[0]);
     expect(plan.entries[0].decision).toBe('IMPORT');
     expect(plan.entries[1].decision).toBe('SKIP_MISSING');
     expect(plan.entries[2].decision).toBe('SKIP_NOT_IN_LIBRARY');
@@ -77,7 +78,7 @@ describe('PlaylistImportPlanner', () => {
       notInLibraryEntries: 1,
       invalidEntries: 1,
       warningCount: 3,
-      successPercentage: 25
+      plannedImportPercentage: 25
     });
 
     expect(plan.warnings).toHaveLength(3);
