@@ -5,7 +5,7 @@ import { queryClient } from '..';
 import { albumQuery } from '../queries/albums';
 import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
-import { collectionKeys } from '../../api/collectionKeys';
+import { collectionKeys } from '@renderer/api/collectionKeys';
 import { searchQuery } from '../queries/search';
 import { songQuery } from '../queries/songs';
 
