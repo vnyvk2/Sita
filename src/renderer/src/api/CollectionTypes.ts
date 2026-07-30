@@ -14,6 +14,11 @@ export interface AddSongsInput {
   insertAt?: number;
 }
 
+export interface RemoveSongsInput {
+  playlistId: number;
+  songIds: readonly number[];
+}
+
 export interface RenameInput {
   collectionId: number;
   name: string;

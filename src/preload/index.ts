@@ -6,6 +6,9 @@ import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 
 import type { CollectionDto, BreadcrumbDto, PlaylistEntryDto } from '../main/collections/dto/CollectionDto';
 import type { CreateFolderInput } from '../main/collections/operations/CreateFolderOp';
+import type { CreatePlaylistInput } from '../main/collections/operations/CreatePlaylistOp';
+import type { AddSongsInput } from '../main/collections/operations/AddSongsOp';
+import type { RemoveSongsInput } from '../main/collections/operations/RemoveSongsOp';
 import type { RenameInput } from '../main/collections/operations/RenameOp';
 import type { MoveCollectionInput } from '../main/collections/operations/MoveCollectionOp';
 import type { DeleteInput } from '../main/collections/operations/DeleteOp';
@@ -434,51 +437,7 @@ const albumsData = {
     ipcRenderer.invoke('app/getAlbumInfoFromLastFM', albumId)
 };
 
-// $ PLAYLIST DATA AND CONTROLS
-const playlistsData = {
-  getPlaylistData: (
-    playlistIds?: number[],
-    sortType?: PlaylistSortTypes,
-    start?: number,
-    end?: number,
-    onlyMutablePlaylists?: boolean
-  ): Promise<PaginatedResult<Playlist, PlaylistSortTypes>> =>
-    ipcRenderer.invoke(
-      'app/getPlaylistData',
-      playlistIds,
-      sortType,
-      start,
-      end,
-      onlyMutablePlaylists
-    ),
-  addNewPlaylist: (
-    playlistName: string,
-    songIds?: number[],
-    artworkPath?: string
-  ): Promise<{ success: boolean; message?: string; playlist?: Playlist }> =>
-    ipcRenderer.invoke('app/addNewPlaylist', playlistName, songIds, artworkPath),
-  addSongsToPlaylist: (playlistId: number, songIds: number[]): PromiseFunctionReturn =>
-    ipcRenderer.invoke('app/addSongsToPlaylist', playlistId, songIds),
-  addArtworkToAPlaylist: (
-    playlistId: number,
-    artworkPath: string
-  ): Promise<ArtworkPaths | undefined> =>
-    ipcRenderer.invoke('app/addArtworkToAPlaylist', playlistId, artworkPath),
-  renameAPlaylist: (playlistId: number, newName: string): Promise<void> =>
-    ipcRenderer.invoke('app/renameAPlaylist', playlistId, newName),
-  removeSongFromPlaylist: (playlistId: number, songId: number): PromiseFunctionReturn =>
-    ipcRenderer.invoke('app/removeSongFromPlaylist', playlistId, songId),
-  removePlaylists: (playlistIds: number[]) =>
-    ipcRenderer.invoke('app/removePlaylists', playlistIds),
-  getArtworksForMultipleArtworksCover: (
-    songIds: number[]
-  ): Promise<{ songId: number; artworkPaths: ArtworkPaths }[]> =>
-    ipcRenderer.invoke('app/getArtworksForMultipleArtworksCover', songIds),
-  exportPlaylist: (playlistId: number): Promise<void> =>
-    ipcRenderer.invoke('app/exportPlaylist', playlistId),
-  importPlaylist: (targetPlaylistId?: number): Promise<void> =>
-    ipcRenderer.invoke('app/importPlaylist', targetPlaylistId)
-};
+
 
 const queue = {
   getQueueInfo: (queueType: QueueTypes, id: string): Promise<QueueInfo | undefined> =>
@@ -627,6 +586,9 @@ const collections = {
   },
   write: {
     createFolder: (input: CreateFolderInput): Promise<number> => ipcRenderer.invoke('collections/write/createFolder', input),
+    createPlaylist: (input: CreatePlaylistInput): Promise<number> => ipcRenderer.invoke('collections/write/createPlaylist', input),
+    addSongs: (input: AddSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/addSongs', input),
+    removeSongs: (input: RemoveSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/removeSongs', input),
     rename: (input: RenameInput): Promise<void> => ipcRenderer.invoke('collections/write/rename', input),
     move: (input: MoveCollectionInput): Promise<void> => ipcRenderer.invoke('collections/write/move', input),
     delete: (input: DeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/delete', input),
@@ -635,7 +597,8 @@ const collections = {
     bulkDelete: (input: BulkDeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkDelete', input),
     bulkRestore: (input: BulkRestoreInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkRestore', input),
     pin: (input: PinInput): Promise<void> => ipcRenderer.invoke('collections/write/pin', input),
-    unpin: (input: UnpinInput): Promise<void> => ipcRenderer.invoke('collections/write/unpin', input)
+    unpin: (input: UnpinInput): Promise<void> => ipcRenderer.invoke('collections/write/unpin', input),
+    setArtwork: (playlistId: number, artworkPath: string): Promise<ArtworkPaths | undefined> => ipcRenderer.invoke('collections/write/setArtwork', { playlistId, artworkPath })
   },
   history: {
     undo: (collectionId: string): Promise<boolean> => ipcRenderer.invoke('collections/history/undo', collectionId),
@@ -644,7 +607,9 @@ const collections = {
   events: {
     onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => ipcRenderer.on('collections/event', callback),
     offEvent: (callback: (...args: any[]) => void) => ipcRenderer.removeListener('collections/event', callback)
-  }
+  },
+  export: (playlistId: number): Promise<void> => ipcRenderer.invoke('collections/export', playlistId),
+  import: (targetPlaylistId?: number): Promise<void> => ipcRenderer.invoke('collections/import', targetPlaylistId)
 };
 
 export const api = {
@@ -670,7 +635,6 @@ export const api = {
   artistsData,
   genresData,
   albumsData,
-  playlistsData,
   log,
   miniPlayer,
   settings,

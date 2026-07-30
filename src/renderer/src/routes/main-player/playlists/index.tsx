@@ -1,4 +1,5 @@
 import NoPlaylistsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 import Button from '@renderer/components/Button';
 import Dropdown from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
@@ -116,7 +117,7 @@ function PlaylistsPage() {
               label: t('playlistsPage.importPlaylist'),
               iconName: 'publish',
               handlerFunction: () =>
-                window.api.playlistsData.importPlaylist().catch((err) => console.error(err))
+                CollectionClient.import().catch((err) => console.error(err))
             }
           ],
           e.pageX,
@@ -174,8 +175,8 @@ function PlaylistsPage() {
                 setIsDisabled(true);
                 setIsPending(true);
 
-                return window.api.playlistsData
-                  .importPlaylist()
+                return CollectionClient
+                  .import()
                   .finally(() => {
                     setIsDisabled(false);
                     setIsPending(false);

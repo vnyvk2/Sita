@@ -1,4 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
@@ -272,11 +273,9 @@ function PlaylistInfoPage() {
                   label: t('playlistsPage.removeFromThisPlaylist'),
                   iconName: 'playlist_remove',
                   handlerFunction: () =>
-                    window.api.playlistsData
-                      .removeSongFromPlaylist(playlistData.playlistId, item.songId)
-                      .then(
-                        (res) =>
-                          res.success &&
+                    CollectionClient
+                      .removeSongs({ playlistId: playlistData.playlistId, songIds: [item.songId] })
+                      .then(() =>
                           addNewNotifications([
                             {
                               id: `${item.songId}Removed`,

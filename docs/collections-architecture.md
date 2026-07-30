@@ -105,3 +105,32 @@ While playlists are persistent, identifiable, undoable, and database-backed, the
 - **Un-journaled**: Users do not "Undo" a queue shuffle in the same way they Undo a playlist deletion.
 
 The `QueueEngine` manages a `QueueState` object directly. It handles shuffle permutations (mapping logical indices to physical queues), cursor management, and history. It avoids the indirection of `OperationExecutor` because queue modifications are transient playback concerns, not persistent data operations.
+
+## 3. Mutation Sequence Diagram
+
+The following sequence diagram illustrates the flow of a mutation (e.g., adding a song to a playlist) through the platform layers.
+
+\\\mermaid
+sequenceDiagram
+    participant UI as React UI (Renderer)
+    participant Client as CollectionClient
+    participant IPC as CollectionIpc (Main)
+    participant Engine as PlaylistEngine
+    participant Op as OperationExecutor
+    participant Repo as PlaylistRepository
+    participant Event as CollectionEventBus
+
+    UI->>Client: addSongs(playlistId, songIds)
+    Client->>IPC: ipcRenderer.invoke('collections/write/addSongs')
+    IPC->>Engine: addSongs({ playlistId, songIds })
+    Engine->>Op: execute(new AddSongsOp(...))
+    Op->>Repo: insert(playlistEntries)
+    Op->>Op: computeInverse()
+    Op-->>Engine: operationResult (with inverse)
+    Engine->>UndoEngine: appendJournal(inverse)
+    Engine->>Event: emitEvent(CollectionEntriesAdded)
+    Event-->>Client: ipcRenderer.send('collection:event')
+    Client-->>UI: queryClient.invalidateQueries()
+    UI->>Client: fetch updated entries (React Query)
+\\\
+

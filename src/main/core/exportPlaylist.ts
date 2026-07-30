@@ -1,16 +1,11 @@
 import { writeFile } from 'fs/promises';
 import { basename } from 'path';
-
-import { SpecialPlaylists } from '@common/playlists.enum';
-import {
-  getPlaylistWithSongPaths,
-  getFavoritesPlaylistWithSongPaths,
-  getHistoryPlaylistWithSongPaths
-} from '@main/db/queries/playlists';
-import type { SaveDialogOptions } from 'electron';
-
+import { inArray } from 'drizzle-orm';
+import { db } from '@main/db';
+import { songs } from '@main/db/schema';
 import logger from '../logger';
 import { sendMessageToRenderer, showSaveDialog } from '../main';
+import type { CollectionReadRepository } from '../collections/repository/CollectionReadRepository';
 
 const generateSaveDialogOptions = (playlistName: string) => {
   const saveOptions: SaveDialogOptions = {
@@ -66,24 +61,17 @@ const createM3u8FileForPlaylist = async (
   }
 };
 
-const exportPlaylist = async (playlistId: number) => {
-  let playlist;
+const exportPlaylist = async (playlistId: number, repository: CollectionReadRepository) => {
+  const collection = await repository.getCollection(playlistId);
 
-  // Handle special playlists
-  if (playlistId === SpecialPlaylists.Favorites) {
-    playlist = await getFavoritesPlaylistWithSongPaths();
-  } else if (playlistId === SpecialPlaylists.History) {
-    playlist = await getHistoryPlaylistWithSongPaths();
-  } else {
-    playlist = await getPlaylistWithSongPaths(playlistId);
-  }
-
-  if (playlist == null)
+  if (!collection)
     return logger.warn("Failed to export playlist because requested playlist didn't exist", {
       playlistId
     });
 
-  if (playlist.songs.length === 0)
+  const entries = await repository.getEntries(playlistId);
+
+  if (entries.length === 0)
     return logger.warn(
       "Failed to export playlist because requested playlist didn't have any songs.",
       {
@@ -91,9 +79,11 @@ const exportPlaylist = async (playlistId: number) => {
       }
     );
 
-  const songs = playlist.songs.map((s) => s.song.path);
+  const songIds = entries.map(e => e.songId);
+  const songRecords = await db.select({ path: songs.path }).from(songs).where(inArray(songs.songId, songIds));
+  const songPaths = songRecords.map(s => s.path);
 
-  return await createM3u8FileForPlaylist(playlist.id, playlist.name, songs);
+  return await createM3u8FileForPlaylist(collection.id, collection.name, songPaths);
 };
 
 export default exportPlaylist;

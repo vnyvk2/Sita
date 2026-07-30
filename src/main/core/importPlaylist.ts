@@ -9,7 +9,7 @@ import type { OpenDialogOptions } from 'electron';
 import { appPreferences } from '../../../package.json';
 import logger from '../logger';
 import { sendMessageToRenderer, showOpenDialog } from '../main';
-import addNewPlaylist from './addNewPlaylist';
+import type { CollectionEngine } from '../collections/engine/CollectionEngine';
 
 const DEFAULT_EXPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   title: `Select a Destination where your M3U8 file is`,
@@ -34,7 +34,7 @@ const resolveSongPath = (text: string, m3uDir: string): string | null => {
   return null;
 };
 
-const importPlaylist = async (targetPlaylistId?: number) => {
+const importPlaylist = async (targetPlaylistId?: number, engine?: CollectionEngine) => {
   try {
     const destinations = await showOpenDialog(DEFAULT_EXPORT_DIALOG_OPTIONS);
 
@@ -154,25 +154,26 @@ const importPlaylist = async (targetPlaylistId?: number) => {
                   });
                 }
               } else {
-                // Convert number array back to strings for addNewPlaylist API
-                const res = await addNewPlaylist(
-                  playlistName,
-                  songIdNumbers.map((id) => id.toString())
-                );
-
-                if (res.success) {
+                // Use Collection Platform if engine is provided
+                if (engine) {
+                  const playlistId = await engine.createPlaylist({ name: playlistName });
+                  if (songIdNumbers.length > 0) {
+                    await engine.addSongs({ playlistId, songIds: songIdNumbers });
+                  }
+                  
                   logger.info(`Imported '${fileName}' playlist successfully.`, { fileName });
                   return sendMessageToRenderer({
                     messageCode: 'PLAYLIST_IMPORT_SUCCESS',
                     data: { name: fileName }
                   });
+                } else {
+                  logger.debug('Failed to create a playlist (no engine provided)', { });
+                  return sendMessageToRenderer({
+                    messageCode: 'PLAYLIST_IMPORT_FAILED'
+                  });
                 }
 
-                logger.debug('Failed to create a playlist', { res });
-                return sendMessageToRenderer({
-                  messageCode: 'PLAYLIST_IMPORT_FAILED'
-                });
-              }
+
             }
           }
         } else {

@@ -1,4 +1,6 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
+import type { CollectionDto } from '@main/collections/dto/CollectionDto';
+import { CollectionClient } from '../../api/CollectionClient';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,16 +19,16 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
 
   const { playlistIds, playlistName } = props;
 
-  const [playlistsData, setPlaylistsData] = useState<Playlist[]>([]);
+  const [playlistsData, setPlaylistsData] = useState<CollectionDto[]>([]);
   const bulkDelete = useBulkDeleteCollections();
 
   useEffect(() => {
     if (playlistIds.length > 0) {
-      window.api.playlistsData
-        .getPlaylistData(playlistIds)
+      Promise.all(playlistIds.map(id => CollectionClient.getCollection(id)))
         .then((res) => {
-          if (Array.isArray(res) && res.length > 0) {
-            return setPlaylistsData(res);
+          const valid = res.filter(Boolean) as CollectionDto[];
+          if (valid.length > 0) {
+            return setPlaylistsData(valid);
           }
           return undefined;
         })
@@ -75,7 +77,7 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
           <p>{t('confirmDeletePlaylistsPrompt.modificationNotice')}</p>
           <ul className="ml-4 list-inside list-disc">
             {playlistsData.map((playlist) => (
-              <li className="text-sm font-light" key={playlist.playlistId}>
+              <li className="text-sm font-light" key={playlist.id}>
                 {playlist.name}
               </li>
             ))}

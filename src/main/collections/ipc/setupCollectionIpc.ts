@@ -7,6 +7,9 @@ import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
 import getArtworksForMultipleArtworksCover from '../../core/getArtworksForMultipleArtworksCover';
+import exportPlaylist from '../../core/exportPlaylist';
+import importPlaylist from '../../core/importPlaylist';
+import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 
 export function setupCollectionIpc(
   engine: PlaylistEngine,
@@ -61,6 +64,10 @@ export function setupCollectionIpc(
     return await engine.addSongs(input);
   });
 
+  ipcMain.handle('collections/write/removeSongs', async (_, input) => {
+    return await engine.removeSongs(input);
+  });
+
   ipcMain.handle('collections/write/rename', async (_, input) => {
     return await engine.renamePlaylist(input);
   });
@@ -97,6 +104,11 @@ export function setupCollectionIpc(
     return await engine.unpinPlaylist(input);
   });
 
+  ipcMain.handle('collections/write/setArtwork', async (_, input: { playlistId: number, artworkPath: string }) => {
+    // Delegate to existing legacy implementation
+    return await addArtworkToAPlaylist(input.playlistId, input.artworkPath);
+  });
+
   // History Endpoints
   ipcMain.handle('collections/history/undo', async (_, collectionId: string) => {
     return await undoEngine.undo(parseCollectionUri(collectionId));
@@ -109,5 +121,14 @@ export function setupCollectionIpc(
   // Event Forwarding
   collectionEventBus.onEvent((event) => {
     sendMessageToRenderer('collections/event', event);
+  });
+
+  // Import / Export
+  ipcMain.handle('collections/export', async (_, playlistId: number) => {
+    return await exportPlaylist(playlistId, repository);
+  });
+
+  ipcMain.handle('collections/import', async (_, targetPlaylistId?: number) => {
+    return await importPlaylist(targetPlaylistId, engine);
   });
 }

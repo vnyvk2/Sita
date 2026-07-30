@@ -51,12 +51,7 @@ const MultipleArtworksCover = (props: Props) => {
     enabled: !artworks && enableArtworkFromSongCovers && (!!props.collectionId || (props.songIds && props.songIds.length > 0))
   });
 
-  // useEffect(() => {
-  //   window.api.playlistsData
-  //     .getArtworksForMultipleArtworksCover(songIds)
-  //     .then((res) => setArtworks(res))
-  //     .catch((err) => console.error(err));
-  // }, [songIds]);
+
 
   const images = useMemo(() => {
     if (artworkPaths.length > 1) {

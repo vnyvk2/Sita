@@ -2,6 +2,7 @@ import type {
   CreateFolderInput,
   CreatePlaylistInput,
   AddSongsInput,
+  RemoveSongsInput,
   RenameInput,  
   MoveCollectionInput, 
   DeleteInput, 
@@ -26,6 +27,7 @@ export const CollectionClient = {
   createFolder: (input: CreateFolderInput) => window.api.collections.write.createFolder(input),
   createPlaylist: (input: CreatePlaylistInput) => window.api.collections.write.createPlaylist(input),
   addSongs: (input: AddSongsInput) => window.api.collections.write.addSongs(input),
+  removeSongs: (input: RemoveSongsInput) => window.api.collections.write.removeSongs(input),
   rename: (input: RenameInput) => window.api.collections.write.rename(input),
   move: (input: MoveCollectionInput) => window.api.collections.write.move(input),
   delete: (input: DeleteInput) => window.api.collections.write.delete(input),
@@ -35,6 +37,7 @@ export const CollectionClient = {
   bulkRestore: (input: BulkRestoreInput) => window.api.collections.write.bulkRestore(input),
   pin: (input: PinInput) => window.api.collections.write.pin(input),
   unpin: (input: UnpinInput) => window.api.collections.write.unpin(input),
+  setArtwork: (playlistId: number, artworkPath: string) => window.api.collections.write.setArtwork(playlistId, artworkPath),
 
   // History
   undo: (collectionId: string) => window.api.collections.history.undo(collectionId),
@@ -43,4 +46,8 @@ export const CollectionClient = {
   // Events
   onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => window.api.collections.events.onEvent(callback as any),
   offEvent: (callback: (e: unknown, event: CollectionEvent) => void) => window.api.collections.events.offEvent(callback as any),
+
+  // Import / Export
+  export: (playlistId: number) => window.api.collections.export(playlistId),
+  import: (targetPlaylistId?: number) => window.api.collections.import(targetPlaylistId),
 };

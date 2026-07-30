@@ -220,13 +220,13 @@ export const Playlist = (props: PlaylistProp) => {
         iconName: 'photo_camera',
         handlerFunction: () => {
           window.api.songUpdates
-            .getImgFileLocation()
-            .then((artworkPath) => {
-              if (artworkPath) {
-                return window.api.playlistsData.addArtworkToAPlaylist(
-                  props.id,
-                  artworkPath
-                );
+              .getImgFileLocation()
+              .then((artworkPath) => {
+                if (artworkPath) {
+                  return CollectionClient.setArtwork(
+                    props.id,
+                    artworkPath
+                  );
               }
               return undefined;
             })
@@ -271,12 +271,12 @@ export const Playlist = (props: PlaylistProp) => {
           } else toggleMultipleSelections(!isAMultipleSelection, 'playlist', [props.id]);
         }
       },
-      {
-        label: t('playlist.exportPlaylist'),
-        iconName: 'upload',
-        handlerFunction: () => window.api.playlistsData.exportPlaylist(props.id),
-        isDisabled: isMultipleSelectionEnabled
-      },
+        {
+          label: t('playlist.exportPlaylist'),
+          iconName: 'upload',
+          handlerFunction: () => CollectionClient.export(props.id),
+          isDisabled: isMultipleSelectionEnabled
+        },
       {
         label: t('common.info'),
         iconName: 'info',

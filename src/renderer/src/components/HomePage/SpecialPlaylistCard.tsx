@@ -1,6 +1,7 @@
 import Img from '@renderer/components/Img';
 import NavLink from '@renderer/components/NavLink';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,7 +28,7 @@ export default function SpecialPlaylistCard({
       {
         label: t('playlist.exportPlaylist'),
         iconName: 'upload',
-        handlerFunction: () => window.api.playlistsData.exportPlaylist(playlistId)
+        handlerFunction: () => CollectionClient.export(playlistId)
       }
     ],
     [playlistId, t]
