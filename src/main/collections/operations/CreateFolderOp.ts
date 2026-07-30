@@ -3,6 +3,7 @@ import { db } from '../../db/db';
 import { playlists } from '../../db/schema';
 import { DeleteOp } from './DeleteOp';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import { createCollectionId } from '../../../common/collections/id';
 
 export interface CreateFolderInput {
   name: string;
@@ -32,7 +33,7 @@ export class CreateFolderOp implements CollectionOperation<CreateFolderInput, nu
 
     return {
       data: inserted.id,
-      collectionId: `local:playlist:${inserted.id}` as any, // Temporary cast or import createCollectionId
+      collectionId: createCollectionId('local', 'playlist', inserted.id),
       operationType: 'playlist.createFolder',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

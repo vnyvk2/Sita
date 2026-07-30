@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists, playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { eq, inArray } from 'drizzle-orm';
@@ -67,11 +68,9 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
         
       insertedEntryIds.push(...inserted.map(i => i.id));
       
-      // Update item count
-      await ctx.trx
-        .update(playlists)
-        .set({ itemCount: targetEntries.length + entriesToInsert.length })
-        .where(eq(playlists.id, targetPlaylistId));
+      const newSongIdArray = Array.from(newSongIds);
+      const deltas = await this.repository.computeStatisticsDelta(newSongIdArray, ctx.trx);
+      await this.repository.applyStatisticsDelta(targetPlaylistId, deltas, ctx.trx);
     }
 
     // Inverse is removing these exact entry IDs
@@ -82,7 +81,7 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
 
     return {
       data: undefined,
-      collectionId: `local:playlist:${targetPlaylistId}` as any,
+      collectionId: createCollectionId('local', 'playlist', targetPlaylistId),
       operationType: 'playlist.merge',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

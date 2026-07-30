@@ -25,7 +25,7 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
     }
 
     const maxPos = await this.repository.getMaxPosition(playlistId, ctx.trx);
-    const startIndex = insertAt !== undefined ? insertAt : (maxPos === 0 ? 0 : maxPos + 1);
+    const startIndex = insertAt !== undefined ? insertAt : maxPos + 1;
 
     if (insertAt !== undefined) {
       await this.repository.shiftPositions(playlistId, startIndex, songIds.length, ctx.trx);

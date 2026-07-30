@@ -14,7 +14,7 @@ describe('DuplicateOp Integration', () => {
     await db.delete(playlists);
     
     repository = new PlaylistRepository();
-    duplicateOp = new DuplicateOp(repository);
+    duplicateOp = new DuplicateOp();
   });
 
   afterEach(async () => {

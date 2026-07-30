@@ -27,6 +27,10 @@ export class UndoEngine {
   // In-memory UI state
   private readonly sequencePointers = new Map<string, number>();
 
+  public getCurrentPointer(collectionId: CollectionId): number | undefined {
+    return this.sequencePointers.get(collectionId.key);
+  }
+
   constructor(
     registry: OperationRegistry,
     journalRepo: OperationJournalRepository,

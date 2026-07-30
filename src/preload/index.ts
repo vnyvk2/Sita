@@ -1,9 +1,21 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
-// const { contextBridge, ipcRenderer } = require('electron');
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
+
+import type { CollectionDto, BreadcrumbDto, PlaylistEntryDto } from '../main/collections/dto/CollectionDto';
+import type { CreateFolderInput } from '../main/collections/operations/CreateFolderOp';
+import type { RenameInput } from '../main/collections/operations/RenameOp';
+import type { MoveCollectionInput } from '../main/collections/operations/MoveCollectionOp';
+import type { DeleteInput } from '../main/collections/operations/DeleteOp';
+import type { DuplicateInput } from '../main/collections/operations/DuplicateOp';
+import type { MergePlaylistsInput } from '../main/collections/operations/MergePlaylistsOp';
+import type { BulkDeleteInput, BulkRestoreInput } from '../main/collections/operations/BulkDeleteOp';
+import type { PinInput, UnpinInput } from '../main/collections/operations/PinOp';
+import type { CollectionEvent } from '../main/collections/events/CollectionEventBus';
+
+// const { contextBridge, ipcRenderer } = require('electron');
 
 const properties = {
   isInDevelopment: process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true',
@@ -606,6 +618,35 @@ const libraryMetrics = {
   retryRecoverable: () => ipcRenderer.invoke('app/retryRecoverable')
 };
 
+const collections = {
+  read: {
+    getCollection: (id: number): Promise<CollectionDto | null> => ipcRenderer.invoke('collections/read/getCollection', id),
+    getChildren: (id: number): Promise<CollectionDto[]> => ipcRenderer.invoke('collections/read/getChildren', id),
+    getEntries: (id: number, offset: number, limit: number): Promise<PlaylistEntryDto[]> => ipcRenderer.invoke('collections/read/getEntries', id, offset, limit),
+    getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> => ipcRenderer.invoke('collections/read/getBreadcrumbs', id)
+  },
+  write: {
+    createFolder: (input: CreateFolderInput): Promise<number> => ipcRenderer.invoke('collections/write/createFolder', input),
+    rename: (input: RenameInput): Promise<void> => ipcRenderer.invoke('collections/write/rename', input),
+    move: (input: MoveCollectionInput): Promise<void> => ipcRenderer.invoke('collections/write/move', input),
+    delete: (input: DeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/delete', input),
+    duplicate: (input: DuplicateInput): Promise<number> => ipcRenderer.invoke('collections/write/duplicate', input),
+    merge: (input: MergePlaylistsInput): Promise<number> => ipcRenderer.invoke('collections/write/merge', input),
+    bulkDelete: (input: BulkDeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkDelete', input),
+    bulkRestore: (input: BulkRestoreInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkRestore', input),
+    pin: (input: PinInput): Promise<void> => ipcRenderer.invoke('collections/write/pin', input),
+    unpin: (input: UnpinInput): Promise<void> => ipcRenderer.invoke('collections/write/unpin', input)
+  },
+  history: {
+    undo: (collectionId: string): Promise<boolean> => ipcRenderer.invoke('collections/history/undo', collectionId),
+    redo: (collectionId: string): Promise<boolean> => ipcRenderer.invoke('collections/history/redo', collectionId)
+  },
+  events: {
+    onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => ipcRenderer.on('collections/event', callback),
+    offEvent: (callback: (...args: any[]) => void) => ipcRenderer.removeListener('collections/event', callback)
+  }
+};
+
 export const api = {
   properties,
   windowControls,
@@ -637,7 +678,8 @@ export const api = {
   appControls,
   utils,
   queue,
-  libraryMetrics
+  libraryMetrics,
+  collections
 };
 
 contextBridge.exposeInMainWorld('api', api);

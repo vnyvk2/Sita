@@ -15,6 +15,18 @@ export class PlaylistRepository {
     return playlist || null;
   }
 
+  public async getChildren(parentId: number | null, trx: DB | DBTransaction = db) {
+    return await trx
+      .select()
+      .from(playlists)
+      .where(
+        parentId === null 
+          ? sql`${playlists.parentId} IS NULL`
+          : eq(playlists.parentId, parentId)
+      )
+      .orderBy(asc(playlists.id));
+  }
+
   public async getAll(options: { limit?: number; offset?: number } = {}, trx: DB | DBTransaction = db) {
     // We cannot use await directly on the dynamic query without breaking typing easily,
     // but Drizzle allows chaining.
@@ -215,7 +227,7 @@ export class PlaylistRepository {
     
     let durationDelta = 0;
     for (const id of songIds) {
-      durationDelta += durationMap.get(id) || 0;
+      durationDelta += Number(durationMap.get(id)) || 0;
     }
 
     return {

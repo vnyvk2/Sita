@@ -6,8 +6,7 @@ import { MoveCollectionOp } from '../../../../../src/main/collections/operations
 import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { OperationExecutor } from '../../../../../src/main/collections/operations/OperationExecutor';
-import { OperationJournal } from '../../../../../src/main/collections/operations/OperationJournal';
-import { EventBus } from '../../../../../src/main/events/EventBus';
+import { OperationJournalWriter } from '../../../../../src/main/collections/operations/OperationJournalWriter';
 
 describe('MoveCollectionOp Integration', () => {
   let repository: PlaylistRepository;
@@ -21,10 +20,9 @@ describe('MoveCollectionOp Integration', () => {
     
     repository = new PlaylistRepository();
     hierarchyService = new HierarchyService();
-    const eventBus = new EventBus();
-    const journal = new OperationJournal(eventBus);
-    executor = new OperationExecutor(journal, eventBus);
-    moveOp = new MoveCollectionOp(repository, hierarchyService);
+    const journalWriter = new OperationJournalWriter();
+    executor = new OperationExecutor(journalWriter);
+    moveOp = new MoveCollectionOp(hierarchyService);
   });
 
   afterEach(async () => {

@@ -11,7 +11,14 @@ import { ReorderOp, type ReorderInput } from '../operations/ReorderOp';
 import { DeleteOp, type DeleteInput } from '../operations/DeleteOp';
 import { PinOp, type PinInput } from '../operations/PinOp';
 import { UnpinOp, type UnpinInput } from '../operations/PinOp';
+import { CreateFolderOp, type CreateFolderInput } from '../operations/CreateFolderOp';
+import { DuplicateOp, type DuplicateInput } from '../operations/DuplicateOp';
+import { MergePlaylistsOp, type MergePlaylistsInput } from '../operations/MergePlaylistsOp';
+import { MoveCollectionOp, type MoveCollectionInput } from '../operations/MoveCollectionOp';
+import { BulkDeleteOp, BulkRestoreOp, type BulkDeleteInput, type BulkRestoreInput } from '../operations/BulkDeleteOp';
 import { FolderStatisticsService } from './FolderStatisticsService';
+import { HierarchyService } from './HierarchyService';
+import { collectionEventBus } from '../events/CollectionEventBus';
 
 export class PlaylistEngine {
   private readonly repository: PlaylistRepository;
@@ -26,7 +33,15 @@ export class PlaylistEngine {
   private readonly deleteOp: DeleteOp;
   private readonly pinOp: PinOp;
   private readonly unpinOp: UnpinOp;
+  private readonly createFolderOp: CreateFolderOp;
+  private readonly duplicateOp: DuplicateOp;
+  private readonly mergeOp: MergePlaylistsOp;
+  private readonly moveOp: MoveCollectionOp;
+  private readonly bulkDeleteOp: BulkDeleteOp;
+  private readonly bulkRestoreOp: BulkRestoreOp;
+  
   private readonly folderStats: FolderStatisticsService;
+  private readonly hierarchyService: HierarchyService;
 
   constructor(
     repository: PlaylistRepository,
@@ -44,6 +59,14 @@ export class PlaylistEngine {
     this.deleteOp = new DeleteOp(this.repository);
     this.pinOp = new PinOp();
     this.unpinOp = new UnpinOp();
+    this.hierarchyService = new HierarchyService();
+    this.createFolderOp = new CreateFolderOp(this.repository);
+    this.duplicateOp = new DuplicateOp(this.repository);
+    this.mergeOp = new MergePlaylistsOp(this.repository);
+    this.moveOp = new MoveCollectionOp(this.repository, this.hierarchyService);
+    this.bulkDeleteOp = new BulkDeleteOp(this.repository);
+    this.bulkRestoreOp = new BulkRestoreOp(this.repository, this.hierarchyService);
+    
     this.folderStats = new FolderStatisticsService();
   }
 
@@ -60,6 +83,7 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'addSongs' } });
     return result.data;
   }
 
@@ -76,6 +100,7 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'removeSongs' } });
     return result.data;
   }
 
@@ -86,6 +111,7 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'rename' } });
     return result.data;
   }
 
@@ -96,6 +122,7 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'reorder' } });
     return result.data;
   }
 
@@ -106,6 +133,7 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionDeleted', payload: { collectionIds: [input.playlistId] } });
     return result.data;
   }
 
@@ -114,6 +142,7 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.pinOp, input, ctx);
     });
+    collectionEventBus.emitEvent({ type: 'CollectionPinned', payload: { collectionId: input.playlistId, isPinned: true } });
     return result.data;
   }
 
@@ -122,6 +151,65 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.unpinOp, input, ctx);
     });
+    collectionEventBus.emitEvent({ type: 'CollectionPinned', payload: { collectionId: input.playlistId, isPinned: false } });
+    return result.data;
+  }
+
+  public async createFolder(input: CreateFolderInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.createFolderOp, input, ctx);
+    });
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: result.data, action: 'create' } });
+    return result.data;
+  }
+
+  public async duplicatePlaylist(input: DuplicateInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.duplicateOp, input, ctx);
+    });
+    this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'duplicate' } });
+    return result.data;
+  }
+
+  public async mergePlaylists(input: MergePlaylistsInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.mergeOp, input, ctx);
+    });
+    this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.targetPlaylistId, action: 'merge' } });
+    return result.data;
+  }
+
+  public async moveCollection(input: MoveCollectionInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.moveOp, input, ctx);
+    });
+    collectionEventBus.emitEvent({ type: 'CollectionMoved', payload: { collectionId: input.playlistId, newParentId: input.newParentId } });
+    return result.data;
+  }
+
+  public async bulkDelete(input: BulkDeleteInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.bulkDeleteOp, input, ctx);
+    });
+    this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionDeleted', payload: { collectionIds: input.playlistIds } });
+    return result.data;
+  }
+
+  public async bulkRestore(input: BulkRestoreInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.bulkRestoreOp, input, ctx);
+    });
+    this.invalidateCache(result.affectedSongIds);
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { action: 'bulkRestore' } });
     return result.data;
   }
 

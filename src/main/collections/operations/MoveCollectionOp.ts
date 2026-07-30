@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { HierarchyService } from '../engine/HierarchyService';
@@ -24,7 +25,7 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
     if (playlistIds.length === 0) {
       return {
         data: undefined,
-        collectionId: 'local:playlist:0' as any,
+        collectionId: createCollectionId('local', 'playlist', 0),
         operationType: 'playlist.move',
         operationInput: input as unknown as Record<string, unknown>,
         inverseInput: {
@@ -75,7 +76,7 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
 
     return {
       data: undefined,
-      collectionId: 'local:playlist:0' as any,
+      collectionId: createCollectionId('local', 'playlist', 0),
       operationType: 'playlist.move',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
