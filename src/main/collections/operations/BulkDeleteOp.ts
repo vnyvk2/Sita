@@ -1,7 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { createCollectionId } from '../../../common/collections/id';
 import { DeleteOp } from './DeleteOp';
-import { RestorePlaylistOp, RestorePlaylistInput } from './RestorePlaylistOp';
+import { RestorePlaylistOp, type RestorePlaylistInput } from './RestorePlaylistOp';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { HierarchyService } from '../engine/HierarchyService';
 

@@ -1,7 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-import { RestoreSongsInput } from './RestoreSongsOp';
+import type { RestoreSongsInput } from './RestoreSongsOp';
 
 export interface RestorePlaylistInput {
   playlist: {

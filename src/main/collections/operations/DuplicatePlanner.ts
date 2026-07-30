@@ -1,4 +1,4 @@
-import { HierarchyService, PlaylistNode } from '../engine/HierarchyService';
+import { HierarchyService, type PlaylistNode } from '../engine/HierarchyService';
 import { CollectionNamingStrategy } from './CollectionNamingStrategy';
 import { db } from '../../db/db';
 import { playlists } from '../../db/schema';
