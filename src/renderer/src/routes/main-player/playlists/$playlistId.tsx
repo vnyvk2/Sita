@@ -20,8 +20,13 @@ import { useStore } from '@tanstack/react-store';
 import { lazy, useCallback, useContext, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import Button from '@renderer/components/Button';
+
 const SensitiveActionConfirmPrompt = lazy(
   () => import('@renderer/components/SensitiveActionConfirmPrompt')
+);
+const AddSongsToTargetPlaylistPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/AddSongsToTargetPlaylistPrompt')
 );
 
 export const Route = createFileRoute('/main-player/playlists/$playlistId')({
@@ -34,16 +39,6 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   }
 });
 
-/**
- * Render the playlist detail page with playlist metadata, a virtualized list of songs, and controls
- * for playing, queuing, sorting, filtering, and playlist-specific actions.
- *
- * The component reads the current playlist ID and search params, persists the chosen sort order,
- * loads playlist and song data, and provides UI handlers for play, shuffle, add-to-queue, clear
- * history, and removing songs from the playlist.
- *
- * @returns The JSX element for the playlist detail page.
- */
 function PlaylistInfoPage() {
   const { playlistId } = Route.useParams({
     select: (params) => ({ playlistId: Number(params.playlistId) })
@@ -85,6 +80,17 @@ function PlaylistInfoPage() {
   });
 
   const selectAllHandler = useSelectAllHandler(playlistSongs, 'songs', 'songId');
+
+  const openAddSongsPrompt = useCallback(() => {
+    changePromptMenuData(
+      true,
+      <AddSongsToTargetPlaylistPrompt
+        playlistId={playlistData.playlistId}
+        playlistName={playlistData.name}
+        existingSongIds={playlistSongs.map((s) => s.songId)}
+      />
+    );
+  }, [changePromptMenuData, playlistData.playlistId, playlistData.name, playlistSongs]);
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
@@ -201,6 +207,14 @@ function PlaylistInfoPage() {
             isDisabled: !(playlistData.itemCount > 0)
           },
           {
+            tooltipLabel: t('playlist.addSongs', 'Add songs'),
+            iconName: 'playlist_add',
+            clickHandler: openAddSongsPrompt,
+            isVisible:
+              playlistData.playlistId !== SpecialPlaylists.History &&
+              playlistData.playlistId !== SpecialPlaylists.Favorites
+          },
+          {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
@@ -297,7 +311,15 @@ function PlaylistInfoPage() {
       {playlistSongs.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
-          {t('playlist.empty')}
+          <span className="mb-6">{t('playlist.empty')}</span>
+          {!SpecialPlaylists.isSpecialPlaylistId(playlistData.playlistId) && (
+            <Button
+              label={t('playlist.addSongs', 'Add songs')}
+              iconName="playlist_add"
+              className="bg-background-color-3! text-font-color-black! dark:bg-dark-background-color-3! dark:text-font-color-black! cursor-pointer rounded-xl px-6 py-3 text-lg font-medium shadow-md"
+              clickHandler={openAddSongsPrompt}
+            />
+          )}
         </div>
       )}
     </MainContainer>
