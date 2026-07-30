@@ -1,6 +1,7 @@
 import type { PlaylistEventBus } from '../../playlistAutomation/events/PlaylistEventBus';
 import type { TimelineBuilder } from '../engine/TimelineBuilder';
-import type { DiagnosticEngine } from '../engine/DiagnosticEngine';
+import type { DiagnosticEvaluator } from '../engine/DiagnosticEvaluator';
+import type { HealthEvaluator } from '../engine/HealthEvaluator';
 import type { RecommendationEngine } from '../engine/RecommendationEngine';
 import type { PlaylistAutomationEvent } from '../../playlistAutomation/models/PlaylistAutomationEvent';
 import type { ObservabilityMetrics } from '../models/ObservabilityMetrics';
@@ -24,7 +25,8 @@ export class PlaylistObservabilityService {
 
   constructor(
     private timelineBuilder: TimelineBuilder,
-    private diagnosticEngine: DiagnosticEngine,
+    private diagnosticEvaluator: DiagnosticEvaluator,
+    private healthEvaluator: HealthEvaluator,
     private recommendationEngine: RecommendationEngine,
     eventBus?: PlaylistEventBus
   ) {
@@ -70,17 +72,17 @@ export class PlaylistObservabilityService {
   }
 
   getDiagnostics(): DiagnosticIssue[] {
-    return this.diagnosticEngine.evaluateDiagnostics(this.metrics);
+    return this.diagnosticEvaluator.evaluateDiagnostics(this.metrics);
   }
 
   getHealth(): PlaylistHealth {
     const issues = this.getDiagnostics();
-    return this.diagnosticEngine.computeHealth(this.metrics, issues);
+    return this.healthEvaluator.computeHealth(this.metrics, issues);
   }
 
   getSnapshot(): ObservabilitySnapshot {
     const diagnostics = this.getDiagnostics();
-    const health = this.diagnosticEngine.computeHealth(this.metrics, diagnostics);
+    const health = this.healthEvaluator.computeHealth(this.metrics, diagnostics);
     const recommendations = this.recommendationEngine.generateRecommendations(diagnostics);
 
     return {
