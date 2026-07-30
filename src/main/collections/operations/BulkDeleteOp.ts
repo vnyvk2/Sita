@@ -2,7 +2,7 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { DeleteOp } from './DeleteOp';
 import { RestorePlaylistOp, RestorePlaylistInput } from './RestorePlaylistOp';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { RelationshipResolver } from '../engine/RelationshipResolver';
+import { HierarchyService } from '../engine/HierarchyService';
 
 export interface BulkDeleteInput {
   playlistIds: number[];
@@ -10,11 +10,11 @@ export interface BulkDeleteInput {
 
 export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> {
   private repository: PlaylistRepository;
-  private resolver: RelationshipResolver;
+  private resolver: HierarchyService;
 
   constructor(
     repository: PlaylistRepository = new PlaylistRepository(),
-    resolver: RelationshipResolver = new RelationshipResolver()
+    resolver: HierarchyService = new HierarchyService()
   ) {
     this.repository = repository;
     this.resolver = resolver;

@@ -9,6 +9,9 @@ import { RemoveSongsOp, type RemoveSongsInput } from '../operations/RemoveSongsO
 import { RenameOp, type RenameInput } from '../operations/RenameOp';
 import { ReorderOp, type ReorderInput } from '../operations/ReorderOp';
 import { DeleteOp, type DeleteInput } from '../operations/DeleteOp';
+import { PinOp, type PinInput } from '../operations/PinOp';
+import { UnpinOp, type UnpinInput } from '../operations/PinOp';
+import { FolderStatisticsService } from './FolderStatisticsService';
 
 export class PlaylistEngine {
   private readonly repository: PlaylistRepository;
@@ -21,6 +24,9 @@ export class PlaylistEngine {
   private readonly renameOp: RenameOp;
   private readonly reorderOp: ReorderOp;
   private readonly deleteOp: DeleteOp;
+  private readonly pinOp: PinOp;
+  private readonly unpinOp: UnpinOp;
+  private readonly folderStats: FolderStatisticsService;
 
   constructor(
     repository: PlaylistRepository,
@@ -36,6 +42,9 @@ export class PlaylistEngine {
     this.renameOp = new RenameOp(this.repository);
     this.reorderOp = new ReorderOp(this.repository);
     this.deleteOp = new DeleteOp(this.repository);
+    this.pinOp = new PinOp();
+    this.unpinOp = new UnpinOp();
+    this.folderStats = new FolderStatisticsService();
   }
 
   public async addSongs(input: AddSongsInput) {
@@ -43,7 +52,8 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       const res = await this.executor.execute(this.addSongsOp, input, ctx);
       
-      await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      const { deltaCount, deltaDuration } = await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
       
       return res;
     });
@@ -57,7 +67,8 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       const res = await this.executor.execute(this.removeSongsOp, input, ctx);
       
-      await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      const { deltaCount, deltaDuration } = await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
       
       return res;
     });
@@ -93,6 +104,22 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
+    return result.data;
+  }
+
+  public async pinPlaylist(input: PinInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.pinOp, input, ctx);
+    });
+    return result.data;
+  }
+
+  public async unpinPlaylist(input: UnpinInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.unpinOp, input, ctx);
+    });
     return result.data;
   }
 

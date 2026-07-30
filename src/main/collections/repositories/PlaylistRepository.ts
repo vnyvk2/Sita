@@ -186,7 +186,7 @@ export class PlaylistRepository {
       .where(eq(playlistEntries.id, entryId));
   }
 
-  public async recalculatePlaylistStatistics(playlistId: number, trx: DB | DBTransaction = db) {
+  public async recalculatePlaylistStatistics(playlistId: number, trx: DB | DBTransaction = db): Promise<{ deltaCount: number, deltaDuration: number }> {
     const [stats] = await trx
       .select({
         count: sql<number>`count(*)::int`,
@@ -196,13 +196,32 @@ export class PlaylistRepository {
       .innerJoin(songs, eq(playlistEntries.songId, songs.id))
       .where(eq(playlistEntries.playlistId, playlistId));
 
+    const newCount = stats?.count ?? 0;
+    const newDuration = stats?.duration ?? 0;
+
+    const [oldStats] = await trx
+      .select({
+        itemCount: playlists.itemCount,
+        totalDuration: playlists.totalDuration
+      })
+      .from(playlists)
+      .where(eq(playlists.id, playlistId));
+
+    const oldCount = oldStats?.itemCount ?? 0;
+    const oldDuration = Number(oldStats?.totalDuration ?? 0);
+
+    const deltaCount = newCount - oldCount;
+    const deltaDuration = newDuration - oldDuration;
+
     await trx
       .update(playlists)
       .set({
-        itemCount: stats?.count ?? 0,
-        totalDuration: (stats?.duration ?? 0).toString(),
+        itemCount: newCount,
+        totalDuration: newDuration.toString(),
         updatedAt: new Date()
       })
       .where(eq(playlists.id, playlistId));
+
+    return { deltaCount, deltaDuration };
   }
 }

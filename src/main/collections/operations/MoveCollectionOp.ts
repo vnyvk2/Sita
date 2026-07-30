@@ -1,7 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { playlists } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { RelationshipResolver } from '../engine/RelationshipResolver';
+import { HierarchyService } from '../engine/HierarchyService';
 
 export interface MoveCollectionInput {
   playlistIds: number[];
@@ -9,9 +9,9 @@ export interface MoveCollectionInput {
 }
 
 export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput, void> {
-  private resolver: RelationshipResolver;
+  private resolver: HierarchyService;
 
-  constructor(resolver: RelationshipResolver = new RelationshipResolver()) {
+  constructor(resolver: HierarchyService = new HierarchyService()) {
     this.resolver = resolver;
   }
 
@@ -36,7 +36,7 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
       };
     }
 
-    // 1. Validate the move using RelationshipResolver to prevent cycles
+    // 1. Validate the move using HierarchyService to prevent cycles
     for (const sourceId of playlistIds) {
       await this.resolver.validateMove(sourceId, targetParentId);
     }

@@ -320,6 +320,7 @@ export const playlists = pgTable(
     itemCount: integer('item_count').notNull().default(0),
     totalDuration: decimal('total_duration', { precision: 12, scale: 3 }).notNull().default('0'),
     sidebarPosition: integer('sidebar_position'),
+    pinnedAt: timestamp('pinned_at', { withTimezone: false }),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
@@ -334,7 +335,8 @@ export const playlists = pgTable(
     index('idx_playlists_created_at').on(t.createdAt.desc()),
     index('idx_playlists_parent_id').on(t.parentId),
     index('idx_playlists_type').on(t.playlistType),
-    index('idx_playlists_sidebar').on(t.sidebarPosition.asc())
+    index('idx_playlists_sidebar').on(t.sidebarPosition.asc()),
+    index('idx_playlists_pinned').on(t.pinnedAt.desc())
   ]
 );
 

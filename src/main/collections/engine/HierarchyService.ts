@@ -9,12 +9,21 @@ export interface PlaylistNode {
   playlistType: string;
 }
 
-export class RelationshipResolver {
+export class HierarchyService {
+  /**
+   * Internal cache map to support future optimization.
+   * Format: Map<cacheKey, result>
+   */
+  private cache = new Map<string, any>();
+
   /**
    * Fetches all direct and indirect descendants of a given playlist/folder ID.
    * If the hierarchy is large, this retrieves all children in multiple queries.
    */
   public async getDescendants(playlistId: number): Promise<PlaylistNode[]> {
+    const cacheKey = `descendants:${playlistId}`;
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+
     const descendants: PlaylistNode[] = [];
     let currentLevelIds = [playlistId];
 
@@ -35,6 +44,7 @@ export class RelationshipResolver {
       currentLevelIds = children.map((c) => c.id);
     }
 
+    this.cache.set(cacheKey, descendants);
     return descendants;
   }
 
@@ -42,6 +52,9 @@ export class RelationshipResolver {
    * Fetches the ancestor chain from the given playlist ID up to the root folder.
    */
   public async getAncestors(playlistId: number): Promise<PlaylistNode[]> {
+    const cacheKey = `ancestors:${playlistId}`;
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+
     const ancestors: PlaylistNode[] = [];
     let currentId: number | null = playlistId;
 
@@ -72,6 +85,7 @@ export class RelationshipResolver {
       depthCount++;
     }
 
+    this.cache.set(cacheKey, ancestors);
     return ancestors;
   }
 
@@ -97,5 +111,45 @@ export class RelationshipResolver {
     if (descendantIds.includes(targetParentId)) {
       throw new Error(`Cannot move folder ${sourceId} into its own descendant ${targetParentId}.`);
     }
+  }
+
+  /**
+   * Returns nodes in topological order (parents before children).
+   * Useful for duplication or recursive operations where structure matters.
+   */
+  public topologicalOrder(nodes: PlaylistNode[]): PlaylistNode[] {
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const result: PlaylistNode[] = [];
+    const visited = new Set<number>();
+    
+    // Iterative approach to avoid call stack limits, and guarantees 
+    // that a parent is always added before its children if the parent is in the set.
+    const visit = (id: number) => {
+      if (visited.has(id)) return;
+      
+      const node = nodeMap.get(id);
+      if (!node) return; // parent is not part of the provided set
+
+      if (node.parentId !== null) {
+         visit(node.parentId);
+      }
+      
+      visited.add(id);
+      result.push(node);
+    };
+
+    for (const node of nodes) {
+      visit(node.id);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Invalidate cached hierarchy data. 
+   * Designed to be called after structurally mutating operations.
+   */
+  public invalidateCache(): void {
+    this.cache.clear();
   }
 }
