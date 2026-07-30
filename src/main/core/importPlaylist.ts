@@ -34,6 +34,15 @@ const resolveSongPath = (text: string, m3uDir: string): string | null => {
   return null;
 };
 
+interface ParsedM3uTrack {
+  rawPath: string;
+  resolvedPath: string;
+  filename: string;
+  filenameWithoutExt: string;
+  extinfTitle?: string;
+  extinfArtist?: string;
+}
+
 const importPlaylist = async (targetPlaylistId?: number, engine?: PlaylistEngine) => {
   try {
     const destinations = await showOpenDialog(DEFAULT_EXPORT_DIALOG_OPTIONS);
@@ -51,22 +60,99 @@ const importPlaylist = async (targetPlaylistId?: number, engine?: PlaylistEngine
         const unavailableSongPaths: string[] = [];
         const availSongIdsForPlaylist: string[] = [];
 
-        // Extract song paths and deduplicate, resolving relative paths
-        const songPathsRaw = textArr
-          .map((line) => resolveSongPath(line, m3uDir))
-          .filter((line): line is string => line !== null);
+        // 1. Parse M3U file preserving #EXTINF metadata and resolving paths
+        const tracks: ParsedM3uTrack[] = [];
+        let currentExtinfArtist: string | undefined;
+        let currentExtinfTitle: string | undefined;
 
-        const songPaths = Array.from(new Set(songPathsRaw));
+        for (const rawLine of textArr) {
+          const line = rawLine.trim();
 
-        if (songPaths.length > 0) {
-          const availableSongs = await getSongsInPathList(songPaths);
-
-          for (const songPath of songPaths) {
-            const songData = availableSongs.find((song) => song.path === songPath);
-
-            if (songData) availSongIdsForPlaylist.push(songData.id.toString());
-            else unavailableSongPaths.push(songPath);
+          if (line.startsWith('#EXTINF:')) {
+            const commaIndex = line.indexOf(',');
+            if (commaIndex !== -1) {
+              const meta = line.substring(commaIndex + 1).trim();
+              const dashIndex = meta.indexOf(' - ');
+              if (dashIndex !== -1) {
+                currentExtinfArtist = meta.substring(0, dashIndex).trim();
+                currentExtinfTitle = meta.substring(dashIndex + 3).trim();
+              } else {
+                currentExtinfTitle = meta;
+              }
+            }
+            continue;
           }
+
+          if (line.startsWith('#') || line.length === 0) {
+            continue;
+          }
+
+          const absolutePath = path.isAbsolute(line)
+            ? path.normalize(line)
+            : path.normalize(path.resolve(m3uDir, line));
+
+          const filename = path.basename(absolutePath);
+          const extension = path.extname(filename).split('.').pop() || '';
+
+          if (appPreferences.supportedMusicExtensions.includes(extension.toLowerCase())) {
+            const filenameWithoutExt = path.basename(filename, path.extname(filename));
+
+            tracks.push({
+              rawPath: line,
+              resolvedPath: absolutePath,
+              filename,
+              filenameWithoutExt,
+              extinfArtist: currentExtinfArtist,
+              extinfTitle: currentExtinfTitle
+            });
+          }
+
+          currentExtinfArtist = undefined;
+          currentExtinfTitle = undefined;
+        }
+
+        if (tracks.length > 0) {
+          // Fetch all songs from DB for intelligent multi-tier matching
+          const allDbSongs = await db
+            .select({
+              id: songs.id,
+              path: songs.path,
+              title: songs.title
+            })
+            .from(songs);
+
+          const matchedSongIds = new Set<number>();
+
+          for (const track of tracks) {
+            // Tier 1: Exact Path Match
+            let match = allDbSongs.find((s) => s.path === track.resolvedPath || s.path === track.rawPath);
+
+            // Tier 2: Normalized Path Match (ignore slash direction & case)
+            if (!match) {
+              const normTrackPath = path.normalize(track.resolvedPath).toLowerCase();
+              match = allDbSongs.find((s) => path.normalize(s.path).toLowerCase() === normTrackPath);
+            }
+
+            // Tier 3: Filename / Basename Match
+            if (!match) {
+              const trackFilename = track.filename.toLowerCase();
+              match = allDbSongs.find((s) => path.basename(s.path).toLowerCase() === trackFilename);
+            }
+
+            // Tier 4: Title Metadata Match (#EXTINF or filename without extension)
+            if (!match) {
+              const targetTitle = (track.extinfTitle || track.filenameWithoutExt).toLowerCase();
+              match = allDbSongs.find((s) => s.title.toLowerCase() === targetTitle);
+            }
+
+            if (match) {
+              matchedSongIds.add(match.id);
+            } else {
+              unavailableSongPaths.push(track.resolvedPath);
+            }
+          }
+
+          availSongIdsForPlaylist.push(...Array.from(matchedSongIds).map((id) => id.toString()));
 
           // Determine import mode: explicit target takes precedence, then auto-detect by filename
           const isImportingToFavorites =
