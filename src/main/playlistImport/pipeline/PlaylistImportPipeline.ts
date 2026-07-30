@@ -2,6 +2,7 @@ import type { PlaylistImportService } from '../services/PlaylistImportService';
 import type { PlaylistPathResolver } from '../resolver/PlaylistPathResolver';
 import type { FilesystemVerifier } from '../verifier/FilesystemVerifier';
 import type { LibraryResolver } from '../resolver/LibraryResolver';
+import type { PlaylistRepairEngine } from '../repair/PlaylistRepairEngine';
 import type { PlaylistImportPlanner } from '../planner/PlaylistImportPlanner';
 import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
@@ -16,7 +17,8 @@ export class PlaylistImportPipeline {
     private pathResolver: PlaylistPathResolver,
     private verifier: FilesystemVerifier,
     private libraryResolver: LibraryResolver,
-    private planner: PlaylistImportPlanner
+    private planner: PlaylistImportPlanner,
+    private repairEngine?: PlaylistRepairEngine
   ) {}
 
   async generatePlan(
@@ -37,7 +39,11 @@ export class PlaylistImportPipeline {
       const verifiedPlaylist = await this.verifier.verifyPlaylist(resolvedPlaylist);
 
       this.emitProgress(onProgress, 'MATCHING_LIBRARY', 'Matching entries against Nora library...', 85);
-      const libraryResolvedPlaylist = await this.libraryResolver.resolvePlaylist(verifiedPlaylist);
+      let libraryResolvedPlaylist = await this.libraryResolver.resolvePlaylist(verifiedPlaylist);
+
+      if (this.repairEngine) {
+        libraryResolvedPlaylist = await this.repairEngine.repairPlaylist(libraryResolvedPlaylist);
+      }
 
       this.emitProgress(onProgress, 'PLANNING_IMPORT', 'Generating import execution plan...', 95);
       const plan = this.planner.createPlan(libraryResolvedPlaylist, importResult.warnings);
