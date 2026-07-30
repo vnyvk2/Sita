@@ -3,14 +3,14 @@ import { extname } from 'path';
 import type { PlaylistImporterRegistry } from '../registry/PlaylistImporterRegistry';
 import type { PlaylistImportResult } from '../models/PlaylistImportResult';
 import type { PlaylistImportContext } from '../interfaces/PlaylistImportContext';
+import type { FileSystemAccess } from '../interfaces/FileSystemAccess';
 import { UnsupportedFormatError, CorruptedPlaylistError } from '../errors/PlaylistImportError';
 
 export class PlaylistImportService {
-  private registry: PlaylistImporterRegistry;
-
-  constructor(registry: PlaylistImporterRegistry) {
-    this.registry = registry;
-  }
+  constructor(
+    private registry: PlaylistImporterRegistry,
+    private fileSystem?: FileSystemAccess
+  ) {}
 
   async importPlaylist(filePath: string, options?: Record<string, unknown>): Promise<PlaylistImportResult> {
     const ext = extname(filePath);
@@ -22,8 +22,12 @@ export class PlaylistImportService {
 
     let content: string;
     try {
-      content = await readFile(filePath, 'utf-8');
-    } catch (err) {
+      if (this.fileSystem?.readFile) {
+        content = await this.fileSystem.readFile(filePath);
+      } else {
+        content = await readFile(filePath, 'utf-8');
+      }
+    } catch {
       throw new CorruptedPlaylistError(filePath);
     }
 
