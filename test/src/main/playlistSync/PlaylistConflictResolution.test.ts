@@ -5,8 +5,8 @@ import { SourceWinsConflictStrategy } from '@main/playlistSync/strategies/Source
 import { KeepLocalConflictStrategy } from '@main/playlistSync/strategies/KeepLocalConflictStrategy';
 import type { PlaylistSyncPlan } from '@main/playlistSync/models/PlaylistSyncPlan';
 
-describe('Phase 11 — Conflict Detection & Resolution Framework', () => {
-  it('should detect duplicate entry additions and resolve automatically via SourceWinsConflictStrategy', () => {
+describe('Phase 11 — Conflict Detection & Resolution Framework Refinements', () => {
+  it('should detect duplicate entry additions objectively and resolve via SourceWinsConflictStrategy', () => {
     const analyzer = new PlaylistConflictAnalyzer();
     const planner = new ConflictResolutionPlanner([new SourceWinsConflictStrategy()]);
 
@@ -28,15 +28,16 @@ describe('Phase 11 — Conflict Detection & Resolution Framework', () => {
     expect(analysis.hasConflicts).toBe(true);
     expect(analysis.conflicts).toHaveLength(1);
     expect(analysis.conflicts[0].type).toBe('DUPLICATE_ENTRY');
-    expect(analysis.conflicts[0].requiresUserDecision).toBe(false);
 
-    const { resolvedPlan, conflictSummary } = planner.resolveConflicts(plan, analysis);
+    const { resolvedPlan, appliedResolutions, conflictSummary } = planner.resolveConflicts(plan, analysis);
     expect(resolvedPlan.operations).toHaveLength(1);
     expect(resolvedPlan.additionsCount).toBe(1);
+    expect(appliedResolutions).toHaveLength(1);
+    expect(appliedResolutions[0].strategyName).toBe('SourceWins');
     expect(conflictSummary.resolvedAutomatically).toBe(1);
   });
 
-  it('should detect local removal conflicts and flag for user decision under KEEP_LOCAL_CHANGES', () => {
+  it('should detect local removal conflicts objectively and resolve via KeepLocalConflictStrategy', () => {
     const analyzer = new PlaylistConflictAnalyzer();
     const planner = new ConflictResolutionPlanner([new KeepLocalConflictStrategy()]);
 
@@ -55,10 +56,11 @@ describe('Phase 11 — Conflict Detection & Resolution Framework', () => {
 
     const analysis = analyzer.analyzePlan(plan, [999]);
     expect(analysis.hasConflicts).toBe(true);
-    expect(analysis.hasManualConflicts).toBe(true);
-    expect(analysis.conflicts[0].requiresUserDecision).toBe(true);
+    expect(analysis.conflicts[0].type).toBe('LOCAL_MODIFIED');
 
-    const { conflictSummary } = planner.resolveConflicts(plan, analysis);
-    expect(conflictSummary.manualConflicts).toBe(1);
+    const { resolvedPlan, appliedResolutions } = planner.resolveConflicts(plan, analysis);
+    expect(resolvedPlan.operations).toHaveLength(0);
+    expect(appliedResolutions).toHaveLength(1);
+    expect(appliedResolutions[0].strategyName).toBe('KeepLocal');
   });
 });

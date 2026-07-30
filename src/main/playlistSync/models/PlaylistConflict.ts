@@ -15,6 +15,5 @@ export interface PlaylistConflict {
   severity: ConflictSeverity;
   songId?: number;
   reason: string;
-  suggestedResolution?: string;
   requiresUserDecision: boolean;
 }

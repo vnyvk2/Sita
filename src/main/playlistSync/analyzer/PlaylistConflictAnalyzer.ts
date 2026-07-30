@@ -13,7 +13,7 @@ export class PlaylistConflictAnalyzer {
       }
     }
 
-    // 1. Detect duplicate entry additions
+    // 1. Detect duplicate entry additions objectively
     for (const [songId, count] of songAddCounts.entries()) {
       if (count > 1) {
         conflicts.push({
@@ -22,26 +22,22 @@ export class PlaylistConflictAnalyzer {
           severity: 'MEDIUM',
           songId,
           reason: `Song ID ${songId} is specified ${count} times in target source playlist`,
-          suggestedResolution: 'Deduplicate additions',
           requiresUserDecision: false
         });
       }
     }
 
-    // 2. Detect local modifications / removal conflicts
+    // 2. Detect local removal conflicts objectively (no policy check here)
     const removals = plan.operations.filter((op) => op.type === 'REMOVE_SONG');
-    if (removals.length > 0 && plan.syncPolicy === 'KEEP_LOCAL_CHANGES') {
-      for (const op of removals) {
-        conflicts.push({
-          id: `conflict_rem_${op.songId}`,
-          type: 'LOCAL_MODIFIED',
-          severity: 'HIGH',
-          songId: op.songId,
-          reason: `Song ID ${op.songId} absent from source but retained under KEEP_LOCAL_CHANGES policy`,
-          suggestedResolution: 'Keep local song',
-          requiresUserDecision: true
-        });
-      }
+    for (const op of removals) {
+      conflicts.push({
+        id: `conflict_rem_${op.songId}`,
+        type: 'LOCAL_MODIFIED',
+        severity: 'HIGH',
+        songId: op.songId,
+        reason: `Song ID ${op.songId} is present locally but marked for removal in target plan`,
+        requiresUserDecision: true
+      });
     }
 
     const hasConflicts = conflicts.length > 0;

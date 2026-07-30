@@ -2,9 +2,11 @@ import type { ConflictResolutionStrategy } from '../interfaces/ConflictResolutio
 import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
 import type { ConflictAnalysis } from '../models/ConflictAnalysis';
 import type { ConflictSummary } from '../models/ConflictSummary';
+import type { ConflictResolution } from '../models/ConflictResolution';
 
 export interface ResolvedSyncPlanResult {
   resolvedPlan: PlaylistSyncPlan;
+  appliedResolutions: ConflictResolution[];
   conflictSummary: ConflictSummary;
 }
 
@@ -13,16 +15,12 @@ export class ConflictResolutionPlanner {
 
   resolveConflicts(plan: PlaylistSyncPlan, analysis: ConflictAnalysis): ResolvedSyncPlanResult {
     let currentOps = [...plan.operations];
+    const appliedResolutions: ConflictResolution[] = [];
     let resolvedAutomatically = 0;
     let manualConflicts = 0;
     let ignoredConflicts = 0;
 
     for (const conflict of analysis.conflicts) {
-      if (conflict.requiresUserDecision) {
-        manualConflicts++;
-        continue;
-      }
-
       let resolved = false;
       for (const strategy of this.strategies) {
         const nextOps = strategy.resolve(conflict, currentOps);
@@ -30,12 +28,22 @@ export class ConflictResolutionPlanner {
           currentOps = nextOps;
           resolved = true;
           resolvedAutomatically++;
+          appliedResolutions.push({
+            conflictId: conflict.id,
+            strategyName: strategy.name,
+            action: `Applied resolution strategy ${strategy.name} for ${conflict.type}`,
+            applied: true
+          });
           break;
         }
       }
 
       if (!resolved) {
-        ignoredConflicts++;
+        if (conflict.requiresUserDecision) {
+          manualConflicts++;
+        } else {
+          ignoredConflicts++;
+        }
       }
     }
 
@@ -59,6 +67,7 @@ export class ConflictResolutionPlanner {
 
     return {
       resolvedPlan,
+      appliedResolutions,
       conflictSummary
     };
   }
