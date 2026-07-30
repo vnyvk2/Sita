@@ -68,6 +68,7 @@ describe('LibraryResolver', () => {
     expect(result.entries[0].trackReference.libraryMatch).toEqual({
       matchedSongId: 4182,
       status: 'MATCHED',
+      matchType: 'EXACT',
       confidence: 100,
       candidates: [mockSong]
     });

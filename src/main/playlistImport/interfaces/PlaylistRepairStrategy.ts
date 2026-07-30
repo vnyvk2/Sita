@@ -1,8 +1,8 @@
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
-import type { RepairResult } from '../models/RepairResult';
-import type { LibraryLookup } from '../interfaces/LibraryLookup';
+import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
+import type { RepairCandidate } from '../models/RepairCandidate';
 
 export interface PlaylistRepairStrategy {
   readonly name: string;
-  repair(entry: LibraryResolvedPlaylistEntry, libraryLookup: LibraryLookup): Promise<RepairResult | null>;
+  evaluate(entry: LibraryResolvedPlaylistEntry, candidate: LibrarySongRecord): RepairCandidate | null;
 }

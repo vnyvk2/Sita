@@ -1,40 +1,31 @@
 import { basename } from 'path';
 import type { PlaylistRepairStrategy } from '../interfaces/PlaylistRepairStrategy';
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
-import type { RepairResult } from '../models/RepairResult';
-import type { LibraryLookup } from '../interfaces/LibraryLookup';
+import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
+import type { RepairCandidate } from '../models/RepairCandidate';
 
 export class ExactFilenameStrategy implements PlaylistRepairStrategy {
   readonly name = 'ExactFilename';
 
-  async repair(entry: LibraryResolvedPlaylistEntry, libraryLookup: LibraryLookup): Promise<RepairResult | null> {
-    if (!libraryLookup.findByFilename) return null;
-
+  evaluate(entry: LibraryResolvedPlaylistEntry, candidate: LibrarySongRecord): RepairCandidate | null {
     const rawLocation =
       entry.trackReference.resolvedTrack.resolution.resolvedPath ??
       entry.trackReference.resolvedTrack.track.originalLocation;
 
-    const filename = basename(rawLocation);
-    if (!filename) return null;
+    const targetFilename = basename(rawLocation);
+    const candidateFilename = basename(candidate.path);
 
-    const matches = await libraryLookup.findByFilename(filename);
-    if (matches.length === 0) return null;
+    if (!targetFilename || !candidateFilename) return null;
 
-    const bestMatch = matches[0];
-    return {
-      repaired: true,
-      candidate: {
-        song: bestMatch,
+    if (targetFilename.toLowerCase() === candidateFilename.toLowerCase()) {
+      return {
+        song: candidate,
         confidence: 95,
         strategyName: this.name,
-        reason: `Matched exact filename: ${filename}`
-      },
-      allCandidates: matches.map((song) => ({
-        song,
-        confidence: 95,
-        strategyName: this.name,
-        reason: `Matched exact filename: ${filename}`
-      }))
-    };
+        reason: `Matched exact filename: ${candidateFilename}`
+      };
+    }
+
+    return null;
   }
 }

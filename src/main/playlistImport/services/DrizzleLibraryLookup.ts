@@ -2,8 +2,9 @@ import { eq, like } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
+import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
 
-export class DrizzleLibraryLookup implements LibraryLookup {
+export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProvider {
   async findByCanonicalPath(path: string): Promise<LibrarySongRecord | null> {
     const matchedSongs = await db
       .select({
@@ -33,7 +34,9 @@ export class DrizzleLibraryLookup implements LibraryLookup {
     };
   }
 
-  async findByFilename(filename: string): Promise<LibrarySongRecord[]> {
+  async getCandidatesForFilename(filename: string): Promise<LibrarySongRecord[]> {
+    if (!filename) return [];
+
     const matchedSongs = await db
       .select({
         id: songs.id,
@@ -45,7 +48,7 @@ export class DrizzleLibraryLookup implements LibraryLookup {
       })
       .from(songs)
       .where(like(songs.path, `%${filename}`))
-      .limit(10);
+      .limit(20);
 
     return matchedSongs.map((song) => ({
       id: song.id,

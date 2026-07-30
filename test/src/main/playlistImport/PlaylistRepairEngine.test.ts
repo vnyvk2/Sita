@@ -3,29 +3,26 @@ import { PlaylistRepairEngine } from '@main/playlistImport/repair/PlaylistRepair
 import { RepairStrategyRegistry } from '@main/playlistImport/registry/RepairStrategyRegistry';
 import { ExactFilenameStrategy } from '@main/playlistImport/strategies/ExactFilenameStrategy';
 import { NormalizedFilenameStrategy } from '@main/playlistImport/strategies/NormalizedFilenameStrategy';
-import type { LibraryLookup, LibrarySongRecord } from '@main/playlistImport/interfaces/LibraryLookup';
+import type { LibraryCandidateProvider } from '@main/playlistImport/interfaces/LibraryCandidateProvider';
+import type { LibrarySongRecord } from '@main/playlistImport/interfaces/LibraryLookup';
 import type { LibraryResolvedPlaylist } from '@main/playlistImport/models/LibraryResolvedPlaylist';
 
 describe('PlaylistRepairEngine', () => {
-  it('should repair unresolved entries using ExactFilenameStrategy (confidence 95)', async () => {
+  it('should repair unresolved entries using ExactFilenameStrategy (confidence 95 & matchType REPAIRED)', async () => {
     const mockSong: LibrarySongRecord = {
       id: 888,
       path: '/new/location/Bohemian Rhapsody.mp3',
       title: 'Bohemian Rhapsody'
     };
 
-    const mockLookup: LibraryLookup = {
-      findByCanonicalPath: vi.fn(async () => null),
-      findByFilename: vi.fn(async (filename: string) => {
-        if (filename === 'Bohemian Rhapsody.mp3') return [mockSong];
-        return [];
-      })
+    const mockProvider: LibraryCandidateProvider = {
+      getCandidatesForFilename: vi.fn(async () => [mockSong])
     };
 
     const registry = new RepairStrategyRegistry();
     registry.register(new ExactFilenameStrategy());
 
-    const repairEngine = new PlaylistRepairEngine(registry, mockLookup);
+    const repairEngine = new PlaylistRepairEngine(registry, mockProvider);
 
     const playlist: LibraryResolvedPlaylist = {
       name: 'Test',
@@ -48,30 +45,35 @@ describe('PlaylistRepairEngine', () => {
     expect(repaired.entries[0].trackReference.libraryMatch).toEqual({
       matchedSongId: 888,
       status: 'MATCHED',
+      matchType: 'REPAIRED',
       confidence: 95,
       candidates: [mockSong],
       diagnostics: [
-        "Repaired via strategy 'ExactFilename' (confidence 95%): Matched exact filename: Bohemian Rhapsody.mp3"
+        {
+          strategyName: 'ExactFilename',
+          confidence: 95,
+          reason: 'Matched exact filename: Bohemian Rhapsody.mp3',
+          candidateCount: 1
+        }
       ]
     });
   });
 
-  it('should repair unresolved entries using NormalizedFilenameStrategy (confidence 85)', async () => {
+  it('should repair unresolved entries using NormalizedFilenameStrategy (confidence 85 & matchType REPAIRED)', async () => {
     const mockSong: LibrarySongRecord = {
       id: 999,
       path: '/music/bohemian_rhapsody.mp3',
       title: 'Bohemian Rhapsody'
     };
 
-    const mockLookup: LibraryLookup = {
-      findByCanonicalPath: vi.fn(async () => null),
-      findByFilename: vi.fn(async () => [mockSong])
+    const mockProvider: LibraryCandidateProvider = {
+      getCandidatesForFilename: vi.fn(async () => [mockSong])
     };
 
     const registry = new RepairStrategyRegistry();
     registry.register(new NormalizedFilenameStrategy());
 
-    const repairEngine = new PlaylistRepairEngine(registry, mockLookup);
+    const repairEngine = new PlaylistRepairEngine(registry, mockProvider);
 
     const playlist: LibraryResolvedPlaylist = {
       name: 'Test',
@@ -92,19 +94,20 @@ describe('PlaylistRepairEngine', () => {
     const repaired = await repairEngine.repairPlaylist(playlist);
 
     expect(repaired.entries[0].trackReference.libraryMatch.status).toBe('MATCHED');
+    expect(repaired.entries[0].trackReference.libraryMatch.matchType).toBe('REPAIRED');
     expect(repaired.entries[0].trackReference.libraryMatch.confidence).toBe(85);
     expect(repaired.entries[0].trackReference.libraryMatch.matchedSongId).toBe(999);
   });
 
   it('should leave exact matches and missing entries untouched', async () => {
-    const mockLookup: LibraryLookup = {
-      findByCanonicalPath: vi.fn(async () => null)
+    const mockProvider: LibraryCandidateProvider = {
+      getCandidatesForFilename: vi.fn(async () => [])
     };
 
     const registry = new RepairStrategyRegistry();
     registry.register(new ExactFilenameStrategy());
 
-    const repairEngine = new PlaylistRepairEngine(registry, mockLookup);
+    const repairEngine = new PlaylistRepairEngine(registry, mockProvider);
 
     const playlist: LibraryResolvedPlaylist = {
       name: 'Test',
@@ -116,7 +119,7 @@ describe('PlaylistRepairEngine', () => {
               track: { originalLocation: 'song.mp3' },
               resolution: { originalReference: 'song.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
             },
-            libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 10 }
+            libraryMatch: { status: 'MATCHED', matchType: 'EXACT', confidence: 100, matchedSongId: 10 }
           }
         },
         {
@@ -135,6 +138,7 @@ describe('PlaylistRepairEngine', () => {
     const repaired = await repairEngine.repairPlaylist(playlist);
 
     expect(repaired.entries[0].trackReference.libraryMatch.confidence).toBe(100);
+    expect(repaired.entries[0].trackReference.libraryMatch.matchType).toBe('EXACT');
     expect(repaired.entries[1].trackReference.libraryMatch.status).toBe('MISSING');
   });
 });

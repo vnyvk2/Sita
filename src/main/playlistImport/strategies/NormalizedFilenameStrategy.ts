@@ -1,8 +1,8 @@
 import { basename, extname } from 'path';
 import type { PlaylistRepairStrategy } from '../interfaces/PlaylistRepairStrategy';
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
-import type { RepairResult } from '../models/RepairResult';
-import type { LibraryLookup } from '../interfaces/LibraryLookup';
+import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
+import type { RepairCandidate } from '../models/RepairCandidate';
 
 export class NormalizedFilenameStrategy implements PlaylistRepairStrategy {
   readonly name = 'NormalizedFilename';
@@ -13,43 +13,30 @@ export class NormalizedFilenameStrategy implements PlaylistRepairStrategy {
     return withoutExt.toLowerCase().replace(/[-_\s]+/g, '');
   }
 
-  async repair(entry: LibraryResolvedPlaylistEntry, libraryLookup: LibraryLookup): Promise<RepairResult | null> {
-    if (!libraryLookup.findByFilename) return null;
-
+  evaluate(entry: LibraryResolvedPlaylistEntry, candidate: LibrarySongRecord): RepairCandidate | null {
     const rawLocation =
       entry.trackReference.resolvedTrack.resolution.resolvedPath ??
       entry.trackReference.resolvedTrack.track.originalLocation;
 
-    const filename = basename(rawLocation);
-    if (!filename) return null;
+    const targetFilename = basename(rawLocation);
+    const candidateFilename = basename(candidate.path);
 
-    const normalizedTarget = this.normalize(filename);
-    if (!normalizedTarget) return null;
+    if (!targetFilename || !candidateFilename) return null;
 
-    // Retrieve candidates by partial filename and test normalized string equivalence
-    const candidates = await libraryLookup.findByFilename('');
-    const matches = candidates.filter((song) => {
-      const songFilename = basename(song.path);
-      return this.normalize(songFilename) === normalizedTarget;
-    });
+    const normalizedTarget = this.normalize(targetFilename);
+    const normalizedCandidate = this.normalize(candidateFilename);
 
-    if (matches.length === 0) return null;
+    if (!normalizedTarget || !normalizedCandidate) return null;
 
-    const bestMatch = matches[0];
-    return {
-      repaired: true,
-      candidate: {
-        song: bestMatch,
+    if (normalizedTarget === normalizedCandidate) {
+      return {
+        song: candidate,
         confidence: 85,
         strategyName: this.name,
         reason: `Matched normalized filename: ${normalizedTarget}`
-      },
-      allCandidates: matches.map((song) => ({
-        song,
-        confidence: 85,
-        strategyName: this.name,
-        reason: `Matched normalized filename: ${normalizedTarget}`
-      }))
-    };
+      };
+    }
+
+    return null;
   }
 }

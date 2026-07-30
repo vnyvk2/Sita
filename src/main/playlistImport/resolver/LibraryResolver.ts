@@ -87,6 +87,7 @@ export class LibraryResolver {
         const match: LibraryMatch = {
           matchedSongId: matchedSong.id,
           status: 'MATCHED',
+          matchType: 'EXACT',
           confidence: 100,
           candidates: [matchedSong]
         };

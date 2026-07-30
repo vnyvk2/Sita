@@ -1,4 +1,5 @@
 import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
+import type { RepairDiagnostic } from './RepairDiagnostic';
 
 export type LibraryMatchStatus =
   | 'MATCHED'
@@ -8,10 +9,13 @@ export type LibraryMatchStatus =
   | 'MISSING'
   | 'INVALID_URI';
 
+export type LibraryMatchType = 'EXACT' | 'REPAIRED';
+
 export interface LibraryMatch {
   matchedSongId?: number;
   status: LibraryMatchStatus;
+  matchType?: LibraryMatchType;
   confidence: number;
   candidates?: LibrarySongRecord[];
-  diagnostics?: string[];
+  diagnostics?: (string | RepairDiagnostic)[];
 }

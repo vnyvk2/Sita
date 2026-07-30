@@ -1,12 +1,15 @@
-import type { LibraryLookup } from '../interfaces/LibraryLookup';
+import { basename } from 'path';
+import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
 import type { RepairStrategyRegistry } from '../registry/RepairStrategyRegistry';
 import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
+import type { RepairCandidate } from '../models/RepairCandidate';
+import type { RepairDiagnostic } from '../models/RepairDiagnostic';
 
 export class PlaylistRepairEngine {
   constructor(
     private registry: RepairStrategyRegistry,
-    private libraryLookup: LibraryLookup
+    private candidateProvider: LibraryCandidateProvider
   ) {}
 
   async repairPlaylist(playlist: LibraryResolvedPlaylist): Promise<LibraryResolvedPlaylist> {
@@ -29,30 +32,51 @@ export class PlaylistRepairEngine {
       return entry;
     }
 
+    const rawLocation =
+      entry.trackReference.resolvedTrack.resolution.resolvedPath ??
+      entry.trackReference.resolvedTrack.track.originalLocation;
+
+    const targetFilename = basename(rawLocation);
+    if (!targetFilename) return entry;
+
+    const candidates = await this.candidateProvider.getCandidatesForFilename(targetFilename);
+    if (candidates.length === 0) return entry;
+
     const strategies = this.registry.getStrategies();
+    let bestCandidate: RepairCandidate | null = null;
 
-    for (const strategy of strategies) {
-      const repairResult = await strategy.repair(entry, this.libraryLookup);
+    for (const candidateSong of candidates) {
+      for (const strategy of strategies) {
+        const result = strategy.evaluate(entry, candidateSong);
 
-      if (repairResult?.repaired && repairResult.candidate) {
-        const { candidate } = repairResult;
-
-        return {
-          ...entry,
-          trackReference: {
-            ...entry.trackReference,
-            libraryMatch: {
-              matchedSongId: candidate.song.id,
-              status: 'MATCHED',
-              confidence: candidate.confidence,
-              candidates: repairResult.allCandidates?.map((c) => c.song) ?? [candidate.song],
-              diagnostics: [
-                `Repaired via strategy '${candidate.strategyName}' (confidence ${candidate.confidence}%): ${candidate.reason}`
-              ]
-            }
-          }
-        };
+        if (result && (!bestCandidate || result.confidence > bestCandidate.confidence)) {
+          bestCandidate = result;
+        }
       }
+    }
+
+    if (bestCandidate) {
+      const diagnostic: RepairDiagnostic = {
+        strategyName: bestCandidate.strategyName,
+        confidence: bestCandidate.confidence,
+        reason: bestCandidate.reason,
+        candidateCount: candidates.length
+      };
+
+      return {
+        ...entry,
+        trackReference: {
+          ...entry.trackReference,
+          libraryMatch: {
+            matchedSongId: bestCandidate.song.id,
+            status: 'MATCHED',
+            matchType: 'REPAIRED',
+            confidence: bestCandidate.confidence,
+            candidates: [bestCandidate.song],
+            diagnostics: [diagnostic]
+          }
+        }
+      };
     }
 
     return entry;
