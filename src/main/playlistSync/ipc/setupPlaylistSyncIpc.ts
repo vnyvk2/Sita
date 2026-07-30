@@ -7,7 +7,7 @@ export function setupPlaylistSyncIpc(workflow: PlaylistSyncWorkflow): void {
   ipcMain.handle(
     'playlistSync:preview',
     async (_event, link: PlaylistLink, currentPlaylistSongIds: number[]) => {
-      return await workflow.generateSyncPlan(link, currentPlaylistSongIds);
+      return await workflow.previewSync(link, currentPlaylistSongIds);
     }
   );
 
