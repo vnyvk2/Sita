@@ -156,7 +156,7 @@ export class HierarchyService {
    * Invalidate cached hierarchy data. 
    * @internal Designed to be called internally by operations that structurally mutate the hierarchy.
    */
-  public invalidateCache(): void {
+  private invalidateCache(): void {
     this.cache.clear();
   }
 }

@@ -53,5 +53,14 @@ describe('MoveCollectionOp Integration', () => {
         await moveOp.execute({ playlistId: folderA.id, newParentId: folderB.id }, ctx);
       });
     }).rejects.toThrow(`Cannot move folder ${folderA.id} into its own descendant ${folderB.id}.`);
+
+    // Verify valid move (B to Root) succeeds
+    await db.transaction(async (trx) => {
+      const ctx = { trx, membershipService: {} as any };
+      await moveOp.execute({ playlistId: folderB.id, newParentId: null }, ctx);
+    });
+
+    const [movedFolderB] = await db.select().from(playlists).where(eq(playlists.id, folderB.id));
+    expect(movedFolderB.parentId).toBeNull();
   });
 });

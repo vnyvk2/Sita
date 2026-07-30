@@ -3,6 +3,7 @@ import { db } from '../../../../../src/main/db/db';
 import { playlists } from '../../../../../src/main/db/schema';
 import { BulkDeleteOp, BulkRestoreOp } from '../../../../../src/main/collections/operations/BulkDeleteOp';
 import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
+import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 
 describe('Delete + Restore Integration', () => {
   let repository: PlaylistRepository;
@@ -82,6 +83,15 @@ describe('Delete + Restore Integration', () => {
       expect(restoredPlaylists[i].name).toBe(originalPlaylists[i].name);
       expect(restoredPlaylists[i].parentId).toBe(originalPlaylists[i].parentId);
       expect(restoredPlaylists[i].playlistType).toBe(originalPlaylists[i].playlistType);
+    }
+
+    // Verify topological order is preserved
+    const hierarchyService = new HierarchyService();
+    const originalSorted = hierarchyService.topologicalOrder(originalPlaylists);
+    const restoredSorted = hierarchyService.topologicalOrder(restoredPlaylists);
+
+    for (let i = 0; i < 4; i++) {
+      expect(restoredSorted[i].id).toBe(originalSorted[i].id);
     }
   });
 });

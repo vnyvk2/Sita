@@ -1,8 +1,6 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-import { songs } from '../../db/schema';
-import { inArray, eq } from 'drizzle-orm';
 
 export interface RemoveSongsInput {
   playlistId: number;
@@ -39,25 +37,15 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
 
     const affectedSongIds = Array.from(new Set(removedEntries.map(e => e.songId)));
 
-    // Compute delta duration (negative since we removed them)
-    let deltaDuration = 0;
-    if (affectedSongIds.length > 0) {
-      const songRows = await ctx.trx
-        .select({ id: songs.id, duration: songs.duration })
-        .from(songs)
-        .where(inArray(songs.id, affectedSongIds));
-      
-      const durationMap = new Map(songRows.map(r => [r.id, r.duration || 0]));
-      for (const entry of removedEntries) {
-        deltaDuration -= durationMap.get(entry.songId) || 0;
-      }
-    }
+    // Compute delta using repository
+    const removedSongIds = removedEntries.map(e => e.songId);
+    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(removedSongIds, ctx.trx);
 
     return {
       data: { 
         removedCount: removedEntries.length,
-        deltaCount: -removedEntries.length,
-        deltaDuration
+        deltaCount: -itemCountDelta,
+        deltaDuration: -durationDelta
       },
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.removeSongs',

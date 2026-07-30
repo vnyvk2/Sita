@@ -67,5 +67,16 @@ describe('DuplicateOp Integration', () => {
     const playlistCopy = allPlaylists.find(p => p.name === 'Playlist' && p.parentId === folderCopy?.id);
     expect(playlistCopy).toBeDefined();
     expect(playlistCopy?.playlistType).toBe('standard');
+
+    // Verify parent IDs are remapped correctly and no duplicated node still references an original parent
+    const originalIds = new Set([root.id, folder.id, playlist.id]);
+    const duplicatedNodes = [rootCopy!, folderCopy!, playlistCopy!];
+
+    for (const node of duplicatedNodes) {
+      expect(originalIds.has(node.id)).toBe(false); // Should have a new ID
+      if (node.parentId !== null) {
+        expect(originalIds.has(node.parentId)).toBe(false); // Should not reference an original parent
+      }
+    }
   });
 });

@@ -202,4 +202,25 @@ export class PlaylistRepository {
       })
       .where(eq(playlists.id, playlistId));
   }
+
+  public async computeStatisticsDelta(songIds: readonly number[], trx: DB | DBTransaction = db): Promise<{ itemCountDelta: number; durationDelta: number }> {
+    if (songIds.length === 0) return { itemCountDelta: 0, durationDelta: 0 };
+
+    const songRows = await trx
+      .select({ id: songs.id, duration: songs.duration })
+      .from(songs)
+      .where(inArray(songs.id, Array.from(new Set(songIds))));
+
+    const durationMap = new Map(songRows.map(r => [r.id, r.duration || 0]));
+    
+    let durationDelta = 0;
+    for (const id of songIds) {
+      durationDelta += durationMap.get(id) || 0;
+    }
+
+    return {
+      itemCountDelta: songIds.length,
+      durationDelta
+    };
+  }
 }

@@ -1,8 +1,6 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-import { songs } from '../../db/schema';
-import { inArray, eq } from 'drizzle-orm';
 
 export interface AddSongsInput {
   playlistId: number;
@@ -42,22 +40,11 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
 
     const inserted = await this.repository.insertEntries(newEntries, ctx.trx);
 
-    // Compute delta duration
-    let deltaDuration = 0;
-    if (songIds.length > 0) {
-      const songRows = await ctx.trx
-        .select({ id: songs.id, duration: songs.duration })
-        .from(songs)
-        .where(inArray(songs.id, Array.from(new Set(songIds))));
-      
-      const durationMap = new Map(songRows.map(r => [r.id, r.duration || 0]));
-      for (const id of songIds) {
-        deltaDuration += durationMap.get(id) || 0;
-      }
-    }
+    // Compute delta using repository
+    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(songIds, ctx.trx);
 
     return {
-      data: { addedCount: inserted.length, deltaCount: inserted.length, deltaDuration },
+      data: { addedCount: inserted.length, deltaCount: itemCountDelta, deltaDuration: durationDelta },
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.addSongs',
       operationInput: input as unknown as Record<string, unknown>,
