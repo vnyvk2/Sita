@@ -8,5 +8,7 @@ export interface PlaylistLink {
   lastImportedAt: Date;
   lastSyncedAt?: Date;
   fileHash?: string;
+  lastKnownSourceHash?: string;
+  lastSuccessfulSyncHash?: string;
   syncPolicy: SyncPolicy;
 }

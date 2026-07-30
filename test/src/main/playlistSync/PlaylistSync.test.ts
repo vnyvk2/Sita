@@ -2,15 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { PlaylistSourceTracker } from '@main/playlistSync/services/PlaylistSourceTracker';
 import { PlaylistSyncPlanner } from '@main/playlistSync/planner/PlaylistSyncPlanner';
 import { PlaylistSyncExecutor } from '@main/playlistSync/executor/PlaylistSyncExecutor';
-import { PlaylistSyncWorkflow } from '@main/playlistSync/workflow/PlaylistSyncWorkflow';
 import type { PlaylistLink } from '@main/playlistSync/models/PlaylistLink';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
-import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
+import type { PlaylistSyncPersistence } from '@main/playlistSync/interfaces/PlaylistSyncPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
-import type { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
 
-describe('Playlist Synchronization Framework (Phase 10)', () => {
+describe('Playlist Synchronization Framework Refinements', () => {
   it('should detect source file modifications using PlaylistSourceTracker', async () => {
     const mockFs: FileSystemAccess = {
       exists: vi.fn(async () => true),
@@ -82,7 +80,6 @@ describe('Playlist Synchronization Framework (Phase 10)', () => {
       ]
     };
 
-    // Current Nora playlist contains songId 101 and stale songId 999
     const currentSongIds = [101, 999];
 
     const syncPlan = planner.createSyncPlan(link, importPlan, currentSongIds);
@@ -97,17 +94,18 @@ describe('Playlist Synchronization Framework (Phase 10)', () => {
     ]);
   });
 
-  it('should execute sync plan inside transaction and apply additions', async () => {
-    const mockPersistence: PlaylistPersistence = {
-      createPlaylist: vi.fn(async () => 10),
-      addEntries: vi.fn(async () => {})
+  it('should execute sync plan inside transaction and apply both additions and removals via PlaylistSyncPersistence', async () => {
+    const mockSyncPersistence: PlaylistSyncPersistence = {
+      addEntries: vi.fn(async () => {}),
+      removeEntries: vi.fn(async () => {}),
+      reorderEntries: vi.fn(async () => {})
     };
 
     const mockTransactionRunner: TransactionRunner = {
       runInTransaction: vi.fn(async (work) => await work())
     };
 
-    const executor = new PlaylistSyncExecutor(mockPersistence, mockTransactionRunner);
+    const executor = new PlaylistSyncExecutor(mockSyncPersistence, mockTransactionRunner);
 
     const syncPlan = {
       linkId: 'link_1',
@@ -116,9 +114,10 @@ describe('Playlist Synchronization Framework (Phase 10)', () => {
       syncPolicy: 'ONE_WAY_SOURCE_WINS' as const,
       hasChanges: true,
       additionsCount: 1,
-      removalsCount: 0,
+      removalsCount: 1,
       operations: [
-        { type: 'ADD_SONG' as const, songId: 102, reason: 'Song present in updated source playlist' }
+        { type: 'ADD_SONG' as const, songId: 102, reason: 'Song present in updated source playlist' },
+        { type: 'REMOVE_SONG' as const, songId: 999, reason: 'Song removed from source playlist' }
       ]
     };
 
@@ -126,6 +125,8 @@ describe('Playlist Synchronization Framework (Phase 10)', () => {
 
     expect(result.success).toBe(true);
     expect(result.appliedAdditionsCount).toBe(1);
-    expect(mockPersistence.addEntries).toHaveBeenCalledWith(10, [{ songId: 102, position: 1 }]);
+    expect(result.appliedRemovalsCount).toBe(1);
+    expect(mockSyncPersistence.removeEntries).toHaveBeenCalledWith(10, [999]);
+    expect(mockSyncPersistence.addEntries).toHaveBeenCalledWith(10, [{ songId: 102, position: 1 }]);
   });
 });

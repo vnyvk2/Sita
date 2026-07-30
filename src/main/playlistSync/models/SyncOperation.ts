@@ -1,4 +1,4 @@
-export type SyncOperationType = 'ADD_SONG' | 'REMOVE_SONG' | 'REORDER';
+export type SyncOperationType = 'ADD_SONG' | 'REMOVE_SONG' | 'MOVE_SONG';
 
 export interface SyncOperation {
   type: SyncOperationType;
