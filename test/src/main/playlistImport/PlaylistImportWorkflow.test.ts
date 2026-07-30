@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
+import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
 import { PlaylistImportService } from '@main/playlistImport/services/PlaylistImportService';
 import { PlaylistImporterRegistry } from '@main/playlistImport/registry/PlaylistImporterRegistry';
 import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
@@ -14,8 +15,8 @@ import type { PlaylistPersistence } from '@main/playlistImport/interfaces/Playli
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
 import type { PlaylistImportProgress } from '@main/playlistImport/models/PlaylistImportProgress';
 
-describe('PlaylistImportWorkflow', () => {
-  it('should orchestrate full pipeline from plan generation to execution with progress updates', async () => {
+describe('PlaylistImportWorkflow & PlaylistImportPipeline', () => {
+  it('should orchestrate full pipeline via PlaylistImportPipeline abstraction', async () => {
     const registry = new PlaylistImporterRegistry();
     registry.register(new M3UImporter());
 
@@ -55,14 +56,15 @@ missing.mp3`;
     const planner = new PlaylistImportPlanner();
     const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
-    const workflow = new PlaylistImportWorkflow(
+    const pipeline = new PlaylistImportPipeline(
       importService,
       pathResolver,
       verifier,
       libraryResolver,
-      planner,
-      executor
+      planner
     );
+
+    const workflow = new PlaylistImportWorkflow(pipeline, executor);
 
     const progressLogs: PlaylistImportProgress[] = [];
     const plan = await workflow.createPlanFromFile(

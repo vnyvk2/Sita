@@ -4,4 +4,6 @@ export interface PlaylistImportProgress {
   stage: PlaylistImportStage;
   message: string;
   percentage: number;
+  itemIndex?: number;
+  totalItems?: number;
 }
