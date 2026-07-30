@@ -49,46 +49,42 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
                 />
               </div>
             ) : (
-              <Img
-                src={playlist.artworkPath || DefaultPlaylistCover}
-                alt="Playlist Cover"
-                loading="eager"
-                className="h-60 w-60 rounded-lg shadow-lg"
-              />
-            )}
-          </div>
-          <div className="playlist-info-container ml-8 flex flex-col items-start justify-center">
-            <div className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight text-5xl font-semibold">
-              {playlist.name}
+                <Img
+                  src={playlist.artworkPath || DefaultPlaylistCover}
+                  className="w-52 rounded-xl lg:w-48"
+                  alt="Playlist Cover"
+                />
+              )}
             </div>
-            <div className="playlist-no-of-songs text-font-color-black dark:text-font-color-white mt-2 flex items-center font-medium">
-              <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
-                music_note
-              </span>
-              {t('common.songWithCount', { count: playlist.itemCount })}
+            <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8">
+              <div className="font-semibold tracking-wider uppercase opacity-50">
+                {t('common.playlist_one')}
+              </div>
+              <div className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight mb-2 w-full overflow-hidden text-5xl text-ellipsis whitespace-nowrap">
+                {playlist.name}
+              </div>
+              <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
+                {t('common.songWithCount', { count: playlist.itemCount })}
+              </div>
+              {songs.length > 0 && (
+                <div className="playlist-total-duration">{totalPlaylistDuration}</div>
+              )}
+              {playlist.createdAt && (
+                <div className="playlist-created-date">
+                  {t('playlistsPage.createdOn', {
+                    val: new Date(playlist.createdAt),
+                    formatParams: {
+                      val: {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }
+                    }
+                  })}
+                </div>
+              )}
             </div>
-            {playlist.createdAt && (
-              <div className="playlist-created-date text-font-color-black dark:text-font-color-white mt-1 flex items-center font-medium">
-                <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
-                  calendar_today
-                </span>
-                {t('playlist.createdAt', {
-                  val: new Date(playlist.createdAt),
-                  formatParams: {
-                    val: { year: 'numeric', month: 'short', day: 'numeric' }
-                  }
-                })}
-              </div>
-            )}
-            {songs.length > 0 && (
-              <div className="playlist-total-duration mt-1 flex items-center font-medium text-font-color-black dark:text-font-color-white">
-                <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
-                  schedule
-                </span>
-                {totalPlaylistDuration}
-              </div>
-            )}
-          </div>
         </div>
       )}
     </>

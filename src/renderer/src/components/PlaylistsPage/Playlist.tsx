@@ -18,6 +18,11 @@ import MultipleArtworksCover from './MultipleArtworksCover';
 const ConfirmDeletePlaylistsPrompt = lazy(() => import('./ConfirmDeletePlaylistsPrompt'));
 const RenamePlaylistPrompt = lazy(() => import('./RenamePlaylistPrompt'));
 
+const getPlaylistSongIds = async (id: number): Promise<number[]> => {
+  const entries = await CollectionClient.getEntries(id);
+  return entries.map((e) => e.songId);
+};
+
 interface PlaylistProp extends PlaylistDto {
   index: number;
   selectAllHandler?: (_upToId?: number) => void;
@@ -68,8 +73,7 @@ export const Playlist = (props: PlaylistProp) => {
 
   const playAllSongs = useCallback(
     (isShuffling = false) => {
-      CollectionClient.getEntries(props.id).then(entries => {
-        const songIds = entries.map(e => e.songId);
+      getPlaylistSongIds(props.id).then((songIds) => {
         return window.api.audioLibraryControls.getSongInfo(songIds, undefined, undefined, undefined, true);
       }).then((songData) => {
         if (Array.isArray(songData)) {
@@ -91,9 +95,9 @@ export const Playlist = (props: PlaylistProp) => {
     (isShuffling = false) => {
       const { multipleSelections: playlistIds } = multipleSelectionsData;
 
-      Promise.all(playlistIds.map(id => CollectionClient.getEntries(id)))
+      Promise.all(playlistIds.map(id => getPlaylistSongIds(id)))
         .then(results => {
-          const ids = results.flat().map(e => e.songId);
+          const ids = results.flat();
           return window.api.audioLibraryControls.getSongInfo(
             ids,
             undefined,
@@ -116,9 +120,9 @@ export const Playlist = (props: PlaylistProp) => {
   const addToQueueForMultipleSelections = useCallback(() => {
     const { multipleSelections: playlistIds } = multipleSelectionsData;
 
-    Promise.all(playlistIds.map(id => CollectionClient.getEntries(id)))
+    Promise.all(playlistIds.map(id => getPlaylistSongIds(id)))
       .then(results => {
-        const ids = results.flat().map(e => e.songId);
+        const ids = results.flat();
         return window.api.audioLibraryControls.getSongInfo(ids);
       })
       .then((songData) => {
@@ -182,8 +186,7 @@ export const Playlist = (props: PlaylistProp) => {
         handlerFunction: () => {
           if (isMultipleSelectionEnabled) addToQueueForMultipleSelections();
           else {
-            CollectionClient.getEntries(props.id).then(entries => {
-              const songIds = entries.map(e => e.songId);
+            getPlaylistSongIds(props.id).then((songIds) => {
               queue.queues[queue.currentQueueIndex].songIds.push(...songIds);
               updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
               addNewNotifications([

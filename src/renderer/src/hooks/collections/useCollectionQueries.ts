@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, queryOptions } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';
 
 export const collectionDetailOptions = (id: number) => {
-  return {
+  return queryOptions({
     queryKey: collectionKeys.detail(id),
     queryFn: () => CollectionClient.getCollection(id),
-  };
+  });
 };
 
 export const useCollectionDetail = (id: number) => {
@@ -14,10 +14,10 @@ export const useCollectionDetail = (id: number) => {
 };
 
 export const collectionChildrenOptions = (id: number | null) => {
-  return {
+  return queryOptions({
     queryKey: collectionKeys.children(id),
     queryFn: () => CollectionClient.getChildren(id),
-  };
+  });
 };
 
 export const useCollectionChildren = (id: number | null) => {
@@ -25,7 +25,7 @@ export const useCollectionChildren = (id: number | null) => {
 };
 
 export const rootCollectionsOptions = (sortType?: PlaylistSortTypes) => {
-  return {
+  return queryOptions({
     queryKey: [...collectionKeys.children(null), sortType],
     queryFn: () => CollectionClient.getChildren(null),
     select: (data: any) => {
@@ -45,7 +45,7 @@ export const rootCollectionsOptions = (sortType?: PlaylistSortTypes) => {
         }
       });
     },
-  };
+  });
 };
 
 export const useRootCollections = (sortType?: PlaylistSortTypes) => {
@@ -73,10 +73,10 @@ export const useCollectionEntries = (id: number, offset: number = 0, limit: numb
 };
 
 export const collectionBreadcrumbsOptions = (id: number) => {
-  return {
+  return queryOptions({
     queryKey: collectionKeys.breadcrumbs(id),
     queryFn: () => CollectionClient.getBreadcrumbs(id),
-  };
+  });
 };
 
 export const useCollectionBreadcrumbs = (id: number) => {
