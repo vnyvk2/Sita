@@ -1,5 +1,5 @@
 import type { PlaylistImportHistoryRepository } from '../interfaces/PlaylistImportHistoryRepository';
-import type { PlaylistPersistence } from '../interfaces/PlaylistPersistence';
+import type { PlaylistUndoPersistence } from '../interfaces/PlaylistUndoPersistence';
 import type { PlaylistImportWorkflow } from '../workflow/PlaylistImportWorkflow';
 import type { PlaylistImportSession } from '../models/PlaylistImportSession';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
@@ -7,7 +7,7 @@ import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExec
 export class PlaylistImportHistoryService {
   constructor(
     private historyRepository: PlaylistImportHistoryRepository,
-    private persistence?: PlaylistPersistence
+    private undoPersistence?: PlaylistUndoPersistence
   ) {}
 
   async listHistory(): Promise<PlaylistImportSession[]> {
@@ -18,19 +18,19 @@ export class PlaylistImportHistoryService {
     return await this.historyRepository.getSession(sessionId);
   }
 
-  async undoImport(sessionId: string, customPersistence?: PlaylistPersistence): Promise<boolean> {
+  async undoImport(sessionId: string, customUndoPersistence?: PlaylistUndoPersistence): Promise<boolean> {
     const session = await this.historyRepository.getSession(sessionId);
 
     if (!session || session.status !== 'COMPLETED' || !session.execution) {
       return false;
     }
 
-    const persistence = customPersistence ?? this.persistence;
-    if (!persistence?.deletePlaylist) {
-      throw new Error('Persistence provider does not support deletePlaylist');
+    const undoPersistence = customUndoPersistence ?? this.undoPersistence;
+    if (!undoPersistence) {
+      throw new Error('No PlaylistUndoPersistence provider available to delete imported playlist');
     }
 
-    await persistence.deletePlaylist(session.execution.playlistId);
+    await undoPersistence.deletePlaylist(session.execution.playlistId);
 
     const updatedSession: PlaylistImportSession = {
       ...session,

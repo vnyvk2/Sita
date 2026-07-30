@@ -1,7 +1,8 @@
 import type { PlaylistEngine } from '../../collections/engine/PlaylistEngine';
 import type { PlaylistPersistence, PlaylistEntryWriteModel } from '../interfaces/PlaylistPersistence';
+import type { PlaylistUndoPersistence } from '../interfaces/PlaylistUndoPersistence';
 
-export class EnginePlaylistPersistence implements PlaylistPersistence {
+export class EnginePlaylistPersistence implements PlaylistPersistence, PlaylistUndoPersistence {
   constructor(private engine: PlaylistEngine) {}
 
   async createPlaylist(name: string, description?: string): Promise<number> {

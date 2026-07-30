@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PlaylistImportHistoryService } from '@main/playlistImport/services/PlaylistImportHistoryService';
+import { PlaylistImportSessionService } from '@main/playlistImport/services/PlaylistImportSessionService';
+import { RepairSummaryBuilder } from '@main/playlistImport/services/RepairSummaryBuilder';
 import { InMemoryPlaylistImportHistoryRepository } from '@main/playlistImport/services/InMemoryPlaylistImportHistoryRepository';
 import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
 import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
@@ -14,10 +16,11 @@ import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistIm
 import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
 import type { LibraryLookup } from '@main/playlistImport/interfaces/LibraryLookup';
 import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
+import type { PlaylistUndoPersistence } from '@main/playlistImport/interfaces/PlaylistUndoPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
 
-describe('PlaylistImportHistoryService & Session Tracking', () => {
-  it('should track sessions during workflow execution and allow undoing an import', async () => {
+describe('PlaylistImportHistoryService & PlaylistImportSessionService', () => {
+  it('should track sessions via SessionService and allow undoing an import', async () => {
     const registry = new PlaylistImporterRegistry();
     registry.register(new M3UImporter());
 
@@ -34,7 +37,7 @@ bohemian.mp3`;
       findByCanonicalPath: vi.fn(async () => ({ id: 555, path: '/music/bohemian.mp3' }))
     };
 
-    const mockPersistence: PlaylistPersistence = {
+    const mockPersistence: PlaylistPersistence & PlaylistUndoPersistence = {
       createPlaylist: vi.fn(async () => 1234),
       addEntries: vi.fn(async () => {}),
       deletePlaylist: vi.fn(async () => {})
@@ -45,6 +48,8 @@ bohemian.mp3`;
     };
 
     const historyRepo = new InMemoryPlaylistImportHistoryRepository();
+    const sessionService = new PlaylistImportSessionService(historyRepo, new RepairSummaryBuilder());
+
     const importService = new PlaylistImportService(registry, mockFs);
     const pathResolver = new PlaylistPathResolver();
     const verifier = new FilesystemVerifier(mockFs);
@@ -53,7 +58,7 @@ bohemian.mp3`;
     const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
     const pipeline = new PlaylistImportPipeline(importService, pathResolver, verifier, libraryResolver, planner);
-    const workflow = new PlaylistImportWorkflow(pipeline, executor, historyRepo);
+    const workflow = new PlaylistImportWorkflow(pipeline, executor, sessionService);
     const historyService = new PlaylistImportHistoryService(historyRepo, mockPersistence);
 
     const plan = await workflow.createPlanFromFile('/music/playlists/rock.m3u');
@@ -93,7 +98,7 @@ bohemian.mp3`;
     };
 
     let createdIdCounter = 2000;
-    const mockPersistence: PlaylistPersistence = {
+    const mockPersistence: PlaylistPersistence & PlaylistUndoPersistence = {
       createPlaylist: vi.fn(async () => createdIdCounter++),
       addEntries: vi.fn(async () => {}),
       deletePlaylist: vi.fn(async () => {})
@@ -104,6 +109,8 @@ bohemian.mp3`;
     };
 
     const historyRepo = new InMemoryPlaylistImportHistoryRepository();
+    const sessionService = new PlaylistImportSessionService(historyRepo, new RepairSummaryBuilder());
+
     const importService = new PlaylistImportService(registry, mockFs);
     const pathResolver = new PlaylistPathResolver();
     const verifier = new FilesystemVerifier(mockFs);
@@ -112,7 +119,7 @@ bohemian.mp3`;
     const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
     const pipeline = new PlaylistImportPipeline(importService, pathResolver, verifier, libraryResolver, planner);
-    const workflow = new PlaylistImportWorkflow(pipeline, executor, historyRepo);
+    const workflow = new PlaylistImportWorkflow(pipeline, executor, sessionService);
     const historyService = new PlaylistImportHistoryService(historyRepo, mockPersistence);
 
     const plan = await workflow.createPlanFromFile('/music/playlists/rock.m3u');
