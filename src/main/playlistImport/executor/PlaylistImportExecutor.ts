@@ -1,30 +1,47 @@
-import type { PlaylistPersistence } from '../interfaces/PlaylistPersistence';
+import type { PlaylistPersistence, PlaylistEntryWriteModel } from '../interfaces/PlaylistPersistence';
+import type { TransactionRunner } from '../interfaces/TransactionRunner';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
 import type { PlaylistImportExecutionStatistics } from '../models/PlaylistImportExecutionStatistics';
 
 export class PlaylistImportExecutor {
-  constructor(private persistence: PlaylistPersistence) {}
+  constructor(
+    private persistence: PlaylistPersistence,
+    private transactionRunner: TransactionRunner
+  ) {}
 
   async execute(plan: PlaylistImportPlan): Promise<PlaylistImportExecutionResult> {
     const startTime = Date.now();
 
-    // Extract matched song IDs from plan entries where decision is IMPORT, preserving order
+    // Extract rich write model entries for persistence where decision is IMPORT, preserving order
+    const entriesToImport: PlaylistEntryWriteModel[] = [];
     const songIdsToImport: number[] = [];
-    for (const entry of plan.entries) {
-      if (entry.decision === 'IMPORT' && entry.source.trackReference.libraryMatch.matchedSongId !== undefined) {
-        songIdsToImport.push(entry.source.trackReference.libraryMatch.matchedSongId);
+
+    for (const planEntry of plan.entries) {
+      if (
+        planEntry.decision === 'IMPORT' &&
+        planEntry.source.trackReference.libraryMatch.matchedSongId !== undefined
+      ) {
+        const songId = planEntry.source.trackReference.libraryMatch.matchedSongId;
+        songIdsToImport.push(songId);
+
+        entriesToImport.push({
+          songId,
+          position: planEntry.source.position,
+          dateAdded: planEntry.source.dateAdded,
+          comments: planEntry.source.comments
+        });
       }
     }
 
     let createdPlaylistId = 0;
 
-    // Execute playlist creation & song insertion atomically in a single transaction
-    await this.persistence.runInTransaction(async () => {
+    // Execute playlist creation & song insertion atomically via TransactionRunner
+    await this.transactionRunner.runInTransaction(async () => {
       createdPlaylistId = await this.persistence.createPlaylist(plan.playlistName, plan.description);
 
-      if (songIdsToImport.length > 0) {
-        await this.persistence.addEntries(createdPlaylistId, songIdsToImport);
+      if (entriesToImport.length > 0) {
+        await this.persistence.addEntries(createdPlaylistId, entriesToImport);
       }
     });
 

@@ -1,17 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistImportExecutor';
 import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
+import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 
 describe('PlaylistImportExecutor', () => {
-  it('should execute IMPORT decisions in order inside a transaction and skip other decisions', async () => {
+  it('should execute IMPORT decisions in order inside TransactionRunner and pass rich persistence write models', async () => {
     const mockPersistence: PlaylistPersistence = {
       createPlaylist: vi.fn(async () => 101),
-      addEntries: vi.fn(async () => {}),
+      addEntries: vi.fn(async () => {})
+    };
+
+    const mockTransactionRunner: TransactionRunner = {
       runInTransaction: vi.fn(async (work) => await work())
     };
 
-    const executor = new PlaylistImportExecutor(mockPersistence);
+    const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
     const plan: PlaylistImportPlan = {
       playlistName: 'My Awesome Playlist',
@@ -32,6 +36,7 @@ describe('PlaylistImportExecutor', () => {
           decision: 'IMPORT',
           source: {
             position: 1,
+            comments: 'Favorite track',
             trackReference: {
               resolvedTrack: { track: { originalLocation: 'song1.mp3' }, resolution: { originalReference: 'song1.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 501 }
@@ -63,9 +68,12 @@ describe('PlaylistImportExecutor', () => {
 
     const result = await executor.execute(plan);
 
-    expect(mockPersistence.runInTransaction).toHaveBeenCalled();
+    expect(mockTransactionRunner.runInTransaction).toHaveBeenCalled();
     expect(mockPersistence.createPlaylist).toHaveBeenCalledWith('My Awesome Playlist', 'Imported from M3U');
-    expect(mockPersistence.addEntries).toHaveBeenCalledWith(101, [501, 502]);
+    expect(mockPersistence.addEntries).toHaveBeenCalledWith(101, [
+      { songId: 501, position: 1, dateAdded: undefined, comments: 'Favorite track' },
+      { songId: 502, position: 3, dateAdded: undefined, comments: undefined }
+    ]);
 
     expect(result.playlistId).toBe(101);
     expect(result.success).toBe(true);
@@ -79,11 +87,14 @@ describe('PlaylistImportExecutor', () => {
       createPlaylist: vi.fn(async () => {
         throw new Error('Database disk full');
       }),
-      addEntries: vi.fn(async () => {}),
+      addEntries: vi.fn(async () => {})
+    };
+
+    const mockTransactionRunner: TransactionRunner = {
       runInTransaction: vi.fn(async (work) => await work())
     };
 
-    const executor = new PlaylistImportExecutor(mockPersistence);
+    const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
     const plan: PlaylistImportPlan = {
       playlistName: 'Failed Playlist',

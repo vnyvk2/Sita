@@ -1,6 +1,5 @@
-import { db } from '../../db/db';
 import type { PlaylistEngine } from '../../collections/engine/PlaylistEngine';
-import type { PlaylistPersistence } from '../interfaces/PlaylistPersistence';
+import type { PlaylistPersistence, PlaylistEntryWriteModel } from '../interfaces/PlaylistPersistence';
 
 export class EnginePlaylistPersistence implements PlaylistPersistence {
   constructor(private engine: PlaylistEngine) {}
@@ -9,14 +8,9 @@ export class EnginePlaylistPersistence implements PlaylistPersistence {
     return await this.engine.createPlaylist({ name, description });
   }
 
-  async addEntries(playlistId: number, songIds: number[]): Promise<void> {
-    if (songIds.length === 0) return;
+  async addEntries(playlistId: number, entries: PlaylistEntryWriteModel[]): Promise<void> {
+    if (entries.length === 0) return;
+    const songIds = entries.map((e) => e.songId);
     await this.engine.addSongs({ playlistId, songIds });
-  }
-
-  async runInTransaction<T>(work: () => Promise<T>): Promise<T> {
-    return await db.transaction(async () => {
-      return await work();
-    });
   }
 }
