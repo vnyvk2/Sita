@@ -1,4 +1,4 @@
-import { playlistQuery } from '@renderer/queries/playlists';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
@@ -9,7 +9,8 @@ import Img from '../Img';
 
 type Props = {
   className?: string;
-  songIds: number[];
+  songIds?: number[];
+  collectionId?: number;
   imgClassName?: string;
   holderClassName?: string;
   type?: number;
@@ -36,9 +37,18 @@ const MultipleArtworksCover = (props: Props) => {
   } = props;
 
   const { data: artworkPaths = artworks ?? [] } = useQuery({
-    ...playlistQuery.songArtworks({ songIds: props.songIds }),
-    enabled: !artworks && enableArtworkFromSongCovers,
-    select: (data) => data?.map((x) => x.artworkPaths)
+    queryKey: ['collectionArtworks', props.collectionId ? `collectionId=${props.collectionId}` : `songIds=${props.songIds?.join(',')}`],
+    queryFn: async () => {
+      let idsToFetch = props.songIds || [];
+      if (props.collectionId !== undefined && idsToFetch.length === 0) {
+        const entries = await CollectionClient.getEntries(props.collectionId, 0, 4);
+        idsToFetch = entries.map(e => e.songId);
+      }
+      if (idsToFetch.length === 0) return [];
+      const data = await CollectionClient.getArtworks(idsToFetch);
+      return data?.map((x) => x.artworkPaths) || [];
+    },
+    enabled: !artworks && enableArtworkFromSongCovers && (!!props.collectionId || (props.songIds && props.songIds.length > 0))
   });
 
   // useEffect(() => {

@@ -6,6 +6,7 @@ import type { HierarchyService } from '../engine/HierarchyService';
 import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
+import getArtworksForMultipleArtworksCover from '../../core/getArtworksForMultipleArtworksCover';
 
 export function setupCollectionIpc(
   engine: PlaylistEngine,
@@ -25,14 +26,22 @@ export function setupCollectionIpc(
     return children.map(mapPlaylistToDto);
   });
 
-  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset: number, limit: number) => {
+  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number) => {
     const entries = await repository.getEntries(id); 
-    return entries.slice(offset, offset + limit).map(mapEntryToDto);
+    const actualOffset = offset ?? 0;
+    return (limit !== undefined 
+      ? entries.slice(actualOffset, actualOffset + limit) 
+      : entries.slice(actualOffset)
+    ).map(mapEntryToDto);
   });
 
   ipcMain.handle('collections/read/getBreadcrumbs', async (_, id: number) => {
     const ancestors = await hierarchyService.getAncestors(id);
     return ancestors; 
+  });
+
+  ipcMain.handle('collections/read/getArtworks', async (_, songIds: number[]) => {
+    return await getArtworksForMultipleArtworksCover(songIds);
   });
 
   // Write Endpoints

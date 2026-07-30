@@ -5,7 +5,7 @@ import { queryClient } from '..';
 import { albumQuery } from '../queries/albums';
 import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
-import { playlistQuery } from '../queries/playlists';
+import { collectionKeys } from '../../api/collectionKeys';
 import { searchQuery } from '../queries/search';
 import { songQuery } from '../queries/songs';
 
@@ -91,7 +91,7 @@ export function useDataSync(): void {
           'playlists/deletedSong'
         ];
         if (playlistEvents.includes(dataEvent.dataType)) {
-          queryClient.invalidateQueries({ queryKey: playlistQuery._def });
+          queryClient.invalidateQueries({ queryKey: collectionKeys.all });
           queryClient.invalidateQueries({ queryKey: searchQuery.query._def });
         }
 

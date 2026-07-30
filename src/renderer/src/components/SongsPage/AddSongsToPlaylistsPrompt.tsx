@@ -1,7 +1,8 @@
 /* eslint-disable promise/catch-or-return */
 
 import { SpecialPlaylists } from '@common/playlists.enum';
-import { playlistQuery } from '@renderer/queries/playlists';
+import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
+import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,7 @@ interface AddSongsToPlaylistProp {
   title?: string;
 }
 
-interface SelectablePlaylistProp extends Playlist {
+interface SelectablePlaylistProp extends PlaylistDto {
   isChecked: boolean;
   playlistCheckedStateUpdateFunc: (_state: boolean) => void;
 }
@@ -24,12 +25,12 @@ interface SelectablePlaylistProp extends Playlist {
 const SelectablePlaylist = (props: SelectablePlaylistProp) => {
   const { t } = useTranslation();
 
-  const { playlistId, artworkPaths, name, songs, playlistCheckedStateUpdateFunc, isChecked } =
+  const { id, artworkPath, name, itemCount, playlistCheckedStateUpdateFunc, isChecked } =
     props;
 
   return (
     <div
-      className={`playlist appear-from-bottom group ${playlistId} text-font-color-black dark:text-font-color-white mr-4 mb-6 flex h-52 w-38 flex-col justify-between rounded-xl p-4 ${
+      className={`playlist appear-from-bottom group ${id} text-font-color-black dark:text-font-color-white mr-4 mb-6 flex h-52 w-38 flex-col justify-between rounded-xl p-4 ${
         isChecked
           ? 'bg-background-color-3 text-font-color-black! dark:bg-dark-background-color-3 dark:text-font-color-black!'
           : 'hover:bg-background-color-2 dark:hover:bg-dark-background-color-2'
@@ -41,14 +42,14 @@ const SelectablePlaylist = (props: SelectablePlaylistProp) => {
     >
       <div className="playlist-cover-and-checkbox-container relative h-[70%] overflow-hidden">
         <Checkbox
-          id={String(playlistId)}
+          id={String(id)}
           checkedStateUpdateFunction={playlistCheckedStateUpdateFunc}
           isChecked={isChecked}
           className="absolute right-3 bottom-3"
         />
         <div className="playlist-cover-container h-full cursor-pointer overflow-hidden rounded-lg">
           <Img
-            src={artworkPaths.artworkPath}
+            src={artworkPath}
             alt="Playlist Cover"
             loading="lazy"
             className="h-full"
@@ -63,7 +64,7 @@ const SelectablePlaylist = (props: SelectablePlaylistProp) => {
           {name}
         </div>
         <div className="playlist-no-of-songs text-sm font-light">
-          {t('common.songWithCount', { count: songs.length })}
+          {t('common.songWithCount', { count: itemCount })}
         </div>
       </div>
     </div>
@@ -75,25 +76,24 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
   const { t } = useTranslation();
 
   const { songIds } = props;
-  const { data: playlists } = useSuspenseQuery({
-    ...playlistQuery.all({ sortType: 'aToZ' }),
-    select: (data) => data.data
-  });
+  const { data: playlists } = useSuspenseQuery(
+    rootCollectionsOptions('aToZ')
+  );
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const addSongsMutation = useAddSongsToCollection();
 
   const addSongsToPlaylists = useCallback(() => {
     const selectedPlaylistsData = playlists.filter((playlist) =>
-      selectedPlaylistIds.includes(playlist.playlistId)
+      selectedPlaylistIds.includes(playlist.id)
     );
     const promises = selectedPlaylistsData.map(async (playlist) => {
-      if (playlist.playlistId === SpecialPlaylists.Favorites)
+      if (playlist.id === SpecialPlaylists.Favorites)
         // Special ID for Favorites playlist
         return window.api.playerControls
           .toggleLikeSongs(songIds, true)
           .catch((err) => console.error(err));
-      return addSongsMutation.mutateAsync({ playlistId: playlist.playlistId, songIds })
+      return addSongsMutation.mutateAsync({ playlistId: playlist.id, songIds })
         .catch((err) => console.error(err));
     });
     Promise.all(promises)
@@ -123,22 +123,17 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
         ? playlists.map((playlist) => {
             return (
               <SelectablePlaylist
-                name={playlist.name}
-                createdDate={playlist.createdDate}
-                playlistId={playlist.playlistId}
-                songs={playlist.songs}
-                artworkPaths={playlist.artworkPaths}
-                isArtworkAvailable={playlist.isArtworkAvailable}
-                isChecked={selectedPlaylistIds.includes(playlist.playlistId)}
+                {...playlist}
+                isChecked={selectedPlaylistIds.includes(playlist.id)}
                 playlistCheckedStateUpdateFunc={(state) => {
                   setSelectedPlaylistIds((prevData) => {
                     if (state) {
-                      return [...prevData, playlist.playlistId];
+                      return [...prevData, playlist.id];
                     }
-                    return prevData.filter((id) => id !== playlist.playlistId);
+                    return prevData.filter((id) => id !== playlist.id);
                   });
                 }}
-                key={playlist.playlistId}
+                key={playlist.id}
               />
             );
           })

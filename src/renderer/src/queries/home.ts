@@ -1,5 +1,6 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { CollectionClient } from '../api/CollectionClient';
 
 const HOME_METRICS_FETCH_LIMIT = 35;
 
@@ -23,15 +24,18 @@ export const homeQuery = createQueryKeys('home', {
     queryKey: null,
     queryFn: async (): Promise<Artist[]> => {
       try {
-        const { data: playlists } = await window.api.playlistsData.getPlaylistData([
-          SpecialPlaylists.History
-        ]);
-        const historyPlaylist = playlists[0];
+        const historyEntries = await CollectionClient.getEntries(
+          SpecialPlaylists.History as unknown as number,
+          0,
+          99999
+        );
 
-        if (!historyPlaylist || historyPlaylist.songs.length === 0) return [];
+        if (!historyEntries || historyEntries.length === 0) return [];
+
+        const songIds = historyEntries.map((e) => e.songId);
 
         const songs = await window.api.audioLibraryControls.getSongInfo(
-          historyPlaylist.songs,
+          songIds,
           undefined,
           undefined,
           HOME_METRICS_FETCH_LIMIT,
@@ -69,15 +73,18 @@ export const homeQuery = createQueryKeys('home', {
     queryKey: null,
     queryFn: async (): Promise<AudioInfo[]> => {
       try {
-        const { data: playlists } = await window.api.playlistsData.getPlaylistData([
-          SpecialPlaylists.Favorites
-        ]);
-        const favoritesPlaylist = playlists[0];
+        const favoritesEntries = await CollectionClient.getEntries(
+          SpecialPlaylists.Favorites as unknown as number,
+          0,
+          99999
+        );
 
-        if (!favoritesPlaylist || favoritesPlaylist.songs.length === 0) return [];
+        if (!favoritesEntries || favoritesEntries.length === 0) return [];
+
+        const songIds = favoritesEntries.map((e) => e.songId);
 
         const songs = await window.api.audioLibraryControls.getSongInfo(
-          favoritesPlaylist.songs,
+          songIds,
           'allTimeMostListened',
           undefined,
           HOME_METRICS_FETCH_LIMIT,

@@ -8,7 +8,7 @@ import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
-import { playlistQuery } from '@renderer/queries/playlists';
+import { collectionDetailOptions, collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   component: PlaylistInfoPage,
   loader: async ({ params }) => {
     await queryClient.ensureQueryData(
-      playlistQuery.single({ playlistId: Number(params.playlistId) })
+      collectionDetailOptions(Number(params.playlistId))
     );
   }
 });
@@ -65,17 +65,22 @@ function PlaylistInfoPage() {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
   }, [sortingOrder]);
 
-  const { data: playlistData } = useSuspenseQuery({
-    ...playlistQuery.single({ playlistId: playlistId }),
-    select: (data) => data.data[0]
+  const { data: playlistData } = useSuspenseQuery(
+    collectionDetailOptions(playlistId)
+  );
+
+  const { data: collectionEntries = [] } = useQuery({
+    ...collectionEntriesOptions(playlistId, 0, 99999),
+    enabled: !!playlistId
   });
+
   const { data: playlistSongs = [] } = useQuery({
     ...songQuery.allSongInfo({
-      songIds: playlistData.songs,
+      songIds: collectionEntries.map((e) => e.songId),
       sortType: sortingOrder,
       filterType: filteringOrder
     }),
-    enabled: Array.isArray(playlistData.songs)
+    enabled: collectionEntries.length > 0
   });
 
   const selectAllHandler = useSelectAllHandler(playlistSongs, 'songs', 'songId');
@@ -89,13 +94,13 @@ function PlaylistInfoPage() {
         queueSongIds,
         'playlist',
         false,
-        playlistData.playlistId,
+        playlistData.id,
         false,
         playlistData.name
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, playlistData.playlistId, playlistData.name, playlistSongs]
+    [createQueue, updateQueueData, playlistData.id, playlistData.name, playlistSongs]
   );
 
   const clearSongHistory = useCallback(() => {
@@ -154,10 +159,10 @@ function PlaylistInfoPage() {
         playlistSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'playlist',
         true,
-        playlistData.playlistId,
+        playlistData.id,
         true
       ),
-    [createQueue, playlistData.playlistId, playlistSongs]
+    [createQueue, playlistData.id, playlistSongs]
   );
 
   const playAllSongs = useCallback(
@@ -166,10 +171,10 @@ function PlaylistInfoPage() {
         playlistSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'songs',
         false,
-        playlistData.playlistId,
+        playlistData.id,
         true
       ),
-    [createQueue, playlistData.playlistId, playlistSongs]
+    [createQueue, playlistData.id, playlistSongs]
   );
 
   return (
@@ -192,25 +197,25 @@ function PlaylistInfoPage() {
             iconName: 'clear',
             clickHandler: clearSongHistory,
             isVisible: playlistData.playlistId === SpecialPlaylists.History,
-            isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
+            isDisabled: !(playlistData.itemCount > 0)
           },
           {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
-            isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
+            isDisabled: !(playlistData.itemCount > 0)
           },
           {
             tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: shuffleAndPlaySongs,
-            isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
+            isDisabled: !(playlistData.itemCount > 0)
           },
           {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: addSongsToQueue,
-            isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
+            isDisabled: !(playlistData.itemCount > 0)
           }
         ]}
         dropdowns={[
@@ -233,7 +238,7 @@ function PlaylistInfoPage() {
               const order = e.currentTarget.value as SongSortTypes;
               navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
             },
-            isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
+            isDisabled: !(playlistData.itemCount > 0)
           }
         ]}
       />

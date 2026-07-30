@@ -11,7 +11,7 @@ import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
-import { playlistQuery } from '@renderer/queries/playlists';
+import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { playlistSearchSchema } from '@renderer/utils/zod/playlistSchema';
@@ -32,11 +32,7 @@ export const Route = createFileRoute('/main-player/playlists/')({
   }),
   loader: async ({ deps }) => {
     await queryClient.ensureQueryData(
-      playlistQuery.all({
-        sortType: deps.sortingOrder || 'aToZ',
-        start: 0,
-        end: 30
-      })
+      rootCollectionsOptions(deps.sortingOrder || 'aToZ')
     );
   }
 });
@@ -65,9 +61,9 @@ function PlaylistsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const {
-    data: { data: playlists }
-  } = useSuspenseQuery(playlistQuery.all({ sortType: sortingOrder }));
+  const { data: playlists } = useSuspenseQuery(
+    rootCollectionsOptions(sortingOrder)
+  );
 
   // useEffect(() => {
   //   fetchPlaylistData();
@@ -98,15 +94,7 @@ function PlaylistsPage() {
         true,
         <NewPlaylistPrompt
           currentPlaylists={playlists}
-          updatePlaylists={() =>
-            queryClient.invalidateQueries(
-              playlistQuery.all({
-                sortType: sortingOrder,
-                start: 0,
-                end: 0
-              })
-            )
-          }
+          updatePlaylists={() => {} /* queries are invalidated via CollectionEventProvider */}
         />
       ),
     [changePromptMenuData, playlists, sortingOrder]

@@ -8,8 +8,10 @@ import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import Img from '../Img';
 import MultipleArtworksCover from '../PlaylistsPage/MultipleArtworksCover';
 
+import type { PlaylistDto } from '@main/collections/ipc/dtos';
+
 type Props = {
-  playlist: Playlist;
+  playlist: PlaylistDto;
   songs: SongData[];
 };
 
@@ -28,19 +30,19 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
 
   return (
     <>
-      {playlist?.songs && (
+      {playlist && (
         <div className="playlist-img-and-info-container mb-8 flex flex-row items-center justify-start">
           <div className="playlist-cover-container mt-2 overflow-hidden">
-            {preferences.enableArtworkFromSongCovers && playlist.songs.length > 1 ? (
+            {preferences.enableArtworkFromSongCovers && playlist.itemCount > 1 ? (
               <div className="relative h-60 w-60">
                 <MultipleArtworksCover
-                  songIds={playlist.songs}
+                  collectionId={playlist.id}
                   artworks={songs.map((song) => song.artworkPaths)}
                   className="h-60 w-60"
                   type={1}
                 />
                 <Img
-                  src={playlist.artworkPaths.artworkPath}
+                  src={playlist.artworkPath || DefaultPlaylistCover}
                   alt="Playlist Cover"
                   loading="eager"
                   className="absolute! right-4 bottom-4 h-16 w-16 rounded-lg!"
@@ -48,40 +50,44 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
               </div>
             ) : (
               <Img
-                src={
-                  playlist.artworkPaths ? playlist.artworkPaths.artworkPath : DefaultPlaylistCover
-                }
-                className="w-52 rounded-xl lg:w-48"
+                src={playlist.artworkPath || DefaultPlaylistCover}
                 alt="Playlist Cover"
+                loading="eager"
+                className="h-60 w-60 rounded-lg shadow-lg"
               />
             )}
           </div>
-          <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8">
-            <div className="font-semibold tracking-wider uppercase opacity-50">
-              {t('common.playlist_one')}
-            </div>
-            <div className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight mb-2 w-full overflow-hidden text-5xl text-ellipsis whitespace-nowrap">
+          <div className="playlist-info-container ml-8 flex flex-col items-start justify-center">
+            <div className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight text-5xl font-semibold">
               {playlist.name}
             </div>
-            <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
-              {t('common.songWithCount', { count: playlist.songs.length })}
+            <div className="playlist-no-of-songs text-font-color-black dark:text-font-color-white mt-2 flex items-center font-medium">
+              <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
+                music_note
+              </span>
+              {t('common.songWithCount', { count: playlist.itemCount })}
             </div>
-            {songs.length > 0 && (
-              <div className="playlist-total-duration">{totalPlaylistDuration}</div>
-            )}
-            <div className="playlist-created-date">
-              {t('playlistsPage.createdOn', {
-                val: new Date(playlist.createdDate),
-                formatParams: {
-                  val: {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+            {playlist.createdAt && (
+              <div className="playlist-created-date text-font-color-black dark:text-font-color-white mt-1 flex items-center font-medium">
+                <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
+                  calendar_today
+                </span>
+                {t('playlist.createdAt', {
+                  val: new Date(playlist.createdAt),
+                  formatParams: {
+                    val: { year: 'numeric', month: 'short', day: 'numeric' }
                   }
-                }
-              })}
-            </div>
+                })}
+              </div>
+            )}
+            {songs.length > 0 && (
+              <div className="playlist-total-duration mt-1 flex items-center font-medium text-font-color-black dark:text-font-color-white">
+                <span className="material-symbols-round text-font-color-highlight dark:text-dark-font-color-highlight mr-2 text-2xl">
+                  schedule
+                </span>
+                {totalPlaylistDuration}
+              </div>
+            )}
           </div>
         </div>
       )}
