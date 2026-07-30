@@ -35,7 +35,7 @@ export class LibraryResolver {
         sourceLine: entry.sourceLine,
         dateAdded: entry.dateAdded,
         comments: entry.comments,
-        entry: {
+        trackReference: {
           resolvedTrack: entry.resolvedTrack,
           libraryMatch: {
             status: 'MISSING',
@@ -52,7 +52,7 @@ export class LibraryResolver {
         sourceLine: entry.sourceLine,
         dateAdded: entry.dateAdded,
         comments: entry.comments,
-        entry: {
+        trackReference: {
           resolvedTrack: entry.resolvedTrack,
           libraryMatch: {
             status: 'UNRESOLVED',
@@ -69,7 +69,7 @@ export class LibraryResolver {
         sourceLine: entry.sourceLine,
         dateAdded: entry.dateAdded,
         comments: entry.comments,
-        entry: {
+        trackReference: {
           resolvedTrack: entry.resolvedTrack,
           libraryMatch: {
             status: 'INVALID_URI',
@@ -96,7 +96,7 @@ export class LibraryResolver {
           sourceLine: entry.sourceLine,
           dateAdded: entry.dateAdded,
           comments: entry.comments,
-          entry: {
+          trackReference: {
             resolvedTrack: entry.resolvedTrack,
             libraryMatch: match
           }
@@ -113,7 +113,7 @@ export class LibraryResolver {
           sourceLine: entry.sourceLine,
           dateAdded: entry.dateAdded,
           comments: entry.comments,
-          entry: {
+          trackReference: {
             resolvedTrack: entry.resolvedTrack,
             libraryMatch: match
           }
@@ -126,7 +126,7 @@ export class LibraryResolver {
       sourceLine: entry.sourceLine,
       dateAdded: entry.dateAdded,
       comments: entry.comments,
-      entry: {
+      trackReference: {
         resolvedTrack: entry.resolvedTrack,
         libraryMatch: {
           status: 'UNVERIFIED',

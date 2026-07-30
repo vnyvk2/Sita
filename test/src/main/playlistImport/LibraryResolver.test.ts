@@ -65,16 +65,16 @@ describe('LibraryResolver', () => {
 
     const result = await resolver.resolvePlaylist(playlist);
 
-    expect(result.entries[0].entry.libraryMatch).toEqual({
+    expect(result.entries[0].trackReference.libraryMatch).toEqual({
       matchedSongId: 4182,
       status: 'MATCHED',
       confidence: 100,
       candidates: [mockSong]
     });
 
-    expect(result.entries[1].entry.libraryMatch.status).toBe('NOT_IN_LIBRARY');
-    expect(result.entries[1].entry.libraryMatch.confidence).toBe(0);
+    expect(result.entries[1].trackReference.libraryMatch.status).toBe('NOT_IN_LIBRARY');
+    expect(result.entries[1].trackReference.libraryMatch.confidence).toBe(0);
 
-    expect(result.entries[2].entry.libraryMatch.status).toBe('MISSING');
+    expect(result.entries[2].trackReference.libraryMatch.status).toBe('MISSING');
   });
 });

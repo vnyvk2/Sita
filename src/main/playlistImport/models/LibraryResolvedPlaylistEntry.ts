@@ -3,7 +3,7 @@ import type { LibraryResolvedTrackReference } from './LibraryResolvedTrackRefere
 export interface LibraryResolvedPlaylistEntry {
   position: number;
   sourceLine?: number;
-  entry: LibraryResolvedTrackReference;
+  trackReference: LibraryResolvedTrackReference;
   dateAdded?: Date;
   comments?: string;
 }
