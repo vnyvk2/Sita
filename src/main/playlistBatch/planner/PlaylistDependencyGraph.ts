@@ -35,4 +35,33 @@ export class PlaylistDependencyGraph {
 
     return order;
   }
+
+  computeExecutionLevels(items: BatchItem[]): string[][] {
+    const levels: string[][] = [];
+    const processed = new Set<string>();
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+
+    let remaining = [...items];
+
+    while (remaining.length > 0) {
+      const currentLevel = remaining.filter((item) =>
+        item.dependencies.every((depId) => processed.has(depId) || !itemMap.has(depId))
+      );
+
+      if (currentLevel.length === 0) {
+        throw new Error('Circular dependency or unsatisfied requirement detected in execution levels calculation');
+      }
+
+      const levelIds = currentLevel.map((i) => i.id);
+      levels.push(levelIds);
+
+      for (const id of levelIds) {
+        processed.add(id);
+      }
+
+      remaining = remaining.filter((item) => !processed.has(item.id));
+    }
+
+    return levels;
+  }
 }

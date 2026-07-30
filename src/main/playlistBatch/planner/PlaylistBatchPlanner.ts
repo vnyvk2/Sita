@@ -12,11 +12,13 @@ export class PlaylistBatchPlanner {
   ): BatchExecutionPlan {
     const id = `batch_plan_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const executionOrder = this.dependencyGraph.sortTopologically(items);
+    const executionLevels = this.dependencyGraph.computeExecutionLevels(items);
 
     return {
       id,
       items,
       executionOrder,
+      executionLevels,
       policy
     };
   }

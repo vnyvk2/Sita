@@ -5,21 +5,28 @@ import { PlaylistBatchOrchestrator } from '@main/playlistBatch/orchestrator/Play
 import type { BatchItem } from '@main/playlistBatch/models/BatchItem';
 import type { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
 
-describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration', () => {
-  it('should sort playlist batch items topologically based on dependency graph', () => {
+describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinements', () => {
+  it('should compute layered executionLevels for parallel dependency execution', () => {
     const graph = new PlaylistDependencyGraph();
 
     const items: BatchItem[] = [
       { id: 'item_gym', action: 'IMPORT', sourceFile: 'gym.m3u', status: 'PENDING', dependencies: ['item_workout'] },
       { id: 'item_workout', action: 'IMPORT', sourceFile: 'workout.m3u', status: 'PENDING', dependencies: ['item_rock'] },
-      { id: 'item_rock', action: 'IMPORT', sourceFile: 'rock.m3u', status: 'PENDING', dependencies: [] }
+      { id: 'item_rock', action: 'IMPORT', sourceFile: 'rock.m3u', status: 'PENDING', dependencies: [] },
+      { id: 'item_pop', action: 'IMPORT', sourceFile: 'pop.m3u', status: 'PENDING', dependencies: [] }
     ];
 
-    const sortedIds = graph.sortTopologically(items);
-    expect(sortedIds).toEqual(['item_rock', 'item_workout', 'item_gym']);
+    const levels = graph.computeExecutionLevels(items);
+
+    // Level 0: independent items (rock & pop)
+    expect(levels[0]).toEqual(['item_rock', 'item_pop']);
+    // Level 1: depends on rock (workout)
+    expect(levels[1]).toEqual(['item_workout']);
+    // Level 2: depends on workout (gym)
+    expect(levels[2]).toEqual(['item_gym']);
   });
 
-  it('should create batch execution plan and orchestrate execution across items', async () => {
+  it('should create batch execution plan with executionLevels and orchestrate execution', async () => {
     const graph = new PlaylistDependencyGraph();
     const planner = new PlaylistBatchPlanner(graph);
 
@@ -42,6 +49,8 @@ describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration', () => {
 
     const plan = planner.createBatchPlan(items, 'CONTINUE_ON_ERROR');
     expect(plan.executionOrder).toHaveLength(2);
+    expect(plan.executionLevels).toHaveLength(1);
+    expect(plan.executionLevels[0]).toEqual(['item_1', 'item_2']);
 
     const summary = await orchestrator.executeBatchPlan(plan);
 

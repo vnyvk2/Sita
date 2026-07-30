@@ -5,5 +5,6 @@ export interface BatchExecutionPlan {
   id: string;
   items: BatchItem[];
   executionOrder: string[];
+  executionLevels: string[][];
   policy: BatchExecutionPolicy;
 }
