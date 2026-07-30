@@ -45,7 +45,8 @@ export class PlaylistPathResolver {
     if (!isWindowsDrive && /^[a-z0-9+-.]+:/i.test(candidatePath) && !candidatePath.toLowerCase().startsWith('file://')) {
       return {
         originalReference,
-        status: 'UNRESOLVED',
+        resolutionStatus: 'UNRESOLVED',
+        verificationStatus: 'UNVERIFIED',
         diagnostics: [`Non-filesystem URI scheme detected: ${candidatePath}`]
       };
     }
@@ -57,7 +58,8 @@ export class PlaylistPathResolver {
       } catch {
         return {
           originalReference,
-          status: 'INVALID_URI',
+          resolutionStatus: 'INVALID_URI',
+          verificationStatus: 'UNVERIFIED',
           diagnostics: [`Failed to parse file URI: ${originalReference}`]
         };
       }
@@ -71,7 +73,8 @@ export class PlaylistPathResolver {
     return {
       originalReference,
       resolvedPath: resolvedTarget,
-      status: 'RESOLVED'
+      resolutionStatus: 'RESOLVED',
+      verificationStatus: 'UNVERIFIED'
     };
   }
 }

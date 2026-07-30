@@ -1,8 +1,10 @@
-export type PathResolutionStatus = 'RESOLVED' | 'UNRESOLVED' | 'MISSING' | 'INVALID_URI';
+export type PathResolutionStatus = 'RESOLVED' | 'UNRESOLVED' | 'INVALID_URI';
+export type FilesystemVerificationStatus = 'FOUND' | 'MISSING' | 'UNVERIFIED';
 
 export interface PathResolutionResult {
   originalReference: string;
   resolvedPath?: string;
-  status: PathResolutionStatus;
+  resolutionStatus: PathResolutionStatus;
+  verificationStatus: FilesystemVerificationStatus;
   diagnostics?: string[];
 }

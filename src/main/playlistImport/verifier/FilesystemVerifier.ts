@@ -28,19 +28,15 @@ export class FilesystemVerifier {
   }
 
   async verifyResolution(resolution: PathResolutionResult): Promise<PathResolutionResult> {
-    if (resolution.status !== 'RESOLVED' || !resolution.resolvedPath) {
+    if (resolution.resolutionStatus !== 'RESOLVED' || !resolution.resolvedPath) {
       return resolution;
     }
 
     const exists = await this.fileSystem.exists(resolution.resolvedPath);
 
-    if (exists) {
-      return resolution;
-    }
-
     return {
       ...resolution,
-      status: 'MISSING'
+      verificationStatus: exists ? 'FOUND' : 'MISSING'
     };
   }
 }

@@ -27,11 +27,12 @@ describe('PlaylistPathResolver & FilesystemVerifier', () => {
     expect(resolved.entries[0].resolvedTrack.resolution).toEqual({
       originalReference: 'song1.mp3',
       resolvedPath: normalize(resolve('/music/playlists', 'song1.mp3')),
-      status: 'RESOLVED'
+      resolutionStatus: 'RESOLVED',
+      verificationStatus: 'UNVERIFIED'
     });
 
-    expect(resolved.entries[1].resolvedTrack.resolution.status).toBe('RESOLVED');
-    expect(resolved.entries[2].resolvedTrack.resolution.status).toBe('UNRESOLVED');
+    expect(resolved.entries[1].resolvedTrack.resolution.resolutionStatus).toBe('RESOLVED');
+    expect(resolved.entries[2].resolvedTrack.resolution.resolutionStatus).toBe('UNRESOLVED');
   });
 
   it('should verify filesystem existence using FilesystemVerifier', async () => {
@@ -52,7 +53,10 @@ describe('PlaylistPathResolver & FilesystemVerifier', () => {
     const resolved = resolver.resolvePlaylist(playlist, '/music/playlists/test.m3u');
     const verified = await verifier.verifyPlaylist(resolved);
 
-    expect(verified.entries[0].resolvedTrack.resolution.status).toBe('RESOLVED');
-    expect(verified.entries[1].resolvedTrack.resolution.status).toBe('MISSING');
+    expect(verified.entries[0].resolvedTrack.resolution.resolutionStatus).toBe('RESOLVED');
+    expect(verified.entries[0].resolvedTrack.resolution.verificationStatus).toBe('FOUND');
+
+    expect(verified.entries[1].resolvedTrack.resolution.resolutionStatus).toBe('RESOLVED');
+    expect(verified.entries[1].resolvedTrack.resolution.verificationStatus).toBe('MISSING');
   });
 });
