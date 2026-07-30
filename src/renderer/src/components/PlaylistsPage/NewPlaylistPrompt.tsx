@@ -29,7 +29,11 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
       createPlaylist.mutate(
         { name: playlistName.trim() },
         {
-          onSuccess: () => {
+          onSuccess: async (data: any) => {
+            const playlistId = typeof data === 'number' ? data : data?.id;
+            if (artworkPath && playlistId) {
+              await window.api.collections.write.setArtwork(playlistId, artworkPath).catch(console.error);
+            }
             changePromptMenuData(false);
             // Invalidation happens automatically via CollectionEventProvider
             addNewNotifications([

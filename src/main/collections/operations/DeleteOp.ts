@@ -32,6 +32,8 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
 
     const affectedSongIds = Array.from(new Set(entries.map(e => e.entry.songId)));
 
+    const duration = typeof playlist.totalDuration === 'string' ? parseFloat(playlist.totalDuration) : (playlist.totalDuration || 0);
+
     return {
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlistId),
@@ -42,7 +44,12 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
         input: { playlist, entries: entries.map(e => e.entry) }
       },
       version: 1,
-      affectedSongIds
+      affectedSongIds,
+      statsDelta: playlist.parentId ? {
+        targetPlaylistId: playlist.parentId,
+        itemCountDelta: -(playlist.itemCount || 0),
+        durationDelta: -duration
+      } : undefined
     };
   }
 }

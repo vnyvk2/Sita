@@ -130,7 +130,7 @@ export function useDataSync(): void {
     window.api.dataUpdates.dataUpdateEvent(noticeDataUpdateEvents);
 
     return () => {
-      window.api.dataUpdates.removeDataUpdateEventListeners();
+      window.api.dataUpdates.removeDataUpdateEventListener?.(noticeDataUpdateEvents);
     };
   }, []);
 }

@@ -55,7 +55,12 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
         input: { playlistId, entries: removedEntries }
       },
       version: 1,
-      affectedSongIds
+      affectedSongIds,
+      statsDelta: {
+        targetPlaylistId: playlistId,
+        itemCountDelta: -itemCountDelta,
+        durationDelta: -durationDelta
+      }
     };
   }
 }

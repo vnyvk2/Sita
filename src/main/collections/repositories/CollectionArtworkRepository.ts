@@ -7,7 +7,8 @@ export class CollectionArtworkRepository {
     const artworkData = await getSongArtworksBySongIds(songIds);
 
     const artworks = artworkData.map((artwork) => {
-      const artworkPaths = parseSongArtworks(artwork.artworks.map((a) => a.artwork));
+      const artworkList = artwork.artworks?.map((a) => a.artwork).filter(Boolean) ?? [];
+      const artworkPaths = parseSongArtworks(artworkList as any);
 
       return {
         songId: artwork.id,

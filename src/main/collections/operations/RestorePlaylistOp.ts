@@ -54,6 +54,8 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
 
     const affectedSongIds = Array.from(new Set(entries.map(e => e.songId)));
 
+    const duration = typeof playlist.totalDuration === 'string' ? parseFloat(playlist.totalDuration) : (playlist.totalDuration || 0);
+
     return {
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlist.id),
@@ -64,7 +66,12 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
         input: { playlistId: playlist.id }
       },
       version: 1,
-      affectedSongIds
+      affectedSongIds,
+      statsDelta: playlist.parentId ? {
+        targetPlaylistId: playlist.parentId,
+        itemCountDelta: playlist.itemCount || 0,
+        durationDelta: duration
+      } : undefined
     };
   }
 }

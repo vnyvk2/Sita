@@ -1,3 +1,4 @@
+import type { SaveDialogOptions } from 'electron';
 import { writeFile } from 'fs/promises';
 import { basename } from 'path';
 import { inArray } from 'drizzle-orm';
@@ -5,7 +6,7 @@ import { db } from '@main/db/db';
 import { songs } from '@main/db/schema';
 import logger from '../logger';
 import { sendMessageToRenderer, showSaveDialog } from '../main';
-import type { CollectionReadRepository } from '../collections/repository/CollectionReadRepository';
+import type { PlaylistRepository } from '../collections/repositories/PlaylistRepository';
 
 const generateSaveDialogOptions = (playlistName: string) => {
   const saveOptions: SaveDialogOptions = {
@@ -61,8 +62,8 @@ const createM3u8FileForPlaylist = async (
   }
 };
 
-const exportPlaylist = async (playlistId: number, repository: CollectionReadRepository) => {
-  const collection = await repository.getCollection(playlistId);
+const exportPlaylist = async (playlistId: number, repository: PlaylistRepository) => {
+  const collection = await repository.getById(playlistId);
 
   if (!collection)
     return logger.warn("Failed to export playlist because requested playlist didn't exist", {
@@ -79,9 +80,9 @@ const exportPlaylist = async (playlistId: number, repository: CollectionReadRepo
       }
     );
 
-  const songIds = entries.map(e => e.songId);
-  const songRecords = await db.select({ path: songs.path }).from(songs).where(inArray(songs.songId, songIds));
-  const songPaths = songRecords.map(s => s.path);
+  const songIds = entries.map((e) => e.entry.songId);
+  const songRecords = await db.select({ path: songs.path }).from(songs).where(inArray(songs.id, songIds));
+  const songPaths = songRecords.map((s) => s.path);
 
   return await createM3u8FileForPlaylist(collection.id, collection.name, songPaths);
 };

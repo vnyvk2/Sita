@@ -53,7 +53,12 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
         input: { playlistId, entryIds: inserted.map(e => e.id) }
       },
       version: 1,
-      affectedSongIds: songIds
+      affectedSongIds: songIds,
+      statsDelta: {
+        targetPlaylistId: playlistId,
+        itemCountDelta,
+        durationDelta
+      }
     };
   }
 }

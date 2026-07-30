@@ -38,7 +38,9 @@ export class RestoreSongsOp implements CollectionOperation<RestoreSongsInput, { 
 
     // Restore the exact entries
     const inserted = await this.repository.insertEntries(entriesToInsert as any, ctx.trx);
-    const affectedSongIds = Array.from(new Set(inserted.map(e => e.songId)));
+    const restoredSongIds = inserted.map(e => e.songId);
+    const affectedSongIds = Array.from(new Set(restoredSongIds));
+    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(restoredSongIds, ctx.trx);
 
     return {
       data: { restoredCount: inserted.length },
@@ -50,7 +52,12 @@ export class RestoreSongsOp implements CollectionOperation<RestoreSongsInput, { 
         input: { playlistId, entryIds: inserted.map(e => e.id) }
       },
       version: 1,
-      affectedSongIds
+      affectedSongIds,
+      statsDelta: {
+        targetPlaylistId: playlistId,
+        itemCountDelta,
+        durationDelta
+      }
     };
   }
 }

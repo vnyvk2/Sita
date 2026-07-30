@@ -79,13 +79,7 @@ export class PlaylistEngine {
   public async addSongs(input: AddSongsInput) {
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      const res = await this.executor.execute(this.addSongsOp, input, ctx);
-      
-      const { deltaCount, deltaDuration } = res.data;
-      await this.repository.applyStatisticsDelta(input.playlistId, { itemCountDelta: deltaCount, durationDelta: deltaDuration }, trx);
-      await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
-      
-      return res;
+      return await this.executor.execute(this.addSongsOp, input, ctx);
     });
 
     this.invalidateCache(result.affectedSongIds);
@@ -96,13 +90,7 @@ export class PlaylistEngine {
   public async removeSongs(input: RemoveSongsInput) {
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      const res = await this.executor.execute(this.removeSongsOp, input, ctx);
-      
-      const { deltaCount, deltaDuration } = res.data;
-      await this.repository.applyStatisticsDelta(input.playlistId, { itemCountDelta: deltaCount, durationDelta: deltaDuration }, trx);
-      await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
-      
-      return res;
+      return await this.executor.execute(this.removeSongsOp, input, ctx);
     });
 
     this.invalidateCache(result.affectedSongIds);
@@ -192,12 +180,7 @@ export class PlaylistEngine {
   public async mergePlaylists(input: MergePlaylistsInput) {
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      const res = await this.executor.execute(this.mergeOp, input, ctx);
-      
-      const { deltaCount, deltaDuration } = res.data;
-      await this.folderStats.propagateStats(input.targetPlaylistId, deltaCount, deltaDuration, trx);
-      
-      return res;
+      return await this.executor.execute(this.mergeOp, input, ctx);
     });
     this.invalidateCache(result.affectedSongIds);
     collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.targetPlaylistId, action: 'merge' } });

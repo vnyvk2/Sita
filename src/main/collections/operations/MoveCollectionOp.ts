@@ -20,7 +20,8 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
     input: MoveCollectionInput,
     ctx: OperationContext
   ): Promise<OperationResult<void>> {
-    const { playlistIds, targetParentId } = input;
+    const playlistIds = input.playlistIds ?? ((input as any).playlistId ? [(input as any).playlistId] : []);
+    const targetParentId = input.targetParentId !== undefined ? input.targetParentId : ((input as any).newParentId ?? null);
 
     if (playlistIds.length === 0) {
       return {
@@ -66,6 +67,8 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
       .set({ parentId: targetParentId })
       .where(inArray(playlists.id, playlistIds));
 
+    this.resolver.invalidateCache();
+
     // Return the inverse
     const restoreInput = {
       moves: currentRows.map((r) => ({
@@ -76,7 +79,7 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
 
     return {
       data: undefined,
-      collectionId: createCollectionId('local', 'playlist', 0),
+      collectionId: createCollectionId('local', 'playlist', playlistIds[0] ?? 0),
       operationType: 'playlist.move',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
@@ -105,14 +108,16 @@ export class RestoreMoveOp implements CollectionOperation<RestoreMoveInput, void
         .where(eq(playlists.id, move.playlistId));
     }
 
+    const firstId = input.moves[0]?.playlistId ?? 0;
+
     return {
       data: undefined,
-      collectionId: createCollectionId('local', 'playlist', 0),
+      collectionId: createCollectionId('local', 'playlist', firstId),
       operationType: 'playlist.restoreMove',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.move',
-        input: { playlistIds: [], targetParentId: null } // We don't generate inverse of inverse for now
+        input: { playlistIds: input.moves.map(m => m.playlistId), targetParentId: null }
       },
       version: 1,
       affectedSongIds: []

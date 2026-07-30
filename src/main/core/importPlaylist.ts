@@ -9,7 +9,7 @@ import type { OpenDialogOptions } from 'electron';
 import { appPreferences } from '../../../package.json';
 import logger from '../logger';
 import { sendMessageToRenderer, showOpenDialog } from '../main';
-import type { CollectionEngine } from '../collections/engine/CollectionEngine';
+import type { PlaylistEngine } from '../collections/engine/PlaylistEngine';
 
 const DEFAULT_EXPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   title: `Select a Destination where your M3U8 file is`,
@@ -34,7 +34,7 @@ const resolveSongPath = (text: string, m3uDir: string): string | null => {
   return null;
 };
 
-const importPlaylist = async (targetPlaylistId?: number, engine?: CollectionEngine) => {
+const importPlaylist = async (targetPlaylistId?: number, engine?: PlaylistEngine) => {
   try {
     const destinations = await showOpenDialog(DEFAULT_EXPORT_DIALOG_OPTIONS);
 

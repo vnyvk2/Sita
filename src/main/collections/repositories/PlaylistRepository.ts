@@ -124,6 +124,7 @@ export class PlaylistRepository {
     const [inserted] = await trx
       .insert(playlists)
       .values(data)
+      .overridingSystemValue()
       .returning();
       
     return inserted;

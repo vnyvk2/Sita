@@ -146,7 +146,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     undoEngine,
     playlistRepository,
     hierarchyService,
-    sendMessageToRenderer
+    (channel: string, ...args: any[]) => mainWindow?.webContents?.send(channel, ...args)
   );
 
   // Ensure we gracefully drain on shutdown only once

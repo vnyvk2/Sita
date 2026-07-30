@@ -32,6 +32,12 @@ export interface OperationInverseInput {
   input: unknown;
 }
 
+export interface OperationStatsDelta {
+  targetPlaylistId: number;
+  itemCountDelta: number;
+  durationDelta: number;
+}
+
 export interface OperationResult<T> {
   data: T;
   collectionId: CollectionId;
@@ -40,6 +46,7 @@ export interface OperationResult<T> {
   inverseInput: OperationInverseInput;
   version: number;
   affectedSongIds: readonly number[];
+  statsDelta?: OperationStatsDelta;
 }
 
 export interface CollectionOperation<TInput, TResult> {

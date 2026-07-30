@@ -21,8 +21,9 @@ export class HierarchyService {
    * If the hierarchy is large, this retrieves all children in multiple queries.
    */
   public async getDescendants(playlistId: number, trx: any = db): Promise<PlaylistNode[]> {
+    const isDb = trx === db;
     const cacheKey = `descendants:${playlistId}`;
-    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    if (isDb && this.cache.has(cacheKey)) return this.cache.get(cacheKey);
 
     const descendants: PlaylistNode[] = [];
     let currentLevelIds = [playlistId];
@@ -44,7 +45,7 @@ export class HierarchyService {
       currentLevelIds = children.map((c: PlaylistNode) => c.id);
     }
 
-    this.cache.set(cacheKey, descendants);
+    if (isDb) this.cache.set(cacheKey, descendants);
     return descendants;
   }
 
@@ -52,8 +53,9 @@ export class HierarchyService {
    * Fetches the ancestor chain from the given playlist ID up to the root folder.
    */
   public async getAncestors(playlistId: number, trx: any = db): Promise<PlaylistNode[]> {
+    const isDb = trx === db;
     const cacheKey = `ancestors:${playlistId}`;
-    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    if (isDb && this.cache.has(cacheKey)) return this.cache.get(cacheKey);
 
     const ancestors: PlaylistNode[] = [];
     let currentId: number | null = playlistId;
@@ -85,7 +87,7 @@ export class HierarchyService {
       depthCount++;
     }
 
-    this.cache.set(cacheKey, ancestors);
+    if (isDb) this.cache.set(cacheKey, ancestors);
     return ancestors;
   }
 
@@ -154,9 +156,8 @@ export class HierarchyService {
 
   /**
    * Invalidate cached hierarchy data. 
-   * @internal Designed to be called internally by operations that structurally mutate the hierarchy.
    */
-  private invalidateCache(): void {
+  public invalidateCache(): void {
     this.cache.clear();
   }
 }

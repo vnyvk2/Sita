@@ -31,12 +31,8 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number) => {
-    const entries = await repository.getEntries(id); 
-    const actualOffset = offset ?? 0;
-    return (limit !== undefined 
-      ? entries.slice(actualOffset, actualOffset + limit) 
-      : entries.slice(actualOffset)
-    ).map(mapEntryToDto);
+    const entries = await repository.getEntries(id, { limit, offset });
+    return entries.map(mapEntryToDto);
   });
 
   ipcMain.handle('collections/read/getBreadcrumbs', async (_, id: number) => {
@@ -112,11 +108,13 @@ export function setupCollectionIpc(
 
   // History Endpoints
   ipcMain.handle('collections/history/undo', async (_, collectionId: string) => {
-    return await undoEngine.undo(parseCollectionUri(collectionId));
+    const uri = collectionId || 'local://playlist/0';
+    return await undoEngine.undo(parseCollectionUri(uri));
   });
 
   ipcMain.handle('collections/history/redo', async (_, collectionId: string) => {
-    return await undoEngine.redo(parseCollectionUri(collectionId));
+    const uri = collectionId || 'local://playlist/0';
+    return await undoEngine.redo(parseCollectionUri(uri));
   });
 
   // Event Forwarding

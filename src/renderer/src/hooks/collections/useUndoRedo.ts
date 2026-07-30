@@ -32,15 +32,15 @@ export const useUndoRedo = () => {
           // Redo: Ctrl+Shift+Z or Cmd+Shift+Z
           // We pass 'global' or empty string since undo/redo is global for now,
           // but if we need a specific context later, we can adjust.
-          redoMutation.mutate('');
+          redoMutation.mutate('local://playlist/0');
         } else {
           // Undo: Ctrl+Z or Cmd+Z
-          undoMutation.mutate('');
+          undoMutation.mutate('local://playlist/0');
         }
       } else if (cmdOrCtrl && e.key.toLowerCase() === 'y' && !isMac) {
         // Redo: Ctrl+Y (Windows/Linux)
         e.preventDefault();
-        redoMutation.mutate('');
+        redoMutation.mutate('local://playlist/0');
       }
     };
 
@@ -51,8 +51,8 @@ export const useUndoRedo = () => {
   }, [undoMutation, redoMutation]);
 
   return {
-    undo: () => undoMutation.mutate(''),
-    redo: () => redoMutation.mutate(''),
+    undo: () => undoMutation.mutate('local://playlist/0'),
+    redo: () => redoMutation.mutate('local://playlist/0'),
     isUndoing: undoMutation.isPending,
     isRedoing: redoMutation.isPending,
   };

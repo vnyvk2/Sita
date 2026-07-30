@@ -71,7 +71,6 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
       insertedEntryIds.push(...inserted.map(i => i.id));
       
       mergeDeltas = await this.repository.computeStatisticsDelta(Array.from(newSongIds), ctx.trx);
-      await this.repository.applyStatisticsDelta(targetPlaylistId, mergeDeltas, ctx.trx);
     }
 
     // Inverse is removing these exact entry IDs
@@ -90,7 +89,12 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
         input: inverseInput
       },
       version: 1,
-      affectedSongIds: Array.from(newSongIds)
+      affectedSongIds: Array.from(newSongIds),
+      statsDelta: {
+        targetPlaylistId,
+        itemCountDelta: mergeDeltas.itemCountDelta,
+        durationDelta: mergeDeltas.durationDelta
+      }
     };
   }
 }

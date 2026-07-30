@@ -260,6 +260,8 @@ const messages = {
 const dataUpdates = {
   dataUpdateEvent: (callback: (e: unknown, dataEvents: DataUpdateEvent[]) => void) =>
     ipcRenderer.on('app/dataUpdateEvent', callback),
+  removeDataUpdateEventListener: (callback: (e: unknown, dataEvents: DataUpdateEvent[]) => void) =>
+    ipcRenderer.removeListener('app/dataUpdateEvent', callback),
   removeDataUpdateEventListeners: () => ipcRenderer.removeAllListeners('app/dataUpdateEvent')
 };
 

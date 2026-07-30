@@ -22,7 +22,7 @@ export class CreatePlaylistOp implements CollectionOperation<CreatePlaylistInput
     const inserted = await this.repository.createPlaylist({
       name: input.name,
       parentId: input.parentId ?? null,
-      playlistType: 'playlist'
+      playlistType: 'standard'
     }, ctx.trx);
 
     return {

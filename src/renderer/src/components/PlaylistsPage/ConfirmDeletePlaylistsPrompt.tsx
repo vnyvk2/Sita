@@ -1,5 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
-import type { CollectionDto } from '@main/collections/dto/CollectionDto';
+import type { PlaylistDto as CollectionDto } from '@main/collections/ipc/dtos';
 import { CollectionClient } from '../../api/CollectionClient';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +42,7 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
 
   const removePlaylists = useCallback(() => {
     bulkDelete.mutate(
-      { collectionIds: playlistIds },
+      { playlistIds },
       {
         onSuccess: () => {
           changePromptMenuData(false);
