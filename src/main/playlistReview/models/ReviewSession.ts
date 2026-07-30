@@ -4,7 +4,7 @@ import type { UserOverride } from './UserOverride';
 export interface ReviewSession {
   id: string;
   originalPlan: PlaylistImportPlan;
-  currentPlan: PlaylistImportPlan;
+  effectivePlan: PlaylistImportPlan;
   userOverrides: UserOverride[];
   isValid: boolean;
   validationErrors: string[];

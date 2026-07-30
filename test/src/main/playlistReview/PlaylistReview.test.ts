@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { PlaylistReviewService } from '@main/playlistReview/services/PlaylistReviewService';
 import { ReviewValidator } from '@main/playlistReview/validator/ReviewValidator';
+import { PlanRegenerator } from '@main/playlistReview/services/PlanRegenerator';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 
-describe('Phase 13 — Interactive Review & Decision Framework', () => {
-  it('should create a review session and apply candidate selection overrides', () => {
+describe('Phase 13 — Interactive Review & Decision Framework Refinements', () => {
+  it('should create a review session and derive effective plan via PlanRegenerator', () => {
     const validator = new ReviewValidator();
-    const service = new PlaylistReviewService(validator);
+    const regenerator = new PlanRegenerator();
+    const service = new PlaylistReviewService(validator, regenerator);
 
     const initialPlan: PlaylistImportPlan = {
       playlistName: 'Rock Classics',
@@ -47,7 +49,7 @@ describe('Phase 13 — Interactive Review & Decision Framework', () => {
 
     const session = service.createSession(initialPlan);
     expect(session.isValid).toBe(true);
-    expect(session.currentPlan.statistics.importedEntries).toBe(1);
+    expect(session.effectivePlan.statistics.importedEntries).toBe(1);
 
     const updatedSession = service.applyOverride(session.id, {
       id: 'ov_1',
@@ -58,14 +60,15 @@ describe('Phase 13 — Interactive Review & Decision Framework', () => {
     });
 
     expect(updatedSession.isValid).toBe(true);
-    expect(updatedSession.currentPlan.statistics.importedEntries).toBe(2);
-    expect(updatedSession.currentPlan.entries[1].decision).toBe('IMPORT');
-    expect(updatedSession.currentPlan.entries[1].source.trackReference.libraryMatch.matchedSongId).toBe(999);
+    expect(updatedSession.effectivePlan.statistics.importedEntries).toBe(2);
+    expect(updatedSession.effectivePlan.entries[1].decision).toBe('IMPORT');
+    expect(updatedSession.effectivePlan.entries[1].source.trackReference.libraryMatch.matchedSongId).toBe(999);
   });
 
-  it('should support FORCE_SKIP user overrides', () => {
+  it('should support FORCE_SKIP user overrides and derive effective plan', () => {
     const validator = new ReviewValidator();
-    const service = new PlaylistReviewService(validator);
+    const regenerator = new PlanRegenerator();
+    const service = new PlaylistReviewService(validator, regenerator);
 
     const initialPlan: PlaylistImportPlan = {
       playlistName: 'Rock Classics',
@@ -102,7 +105,7 @@ describe('Phase 13 — Interactive Review & Decision Framework', () => {
       reason: 'User decided to skip this track'
     });
 
-    expect(updatedSession.currentPlan.entries[0].decision).toBe('SKIP_MISSING');
-    expect(updatedSession.currentPlan.statistics.importedEntries).toBe(0);
+    expect(updatedSession.effectivePlan.entries[0].decision).toBe('SKIP_MISSING');
+    expect(updatedSession.effectivePlan.statistics.importedEntries).toBe(0);
   });
 });

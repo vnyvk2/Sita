@@ -24,6 +24,6 @@ export function setupPlaylistReviewIpc(
     if (!session || !session.isValid) {
       throw new Error(`Cannot execute invalid or missing review session ${sessionId}`);
     }
-    return await workflow.executePlan(session.currentPlan);
+    return await workflow.executePlan(session.effectivePlan);
   });
 }
