@@ -186,42 +186,20 @@ export class PlaylistRepository {
       .where(eq(playlistEntries.id, entryId));
   }
 
-  public async recalculatePlaylistStatistics(playlistId: number, trx: DB | DBTransaction = db): Promise<{ deltaCount: number, deltaDuration: number }> {
-    const [stats] = await trx
-      .select({
-        count: sql<number>`count(*)::int`,
-        duration: sql<number>`sum(COALESCE(${songs.duration}, 0))::int`
-      })
-      .from(playlistEntries)
-      .innerJoin(songs, eq(playlistEntries.songId, songs.id))
-      .where(eq(playlistEntries.playlistId, playlistId));
-
-    const newCount = stats?.count ?? 0;
-    const newDuration = stats?.duration ?? 0;
-
-    const [oldStats] = await trx
-      .select({
-        itemCount: playlists.itemCount,
-        totalDuration: playlists.totalDuration
-      })
-      .from(playlists)
-      .where(eq(playlists.id, playlistId));
-
-    const oldCount = oldStats?.itemCount ?? 0;
-    const oldDuration = Number(oldStats?.totalDuration ?? 0);
-
-    const deltaCount = newCount - oldCount;
-    const deltaDuration = newDuration - oldDuration;
+  public async applyStatisticsDelta(
+    playlistId: number, 
+    deltas: { itemCountDelta: number; durationDelta: number },
+    trx: DB | DBTransaction = db
+  ): Promise<void> {
+    if (deltas.itemCountDelta === 0 && deltas.durationDelta === 0) return;
 
     await trx
       .update(playlists)
       .set({
-        itemCount: newCount,
-        totalDuration: newDuration.toString(),
+        itemCount: sql`${playlists.itemCount} + ${deltas.itemCountDelta}`,
+        totalDuration: sql`(${playlists.totalDuration} + ${deltas.durationDelta})::decimal(12,3)`,
         updatedAt: new Date()
       })
       .where(eq(playlists.id, playlistId));
-
-    return { deltaCount, deltaDuration };
   }
 }

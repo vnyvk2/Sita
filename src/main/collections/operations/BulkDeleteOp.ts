@@ -79,9 +79,14 @@ export interface BulkRestoreInput {
 
 export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void> {
   private repository: PlaylistRepository;
+  private resolver: HierarchyService;
 
-  constructor(repository: PlaylistRepository = new PlaylistRepository()) {
+  constructor(
+    repository: PlaylistRepository = new PlaylistRepository(),
+    resolver: HierarchyService = new HierarchyService()
+  ) {
     this.repository = repository;
+    this.resolver = resolver;
   }
 
   public async execute(
@@ -91,36 +96,29 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
     const restoreOp = new RestorePlaylistOp(this.repository);
     const allAffectedSongIds = new Set<number>();
 
-    // 1. Build a map of parentId -> children from the input to perform topological sort
-    const childrenMap = new Map<number | null, RestorePlaylistInput[]>();
-    const allInputIds = new Set(input.restores.map(r => r.playlist.id));
+    // 1. Use HierarchyService to determine topological order
+    const nodes = input.restores.map(r => ({
+      id: r.playlist.id,
+      parentId: r.playlist.parentId,
+      name: r.playlist.name,
+      playlistType: r.playlist.playlistType
+    }));
+    
+    const sortedNodes = this.resolver.topologicalOrder(nodes);
+    
+    // Create a map for quick lookup
+    const restoreMap = new Map(input.restores.map(r => [r.playlist.id, r]));
 
-    for (const restore of input.restores) {
-      // If a node's parent is not in this restore batch, treat it as a root for this batch
-      const effectiveParentId = (restore.playlist.parentId !== null && allInputIds.has(restore.playlist.parentId))
-        ? restore.playlist.parentId
-        : null;
-      
-      const children = childrenMap.get(effectiveParentId) || [];
-      children.push(restore);
-      childrenMap.set(effectiveParentId, children);
-    }
-
-    // 2. Traverse and execute restores top-down
-    const executeTopDown = async (parentId: number | null) => {
-      const nodes = childrenMap.get(parentId) || [];
-      for (const node of nodes) {
-        const result = await restoreOp.execute(node, ctx);
-        if (result.affectedSongIds) {
-          for (const songId of result.affectedSongIds) {
-            allAffectedSongIds.add(songId);
-          }
+    // 2. Execute restores top-down sequentially
+    for (const node of sortedNodes) {
+      const restoreNode = restoreMap.get(node.id)!;
+      const result = await restoreOp.execute(restoreNode, ctx);
+      if (result.affectedSongIds) {
+        for (const songId of result.affectedSongIds) {
+          allAffectedSongIds.add(songId);
         }
-        await executeTopDown(node.playlist.id);
       }
-    };
-
-    await executeTopDown(null);
+    }
 
     return {
       data: undefined,

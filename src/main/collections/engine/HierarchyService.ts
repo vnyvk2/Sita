@@ -115,10 +115,17 @@ export class HierarchyService {
 
   /**
    * Returns nodes in topological order (parents before children).
-   * Useful for duplication or recursive operations where structure matters.
+   * Guarantees stable ordering between siblings (sorted by name case-insensitively, then id).
    */
   public topologicalOrder(nodes: PlaylistNode[]): PlaylistNode[] {
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    // Sort nodes to guarantee deterministic ordering
+    const sortedNodes = [...nodes].sort((a, b) => {
+      const nameCmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      if (nameCmp !== 0) return nameCmp;
+      return a.id - b.id;
+    });
+
+    const nodeMap = new Map(sortedNodes.map(n => [n.id, n]));
     const result: PlaylistNode[] = [];
     const visited = new Set<number>();
     
@@ -138,7 +145,7 @@ export class HierarchyService {
       result.push(node);
     };
 
-    for (const node of nodes) {
+    for (const node of sortedNodes) {
       visit(node.id);
     }
     
@@ -147,7 +154,7 @@ export class HierarchyService {
 
   /**
    * Invalidate cached hierarchy data. 
-   * Designed to be called after structurally mutating operations.
+   * @internal Designed to be called internally by operations that structurally mutate the hierarchy.
    */
   public invalidateCache(): void {
     this.cache.clear();

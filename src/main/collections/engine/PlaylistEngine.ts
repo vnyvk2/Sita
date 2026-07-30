@@ -52,7 +52,8 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       const res = await this.executor.execute(this.addSongsOp, input, ctx);
       
-      const { deltaCount, deltaDuration } = await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      const { deltaCount, deltaDuration } = res.data;
+      await this.repository.applyStatisticsDelta(input.playlistId, { itemCountDelta: deltaCount, durationDelta: deltaDuration }, trx);
       await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
       
       return res;
@@ -67,7 +68,8 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       const res = await this.executor.execute(this.removeSongsOp, input, ctx);
       
-      const { deltaCount, deltaDuration } = await this.repository.recalculatePlaylistStatistics(input.playlistId, trx);
+      const { deltaCount, deltaDuration } = res.data;
+      await this.repository.applyStatisticsDelta(input.playlistId, { itemCountDelta: deltaCount, durationDelta: deltaDuration }, trx);
       await this.folderStats.propagateStats(input.playlistId, deltaCount, deltaDuration, trx);
       
       return res;
