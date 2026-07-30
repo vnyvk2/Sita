@@ -4,13 +4,24 @@ import { libraryEventBus } from '../../events/LibraryEventBus';
 import { DependencyAnalyzer } from './DependencyAnalyzer';
 import { libraryScheduler } from '../../workers/jobScheduler';
 import { SmartPlaylistJob } from '../../workers/jobs/smartPlaylistJob';
+import type { SmartPlaylistField } from '../query/ast';
 
 export class SmartPlaylistScheduler {
   private dirtyPlaylists = new Set<number>();
   private debounceTimeout: NodeJS.Timeout | null = null;
+  private metrics = {
+    eventsReceived: 0,
+    playlistsConsidered: 0,
+    jobsQueued: 0,
+    lastFlushDurationMs: 0
+  };
 
   constructor() {
     this.setupListeners();
+  }
+
+  public getMetrics() {
+    return { ...this.metrics };
   }
 
   private setupListeners() {
@@ -33,7 +44,8 @@ export class SmartPlaylistScheduler {
     );
   }
 
-  private async handleEvent(eventName: string, changedFields: string[]) {
+  private async handleEvent(eventName: string, changedFields: SmartPlaylistField[]) {
+    this.metrics.eventsReceived++;
     try {
       const allRules = await db
         .select({
@@ -42,15 +54,17 @@ export class SmartPlaylistScheduler {
         })
         .from(smartPlaylistRules);
 
+      this.metrics.playlistsConsidered += allRules.length;
+
       for (const rule of allRules) {
         // If it's a structural change, we assume it's affected since it could match any rule
         let affected = false;
 
         if (eventName === 'SongAdded' || eventName === 'SongRemoved') {
           affected = true;
-        } else if (rule.dependencies && rule.dependencies.length > 0) {
+        } else if (Array.isArray(rule.dependencies)) {
           affected = DependencyAnalyzer.isAffectedByMetadataChange(
-            rule.dependencies as any[],
+            rule.dependencies,
             changedFields
           );
         } else {
@@ -81,13 +95,16 @@ export class SmartPlaylistScheduler {
   }
 
   private flushDirtyPlaylists() {
+    const startTime = performance.now();
     for (const playlistId of this.dirtyPlaylists) {
       const job = new SmartPlaylistJob(`smart_playlist_regenerate_${playlistId}`, playlistId);
       libraryScheduler.enqueue(job);
+      this.metrics.jobsQueued++;
     }
 
     this.dirtyPlaylists.clear();
     this.debounceTimeout = null;
+    this.metrics.lastFlushDurationMs = performance.now() - startTime;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SmartPlaylistScheduler } from '../../../../../src/main/collections/engine/SmartPlaylistScheduler';
+import { smartPlaylistScheduler } from '../../../../../src/main/collections/engine/SmartPlaylistScheduler';
 import { libraryEventBus } from '../../../../../src/main/events/LibraryEventBus';
 import { db } from '../../../../../src/main/db/db';
 import { smartPlaylistRules } from '../../../../../src/main/db/schema';
@@ -18,24 +18,30 @@ vi.mock('../../../../../src/main/db/db', () => ({
       from: vi.fn().mockResolvedValue([
         { playlistId: 1, dependencies: ['title'] },
         { playlistId: 2, dependencies: ['playCount'] },
-        { playlistId: 3, dependencies: ['artist', 'genre'] }
+        { playlistId: 3, dependencies: ['artist', 'genre'] },
+        { playlistId: 4, dependencies: ['artist'] }, // For testing multiple playlists depending on the same field
+        { playlistId: 5, dependencies: [] } // For testing playlist depending on no fields
       ])
     }))
   }
 }));
 
 describe('SmartPlaylistScheduler', () => {
-  let scheduler: SmartPlaylistScheduler;
+  const flushMicrotasks = async (count = 1) => {
+    for (let i = 0; i < count; i++) {
+      await Promise.resolve();
+    }
+  };
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    scheduler = new SmartPlaylistScheduler(); // this sets up listeners
+    (smartPlaylistScheduler as any).dirtyPlaylists.clear();
+    (smartPlaylistScheduler as any).debounceTimeout = null;
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    libraryEventBus.removeAllListeners();
   });
 
   it('should ignore events if dependencies do not match', async () => {
@@ -82,9 +88,9 @@ describe('SmartPlaylistScheduler', () => {
     await Promise.resolve();
     await vi.runAllTimersAsync();
     
-    // Playlist 3 cares about artist
-    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
-    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(3);
+    // Playlist 3 and 4 care about artist
+    const queuedIds = (libraryScheduler.enqueue as any).mock.calls.map((c: any) => c[0].playlistId);
+    expect(queuedIds).toContain(3);
   });
 
   it('should only queue playlist once when it matches multiple changing fields', async () => {
@@ -95,7 +101,47 @@ describe('SmartPlaylistScheduler', () => {
     await vi.runAllTimersAsync();
     
     // Playlist 3 should only be queued once
+    const queuedIds = (libraryScheduler.enqueue as any).mock.calls.map((c: any) => c[0].playlistId);
+    expect(queuedIds.filter((id: number) => id === 3).length).toBe(1);
+  });
+
+  it('should queue all playlists that depend on the same changed field', async () => {
+    // Both playlist 3 and playlist 4 depend on 'artist'
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['artist'] });
+    
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    
+    expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(2);
+    const queuedIds = (libraryScheduler.enqueue as any).mock.calls.map((c: any) => c[0].playlistId);
+    expect(queuedIds).toContain(3);
+    expect(queuedIds).toContain(4);
+  });
+
+  it('should never queue a playlist that depends on no fields', async () => {
+    // Playlist 5 has empty dependencies. It should never be queued by a metadata change.
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['title', 'artist', 'genre', 'year'] });
+    
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    
+    const queuedIds = (libraryScheduler.enqueue as any).mock.calls.map((c: any) => c[0].playlistId);
+    expect(queuedIds).not.toContain(5);
+  });
+
+  it('should debounce rapid burst of 100 metadata events into a single queue operation per affected playlist', async () => {
+    // Simulate a burst of 100 song updates (e.g. bulk edit or scanning)
+    for (let i = 0; i < 100; i++) {
+      libraryEventBus.emitEvent('SongMetadataChanged', { songId: i, changedFields: ['title'] });
+    }
+    
+    // Drain microtasks for all 100 events
+    await flushMicrotasks(100);
+    
+    await vi.runAllTimersAsync();
+    
+    // Playlist 1 cares about 'title'. Even after 100 events, it should be queued exactly once.
     expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
-    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(3);
+    expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(1);
   });
 });

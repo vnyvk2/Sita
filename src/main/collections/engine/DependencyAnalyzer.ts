@@ -38,11 +38,12 @@ export class DependencyAnalyzer {
    */
   public static isAffectedByMetadataChange(
     cachedDependencies: SmartPlaylistField[],
-    changedFields: string[]
+    changedFields: SmartPlaylistField[]
   ): boolean {
-    if (!cachedDependencies || cachedDependencies.length === 0) return true; // Default safe fallback
+    if (!cachedDependencies) return true; // Default safe fallback if missing
+    if (cachedDependencies.length === 0) return false; // Explicitly empty means no dependencies
 
-    const dependencySet = new Set(cachedDependencies as string[]);
+    const dependencySet = new Set(cachedDependencies);
     // If any of the changed fields is in our dependencies, we are affected
     for (const field of changedFields) {
       if (dependencySet.has(field)) {

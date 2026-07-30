@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { SmartPlaylistField } from '../collections/query/ast';
 
 export type LibraryEvent =
   | 'SongMetadataChanged'
@@ -10,7 +11,7 @@ export type LibraryEvent =
 
 export interface SongMetadataChangedEvent {
   songId: number;
-  changedFields: string[]; // e.g. ['title', 'artist']
+  changedFields: SmartPlaylistField[]; // e.g. ['title', 'artist']
 }
 
 export interface SongEvent {
