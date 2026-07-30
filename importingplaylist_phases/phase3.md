@@ -14,24 +14,28 @@ M3UImporter
 ImportedPlaylist
       │
       ▼
-PlaylistPathResolver
+PlaylistPathResolver (Pure path calculation)
+      │
+      ▼
+FilesystemVerifier (Disk verification via FileSystemAccess)
       │
       ▼
 ResolvedPlaylist
 ```
 
-## Features & Behaviors
-1. **Resolution Pipeline**:
-   - Converts `file:///` URIs to native filesystem paths (`file:///C:/Music/Song.mp3` -> `C:\Music\Song.mp3` or `/Music/Song.mp3`).
+## Features & Components
+1. **`PlaylistPathResolver` (Pure Path Calculation)**:
+   - Converts `file:///` URIs to native filesystem paths (`file:///C:/Music/Song.mp3` -> `C:\Music\Song.mp3`).
    - Resolves relative paths (`..\Music\Song.mp3`, `./Song.mp3`, `Music/Song.mp3`) using the playlist file's directory as the base.
-   - Preserves absolute paths (`C:\Music\Song.mp3`, `/home/user/music/song.mp3`) untouched.
-   - Normalizes path separators without altering filename casing or Unicode normalization.
-2. **Filesystem Existence Checking**:
-   - Checks if the resolved target path exists on the filesystem (`stat` / `access`).
-   - Assigns status: `'FOUND'` | `'MISSING'` | `'INVALID_URI'`.
-3. **Immutability & Diagnostics**:
-   - `ImportedPlaylist` remains untouched.
-   - Produces `ResolvedPlaylist`, `ResolvedPlaylistEntry`, `ResolvedTrackReference`, and `PathResolutionResult`.
-   - Stores `originalReference` and `resolvedPath`.
-4. **Side-effect Free**:
-   - No music database queries, no song metadata matching, no UI, no IPC.
+   - Preserves absolute paths (`C:\Music\Song.mp3`, `/home/user/music/song.mp3`).
+   - Marks non-filesystem URIs (e.g. `spotify:track:...`, `http://...`) as `UNRESOLVED`.
+   - Normalizes path separators without altering filename casing or Unicode.
+
+2. **`FilesystemVerifier` & `FileSystemAccess`**:
+   - `FileSystemAccess`: Abstraction interface for disk checking (`exists(path)`).
+   - `FilesystemVerifier`: Async layer that verifies if resolved paths exist on disk, updating status from `RESOLVED` to `MISSING` if absent.
+
+3. **Models**:
+   - `PathResolutionResult` (`status: 'RESOLVED' | 'UNRESOLVED' | 'MISSING' | 'INVALID_URI'`).
+   - `ResolvedTrackReference`, `ResolvedPlaylistEntry`, `ResolvedPlaylist`.
+   - Immutability preserved (`ImportedPlaylist` is never mutated).
