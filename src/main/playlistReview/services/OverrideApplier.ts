@@ -3,8 +3,14 @@ import type { UserOverride } from '../models/UserOverride';
 
 export class OverrideApplier {
   applyOverrides(entries: PlaylistImportPlanEntry[], overrides: UserOverride[]): PlaylistImportPlanEntry[] {
+    if (overrides.length === 0) return entries;
+
+    const overrideMap = new Map<number, UserOverride>(
+      overrides.map((o) => [o.entryPosition, o])
+    );
+
     return entries.map((entry) => {
-      const override = overrides.find((o) => o.entryPosition === entry.source.position);
+      const override = overrideMap.get(entry.source.position);
       if (!override) return entry;
 
       if (override.type === 'FORCE_SKIP') {
