@@ -8,4 +8,5 @@ export interface PlaylistEntryWriteModel {
 export interface PlaylistPersistence {
   createPlaylist(name: string, description?: string): Promise<number>;
   addEntries(playlistId: number, entries: PlaylistEntryWriteModel[]): Promise<void>;
+  deletePlaylist?(playlistId: number): Promise<void>;
 }

@@ -13,4 +13,8 @@ export class EnginePlaylistPersistence implements PlaylistPersistence {
     const songIds = entries.map((e) => e.songId);
     await this.engine.addSongs({ playlistId, songIds });
   }
+
+  async deletePlaylist(playlistId: number): Promise<void> {
+    await this.engine.deletePlaylist({ playlistId });
+  }
 }

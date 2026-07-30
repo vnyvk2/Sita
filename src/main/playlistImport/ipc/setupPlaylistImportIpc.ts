@@ -1,9 +1,13 @@
 import { ipcMain } from 'electron';
 import type { PlaylistImportWorkflow } from '../workflow/PlaylistImportWorkflow';
+import type { PlaylistImportHistoryService } from '../services/PlaylistImportHistoryService';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
 
-export function setupPlaylistImportIpc(workflow: PlaylistImportWorkflow): void {
+export function setupPlaylistImportIpc(
+  workflow: PlaylistImportWorkflow,
+  historyService?: PlaylistImportHistoryService
+): void {
   ipcMain.handle(
     'playlistImport:preview',
     async (_event, filePath: string, options?: PlaylistImportOptions) => {
@@ -17,4 +21,18 @@ export function setupPlaylistImportIpc(workflow: PlaylistImportWorkflow): void {
       return await workflow.executePlan(plan);
     }
   );
+
+  if (historyService) {
+    ipcMain.handle('playlistImport:history', async () => {
+      return await historyService.listHistory();
+    });
+
+    ipcMain.handle('playlistImport:undo', async (_event, sessionId: string) => {
+      return await historyService.undoImport(sessionId);
+    });
+
+    ipcMain.handle('playlistImport:replay', async (_event, sessionId: string) => {
+      return await historyService.replayImport(sessionId, workflow);
+    });
+  }
 }
