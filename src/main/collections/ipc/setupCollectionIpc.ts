@@ -6,10 +6,11 @@ import type { HierarchyService } from '../engine/HierarchyService';
 import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
-import getArtworksForMultipleArtworksCover from '../../core/getArtworksForMultipleArtworksCover';
+
 import exportPlaylist from '../../core/exportPlaylist';
 import importPlaylist from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
+import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
 
 export function setupCollectionIpc(
   engine: PlaylistEngine,
@@ -44,7 +45,7 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/read/getArtworks', async (_, songIds: number[]) => {
-    return await getArtworksForMultipleArtworksCover(songIds);
+    return await CollectionArtworkRepository.getArtworks(songIds);
   });
 
   // Write Endpoints

@@ -3,7 +3,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Link, RouterProvider, createHashHistory, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CollectionEventProvider } from './components/CollectionEventProvider';
+import { CollectionEventProvider } from './components/providers/CollectionEventProvider';
 import { UndoShortcutProvider } from './components/UndoShortcutProvider';
 
 import './i18n';

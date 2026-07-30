@@ -42,7 +42,7 @@ import restoreBlacklistedSongs from './core/restoreBlacklistedSongs';
 import saveArtworkToSystem from './core/saveArtworkToSystem';
 import sendAudioData from './core/sendAudioData';
 import sendAudioDataFromPath from './core/sendAudioDataFromPath';
-import sendPlaylistData from './core/sendPlaylistData';
+
 import sendSongID3Tags from './core/sendSongMetadata';
 import toggleBlacklistFolders from './core/toggleBlacklistFolders';
 import toggleLikeArtists from './core/toggleLikeArtists';
