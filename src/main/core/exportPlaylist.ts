@@ -1,7 +1,7 @@
 import { writeFile } from 'fs/promises';
 import { basename } from 'path';
 import { inArray } from 'drizzle-orm';
-import { db } from '@main/db';
+import { db } from '@main/db/db';
 import { songs } from '@main/db/schema';
 import logger from '../logger';
 import { sendMessageToRenderer, showSaveDialog } from '../main';
