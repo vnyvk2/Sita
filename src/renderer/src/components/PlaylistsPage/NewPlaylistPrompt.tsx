@@ -3,6 +3,7 @@
 /* eslint-disable promise/catch-or-return */
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useCreatePlaylist } from '../../hooks/collections/useCollectionMutations';
 
 import PlaylistDefaultCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
@@ -21,14 +22,16 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
   const [input, setInput] = useState('');
   const [artworkPath, setArtworkPath] = useState('');
 
+  const createPlaylist = useCreatePlaylist();
+
   const createNewPlaylist = (playlistName: string) => {
     if (playlistName !== '') {
-      window.api.playlistsData
-        .addNewPlaylist(playlistName.trim(), undefined, artworkPath)
-        .then((res) => {
-          if (res && res.success && res.playlist) {
+      createPlaylist.mutate(
+        { name: playlistName.trim() },
+        {
+          onSuccess: () => {
             changePromptMenuData(false);
-            props.updatePlaylists([...props.currentPlaylists, res.playlist]);
+            // Invalidation happens automatically via CollectionEventProvider
             addNewNotifications([
               {
                 id: 'playlistCreated',
@@ -36,18 +39,19 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
                 content: t('newPlaylistPrompt.addPlaylistSuccess')
               }
             ]);
-          } else {
+          },
+          onError: (err) => {
             addNewNotifications([
               {
                 id: 'playlistCreateFailed',
                 duration: 5000,
-
-                content: <>{res.message}</>
+                content: <>{(err as Error).message}</>
               }
             ]);
           }
-        });
-    } else
+        }
+      );
+    } else {
       addNewNotifications([
         {
           id: 'EmptyPlaylistName',
@@ -55,6 +59,7 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
           content: t('newPlaylistPrompt.playlistNameEmpty')
         }
       ]);
+    }
   };
 
   return (

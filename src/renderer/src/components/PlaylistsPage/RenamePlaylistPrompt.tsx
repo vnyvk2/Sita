@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/no-autofocus */
 import { useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRenameCollection } from '../../hooks/collections/useCollectionMutations';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
@@ -17,12 +18,23 @@ const RenamePlaylistPrompt = (props: Props) => {
 
   const [input, setInput] = useState(name);
 
+  const renameCollection = useRenameCollection();
+
   const renamePlaylist = useCallback(
-    (newName: string) =>
-      window.api.playlistsData
-        .renameAPlaylist(playlistId, newName)
-        .then(() => changePromptMenuData(false)),
-    [changePromptMenuData, playlistId]
+    (newName: string) => {
+      renameCollection.mutate(
+        { collectionId: playlistId, name: newName },
+        {
+          onSuccess: () => {
+            changePromptMenuData(false);
+          },
+          onError: (err) => {
+            console.error(err);
+          }
+        }
+      );
+    },
+    [changePromptMenuData, playlistId, renameCollection]
   );
 
   return (

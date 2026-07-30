@@ -1,6 +1,17 @@
 export interface CreateFolderInput {
-  parentId?: number;
   name: string;
+  parentId?: number | null;
+}
+
+export interface CreatePlaylistInput {
+  name: string;
+  parentId?: number | null;
+}
+
+export interface AddSongsInput {
+  playlistId: number;
+  songIds: readonly number[];
+  insertAt?: number;
 }
 
 export interface RenameInput {

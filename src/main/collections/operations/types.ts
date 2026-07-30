@@ -11,6 +11,7 @@ export type OperationType =
   | 'playlist.restoreSongs'
   | 'playlist.updateSmartRule'
   | 'playlist.createFolder'
+  | 'playlist.createPlaylist'
   | 'playlist.move'
   | 'playlist.restoreMove'
   | 'playlist.bulkDelete'

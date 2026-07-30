@@ -12,6 +12,7 @@ import { DeleteOp, type DeleteInput } from '../operations/DeleteOp';
 import { PinOp, type PinInput } from '../operations/PinOp';
 import { UnpinOp, type UnpinInput } from '../operations/PinOp';
 import { CreateFolderOp, type CreateFolderInput } from '../operations/CreateFolderOp';
+import { CreatePlaylistOp, type CreatePlaylistInput } from '../operations/CreatePlaylistOp';
 import { DuplicateOp, type DuplicateInput } from '../operations/DuplicateOp';
 import { DuplicatePlanner } from '../operations/DuplicatePlanner';
 import { DuplicateExecutor } from '../operations/DuplicateExecutor';
@@ -36,6 +37,7 @@ export class PlaylistEngine {
   private readonly pinOp: PinOp;
   private readonly unpinOp: UnpinOp;
   private readonly createFolderOp: CreateFolderOp;
+  private readonly createPlaylistOp: CreatePlaylistOp;
   private readonly duplicateOp: DuplicateOp;
   private readonly mergeOp: MergePlaylistsOp;
   private readonly moveOp: MoveCollectionOp;
@@ -64,6 +66,7 @@ export class PlaylistEngine {
     this.pinOp = new PinOp();
     this.unpinOp = new UnpinOp();
     this.createFolderOp = new CreateFolderOp(this.repository);
+    this.createPlaylistOp = new CreatePlaylistOp(this.repository);
     this.duplicateOp = new DuplicateOp(new DuplicatePlanner(this.hierarchyService), new DuplicateExecutor());
     this.mergeOp = new MergePlaylistsOp(this.repository);
     this.moveOp = new MoveCollectionOp(this.hierarchyService);
@@ -163,7 +166,16 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.createFolderOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: result.data, action: 'create' } });
+    collectionEventBus.emitEvent({ type: 'CollectionCreated', payload: { collectionId: result.data, parentId: input.parentId ?? null } });
+    return result.data;
+  }
+
+  public async createPlaylist(input: CreatePlaylistInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.createPlaylistOp, input, ctx);
+    });
+    collectionEventBus.emitEvent({ type: 'CollectionCreated', payload: { collectionId: result.data, parentId: input.parentId ?? null } });
     return result.data;
   }
 

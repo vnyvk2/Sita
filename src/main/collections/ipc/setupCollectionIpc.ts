@@ -42,6 +42,16 @@ export function setupCollectionIpc(
     return playlist ? mapPlaylistToDto(playlist) : null;
   });
 
+  ipcMain.handle('collections/write/createPlaylist', async (_, input) => {
+    const result = await engine.createPlaylist(input);
+    const playlist = await repository.getById(result);
+    return playlist ? mapPlaylistToDto(playlist) : null;
+  });
+
+  ipcMain.handle('collections/write/addSongs', async (_, input) => {
+    return await engine.addSongs(input);
+  });
+
   ipcMain.handle('collections/write/rename', async (_, input) => {
     return await engine.renamePlaylist(input);
   });

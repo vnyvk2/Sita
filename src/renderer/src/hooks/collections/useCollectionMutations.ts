@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
 import type { 
-  CreateFolderInput, 
+  CreateFolderInput,
+  CreatePlaylistInput,
+  AddSongsInput,
   RenameInput, 
   MoveCollectionInput, 
   DeleteInput, 
@@ -16,6 +18,18 @@ import type {
 export const useCreateFolder = () => {
   return useMutation({
     mutationFn: (input: CreateFolderInput) => CollectionClient.createFolder(input),
+  });
+};
+
+export const useCreatePlaylist = () => {
+  return useMutation({
+    mutationFn: (input: CreatePlaylistInput) => CollectionClient.createPlaylist(input),
+  });
+};
+
+export const useAddSongsToCollection = () => {
+  return useMutation({
+    mutationFn: (input: AddSongsInput) => CollectionClient.addSongs(input),
   });
 };
 

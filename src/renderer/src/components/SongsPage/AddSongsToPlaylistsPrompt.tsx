@@ -5,8 +5,8 @@ import { playlistQuery } from '@renderer/queries/playlists';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useAddSongsToCollection } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
 import Checkbox from '../Checkbox';
 import Img from '../Img';
@@ -81,6 +81,7 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
   });
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
+  const addSongsMutation = useAddSongsToCollection();
 
   const addSongsToPlaylists = useCallback(() => {
     const selectedPlaylistsData = playlists.filter((playlist) =>
@@ -92,8 +93,7 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
         return window.api.playerControls
           .toggleLikeSongs(songIds, true)
           .catch((err) => console.error(err));
-      return window.api.playlistsData
-        .addSongsToPlaylist(playlist.playlistId, songIds)
+      return addSongsMutation.mutateAsync({ playlistId: playlist.playlistId, songIds })
         .catch((err) => console.error(err));
     });
     Promise.all(promises)
@@ -115,7 +115,7 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
       .finally(() => {
         changePromptMenuData(false);
       });
-  }, [playlists, songIds, selectedPlaylistIds, addNewNotifications, t, changePromptMenuData]);
+  }, [playlists, songIds, selectedPlaylistIds, addNewNotifications, t, changePromptMenuData, addSongsMutation]);
 
   const playlistComponents = useMemo(
     () =>

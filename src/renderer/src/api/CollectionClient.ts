@@ -1,6 +1,8 @@
 import type { 
-  CreateFolderInput, 
-  RenameInput, 
+  CreateFolderInput,
+  CreatePlaylistInput,
+  AddSongsInput,
+  RenameInput,  
   MoveCollectionInput, 
   DeleteInput, 
   DuplicateInput,
@@ -21,6 +23,8 @@ export const CollectionClient = {
 
   // Write
   createFolder: (input: CreateFolderInput) => window.api.collections.write.createFolder(input),
+  createPlaylist: (input: CreatePlaylistInput) => window.api.collections.write.createPlaylist(input),
+  addSongs: (input: AddSongsInput) => window.api.collections.write.addSongs(input),
   rename: (input: RenameInput) => window.api.collections.write.rename(input),
   move: (input: MoveCollectionInput) => window.api.collections.write.move(input),
   delete: (input: DeleteInput) => window.api.collections.write.delete(input),

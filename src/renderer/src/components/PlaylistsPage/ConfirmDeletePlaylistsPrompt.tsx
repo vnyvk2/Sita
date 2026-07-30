@@ -3,6 +3,7 @@ import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useBulkDeleteCollections } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
 
 interface ConfirmDeletePlaylistProp {
@@ -17,6 +18,7 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
   const { playlistIds, playlistName } = props;
 
   const [playlistsData, setPlaylistsData] = useState<Playlist[]>([]);
+  const bulkDelete = useBulkDeleteCollections();
 
   useEffect(() => {
     if (playlistIds.length > 0) {
@@ -37,22 +39,25 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
   }, [playlistIds]);
 
   const removePlaylists = useCallback(() => {
-    window.api.playlistsData
-      .removePlaylists(playlistIds)
-      .then(() => {
-        changePromptMenuData(false);
-        return addNewNotifications([
-          {
-            id: `playlistsDeleted`,
-            duration: 5000,
-            content: t('confirmDeletePlaylistsPrompt.playlistsDeletedWithCount', {
-              count: playlistIds.length
-            })
-          }
-        ]);
-      })
-      .catch((err) => console.error(err));
-  }, [addNewNotifications, changePromptMenuData, playlistIds, t]);
+    bulkDelete.mutate(
+      { collectionIds: playlistIds },
+      {
+        onSuccess: () => {
+          changePromptMenuData(false);
+          addNewNotifications([
+            {
+              id: `playlistsDeleted`,
+              duration: 5000,
+              content: t('confirmDeletePlaylistsPrompt.playlistsDeletedWithCount', {
+                count: playlistIds.length
+              })
+            }
+          ]);
+        },
+        onError: (err) => console.error(err)
+      }
+    );
+  }, [addNewNotifications, changePromptMenuData, playlistIds, t, bulkDelete]);
 
   return (
     <>

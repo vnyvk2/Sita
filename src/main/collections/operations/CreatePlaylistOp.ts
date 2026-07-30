@@ -3,12 +3,12 @@ import { db } from '../../db/db';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 
-export interface CreateFolderInput {
+export interface CreatePlaylistInput {
   name: string;
   parentId?: number | null;
 }
 
-export class CreateFolderOp implements CollectionOperation<CreateFolderInput, number> {
+export class CreatePlaylistOp implements CollectionOperation<CreatePlaylistInput, number> {
   private repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository = new PlaylistRepository()) {
@@ -16,19 +16,19 @@ export class CreateFolderOp implements CollectionOperation<CreateFolderInput, nu
   }
 
   public async execute(
-    input: CreateFolderInput,
+    input: CreatePlaylistInput,
     ctx: OperationContext
   ): Promise<OperationResult<number>> {
     const inserted = await this.repository.createPlaylist({
       name: input.name,
       parentId: input.parentId ?? null,
-      playlistType: 'folder'
+      playlistType: 'playlist'
     }, ctx.trx);
 
     return {
       data: inserted.id,
       collectionId: createCollectionId('local', 'playlist', inserted.id),
-      operationType: 'playlist.createFolder',
+      operationType: 'playlist.createPlaylist',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.delete',

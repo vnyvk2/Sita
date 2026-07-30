@@ -5,7 +5,8 @@ export type CollectionEvent =
   | { type: 'CollectionDeleted'; payload: { collectionIds: number[] } }
   | { type: 'CollectionMoved'; payload: { collectionId: number; newParentId: number | null } }
   | { type: 'CollectionPinned'; payload: { collectionId: number; isPinned: boolean } }
-  | { type: 'SmartPlaylistUpdated'; payload: { collectionId: number } };
+  | { type: 'SmartPlaylistUpdated'; payload: { collectionId: number } }
+  | { type: 'CollectionCreated'; payload: { collectionId: number; parentId: number | null } };
 
 export class CollectionEventBus extends EventEmitter {
   public emitEvent(event: CollectionEvent): boolean {
