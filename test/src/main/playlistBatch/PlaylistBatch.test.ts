@@ -6,7 +6,7 @@ import type { BatchItem } from '@main/playlistBatch/models/BatchItem';
 import type { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
 
 describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinements', () => {
-  it('should compute layered executionLevels for parallel dependency execution', () => {
+  it('should compute structured ExecutionLevel metadata for parallel dependency execution', () => {
     const graph = new PlaylistDependencyGraph();
 
     const items: BatchItem[] = [
@@ -19,14 +19,21 @@ describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinemen
     const levels = graph.computeExecutionLevels(items);
 
     // Level 0: independent items (rock & pop)
-    expect(levels[0]).toEqual(['item_rock', 'item_pop']);
+    expect(levels[0].level).toBe(0);
+    expect(levels[0].items).toEqual(['item_rock', 'item_pop']);
+    expect(levels[0].parallelizable).toBe(true);
+
     // Level 1: depends on rock (workout)
-    expect(levels[1]).toEqual(['item_workout']);
+    expect(levels[1].level).toBe(1);
+    expect(levels[1].items).toEqual(['item_workout']);
+    expect(levels[1].parallelizable).toBe(false);
+
     // Level 2: depends on workout (gym)
-    expect(levels[2]).toEqual(['item_gym']);
+    expect(levels[2].level).toBe(2);
+    expect(levels[2].items).toEqual(['item_gym']);
   });
 
-  it('should create batch execution plan with executionLevels and orchestrate execution', async () => {
+  it('should create batch execution plan with executionLevels metadata and orchestrate execution', async () => {
     const graph = new PlaylistDependencyGraph();
     const planner = new PlaylistBatchPlanner(graph);
 
@@ -50,7 +57,7 @@ describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinemen
     const plan = planner.createBatchPlan(items, 'CONTINUE_ON_ERROR');
     expect(plan.executionOrder).toHaveLength(2);
     expect(plan.executionLevels).toHaveLength(1);
-    expect(plan.executionLevels[0]).toEqual(['item_1', 'item_2']);
+    expect(plan.executionLevels[0].items).toEqual(['item_1', 'item_2']);
 
     const summary = await orchestrator.executeBatchPlan(plan);
 

@@ -1,4 +1,5 @@
 import type { BatchItem } from '../models/BatchItem';
+import type { ExecutionLevel } from '../models/ExecutionLevel';
 
 export class PlaylistDependencyGraph {
   sortTopologically(items: BatchItem[]): string[] {
@@ -36,12 +37,13 @@ export class PlaylistDependencyGraph {
     return order;
   }
 
-  computeExecutionLevels(items: BatchItem[]): string[][] {
-    const levels: string[][] = [];
+  computeExecutionLevels(items: BatchItem[]): ExecutionLevel[] {
+    const levels: ExecutionLevel[] = [];
     const processed = new Set<string>();
     const itemMap = new Map(items.map((item) => [item.id, item]));
 
     let remaining = [...items];
+    let levelNumber = 0;
 
     while (remaining.length > 0) {
       const currentLevel = remaining.filter((item) =>
@@ -53,7 +55,11 @@ export class PlaylistDependencyGraph {
       }
 
       const levelIds = currentLevel.map((i) => i.id);
-      levels.push(levelIds);
+      levels.push({
+        level: levelNumber++,
+        items: levelIds,
+        parallelizable: levelIds.length > 1
+      });
 
       for (const id of levelIds) {
         processed.add(id);
