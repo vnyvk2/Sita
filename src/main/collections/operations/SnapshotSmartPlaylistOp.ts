@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists, playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { eq } from 'drizzle-orm';
@@ -68,7 +69,7 @@ export class SnapshotSmartPlaylistOp implements CollectionOperation<SnapshotSmar
 
     return {
       data: inserted.id,
-      collectionId: `local:playlist:${inserted.id}` as any,
+      collectionId: createCollectionId('local', 'playlist', inserted.id),
       operationType: 'playlist.snapshot',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

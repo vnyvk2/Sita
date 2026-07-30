@@ -107,7 +107,7 @@ export class RestoreMoveOp implements CollectionOperation<RestoreMoveInput, void
 
     return {
       data: undefined,
-      collectionId: 'local:playlist:0' as any,
+      collectionId: createCollectionId('local', 'playlist', 0),
       operationType: 'playlist.restoreMove',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

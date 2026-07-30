@@ -13,6 +13,8 @@ import { PinOp, type PinInput } from '../operations/PinOp';
 import { UnpinOp, type UnpinInput } from '../operations/PinOp';
 import { CreateFolderOp, type CreateFolderInput } from '../operations/CreateFolderOp';
 import { DuplicateOp, type DuplicateInput } from '../operations/DuplicateOp';
+import { DuplicatePlanner } from '../operations/DuplicatePlanner';
+import { DuplicateExecutor } from '../operations/DuplicateExecutor';
 import { MergePlaylistsOp, type MergePlaylistsInput } from '../operations/MergePlaylistsOp';
 import { MoveCollectionOp, type MoveCollectionInput } from '../operations/MoveCollectionOp';
 import { BulkDeleteOp, BulkRestoreOp, type BulkDeleteInput, type BulkRestoreInput } from '../operations/BulkDeleteOp';
@@ -46,11 +48,13 @@ export class PlaylistEngine {
   constructor(
     repository: PlaylistRepository,
     membershipService: MembershipService,
-    executor: OperationExecutor
+    executor: OperationExecutor,
+    hierarchyService: HierarchyService
   ) {
     this.repository = repository;
     this.membershipService = membershipService;
     this.executor = executor;
+    this.hierarchyService = hierarchyService;
 
     this.addSongsOp = new AddSongsOp(this.repository);
     this.removeSongsOp = new RemoveSongsOp(this.repository);
@@ -59,11 +63,10 @@ export class PlaylistEngine {
     this.deleteOp = new DeleteOp(this.repository);
     this.pinOp = new PinOp();
     this.unpinOp = new UnpinOp();
-    this.hierarchyService = new HierarchyService();
     this.createFolderOp = new CreateFolderOp(this.repository);
-    this.duplicateOp = new DuplicateOp(this.repository);
+    this.duplicateOp = new DuplicateOp(new DuplicatePlanner(this.hierarchyService), new DuplicateExecutor());
     this.mergeOp = new MergePlaylistsOp(this.repository);
-    this.moveOp = new MoveCollectionOp(this.repository, this.hierarchyService);
+    this.moveOp = new MoveCollectionOp(this.hierarchyService);
     this.bulkDeleteOp = new BulkDeleteOp(this.repository);
     this.bulkRestoreOp = new BulkRestoreOp(this.repository, this.hierarchyService);
     
@@ -177,7 +180,12 @@ export class PlaylistEngine {
   public async mergePlaylists(input: MergePlaylistsInput) {
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      return await this.executor.execute(this.mergeOp, input, ctx);
+      const res = await this.executor.execute(this.mergeOp, input, ctx);
+      
+      const { deltaCount, deltaDuration } = res.data;
+      await this.folderStats.propagateStats(input.targetPlaylistId, deltaCount, deltaDuration, trx);
+      
+      return res;
     });
     this.invalidateCache(result.affectedSongIds);
     collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.targetPlaylistId, action: 'merge' } });
@@ -189,7 +197,9 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.moveOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionMoved', payload: { collectionId: input.playlistId, newParentId: input.newParentId } });
+    for (const id of input.playlistIds) {
+      collectionEventBus.emitEvent({ type: 'CollectionMoved', payload: { collectionId: id, newParentId: input.targetParentId } });
+    }
     return result.data;
   }
 

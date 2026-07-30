@@ -42,7 +42,7 @@ export function registerDefaultOperations(
   reg.register('playlist.duplicate', new DuplicateOp(new DuplicatePlanner(hierarchy), new DuplicateExecutor()));
   reg.register('playlist.merge', new MergePlaylistsOp(repo));
   reg.register('playlist.rename', new RenameOp(repo));
-  reg.register('playlist.move', new MoveCollectionOp(repo, hierarchy));
+  reg.register('playlist.move', new MoveCollectionOp(hierarchy));
   reg.register('playlist.restoreMove', new RestoreMoveOp());
   reg.register('playlist.restore', new RestorePlaylistOp(repo));
   reg.register('playlist.addSongs', new AddSongsOp(repo));

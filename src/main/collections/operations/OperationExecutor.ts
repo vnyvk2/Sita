@@ -1,3 +1,4 @@
+import type { CollectionId } from '../../../common/collections/types';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import type { OperationJournalWriter } from './OperationJournalWriter';
 

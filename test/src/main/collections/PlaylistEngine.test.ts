@@ -20,6 +20,7 @@ vi.mock('../../../../src/main/db/db', async () => {
 
 import { db, client } from '../../../../src/main/db/db';
 import { PlaylistEngine } from '../../../../src/main/collections/engine/PlaylistEngine';
+import { HierarchyService } from '../../../../src/main/collections/engine/HierarchyService';
 import { PlaylistRepository } from '../../../../src/main/collections/repositories/PlaylistRepository';
 import { OperationExecutor } from '../../../../src/main/collections/operations/OperationExecutor';
 import { OperationJournalWriter } from '../../../../src/main/collections/operations/OperationJournalWriter';
@@ -61,7 +62,7 @@ describe('PlaylistEngine', () => {
       getCollectionsForSong: vi.fn(),
     } as unknown as MembershipService;
 
-    engine = new PlaylistEngine(repository, membershipService, executor);
+    engine = new PlaylistEngine(repository, membershipService, executor, new HierarchyService());
   });
 
   afterEach(async () => {

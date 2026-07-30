@@ -4,7 +4,11 @@ import { playlists } from '../../db/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export class FolderStatisticsService {
-  constructor(private hierarchyService: HierarchyService = new HierarchyService()) {}
+  private readonly hierarchyService: HierarchyService;
+
+  constructor(hierarchyService: HierarchyService = new HierarchyService()) {
+    this.hierarchyService = hierarchyService;
+  }
 
   /**
    * Propagates stat deltas up the ancestor chain.
@@ -19,7 +23,7 @@ export class FolderStatisticsService {
   ): Promise<void> {
     if (deltaCount === 0 && deltaDuration === 0) return;
 
-    const ancestors = await this.hierarchyService.getAncestors(playlistId);
+    const ancestors = await this.hierarchyService.getAncestors(playlistId, trx);
     if (ancestors.length === 0) return;
 
     for (const ancestor of ancestors) {

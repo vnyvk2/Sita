@@ -31,7 +31,7 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/read/getBreadcrumbs', async (_, id: number) => {
-    const ancestors = hierarchyService.collectAncestors(id);
+    const ancestors = await hierarchyService.getAncestors(id);
     return ancestors; 
   });
 

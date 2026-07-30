@@ -4,9 +4,13 @@ import { playlists } from '../../../../../src/main/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { DuplicateOp } from '../../../../../src/main/collections/operations/DuplicateOp';
 import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
+import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
+import { DuplicatePlanner } from '../../../../../src/main/collections/operations/DuplicatePlanner';
+import { DuplicateExecutor } from '../../../../../src/main/collections/operations/DuplicateExecutor';
 
 describe('DuplicateOp Integration', () => {
   let repository: PlaylistRepository;
+  let hierarchyService: HierarchyService;
   let duplicateOp: DuplicateOp;
 
   beforeEach(async () => {
@@ -14,7 +18,8 @@ describe('DuplicateOp Integration', () => {
     await db.delete(playlists);
     
     repository = new PlaylistRepository();
-    duplicateOp = new DuplicateOp();
+    hierarchyService = new HierarchyService();
+    duplicateOp = new DuplicateOp(new DuplicatePlanner(hierarchyService), new DuplicateExecutor());
   });
 
   afterEach(async () => {

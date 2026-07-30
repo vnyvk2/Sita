@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -21,7 +22,7 @@ export class PinOp implements CollectionOperation<PinInput, void> {
 
     return {
       data: undefined,
-      collectionId: `local:playlist:${playlistId}` as any,
+      collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.pin',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
@@ -52,7 +53,7 @@ export class UnpinOp implements CollectionOperation<UnpinInput, void> {
 
     return {
       data: undefined,
-      collectionId: `local:playlist:${playlistId}` as any,
+      collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.unpin',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

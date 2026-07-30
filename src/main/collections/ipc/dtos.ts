@@ -41,7 +41,7 @@ export function mapPlaylistToDto(playlist: any): PlaylistDto {
     parentId: playlist.parentId,
     itemCount: playlist.itemCount,
     totalDuration: typeof playlist.totalDuration === 'string' ? parseFloat(playlist.totalDuration) : playlist.totalDuration,
-    isPinned: playlist.isPinned ?? false,
+    isPinned: playlist.pinnedAt !== null,
     artworkPath: playlist.artworkPath,
     createdAt: playlist.createdAt.toISOString(),
     updatedAt: playlist.updatedAt.toISOString(),

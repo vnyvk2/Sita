@@ -20,7 +20,7 @@ export class HierarchyService {
    * Fetches all direct and indirect descendants of a given playlist/folder ID.
    * If the hierarchy is large, this retrieves all children in multiple queries.
    */
-  public async getDescendants(playlistId: number): Promise<PlaylistNode[]> {
+  public async getDescendants(playlistId: number, trx: any = db): Promise<PlaylistNode[]> {
     const cacheKey = `descendants:${playlistId}`;
     if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
 
@@ -28,7 +28,7 @@ export class HierarchyService {
     let currentLevelIds = [playlistId];
 
     while (currentLevelIds.length > 0) {
-      const children = await db
+      const children: PlaylistNode[] = await trx
         .select({
           id: playlists.id,
           parentId: playlists.parentId,
@@ -41,7 +41,7 @@ export class HierarchyService {
       if (children.length === 0) break;
 
       descendants.push(...children);
-      currentLevelIds = children.map((c) => c.id);
+      currentLevelIds = children.map((c: PlaylistNode) => c.id);
     }
 
     this.cache.set(cacheKey, descendants);
@@ -51,7 +51,7 @@ export class HierarchyService {
   /**
    * Fetches the ancestor chain from the given playlist ID up to the root folder.
    */
-  public async getAncestors(playlistId: number): Promise<PlaylistNode[]> {
+  public async getAncestors(playlistId: number, trx: any = db): Promise<PlaylistNode[]> {
     const cacheKey = `ancestors:${playlistId}`;
     if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
 
@@ -63,7 +63,7 @@ export class HierarchyService {
     const MAX_DEPTH = 50;
 
     while (currentId !== null && depthCount < MAX_DEPTH) {
-      const [node] = await db
+      const [node]: PlaylistNode[] = await trx
         .select({
           id: playlists.id,
           parentId: playlists.parentId,

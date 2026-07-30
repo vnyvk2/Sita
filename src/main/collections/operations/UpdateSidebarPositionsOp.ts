@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
@@ -14,7 +15,7 @@ export class UpdateSidebarPositionsOp implements CollectionOperation<UpdateSideb
     if (input.updates.length === 0) {
       return {
         data: undefined,
-        collectionId: 'local:playlist:0' as any,
+        collectionId: createCollectionId('local', 'playlist', 0),
         operationType: 'playlist.updateSidebarPositions',
         operationInput: input as unknown as Record<string, unknown>,
         inverseInput: {
@@ -53,7 +54,7 @@ export class UpdateSidebarPositionsOp implements CollectionOperation<UpdateSideb
 
     return {
       data: undefined,
-      collectionId: 'local:playlist:0' as any,
+      collectionId: createCollectionId('local', 'playlist', 0),
       operationType: 'playlist.updateSidebarPositions',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

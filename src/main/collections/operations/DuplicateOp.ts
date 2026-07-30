@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { DuplicatePlanner } from './DuplicatePlanner';
@@ -40,7 +41,7 @@ export class DuplicateOp implements CollectionOperation<DuplicateInput, number> 
 
     return {
       data: rootNewId,
-      collectionId: `local:playlist:${rootNewId}` as any,
+      collectionId: createCollectionId('local', 'playlist', rootNewId),
       operationType: 'playlist.duplicate',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

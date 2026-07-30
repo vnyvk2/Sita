@@ -9,7 +9,7 @@ export interface MergePlaylistsInput {
   targetPlaylistId: number;
 }
 
-export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput, void> {
+export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput, { deltaCount: number; deltaDuration: number }> {
   private repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository = new PlaylistRepository()) {
@@ -19,7 +19,7 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
   public async execute(
     input: MergePlaylistsInput,
     ctx: OperationContext
-  ): Promise<OperationResult<void>> {
+  ): Promise<OperationResult<{ deltaCount: number; deltaDuration: number }>> {
     const { sourcePlaylistIds, targetPlaylistId } = input;
 
     // 1. Get current items in target to calculate starting position and for deduplication
@@ -58,8 +58,10 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
       }
     }
 
-    // 4. Insert
+    // 4. Insert and compute deltas
     const insertedEntryIds: number[] = [];
+    let mergeDeltas = { itemCountDelta: 0, durationDelta: 0 };
+
     if (entriesToInsert.length > 0) {
       const inserted = await ctx.trx
         .insert(playlistEntries)
@@ -68,9 +70,8 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
         
       insertedEntryIds.push(...inserted.map(i => i.id));
       
-      const newSongIdArray = Array.from(newSongIds);
-      const deltas = await this.repository.computeStatisticsDelta(newSongIdArray, ctx.trx);
-      await this.repository.applyStatisticsDelta(targetPlaylistId, deltas, ctx.trx);
+      mergeDeltas = await this.repository.computeStatisticsDelta(Array.from(newSongIds), ctx.trx);
+      await this.repository.applyStatisticsDelta(targetPlaylistId, mergeDeltas, ctx.trx);
     }
 
     // Inverse is removing these exact entry IDs
@@ -80,7 +81,7 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
     };
 
     return {
-      data: undefined,
+      data: { deltaCount: mergeDeltas.itemCountDelta, deltaDuration: mergeDeltas.durationDelta },
       collectionId: createCollectionId('local', 'playlist', targetPlaylistId),
       operationType: 'playlist.merge',
       operationInput: input as unknown as Record<string, unknown>,

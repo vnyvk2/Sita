@@ -1,4 +1,5 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { createCollectionId } from '../../../common/collections/id';
 import { DeleteOp } from './DeleteOp';
 import { RestorePlaylistOp, RestorePlaylistInput } from './RestorePlaylistOp';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
@@ -60,7 +61,7 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
 
     return {
       data: undefined,
-      collectionId: 'local:playlist:0' as any,
+      collectionId: createCollectionId('local', 'playlist', 0),
       operationType: 'playlist.bulkDelete',
       operationInput: { playlistIds: idsArray } as unknown as Record<string, unknown>,
       inverseInput: {
@@ -122,7 +123,7 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
 
     return {
       data: undefined,
-      collectionId: 'local:playlist:0' as any,
+      collectionId: createCollectionId('local', 'playlist', 0),
       operationType: 'playlist.bulkRestore',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {

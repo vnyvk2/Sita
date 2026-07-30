@@ -12,6 +12,7 @@ import { OperationJournalWriter } from '../../../../../src/main/collections/oper
 import { OperationRegistry } from '../../../../../src/main/collections/operations/OperationRegistry';
 import { OperationJournalRepository } from '../../../../../src/main/collections/repositories/OperationJournalRepository';
 import { MembershipService } from '../../../../../src/main/collections/membership/MembershipService';
+import { MembershipCache } from '../../../../../src/main/collections/membership/MembershipCache';
 import { registerDefaultOperations } from '../../../../../src/main/collections/setup';
 import { ipcMain } from 'electron';
 import { collectionEventBus } from '../../../../../src/main/collections/events/CollectionEventBus';
@@ -42,8 +43,8 @@ describe('Collection IPC Integration', () => {
     hierarchyService = new HierarchyService();
     const journalWriter = new OperationJournalWriter();
     executor = new OperationExecutor(journalWriter);
-    const membershipService = new MembershipService(repository);
-    engine = new PlaylistEngine(repository, membershipService, executor);
+    const membershipService = new MembershipService(new MembershipCache(), []);
+    engine = new PlaylistEngine(repository, membershipService, executor, hierarchyService);
     
     const registry = new OperationRegistry();
     registerDefaultOperations(registry, repository, hierarchyService);
