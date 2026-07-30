@@ -1,5 +1,4 @@
 import { dirname, isAbsolute, normalize, resolve } from 'path';
-import { stat } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import type { ImportedPlaylist } from '../models/ImportedPlaylist';
 import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
@@ -7,20 +6,12 @@ import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
 import type { PathResolutionResult } from '../models/PathResolutionResult';
 
 export class PlaylistPathResolver {
-  async resolvePlaylist(playlist: ImportedPlaylist, playlistFilePath: string): Promise<ResolvedPlaylist> {
+  resolvePlaylist(playlist: ImportedPlaylist, playlistFilePath: string): ResolvedPlaylist {
     const playlistDir = dirname(playlistFilePath);
     const resolvedEntries: ResolvedPlaylistEntry[] = [];
-    let foundCount = 0;
-    let missingCount = 0;
 
     for (const entry of playlist.entries) {
-      const resolution = await this.resolvePath(entry.track.originalLocation, playlistDir);
-
-      if (resolution.status === 'FOUND') {
-        foundCount++;
-      } else {
-        missingCount++;
-      }
+      const resolution = this.resolvePath(entry.track.originalLocation, playlistDir);
 
       resolvedEntries.push({
         position: entry.position,
@@ -40,20 +31,30 @@ export class PlaylistPathResolver {
       entries: resolvedEntries,
       sourceFormat: playlist.sourceFormat,
       sourceFile: playlist.sourceFile,
-      createdByImporter: playlist.createdByImporter,
-      foundCount,
-      missingCount
+      createdByImporter: playlist.createdByImporter
     };
   }
 
-  async resolvePath(originalReference: string, baseDir: string): Promise<PathResolutionResult> {
-    let candidatePath = originalReference;
+  resolvePath(originalReference: string, baseDir: string): PathResolutionResult {
+    let candidatePath = originalReference.trim();
+
+    // Check if it's a Windows drive letter (e.g. C:\ or D:/)
+    const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(candidatePath);
+
+    // Check for non-filesystem custom schemes (e.g. spotify:track:..., http://...)
+    if (!isWindowsDrive && /^[a-z0-9+-.]+:/i.test(candidatePath) && !candidatePath.toLowerCase().startsWith('file://')) {
+      return {
+        originalReference,
+        status: 'UNRESOLVED',
+        diagnostics: [`Non-filesystem URI scheme detected: ${candidatePath}`]
+      };
+    }
 
     // Handle file:// URIs
     if (candidatePath.toLowerCase().startsWith('file://')) {
       try {
         candidatePath = fileURLToPath(candidatePath);
-      } catch (err) {
+      } catch {
         return {
           originalReference,
           status: 'INVALID_URI',
@@ -67,20 +68,10 @@ export class PlaylistPathResolver {
       ? normalize(candidatePath)
       : normalize(resolve(baseDir, candidatePath));
 
-    // Check filesystem existence
-    try {
-      await stat(resolvedTarget);
-      return {
-        originalReference,
-        resolvedPath: resolvedTarget,
-        status: 'FOUND'
-      };
-    } catch {
-      return {
-        originalReference,
-        resolvedPath: resolvedTarget,
-        status: 'MISSING'
-      };
-    }
+    return {
+      originalReference,
+      resolvedPath: resolvedTarget,
+      status: 'RESOLVED'
+    };
   }
 }

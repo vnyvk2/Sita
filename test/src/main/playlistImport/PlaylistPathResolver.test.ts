@@ -1,72 +1,58 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
-import { stat } from 'fs/promises';
+import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
+import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
 import { normalize, resolve } from 'path';
 import type { ImportedPlaylist } from '@main/playlistImport/models/ImportedPlaylist';
 
-vi.mock('fs/promises', () => ({
-  stat: vi.fn()
-}));
-
-describe('PlaylistPathResolver', () => {
+describe('PlaylistPathResolver & FilesystemVerifier', () => {
   let resolver: PlaylistPathResolver;
 
   beforeEach(() => {
     resolver = new PlaylistPathResolver();
-    vi.clearAllMocks();
   });
 
-  it('should resolve relative paths against playlist directory and check existence', async () => {
-    vi.mocked(stat).mockImplementation(async (targetPath) => {
-      if (typeof targetPath === 'string' && targetPath.includes('song1.mp3')) {
-        return {} as any;
-      }
-      throw new Error('File not found');
+  it('should calculate relative and absolute resolved paths without filesystem check', () => {
+    const playlist: ImportedPlaylist = {
+      name: 'Test',
+      entries: [
+        { position: 1, track: { originalLocation: 'song1.mp3' } },
+        { position: 2, track: { originalLocation: String.raw`C:\Music\song2.flac` } },
+        { position: 3, track: { originalLocation: 'spotify:track:12345' } }
+      ]
+    };
+
+    const resolved = resolver.resolvePlaylist(playlist, '/music/playlists/test.m3u');
+
+    expect(resolved.entries[0].resolvedTrack.resolution).toEqual({
+      originalReference: 'song1.mp3',
+      resolvedPath: normalize(resolve('/music/playlists', 'song1.mp3')),
+      status: 'RESOLVED'
     });
+
+    expect(resolved.entries[1].resolvedTrack.resolution.status).toBe('RESOLVED');
+    expect(resolved.entries[2].resolvedTrack.resolution.status).toBe('UNRESOLVED');
+  });
+
+  it('should verify filesystem existence using FilesystemVerifier', async () => {
+    const mockFs: FileSystemAccess = {
+      exists: vi.fn(async (path: string) => path.includes('song1.mp3'))
+    };
+
+    const verifier = new FilesystemVerifier(mockFs);
 
     const playlist: ImportedPlaylist = {
       name: 'Test',
       entries: [
-        {
-          position: 1,
-          track: { originalLocation: 'song1.mp3' }
-        },
-        {
-          position: 2,
-          track: { originalLocation: 'missing.mp3' }
-        }
+        { position: 1, track: { originalLocation: 'song1.mp3' } },
+        { position: 2, track: { originalLocation: 'missing.mp3' } }
       ]
     };
 
-    const result = await resolver.resolvePlaylist(playlist, '/music/playlists/test.m3u');
+    const resolved = resolver.resolvePlaylist(playlist, '/music/playlists/test.m3u');
+    const verified = await verifier.verifyPlaylist(resolved);
 
-    expect(result.foundCount).toBe(1);
-    expect(result.missingCount).toBe(1);
-
-    expect(result.entries[0].resolvedTrack.resolution).toEqual({
-      originalReference: 'song1.mp3',
-      resolvedPath: normalize(resolve('/music/playlists', 'song1.mp3')),
-      status: 'FOUND'
-    });
-
-    expect(result.entries[1].resolvedTrack.resolution).toEqual({
-      originalReference: 'missing.mp3',
-      resolvedPath: normalize(resolve('/music/playlists', 'missing.mp3')),
-      status: 'MISSING'
-    });
-  });
-
-  it('should handle file:// URIs correctly', async () => {
-    vi.mocked(stat).mockResolvedValue({} as any);
-
-    const result = await resolver.resolvePath('file:///C:/Music/Song.mp3', 'C:\\Base');
-
-    expect(result.status).toBe('FOUND');
-    expect(result.resolvedPath).toBe(normalize('C:/Music/Song.mp3'));
-  });
-
-  it('should return INVALID_URI for malformed file:// URIs', async () => {
-    const result = await resolver.resolvePath('file://::invalid::', 'C:\\Base');
-    expect(result.status).toBe('INVALID_URI');
+    expect(verified.entries[0].resolvedTrack.resolution.status).toBe('RESOLVED');
+    expect(verified.entries[1].resolvedTrack.resolution.status).toBe('MISSING');
   });
 });

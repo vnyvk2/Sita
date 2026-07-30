@@ -7,6 +7,4 @@ export interface ResolvedPlaylist {
   sourceFormat?: string;
   sourceFile?: string;
   createdByImporter?: string;
-  foundCount: number;
-  missingCount: number;
 }
