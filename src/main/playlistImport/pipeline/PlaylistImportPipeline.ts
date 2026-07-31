@@ -44,14 +44,16 @@ export class PlaylistImportPipeline {
 
       for (const entry of libraryResolvedPlaylist.entries) {
         const match = entry.trackReference.libraryMatch;
-        logger.info({
-          stage: 'RESOLVED',
-          path: entry.trackReference.resolvedTrack.track.originalLocation,
-          libraryMatchStatus: match.status,
-          matchType: match.matchType,
-          songId: match.matchedSongId,
-          confidence: match.confidence
-        });
+        logger.info(
+          JSON.stringify({
+            stage: 'RESOLVED',
+            path: entry.trackReference.resolvedTrack.track.originalLocation,
+            libraryMatchStatus: match.status,
+            matchType: match.matchType,
+            songId: match.matchedSongId,
+            confidence: match.confidence
+          })
+        );
       }
 
       if (this.repairEngine) {
@@ -59,18 +61,20 @@ export class PlaylistImportPipeline {
 
         for (const entry of libraryResolvedPlaylist.entries) {
           const match = entry.trackReference.libraryMatch;
-          logger.info({
-            stage: 'REPAIRED',
-            path: entry.trackReference.resolvedTrack.track.originalLocation,
-            libraryMatchStatus: match.status,
-            matchType: match.matchType,
-            songId: match.matchedSongId,
-            confidence: match.confidence,
-            strategyName:
-              match.diagnostics?.[0] && typeof match.diagnostics[0] === 'object'
-                ? (match.diagnostics[0] as any).strategyName
-                : undefined
-          });
+          logger.info(
+            JSON.stringify({
+              stage: 'REPAIRED',
+              path: entry.trackReference.resolvedTrack.track.originalLocation,
+              libraryMatchStatus: match.status,
+              matchType: match.matchType,
+              songId: match.matchedSongId,
+              confidence: match.confidence,
+              strategyName:
+                match.diagnostics?.[0] && typeof match.diagnostics[0] === 'object'
+                  ? (match.diagnostics[0] as any).strategyName
+                  : undefined
+            })
+          );
         }
       }
 

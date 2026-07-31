@@ -29,23 +29,6 @@ export class LibraryResolver {
   async resolveEntry(entry: ResolvedPlaylistEntry): Promise<LibraryResolvedPlaylistEntry> {
     const { resolution } = entry.resolvedTrack;
 
-    if (resolution.verificationStatus === 'MISSING') {
-      return {
-        position: entry.position,
-        sourceLine: entry.sourceLine,
-        dateAdded: entry.dateAdded,
-        comments: entry.comments,
-        trackReference: {
-          resolvedTrack: entry.resolvedTrack,
-          libraryMatch: {
-            status: 'MISSING',
-            confidence: 0,
-            diagnostics: ['File is missing from filesystem']
-          }
-        }
-      };
-    }
-
     if (resolution.resolutionStatus === 'UNRESOLVED') {
       return {
         position: entry.position,
@@ -80,33 +63,24 @@ export class LibraryResolver {
       };
     }
 
-    if (resolution.resolutionStatus === 'RESOLVED' && resolution.resolvedPath) {
-      const matchedSong = await this.libraryLookup.findByCanonicalPath(resolution.resolvedPath);
+    // Always attempt canonical library lookup regardless of filesystem existence status
+    const targetPath = resolution.resolvedPath ?? entry.resolvedTrack.track.originalLocation;
+    if (targetPath) {
+      const matchedSong = await this.libraryLookup.findByCanonicalPath(targetPath);
 
       if (matchedSong) {
+        const diagnostics: string[] = [];
+        if (resolution.verificationStatus === 'MISSING') {
+          diagnostics.push('File missing from original playlist filesystem location, but matched in Nora library');
+        }
+
         const match: LibraryMatch = {
           matchedSongId: matchedSong.id,
           status: 'MATCHED',
           matchType: 'EXACT',
           confidence: 100,
-          candidates: [matchedSong]
-        };
-
-        return {
-          position: entry.position,
-          sourceLine: entry.sourceLine,
-          dateAdded: entry.dateAdded,
-          comments: entry.comments,
-          trackReference: {
-            resolvedTrack: entry.resolvedTrack,
-            libraryMatch: match
-          }
-        };
-      } else {
-        const match: LibraryMatch = {
-          status: 'NOT_IN_LIBRARY',
-          confidence: 0,
-          diagnostics: [`File exists at ${resolution.resolvedPath} but is not present in Nora library`]
+          candidates: [matchedSong],
+          diagnostics: diagnostics.length > 0 ? diagnostics : undefined
         };
 
         return {
@@ -122,6 +96,13 @@ export class LibraryResolver {
       }
     }
 
+    // If canonical lookup fails, preserve filesystem verification status as diagnostic metadata for RepairEngine
+    const status = resolution.verificationStatus === 'MISSING' ? 'MISSING' : 'NOT_IN_LIBRARY';
+    const diagnostics =
+      resolution.verificationStatus === 'MISSING'
+        ? ['File is missing from filesystem and not found in Nora library']
+        : [`File exists at ${targetPath} but is not present in Nora library`];
+
     return {
       position: entry.position,
       sourceLine: entry.sourceLine,
@@ -130,8 +111,9 @@ export class LibraryResolver {
       trackReference: {
         resolvedTrack: entry.resolvedTrack,
         libraryMatch: {
-          status: 'UNVERIFIED',
-          confidence: 0
+          status,
+          confidence: 0,
+          diagnostics
         }
       }
     };

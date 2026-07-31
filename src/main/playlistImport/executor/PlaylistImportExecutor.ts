@@ -36,10 +36,12 @@ export class PlaylistImportExecutor {
       }
     }
 
-    logger.info({
-      stage: 'EXECUTOR',
-      entriesQueued: entriesToImport.length
-    });
+    logger.info(
+      JSON.stringify({
+        stage: 'EXECUTOR',
+        entriesQueued: entriesToImport.length
+      })
+    );
 
     let createdPlaylistId = 0;
 

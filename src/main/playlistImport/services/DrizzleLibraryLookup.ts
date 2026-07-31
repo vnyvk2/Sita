@@ -39,6 +39,24 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         .limit(1);
     }
 
+    // 3. Try case-insensitive canonical path match (ilike) if exact slash queries fail
+    if (matchedSongs.length === 0) {
+      const targetAltSlash = targetPath.includes('\\')
+        ? targetPath.replaceAll('\\', '/')
+        : targetPath.replaceAll('/', '\\');
+
+      matchedSongs = await db
+        .select({
+          id: songs.id,
+          path: songs.path,
+          title: songs.title,
+          duration: songs.duration
+        })
+        .from(songs)
+        .where(or(ilike(songs.path, targetPath), ilike(songs.path, targetAltSlash)))
+        .limit(1);
+    }
+
     if (matchedSongs.length === 0) {
       return null;
     }

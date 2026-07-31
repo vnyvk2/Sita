@@ -90,10 +90,12 @@ export class M3UImporter implements PlaylistImporter {
         track
       });
 
-      logger.info({
-        stage: 'PARSED',
-        path: line
-      });
+      logger.info(
+        JSON.stringify({
+          stage: 'PARSED',
+          path: line
+        })
+      );
 
       pendingMetadata = null;
     }

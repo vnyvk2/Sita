@@ -77,15 +77,17 @@ export class PlaylistImportPlanner {
 
     for (const planEntry of planEntries) {
       const match = planEntry.source.trackReference.libraryMatch;
-      logger.info({
-        stage: 'PLANNED',
-        path: planEntry.source.trackReference.resolvedTrack.track.originalLocation,
-        decision: planEntry.decision,
-        libraryMatchStatus: match.status,
-        matchType: match.matchType,
-        songId: match.matchedSongId,
-        confidence: match.confidence
-      });
+      logger.info(
+        JSON.stringify({
+          stage: 'PLANNED',
+          path: planEntry.source.trackReference.resolvedTrack.track.originalLocation,
+          decision: planEntry.decision,
+          libraryMatchStatus: match.status,
+          matchType: match.matchType,
+          songId: match.matchedSongId,
+          confidence: match.confidence
+        })
+      );
     }
 
     const totalEntries = playlist.entries.length;
