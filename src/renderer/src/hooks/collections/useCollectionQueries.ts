@@ -29,8 +29,11 @@ export const rootCollectionsOptions = (sortType?: PlaylistSortTypes) => {
     queryKey: [...collectionKeys.children(null), sortType],
     queryFn: () => CollectionClient.getChildren(null),
     select: (data: any) => {
-      if (!sortType) return data;
+      if (!data) return [];
       return [...data].sort((a, b) => {
+        if (!!a.isPinned !== !!b.isPinned) {
+          return a.isPinned ? -1 : 1;
+        }
         switch (sortType) {
           case 'aToZ':
             return a.name.localeCompare(b.name);

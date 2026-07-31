@@ -414,6 +414,14 @@ export const Playlist = (props: PlaylistProp) => {
       }}
     >
       <div className="playlist-cover-and-play-btn-container relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl before:invisible before:absolute before:z-10 before:h-full before:w-full before:bg-linear-to-b before:from-[hsla(0,0%,0%,0%)] before:to-[hsla(0,0%,0%,40%)] before:opacity-0 before:transition-[visibility,opacity] before:duration-300 before:content-[''] group-focus-within:before:visible group-focus-within:before:opacity-100 group-hover:before:visible group-hover:before:opacity-100">
+        {props.isPinned && (
+          <div
+            className="absolute top-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-background-color-1/80 text-font-color-highlight backdrop-blur-xs shadow-md dark:bg-dark-background-color-1/80"
+            title={t('playlist.pinnedPlaylist', 'Pinned Playlist')}
+          >
+            <span className="material-icons-round text-sm">push_pin</span>
+          </div>
+        )}
         {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'playlist' ? (
           <MultipleSelectionCheckbox
             id={props.id}
