@@ -101,15 +101,17 @@ function PlaylistInfoPage() {
   });
 
   const filteredSongs = useMemo(() => {
-    if (!keyword?.trim()) return playlistSongs;
-    const q = keyword.trim().toLowerCase();
+    const q = keyword?.trim();
+    if (!q) return playlistSongs;
+    const lowerQ = q.toLowerCase();
+
     return playlistSongs.filter((song) => {
-      const titleMatch = song.title?.toLowerCase().includes(q);
+      const titleMatch = song.title?.toLowerCase().includes(lowerQ);
       const artistsStr = song.artists?.map((a) => a.name).join(' ').toLowerCase() ?? '';
-      const artistMatch = artistsStr.includes(q);
-      const albumMatch = song.album?.title?.toLowerCase().includes(q);
+      const artistMatch = artistsStr.includes(lowerQ);
+      const albumMatch = song.album?.title?.toLowerCase().includes(lowerQ);
       const genresStr = song.genres?.map((g) => g.name).join(' ').toLowerCase() ?? '';
-      const genreMatch = genresStr.includes(q);
+      const genreMatch = genresStr.includes(lowerQ);
       return titleMatch || artistMatch || albumMatch || genreMatch;
     });
   }, [playlistSongs, keyword]);
@@ -355,6 +357,13 @@ function PlaylistInfoPage() {
           );
         }}
       />
+      {playlistSongs.length > 0 && filteredSongs.length === 0 && (
+        <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
+          <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
+          <span className="mb-2 font-medium text-xl">{t('searchPage.noResultsTitle', 'No matching songs found')}</span>
+          <span className="text-sm opacity-75">{t('searchPage.noResultsDesc', { keyword, defaultValue: `No songs match "${keyword}" in this playlist.` })}</span>
+        </div>
+      )}
       {playlistSongs.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
