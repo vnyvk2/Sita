@@ -17,7 +17,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect } from 'react';
+import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Button from '@renderer/components/Button';
@@ -70,7 +70,7 @@ function PlaylistInfoPage() {
     enabled: !!playlistId
   });
 
-  const { data: playlistSongs = [] } = useQuery({
+  const { data: rawPlaylistSongs = [] } = useQuery({
     ...songQuery.allSongInfo({
       songIds: collectionEntries.map((e) => e.songId),
       sortType: sortingOrder,
@@ -78,6 +78,19 @@ function PlaylistInfoPage() {
     }),
     enabled: collectionEntries.length > 0
   });
+
+  const playlistSongs = useMemo(() => {
+    if (sortingOrder === 'addedOrder' || !sortingOrder) {
+      const songMap = new Map(rawPlaylistSongs.map((s) => [s.songId, s]));
+      const positionOrderedSongs: typeof rawPlaylistSongs = [];
+      for (const entry of collectionEntries) {
+        const song = songMap.get(entry.songId);
+        if (song) positionOrderedSongs.push(song);
+      }
+      return positionOrderedSongs;
+    }
+    return rawPlaylistSongs;
+  }, [collectionEntries, rawPlaylistSongs, sortingOrder]);
 
   const selectAllHandler = useSelectAllHandler(playlistSongs, 'songs', 'songId');
 
