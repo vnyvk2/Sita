@@ -11,8 +11,6 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         id: songs.id,
         path: songs.path,
         title: songs.title,
-        artist: songs.artist,
-        album: songs.album,
         duration: songs.duration
       })
       .from(songs)
@@ -28,9 +26,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       id: song.id,
       path: song.path,
       title: song.title ?? undefined,
-      artist: song.artist ?? undefined,
-      album: song.album ?? undefined,
-      duration: song.duration ?? undefined
+      duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
     };
   }
 
@@ -42,8 +38,6 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         id: songs.id,
         path: songs.path,
         title: songs.title,
-        artist: songs.artist,
-        album: songs.album,
         duration: songs.duration
       })
       .from(songs)
@@ -54,9 +48,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       id: song.id,
       path: song.path,
       title: song.title ?? undefined,
-      artist: song.artist ?? undefined,
-      album: song.album ?? undefined,
-      duration: song.duration ?? undefined
+      duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
     }));
   }
 }

@@ -5,8 +5,8 @@ import type { PlaylistUndoPersistence } from '../interfaces/PlaylistUndoPersiste
 export class EnginePlaylistPersistence implements PlaylistPersistence, PlaylistUndoPersistence {
   constructor(private engine: PlaylistEngine) {}
 
-  async createPlaylist(name: string, description?: string): Promise<number> {
-    return await this.engine.createPlaylist({ name, description });
+  async createPlaylist(name: string, _description?: string): Promise<number> {
+    return await this.engine.createPlaylist({ name });
   }
 
   async addEntries(playlistId: number, entries: PlaylistEntryWriteModel[]): Promise<void> {

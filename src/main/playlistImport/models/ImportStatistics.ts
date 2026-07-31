@@ -1,6 +1,7 @@
 export interface ImportStatistics {
   totalEntries: number;
   importedEntries: number;
+  repairedEntries: number;
   skippedEntries: number;
   missingEntries: number;
   notInLibraryEntries: number;

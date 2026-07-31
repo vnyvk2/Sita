@@ -1,6 +1,8 @@
 import type { PlaylistImportResult } from '../models/PlaylistImportResult';
 import type { PlaylistImportContext } from './PlaylistImportContext';
 
+export type PlaylistImportOptions = Record<string, unknown>;
+
 export interface PlaylistImporter {
   readonly id: string;
   readonly name: string;

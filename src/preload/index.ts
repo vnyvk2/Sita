@@ -4,7 +4,7 @@ import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 
-import type { CollectionDto, BreadcrumbDto, PlaylistEntryDto } from '../main/collections/dto/CollectionDto';
+import type { PlaylistDto as CollectionDto, CollectionHierarchyNodeDto as BreadcrumbDto, PlaylistEntryDto } from '../main/collections/ipc/dtos';
 import type { CreateFolderInput } from '../main/collections/operations/CreateFolderOp';
 import type { CreatePlaylistInput } from '../main/collections/operations/CreatePlaylistOp';
 import type { AddSongsInput } from '../main/collections/operations/AddSongsOp';

@@ -115,6 +115,8 @@ import { libraryObservability } from './workers/libraryObservability';
 import { recoverLibraryAssets } from './core/recovery';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import { playlistEngine, undoEngine, playlistRepository, hierarchyService } from './collections/setup';
+import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
+import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
@@ -140,14 +142,17 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   // Fire and forget startup recovery sync
   recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
   
-  // Setup Collection IPC
+  // Setup Collection IPC & Playlist Import IPC
   setupCollectionIpc(
     playlistEngine,
     undoEngine,
     playlistRepository,
     hierarchyService,
+    playlistImportWorkflow,
     (channel: string, ...args: any[]) => mainWindow?.webContents?.send(channel, ...args)
   );
+
+  setupPlaylistImportIpc(playlistImportWorkflow, importHistoryService);
 
   // Ensure we gracefully drain on shutdown only once
   let isShuttingDown = false;

@@ -4,9 +4,17 @@ import type { PlaylistImportSessionService } from '../services/PlaylistImportSes
 import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
-import type { PlaylistImportProgress } from '../models/PlaylistImportProgress';
 import type { PlaylistImportStage } from '../models/PlaylistImportStage';
 import type { PlaylistImportSession } from '../models/PlaylistImportSession';
+
+export interface ImportExecutionSummary {
+  playlistId: number;
+  playlistName: string;
+  importedCount: number;
+  repairedCount: number;
+  skippedCount: number;
+  totalPlanned: number;
+}
 
 export class PlaylistImportWorkflow {
   constructor(
@@ -55,6 +63,24 @@ export class PlaylistImportWorkflow {
 
       throw error;
     }
+  }
+
+  async importFile(
+    filePath: string,
+    options?: PlaylistImportOptions,
+    onProgress?: ProgressListener
+  ): Promise<ImportExecutionSummary> {
+    const plan = await this.createPlanFromFile(filePath, options, onProgress);
+    const executionResult = await this.executePlan(plan, onProgress);
+
+    return {
+      playlistId: executionResult.playlistId,
+      playlistName: executionResult.playlistName,
+      importedCount: executionResult.statistics.importedEntriesCount,
+      repairedCount: plan.statistics.repairedEntries,
+      skippedCount: executionResult.statistics.skippedEntriesCount,
+      totalPlanned: plan.statistics.totalEntries
+    };
   }
 
   private emitProgress(

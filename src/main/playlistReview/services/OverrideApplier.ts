@@ -17,7 +17,7 @@ export class OverrideApplier {
         return {
           ...entry,
           decision: 'SKIP_MISSING',
-          notes: override.reason ?? 'Skipped by user override'
+          notes: [override.reason ?? 'Skipped by user override']
         };
       }
 
@@ -25,7 +25,7 @@ export class OverrideApplier {
         return {
           ...entry,
           decision: 'IMPORT',
-          notes: override.reason ?? 'Selected manually by user',
+          notes: [override.reason ?? 'Selected manually by user'],
           source: {
             ...entry.source,
             trackReference: {
@@ -35,7 +35,7 @@ export class OverrideApplier {
                 status: 'MATCHED',
                 matchType: 'REPAIRED',
                 confidence: 100,
-                diagnostics: ['Selected manually via review dialog']
+                diagnostics: [{ strategyName: 'UserOverride', confidence: 100, reason: override.reason ?? 'Selected manually', candidateCount: 1 }]
               }
             }
           }
@@ -46,7 +46,7 @@ export class OverrideApplier {
         return {
           ...entry,
           decision: 'IMPORT',
-          notes: override.reason ?? 'Forced import by user'
+          notes: [override.reason ?? 'Forced import by user']
         };
       }
 

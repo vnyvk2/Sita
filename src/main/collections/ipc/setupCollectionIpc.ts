@@ -3,6 +3,7 @@ import type { PlaylistEngine } from '../engine/PlaylistEngine';
 import type { UndoEngine } from '../engine/UndoEngine';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { HierarchyService } from '../engine/HierarchyService';
+import type { PlaylistImportWorkflow } from '../../playlistImport/workflow/PlaylistImportWorkflow';
 import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
@@ -17,6 +18,7 @@ export function setupCollectionIpc(
   undoEngine: UndoEngine,
   repository: PlaylistRepository,
   hierarchyService: HierarchyService,
+  workflow: PlaylistImportWorkflow,
   sendMessageToRenderer: (channel: string, ...args: any[]) => void
 ) {
   // Read Endpoints
@@ -128,6 +130,6 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/import', async (_, targetPlaylistId?: number) => {
-    return await importPlaylist(targetPlaylistId, engine);
+    return await importPlaylist(workflow, targetPlaylistId);
   });
 }

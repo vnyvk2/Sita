@@ -11,9 +11,15 @@ export class PlaylistImportPlanner {
     const warnings: ImportWarning[] = [...initialWarnings];
 
     let importedEntries = 0;
+    let repairedEntries = 0;
     let missingEntries = 0;
     let notInLibraryEntries = 0;
     let invalidEntries = 0;
+
+    const getDiagReason = (diag?: any): string | undefined => {
+      if (!diag) return undefined;
+      return typeof diag === 'string' ? diag : diag.reason;
+    };
 
     for (const entry of playlist.entries) {
       const match = entry.trackReference.libraryMatch;
@@ -23,6 +29,9 @@ export class PlaylistImportPlanner {
         case 'MATCHED':
           decision = 'IMPORT';
           importedEntries++;
+          if (match.matchType === 'REPAIRED') {
+            repairedEntries++;
+          }
           break;
 
         case 'MISSING':
@@ -30,7 +39,7 @@ export class PlaylistImportPlanner {
           missingEntries++;
           warnings.push({
             code: 'MISSING_FILE',
-            message: match.diagnostics?.[0] ?? 'Track file missing from disk',
+            message: getDiagReason(match.diagnostics?.[0]) ?? 'Track file missing from disk',
             lineNumber: entry.sourceLine
           });
           break;
@@ -40,7 +49,7 @@ export class PlaylistImportPlanner {
           notInLibraryEntries++;
           warnings.push({
             code: 'NOT_IN_LIBRARY',
-            message: match.diagnostics?.[0] ?? 'File exists on disk but is not scanned into Nora library',
+            message: getDiagReason(match.diagnostics?.[0]) ?? 'File exists on disk but is not scanned into Nora library',
             lineNumber: entry.sourceLine
           });
           break;
@@ -53,7 +62,7 @@ export class PlaylistImportPlanner {
           invalidEntries++;
           warnings.push({
             code: 'INVALID_REFERENCE',
-            message: match.diagnostics?.[0] ?? 'Unresolvable or invalid track reference',
+            message: getDiagReason(match.diagnostics?.[0]) ?? 'Unresolvable or invalid track reference',
             lineNumber: entry.sourceLine
           });
           break;
@@ -72,6 +81,7 @@ export class PlaylistImportPlanner {
     const statistics: ImportStatistics = {
       totalEntries,
       importedEntries,
+      repairedEntries,
       skippedEntries,
       missingEntries,
       notInLibraryEntries,
