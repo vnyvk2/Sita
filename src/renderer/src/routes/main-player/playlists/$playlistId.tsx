@@ -17,9 +17,8 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-
+import PageSearchInput from '@renderer/components/PageSearchInput';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import Button from '@renderer/components/Button';
 
 const SensitiveActionConfirmPrompt = lazy(
@@ -54,7 +53,7 @@ function PlaylistInfoPage() {
   const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState, filteringOrder = 'notSelected' } = Route.useSearch();
+  const { sortingOrder = playlistSortingState, filteringOrder = 'notSelected', keyword, scrollTopOffset } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
 
   useEffect(() => {
@@ -92,7 +91,30 @@ function PlaylistInfoPage() {
     return rawPlaylistSongs;
   }, [collectionEntries, rawPlaylistSongs, sortingOrder]);
 
-  const selectAllHandler = useSelectAllHandler(playlistSongs, 'songs', 'songId');
+  const search = usePageSearch({
+    keyword,
+    updateSearch: (val) =>
+      navigate({
+        search: (prev) => ({ ...prev, keyword: val || undefined }),
+        replace: true
+      })
+  });
+
+  const filteredSongs = useMemo(() => {
+    if (!keyword?.trim()) return playlistSongs;
+    const q = keyword.trim().toLowerCase();
+    return playlistSongs.filter((song) => {
+      const titleMatch = song.title?.toLowerCase().includes(q);
+      const artistsStr = song.artists?.map((a) => a.name).join(' ').toLowerCase() ?? '';
+      const artistMatch = artistsStr.includes(q);
+      const albumMatch = song.album?.title?.toLowerCase().includes(q);
+      const genresStr = song.genres?.map((g) => g.name).join(' ').toLowerCase() ?? '';
+      const genreMatch = genresStr.includes(q);
+      return titleMatch || artistMatch || albumMatch || genreMatch;
+    });
+  }, [playlistSongs, keyword]);
+
+  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const openAddSongsPrompt = useCallback(() => {
     changePromptMenuData(
@@ -107,7 +129,7 @@ function PlaylistInfoPage() {
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = playlistSongs
+      const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(
@@ -120,7 +142,7 @@ function PlaylistInfoPage() {
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, playlistData.id, playlistData.name, playlistSongs]
+    [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]
   );
 
   const clearSongHistory = useCallback(() => {
@@ -152,7 +174,7 @@ function PlaylistInfoPage() {
   }, [addNewNotifications, changePromptMenuData, t]);
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = playlistSongs
+    const validSongIds = filteredSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
     updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...validSongIds]);
@@ -167,7 +189,7 @@ function PlaylistInfoPage() {
     ]);
   }, [
     addNewNotifications,
-    playlistSongs,
+    filteredSongs,
     queue.queues[queue.currentQueueIndex].songIds,
     t,
     updateQueueData
@@ -176,25 +198,36 @@ function PlaylistInfoPage() {
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        playlistSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'playlist',
         true,
         playlistData.id,
         true
       ),
-    [createQueue, playlistData.id, playlistSongs]
+    [createQueue, playlistData.id, filteredSongs]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        playlistSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'songs',
         false,
         playlistData.id,
         true
       ),
-    [createQueue, playlistData.id, playlistSongs]
+    [createQueue, playlistData.id, filteredSongs]
+  );
+
+  const searchBar = (
+    <PageSearchInput
+      inputRef={search.inputRef}
+      value={search.value}
+      onChange={search.onChange}
+      onCompositionStart={search.onCompositionStart}
+      onCompositionEnd={search.onCompositionEnd}
+      placeholder={t('searchPage.searchPlaceholderSongs', 'Search songs...')}
+    />
   );
 
   return (
@@ -211,6 +244,7 @@ function PlaylistInfoPage() {
       <TitleContainer
         title={playlistData.name}
         className="pr-4"
+        otherItems={[searchBar]}
         buttons={[
           {
             label: t('settingsPage.clearHistory'),
@@ -271,7 +305,7 @@ function PlaylistInfoPage() {
         ]}
       />
       <VirtualizedList
-        data={playlistSongs}
+        data={filteredSongs}
         fixedItemHeight={60}
         scrollTopOffset={scrollTopOffset}
         onDebouncedScroll={(range) => {
