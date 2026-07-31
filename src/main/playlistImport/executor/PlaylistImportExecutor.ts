@@ -36,7 +36,11 @@ export class PlaylistImportExecutor {
       }
     }
 
-    logger.info(`PlaylistImportExecutor: ${entriesToImport.length} entries queued for import.`);
+    logger.info({
+      stage: 'EXECUTOR',
+      entriesQueued: entriesToImport.length
+    });
+
     let createdPlaylistId = 0;
 
     // Execute playlist creation & song insertion via TransactionRunner

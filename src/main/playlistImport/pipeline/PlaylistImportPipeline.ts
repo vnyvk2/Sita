@@ -8,6 +8,7 @@ import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportProgress } from '../models/PlaylistImportProgress';
 import type { PlaylistImportStage } from '../models/PlaylistImportStage';
+import logger from '../../logger';
 
 export type ProgressListener = (progress: PlaylistImportProgress) => void;
 
@@ -41,8 +42,36 @@ export class PlaylistImportPipeline {
       this.emitProgress(onProgress, 'MATCHING_LIBRARY', 'Matching entries against Nora library...', 85);
       let libraryResolvedPlaylist = await this.libraryResolver.resolvePlaylist(verifiedPlaylist);
 
+      for (const entry of libraryResolvedPlaylist.entries) {
+        const match = entry.trackReference.libraryMatch;
+        logger.info({
+          stage: 'RESOLVED',
+          path: entry.trackReference.resolvedTrack.track.originalLocation,
+          libraryMatchStatus: match.status,
+          matchType: match.matchType,
+          songId: match.matchedSongId,
+          confidence: match.confidence
+        });
+      }
+
       if (this.repairEngine) {
         libraryResolvedPlaylist = await this.repairEngine.repairPlaylist(libraryResolvedPlaylist);
+
+        for (const entry of libraryResolvedPlaylist.entries) {
+          const match = entry.trackReference.libraryMatch;
+          logger.info({
+            stage: 'REPAIRED',
+            path: entry.trackReference.resolvedTrack.track.originalLocation,
+            libraryMatchStatus: match.status,
+            matchType: match.matchType,
+            songId: match.matchedSongId,
+            confidence: match.confidence,
+            strategyName:
+              match.diagnostics?.[0] && typeof match.diagnostics[0] === 'object'
+                ? (match.diagnostics[0] as any).strategyName
+                : undefined
+          });
+        }
       }
 
       this.emitProgress(onProgress, 'PLANNING_IMPORT', 'Generating import execution plan...', 95);

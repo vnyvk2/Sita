@@ -4,6 +4,7 @@ import type { PlaylistImportPlanEntry } from '../models/PlaylistImportPlanEntry'
 import type { ImportDecision } from '../models/ImportDecision';
 import type { ImportStatistics } from '../models/ImportStatistics';
 import type { ImportWarning } from '../models/ImportWarning';
+import logger from '../../logger';
 
 export class PlaylistImportPlanner {
   createPlan(playlist: LibraryResolvedPlaylist, initialWarnings: ImportWarning[] = []): PlaylistImportPlan {
@@ -71,6 +72,19 @@ export class PlaylistImportPlanner {
       planEntries.push({
         source: entry,
         decision
+      });
+    }
+
+    for (const planEntry of planEntries) {
+      const match = planEntry.source.trackReference.libraryMatch;
+      logger.info({
+        stage: 'PLANNED',
+        path: planEntry.source.trackReference.resolvedTrack.track.originalLocation,
+        decision: planEntry.decision,
+        libraryMatchStatus: match.status,
+        matchType: match.matchType,
+        songId: match.matchedSongId,
+        confidence: match.confidence
       });
     }
 

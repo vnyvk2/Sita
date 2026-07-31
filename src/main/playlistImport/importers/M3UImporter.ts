@@ -7,6 +7,7 @@ import type { ImportedTrackReference } from '../models/ImportedTrackReference';
 import type { PlaylistImportWarning } from '../models/PlaylistImportWarning';
 import type { PlaylistFormat } from '../constants/PlaylistFormats';
 import { InvalidPlaylistError } from '../errors/PlaylistImportError';
+import logger from '../../logger';
 
 interface PendingExtInf {
   duration?: number;
@@ -87,6 +88,11 @@ export class M3UImporter implements PlaylistImporter {
         position: position++,
         sourceLine: lineNum,
         track
+      });
+
+      logger.info({
+        stage: 'PARSED',
+        path: line
       });
 
       pendingMetadata = null;
