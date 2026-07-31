@@ -1,4 +1,5 @@
-import { eq, like } from 'drizzle-orm';
+import { extname } from 'path';
+import { eq, like, ilike, or } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
@@ -54,7 +55,8 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
   async getCandidatesForFilename(filename: string): Promise<LibrarySongRecord[]> {
     if (!filename) return [];
 
-    const matchedSongs = await db
+    // 1. Try exact filename end match (%filename)
+    let matchedSongs = await db
       .select({
         id: songs.id,
         path: songs.path,
@@ -64,6 +66,31 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       .from(songs)
       .where(like(songs.path, `%${filename}`))
       .limit(50);
+
+    // 2. If no candidate found, strip leading track numbers & extension for fallback candidate retrieval
+    if (matchedSongs.length === 0) {
+      const ext = extname(filename);
+      const nameWithoutExt = ext ? filename.slice(0, -ext.length) : filename;
+      const cleanTitle = nameWithoutExt.replace(/^\d+[\s._-]+/, '').trim();
+
+      if (cleanTitle.length > 1) {
+        matchedSongs = await db
+          .select({
+            id: songs.id,
+            path: songs.path,
+            title: songs.title,
+            duration: songs.duration
+          })
+          .from(songs)
+          .where(
+            or(
+              like(songs.path, `%${cleanTitle}%`),
+              ilike(songs.title, `%${cleanTitle}%`)
+            )
+          )
+          .limit(50);
+      }
+    }
 
     return matchedSongs.map((song) => ({
       id: song.id,

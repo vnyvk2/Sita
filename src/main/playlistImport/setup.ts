@@ -9,6 +9,7 @@ import { LibraryResolver } from './resolver/LibraryResolver';
 import { PlaylistPathResolver } from './resolver/PlaylistPathResolver';
 import { ExactFilenameStrategy } from './strategies/ExactFilenameStrategy';
 import { NormalizedFilenameStrategy } from './strategies/NormalizedFilenameStrategy';
+import { TitleMatchStrategy } from './strategies/TitleMatchStrategy';
 import { DrizzleLibraryLookup } from './services/DrizzleLibraryLookup';
 import { DrizzleTransactionRunner } from './services/DrizzleTransactionRunner';
 import { EnginePlaylistPersistence } from './services/EnginePlaylistPersistence';
@@ -40,6 +41,7 @@ export const libraryResolver = new LibraryResolver(libraryLookup);
 export const repairStrategyRegistry = new RepairStrategyRegistry();
 repairStrategyRegistry.register(new ExactFilenameStrategy());
 repairStrategyRegistry.register(new NormalizedFilenameStrategy());
+repairStrategyRegistry.register(new TitleMatchStrategy());
 export const repairEngine = new PlaylistRepairEngine(repairStrategyRegistry, libraryLookup);
 
 // 5. Import Planner & Pipeline
