@@ -154,13 +154,13 @@ export const AddSongsToTargetPlaylistPrompt = ({
         )}
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="h-[350px] min-h-[350px] w-full overflow-hidden">
         {filteredSongs.length > 0 ? (
           <VirtualizedList
             data={filteredSongs}
             fixedItemHeight={56}
             itemContent={renderSongRow}
-            style={{ height: '100%', width: '100%' }}
+            style={{ height: '350px', width: '100%' }}
           />
         ) : (
           <div className="py-8 text-center text-sm opacity-60">No available songs found</div>
