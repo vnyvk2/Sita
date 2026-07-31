@@ -46,16 +46,27 @@ const folderWatcherFunction = async (
   folder: MusicFolderData,
   abortSignal: AbortSignal
 ) => {
-  // consolelogger.debug(`folder event - '${eventType}' - ${filename}`);
   if (filename) {
     if (eventType === 'rename') {
-      const doesFilenameHasSongExtension = supportedMusicExtensions.includes(
-        path.extname(filename)
-      );
+      const ext = path.extname(filename).toLowerCase();
+      const doesFilenameHasSongExtension = supportedMusicExtensions.includes(ext);
 
       if (doesFilenameHasSongExtension) {
         // possible new song addition
         await checkFolderForContentModifications(folder.path, filename, abortSignal);
+      } else if (!ext || ext.length === 0) {
+        // possible new subfolder creation/copy event
+        const targetSubfolderPath = path.join(folder.path, filename);
+        try {
+          const stats = await fs.stat(targetSubfolderPath);
+          if (stats.isDirectory()) {
+            logger.info(`New subfolder detected in watched directory '${folder.path}': '${filename}'`);
+            await checkFolderForUnknownModifications(targetSubfolderPath);
+          }
+        } catch {
+          // Subfolder deleted or renamed
+          await checkFolderForUnknownModifications(folder.path);
+        }
       }
     }
   } else {
