@@ -4,10 +4,12 @@ import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
 import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
+import { normalizeCanonicalPath } from '../utils/normalizeCanonicalPath';
 
 export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProvider {
   async findByCanonicalPath(targetPath: string): Promise<LibrarySongRecord | null> {
     if (!targetPath) return null;
+    const canonicalTarget = normalizeCanonicalPath(targetPath);
 
     // 1. Try exact path match
     let matchedSongs = await db
@@ -21,7 +23,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       .where(eq(songs.path, targetPath))
       .limit(1);
 
-    // 2. Try normalized slash direction match if exact fails
+    // 2. Try slash direction variant match
     if (matchedSongs.length === 0) {
       const targetAltSlash = targetPath.includes('\\')
         ? targetPath.replaceAll('\\', '/')
@@ -39,13 +41,9 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         .limit(1);
     }
 
-    // 3. Try case-insensitive canonical path match (ilike) if exact slash queries fail
+    // 3. Try deterministic canonical normalization comparison if exact DB string queries fail
     if (matchedSongs.length === 0) {
-      const targetAltSlash = targetPath.includes('\\')
-        ? targetPath.replaceAll('\\', '/')
-        : targetPath.replaceAll('/', '\\');
-
-      matchedSongs = await db
+      const candidates = await db
         .select({
           id: songs.id,
           path: songs.path,
@@ -53,8 +51,16 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
           duration: songs.duration
         })
         .from(songs)
-        .where(or(ilike(songs.path, targetPath), ilike(songs.path, targetAltSlash)))
-        .limit(1);
+        .where(like(songs.path, `%${extname(targetPath)}`))
+        .limit(100);
+
+      const canonicalMatch = candidates.find(
+        (song) => normalizeCanonicalPath(song.path) === canonicalTarget
+      );
+
+      if (canonicalMatch) {
+        matchedSongs = [canonicalMatch];
+      }
     }
 
     if (matchedSongs.length === 0) {

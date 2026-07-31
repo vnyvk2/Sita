@@ -65,6 +65,15 @@ export class PlaylistPathResolver {
       }
     }
 
+    // Decode URI percent-encoded sequences (e.g. %20 -> space) if present
+    if (candidatePath.includes('%')) {
+      try {
+        candidatePath = decodeURIComponent(candidatePath);
+      } catch {
+        // Ignore malformed percent sequences
+      }
+    }
+
     // Determine normalized filesystem target path
     const resolvedTarget = isAbsolute(candidatePath)
       ? normalize(candidatePath)
