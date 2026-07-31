@@ -239,6 +239,7 @@ function PlaylistInfoPage() {
       onKeyDown={(e) => {
         if (e.ctrlKey && e.key === 'f') {
           e.preventDefault();
+          e.stopPropagation();
           search.inputRef.current?.focus();
         } else if (e.ctrlKey && e.key === 'a') {
           e.stopPropagation();
@@ -322,7 +323,11 @@ function PlaylistInfoPage() {
           }}
           components={{
             Header: () => (
-              <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />
+              <PlaylistInfoAndImgContainer
+                playlist={playlistData}
+                songs={playlistSongs}
+                filteredSongsCount={filteredSongs.length}
+              />
             )
           }}
           itemContent={(index, item) => {
@@ -364,7 +369,11 @@ function PlaylistInfoPage() {
       )}
       {playlistSongs.length > 0 && filteredSongs.length === 0 && (
         <div className="flex h-full grow flex-col">
-          <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />
+          <PlaylistInfoAndImgContainer
+            playlist={playlistData}
+            songs={playlistSongs}
+            filteredSongsCount={filteredSongs.length}
+          />
           <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80! py-12">
             <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
             <span className="mb-2 font-medium text-xl">{t('searchPage.noResultsTitle', 'No matching songs found')}</span>

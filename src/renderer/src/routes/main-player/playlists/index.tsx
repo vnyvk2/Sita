@@ -108,6 +108,7 @@ function PlaylistsPage() {
       onKeyDown={(e) => {
         if (e.ctrlKey && e.key === 'f') {
           e.preventDefault();
+          e.stopPropagation();
           search.inputRef.current?.focus();
         }
       }}
@@ -289,6 +290,13 @@ function PlaylistsPage() {
                 return <Playlist index={index} selectAllHandler={selectAllHandler} {...playlist} />;
               }}
             />
+          </div>
+        )}
+        {playlists.length > 0 && filteredPlaylists.length === 0 && (
+          <div className="no-playlists-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
+            <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
+            <span className="mb-2 font-medium">{t('playlistsPage.noMatchingPlaylistsTitle', 'No matching playlists found')}</span>
+            <span className="text-sm opacity-75">{t('playlistsPage.noMatchingPlaylistsDesc', { keyword, defaultValue: `No playlists match "${keyword}"` })}</span>
           </div>
         )}
         {playlists.length === 0 && (

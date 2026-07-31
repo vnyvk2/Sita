@@ -13,13 +13,16 @@ import type { PlaylistDto } from '@main/collections/ipc/dtos';
 type Props = {
   playlist: PlaylistDto;
   songs: SongData[];
+  filteredSongsCount?: number;
 };
 
 const PlaylistInfoAndImgContainer = (props: Props) => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { t } = useTranslation();
 
-  const { playlist, songs } = props;
+  const { playlist, songs, filteredSongsCount } = props;
+
+  const isFiltered = filteredSongsCount !== undefined && filteredSongsCount !== songs.length;
 
   const totalPlaylistDuration = useMemo(() => {
     const { timeString } = calculateTimeFromSeconds(
@@ -64,7 +67,9 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
                 {playlist.name}
               </div>
               <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
-                {t('common.songWithCount', { count: playlist.itemCount })}
+                {isFiltered
+                  ? `${t('common.songWithCount', { count: filteredSongsCount })} (${t('common.filteredFromTotal', { total: playlist.itemCount, defaultValue: `filtered from ${playlist.itemCount} total` })})`
+                  : t('common.songWithCount', { count: playlist.itemCount })}
               </div>
               {songs.length > 0 && (
                 <div className="playlist-total-duration">{totalPlaylistDuration}</div>
