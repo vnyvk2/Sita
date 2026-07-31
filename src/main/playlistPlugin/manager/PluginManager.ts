@@ -31,6 +31,7 @@ export class PluginManager {
 
     try {
       const context: PluginContext = {
+        apiVersion: '1.0.0',
         pluginId,
         eventBus: this.eventBus,
         log: (message: string) => {

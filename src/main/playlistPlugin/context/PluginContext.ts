@@ -1,6 +1,7 @@
 import type { PlaylistEventBus } from '../../playlistAutomation/events/PlaylistEventBus';
 
 export interface PluginContext {
+  apiVersion: string;
   pluginId: string;
   eventBus: PlaylistEventBus;
   log(message: string): void;

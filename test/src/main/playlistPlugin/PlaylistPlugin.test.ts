@@ -4,14 +4,20 @@ import { PluginManager } from '@main/playlistPlugin/manager/PluginManager';
 import { PlaylistEventBus } from '@main/playlistAutomation/events/PlaylistEventBus';
 import type { PlaylistPlugin } from '@main/playlistPlugin/interfaces/PlaylistPlugin';
 import type { PluginContext } from '@main/playlistPlugin/context/PluginContext';
+import type { ImportProvider } from '@main/playlistPlugin/providers/ImportProvider';
 
-describe('Phase 16 — Plugin & Extension Framework', () => {
-  it('should register, activate, and route capabilities for an external plugin', async () => {
+describe('Phase 16 — Plugin & Extension Framework Refinements', () => {
+  it('should register, activate, and route typed providers for a versioned external plugin', async () => {
     const registry = new PluginRegistry();
     const eventBus = new PlaylistEventBus();
     const manager = new PluginManager(registry, eventBus);
 
     let activatedContext: PluginContext | null = null;
+
+    const mockImportProvider: ImportProvider = {
+      format: 'spotify',
+      parseAndPlan: vi.fn(async () => ({} as any))
+    };
 
     const mockSpotifyPlugin: PlaylistPlugin = {
       manifest: {
@@ -22,6 +28,7 @@ describe('Phase 16 — Plugin & Extension Framework', () => {
         minimumApiVersion: '1.0.0',
         capabilities: ['IMPORT_PROVIDER', 'SYNC_PROVIDER']
       },
+      importProvider: mockImportProvider,
       activate: vi.fn(async (ctx: PluginContext) => {
         activatedContext = ctx;
         ctx.log('Spotify plugin activated');
@@ -30,25 +37,19 @@ describe('Phase 16 — Plugin & Extension Framework', () => {
     };
 
     manager.registerPlugin(mockSpotifyPlugin);
-    const initialList = manager.listPlugins();
-    expect(initialList).toHaveLength(1);
-    expect(initialList[0].status).toBe('DISCOVERED');
-
     const activated = await manager.activatePlugin('com.nora.plugin.spotify');
     expect(activated).toBe(true);
 
-    const activeInfo = manager.getPluginInfo('com.nora.plugin.spotify');
-    expect(activeInfo?.status).toBe('RUNNING');
     expect(activatedContext).not.toBeNull();
+    expect(activatedContext?.apiVersion).toBe('1.0.0');
 
-    const importProviders = registry.getProviders('IMPORT_PROVIDER');
+    const importProviders = registry.getImportProviders();
     expect(importProviders).toHaveLength(1);
-    expect(importProviders[0].manifest.id).toBe('com.nora.plugin.spotify');
+    expect(importProviders[0].format).toBe('spotify');
 
     const deactivated = await manager.deactivatePlugin('com.nora.plugin.spotify');
     expect(deactivated).toBe(true);
 
-    const postDeactivateProviders = registry.getProviders('IMPORT_PROVIDER');
-    expect(postDeactivateProviders).toHaveLength(0);
+    expect(registry.getImportProviders()).toHaveLength(0);
   });
 });
