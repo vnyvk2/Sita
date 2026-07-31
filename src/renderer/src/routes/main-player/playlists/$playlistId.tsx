@@ -326,7 +326,7 @@ function PlaylistInfoPage() {
               <PlaylistInfoAndImgContainer
                 playlist={playlistData}
                 songs={playlistSongs}
-                filteredSongsCount={filteredSongs.length}
+                filteredSongs={filteredSongs}
               />
             )
           }}
@@ -372,7 +372,7 @@ function PlaylistInfoPage() {
           <PlaylistInfoAndImgContainer
             playlist={playlistData}
             songs={playlistSongs}
-            filteredSongsCount={filteredSongs.length}
+            filteredSongs={filteredSongs}
           />
           <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80! py-12">
             <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>

@@ -13,23 +13,24 @@ import type { PlaylistDto } from '@main/collections/ipc/dtos';
 type Props = {
   playlist: PlaylistDto;
   songs: SongData[];
-  filteredSongsCount?: number;
+  filteredSongs?: SongData[];
 };
 
 const PlaylistInfoAndImgContainer = (props: Props) => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { t } = useTranslation();
 
-  const { playlist, songs, filteredSongsCount } = props;
+  const { playlist, songs, filteredSongs } = props;
 
-  const isFiltered = filteredSongsCount !== undefined && filteredSongsCount !== songs.length;
+  const displaySongs = filteredSongs ?? songs;
+  const isFiltered = Boolean(filteredSongs && filteredSongs.length !== songs.length);
 
   const totalPlaylistDuration = useMemo(() => {
     const { timeString } = calculateTimeFromSeconds(
-      songs.reduce((prev, current) => prev + current.duration, 0)
+      displaySongs.reduce((prev, current) => prev + current.duration, 0)
     );
     return timeString;
-  }, [songs]);
+  }, [displaySongs]);
 
   return (
     <>
@@ -68,10 +69,14 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
               </div>
               <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
                 {isFiltered
-                  ? `${t('common.songWithCount', { count: filteredSongsCount })} (${t('common.filteredFromTotal', { total: playlist.itemCount, defaultValue: `filtered from ${playlist.itemCount} total` })})`
+                  ? t('playlistsPage.filteredSongCount', {
+                      count: displaySongs.length,
+                      total: playlist.itemCount,
+                      defaultValue: '{{count}} of {{total}} songs'
+                    })
                   : t('common.songWithCount', { count: playlist.itemCount })}
               </div>
-              {songs.length > 0 && (
+              {displaySongs.length > 0 && (
                 <div className="playlist-total-duration">{totalPlaylistDuration}</div>
               )}
               {playlist.createdAt && (
