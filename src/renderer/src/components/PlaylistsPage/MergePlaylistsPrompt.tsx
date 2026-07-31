@@ -23,9 +23,13 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
     return allPlaylists.filter((p: PlaylistDto) => !sourceSet.has(p.id));
   }, [allPlaylists, sourcePlaylistIds]);
 
-  const [selectedTargetId, setSelectedTargetId] = useState<number | null>(
-    candidateTargets.length > 0 ? candidateTargets[0].id : null
-  );
+  const [selectedTargetId, setSelectedTargetId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (candidateTargets.length > 0 && selectedTargetId == null) {
+      setSelectedTargetId(candidateTargets[0].id);
+    }
+  }, [candidateTargets, selectedTargetId]);
 
   const handleMerge = useCallback(() => {
     if (!selectedTargetId) return;
@@ -40,15 +44,13 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
           changePromptMenuData(false);
           toggleMultipleSelections(false);
           const targetName = allPlaylists.find((p: PlaylistDto) => p.id === selectedTargetId)?.name || 'Playlist';
+          const sourcesText = sourcePlaylistNames.length > 0 ? sourcePlaylistNames.join(', ') : `${sourcePlaylistIds.length} playlists`;
           addNewNotifications([
             {
               id: 'playlistsMerged',
               duration: 5000,
               iconName: 'call_merge',
-              content: t('playlistsPage.mergeSuccess', {
-                count: sourcePlaylistIds.length,
-                targetName
-              })
+              content: `Merged ${sourcesText} into '${targetName}'`
             }
           ]);
         },
@@ -63,7 +65,7 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
         }
       }
     );
-  }, [selectedTargetId, sourcePlaylistIds, mergeMutation, changePromptMenuData, toggleMultipleSelections, allPlaylists, addNewNotifications, t]);
+  }, [selectedTargetId, sourcePlaylistIds, sourcePlaylistNames, mergeMutation, changePromptMenuData, toggleMultipleSelections, allPlaylists, addNewNotifications]);
 
   return (
     <div className="flex flex-col gap-4 p-2">

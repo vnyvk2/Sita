@@ -12,6 +12,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
+import { usePinCollection, useUnpinCollection } from '../../hooks/collections/useCollectionMutations';
 import NavLink from '../NavLink';
 import MultipleArtworksCover from './MultipleArtworksCover';
 
@@ -47,7 +48,8 @@ export const Playlist = (props: PlaylistProp) => {
     addNewNotifications
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const pinMutation = usePinCollection();
+  const unpinMutation = useUnpinCollection();
 
   const openPlaylistInfoPage = useCallback(
     () =>
@@ -282,9 +284,9 @@ export const Playlist = (props: PlaylistProp) => {
           iconName: 'push_pin',
           handlerFunction: () => {
             if (props.isPinned) {
-              CollectionClient.unpin({ playlistId: props.id });
+              unpinMutation.mutate({ playlistId: props.id });
             } else {
-              CollectionClient.pin({ playlistId: props.id });
+              pinMutation.mutate({ playlistId: props.id });
             }
           },
           isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)

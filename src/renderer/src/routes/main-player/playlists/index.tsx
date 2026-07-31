@@ -156,6 +156,13 @@ function PlaylistsPage() {
           <div className="other-control-container flex">
             {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'playlist' && (
               <>
+                <Button
+                  key="select-all-btn"
+                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                  iconName="select_all"
+                  clickHandler={() => selectAllHandler()}
+                  tooltipLabel={t('common.selectAll')}
+                />
                 {multipleSelectionsData.multipleSelections.length >= 2 && (
                   <Button
                     key="merge-playlists-btn"
@@ -164,21 +171,20 @@ function PlaylistsPage() {
                     iconName="call_merge"
                     clickHandler={() => {
                       const sourcePlaylistIds = multipleSelectionsData.multipleSelections.map(Number);
+                      const sourcePlaylistNames = playlists
+                        .filter((p) => sourcePlaylistIds.includes(p.id))
+                        .map((p) => p.name);
                       changePromptMenuData(
                         true,
-                        <MergePlaylistsPrompt sourcePlaylistIds={sourcePlaylistIds} />
+                        <MergePlaylistsPrompt
+                          sourcePlaylistIds={sourcePlaylistIds}
+                          sourcePlaylistNames={sourcePlaylistNames}
+                        />
                       );
                     }}
                     tooltipLabel={t('playlistsPage.mergePlaylistsTitle', 'Merge selected playlists')}
                   />
                 )}
-                <Button
-                  key="select-all-btn"
-                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                  iconName="select_all"
-                  clickHandler={() => selectAllHandler()}
-                  tooltipLabel={t('common.selectAll')}
-                />
               </>
             )}
             <Button
