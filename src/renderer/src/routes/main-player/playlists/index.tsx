@@ -41,6 +41,9 @@ export const Route = createFileRoute('/main-player/playlists/')({
 const NewPlaylistPrompt = lazy(
   () => import('@renderer/components/PlaylistsPage/NewPlaylistPrompt')
 );
+const MergePlaylistsPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/MergePlaylistsPrompt')
+);
 
 const MIN_ITEM_WIDTH = 175;
 const MIN_ITEM_HEIGHT = 220;
@@ -152,13 +155,31 @@ function PlaylistsPage() {
           </div>
           <div className="other-control-container flex">
             {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'playlist' && (
-              <Button
-                key="select-all-btn"
-                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                iconName="select_all"
-                clickHandler={() => selectAllHandler()}
-                tooltipLabel={t('common.selectAll')}
-              />
+              <>
+                {multipleSelectionsData.multipleSelections.length >= 2 && (
+                  <Button
+                    key="merge-playlists-btn"
+                    label={t('playlistsPage.merge', 'Merge')}
+                    className="merge-playlists-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                    iconName="call_merge"
+                    clickHandler={() => {
+                      const sourcePlaylistIds = multipleSelectionsData.multipleSelections.map(Number);
+                      changePromptMenuData(
+                        true,
+                        <MergePlaylistsPrompt sourcePlaylistIds={sourcePlaylistIds} />
+                      );
+                    }}
+                    tooltipLabel={t('playlistsPage.mergePlaylistsTitle', 'Merge selected playlists')}
+                  />
+                )}
+                <Button
+                  key="select-all-btn"
+                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                  iconName="select_all"
+                  clickHandler={() => selectAllHandler()}
+                  tooltipLabel={t('common.selectAll')}
+                />
+              </>
             )}
             <Button
               className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"

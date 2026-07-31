@@ -277,6 +277,24 @@ export const Playlist = (props: PlaylistProp) => {
           handlerFunction: () => CollectionClient.export(props.id),
           isDisabled: isMultipleSelectionEnabled
         },
+        {
+          label: t(props.isPinned ? 'playlist.unpinPlaylist' : 'playlist.pinPlaylist', props.isPinned ? 'Unpin Playlist' : 'Pin Playlist'),
+          iconName: 'push_pin',
+          handlerFunction: () => {
+            if (props.isPinned) {
+              CollectionClient.unpin({ playlistId: props.id });
+            } else {
+              CollectionClient.pin({ playlistId: props.id });
+            }
+          },
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: t('playlist.importIntoPlaylist', 'Import M3U into Playlist'),
+          iconName: 'publish',
+          handlerFunction: () => CollectionClient.import(props.id),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
       {
         label: t('common.info'),
         iconName: 'info',
