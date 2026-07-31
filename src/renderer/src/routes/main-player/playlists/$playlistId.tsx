@@ -98,12 +98,12 @@ function PlaylistInfoPage() {
     changePromptMenuData(
       true,
       <AddSongsToTargetPlaylistPrompt
-        playlistId={playlistData.playlistId}
+        playlistId={playlistData.id}
         playlistName={playlistData.name}
         existingSongIds={playlistSongs.map((s) => s.songId)}
       />
     );
-  }, [changePromptMenuData, playlistData.playlistId, playlistData.name, playlistSongs]);
+  }, [changePromptMenuData, playlistData.id, playlistData.name, playlistSongs]);
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {

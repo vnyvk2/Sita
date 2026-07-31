@@ -36,7 +36,10 @@ export const useAddSongsToCollection = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: AddSongsInput) => CollectionClient.addSongs(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKeys.all })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: collectionKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['songs'] });
+    }
   });
 };
 
