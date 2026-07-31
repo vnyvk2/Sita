@@ -17,6 +17,9 @@ const PageSearchInput = ({ inputRef, value, onChange, className, ...props }: Pag
       {...props}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (e.key === 'Escape' && value) {
+          onChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>);
+        }
         props.onKeyDown?.(e);
       }}
     />

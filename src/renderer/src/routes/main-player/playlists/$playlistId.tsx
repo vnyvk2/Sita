@@ -237,7 +237,10 @@ function PlaylistInfoPage() {
       className="main-container playlist-info-page-container h-full! px-8 pr-0! pb-0!"
       focusable
       onKeyDown={(e) => {
-        if (e.ctrlKey && e.key === 'a') {
+        if (e.ctrlKey && e.key === 'f') {
+          e.preventDefault();
+          search.inputRef.current?.focus();
+        } else if (e.ctrlKey && e.key === 'a') {
           e.stopPropagation();
           selectAllHandler();
         }
@@ -306,62 +309,67 @@ function PlaylistInfoPage() {
           }
         ]}
       />
-      <VirtualizedList
-        data={filteredSongs}
-        fixedItemHeight={60}
-        scrollTopOffset={scrollTopOffset}
-        onDebouncedScroll={(range) => {
-          navigate({
-            replace: true,
-            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-          });
-        }}
-        components={{
-          Header: () => (
-            <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />
-          )
-        }}
-        itemContent={(index, item) => {
-          return (
-            <Song
-              key={index}
-              index={index}
-              isIndexingSongs={preferences.isSongIndexingEnabled}
-              onPlayClick={handleSongPlayBtnClick}
-              selectAllHandler={selectAllHandler}
-              {...item}
-              trackNo={undefined}
-              additionalContextMenuItems={[
-                {
-                  label: t('playlistsPage.removeFromThisPlaylist'),
-                  iconName: 'playlist_remove',
-                  handlerFunction: () =>
-                    CollectionClient
-                      .removeSongs({ playlistId: playlistData.playlistId, songIds: [item.songId] })
-                      .then(() =>
-                          addNewNotifications([
-                            {
-                              id: `${item.songId}Removed`,
-                              duration: 5000,
-                              content: t('playlistsPage.removeSongFromPlaylistSuccess', {
-                                title: item.title,
-                                playlistName: playlistData.name
-                              })
-                            }
-                          ])
-                      )
-                      .catch((err) => console.error(err))
-                }
-              ]}
-            />
-          );
-        }}
-      />
+      {filteredSongs.length > 0 && (
+        <VirtualizedList
+          data={filteredSongs}
+          fixedItemHeight={60}
+          scrollTopOffset={scrollTopOffset}
+          onDebouncedScroll={(range) => {
+            navigate({
+              replace: true,
+              search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+            });
+          }}
+          components={{
+            Header: () => (
+              <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />
+            )
+          }}
+          itemContent={(index, item) => {
+            return (
+              <Song
+                key={index}
+                index={index}
+                isIndexingSongs={preferences.isSongIndexingEnabled}
+                onPlayClick={handleSongPlayBtnClick}
+                selectAllHandler={selectAllHandler}
+                {...item}
+                trackNo={undefined}
+                additionalContextMenuItems={[
+                  {
+                    label: t('playlistsPage.removeFromThisPlaylist'),
+                    iconName: 'playlist_remove',
+                    handlerFunction: () =>
+                      CollectionClient
+                        .removeSongs({ playlistId: playlistData.playlistId, songIds: [item.songId] })
+                        .then(() =>
+                            addNewNotifications([
+                              {
+                                id: `${item.songId}Removed`,
+                                duration: 5000,
+                                content: t('playlistsPage.removeSongFromPlaylistSuccess', {
+                                  title: item.title,
+                                  playlistName: playlistData.name
+                                })
+                              }
+                            ])
+                        )
+                        .catch((err) => console.error(err))
+                  }
+                ]}
+              />
+            );
+          }}
+        />
+      )}
       {playlistSongs.length > 0 && filteredSongs.length === 0 && (
-        <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
-          <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
-          <span className="mb-2 font-medium text-xl">{t('searchPage.noResultsTitle', 'No matching songs found')}</span>
-          <span className="text-sm opacity-75">{t('searchPage.noResultsDesc', { keyword, defaultValue: `No songs match "${keyword}" in this playlist.` })}</span>
+        <div className="flex h-full grow flex-col">
+          <PlaylistInfoAndImgContainer playlist={playlistData} songs={playlistSongs} />
+          <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80! py-12">
+            <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
+            <span className="mb-2 font-medium text-xl">{t('searchPage.noResultsTitle', 'No matching songs found')}</span>
+            <span className="text-sm opacity-75">{t('searchPage.noResultsDesc', { keyword, defaultValue: `No songs match "${keyword}" in this playlist.` })}</span>
+          </div>
         </div>
       )}
       {playlistSongs.length === 0 && (

@@ -17,9 +17,11 @@ import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { playlistSearchSchema } from '@renderer/utils/zod/playlistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import PageSearchInput from '@renderer/components/PageSearchInput';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect } from 'react';
+import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -54,7 +56,7 @@ function PlaylistsPage() {
     store,
     (state) => state.localStorage.sortingStates.playlistsPage
   );
-  const { sortingOrder = playlistsPageSortingState || 'aToZ' } = Route.useSearch();
+  const { sortingOrder = playlistsPageSortingState || 'aToZ', keyword } = Route.useSearch();
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) => state.multipleSelectionsData.isEnabled
@@ -65,32 +67,27 @@ function PlaylistsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const { data: playlists } = useSuspenseQuery(
-    rootCollectionsOptions(sortingOrder)
-  );
+  const search = usePageSearch({
+    keyword,
+    updateSearch: (val) =>
+      navigate({
+        search: (prev) => ({ ...prev, keyword: val || undefined }),
+        replace: true
+      })
+  });
 
-  // useEffect(() => {
-  //   fetchPlaylistData();
-  //   const managePlaylistDataUpdatesInPlaylistsPage = (e: Event) => {
-  //     if ('detail' in e) {
-  //       const dataEvents = (e as DetailAvailableEvent<DataUpdateEvent[]>).detail;
-  //       for (let i = 0; i < dataEvents.length; i += 1) {
-  //         const event = dataEvents[i];
-  //         if (event.dataType === 'playlists') fetchPlaylistData();
-  //       }
-  //     }
-  //   };
-  //   document.addEventListener('app/dataUpdates', managePlaylistDataUpdatesInPlaylistsPage);
-  //   return () => {
-  //     document.removeEventListener('app/dataUpdates', managePlaylistDataUpdatesInPlaylistsPage);
-  //   };
-  // }, [fetchPlaylistData]);
+  const filteredPlaylists = useMemo(() => {
+    const q = keyword?.trim();
+    if (!q) return playlists;
+    const lowerQ = q.toLowerCase();
+    return playlists.filter((p) => p.name.toLowerCase().includes(lowerQ));
+  }, [playlists, keyword]);
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistsPage', sortingOrder);
   }, [sortingOrder]);
 
-  const selectAllHandler = useSelectAllHandler(playlists, 'playlist', 'playlistId');
+  const selectAllHandler = useSelectAllHandler(filteredPlaylists, 'playlist', 'playlistId');
 
   const createNewPlaylist = useCallback(
     () =>
@@ -107,6 +104,13 @@ function PlaylistsPage() {
   return (
     <MainContainer
       className="main-container appear-from-bottom playlists-list-container mb-0 h-full! pb-0!"
+      focusable
+      onKeyDown={(e) => {
+        if (e.ctrlKey && e.key === 'f') {
+          e.preventDefault();
+          search.inputRef.current?.focus();
+        }
+      }}
       onContextMenu={(e) =>
         updateContextMenuData(
           true,
@@ -154,6 +158,14 @@ function PlaylistsPage() {
             </div>
           </div>
           <div className="other-control-container flex">
+            <PageSearchInput
+              inputRef={search.inputRef}
+              value={search.value}
+              onChange={search.onChange}
+              onCompositionStart={search.onCompositionStart}
+              onCompositionEnd={search.onCompositionEnd}
+              placeholder={t('playlistsPage.searchPlaylists', 'Search playlists...')}
+            />
             {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'playlist' && (
               <>
                 <Button
@@ -264,7 +276,7 @@ function PlaylistsPage() {
                   </SecondaryContainer>
                 )
               }}
-              data={playlists}
+              data={filteredPlaylists}
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
               onDebouncedScroll={(range) => {
