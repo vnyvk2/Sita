@@ -1,7 +1,6 @@
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CollectionClient } from '../../api/CollectionClient';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useMergePlaylists } from '../../hooks/collections/useCollectionMutations';
 import { useRootCollections } from '../../hooks/collections/useCollectionQueries';
@@ -11,6 +10,12 @@ interface Props {
   sourcePlaylistIds: number[];
   sourcePlaylistNames?: string[];
 }
+
+const formatSourcesText = (names: string[], ids: number[]) => {
+  if (names.length === 0) return `${ids.length} playlists`;
+  if (names.length <= 3) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+};
 
 export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = [] }: Props) => {
   const { changePromptMenuData, toggleMultipleSelections, addNewNotifications } = useContext(AppUpdateContext);
@@ -26,7 +31,10 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
   const [selectedTargetId, setSelectedTargetId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (candidateTargets.length > 0 && selectedTargetId == null) {
+    if (
+      candidateTargets.length > 0 &&
+      (!selectedTargetId || !candidateTargets.some((p) => p.id === selectedTargetId))
+    ) {
       setSelectedTargetId(candidateTargets[0].id);
     }
   }, [candidateTargets, selectedTargetId]);
@@ -44,28 +52,33 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
           changePromptMenuData(false);
           toggleMultipleSelections(false);
           const targetName = allPlaylists.find((p: PlaylistDto) => p.id === selectedTargetId)?.name || 'Playlist';
-          const sourcesText = sourcePlaylistNames.length > 0 ? sourcePlaylistNames.join(', ') : `${sourcePlaylistIds.length} playlists`;
+          const sourcesText = formatSourcesText(sourcePlaylistNames, sourcePlaylistIds);
           addNewNotifications([
             {
               id: 'playlistsMerged',
               duration: 5000,
               iconName: 'call_merge',
-              content: `Merged ${sourcesText} into '${targetName}'`
+              content: t('playlistsPage.mergeSuccess', {
+                sources: sourcesText,
+                target: targetName,
+                defaultValue: `Merged ${sourcesText} into '${targetName}'`
+              })
             }
           ]);
         },
         onError: (err) => {
+          const errorMessage = err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred.');
           addNewNotifications([
             {
               id: 'playlistsMergeFailed',
               duration: 5000,
-              content: (err as Error).message
+              content: errorMessage
             }
           ]);
         }
       }
     );
-  }, [selectedTargetId, sourcePlaylistIds, sourcePlaylistNames, mergeMutation, changePromptMenuData, toggleMultipleSelections, allPlaylists, addNewNotifications]);
+  }, [selectedTargetId, sourcePlaylistIds, sourcePlaylistNames, mergeMutation, changePromptMenuData, toggleMultipleSelections, allPlaylists, addNewNotifications, t]);
 
   return (
     <div className="flex flex-col gap-4 p-2">

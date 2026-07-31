@@ -48,6 +48,7 @@ export const Playlist = (props: PlaylistProp) => {
     addNewNotifications
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const pinMutation = usePinCollection();
   const unpinMutation = useUnpinCollection();
 
