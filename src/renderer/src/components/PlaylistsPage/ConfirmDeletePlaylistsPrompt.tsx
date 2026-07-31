@@ -9,22 +9,28 @@ import { useBulkDeleteCollections } from '../../hooks/collections/useCollectionM
 import Button from '../Button';
 
 interface ConfirmDeletePlaylistProp {
-  playlistIds: number[];
+  playlistIds: (number | string)[];
   playlistName?: string;
 }
 
 const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
-  const { addNewNotifications, changePromptMenuData } = useContext(AppUpdateContext);
+  const { addNewNotifications, changePromptMenuData, toggleMultipleSelections } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const { playlistIds, playlistName } = props;
+
+  const numericPlaylistIds = useMemo(() => {
+    return playlistIds
+      .map((id) => Number(id))
+      .filter((id) => !isNaN(id) && !SpecialPlaylists.isSpecialPlaylistId(id));
+  }, [playlistIds]);
 
   const [playlistsData, setPlaylistsData] = useState<CollectionDto[]>([]);
   const bulkDelete = useBulkDeleteCollections();
 
   useEffect(() => {
-    if (playlistIds.length > 0) {
-      Promise.all(playlistIds.map(id => CollectionClient.getCollection(id)))
+    if (numericPlaylistIds.length > 0) {
+      Promise.all(numericPlaylistIds.map((id) => CollectionClient.getCollection(id)))
         .then((res) => {
           const valid = res.filter(Boolean) as CollectionDto[];
           if (valid.length > 0) {
@@ -32,46 +38,54 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
           }
           return undefined;
         })
-        .catch((err) => console.error(err));
+        .catch((err) => console.error('Failed to load playlist details for delete prompt:', err));
     }
-  }, [playlistIds]);
+  }, [numericPlaylistIds]);
 
   const arePlaylistsRemovable = useMemo(() => {
-    return !playlistIds.some((playlistId) => SpecialPlaylists.isSpecialPlaylistId(playlistId));
-  }, [playlistIds]);
+    return (
+      numericPlaylistIds.length > 0 &&
+      !playlistIds.some((playlistId) => SpecialPlaylists.isSpecialPlaylistId(playlistId))
+    );
+  }, [playlistIds, numericPlaylistIds]);
 
   const removePlaylists = useCallback(() => {
+    if (numericPlaylistIds.length === 0) return;
+
+    console.debug('Executing bulkDelete for playlists:', { numericPlaylistIds });
+
     bulkDelete.mutate(
-      { playlistIds },
+      { playlistIds: numericPlaylistIds },
       {
         onSuccess: () => {
           changePromptMenuData(false);
+          toggleMultipleSelections(false);
           addNewNotifications([
             {
               id: `playlistsDeleted`,
               duration: 5000,
               content: t('confirmDeletePlaylistsPrompt.playlistsDeletedWithCount', {
-                count: playlistIds.length
+                count: numericPlaylistIds.length
               })
             }
           ]);
         },
-        onError: (err) => console.error(err)
+        onError: (err) => console.error('Failed to bulk delete playlists:', err)
       }
     );
-  }, [addNewNotifications, changePromptMenuData, playlistIds, t, bulkDelete]);
+  }, [addNewNotifications, changePromptMenuData, toggleMultipleSelections, numericPlaylistIds, t, bulkDelete]);
 
   return (
     <>
       <div className="title-container text-font-color-black dark:text-font-color-white mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
         {t('confirmDeletePlaylistsPrompt.confirmPlaylistDeleteWithCount', {
-          count: playlistIds.length,
+          count: numericPlaylistIds.length,
           playlistName
         })}
       </div>
       <div className="description">
         {t('confirmDeletePlaylistsPrompt.message', {
-          count: playlistIds.length
+          count: numericPlaylistIds.length
         })}
         <div className="info-about-affecting-files-container mt-4">
           <p>{t('confirmDeletePlaylistsPrompt.modificationNotice')}</p>
@@ -94,7 +108,7 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
         <div className="buttons-container mt-8 flex w-full justify-end">
           <Button
             label={t('playlist.deletePlaylist', {
-              count: playlistsData.length
+              count: playlistsData.length || numericPlaylistIds.length
             })}
             className="delete-playlist-btn danger-btn bg-font-color-crimson! text-font-color-white hover:border-font-color-crimson dark:bg-font-color-crimson! dark:text-font-color-white dark:hover:border-font-color-crimson float-right h-10 w-48 cursor-pointer rounded-lg border-transparent outline-hidden ease-in-out"
             clickHandler={removePlaylists}
