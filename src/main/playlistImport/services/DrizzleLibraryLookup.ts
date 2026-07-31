@@ -1,10 +1,11 @@
-import { extname } from 'path';
+import { basename, extname } from 'path';
 import { eq, like, ilike, or } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
 import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
 import { normalizeCanonicalPath } from '../utils/normalizeCanonicalPath';
+import logger from '../../logger';
 
 export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProvider {
   async findByCanonicalPath(targetPath: string): Promise<LibrarySongRecord | null> {
@@ -41,8 +42,9 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         .limit(1);
     }
 
-    // 3. Try deterministic canonical normalization comparison if exact DB string queries fail
+    // 3. Try deterministic canonical normalization comparison filtering candidates by target filename
     if (matchedSongs.length === 0) {
+      const targetFilename = basename(targetPath);
       const candidates = await db
         .select({
           id: songs.id,
@@ -51,8 +53,25 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
           duration: songs.duration
         })
         .from(songs)
-        .where(like(songs.path, `%${extname(targetPath)}`))
+        .where(like(songs.path, `%${targetFilename}`))
         .limit(100);
+
+      if (candidates.length > 0) {
+        const firstCandidate = candidates[0];
+        const canonicalDbPath = normalizeCanonicalPath(firstCandidate.path);
+        const isEqual = canonicalDbPath === canonicalTarget;
+
+        logger.info(
+          JSON.stringify({
+            stage: 'CANONICAL_LOOKUP_INSPECTION',
+            targetPath,
+            canonicalTarget,
+            databasePath: firstCandidate.path,
+            canonicalDatabasePath: canonicalDbPath,
+            equal: isEqual
+          })
+        );
+      }
 
       const canonicalMatch = candidates.find(
         (song) => normalizeCanonicalPath(song.path) === canonicalTarget
