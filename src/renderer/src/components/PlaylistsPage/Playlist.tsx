@@ -418,6 +418,7 @@ export const Playlist = (props: PlaylistProp) => {
           <div
             className="absolute top-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-background-color-1/80 text-font-color-highlight backdrop-blur-xs shadow-md dark:bg-dark-background-color-1/80"
             title={t('playlist.pinnedPlaylist', 'Pinned Playlist')}
+            aria-label={t('playlist.pinnedPlaylist', 'Pinned Playlist')}
           >
             <span className="material-icons-round text-sm">push_pin</span>
           </div>

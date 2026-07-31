@@ -1,3 +1,4 @@
+import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';
@@ -24,28 +25,31 @@ export const useCollectionChildren = (id: number | null) => {
   return useQuery(collectionChildrenOptions(id));
 };
 
+const compareBySortType = (a: PlaylistDto, b: PlaylistDto, sortType?: PlaylistSortTypes) => {
+  switch (sortType) {
+    case 'aToZ':
+      return a.name.localeCompare(b.name);
+    case 'zToA':
+      return b.name.localeCompare(a.name);
+    case 'noOfSongsAscending':
+      return a.itemCount - b.itemCount;
+    case 'noOfSongsDescending':
+      return b.itemCount - a.itemCount;
+    default:
+      return 0;
+  }
+};
+
 export const rootCollectionsOptions = (sortType?: PlaylistSortTypes) => {
   return queryOptions({
     queryKey: [...collectionKeys.children(null), sortType],
     queryFn: () => CollectionClient.getChildren(null),
-    select: (data: any) => {
+    select: (data: PlaylistDto[]) => {
       if (!data) return [];
       return [...data].sort((a, b) => {
-        if (!!a.isPinned !== !!b.isPinned) {
-          return a.isPinned ? -1 : 1;
-        }
-        switch (sortType) {
-          case 'aToZ':
-            return a.name.localeCompare(b.name);
-          case 'zToA':
-            return b.name.localeCompare(a.name);
-          case 'noOfSongsAscending':
-            return a.itemCount - b.itemCount;
-          case 'noOfSongsDescending':
-            return b.itemCount - a.itemCount;
-          default:
-            return 0;
-        }
+        const pinCompare = Number(b.isPinned) - Number(a.isPinned);
+        if (pinCompare !== 0) return pinCompare;
+        return compareBySortType(a, b, sortType);
       });
     },
   });
