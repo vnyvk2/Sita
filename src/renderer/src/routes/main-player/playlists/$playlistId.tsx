@@ -42,7 +42,6 @@ function PlaylistInfoPage() {
   const { playlistId } = Route.useParams({
     select: (params) => ({ playlistId: Number(params.playlistId) })
   });
-  const { scrollTopOffset } = Route.useSearch();
 
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(

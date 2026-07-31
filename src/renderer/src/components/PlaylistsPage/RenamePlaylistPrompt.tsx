@@ -21,6 +21,7 @@ const RenamePlaylistPrompt = (props: Props) => {
   const renameCollection = useRenameCollection();
 
   const renamePlaylist = useCallback(
+    (newName: string) => {
       renameCollection.mutate(
         { playlistId, newName: newName.trim() },
         {
