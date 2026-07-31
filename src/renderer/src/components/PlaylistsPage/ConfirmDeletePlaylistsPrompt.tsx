@@ -52,8 +52,6 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
   const removePlaylists = useCallback(() => {
     if (numericPlaylistIds.length === 0) return;
 
-    console.debug('Executing bulkDelete for playlists:', { numericPlaylistIds });
-
     bulkDelete.mutate(
       { playlistIds: numericPlaylistIds },
       {

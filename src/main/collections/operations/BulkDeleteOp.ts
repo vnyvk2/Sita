@@ -5,6 +5,8 @@ import { RestorePlaylistOp, type RestorePlaylistInput } from './RestorePlaylistO
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { HierarchyService } from '../engine/HierarchyService';
 
+import logger from '../../logger';
+
 export interface BulkDeleteInput {
   playlistIds: number[];
 }
@@ -32,13 +34,14 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
     
     for (const id of playlistIds) {
       allIdsToDelete.add(id);
-      const descendants = await this.resolver.getDescendants(id);
+      const descendants = await this.resolver.getDescendants(id, ctx.trx);
       for (const d of descendants) {
         allIdsToDelete.add(d.id);
       }
     }
 
     const idsArray = Array.from(allIdsToDelete);
+    logger.info('[BulkDeleteOp] Executing bulk delete', { playlistIds, idsArray });
     const deleteOp = new DeleteOp(this.repository);
     const inverseInputs: RestorePlaylistInput[] = [];
     const allAffectedSongIds = new Set<number>();

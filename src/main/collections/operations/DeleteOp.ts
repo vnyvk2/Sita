@@ -2,6 +2,8 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 
+import logger from '../../logger';
+
 export interface DeleteInput {
   playlistId: number;
 }
@@ -21,8 +23,11 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
 
     const playlist = await this.repository.getById(playlistId, ctx.trx);
     if (!playlist) {
+      logger.warn('[DeleteOp] Playlist not found', { playlistId });
       throw new Error(`Playlist ${playlistId} not found`);
     }
+
+    logger.info('[DeleteOp] Deleting playlist', { playlistId, playlistName: playlist.name });
 
     // Get all entries so we know what song memberships are affected, and for undo
     const entries = await this.repository.getEntries(playlistId, {}, ctx.trx);

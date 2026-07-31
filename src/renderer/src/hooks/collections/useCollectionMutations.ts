@@ -87,7 +87,10 @@ export const useBulkDeleteCollections = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BulkDeleteInput) => CollectionClient.bulkDelete(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKeys.all })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: collectionKeys.all, refetchType: 'all' });
+      queryClient.refetchQueries({ queryKey: collectionKeys.all });
+    }
   });
 };
 

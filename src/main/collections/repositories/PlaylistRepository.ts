@@ -1,6 +1,7 @@
 import { db } from '@db/db';
 import { playlists, playlistEntries, songs } from '@db/schema';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
+import logger from '../../logger';
 
 export type NewPlaylist = typeof playlists.$inferInsert;
 export type NewPlaylistEntry = typeof playlistEntries.$inferInsert;
@@ -146,6 +147,7 @@ export class PlaylistRepository {
       .where(eq(playlists.id, playlistId))
       .returning();
       
+    logger.info('[PlaylistRepository] deletePlaylist executed', { playlistId, deleted: !!deleted });
     return deleted || null;
   }
 

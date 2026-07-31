@@ -12,6 +12,7 @@ import exportPlaylist from '../../core/exportPlaylist';
 import importPlaylist from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
+import logger from '../../logger';
 
 export function setupCollectionIpc(
   engine: PlaylistEngine,
@@ -88,7 +89,15 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/write/bulkDelete', async (_, input) => {
-    return await engine.bulkDelete(input);
+    logger.info('[IPC] collections/write/bulkDelete called', { input });
+    try {
+      const result = await engine.bulkDelete(input);
+      logger.info('[IPC] collections/write/bulkDelete success', { result });
+      return result;
+    } catch (error) {
+      logger.error('[IPC] collections/write/bulkDelete error', { error, input });
+      throw error;
+    }
   });
 
   ipcMain.handle('collections/write/bulkRestore', async (_, input) => {
