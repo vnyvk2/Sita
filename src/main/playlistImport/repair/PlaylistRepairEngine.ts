@@ -27,8 +27,8 @@ export class PlaylistRepairEngine {
   }
 
   async repairEntry(entry: LibraryResolvedPlaylistEntry): Promise<LibraryResolvedPlaylistEntry> {
-    // Only attempt repair for unresolved library entries (NOT_IN_LIBRARY)
-    if (entry.trackReference.libraryMatch.status !== 'NOT_IN_LIBRARY') {
+    // Attempt repair for any entry that is not already matched to a song in the library
+    if (entry.trackReference.libraryMatch.status === 'MATCHED') {
       return entry;
     }
 

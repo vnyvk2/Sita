@@ -5,8 +5,11 @@ import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLook
 import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
 
 export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProvider {
-  async findByCanonicalPath(path: string): Promise<LibrarySongRecord | null> {
-    const matchedSongs = await db
+  async findByCanonicalPath(targetPath: string): Promise<LibrarySongRecord | null> {
+    if (!targetPath) return null;
+
+    // 1. Try exact path match
+    let matchedSongs = await db
       .select({
         id: songs.id,
         path: songs.path,
@@ -14,8 +17,26 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         duration: songs.duration
       })
       .from(songs)
-      .where(eq(songs.path, path))
+      .where(eq(songs.path, targetPath))
       .limit(1);
+
+    // 2. Try normalized slash direction match if exact fails
+    if (matchedSongs.length === 0) {
+      const targetAltSlash = targetPath.includes('\\')
+        ? targetPath.replaceAll('\\', '/')
+        : targetPath.replaceAll('/', '\\');
+
+      matchedSongs = await db
+        .select({
+          id: songs.id,
+          path: songs.path,
+          title: songs.title,
+          duration: songs.duration
+        })
+        .from(songs)
+        .where(eq(songs.path, targetAltSlash))
+        .limit(1);
+    }
 
     if (matchedSongs.length === 0) {
       return null;
@@ -42,7 +63,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       })
       .from(songs)
       .where(like(songs.path, `%${filename}`))
-      .limit(20);
+      .limit(50);
 
     return matchedSongs.map((song) => ({
       id: song.id,
