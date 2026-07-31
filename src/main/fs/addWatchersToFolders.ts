@@ -61,6 +61,24 @@ const folderWatcherFunction = async (
           const stats = await fs.stat(targetSubfolderPath);
           if (stats.isDirectory()) {
             logger.info(`New subfolder detected in watched directory '${folder.path}': '${filename}'`);
+            
+            // 1. Ensure new folder structure is persisted into music_folders DB table
+            const newFolderStructure: FolderStructure = {
+              path: targetSubfolderPath,
+              stats: {
+                lastModifiedDate: stats.mtime,
+                lastChangedDate: stats.ctime,
+                fileCreatedDate: stats.birthtime,
+                lastParsedDate: new Date()
+              },
+              subFolders: []
+            };
+            await saveFolderStructures([newFolderStructure], false);
+
+            // 2. Attach filesystem watcher to new directory
+            await addWatcherToFolder({ path: targetSubfolderPath, stats: newFolderStructure.stats });
+
+            // 3. Scan for new songs inside the new directory with valid folder.id
             await checkFolderForUnknownModifications(targetSubfolderPath);
           }
         } catch {
