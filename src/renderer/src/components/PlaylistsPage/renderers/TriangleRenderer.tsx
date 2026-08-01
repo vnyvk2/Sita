@@ -1,6 +1,24 @@
 import type { CoverRendererProps } from '../../../types/playlistCover';
 import CoverImageTile from './CoverImageTile';
 
+const TRIANGLE_CLIP_PATHS: Record<number, string[]> = {
+  2: [
+    'polygon(0 0, 100% 0, 0 100%)',
+    'polygon(100% 0, 100% 100%, 0 100%)'
+  ],
+  3: [
+    'polygon(0 0, 100% 0, 50% 50%)',
+    'polygon(0 0, 50% 50%, 0 100%)',
+    'polygon(100% 0, 100% 100%, 0 100%, 50% 50%)'
+  ],
+  4: [
+    'polygon(0 0, 100% 0, 50% 50%)',
+    'polygon(100% 0, 100% 100%, 50% 50%)',
+    'polygon(0 100%, 100% 100%, 50% 50%)',
+    'polygon(0 0, 0 100%, 50% 50%)'
+  ]
+};
+
 const TriangleRenderer = ({
   artworks = [],
   className = '',
@@ -25,95 +43,20 @@ const TriangleRenderer = ({
     );
   }
 
-  if (count === 2) {
-    return (
-      <div className={containerClass}>
-        {/* Top-Left Diagonal Triangle */}
-        <CoverImageTile
-          src={artworks[0]}
-          enableImgFadeIns={enableImgFadeIns}
-          alt="Cover 1"
-          className="absolute inset-0"
-          clipPath="polygon(0 0, 100% 0, 0 100%)"
-        />
-        {/* Bottom-Right Diagonal Triangle */}
-        <CoverImageTile
-          src={artworks[1]}
-          enableImgFadeIns={enableImgFadeIns}
-          alt="Cover 2"
-          className="absolute inset-0"
-          clipPath="polygon(100% 0, 100% 100%, 0 100%)"
-        />
-      </div>
-    );
-  }
+  const clipPaths = TRIANGLE_CLIP_PATHS[count] || TRIANGLE_CLIP_PATHS[4];
 
-  if (count === 3) {
-    return (
-      <div className={containerClass}>
-        {/* Top Triangle */}
-        <CoverImageTile
-          src={artworks[0]}
-          enableImgFadeIns={enableImgFadeIns}
-          alt="Cover 1"
-          className="absolute inset-0"
-          clipPath="polygon(0 0, 100% 0, 50% 50%)"
-        />
-        {/* Left Triangle */}
-        <CoverImageTile
-          src={artworks[1]}
-          enableImgFadeIns={enableImgFadeIns}
-          alt="Cover 2"
-          className="absolute inset-0"
-          clipPath="polygon(0 0, 50% 50%, 0 100%)"
-        />
-        {/* Bottom-Right Quad */}
-        <CoverImageTile
-          src={artworks[2]}
-          enableImgFadeIns={enableImgFadeIns}
-          alt="Cover 3"
-          className="absolute inset-0"
-          clipPath="polygon(100% 0, 100% 100%, 0 100%, 50% 50%)"
-        />
-      </div>
-    );
-  }
-
-  // 4 Artworks 100% Coverage 4-Triangle Pinwheel Layout
   return (
     <div className={containerClass}>
-      {/* Top Triangle */}
-      <CoverImageTile
-        src={artworks[0]}
-        enableImgFadeIns={enableImgFadeIns}
-        alt="Cover 1"
-        className="absolute inset-0"
-        clipPath="polygon(0 0, 100% 0, 50% 50%)"
-      />
-      {/* Right Triangle */}
-      <CoverImageTile
-        src={artworks[1]}
-        enableImgFadeIns={enableImgFadeIns}
-        alt="Cover 2"
-        className="absolute inset-0"
-        clipPath="polygon(100% 0, 100% 100%, 50% 50%)"
-      />
-      {/* Bottom Triangle */}
-      <CoverImageTile
-        src={artworks[2]}
-        enableImgFadeIns={enableImgFadeIns}
-        alt="Cover 3"
-        className="absolute inset-0"
-        clipPath="polygon(0 100%, 100% 100%, 50% 50%)"
-      />
-      {/* Left Triangle */}
-      <CoverImageTile
-        src={artworks[3]}
-        enableImgFadeIns={enableImgFadeIns}
-        alt="Cover 4"
-        className="absolute inset-0"
-        clipPath="polygon(0 0, 0 100%, 50% 50%)"
-      />
+      {artworks.slice(0, count).map((art, index) => (
+        <CoverImageTile
+          key={index}
+          src={art}
+          enableImgFadeIns={enableImgFadeIns}
+          alt={`Cover ${index + 1}`}
+          className="absolute inset-0"
+          clipPath={clipPaths[index]}
+        />
+      ))}
     </div>
   );
 };
