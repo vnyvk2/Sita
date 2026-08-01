@@ -73,21 +73,40 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     }));
   }, []);
 
+  const handleSizeChange = useCallback((newSize: 1 | 2 | 3 | 4) => {
+    setCurrentSettings((prev) => {
+      const currentIds = prev.collage?.songIds || [];
+      const newSongIds = currentIds.length > newSize ? currentIds.slice(0, newSize) : currentIds;
+      return {
+        ...prev,
+        collage: {
+          layout: prev.collage?.layout || 'grid',
+          size: newSize,
+          songIds: newSongIds
+        }
+      };
+    });
+  }, []);
+
   const handleToggleSong = useCallback((songId: number) => {
     setCurrentSettings((prev) => {
       const currentIds = prev.collage?.songIds || [];
       const maxSize = prev.collage?.size || 4;
       const isSelected = currentIds.includes(songId);
 
-      let newSongIds: number[];
       if (isSelected) {
-        newSongIds = currentIds.filter((id) => id !== songId);
-      } else {
-        if (currentIds.length >= maxSize) {
-          newSongIds = [...currentIds.slice(1), songId];
-        } else {
-          newSongIds = [...currentIds, songId];
-        }
+        return {
+          ...prev,
+          collage: {
+            layout: prev.collage?.layout || 'grid',
+            size: maxSize,
+            songIds: currentIds.filter((id) => id !== songId)
+          }
+        };
+      }
+
+      if (currentIds.length >= maxSize) {
+        return prev;
       }
 
       return {
@@ -95,7 +114,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         collage: {
           layout: prev.collage?.layout || 'grid',
           size: maxSize,
-          songIds: newSongIds
+          songIds: [...currentIds, songId]
         }
       };
     });
@@ -110,6 +129,8 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
     changePromptMenuData(false);
   }, [changePromptMenuData, isDirty, playlist.id, currentSettings]);
+
+  const currentSize = currentSettings.collage?.size || 4;
 
   return (
     <div className="flex w-[460px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-xl">
@@ -130,6 +151,27 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       {/* Mode Selector (Auto vs Collage) */}
       <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />
 
+      {/* Cover Images Count Selector */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
+        <div className="grid grid-cols-4 gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800">
+          {([1, 2, 3, 4] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => handleSizeChange(s)}
+              className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                currentSize === s
+                  ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Custom Collage Options */}
       {currentSettings.type === 'collage' && (
         <>
@@ -143,7 +185,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
           <NumberedSongPicker
             playlistSongs={playlistSongs}
             selectedSongIds={currentSettings.collage?.songIds || []}
-            maxSize={currentSettings.collage?.size || 4}
+            maxSize={currentSize}
             onToggleSong={handleToggleSong}
           />
         </>

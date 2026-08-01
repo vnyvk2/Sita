@@ -262,6 +262,29 @@ export const Playlist = (props: PlaylistProp) => {
             props.id === SpecialPlaylists.History
       },
       {
+        label: t('playlistsPage.editCover', 'Edit Cover'),
+        iconName: 'grid_view',
+        handlerFunction: () => {
+          CollectionClient.getEntries(props.id)
+            .then((entries) => {
+              const ids = (entries || []).map((e) => e.songId);
+              if (ids.length === 0) return [];
+              return window.api.songs.getSong({ songIds: ids });
+            })
+            .then((songs) => {
+              changePromptMenuData(
+                true,
+                <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />
+              );
+            })
+            .catch((err) => console.error(err));
+        },
+        isDisabled: isMultipleSelectionEnabled
+          ? false
+          : props.id === SpecialPlaylists.Favorites ||
+            props.id === SpecialPlaylists.History
+      },
+      {
         label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
         iconName: 'checklist',
         handlerFunction: () => {

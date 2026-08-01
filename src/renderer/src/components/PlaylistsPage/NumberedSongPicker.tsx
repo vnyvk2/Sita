@@ -52,15 +52,18 @@ const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleS
           uniquePlaylistSongs.map((song) => {
             const isSelected = selectedSet.has(song.songId);
             const badge = getPositionBadge(song.songId);
+            const isMaxReached = !isSelected && selectedSongIds.length >= maxSize;
 
             return (
               <div
                 key={song.songId}
-                onClick={() => onToggleSong(song.songId)}
-                className={`group flex items-center justify-between p-2 rounded-lg transition-all duration-150 cursor-pointer ${
+                onClick={() => !isMaxReached && onToggleSong(song.songId)}
+                className={`group flex items-center justify-between p-2 rounded-lg transition-all duration-150 ${
                   isSelected
-                    ? 'bg-neutral-800/90 border border-neutral-700 text-white shadow-sm'
-                    : 'bg-neutral-900/40 border border-transparent text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200'
+                    ? 'bg-neutral-800/90 border border-neutral-700 text-white shadow-sm cursor-pointer'
+                    : isMaxReached
+                      ? 'bg-neutral-900/20 border border-transparent text-neutral-600 opacity-50 cursor-not-allowed'
+                      : 'bg-neutral-900/40 border border-transparent text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
