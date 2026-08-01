@@ -66,9 +66,9 @@ const MultipleArtworksCover = (props: Props) => {
       (!!props.collectionId || (props.songIds && props.songIds.length > 0))
   });
 
-  // --- 1. Phase 1 Custom Grid Layout Rendering ---
-  if (resolvedArtworks || layout === 'grid') {
-    const list = resolvedArtworks || [];
+  // --- 1. Phase 1 Custom Resolved Collage Layout Rendering ---
+  if (resolvedArtworks !== undefined) {
+    const list = resolvedArtworks;
     const count = list.length;
 
     if (count === 0) {
