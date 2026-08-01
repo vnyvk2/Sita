@@ -33,7 +33,7 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     title: 'Diamond Rotation',
     description: 'Rotated diamond center focus',
     icon: 'diamond',
-    enabled: false,
+    enabled: true,
     minImages: 1,
     maxImages: 4,
   },

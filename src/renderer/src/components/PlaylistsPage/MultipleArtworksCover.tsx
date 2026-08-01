@@ -10,6 +10,7 @@ import Img from '../Img';
 import GridRenderer from './renderers/GridRenderer';
 import TriangleRenderer from './renderers/TriangleRenderer';
 import FanRenderer from './renderers/FanRenderer';
+import DiamondRenderer from './renderers/DiamondRenderer';
 
 type Props = {
   className?: string;
@@ -28,6 +29,7 @@ const COVER_RENDERERS: Partial<Record<PlaylistCoverLayout, React.ComponentType<C
   grid: GridRenderer,
   triangle: TriangleRenderer,
   fan: FanRenderer,
+  diamond: DiamondRenderer,
 };
 
 const MultipleArtworksCover = (props: Props) => {
