@@ -1,6 +1,4 @@
-import type { ClipPathArtworkCount } from '../types/playlistCover';
-
-export type FanStyle = 'standard';
+import type { ClipPathArtworkCount, FanStyle } from '../types/playlistCover';
 
 const STANDARD_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
   2: [
