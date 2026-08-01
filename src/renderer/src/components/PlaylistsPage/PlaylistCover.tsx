@@ -47,8 +47,38 @@ const PlaylistCover = (props: Props) => {
   // 1. Read stored settings for this playlist
   const settings = storage.playlistCoverSettings.getSettings(playlist.id);
   const hasCustomCollage = settings?.type === 'collage';
+  const isAutoMode = !hasCustomCollage;
 
-  // 2. Option A Priority Chain:
+  // 2. Fetch playlist entry pointers when songs prop is not provided (ALWAYS CALL HOOKS AT TOP OF COMPONENT)
+  const { data: collectionEntries = [] } = useQuery({
+    ...collectionEntriesOptions(playlist.id),
+    enabled: !songs && hasCustomCollage
+  });
+
+  // 3. Fetch full SongData objects using Nora's cached songQuery.allSongInfo
+  const { data: fetchedSongData = [] } = useQuery({
+    ...songQuery.allSongInfo({
+      songIds: collectionEntries.map((e) => e.songId),
+      sortType: 'addedOrder'
+    }),
+    enabled: !songs && hasCustomCollage && collectionEntries.length > 0
+  });
+
+  // 4. Preserve exact playlist position order matching collectionEntries (0, 1, 2, 3...)
+  const playlistSongs: SongData[] = useMemo(() => {
+    if (songs) return songs;
+    const songMap = new Map(fetchedSongData.map((s) => [s.songId, s]));
+    const positionOrderedSongs: SongData[] = [];
+    for (const entry of collectionEntries) {
+      const song = songMap.get(entry.songId);
+      if (song) positionOrderedSongs.push(song);
+    }
+    return positionOrderedSongs;
+  }, [songs, fetchedSongData, collectionEntries]);
+
+  // --- ALL HOOKS ARE NOW EXECUTED UNCONDITIONALLY AT THE TOP ---
+
+  // 5. Option A Priority Chain:
   //    (1) Custom Collage (if explicitly set by user)
   //    (2) Playlist Artwork (if user manually uploaded/assigned artwork or static special playlist icon)
   //    (3) Automatic Song Collage (if enableArtworkFromSongCovers is true and itemCount > 1)
@@ -81,36 +111,7 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  const isAutoMode = !hasCustomCollage;
-
-  // 3. Fetch playlist entry pointers when songs prop is not provided
-  const { data: collectionEntries = [] } = useQuery({
-    ...collectionEntriesOptions(playlist.id),
-    enabled: !songs
-  });
-
-  // 4. Fetch full SongData objects using Nora's cached songQuery.allSongInfo
-  const { data: fetchedSongData = [] } = useQuery({
-    ...songQuery.allSongInfo({
-      songIds: collectionEntries.map((e) => e.songId),
-      sortType: 'addedOrder'
-    }),
-    enabled: !songs && collectionEntries.length > 0
-  });
-
-  // Preserve exact playlist position order matching collectionEntries (0, 1, 2, 3...)
-  const playlistSongs: SongData[] = useMemo(() => {
-    if (songs) return songs;
-    const songMap = new Map(fetchedSongData.map((s) => [s.songId, s]));
-    const positionOrderedSongs: SongData[] = [];
-    for (const entry of collectionEntries) {
-      const song = songMap.get(entry.songId);
-      if (song) positionOrderedSongs.push(song);
-    }
-    return positionOrderedSongs;
-  }, [songs, fetchedSongData, collectionEntries]);
-
-  // 5. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
+  // 6. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
   if (isAutoMode && !songs) {
     return (
       <MultipleArtworksCover
@@ -123,10 +124,10 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  // 6. Resolve layout and artwork paths via pure resolver utility (strictly type-checked SongData[])
+  // 7. Resolve layout and artwork paths via pure resolver utility (strictly type-checked SongData[])
   const { layout, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
 
-  // 7. Render presentation component
+  // 8. Render presentation component
   return (
     <MultipleArtworksCover
       resolvedArtworks={artworks}
