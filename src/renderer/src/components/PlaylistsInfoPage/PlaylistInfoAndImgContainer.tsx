@@ -47,24 +47,8 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
     <>
       {playlist && (
         <div className="playlist-img-and-info-container mb-8 flex flex-row items-center justify-start">
-          <div className="playlist-cover-container group relative mt-2 overflow-hidden rounded-xl">
-            {preferences.enableArtworkFromSongCovers && playlist.itemCount > 1 ? (
-              <div className="relative h-60 w-60">
-                <PlaylistCover playlist={playlist} songs={songs} className="h-60 w-60" />
-                <Img
-                  src={playlist.artworkPath || DefaultPlaylistCover}
-                  alt="Playlist Cover"
-                  loading="eager"
-                  className="absolute! right-4 bottom-4 h-16 w-16 rounded-lg!"
-                />
-              </div>
-            ) : (
-                <Img
-                  src={playlist.artworkPath || DefaultPlaylistCover}
-                  className="w-52 rounded-xl lg:w-48"
-                  alt="Playlist Cover"
-                />
-              )}
+          <div className="playlist-cover-container group relative mt-2 overflow-hidden rounded-xl h-60 w-60">
+            <PlaylistCover playlist={playlist} songs={songs} className="h-60 w-60" />
             <button
               onClick={openCoverSettings}
               className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"

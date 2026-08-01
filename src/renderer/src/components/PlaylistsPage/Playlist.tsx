@@ -438,30 +438,11 @@ export const Playlist = (props: PlaylistProp) => {
           />
         )}
         <div className="playlist-cover-container h-full cursor-pointer overflow-hidden">
-          {preferences?.enableArtworkFromSongCovers && (props.itemCount > 1 || props.itemCount === 0) ? (
-            <div className="relative aspect-square w-full">
-              <PlaylistCover
-                playlist={props}
-                className="aspect-square w-full"
-                enableImgFadeIns={!isMultipleSelectionEnabled}
-              />
-              <Img
-                src={props.artworkPath || DefaultPlaylistCover}
-                alt="Playlist Cover"
-                loading="lazy"
-                className="absolute! bottom-1 left-1 h-8 w-8 rounded-md!"
-                enableImgFadeIns={!isMultipleSelectionEnabled}
-              />
-            </div>
-          ) : (
-            <Img
-              src={props.artworkPath || DefaultPlaylistCover}
-              alt="Playlist Cover"
-              loading="lazy"
-              className="h-full w-full"
-              enableImgFadeIns={!isMultipleSelectionEnabled}
-            />
-          )}
+          <PlaylistCover
+            playlist={props}
+            className="aspect-square w-full"
+            enableImgFadeIns={!isMultipleSelectionEnabled}
+          />
         </div>
       </div>
       <div className="playlist-info-container mt-2">

@@ -1,8 +1,13 @@
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
+import { useStore } from '@tanstack/react-store';
+import { useEffect, useState } from 'react';
 import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
 import storage from '@renderer/utils/localStorage';
+import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
+import Img from '../Img';
 import MultipleArtworksCover from './MultipleArtworksCover';
 
 type Props = {
@@ -15,14 +20,51 @@ type Props = {
 };
 
 const PlaylistCover = (props: Props) => {
-  const { playlist, songs, className, imgClassName, holderClassName, enableImgFadeIns } = props;
+  const { playlist, songs, className = '', imgClassName = '', holderClassName = '', enableImgFadeIns } = props;
+
+  const enableArtworkFromSongCovers = useStore(
+    store,
+    (state) => state.localStorage.preferences.enableArtworkFromSongCovers
+  );
+
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  // Subscribe to cover settings changes for instant real-time UI re-rendering
+  useEffect(() => {
+    const handleSettingsChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ playlistId: number }>;
+      if (customEvent.detail?.playlistId === playlist.id) {
+        setSettingsVersion((prev) => prev + 1);
+      }
+    };
+    window.addEventListener('playlist-cover-settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('playlist-cover-settings-changed', handleSettingsChange);
+    };
+  }, [playlist.id]);
 
   // 1. Read stored settings for this playlist
   const settings = storage.playlistCoverSettings.getSettings(playlist.id);
+  const hasCustomCollage = settings?.type === 'collage';
 
-  const isAutoMode = !settings || settings.type === 'auto';
+  // 2. If auto mode and global preferences disabled (or itemCount <= 1): render playlist.artworkPath -> DefaultPlaylistCover fallback
+  if (!hasCustomCollage && (!enableArtworkFromSongCovers || playlist.itemCount <= 1)) {
+    return (
+      <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
+        <Img
+          src={playlist.artworkPath || DefaultPlaylistCover}
+          fallbackSrc={DefaultPlaylistCover}
+          alt="Playlist Cover"
+          className={`h-full w-full object-cover ${imgClassName}`}
+          enableImgFadeIns={enableImgFadeIns}
+        />
+      </div>
+    );
+  }
 
-  // 2. Fetch entries if playlist songs were not provided directly
+  const isAutoMode = !hasCustomCollage;
+
+  // 3. Fetch entries if playlist songs were not provided directly and in custom collage mode
   const { data: fetchedSongs = [] } = useQuery({
     ...collectionEntriesOptions(playlist.id),
     enabled: !songs && !isAutoMode
@@ -30,7 +72,7 @@ const PlaylistCover = (props: Props) => {
 
   const playlistSongs = songs ?? fetchedSongs;
 
-  // 3. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
+  // 4. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
   if (isAutoMode && !songs) {
     return (
       <MultipleArtworksCover
@@ -43,10 +85,10 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  // 4. Resolve layout and artwork paths via pure resolver utility
+  // 5. Resolve layout and artwork paths via pure resolver utility
   const { layout, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
 
-  // 5. Render presentation component
+  // 6. Render presentation component
   return (
     <MultipleArtworksCover
       resolvedArtworks={artworks}
