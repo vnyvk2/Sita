@@ -98,7 +98,17 @@ const PlaylistCover = (props: Props) => {
     enabled: !songs && collectionEntries.length > 0
   });
 
-  const playlistSongs = songs ?? fetchedSongData;
+  // Preserve exact playlist position order matching collectionEntries (0, 1, 2, 3...)
+  const playlistSongs: SongData[] = useMemo(() => {
+    if (songs) return songs;
+    const songMap = new Map(fetchedSongData.map((s) => [s.songId, s]));
+    const positionOrderedSongs: SongData[] = [];
+    for (const entry of collectionEntries) {
+      const song = songMap.get(entry.songId);
+      if (song) positionOrderedSongs.push(song);
+    }
+    return positionOrderedSongs;
+  }, [songs, fetchedSongData, collectionEntries]);
 
   // 5. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
   if (isAutoMode && !songs) {
@@ -116,12 +126,7 @@ const PlaylistCover = (props: Props) => {
   // 6. Resolve layout and artwork paths via pure resolver utility (strictly type-checked SongData[])
   const { layout, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
 
-    settingsType: settings?.type,
-    resolvedArtworksLength: artworks.length,
-    artworks
-  });
-
-  // 6. Render presentation component
+  // 7. Render presentation component
   return (
     <MultipleArtworksCover
       resolvedArtworks={artworks}
