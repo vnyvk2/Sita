@@ -205,21 +205,23 @@ function PlaylistInfoPage() {
         'playlist',
         true,
         playlistData.id,
-        true
+        true,
+        playlistData.name
       ),
-    [createQueue, playlistData.id, filteredSongs]
+    [createQueue, playlistData.id, playlistData.name, filteredSongs]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
         filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-        'songs',
+        'playlist',
         false,
         playlistData.id,
-        true
+        true,
+        playlistData.name
       ),
-    [createQueue, playlistData.id, filteredSongs]
+    [createQueue, playlistData.id, playlistData.name, filteredSongs]
   );
 
   const searchBar = (
