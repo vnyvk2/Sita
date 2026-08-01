@@ -22,6 +22,10 @@ type Props = {
   layout?: PlaylistCoverLayout;
 };
 
+const COVER_RENDERERS: Partial<Record<PlaylistCoverLayout, React.ComponentType<CoverRendererProps>>> = {
+  grid: GridRenderer,
+};
+
 const MultipleArtworksCover = (props: Props) => {
   const enableArtworkFromSongCovers = useStore(
     store,
