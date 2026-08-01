@@ -2,12 +2,14 @@ import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import type { PlaylistCoverSettings } from '../../types/playlistCover';
+import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
+import type { PlaylistCoverDraft, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
 import Button from '../Button';
-import Img from '../Img';
-import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
-import CollageSongPickerPrompt from './CollageSongPickerPrompt';
+import CoverLivePreview from './CoverLivePreview';
+import CoverTypeSelector from './CoverTypeSelector';
+import LayoutSelector from './LayoutSelector';
+import NumberedSongPicker from './NumberedSongPicker';
 
 interface Props {
   playlist: PlaylistDto;
@@ -18,7 +20,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const initialSettings: PlaylistCoverSettings = useMemo(() => {
+  const originalSettings: PlaylistCoverSettings = useMemo(() => {
     return (
       storage.playlistCoverSettings.getSettings(playlist.id) ?? {
         type: 'auto',
@@ -31,165 +33,120 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     );
   }, [playlist.id]);
 
-  const [type, setType] = useState<'auto' | 'collage'>(initialSettings.type);
-  const [size, setSize] = useState<1 | 2 | 3 | 4>(initialSettings.collage?.size ?? 4);
-  const [selectedSongIds, setSelectedSongIds] = useState<number[]>(
-    initialSettings.collage?.songIds ?? []
-  );
+  const [currentSettings, setCurrentSettings] = useState<PlaylistCoverSettings>(originalSettings);
 
-  const selectedSongs = useMemo(() => {
-    const map = new Map(playlistSongs.map((s) => [s.songId, s]));
-    return selectedSongIds
-      .map((id) => map.get(id))
-      .filter((song): song is SongData => Boolean(song));
-  }, [playlistSongs, selectedSongIds]);
+  const draft: PlaylistCoverDraft = useMemo(() => {
+    return {
+      originalSettings,
+      currentSettings,
+      workingSongs: playlistSongs
+    };
+  }, [originalSettings, currentSettings, playlistSongs]);
 
-  const handleOpenSongPicker = useCallback(() => {
-    changePromptMenuData(
-      true,
-      <CollageSongPickerPrompt
-        playlistSongs={playlistSongs}
-        maxSize={size}
-        selectedSongIds={selectedSongIds}
-        onSave={(newIds) => {
-          setSelectedSongIds(newIds);
-          // Restore cover settings prompt
-          changePromptMenuData(
-            true,
-            <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={playlistSongs} />
-          );
-        }}
-        onCancel={() => {
-          changePromptMenuData(
-            true,
-            <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={playlistSongs} />
-          );
-        }}
-      />
-    );
-  }, [changePromptMenuData, playlist, playlistSongs, selectedSongIds, size]);
+  const resolvedPreviewCover = usePlaylistCoverPreview({ draft, playlist });
+
+  const isDirty = useMemo(() => {
+    return JSON.stringify(originalSettings) !== JSON.stringify(currentSettings);
+  }, [originalSettings, currentSettings]);
+
+  const handleTypeChange = useCallback((newType: PlaylistCoverSettings['type']) => {
+    setCurrentSettings((prev) => ({
+      ...prev,
+      type: newType,
+      collage: prev.collage || {
+        layout: 'grid',
+        size: 4,
+        songIds: []
+      }
+    }));
+  }, []);
+
+  const handleLayoutChange = useCallback((newLayout: PlaylistCoverLayout) => {
+    setCurrentSettings((prev) => ({
+      ...prev,
+      collage: {
+        layout: newLayout,
+        size: prev.collage?.size || 4,
+        songIds: prev.collage?.songIds || []
+      }
+    }));
+  }, []);
+
+  const handleToggleSong = useCallback((songId: number) => {
+    setCurrentSettings((prev) => {
+      const currentIds = prev.collage?.songIds || [];
+      const maxSize = prev.collage?.size || 4;
+      const isSelected = currentIds.includes(songId);
+
+      let newSongIds: number[];
+      if (isSelected) {
+        newSongIds = currentIds.filter((id) => id !== songId);
+      } else {
+        if (currentIds.length >= maxSize) {
+          newSongIds = [...currentIds.slice(1), songId];
+        } else {
+          newSongIds = [...currentIds, songId];
+        }
+      }
+
+      return {
+        ...prev,
+        collage: {
+          layout: prev.collage?.layout || 'grid',
+          size: maxSize,
+          songIds: newSongIds
+        }
+      };
+    });
+  }, []);
 
   const handleSave = useCallback(() => {
-    const newSettings: PlaylistCoverSettings = {
-      type,
-      collage: {
-        layout: 'grid',
-        size,
-        songIds: selectedSongIds
-      }
-    };
-    storage.playlistCoverSettings.setSettings(playlist.id, newSettings);
+    storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
     changePromptMenuData(false);
-  }, [changePromptMenuData, playlist.id, selectedSongIds, size, type]);
+  }, [changePromptMenuData, playlist.id, currentSettings]);
 
   return (
-    <div className="flex w-[420px] flex-col p-4 text-font-color-black dark:text-font-color-white">
-      <div className="mb-4 text-xl font-semibold">
-        {t('playlistsPage.coverSettingsTitle', 'Playlist Cover Settings')}
+    <div className="flex w-[460px] flex-col p-5 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto">
+      <div className="mb-4 text-xl font-bold border-b border-neutral-800 pb-3">
+        {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
       </div>
 
-      {/* Cover Type Selector */}
-      <div className="mb-4">
-        <label className="mb-2 block text-xs font-semibold uppercase opacity-70">
-          {t('playlistsPage.coverType', 'Cover Type')}
-        </label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input
-              type="radio"
-              name="coverType"
-              checked={type === 'auto'}
-              onChange={() => setType('auto')}
-              className="accent-font-color-highlight dark:accent-dark-font-color-highlight"
-            />
-            {t('playlistsPage.coverTypeAuto', 'Auto (Default)')}
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input
-              type="radio"
-              name="coverType"
-              checked={type === 'collage'}
-              onChange={() => setType('collage')}
-              className="accent-font-color-highlight dark:accent-dark-font-color-highlight"
-            />
-            {t('playlistsPage.coverTypeCollage', 'Song Collage')}
-          </label>
-        </div>
-      </div>
+      {/* Production-Identical Live Preview */}
+      <CoverLivePreview resolvedCover={resolvedPreviewCover} />
 
-      {/* Grid Size Selector */}
-      {type === 'collage' && (
+      {/* Mode Selector (Auto vs Collage) */}
+      <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />
+
+      {/* Custom Collage Options */}
+      {currentSettings.type === 'collage' && (
         <>
-          <div className="mb-4">
-            <label className="mb-2 block text-xs font-semibold uppercase opacity-70">
-              {t('playlistsPage.numberofImages', 'Number of Images')}
-            </label>
-            <div className="flex gap-4">
-              {([1, 2, 3, 4] as const).map((s) => (
-                <label key={s} className="flex items-center gap-1.5 cursor-pointer text-sm font-medium">
-                  <input
-                    type="radio"
-                    name="collageSize"
-                    checked={size === s}
-                    onChange={() => {
-                      setSize(s);
-                      if (selectedSongIds.length > s) {
-                        setSelectedSongIds(selectedSongIds.slice(0, s));
-                      }
-                    }}
-                    className="accent-font-color-highlight dark:accent-dark-font-color-highlight"
-                  />
-                  {s}
-                </label>
-              ))}
-            </div>
-          </div>
+          {/* Data-Driven Layout Cards */}
+          <LayoutSelector
+            selectedLayout={currentSettings.collage?.layout || 'grid'}
+            onChange={handleLayoutChange}
+          />
 
-          {/* Selected Songs List */}
-          <div className="mb-4">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase opacity-70">
-                {t('playlistsPage.selectedSongs', 'Selected Songs')} ({selectedSongs.length}/{size})
-              </label>
-              <Button
-                label={t('playlistsPage.chooseSongs', 'Choose Songs')}
-                type="tertiary"
-                clickHandler={handleOpenSongPicker}
-              />
-            </div>
-            <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-font-color-black/10 dark:border-font-color-white/10 p-2">
-              {selectedSongs.length === 0 ? (
-                <span className="text-xs opacity-60 italic block py-2 text-center">
-                  {t('playlistsPage.noSongsChosen', 'No specific songs chosen. Will auto-fill from playlist.')}
-                </span>
-              ) : (
-                selectedSongs.map((song, i) => (
-                  <div key={song.songId} className="flex items-center gap-2 text-xs py-1">
-                    <span className="font-semibold opacity-60 w-4 text-center">{i + 1}.</span>
-                    <Img
-                      src={song.artworkPaths?.artworkPath || DefaultImgCover}
-                      fallbackSrc={DefaultImgCover}
-                      className="h-6 w-6 rounded object-cover"
-                    />
-                    <span className="truncate flex-1">{song.title}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          {/* Numbered Song Picker Cards */}
+          <NumberedSongPicker
+            playlistSongs={playlistSongs}
+            selectedSongIds={currentSettings.collage?.songIds || []}
+            maxSize={currentSettings.collage?.size || 4}
+            onToggleSong={handleToggleSong}
+          />
         </>
       )}
 
-      {/* Footer Controls */}
-      <div className="mt-2 flex items-center justify-end gap-3 pt-3 border-t border-font-color-black/10 dark:border-font-color-white/10">
+      {/* Footer Action Buttons */}
+      <div className="mt-4 flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
         <Button
-          label={t('common.cancel')}
+          label={t('common.cancel', 'Cancel')}
           type="tertiary"
           clickHandler={() => changePromptMenuData(false)}
         />
         <Button
-          label={t('common.save')}
+          label={t('common.save', 'Save Changes')}
           type="primary"
+          isDisabled={!isDirty}
           clickHandler={handleSave}
         />
       </div>

@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useMemo } from 'react';
 
-import type { PlaylistCoverLayout } from '../../types/playlistCover';
+import type { CoverRendererProps, PlaylistCoverLayout } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
+import GridRenderer from './renderers/GridRenderer';
 
 type Props = {
   className?: string;
@@ -66,103 +67,12 @@ const MultipleArtworksCover = (props: Props) => {
       (!!props.collectionId || (props.songIds && props.songIds.length > 0))
   });
 
-  // --- 1. Phase 1 Custom Resolved Collage Layout Rendering ---
+  // --- 1. Phase 1 & 2 Custom Resolved Collage Layout Renderer Dispatcher ---
   if (resolvedArtworks !== undefined) {
-    const list = resolvedArtworks;
-    const count = list.length;
-
-    if (count === 0) {
-      return (
-        <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-          <Img
-            src={DefaultImgCover}
-            alt="Default Cover"
-            className={`h-full w-full object-cover ${imgClassName}`}
-            enableImgFadeIns={enableImgFadeIns}
-          />
-        </div>
-      );
-    }
-
-    if (count === 1) {
-      return (
-        <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-          <Img
-            src={list[0] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover Artwork"
-            className={`h-full w-full object-cover ${imgClassName}`}
-            enableImgFadeIns={enableImgFadeIns}
-          />
-        </div>
-      );
-    }
-
-    if (count === 2) {
-      return (
-        <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-          <div className={`grid h-full w-full grid-cols-2 grid-rows-1 gap-0.5 ${holderClassName}`}>
-            {list.slice(0, 2).map((art, i) => (
-              <div key={i} className="relative h-full w-full overflow-hidden">
-                <Img
-                  src={art}
-                  fallbackSrc={DefaultImgCover}
-                  alt={`Cover Artwork ${i + 1}`}
-                  className={`h-full w-full object-cover ${imgClassName}`}
-                  enableImgFadeIns={enableImgFadeIns}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (count === 3) {
-      return (
-        <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-          <div className={`grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 ${holderClassName}`}>
-            <div className="col-span-2 row-span-1 relative h-full w-full overflow-hidden">
-              <Img
-                src={list[0]}
-                fallbackSrc={DefaultImgCover}
-                alt="Cover Artwork 1"
-                className={`h-full w-full object-cover ${imgClassName}`}
-                enableImgFadeIns={enableImgFadeIns}
-              />
-            </div>
-            {list.slice(1, 3).map((art, i) => (
-              <div key={i + 1} className="col-span-1 row-span-1 relative h-full w-full overflow-hidden">
-                <Img
-                  src={art}
-                  fallbackSrc={DefaultImgCover}
-                  alt={`Cover Artwork ${i + 2}`}
-                  className={`h-full w-full object-cover ${imgClassName}`}
-                  enableImgFadeIns={enableImgFadeIns}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // count >= 4: 2x2 grid
+    const Renderer = (layout && COVER_RENDERERS[layout]) || GridRenderer;
     return (
       <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-        <div className={`grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 ${holderClassName}`}>
-          {list.slice(0, 4).map((art, i) => (
-            <div key={i} className="relative h-full w-full overflow-hidden">
-              <Img
-                src={art}
-                fallbackSrc={DefaultImgCover}
-                alt={`Cover Artwork ${i + 1}`}
-                className={`h-full w-full object-cover ${imgClassName}`}
-                enableImgFadeIns={enableImgFadeIns}
-              />
-            </div>
-          ))}
-        </div>
+        <Renderer artworks={resolvedArtworks} layout={layout || 'grid'} />
       </div>
     );
   }
