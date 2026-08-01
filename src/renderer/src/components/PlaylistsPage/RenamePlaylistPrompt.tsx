@@ -9,6 +9,8 @@ import Img from '../Img';
 
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 
+import PlaylistCover from './PlaylistCover';
+
 interface Props {
   playlistData: PlaylistDto;
 }
@@ -18,7 +20,7 @@ const RenamePlaylistPrompt = (props: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const { name, playlistId, artworkPath } = playlistData;
+  const { id, name } = playlistData;
 
   const [input, setInput] = useState(name);
 
@@ -26,8 +28,9 @@ const RenamePlaylistPrompt = (props: Props) => {
 
   const renamePlaylist = useCallback(
     (newName: string) => {
+      if (!id) return;
       renameCollection.mutate(
-        { playlistId, newName: newName.trim() },
+        { playlistId: id, newName: newName.trim() },
         {
           onSuccess: () => {
             changePromptMenuData(false);
@@ -38,19 +41,13 @@ const RenamePlaylistPrompt = (props: Props) => {
         }
       );
     },
-    [changePromptMenuData, playlistId, renameCollection]
+    [changePromptMenuData, id, renameCollection]
   );
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="img-container relative mb-8 max-w-[50%] rounded-xl">
-        <Img
-          src={artworkPath || DefaultPlaylistCover}
-          fallbackSrc={DefaultPlaylistCover}
-          alt="Playlist default cover"
-          loading="eager"
-          className="aspect-square w-full max-w-60 rounded-xl shadow-lg"
-        />
+      <div className="img-container relative mb-8 flex h-48 w-48 items-center justify-center overflow-hidden rounded-xl">
+        <PlaylistCover playlist={playlistData} className="h-48 w-48 rounded-xl shadow-lg" />
       </div>
       <span className="mb-4 text-center text-2xl font-medium">
         {t('renamePlaylistPrompt.renamePlaylistWithName', { name })}
