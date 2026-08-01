@@ -7,14 +7,18 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
 
-type Props = { playlistData: Playlist };
+import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
+
+interface Props {
+  playlistData: PlaylistDto;
+}
 
 const RenamePlaylistPrompt = (props: Props) => {
   const { playlistData } = props;
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const { name, playlistId, artworkPaths } = playlistData;
+  const { name, playlistId, artworkPath } = playlistData;
 
   const [input, setInput] = useState(name);
 
@@ -41,7 +45,8 @@ const RenamePlaylistPrompt = (props: Props) => {
     <div className="flex flex-col items-center justify-center">
       <div className="img-container relative mb-8 max-w-[50%] rounded-xl">
         <Img
-          src={artworkPaths.artworkPath}
+          src={artworkPath || DefaultPlaylistCover}
+          fallbackSrc={DefaultPlaylistCover}
           alt="Playlist default cover"
           loading="eager"
           className="aspect-square w-full max-w-60 rounded-xl shadow-lg"

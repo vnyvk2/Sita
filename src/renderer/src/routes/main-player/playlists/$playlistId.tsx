@@ -224,6 +224,7 @@ function PlaylistInfoPage() {
 
   const searchBar = (
     <PageSearchInput
+      key="playlist-search-input"
       inputRef={search.inputRef}
       value={search.value}
       onChange={search.onChange}

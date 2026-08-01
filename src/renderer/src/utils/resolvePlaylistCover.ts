@@ -1,4 +1,5 @@
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import DefaultImgCover from '../assets/images/webp/song_cover_default.webp';
 import type { PlaylistCoverSettings, ResolvedPlaylistCover } from '../types/playlistCover';
 
 export function resolvePlaylistCover(
@@ -9,9 +10,9 @@ export function resolvePlaylistCover(
   // 1. If auto mode or no custom collage settings provided: default to taking first 4 playlist song artworks
   if (!settings || settings.type === 'auto' || !settings.collage) {
     const defaultSongs = playlistSongs.slice(0, 4);
-    const artworks = defaultSongs
-      .map((s) => s.artworkPaths?.artworkPath)
-      .filter((path): path is string => Boolean(path));
+    const artworks = defaultSongs.map(
+      (s) => s.artworkPaths?.artworkPath || DefaultImgCover
+    );
     return { layout: 'grid', artworks };
   }
 
@@ -42,9 +43,9 @@ export function resolvePlaylistCover(
     }
   }
 
-  const artworks = validSelectedSongs
-    .map((s) => s.artworkPaths?.artworkPath)
-    .filter((path): path is string => Boolean(path));
+  const artworks = validSelectedSongs.map(
+    (s) => s.artworkPaths?.artworkPath || DefaultImgCover
+  );
 
   return { layout, artworks };
 }
