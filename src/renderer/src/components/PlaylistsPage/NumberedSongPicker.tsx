@@ -38,13 +38,13 @@ const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleS
         {playlistSongs.length === 0 ? (
           <div className="p-4 text-center text-sm text-neutral-500">No songs in playlist</div>
         ) : (
-          playlistSongs.map((song) => {
+          playlistSongs.map((song, index) => {
             const isSelected = selectedSet.has(song.songId);
             const badge = getPositionBadge(song.songId);
 
             return (
               <div
-                key={song.songId}
+                key={`${song.songId}-${index}`}
                 onClick={() => onToggleSong(song.songId)}
                 className={`group flex items-center justify-between p-2 rounded-lg transition-all duration-150 cursor-pointer ${
                   isSelected
