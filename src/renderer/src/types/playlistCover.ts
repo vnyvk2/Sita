@@ -16,9 +16,13 @@ export interface ResolvedPlaylistCover {
   artworks: string[];
 }
 
+export type TriangleStyle = 'diagonal' | 'pinwheel' | 'center';
+export type CoverLayoutStyle = TriangleStyle | undefined;
+
 export interface CoverRendererProps {
   artworks: string[];
   layout: PlaylistCoverLayout;
+  style?: CoverLayoutStyle;
   className?: string;
   enableImgFadeIns?: boolean;
 }
