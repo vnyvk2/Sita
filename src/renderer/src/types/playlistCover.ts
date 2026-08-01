@@ -28,6 +28,12 @@ export interface ActiveSlot {
   index: CoverSlotIndex;
 }
 
+export interface EffectiveCoverSlot {
+  slot: CoverSlotIndex;
+  song?: SongData;
+  isFallback: boolean;
+}
+
 export type LayoutPreset<S extends string> = Record<S, Record<ClipPathArtworkCount, readonly string[]>>;
 
 export interface CoverRendererProps {
