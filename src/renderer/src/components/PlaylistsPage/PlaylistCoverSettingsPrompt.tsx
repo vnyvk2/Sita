@@ -3,7 +3,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
-import type { PlaylistCoverDraft, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
+import { COVER_IMAGE_COUNTS, type PlaylistCoverDraft, type PlaylistCoverLayout, type PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
 import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
 import Button from '../Button';
@@ -155,7 +155,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       <div className="mb-6">
         <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
         <div className="grid grid-cols-4 gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800">
-          {([1, 2, 3, 4] as const).map((s) => (
+          {COVER_IMAGE_COUNTS.map((s) => (
             <button
               key={s}
               type="button"

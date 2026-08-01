@@ -50,11 +50,15 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
           <div className="playlist-cover-container group relative mt-2 overflow-hidden rounded-xl h-60 w-60">
             <PlaylistCover playlist={playlist} songs={songs} className="h-60 w-60" />
             <button
-              onClick={openCoverSettings}
-              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                openCoverSettings();
+              }}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer backdrop-blur-xs"
               title={t('playlistsPage.editCover', 'Edit Cover')}
             >
               <span className="material-icons-round text-3xl text-white">edit</span>
+              <span className="text-xs font-semibold tracking-wider text-white uppercase">Edit Cover</span>
             </button>
           </div>
             <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8">

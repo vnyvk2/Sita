@@ -1,5 +1,7 @@
 export type PlaylistCoverLayout = 'grid' | 'triangle' | 'fan' | 'diamond';
 
+export const COVER_IMAGE_COUNTS = [1, 2, 3, 4] as const;
+
 export interface PlaylistCoverSettings {
   type: 'auto' | 'collage';
   collage?: {
