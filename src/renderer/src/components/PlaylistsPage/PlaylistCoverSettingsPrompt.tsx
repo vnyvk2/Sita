@@ -5,6 +5,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
 import type { PlaylistCoverDraft, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
+import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
 import Button from '../Button';
 import CoverLivePreview from './CoverLivePreview';
 import CoverTypeSelector from './CoverTypeSelector';
@@ -46,7 +47,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const resolvedPreviewCover = usePlaylistCoverPreview({ draft, playlist });
 
   const isDirty = useMemo(() => {
-    return JSON.stringify(originalSettings) !== JSON.stringify(currentSettings);
+    return !isPlaylistCoverSettingsEqual(originalSettings, currentSettings);
   }, [originalSettings, currentSettings]);
 
   const handleTypeChange = useCallback((newType: PlaylistCoverSettings['type']) => {
@@ -111,7 +112,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [changePromptMenuData, isDirty, playlist.id, currentSettings]);
 
   return (
-    <div className="flex w-[460px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl">
+    <div className="flex w-[460px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-xl">
       <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3">
         <span className="text-xl font-bold tracking-tight">
           {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
@@ -151,7 +152,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       {/* Footer Action Buttons */}
       <div className="mt-4 flex items-center justify-between pt-4 border-t border-neutral-800">
         <Button
-          label={t('common.reset', 'Reset Draft')}
+          label={t('common.reset', 'Reset Changes')}
           type="tertiary"
           isDisabled={!isDirty}
           className={`${!isDirty ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:text-white'}`}
