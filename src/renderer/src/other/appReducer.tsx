@@ -401,7 +401,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     showSongRemainingTime: false,
     noUpdateNotificationForNewUpdate: '',
     defaultPageOnStartUp: 'Home',
-    enableArtworkFromSongCovers: false,
+    enableArtworkFromSongCovers: true,
     shuffleArtworkFromSongCovers: false,
     removeAnimationsOnBatteryPower: false,
     isSimilaritySearchEnabled: true,
