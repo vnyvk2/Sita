@@ -5,10 +5,6 @@ import { useRenameCollection } from '../../hooks/collections/useCollectionMutati
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
-import Img from '../Img';
-
-import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
-
 import PlaylistCover from './PlaylistCover';
 
 interface Props {
