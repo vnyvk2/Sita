@@ -16,6 +16,7 @@ export interface ResolvedPlaylistCover {
   artworks: string[];
 }
 
+export type ClipPathArtworkCount = 2 | 3 | 4;
 export type TriangleStyle = 'diagonal' | 'pinwheel' | 'center';
 export type CoverLayoutStyle = TriangleStyle | undefined;
 
