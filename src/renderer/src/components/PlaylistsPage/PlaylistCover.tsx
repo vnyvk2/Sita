@@ -2,7 +2,7 @@ import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { songQuery } from '@renderer/queries/songs';
 import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
