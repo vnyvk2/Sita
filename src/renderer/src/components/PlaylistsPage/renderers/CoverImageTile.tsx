@@ -25,7 +25,7 @@ const CoverImageTile = ({
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden ${className}`}
+      className={`h-full w-full overflow-hidden ${className}`}
       style={combinedStyle}
     >
       <Img
