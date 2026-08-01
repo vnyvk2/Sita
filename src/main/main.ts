@@ -41,6 +41,7 @@ import { closeAllAbortControllers, saveAbortController } from './fs/controlAbort
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import logger from './logger';
+import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import { ShutdownState } from './lifecycle/ShutdownState';
 import { clearTempArtworkFolder } from './other/artworks';
@@ -458,41 +459,32 @@ async function manageWindowFinishLoad() {
   });
 }
 
-let asyncOperationDone = false;
-async function handleBeforeQuit() {
-  ShutdownLogger.logShutdownTransition(ShutdownState.Started, 'main.ts:handleBeforeQuit');
-  if (!asyncOperationDone) {
-    try {
-      try {
-        await clearDiscordRpcActivity();
-      } catch (error) {
-        logger.error('Optional cleanup functions failed when quiting the app.', { error });
-      }
-
-      ShutdownLogger.logShutdownTransition(
-        ShutdownState.SavingState,
-        'main.ts:handleBeforeQuit'
-      );
-      const promise1 = savePendingSongLyrics(currentSongPath, true);
-      const promise2 = savePendingMetadataUpdates(currentSongPath, true);
-      const promise3 = closeAllAbortControllers();
-      const promise4 = clearTempArtworkFolder();
-
-      await Promise.all([promise1, promise2, promise3, promise4]);
-
-      mainWindow.webContents.send('app/beforeQuitEvent');
-      await closeDatabaseInstance();
-
-      logger.debug(`Quiting Nora`, { uptime: `${Math.floor(process.uptime())} seconds` });
-      asyncOperationDone = true;
-      ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[completed]');
-    } catch (error) {
-      asyncOperationDone = true;
-      console.error(error);
-      logger.error('Error occurred when quiting the app.', { error });
-      ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[failed]', { error });
-    }
+let isCleaningUp = false;
+let isCleanupComplete = false;
+async function handleBeforeQuit(e: Electron.Event) {
+  if (isCleanupComplete) {
+    ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[allowing-natural-quit]');
+    return;
   }
+
+  e.preventDefault();
+
+  if (isCleaningUp) {
+    ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[already-in-progress]');
+    return;
+  }
+
+  isCleaningUp = true;
+  void (async () => {
+    try {
+      await ShutdownCoordinator.shutdown('main.ts:handleBeforeQuit', mainWindow, currentSongPath);
+      isCleanupComplete = true;
+      app.quit();
+    } catch (error) {
+      isCleaningUp = false;
+      logger.error('ShutdownCoordinator failed during handleBeforeQuit:', { error });
+    }
+  })();
 }
 
 export function toggleAudioPlayingState(isPlaying: boolean) {
