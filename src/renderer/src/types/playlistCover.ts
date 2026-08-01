@@ -1,6 +1,6 @@
 export type PlaylistCoverLayout = 'grid' | 'triangle' | 'fan' | 'diamond';
 
-export const COVER_IMAGE_COUNTS = [1, 2, 3, 4] as const;
+export const COVER_IMAGE_COUNTS = [1, 2, 3, 4, 5] as const;
 
 export interface PlaylistCoverSettings {
   type: 'auto' | 'collage';
@@ -16,7 +16,7 @@ export interface ResolvedPlaylistCover {
   artworks: string[];
 }
 
-export type ClipPathArtworkCount = 2 | 3 | 4;
+export type ClipPathArtworkCount = 2 | 3 | 4 | 5;
 export type TriangleStyle = 'diagonal' | 'pinwheel' | 'center';
 export type FanStyle = 'standard';
 export type DiamondStyle = 'classic';

@@ -35,6 +35,6 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     icon: 'diamond',
     enabled: true,
     minImages: 1,
-    maxImages: 4,
+    maxImages: 5,
   },
 ];

@@ -63,17 +63,25 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, []);
 
   const handleLayoutChange = useCallback((newLayout: PlaylistCoverLayout) => {
-    setCurrentSettings((prev) => ({
-      ...prev,
-      collage: {
-        layout: newLayout,
-        size: prev.collage?.size || 4,
-        songIds: prev.collage?.songIds || []
-      }
-    }));
+    setCurrentSettings((prev) => {
+      const currentSize = prev.collage?.size || 4;
+      // If switching away from Diamond and current size is 5, trim size back to 4
+      const nextSize = (newLayout !== 'diamond' && currentSize > 4 ? 4 : currentSize) as 1 | 2 | 3 | 4 | 5;
+      const currentIds = prev.collage?.songIds || [];
+      const newSongIds = currentIds.length > nextSize ? currentIds.slice(0, nextSize) : currentIds;
+
+      return {
+        ...prev,
+        collage: {
+          layout: newLayout,
+          size: nextSize,
+          songIds: newSongIds
+        }
+      };
+    });
   }, []);
 
-  const handleSizeChange = useCallback((newSize: 1 | 2 | 3 | 4) => {
+  const handleSizeChange = useCallback((newSize: 1 | 2 | 3 | 4 | 5) => {
     setCurrentSettings((prev) => {
       const currentIds = prev.collage?.songIds || [];
       const newSongIds = currentIds.length > newSize ? currentIds.slice(0, newSize) : currentIds;
@@ -132,6 +140,9 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
   const currentSize = currentSettings.collage?.size || 4;
 
+  const isDiamond = currentSettings.collage?.layout === 'diamond';
+  const availableCounts = isDiamond ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
+
   return (
     <div className="flex w-[460px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-xl">
       <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3">
@@ -154,12 +165,12 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       {/* Cover Images Count Selector */}
       <div className="mb-6">
         <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
-        <div className="grid grid-cols-4 gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800">
-          {COVER_IMAGE_COUNTS.map((s) => (
+        <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
+          {availableCounts.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => handleSizeChange(s)}
+              onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
               className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 currentSize === s
                   ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
