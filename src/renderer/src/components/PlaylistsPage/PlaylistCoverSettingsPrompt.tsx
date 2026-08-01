@@ -174,6 +174,11 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         // Targeted Replacement Mode
         if (activeSlotIndex !== null) {
           const updatedIds = [...currentIds];
+          // Remove existing instance if present to prevent duplicate song assignments
+          const existingIndex = updatedIds.indexOf(songId);
+          if (existingIndex !== -1 && existingIndex !== activeSlotIndex) {
+            updatedIds[existingIndex] = 0;
+          }
           // Fill empty preceding slots with 0 if necessary
           while (updatedIds.length < activeSlotIndex) {
             updatedIds.push(0);
@@ -360,8 +365,8 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
       {/* Action Buttons (Reset vs Save) */}
       <div className="mt-6 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4">
-        <Button label={t('common.reset', 'Reset')} disabled={!isDirty} onClick={handleReset} />
-        <Button label={t('common.save', 'Save')} disabled={!isDirty} primary onClick={handleSave} />
+        <Button label={t('common.reset', 'Reset')} isDisabled={!isDirty} clickHandler={handleReset} />
+        <Button label={t('common.save', 'Save')} isDisabled={!isDirty} clickHandler={handleSave} />
       </div>
     </div>
   );

@@ -190,8 +190,8 @@ export const Playlist = (props: PlaylistProp) => {
           if (isMultipleSelectionEnabled) addToQueueForMultipleSelections();
           else {
             getPlaylistSongIds(props.id).then((songIds) => {
-              queue.queues[queue.currentQueueIndex].songIds.push(...songIds);
-              updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
+              const currentQueueSongIds = queue.queues[queue.currentQueueIndex].songIds;
+              updateQueueData(undefined, [...currentQueueSongIds, ...songIds]);
               addNewNotifications([
                 {
                   id: 'newSongsToQueue',

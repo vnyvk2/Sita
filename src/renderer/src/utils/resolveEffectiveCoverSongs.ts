@@ -51,5 +51,10 @@ export function resolveEffectiveCoverSongs(
     }
   }
 
+  // 4. Pad array up to targetSize with undefined so downstream renderers receive expected slot count
+  while (validSelectedSongs.length < targetSize) {
+    validSelectedSongs.push(undefined);
+  }
+
   return validSelectedSongs;
 }

@@ -21,7 +21,7 @@ const ClipPathRenderer = ({
       {clipPaths.map((clipPath, index) => (
         <CoverImageTile
           key={index}
-          src={artworks[index] || DefaultImgCover}
+          src={artworks[index] ?? DefaultImgCover}
           enableImgFadeIns={enableImgFadeIns}
           alt={`Cover ${index + 1}`}
           className="absolute inset-0"
