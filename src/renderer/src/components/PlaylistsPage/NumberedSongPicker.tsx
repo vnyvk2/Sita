@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 
@@ -10,6 +11,16 @@ type Props = {
 
 const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleSong }: Props) => {
   const selectedSet = new Set(selectedSongIds);
+
+  const uniquePlaylistSongs = useMemo(() => {
+    const map = new Map<number, SongData>();
+    for (const song of playlistSongs) {
+      if (song && song.songId !== undefined && !map.has(song.songId)) {
+        map.set(song.songId, song);
+      }
+    }
+    return Array.from(map.values());
+  }, [playlistSongs]);
 
   const getPositionBadge = (songId: number) => {
     const idx = selectedSongIds.indexOf(songId);
@@ -35,16 +46,16 @@ const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleS
       </div>
 
       <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-xl bg-neutral-900/60 p-2 border border-neutral-800">
-        {playlistSongs.length === 0 ? (
+        {uniquePlaylistSongs.length === 0 ? (
           <div className="p-4 text-center text-sm text-neutral-500">No songs in playlist</div>
         ) : (
-          playlistSongs.map((song, index) => {
+          uniquePlaylistSongs.map((song) => {
             const isSelected = selectedSet.has(song.songId);
             const badge = getPositionBadge(song.songId);
 
             return (
               <div
-                key={`${song.songId}-${index}`}
+                key={song.songId}
                 onClick={() => onToggleSong(song.songId)}
                 className={`group flex items-center justify-between p-2 rounded-lg transition-all duration-150 cursor-pointer ${
                   isSelected
