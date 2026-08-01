@@ -15,9 +15,9 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     title: 'Triangle Split',
     description: 'Diagonal split geometric collage',
     icon: 'change_history',
-    enabled: false,
-    minImages: 2,
-    maxImages: 3,
+    enabled: true,
+    minImages: 1,
+    maxImages: 4,
   },
   {
     id: 'fan',
