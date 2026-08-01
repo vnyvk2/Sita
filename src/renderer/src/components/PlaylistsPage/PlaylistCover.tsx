@@ -49,7 +49,7 @@ const PlaylistCover = (props: Props) => {
   // 5. Render presentation component
   return (
     <MultipleArtworksCover
-      artworks={artworks}
+      resolvedArtworks={artworks}
       layout={layout}
       className={className}
       imgClassName={imgClassName}

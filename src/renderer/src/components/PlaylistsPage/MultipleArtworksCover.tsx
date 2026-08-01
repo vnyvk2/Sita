@@ -16,7 +16,8 @@ type Props = {
   holderClassName?: string;
   type?: number;
   enableImgFadeIns?: boolean;
-  artworks?: ArtworkPaths[] | string[];
+  artworks?: ArtworkPaths[];
+  resolvedArtworks?: string[];
   layout?: PlaylistCoverLayout;
 };
 
@@ -32,18 +33,13 @@ const MultipleArtworksCover = (props: Props) => {
   const {
     className = '',
     artworks,
+    resolvedArtworks,
     imgClassName = '',
     holderClassName = '',
     type = 2,
     enableImgFadeIns = true,
     layout
   } = props;
-
-  // Check if string array of resolved artwork URLs is passed (Phase 1 PlaylistCover mode)
-  const isResolvedStringArtworks =
-    Array.isArray(artworks) && (artworks.length === 0 || typeof artworks[0] === 'string');
-
-  const resolvedArtworksList = isResolvedStringArtworks ? (artworks as string[]) : undefined;
 
   // Legacy TanStack Query for callers passing collectionId or songIds
   const { data: fetchedArtworkPaths = [] } = useQuery({
@@ -64,15 +60,15 @@ const MultipleArtworksCover = (props: Props) => {
       return data?.map((x) => x.artworkPaths) || [];
     },
     enabled:
-      !isResolvedStringArtworks &&
+      !resolvedArtworks &&
       !artworks &&
       enableArtworkFromSongCovers &&
       (!!props.collectionId || (props.songIds && props.songIds.length > 0))
   });
 
   // --- 1. Phase 1 Custom Grid Layout Rendering ---
-  if (isResolvedStringArtworks || layout === 'grid') {
-    const list = resolvedArtworksList || [];
+  if (resolvedArtworks || layout === 'grid') {
+    const list = resolvedArtworks || [];
     const count = list.length;
 
     if (count === 0) {
