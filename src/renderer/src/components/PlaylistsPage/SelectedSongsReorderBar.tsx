@@ -1,11 +1,9 @@
-import { useMemo } from 'react';
 import type { CoverSlotIndex } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 
 interface Props {
-  selectedSongIds: number[];
-  playlistSongs: SongData[];
+  effectiveSongs: SongData[];
   maxSize: number;
   activeSlotIndex: CoverSlotIndex | null;
   hoveredSlotIndex: CoverSlotIndex | null;
@@ -19,8 +17,7 @@ interface Props {
 const BADGES = ['①', '②', '③', '④', '⑤'];
 
 const SelectedSongsReorderBar = ({
-  selectedSongIds,
-  playlistSongs,
+  effectiveSongs,
   maxSize,
   activeSlotIndex,
   hoveredSlotIndex,
@@ -30,40 +27,6 @@ const SelectedSongsReorderBar = ({
   onSwapSlots,
   onClearSlot
 }: Props) => {
-  const songMap = useMemo(() => {
-    const map = new Map<number, SongData>();
-    for (const song of playlistSongs) {
-      if (song && song.songId !== undefined) {
-        map.set(song.songId, song);
-      }
-    }
-    return map;
-  }, [playlistSongs]);
-
-  // Compute effective song IDs so slots match live preview auto-filled songs
-  const effectiveSongIds = useMemo(() => {
-    const validSongs: SongData[] = [];
-    for (const id of selectedSongIds) {
-      const found = songMap.get(id);
-      if (found && validSongs.length < maxSize) {
-        validSongs.push(found);
-      }
-    }
-
-    if (validSongs.length < maxSize) {
-      const selectedSet = new Set(validSongs.map((s) => s.songId));
-      for (const song of playlistSongs) {
-        if (validSongs.length >= maxSize) break;
-        if (song && !selectedSet.has(song.songId)) {
-          validSongs.push(song);
-          selectedSet.add(song.songId);
-        }
-      }
-    }
-
-    return validSongs.map((s) => s.songId);
-  }, [selectedSongIds, maxSize, playlistSongs, songMap]);
-
   const formatArtists = (artists?: any) => {
     if (!Array.isArray(artists) || artists.length === 0) return '';
     return artists
@@ -77,15 +40,14 @@ const SelectedSongsReorderBar = ({
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Selected Cover Slots</label>
         <span className="text-xs font-medium text-neutral-400">
-          {effectiveSongIds.length} / {maxSize} Slots Filled
+          {effectiveSongs.length} / {maxSize} Slots Filled
         </span>
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800">
         {Array.from({ length: maxSize }).map((_, i) => {
           const slotIndex = i as CoverSlotIndex;
-          const songId = effectiveSongIds[i];
-          const song = songId !== undefined ? songMap.get(songId) : undefined;
+          const song = effectiveSongs[i];
           const isActive = activeSlotIndex === slotIndex;
           const isHovered = hoveredSlotIndex === slotIndex;
           const isFocused = focusedSlotIndex === slotIndex;

@@ -6,6 +6,7 @@ import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
 import { type CoverSlotIndex, type PlaylistCoverDraft, type PlaylistCoverLayout, type PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
 import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
+import { resolveEffectiveCoverSongs } from '../../utils/resolveEffectiveCoverSongs';
 import Button from '../Button';
 import CoverLivePreview from './CoverLivePreview';
 import CoverTypeSelector from './CoverTypeSelector';
@@ -240,6 +241,11 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const isDiamond = currentSettings.collage?.layout === 'diamond';
   const availableCounts = isDiamond ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
 
+  // Single Source of Truth for Effective Cover Songs
+  const effectiveSongs = useMemo(() => {
+    return resolveEffectiveCoverSongs(currentSettings, playlistSongs, currentSize);
+  }, [currentSettings, playlistSongs, currentSize]);
+
   return (
     <div className="flex w-[480px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl">
       <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3">
@@ -320,8 +326,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
           {/* Selected Songs Reorder & Position Swap Bar */}
           <SelectedSongsReorderBar
-            selectedSongIds={currentSettings.collage?.songIds || []}
-            playlistSongs={playlistSongs}
+            effectiveSongs={effectiveSongs}
             maxSize={currentSize}
             activeSlotIndex={activeSlotIndex}
             hoveredSlotIndex={hoveredSlotIndex}
