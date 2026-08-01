@@ -100,15 +100,27 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     });
   }, []);
 
+  const handleReset = useCallback(() => {
+    setCurrentSettings(originalSettings);
+  }, [originalSettings]);
+
   const handleSave = useCallback(() => {
+    if (!isDirty) return;
     storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
     changePromptMenuData(false);
-  }, [changePromptMenuData, playlist.id, currentSettings]);
+  }, [changePromptMenuData, isDirty, playlist.id, currentSettings]);
 
   return (
-    <div className="flex w-[460px] flex-col p-5 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto">
-      <div className="mb-4 text-xl font-bold border-b border-neutral-800 pb-3">
-        {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
+    <div className="flex w-[460px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl">
+      <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3">
+        <span className="text-xl font-bold tracking-tight">
+          {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
+        </span>
+        {isDirty && (
+          <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400 border border-amber-500/20">
+            Unsaved Changes
+          </span>
+        )}
       </div>
 
       {/* Production-Identical Live Preview */}
@@ -137,18 +149,28 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       )}
 
       {/* Footer Action Buttons */}
-      <div className="mt-4 flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+      <div className="mt-4 flex items-center justify-between pt-4 border-t border-neutral-800">
         <Button
-          label={t('common.cancel', 'Cancel')}
+          label={t('common.reset', 'Reset Draft')}
           type="tertiary"
-          clickHandler={() => changePromptMenuData(false)}
-        />
-        <Button
-          label={t('common.save', 'Save Changes')}
-          type="primary"
           isDisabled={!isDirty}
-          clickHandler={handleSave}
+          className={`${!isDirty ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:text-white'}`}
+          clickHandler={handleReset}
         />
+        <div className="flex items-center gap-3">
+          <Button
+            label={t('common.cancel', 'Cancel')}
+            type="tertiary"
+            clickHandler={() => changePromptMenuData(false)}
+          />
+          <Button
+            label={t('common.save', 'Save Changes')}
+            type="primary"
+            isDisabled={!isDirty}
+            className={`${!isDirty ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}
+            clickHandler={handleSave}
+          />
+        </div>
       </div>
     </div>
   );
