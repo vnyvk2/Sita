@@ -33,7 +33,8 @@ export class PlaylistImportWorkflow {
 
   async executePlan(
     plan: PlaylistImportPlan,
-    onProgress?: ProgressListener
+    onProgress?: ProgressListener,
+    options?: PlaylistImportOptions
   ): Promise<PlaylistImportExecutionResult> {
     let session: PlaylistImportSession | undefined;
 
@@ -44,7 +45,7 @@ export class PlaylistImportWorkflow {
     try {
       this.emitProgress(onProgress, 'EXECUTING_IMPORT', 'Persisting imported playlist...', 50);
 
-      const executionResult = await this.executor.execute(plan);
+      const executionResult = await this.executor.execute(plan, options);
 
       this.emitProgress(onProgress, 'COMPLETED', 'Playlist imported successfully', 100);
 
@@ -71,7 +72,7 @@ export class PlaylistImportWorkflow {
     onProgress?: ProgressListener
   ): Promise<ImportExecutionSummary> {
     const plan = await this.createPlanFromFile(filePath, options, onProgress);
-    const executionResult = await this.executePlan(plan, onProgress);
+    const executionResult = await this.executePlan(plan, onProgress, options);
 
     return {
       playlistId: executionResult.playlistId,

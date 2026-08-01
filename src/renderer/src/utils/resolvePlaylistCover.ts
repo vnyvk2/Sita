@@ -17,7 +17,7 @@ export function resolvePlaylistCover(
   const size = settings?.collage?.size || 4;
 
   const effectiveSongs = resolveEffectiveCoverSongs(settings, playlistSongs, size);
-  const artworks = effectiveSongs.map((s) => s.artworkPaths?.artworkPath || DefaultImgCover);
+  const artworks = effectiveSongs.map((s) => s?.artworkPaths?.artworkPath || DefaultImgCover);
 
   return { layout, artworks };
 }

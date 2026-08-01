@@ -4,7 +4,7 @@ export function resolveEffectiveCoverSongs(
   settings?: PlaylistCoverSettings,
   playlistSongs: SongData[] = [],
   maxSize: number = 4
-): SongData[] {
+): (SongData | undefined)[] {
   const songMap = new Map<number, SongData>();
   for (const song of playlistSongs) {
     if (song && song.songId !== undefined) {
@@ -20,23 +20,33 @@ export function resolveEffectiveCoverSongs(
   const { size = maxSize, songIds = [] } = settings.collage;
   const targetSize = Math.min(size, maxSize);
 
-  // 2. Validate requested songIds against available playlist songs
-  const validSelectedSongs: SongData[] = [];
+  // 2. Map requested songIds directly, preserving index and explicitly preserving undefined for '0'
+  const validSelectedSongs: (SongData | undefined)[] = [];
   for (const id of songIds) {
-    const found = songMap.get(id);
-    if (found && validSelectedSongs.length < targetSize) {
-      validSelectedSongs.push(found);
+    if (validSelectedSongs.length >= targetSize) break;
+    if (id === 0) {
+      validSelectedSongs.push(undefined);
+    } else {
+      validSelectedSongs.push(songMap.get(id));
     }
   }
 
-  // 3. Fill missing slots from playlist songs if selected songs are fewer than requested size
-  if (validSelectedSongs.length < targetSize) {
-    const selectedSet = new Set(validSelectedSongs.map((s) => s.songId));
-    for (const song of playlistSongs) {
-      if (validSelectedSongs.length >= targetSize) break;
-      if (song && !selectedSet.has(song.songId)) {
-        validSelectedSongs.push(song);
-        selectedSet.add(song.songId);
+  // 3. Fill missing slots from playlist songs where elements are undefined
+  const validSongsSet = new Set(validSelectedSongs.filter((s): s is SongData => s !== undefined).map(s => s.songId));
+  let fallbackIndex = 0;
+
+  for (let i = 0; i < targetSize; i++) {
+    if (validSelectedSongs[i] === undefined) {
+      // Find next unused playlist song
+      while (fallbackIndex < playlistSongs.length) {
+        const fallbackSong = playlistSongs[fallbackIndex];
+        fallbackIndex++;
+        
+        if (fallbackSong && !validSongsSet.has(fallbackSong.songId)) {
+          validSelectedSongs[i] = fallbackSong;
+          validSongsSet.add(fallbackSong.songId);
+          break;
+        }
       }
     }
   }

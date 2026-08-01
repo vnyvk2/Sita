@@ -150,7 +150,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       const maxSize = prev.collage?.size || 4;
 
       if (slot < currentIds.length) {
-        currentIds.splice(slot, 1);
+        currentIds[slot] = 0;
       }
 
       return {
@@ -198,13 +198,23 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
             collage: {
               layout: prev.collage?.layout || 'grid',
               size: maxSize,
-              songIds: currentIds.filter((id) => id !== songId)
+              songIds: currentIds.map((id) => id === songId ? 0 : id)
             }
           };
         }
 
-        if (currentIds.length >= maxSize) {
+        // Find the first empty slot if available, otherwise append
+        const emptyIndex = currentIds.indexOf(0);
+        
+        if (emptyIndex === -1 && currentIds.length >= maxSize) {
           return prev;
+        }
+
+        const updatedIds = [...currentIds];
+        if (emptyIndex !== -1) {
+          updatedIds[emptyIndex] = songId;
+        } else {
+          updatedIds.push(songId);
         }
 
         return {
@@ -212,7 +222,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
           collage: {
             layout: prev.collage?.layout || 'grid',
             size: maxSize,
-            songIds: [...currentIds, songId]
+            songIds: updatedIds
           }
         };
       });

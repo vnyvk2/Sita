@@ -1,3 +1,4 @@
+import DefaultImgCover from '../../../assets/images/webp/song_cover_default.webp';
 import CoverImageTile from './CoverImageTile';
 
 interface Props {
@@ -13,19 +14,18 @@ const ClipPathRenderer = ({
   className = '',
   enableImgFadeIns = true
 }: Props) => {
-  const count = artworks.length;
   const containerClass = `relative overflow-hidden aspect-square h-full w-full bg-neutral-900 ${className}`;
 
   return (
     <div className={containerClass}>
-      {artworks.slice(0, count).map((art, index) => (
+      {clipPaths.map((clipPath, index) => (
         <CoverImageTile
           key={index}
-          src={art}
+          src={artworks[index] || DefaultImgCover}
           enableImgFadeIns={enableImgFadeIns}
           alt={`Cover ${index + 1}`}
           className="absolute inset-0"
-          clipPath={clipPaths[index]}
+          clipPath={clipPath}
         />
       ))}
     </div>

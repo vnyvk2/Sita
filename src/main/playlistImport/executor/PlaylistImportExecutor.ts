@@ -11,7 +11,7 @@ export class PlaylistImportExecutor {
     private transactionRunner: TransactionRunner
   ) {}
 
-  async execute(plan: PlaylistImportPlan): Promise<PlaylistImportExecutionResult> {
+  async execute(plan: PlaylistImportPlan, options?: { targetPlaylistId?: number }): Promise<PlaylistImportExecutionResult> {
     const startTime = Date.now();
     logger.info(`PlaylistImportExecutor: starting execution for '${plan.playlistName}'...`);
 
@@ -43,17 +43,21 @@ export class PlaylistImportExecutor {
       })
     );
 
-    let createdPlaylistId = 0;
+    let playlistId = options?.targetPlaylistId || 0;
 
     // Execute playlist creation & song insertion via TransactionRunner
     await this.transactionRunner.runInTransaction(async () => {
-      logger.info(`PlaylistImportExecutor: creating playlist '${plan.playlistName}' via persistence...`);
-      createdPlaylistId = await this.persistence.createPlaylist(plan.playlistName, plan.description);
-      logger.info(`PlaylistImportExecutor: playlist created with ID ${createdPlaylistId}.`);
+      if (!playlistId) {
+        logger.info(`PlaylistImportExecutor: creating playlist '${plan.playlistName}' via persistence...`);
+        playlistId = await this.persistence.createPlaylist(plan.playlistName, plan.description);
+        logger.info(`PlaylistImportExecutor: playlist created with ID ${playlistId}.`);
+      } else {
+        logger.info(`PlaylistImportExecutor: using existing target playlist ID ${playlistId}...`);
+      }
 
       if (entriesToImport.length > 0) {
-        logger.info(`PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${createdPlaylistId}...`);
-        await this.persistence.addEntries(createdPlaylistId, entriesToImport);
+        logger.info(`PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${playlistId}...`);
+        await this.persistence.addEntries(playlistId, entriesToImport);
         logger.info(`PlaylistImportExecutor: entries added successfully.`);
       }
     });
@@ -69,7 +73,7 @@ export class PlaylistImportExecutor {
     };
 
     return {
-      playlistId: createdPlaylistId,
+      playlistId: playlistId,
       playlistName: plan.playlistName,
       success: true,
       importedSongIds: songIdsToImport,

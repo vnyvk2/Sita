@@ -5,8 +5,8 @@ import type { ClipPathArtworkCount, CoverLayoutStyle, PlaylistCoverLayout } from
 
 const GRID_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
   2: [
-    'polygon(0 0, 100% 0, 100% 50%, 0 50%)',
-    'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)'
+    'polygon(0 0, 50% 0, 50% 100%, 0 100%)',
+    'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'
   ],
   3: [
     'polygon(0 0, 50% 0, 50% 100%, 0 100%)',

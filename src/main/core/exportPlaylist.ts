@@ -81,8 +81,9 @@ const exportPlaylist = async (playlistId: number, repository: PlaylistRepository
     );
 
   const songIds = entries.map((e) => e.entry.songId);
-  const songRecords = await db.select({ path: songs.path }).from(songs).where(inArray(songs.id, songIds));
-  const songPaths = songRecords.map((s) => s.path);
+  const songRecords = await db.select({ id: songs.id, path: songs.path }).from(songs).where(inArray(songs.id, songIds));
+  const pathMap = new Map(songRecords.map((s) => [s.id, s.path]));
+  const songPaths = songIds.map((id) => pathMap.get(id)).filter((p): p is string => p !== undefined);
 
   return await createM3u8FileForPlaylist(collection.id, collection.name, songPaths);
 };

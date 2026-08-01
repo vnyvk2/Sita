@@ -3,7 +3,7 @@ import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 
 interface Props {
-  effectiveSongs: SongData[];
+  effectiveSongs: (SongData | undefined)[];
   maxSize: number;
   activeSlotIndex: CoverSlotIndex | null;
   hoveredSlotIndex: CoverSlotIndex | null;
@@ -118,11 +118,11 @@ const SelectedSongsReorderBar = ({
                 {song && (
                   <button
                     type="button"
-                    title="Clear Slot"
+                    title="Reset to Auto Selection"
                     onClick={() => onClearSlot(slotIndex)}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors ml-1"
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-400 hover:bg-amber-500/20 hover:text-amber-300 transition-colors ml-1"
                   >
-                    ×
+                    ↺
                   </button>
                 )}
               </div>

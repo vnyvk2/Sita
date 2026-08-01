@@ -19,7 +19,7 @@ function PresetRenderer<S extends string>({
   const count = requestedCount ?? artworks.length;
   const containerClass = `relative overflow-hidden aspect-square h-full w-full bg-neutral-900 ${className}`;
 
-  if (count === 0) {
+  if (artworks.length === 0) {
     return (
       <div className={containerClass}>
         <CoverImageTile enableImgFadeIns={enableImgFadeIns} />

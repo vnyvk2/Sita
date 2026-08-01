@@ -20,7 +20,7 @@ const DEFAULT_IMPORT_DIALOG_OPTIONS: OpenDialogOptions = {
  */
 const importPlaylist = async (
   workflow: PlaylistImportWorkflow,
-  _targetPlaylistId?: number
+  targetPlaylistId?: number
 ) => {
   try {
     const destinations = await showOpenDialog(DEFAULT_IMPORT_DIALOG_OPTIONS);
@@ -41,7 +41,7 @@ const importPlaylist = async (
     }
 
     // Delegate analysis, planning, and execution exclusively to PlaylistImportWorkflow
-    const summary = await workflow.importFile(filePath);
+    const summary = await workflow.importFile(filePath, { targetPlaylistId });
 
     if (summary.importedCount > 0) {
       logger.info(`Imported playlist '${summary.playlistName}' successfully.`, { summary });
