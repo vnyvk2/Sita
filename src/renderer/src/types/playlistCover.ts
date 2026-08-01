@@ -20,8 +20,6 @@ export interface CoverRendererProps {
   artworks: string[];
   layout: PlaylistCoverLayout;
   className?: string;
-  imgClassName?: string;
-  holderClassName?: string;
   enableImgFadeIns?: boolean;
 }
 

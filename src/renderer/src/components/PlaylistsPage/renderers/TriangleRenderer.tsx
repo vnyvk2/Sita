@@ -28,7 +28,7 @@ const TriangleRenderer = ({
   if (count === 2) {
     return (
       <div className={containerClass}>
-        {/* Top-Left Diagonal */}
+        {/* Top-Left Diagonal Triangle */}
         <CoverImageTile
           src={artworks[0]}
           enableImgFadeIns={enableImgFadeIns}
@@ -36,7 +36,7 @@ const TriangleRenderer = ({
           className="absolute inset-0"
           clipPath="polygon(0 0, 100% 0, 0 100%)"
         />
-        {/* Bottom-Right Diagonal */}
+        {/* Bottom-Right Diagonal Triangle */}
         <CoverImageTile
           src={artworks[1]}
           enableImgFadeIns={enableImgFadeIns}
@@ -57,62 +57,62 @@ const TriangleRenderer = ({
           enableImgFadeIns={enableImgFadeIns}
           alt="Cover 1"
           className="absolute inset-0"
-          clipPath="polygon(0 0, 100% 0, 50% 60%)"
+          clipPath="polygon(0 0, 100% 0, 50% 50%)"
         />
-        {/* Bottom Left Triangle */}
+        {/* Left Triangle */}
         <CoverImageTile
           src={artworks[1]}
           enableImgFadeIns={enableImgFadeIns}
           alt="Cover 2"
           className="absolute inset-0"
-          clipPath="polygon(0 0, 50% 60%, 0 100%)"
+          clipPath="polygon(0 0, 50% 50%, 0 100%)"
         />
-        {/* Bottom Right Triangle */}
+        {/* Bottom-Right Quad */}
         <CoverImageTile
           src={artworks[2]}
           enableImgFadeIns={enableImgFadeIns}
           alt="Cover 3"
           className="absolute inset-0"
-          clipPath="polygon(100% 0, 100% 100%, 50% 60%)"
+          clipPath="polygon(100% 0, 100% 100%, 0 100%, 50% 50%)"
         />
       </div>
     );
   }
 
-  // 4 Artworks Balanced Triangular Geometric Composition
+  // 4 Artworks 100% Coverage 4-Triangle Pinwheel Layout
   return (
     <div className={containerClass}>
-      {/* Top-Left Region */}
+      {/* Top Triangle */}
       <CoverImageTile
         src={artworks[0]}
         enableImgFadeIns={enableImgFadeIns}
         alt="Cover 1"
         className="absolute inset-0"
-        clipPath="polygon(0 0, 100% 0, 0 100%)"
+        clipPath="polygon(0 0, 100% 0, 50% 50%)"
       />
-      {/* Bottom-Right Region */}
+      {/* Right Triangle */}
       <CoverImageTile
         src={artworks[1]}
         enableImgFadeIns={enableImgFadeIns}
         alt="Cover 2"
         className="absolute inset-0"
-        clipPath="polygon(100% 0, 100% 100%, 0 100%)"
+        clipPath="polygon(100% 0, 100% 100%, 50% 50%)"
       />
-      {/* Center Top Triangle Overlay */}
+      {/* Bottom Triangle */}
       <CoverImageTile
         src={artworks[2]}
         enableImgFadeIns={enableImgFadeIns}
         alt="Cover 3"
         className="absolute inset-0"
-        clipPath="polygon(25% 25%, 75% 25%, 50% 75%)"
+        clipPath="polygon(0 100%, 100% 100%, 50% 50%)"
       />
-      {/* Bottom Left Corner Triangle Overlay */}
+      {/* Left Triangle */}
       <CoverImageTile
         src={artworks[3]}
         enableImgFadeIns={enableImgFadeIns}
         alt="Cover 4"
         className="absolute inset-0"
-        clipPath="polygon(0 50%, 50% 100%, 0 100%)"
+        clipPath="polygon(0 0, 0 100%, 50% 50%)"
       />
     </div>
   );
