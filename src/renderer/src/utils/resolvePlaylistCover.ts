@@ -7,6 +7,11 @@ export function resolvePlaylistCover(
   settings?: PlaylistCoverSettings,
   playlistSongs: SongData[] = []
 ): ResolvedPlaylistCover {
+  // 0. If playlist has a custom static artworkPath set and no custom collage: return custom artworkPath
+  if ((!settings || settings.type === 'auto') && playlist.artworkPath && playlistSongs.length === 0) {
+    return { layout: 'grid', artworks: [playlist.artworkPath] };
+  }
+
   // 1. If auto mode or no custom collage settings provided: default to taking first 4 playlist song artworks
   if (!settings || settings.type === 'auto' || !settings.collage) {
     const defaultSongs = playlistSongs.slice(0, 4);
