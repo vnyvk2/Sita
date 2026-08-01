@@ -67,6 +67,10 @@ function PlaylistsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const { data: playlists } = useSuspenseQuery(
+    rootCollectionsOptions(sortingOrder)
+  );
+
   const search = usePageSearch({
     keyword,
     updateSearch: (val) =>
