@@ -1,4 +1,4 @@
-import type { ClipPathArtworkCount, DiamondStyle } from '../types/playlistCover';
+import type { ClipPathArtworkCount, DiamondStyle, LayoutPreset } from '../types/playlistCover';
 
 const CLASSIC_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
   2: [
@@ -25,6 +25,6 @@ const CLASSIC_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> =
   ]
 } as const;
 
-export const DIAMOND_PRESETS: Record<DiamondStyle, Record<ClipPathArtworkCount, readonly string[]>> = {
+export const DIAMOND_PRESETS: LayoutPreset<DiamondStyle> = {
   classic: CLASSIC_DIAMOND_PRESETS
 };

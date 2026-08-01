@@ -22,6 +22,8 @@ export type FanStyle = 'standard';
 export type DiamondStyle = 'classic';
 export type CoverLayoutStyle = TriangleStyle | FanStyle | DiamondStyle | undefined;
 
+export type LayoutPreset<S extends string> = Record<S, Record<ClipPathArtworkCount, readonly string[]>>;
+
 export interface CoverRendererProps {
   artworks: string[];
   layout: PlaylistCoverLayout;

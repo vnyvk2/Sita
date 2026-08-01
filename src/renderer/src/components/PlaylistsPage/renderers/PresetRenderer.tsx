@@ -1,9 +1,9 @@
-import type { ClipPathArtworkCount, CoverRendererProps } from '../../../types/playlistCover';
+import type { ClipPathArtworkCount, CoverRendererProps, LayoutPreset } from '../../../types/playlistCover';
 import ClipPathRenderer from './ClipPathRenderer';
 import CoverImageTile from './CoverImageTile';
 
 interface PresetRendererProps<S extends string> extends CoverRendererProps {
-  presets: Record<S, Record<ClipPathArtworkCount, readonly string[]>>;
+  presets: LayoutPreset<S>;
   defaultStyle: S;
 }
 

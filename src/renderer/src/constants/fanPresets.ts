@@ -1,4 +1,4 @@
-import type { ClipPathArtworkCount, FanStyle } from '../types/playlistCover';
+import type { ClipPathArtworkCount, FanStyle, LayoutPreset } from '../types/playlistCover';
 
 const STANDARD_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
   2: [
@@ -15,9 +15,16 @@ const STANDARD_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
     'polygon(35% 0, 60% 0, 40% 100%, 15% 100%)',
     'polygon(60% 0, 85% 0, 65% 100%, 40% 100%)',
     'polygon(85% 0, 100% 0, 100% 100%, 65% 100%)'
+  ],
+  5: [
+    'polygon(0 0, 35% 0, 15% 100%, 0 100%)',
+    'polygon(35% 0, 60% 0, 40% 100%, 15% 100%)',
+    'polygon(60% 0, 85% 0, 65% 100%, 40% 100%)',
+    'polygon(85% 0, 100% 0, 100% 100%, 65% 100%)',
+    'polygon(50% 25%, 75% 50%, 50% 75%, 25% 50%)'
   ]
 } as const;
 
-export const FAN_PRESETS: Record<FanStyle, Record<ClipPathArtworkCount, readonly string[]>> = {
+export const FAN_PRESETS: LayoutPreset<FanStyle> = {
   standard: STANDARD_FAN_PRESETS
 };
