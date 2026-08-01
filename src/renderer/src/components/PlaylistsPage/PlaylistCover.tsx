@@ -47,12 +47,30 @@ const PlaylistCover = (props: Props) => {
   const settings = storage.playlistCoverSettings.getSettings(playlist.id);
   const hasCustomCollage = settings?.type === 'collage';
 
-  // 2. If auto mode and global preferences disabled (or itemCount <= 1): render playlist.artworkPath -> DefaultPlaylistCover fallback
+  // 2. Option A Priority Chain:
+  //    (1) Custom Collage (if explicitly set by user)
+  //    (2) Playlist Artwork (if user manually uploaded/assigned artwork or static special playlist icon)
+  //    (3) Automatic Song Collage (if enableArtworkFromSongCovers is true and itemCount > 1)
+  //    (4) Default Playlist Cover (pink fallback)
+  if (!hasCustomCollage && playlist.artworkPath) {
+    return (
+      <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
+        <Img
+          src={playlist.artworkPath}
+          fallbackSrc={DefaultPlaylistCover}
+          alt="Playlist Cover"
+          className={`h-full w-full object-cover ${imgClassName}`}
+          enableImgFadeIns={enableImgFadeIns}
+        />
+      </div>
+    );
+  }
+
   if (!hasCustomCollage && (!enableArtworkFromSongCovers || playlist.itemCount <= 1)) {
     return (
       <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
         <Img
-          src={playlist.artworkPath || DefaultPlaylistCover}
+          src={DefaultPlaylistCover}
           fallbackSrc={DefaultPlaylistCover}
           alt="Playlist Cover"
           className={`h-full w-full object-cover ${imgClassName}`}
