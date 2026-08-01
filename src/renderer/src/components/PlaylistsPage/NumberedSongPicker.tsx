@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+
+import type { CoverSlotIndex } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 
@@ -6,10 +8,17 @@ type Props = {
   playlistSongs: SongData[];
   selectedSongIds: number[];
   maxSize: number;
+  activeSlotIndex?: CoverSlotIndex | null;
   onToggleSong: (songId: number) => void;
 };
 
-const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleSong }: Props) => {
+const NumberedSongPicker = ({
+  playlistSongs,
+  selectedSongIds,
+  maxSize,
+  activeSlotIndex = null,
+  onToggleSong
+}: Props) => {
   const selectedSet = new Set(selectedSongIds);
 
   const uniquePlaylistSongs = useMemo(() => {
@@ -52,7 +61,7 @@ const NumberedSongPicker = ({ playlistSongs, selectedSongIds, maxSize, onToggleS
           uniquePlaylistSongs.map((song) => {
             const isSelected = selectedSet.has(song.songId);
             const badge = getPositionBadge(song.songId);
-            const isMaxReached = !isSelected && selectedSongIds.length >= maxSize;
+            const isMaxReached = activeSlotIndex === null && !isSelected && selectedSongIds.length >= maxSize;
 
             return (
               <div

@@ -358,6 +358,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
             playlistSongs={playlistSongs}
             selectedSongIds={currentSettings.collage?.songIds || []}
             maxSize={currentSize}
+            activeSlotIndex={activeSlotIndex}
             onToggleSong={handleToggleSong}
           />
         </>
