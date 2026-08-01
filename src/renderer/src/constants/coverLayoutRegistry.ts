@@ -24,8 +24,8 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     title: 'Fan Stack',
     description: 'Layered angled card fan stack',
     icon: 'style',
-    enabled: false,
-    minImages: 2,
+    enabled: true,
+    minImages: 1,
     maxImages: 4,
   },
   {

@@ -9,6 +9,7 @@ import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 import GridRenderer from './renderers/GridRenderer';
 import TriangleRenderer from './renderers/TriangleRenderer';
+import FanRenderer from './renderers/FanRenderer';
 
 type Props = {
   className?: string;
@@ -26,6 +27,7 @@ type Props = {
 const COVER_RENDERERS: Partial<Record<PlaylistCoverLayout, React.ComponentType<CoverRendererProps>>> = {
   grid: GridRenderer,
   triangle: TriangleRenderer,
+  fan: FanRenderer,
 };
 
 const MultipleArtworksCover = (props: Props) => {
