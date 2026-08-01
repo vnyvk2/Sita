@@ -18,7 +18,10 @@ export class ShutdownLogger {
     }
 
     const timestamp = new Date().toISOString();
-    logger.info(`[${currentBootSessionId}][${timestamp}] Boot Milestone: ${milestone}`, details || {});
+    logger.info(`[${currentBootSessionId}][${timestamp}] Boot Milestone: ${milestone}`, {
+      category: 'lifecycle',
+      ...(details || {})
+    });
     return currentBootSessionId;
   }
 
@@ -26,7 +29,7 @@ export class ShutdownLogger {
     const now = Date.now();
     const timestamp = new Date(now).toISOString();
 
-    if (state === ShutdownState.Started && !currentShutdownSessionId) {
+    if (state === ShutdownState.Started) {
       shutdownSessionCounter += 1;
       currentShutdownSessionId = `Shutdown #${shutdownSessionCounter}`;
       shutdownStartTime = now;
@@ -35,7 +38,8 @@ export class ShutdownLogger {
     if (!currentShutdownSessionId) {
       // Transition called before Started state session initialization
       logger.warn(
-        `[Pre-Shutdown][${timestamp}] State transition to ${state} without active Started session (source: ${source || 'unknown'})`
+        `[Pre-Shutdown][${timestamp}] State transition to ${state} without active Started session (source: ${source || 'unknown'})`,
+        { category: 'lifecycle' }
       );
       return 'uninitialized';
     }
@@ -44,7 +48,8 @@ export class ShutdownLogger {
     const durationMs = shutdownStartTime ? now - shutdownStartTime : 0;
 
     logger.info(
-      `[${currentShutdownSessionId}][${timestamp}] Shutdown State: ${state} (source: ${source || 'unknown'}, elapsed: ${durationMs}ms)`
+      `[${currentShutdownSessionId}][${timestamp}] Shutdown State: ${state} (source: ${source || 'unknown'}, elapsed: ${durationMs}ms)`,
+      { category: 'lifecycle' }
     );
 
     return currentShutdownSessionId;
@@ -58,7 +63,7 @@ export class ShutdownLogger {
 
     logger.info(
       `[${sessionId}][${timestamp}] Observed Lifecycle Event: ${eventName} (elapsed: ${elapsedMs}ms)`,
-      details || {}
+      { category: 'lifecycle', ...(details || {}) }
     );
   }
 
@@ -72,6 +77,15 @@ export class ShutdownLogger {
 
   public static getCurrentShutdownSessionId(): string | null {
     return currentShutdownSessionId;
+  }
+
+  public static resetStateForTesting(): void {
+    bootSessionCounter = 0;
+    shutdownSessionCounter = 0;
+    currentBootSessionId = null;
+    currentShutdownSessionId = null;
+    shutdownStartTime = null;
+    currentShutdownState = ShutdownState.Idle;
   }
 }
 

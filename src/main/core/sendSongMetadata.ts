@@ -46,7 +46,7 @@ const sendSongMetadata = async (
   songIdOrPath: number | string,
   isKnownSource = true
 ): Promise<SongTags> => {
-  logger.debug(`Requested song metadata of a song`, { songIdOrPath, isKnownSource });
+  logger.verbose(`Requested song metadata of a song`, { songIdOrPath, isKnownSource });
 
   if (isKnownSource) {
     const songId = songIdOrPath as number;

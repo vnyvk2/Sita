@@ -106,6 +106,7 @@ export class ShutdownCoordinator {
 
   public static resetStateForTesting(): void {
     this.shutdownPromise = null;
+    ShutdownLogger.resetStateForTesting();
   }
 }
 
