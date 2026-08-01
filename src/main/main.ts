@@ -41,6 +41,8 @@ import { closeAllAbortControllers, saveAbortController } from './fs/controlAbort
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import logger from './logger';
+import ShutdownLogger from './lifecycle/ShutdownLogger';
+import { ShutdownState } from './lifecycle/ShutdownState';
 import { clearTempArtworkFolder } from './other/artworks';
 import { clearDiscordRpcActivity } from './other/discordRPC';
 import resetAppData from './resetAppData';
@@ -141,6 +143,7 @@ const APP_INFO = {
 };
 
 logger.debug(`Starting up Nora`, { APP_INFO });
+ShutdownLogger.logBootMilestone('Application boot', { APP_INFO });
 
 function launchExtensionBackgroundWorkers(session = electronSession.defaultSession) {
   return Promise.all(
@@ -246,6 +249,7 @@ const createWindow = async () => {
     titleBarStyle: 'hidden',
     show: false
   });
+  ShutdownLogger.logBootMilestone('BrowserWindow created');
 
   if (IS_DEVELOPMENT && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -375,6 +379,7 @@ app
     // ? / / / / / / / / /  IPC RENDERER EVENTS  / / / / / / / / / / / /
     if (mainWindow) {
       initializeIPC(mainWindow, abortController.signal);
+      ShutdownLogger.logBootMilestone('IPC initialized');
       checkForUpdates();
       //  / / / / / / / / / / / GLOBAL SHORTCUTS / / / / / / / / / / / / / /
       // globalShortcut.register('F5', () => {
@@ -395,7 +400,25 @@ app
   .catch((error) => logger.error('Error occurred when starting the app.', { error }));
 
 app.on('window-all-closed', () => {
+  ShutdownLogger.logEventObservation('main.ts:app.on(window-all-closed)');
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  ShutdownLogger.logEventObservation('main.ts:app.on(will-quit)');
+  void closeDatabaseInstance();
+});
+
+process.on('SIGTERM', () => {
+  ShutdownLogger.logEventObservation('process.on(SIGTERM)');
+});
+
+process.on('SIGINT', () => {
+  ShutdownLogger.logEventObservation('process.on(SIGINT)');
+});
+
+process.on('exit', (code) => {
+  ShutdownLogger.logEventObservation(`process.on(exit)[exitCode:${code}]`);
 });
 
 // / / / / / / / / / / / / / / / / / / / / / / / / / / / /
@@ -437,6 +460,7 @@ async function manageWindowFinishLoad() {
 
 let asyncOperationDone = false;
 async function handleBeforeQuit() {
+  ShutdownLogger.logShutdownTransition(ShutdownState.Started, 'main.ts:handleBeforeQuit');
   if (!asyncOperationDone) {
     try {
       try {
@@ -445,6 +469,10 @@ async function handleBeforeQuit() {
         logger.error('Optional cleanup functions failed when quiting the app.', { error });
       }
 
+      ShutdownLogger.logShutdownTransition(
+        ShutdownState.SavingState,
+        'main.ts:handleBeforeQuit'
+      );
       const promise1 = savePendingSongLyrics(currentSongPath, true);
       const promise2 = savePendingMetadataUpdates(currentSongPath, true);
       const promise3 = closeAllAbortControllers();
@@ -457,10 +485,12 @@ async function handleBeforeQuit() {
 
       logger.debug(`Quiting Nora`, { uptime: `${Math.floor(process.uptime())} seconds` });
       asyncOperationDone = true;
+      ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[completed]');
     } catch (error) {
       asyncOperationDone = true;
       console.error(error);
       logger.error('Error occurred when quiting the app.', { error });
+      ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[failed]', { error });
     }
   }
 }

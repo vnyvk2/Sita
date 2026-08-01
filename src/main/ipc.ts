@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
+import ShutdownLogger from './lifecycle/ShutdownLogger';
+import { ShutdownState } from './lifecycle/ShutdownState';
 import addArtworkToAPlaylist from './core/addArtworkToAPlaylist';
 import addSongsFromFolderStructures from './core/addMusicFolder';
 
@@ -157,11 +159,20 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   // Ensure we gracefully drain on shutdown only once
   let isShuttingDown = false;
   app.on('before-quit', async (e) => {
-    if (isShuttingDown) return;
+    ShutdownLogger.logEventObservation('ipc.ts:app.on(before-quit)');
+    if (isShuttingDown) {
+      ShutdownLogger.logEventObservation('ipc.ts:app.on(before-quit)[already-shutting-down]');
+      return;
+    }
     isShuttingDown = true;
     e.preventDefault();
+    ShutdownLogger.logShutdownTransition(
+      ShutdownState.StoppingSchedulers,
+      'ipc.ts:app.on(before-quit)'
+    );
     await libraryScheduler.stop();
     adaptivePolicyEngine.stop();
+    ShutdownLogger.logEventObservation('ipc.ts:app.on(before-quit)[calling-app.exit]');
     app.exit();
   });
 
