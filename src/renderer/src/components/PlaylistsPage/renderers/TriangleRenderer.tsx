@@ -1,7 +1,7 @@
 import type { CoverRendererProps } from '../../../types/playlistCover';
 import CoverImageTile from './CoverImageTile';
 
-const TRIANGLE_CLIP_PATHS: Record<number, string[]> = {
+const TRIANGLE_CLIP_PATHS = {
   2: [
     'polygon(0 0, 100% 0, 0 100%)',
     'polygon(100% 0, 100% 100%, 0 100%)'
@@ -17,7 +17,7 @@ const TRIANGLE_CLIP_PATHS: Record<number, string[]> = {
     'polygon(0 100%, 100% 100%, 50% 50%)',
     'polygon(0 0, 0 100%, 50% 50%)'
   ]
-};
+} as const;
 
 const TriangleRenderer = ({
   artworks = [],
