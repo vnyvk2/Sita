@@ -15,8 +15,8 @@ export function isPlaylistCoverSettingsEqual(
   if (aCollage.layout !== bCollage.layout) return false;
   if (aCollage.size !== bCollage.size) return false;
 
-  const aSongIds = aCollage.songIds || [];
-  const bSongIds = bCollage.songIds || [];
+  const aSongIds = aCollage.songIds ?? [];
+  const bSongIds = bCollage.songIds ?? [];
 
   if (aSongIds.length !== bSongIds.length) return false;
 
