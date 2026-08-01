@@ -9,13 +9,14 @@ interface PresetRendererProps<S extends string> extends CoverRendererProps {
 
 function PresetRenderer<S extends string>({
   artworks = [],
+  requestedCount,
   style,
   className = '',
   enableImgFadeIns = true,
   presets,
   defaultStyle
 }: PresetRendererProps<S>) {
-  const count = artworks.length;
+  const count = requestedCount ?? artworks.length;
   const containerClass = `relative overflow-hidden aspect-square h-full w-full bg-neutral-900 ${className}`;
 
   if (count === 0) {

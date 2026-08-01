@@ -25,6 +25,7 @@ export type CoverLayoutStyle = TriangleStyle | FanStyle | DiamondStyle | undefin
 export interface CoverRendererProps {
   artworks: string[];
   layout: PlaylistCoverLayout;
+  requestedCount?: number;
   style?: CoverLayoutStyle;
   className?: string;
   enableImgFadeIns?: boolean;

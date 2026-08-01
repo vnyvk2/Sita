@@ -23,6 +23,7 @@ type Props = {
   artworks?: ArtworkPaths[];
   resolvedArtworks?: string[];
   layout?: PlaylistCoverLayout;
+  requestedCount?: number;
 };
 
 const COVER_RENDERERS: Partial<Record<PlaylistCoverLayout, React.ComponentType<CoverRendererProps>>> = {
@@ -43,38 +44,41 @@ const MultipleArtworksCover = (props: Props) => {
   );
   const {
     className = '',
-    artworks,
-    resolvedArtworks,
+    songIds,
+    collectionId,
     imgClassName = '',
     holderClassName = '',
     type = 2,
     enableImgFadeIns = true,
-    layout
+    artworks,
+    resolvedArtworks,
+    layout,
+    requestedCount
   } = props;
+
+  const idsToFetch = useMemo(() => {
+    if (songIds && songIds.length > 0) return songIds;
+    return undefined;
+  }, [songIds]);
 
   // Legacy TanStack Query for callers passing collectionId or songIds
   const { data: fetchedArtworkPaths = [] } = useQuery({
-    queryKey: [
-      'collectionArtworks',
-      props.collectionId
-        ? `collectionId=${props.collectionId}`
-        : `songIds=${props.songIds?.join(',')}`
-    ],
+    queryKey: ['multiple-artworks', collectionId, idsToFetch],
     queryFn: async () => {
-      let idsToFetch = props.songIds || [];
-      if (props.collectionId !== undefined && idsToFetch.length === 0) {
-        const entries = await CollectionClient.getEntries(props.collectionId, 0, 4);
-        idsToFetch = entries.map((e) => e.songId);
+      let idsToFetchArr = songIds || [];
+      if (collectionId !== undefined && idsToFetchArr.length === 0) {
+        const entries = await CollectionClient.getEntries(collectionId, 0, 4);
+        idsToFetchArr = entries.map((e) => e.songId);
       }
-      if (idsToFetch.length === 0) return [];
-      const data = await CollectionClient.getArtworks(idsToFetch);
+      if (idsToFetchArr.length === 0) return [];
+      const data = await CollectionClient.getArtworks(idsToFetchArr);
       return data?.map((x) => x.artworkPaths) || [];
     },
     enabled:
       !resolvedArtworks &&
       !artworks &&
       enableArtworkFromSongCovers &&
-      (!!props.collectionId || (props.songIds && props.songIds.length > 0))
+      (!!collectionId || (!!songIds && songIds.length > 0))
   });
 
   // --- 1. Phase 1 & 2 Custom Resolved Collage Layout Renderer Dispatcher ---
@@ -85,6 +89,7 @@ const MultipleArtworksCover = (props: Props) => {
         <Renderer
           artworks={resolvedArtworks}
           layout={layout || 'grid'}
+          requestedCount={requestedCount}
           className={imgClassName}
           enableImgFadeIns={enableImgFadeIns}
         />

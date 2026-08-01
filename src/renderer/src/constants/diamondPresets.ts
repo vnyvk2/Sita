@@ -17,11 +17,11 @@ const CLASSIC_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> =
     'polygon(0 0, 0 100%, 50% 50%)'
   ],
   5: [
-    'polygon(0 0, 100% 0, 50% 50%)',
-    'polygon(100% 0, 100% 100%, 50% 50%)',
-    'polygon(0 100%, 100% 100%, 50% 50%)',
-    'polygon(0 0, 0 100%, 50% 50%)',
-    'polygon(50% 20%, 80% 50%, 50% 80%, 20% 50%)'
+    'polygon(0 0, 100% 0, 75% 50%, 50% 25%)',
+    'polygon(100% 0, 100% 100%, 50% 75%, 75% 50%)',
+    'polygon(100% 100%, 0 100%, 25% 50%, 50% 75%)',
+    'polygon(0 100%, 0 0, 50% 25%, 25% 50%)',
+    'polygon(50% 25%, 75% 50%, 50% 75%, 25% 50%)'
   ]
 } as const;
 

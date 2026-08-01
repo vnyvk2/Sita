@@ -52,10 +52,5 @@ export function resolvePlaylistCover(
     (s) => s.artworkPaths?.artworkPath || DefaultImgCover
   );
 
-  // Pad artworks array up to requested size with DefaultImgCover so layout geometry matches requested size
-  while (artworks.length < size) {
-    artworks.push(DefaultImgCover);
-  }
-
   return { layout, artworks };
 }

@@ -157,7 +157,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       </div>
 
       {/* Production-Identical Live Preview */}
-      <CoverLivePreview resolvedCover={resolvedPreviewCover} />
+      <CoverLivePreview resolvedCover={resolvedPreviewCover} requestedCount={currentSettings.collage?.size} />
 
       {/* Mode Selector (Auto vs Collage) */}
       <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />

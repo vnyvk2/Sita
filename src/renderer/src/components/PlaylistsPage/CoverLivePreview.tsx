@@ -3,9 +3,10 @@ import MultipleArtworksCover from './MultipleArtworksCover';
 
 type Props = {
   resolvedCover: ResolvedPlaylistCover;
+  requestedCount?: number;
 };
 
-const CoverLivePreview = ({ resolvedCover }: Props) => {
+const CoverLivePreview = ({ resolvedCover, requestedCount }: Props) => {
   return (
     <div className="cover-live-preview mb-6 flex flex-col items-center">
       <label className="mb-2 w-full text-left text-sm font-semibold text-neutral-300">Live Preview</label>
@@ -13,6 +14,7 @@ const CoverLivePreview = ({ resolvedCover }: Props) => {
         <MultipleArtworksCover
           resolvedArtworks={resolvedCover.artworks}
           layout={resolvedCover.layout}
+          requestedCount={requestedCount}
           className="h-full w-full transition-opacity duration-300 ease-out"
         />
       </div>

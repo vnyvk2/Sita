@@ -132,6 +132,7 @@ const PlaylistCover = (props: Props) => {
     <MultipleArtworksCover
       resolvedArtworks={artworks}
       layout={layout}
+      requestedCount={settings?.collage?.size}
       className={className}
       imgClassName={imgClassName}
       holderClassName={holderClassName}
