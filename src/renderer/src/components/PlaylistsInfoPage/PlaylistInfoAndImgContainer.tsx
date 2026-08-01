@@ -6,7 +6,10 @@ import { useTranslation } from 'react-i18next';
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import Img from '../Img';
-import MultipleArtworksCover from '../PlaylistsPage/MultipleArtworksCover';
+import { useContext } from 'react';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import PlaylistCover from '../PlaylistsPage/PlaylistCover';
+import PlaylistCoverSettingsPrompt from '../PlaylistsPage/PlaylistCoverSettingsPrompt';
 
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
 
@@ -18,6 +21,7 @@ type Props = {
 
 const PlaylistInfoAndImgContainer = (props: Props) => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
+  const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const { playlist, songs, filteredSongs } = props;
@@ -32,19 +36,21 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
     return timeString;
   }, [displaySongs]);
 
+  const openCoverSettings = () => {
+    changePromptMenuData(
+      true,
+      <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={songs} />
+    );
+  };
+
   return (
     <>
       {playlist && (
         <div className="playlist-img-and-info-container mb-8 flex flex-row items-center justify-start">
-          <div className="playlist-cover-container mt-2 overflow-hidden">
+          <div className="playlist-cover-container group relative mt-2 overflow-hidden rounded-xl">
             {preferences.enableArtworkFromSongCovers && playlist.itemCount > 1 ? (
               <div className="relative h-60 w-60">
-                <MultipleArtworksCover
-                  collectionId={playlist.id}
-                  artworks={songs.map((song) => song.artworkPaths)}
-                  className="h-60 w-60"
-                  type={1}
-                />
+                <PlaylistCover playlist={playlist} songs={songs} className="h-60 w-60" />
                 <Img
                   src={playlist.artworkPath || DefaultPlaylistCover}
                   alt="Playlist Cover"
@@ -59,7 +65,14 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
                   alt="Playlist Cover"
                 />
               )}
-            </div>
+            <button
+              onClick={openCoverSettings}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
+              title={t('playlistsPage.editCover', 'Edit Cover')}
+            >
+              <span className="material-icons-round text-3xl text-white">edit</span>
+            </button>
+          </div>
             <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8">
               <div className="font-semibold tracking-wider uppercase opacity-50">
                 {t('common.playlist_one')}

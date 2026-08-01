@@ -14,7 +14,7 @@ import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import { usePinCollection, useUnpinCollection } from '../../hooks/collections/useCollectionMutations';
 import NavLink from '../NavLink';
-import MultipleArtworksCover from './MultipleArtworksCover';
+import PlaylistCover from './PlaylistCover';
 
 const ConfirmDeletePlaylistsPrompt = lazy(() => import('./ConfirmDeletePlaylistsPrompt'));
 const RenamePlaylistPrompt = lazy(() => import('./RenamePlaylistPrompt'));
@@ -438,10 +438,10 @@ export const Playlist = (props: PlaylistProp) => {
           />
         )}
         <div className="playlist-cover-container h-full cursor-pointer overflow-hidden">
-          {preferences?.enableArtworkFromSongCovers && songs.length > 2 ? (
+          {preferences?.enableArtworkFromSongCovers && (props.itemCount > 1 || props.itemCount === 0) ? (
             <div className="relative aspect-square w-full">
-              <MultipleArtworksCover
-                songIds={songs}
+              <PlaylistCover
+                playlist={props}
                 className="aspect-square w-full"
                 enableImgFadeIns={!isMultipleSelectionEnabled}
               />

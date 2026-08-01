@@ -346,6 +346,26 @@ const setLyricsEditorSettings = <
 const getLyricsEditorSettings = <Type extends keyof LyricsEditorSettings>(type: Type) =>
   getItem('lyricsEditorSettings', type);
 
+// PLAYLIST COVER SETTINGS
+const getPlaylistCoverSettings = (playlistId: number): import('@renderer/types/playlistCover').PlaylistCoverSettings | undefined => {
+  try {
+    const raw = localStorage.getItem(`playlist_cover_settings_${playlistId}`);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch (err) {
+    console.error('Failed to parse playlist cover settings:', err);
+    return undefined;
+  }
+};
+
+const setPlaylistCoverSettings = (playlistId: number, settings: import('@renderer/types/playlistCover').PlaylistCoverSettings): void => {
+  try {
+    localStorage.setItem(`playlist_cover_settings_${playlistId}`, JSON.stringify(settings));
+    window.dispatchEvent(new CustomEvent('playlist-cover-settings-changed', { detail: { playlistId } }));
+  } catch (err) {
+    console.error('Failed to set playlist cover settings:', err);
+  }
+};
+
 // / / / / / / / / / /
 
 export default {
@@ -365,6 +385,10 @@ export default {
     setKeyboardShortcuts
   },
   equalizerPreset: { setEqualizerPreset, getEqualizerPreset },
+  playlistCoverSettings: {
+    getSettings: getPlaylistCoverSettings,
+    setSettings: setPlaylistCoverSettings
+  },
   checkLocalStorage,
   getLocalStorage,
   setLocalStorage,
