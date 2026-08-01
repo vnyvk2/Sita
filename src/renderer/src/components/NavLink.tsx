@@ -5,9 +5,9 @@ interface Props extends React.AnchorHTMLAttributes<HTMLAnchorElement> {}
 export type NavLinkProps = LinkComponentProps<typeof NavLinkComponent>;
 
 const NavLinkComponent = forwardRef<HTMLAnchorElement, Props>((props, ref) => {
-  const { _nonReactive, ...restProps } = props as any;
+  const { _nonReactive, ...restProps } = (props || {}) as any;
   // eslint-disable-next-line jsx-a11y/anchor-has-content
-  return <a ref={ref} {...restProps} className={` ${props.className ?? ''}`} />;
+  return <a ref={ref} {...restProps} className={` ${props?.className ?? ''}`} />;
 });
 
 const CreatedLinkComponent = createLink(NavLinkComponent);

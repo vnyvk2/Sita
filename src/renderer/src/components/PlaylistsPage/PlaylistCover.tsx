@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useEffect, useState } from 'react';
 import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
+import { songQuery } from '@renderer/queries/songs';
 import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
 import storage from '@renderer/utils/localStorage';
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
@@ -82,15 +83,24 @@ const PlaylistCover = (props: Props) => {
 
   const isAutoMode = !hasCustomCollage;
 
-  // 3. Fetch entries if playlist songs were not provided directly and in custom collage mode
-  const { data: fetchedSongs = [] } = useQuery({
+  // 3. Fetch playlist entry pointers when songs prop is not provided
+  const { data: collectionEntries = [] } = useQuery({
     ...collectionEntriesOptions(playlist.id),
-    enabled: !songs && !isAutoMode
+    enabled: !songs
   });
 
-  const playlistSongs = songs ?? fetchedSongs;
+  // 4. Fetch full SongData objects using Nora's cached songQuery.allSongInfo
+  const { data: fetchedSongData = [] } = useQuery({
+    ...songQuery.allSongInfo({
+      songIds: collectionEntries.map((e) => e.songId),
+      sortType: 'addedOrder'
+    }),
+    enabled: !songs && collectionEntries.length > 0
+  });
 
-  // 4. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
+  const playlistSongs = songs ?? fetchedSongData;
+
+  // 5. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
   if (isAutoMode && !songs) {
     return (
       <MultipleArtworksCover
@@ -103,8 +113,13 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  // 5. Resolve layout and artwork paths via pure resolver utility
+  // 6. Resolve layout and artwork paths via pure resolver utility (strictly type-checked SongData[])
   const { layout, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
+
+    settingsType: settings?.type,
+    resolvedArtworksLength: artworks.length,
+    artworks
+  });
 
   // 6. Render presentation component
   return (
