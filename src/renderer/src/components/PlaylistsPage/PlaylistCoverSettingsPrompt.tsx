@@ -1,3 +1,4 @@
+import { SpecialPlaylists } from '@common/playlists.enum';
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -232,7 +233,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [originalSettings]);
 
   const handleSave = useCallback(() => {
-    if (!isDirty || !playlist?.id || playlist.id <= 0) return;
+    if (!isDirty || !playlist?.id || SpecialPlaylists.isSpecialPlaylistId(playlist.id)) return;
     storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
     changePromptMenuData(false);
   }, [changePromptMenuData, isDirty, playlist?.id, currentSettings]);
