@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { CoverSlotIndex } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
@@ -29,25 +30,66 @@ const SelectedSongsReorderBar = ({
   onSwapSlots,
   onClearSlot
 }: Props) => {
-  const songMap = new Map(playlistSongs.map((s) => [s.songId, s]));
+  const songMap = useMemo(() => {
+    const map = new Map<number, SongData>();
+    for (const song of playlistSongs) {
+      if (song && song.songId !== undefined) {
+        map.set(song.songId, song);
+      }
+    }
+    return map;
+  }, [playlistSongs]);
+
+  // Compute effective song IDs so slots match live preview auto-filled songs
+  const effectiveSongIds = useMemo(() => {
+    const validSongs: SongData[] = [];
+    for (const id of selectedSongIds) {
+      const found = songMap.get(id);
+      if (found && validSongs.length < maxSize) {
+        validSongs.push(found);
+      }
+    }
+
+    if (validSongs.length < maxSize) {
+      const selectedSet = new Set(validSongs.map((s) => s.songId));
+      for (const song of playlistSongs) {
+        if (validSongs.length >= maxSize) break;
+        if (song && !selectedSet.has(song.songId)) {
+          validSongs.push(song);
+          selectedSet.add(song.songId);
+        }
+      }
+    }
+
+    return validSongs.map((s) => s.songId);
+  }, [selectedSongIds, maxSize, playlistSongs, songMap]);
+
+  const formatArtists = (artists?: any) => {
+    if (!Array.isArray(artists) || artists.length === 0) return '';
+    return artists
+      .map((a) => (typeof a === 'string' ? a : a?.name || ''))
+      .filter(Boolean)
+      .join(', ');
+  };
 
   return (
     <div className="mb-6 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Selected Cover Slots</label>
         <span className="text-xs font-medium text-neutral-400">
-          {selectedSongIds.length} / {maxSize} Slots Filled
+          {effectiveSongIds.length} / {maxSize} Slots Filled
         </span>
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800">
         {Array.from({ length: maxSize }).map((_, i) => {
           const slotIndex = i as CoverSlotIndex;
-          const songId = selectedSongIds[i];
-          const song = songId ? songMap.get(songId) : undefined;
+          const songId = effectiveSongIds[i];
+          const song = songId !== undefined ? songMap.get(songId) : undefined;
           const isActive = activeSlotIndex === slotIndex;
           const isHovered = hoveredSlotIndex === slotIndex;
           const isFocused = focusedSlotIndex === slotIndex;
+          const artistText = formatArtists(song?.artists);
 
           return (
             <div
@@ -64,7 +106,7 @@ const SelectedSongsReorderBar = ({
               }`}
             >
               <div className="flex items-center gap-3 overflow-hidden">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-xs font-bold text-neutral-200">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-xs font-bold text-neutral-200 shrink-0">
                   {BADGES[i]}
                 </span>
 
@@ -81,16 +123,16 @@ const SelectedSongsReorderBar = ({
                   <span className={`truncate text-xs font-semibold ${song ? 'text-neutral-200' : 'text-neutral-500 italic'}`}>
                     {song?.title || 'Empty Slot (Default Cover)'}
                   </span>
-                  {song?.artists && song.artists.length > 0 && (
+                  {artistText && (
                     <span className="truncate text-[11px] text-neutral-400">
-                      {song.artists.map((a) => a.name).join(', ')}
+                      {artistText}
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Slot Actions: Swap & Clear */}
-              <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 shrink-0" onClick={(e) => e.stopPropagation()}>
                 {i > 0 && (
                   <button
                     type="button"
