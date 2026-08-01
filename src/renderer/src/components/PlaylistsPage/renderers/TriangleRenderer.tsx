@@ -1,160 +1,119 @@
 import type { CoverRendererProps } from '../../../types/playlistCover';
-import DefaultImgCover from '../../../assets/images/webp/song_cover_default.webp';
-import Img from '../../Img';
+import CoverImageTile from './CoverImageTile';
 
-const TriangleRenderer = ({ artworks = [] }: CoverRendererProps) => {
+const TriangleRenderer = ({
+  artworks = [],
+  className = '',
+  enableImgFadeIns = true
+}: CoverRendererProps) => {
   const count = artworks.length;
+  const containerClass = `relative overflow-hidden aspect-square h-full w-full bg-neutral-900 ${className}`;
 
   if (count === 0) {
     return (
-      <div className="relative overflow-hidden rounded-lg shadow-md aspect-square h-full w-full bg-neutral-900">
-        <Img
-          src={DefaultImgCover}
-          alt="Default Cover"
-          className="h-full w-full object-cover"
-        />
+      <div className={containerClass}>
+        <CoverImageTile enableImgFadeIns={enableImgFadeIns} />
       </div>
     );
   }
 
   if (count === 1) {
     return (
-      <div className="relative overflow-hidden rounded-lg shadow-md aspect-square h-full w-full bg-neutral-900">
-        <Img
-          src={artworks[0] || DefaultImgCover}
-          fallbackSrc={DefaultImgCover}
-          alt="Playlist Cover"
-          className="h-full w-full object-cover"
-        />
+      <div className={containerClass}>
+        <CoverImageTile src={artworks[0]} enableImgFadeIns={enableImgFadeIns} alt="Cover 1" />
       </div>
     );
   }
 
   if (count === 2) {
     return (
-      <div className="relative overflow-hidden rounded-lg shadow-md aspect-square h-full w-full bg-neutral-900">
-        {/* Top-Left Diagonal Triangle */}
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden"
-          style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}
-        >
-          <Img
-            src={artworks[0] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover 1"
-            className="h-full w-full object-cover"
-          />
-        </div>
-        {/* Bottom-Right Diagonal Triangle */}
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden"
-          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
-        >
-          <Img
-            src={artworks[1] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover 2"
-            className="h-full w-full object-cover"
-          />
-        </div>
+      <div className={containerClass}>
+        {/* Top-Left Diagonal */}
+        <CoverImageTile
+          src={artworks[0]}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 1"
+          className="absolute inset-0"
+          clipPath="polygon(0 0, 100% 0, 0 100%)"
+        />
+        {/* Bottom-Right Diagonal */}
+        <CoverImageTile
+          src={artworks[1]}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 2"
+          className="absolute inset-0"
+          clipPath="polygon(100% 0, 100% 100%, 0 100%)"
+        />
       </div>
     );
   }
 
   if (count === 3) {
     return (
-      <div className="relative overflow-hidden rounded-lg shadow-md aspect-square h-full w-full bg-neutral-900">
-        {/* Top Centered Triangle */}
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden"
-          style={{ clipPath: 'polygon(0 0, 100% 0, 50% 60%)' }}
-        >
-          <Img
-            src={artworks[0] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover 1"
-            className="h-full w-full object-cover"
-          />
-        </div>
-        {/* Bottom-Left Triangle */}
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden"
-          style={{ clipPath: 'polygon(0 0, 50% 60%, 0 100%)' }}
-        >
-          <Img
-            src={artworks[1] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover 2"
-            className="h-full w-full object-cover"
-          />
-        </div>
-        {/* Bottom-Right Triangle */}
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden"
-          style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
-        >
-          <Img
-            src={artworks[2] || DefaultImgCover}
-            fallbackSrc={DefaultImgCover}
-            alt="Cover 3"
-            className="h-full w-full object-cover"
-          />
-        </div>
+      <div className={containerClass}>
+        {/* Top Triangle */}
+        <CoverImageTile
+          src={artworks[0]}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 1"
+          className="absolute inset-0"
+          clipPath="polygon(0 0, 100% 0, 50% 60%)"
+        />
+        {/* Bottom Left Triangle */}
+        <CoverImageTile
+          src={artworks[1]}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 2"
+          className="absolute inset-0"
+          clipPath="polygon(0 0, 50% 60%, 0 100%)"
+        />
+        {/* Bottom Right Triangle */}
+        <CoverImageTile
+          src={artworks[2]}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 3"
+          className="absolute inset-0"
+          clipPath="polygon(100% 0, 100% 100%, 50% 60%)"
+        />
       </div>
     );
   }
 
-  // 4 Artworks Geometric Composition
+  // 4 Artworks Balanced Triangular Geometric Composition
   return (
-    <div className="relative overflow-hidden rounded-lg shadow-md aspect-square h-full w-full bg-neutral-900">
-      {/* Quadrant Top-Left Diagonal */}
-      <div
-        className="absolute inset-0 h-full w-full overflow-hidden"
-        style={{ clipPath: 'polygon(0 0, 50% 0, 0 50%)' }}
-      >
-        <Img
-          src={artworks[0] || DefaultImgCover}
-          fallbackSrc={DefaultImgCover}
-          alt="Cover 1"
-          className="h-full w-full object-cover"
-        />
-      </div>
-      {/* Quadrant Top-Right Triangle */}
-      <div
-        className="absolute inset-0 h-full w-full overflow-hidden"
-        style={{ clipPath: 'polygon(50% 0, 100% 0, 100% 50%, 50% 50%)' }}
-      >
-        <Img
-          src={artworks[1] || DefaultImgCover}
-          fallbackSrc={DefaultImgCover}
-          alt="Cover 2"
-          className="h-full w-full object-cover"
-        />
-      </div>
-      {/* Quadrant Bottom-Left Triangle */}
-      <div
-        className="absolute inset-0 h-full w-full overflow-hidden"
-        style={{ clipPath: 'polygon(0 50%, 50% 50%, 50% 100%, 0 100%)' }}
-      >
-        <Img
-          src={artworks[2] || DefaultImgCover}
-          fallbackSrc={DefaultImgCover}
-          alt="Cover 3"
-          className="h-full w-full object-cover"
-        />
-      </div>
-      {/* Quadrant Bottom-Right Diagonal Triangle */}
-      <div
-        className="absolute inset-0 h-full w-full overflow-hidden"
-        style={{ clipPath: 'polygon(50% 50%, 100% 50%, 100% 100%)' }}
-      >
-        <Img
-          src={artworks[3] || DefaultImgCover}
-          fallbackSrc={DefaultImgCover}
-          alt="Cover 4"
-          className="h-full w-full object-cover"
-        />
-      </div>
+    <div className={containerClass}>
+      {/* Top-Left Region */}
+      <CoverImageTile
+        src={artworks[0]}
+        enableImgFadeIns={enableImgFadeIns}
+        alt="Cover 1"
+        className="absolute inset-0"
+        clipPath="polygon(0 0, 100% 0, 0 100%)"
+      />
+      {/* Bottom-Right Region */}
+      <CoverImageTile
+        src={artworks[1]}
+        enableImgFadeIns={enableImgFadeIns}
+        alt="Cover 2"
+        className="absolute inset-0"
+        clipPath="polygon(100% 0, 100% 100%, 0 100%)"
+      />
+      {/* Center Top Triangle Overlay */}
+      <CoverImageTile
+        src={artworks[2]}
+        enableImgFadeIns={enableImgFadeIns}
+        alt="Cover 3"
+        className="absolute inset-0"
+        clipPath="polygon(25% 25%, 75% 25%, 50% 75%)"
+      />
+      {/* Bottom Left Corner Triangle Overlay */}
+      <CoverImageTile
+        src={artworks[3]}
+        enableImgFadeIns={enableImgFadeIns}
+        alt="Cover 4"
+        className="absolute inset-0"
+        clipPath="polygon(0 50%, 50% 100%, 0 100%)"
+      />
     </div>
   );
 };

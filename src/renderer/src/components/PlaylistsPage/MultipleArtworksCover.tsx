@@ -78,7 +78,12 @@ const MultipleArtworksCover = (props: Props) => {
     const Renderer = (layout && COVER_RENDERERS[layout]) || GridRenderer;
     return (
       <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
-        <Renderer artworks={resolvedArtworks} layout={layout || 'grid'} />
+        <Renderer
+          artworks={resolvedArtworks}
+          layout={layout || 'grid'}
+          className={imgClassName}
+          enableImgFadeIns={enableImgFadeIns}
+        />
       </div>
     );
   }
