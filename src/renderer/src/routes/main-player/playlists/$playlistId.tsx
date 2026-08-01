@@ -258,7 +258,7 @@ function PlaylistInfoPage() {
             label: t('settingsPage.clearHistory'),
             iconName: 'clear',
             clickHandler: clearSongHistory,
-            isVisible: playlistData.playlistId === SpecialPlaylists.History,
+            isVisible: playlistData.id === SpecialPlaylists.History,
             isDisabled: !(playlistData.itemCount > 0)
           },
           {
@@ -266,8 +266,8 @@ function PlaylistInfoPage() {
             iconName: 'playlist_add',
             clickHandler: openAddSongsPrompt,
             isVisible:
-              playlistData.playlistId !== SpecialPlaylists.History &&
-              playlistData.playlistId !== SpecialPlaylists.Favorites
+              playlistData.id !== SpecialPlaylists.History &&
+              playlistData.id !== SpecialPlaylists.Favorites
           },
           {
             tooltipLabel: t('common.playAll'),
@@ -348,7 +348,7 @@ function PlaylistInfoPage() {
                     iconName: 'playlist_remove',
                     handlerFunction: () =>
                       CollectionClient
-                        .removeSongs({ playlistId: playlistData.playlistId, songIds: [item.songId] })
+                        .removeSongs({ playlistId: playlistData.id, songIds: [item.songId] })
                         .then(() =>
                             addNewNotifications([
                               {

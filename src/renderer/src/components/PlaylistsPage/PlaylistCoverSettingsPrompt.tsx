@@ -232,10 +232,10 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [originalSettings]);
 
   const handleSave = useCallback(() => {
-    if (!isDirty) return;
+    if (!isDirty || !playlist?.id || playlist.id <= 0) return;
     storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
     changePromptMenuData(false);
-  }, [changePromptMenuData, isDirty, playlist.id, currentSettings]);
+  }, [changePromptMenuData, isDirty, playlist?.id, currentSettings]);
 
   const currentSize = currentSettings.collage?.size || 4;
   const isDiamond = currentSettings.collage?.layout === 'diamond';
