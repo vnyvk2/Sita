@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { artworksPlaylists } from '../../db/schema';
+import { artworks, artworksPlaylists } from '../../db/schema';
 import { linkArtworkToPlaylist, saveArtworks } from '../../db/queries/artworks';
 import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
 import { resetArtworkCache } from '../../fs/resolveFilePaths';
@@ -11,9 +11,22 @@ import { createCollectionId } from '../../../common/collections/id';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
+export interface ProcessedArtworkPayload {
+  existing?: (typeof artworks.$inferSelect)[];
+  payloads?: {
+    hash: string;
+    path: string;
+    width: number;
+    height: number;
+    source: 'playlist';
+  }[];
+}
+
 export interface SetArtworkInput {
   playlistId: number;
-  artworkPath: string;
+  artworkPath?: string;
+  artworkId?: number;
+  processedArtwork?: ProcessedArtworkPayload;
 }
 
 export class SetArtworkOp implements CollectionOperation<SetArtworkInput, void> {
@@ -23,34 +36,51 @@ export class SetArtworkOp implements CollectionOperation<SetArtworkInput, void> 
     input: SetArtworkInput,
     ctx: OperationContext
   ): Promise<OperationResult<void>> {
-    const { playlistId, artworkPath } = input;
+    const { playlistId, artworkPath, artworkId, processedArtwork } = input;
 
     const playlist = await this.repository.getById(playlistId, ctx.trx);
     if (!playlist) {
       throw new Error(`Playlist ${playlistId} not found`);
     }
 
+    // Capture existing artwork link for undo snapshot
+    const existingLinks = await ctx.trx
+      .select({ artworkId: artworksPlaylists.artworkId })
+      .from(artworksPlaylists)
+      .where(eq(artworksPlaylists.playlistId, playlistId))
+      .limit(1);
+
+    const previousArtworkId = existingLinks.length > 0 ? existingLinks[0].artworkId : undefined;
+
     try {
-      const buffer = await generateLocalArtworkBuffer(artworkPath || '');
-      const processedArtwork = await processArtworkFiles('playlist', buffer);
+      if (artworkId !== undefined) {
+        // Direct relink flow (e.g. undo operation)
+        await ctx.trx.delete(artworksPlaylists).where(eq(artworksPlaylists.playlistId, playlistId));
+        if (artworkId > 0) {
+          await linkArtworkToPlaylist(playlistId, artworkId, ctx.trx);
+        }
+      } else {
+        // File artwork processing flow
+        const processed =
+          processedArtwork ??
+          (await processArtworkFiles(
+            'playlist',
+            await generateLocalArtworkBuffer(artworkPath || '')
+          ));
 
-      // Remove previous artwork links inside transaction
-      await ctx.trx.delete(artworksPlaylists).where(eq(artworksPlaylists.playlistId, playlistId));
+        await ctx.trx.delete(artworksPlaylists).where(eq(artworksPlaylists.playlistId, playlistId));
 
-      let artworks = processedArtwork.existing;
-      if (!artworks && processedArtwork.payloads) {
-        artworks = await saveArtworks(processedArtwork.payloads, ctx.trx);
+        let savedArtworks = processed.existing;
+        if (!savedArtworks && processed.payloads) {
+          savedArtworks = await saveArtworks(processed.payloads, ctx.trx);
+        }
+
+        if (savedArtworks && savedArtworks.length > 0) {
+          await linkArtworkToPlaylist(playlistId, savedArtworks[0].id, ctx.trx);
+        }
       }
-
-      if (artworks && artworks.length > 0) {
-        await linkArtworkToPlaylist(playlistId, artworks[0].id, ctx.trx);
-      }
-
-      libraryScheduler.requestMaintenance();
-      resetArtworkCache('playlistArtworks');
-      dataUpdateEvent('playlists');
     } catch (error) {
-      logger.error('Failed to set artwork for playlist', { playlistId, artworkPath, error });
+      logger.error('Failed to set artwork for playlist', { playlistId, artworkPath, artworkId, error });
       throw error;
     }
 
@@ -58,10 +88,10 @@ export class SetArtworkOp implements CollectionOperation<SetArtworkInput, void> 
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.setArtwork',
-      operationInput: { playlistId, artworkPath },
+      operationInput: { playlistId, artworkPath: artworkPath ?? '', artworkId },
       inverseInput: {
         operationType: 'playlist.setArtwork',
-        input: { playlistId, artworkPath: '' }
+        input: { playlistId, artworkId: previousArtworkId ?? 0 }
       },
       version: 1,
       affectedSongIds: []

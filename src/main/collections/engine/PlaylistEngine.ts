@@ -4,6 +4,8 @@ import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { OperationExecutor } from '../operations/OperationExecutor';
 import type { OperationContext } from '../operations/types';
 
+import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
+import { processArtworkFiles } from '../../other/artworks';
 import { AddSongsOp, type AddSongsInput } from '../operations/AddSongsOp';
 import { RemoveSongsOp, type RemoveSongsInput } from '../operations/RemoveSongsOp';
 import { RenameOp, type RenameInput } from '../operations/RenameOp';
@@ -222,10 +224,17 @@ export class PlaylistEngine {
   }
 
   public async setArtwork(input: SetArtworkInput) {
+    let processedArtwork = input.processedArtwork;
+    if (!processedArtwork && input.artworkPath !== undefined && input.artworkId === undefined) {
+      const buffer = await generateLocalArtworkBuffer(input.artworkPath || '');
+      processedArtwork = await processArtworkFiles('playlist', buffer);
+    }
+
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      return await this.executor.execute(this.setArtworkOp, input, ctx);
+      return await this.executor.execute(this.setArtworkOp, { ...input, processedArtwork }, ctx);
     });
+
     collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'setArtwork' } });
     return result.data;
   }
