@@ -30,6 +30,8 @@ const SelectedSongsReorderBar = ({
   onSwapSlots,
   onClearSlot
 }: Props) => {
+  const [draggingSlot, setDraggingSlot] = useState<CoverSlotIndex | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<CoverSlotIndex | null>(null);
   const [statusAnnouncement, setStatusAnnouncement] = useState<string>('');
 
   const handleSwapWithAnnouncement = (from: CoverSlotIndex, to: CoverSlotIndex) => {
