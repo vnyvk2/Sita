@@ -1,8 +1,9 @@
 import { MetadataFieldDefinition } from './MetadataFieldDefinition';
+import { MetadataFields } from './MetadataFieldId';
 
 export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
   new MetadataFieldDefinition({
-    id: 'title',
+    id: MetadataFields.Title,
     displayName: 'Title',
     valueType: 'string',
     searchable: true,
@@ -11,7 +12,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     indexed: true
   }),
   new MetadataFieldDefinition({
-    id: 'artist',
+    id: MetadataFields.Artist,
     displayName: 'Artist',
     valueType: 'string',
     multiValue: true,
@@ -21,7 +22,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     indexed: true
   }),
   new MetadataFieldDefinition({
-    id: 'album',
+    id: MetadataFields.Album,
     displayName: 'Album',
     valueType: 'string',
     searchable: true,
@@ -30,7 +31,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     indexed: true
   }),
   new MetadataFieldDefinition({
-    id: 'genre',
+    id: MetadataFields.Genre,
     displayName: 'Genre',
     valueType: 'string',
     multiValue: true,
@@ -40,7 +41,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     indexed: true
   }),
   new MetadataFieldDefinition({
-    id: 'bpm',
+    id: MetadataFields.BPM,
     displayName: 'BPM',
     valueType: 'number',
     searchable: false,
@@ -48,7 +49,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     sortable: true
   }),
   new MetadataFieldDefinition({
-    id: 'year',
+    id: MetadataFields.Year,
     displayName: 'Year',
     valueType: 'number',
     searchable: true,
@@ -56,7 +57,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     sortable: true
   }),
   new MetadataFieldDefinition({
-    id: 'tag',
+    id: MetadataFields.Tag,
     displayName: 'Tag',
     valueType: 'string',
     multiValue: true,
@@ -66,7 +67,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     indexed: true
   }),
   new MetadataFieldDefinition({
-    id: 'mood',
+    id: MetadataFields.Mood,
     displayName: 'Mood',
     valueType: 'string',
     multiValue: true,

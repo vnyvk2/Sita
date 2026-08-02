@@ -1,7 +1,8 @@
 import type { FieldValueType } from '../common/types';
+import type { MetadataFieldId } from './MetadataFieldId';
 
 export interface MetadataFieldDefinitionOptions {
-  id: string;
+  id: MetadataFieldId;
   displayName: string;
   description?: string;
   valueType: FieldValueType;
@@ -15,7 +16,7 @@ export interface MetadataFieldDefinitionOptions {
 }
 
 export class MetadataFieldDefinition {
-  public readonly id: string;
+  public readonly id: MetadataFieldId;
   public readonly displayName: string;
   public readonly description: string;
   public readonly valueType: FieldValueType;

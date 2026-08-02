@@ -1,3 +1,4 @@
+import type { MetadataFieldId } from './MetadataFieldId';
 import type { MetadataIdentity } from './MetadataIdentity';
 import type { MetadataKind } from './MetadataKind';
 
@@ -6,12 +7,12 @@ import { MetadataValue } from './MetadataValue';
 
 export interface MetadataEntityOptions {
   identity: MetadataIdentity;
-  fields?: Record<string, MetadataValue<unknown>>;
+  fields?: Record<MetadataFieldId, MetadataValue<unknown>>;
 }
 
 export class MetadataEntity {
   public readonly identity: MetadataIdentity;
-  private readonly fieldsMap: Map<string, MetadataValue<unknown>>;
+  private readonly fieldsMap: Map<MetadataFieldId, MetadataValue<unknown>>;
 
   constructor(options: MetadataEntityOptions) {
     this.identity = options.identity;
@@ -28,24 +29,24 @@ export class MetadataEntity {
     return this.identity.entityKind;
   }
 
-  public getField<T>(fieldId: string): MetadataValue<T> | undefined {
+  public getField<T>(fieldId: MetadataFieldId): MetadataValue<T> | undefined {
     return this.fieldsMap.get(fieldId) as MetadataValue<T> | undefined;
   }
 
-  public setField<T>(fieldId: string, value: MetadataValue<T>): void {
+  public setField<T>(fieldId: MetadataFieldId, value: MetadataValue<T>): void {
     this.fieldsMap.set(fieldId, value as MetadataValue<unknown>);
   }
 
-  public hasField(fieldId: string): boolean {
+  public hasField(fieldId: MetadataFieldId): boolean {
     return this.fieldsMap.has(fieldId);
   }
 
-  public removeField(fieldId: string): boolean {
+  public removeField(fieldId: MetadataFieldId): boolean {
     return this.fieldsMap.delete(fieldId);
   }
 
-  public getAllFields(): Record<string, MetadataValue<unknown>> {
-    const obj: Record<string, MetadataValue<unknown>> = {};
+  public getAllFields(): Record<MetadataFieldId, MetadataValue<unknown>> {
+    const obj: Record<MetadataFieldId, MetadataValue<unknown>> = {};
     for (const [key, val] of this.fieldsMap.entries()) {
       obj[key] = val;
     }
