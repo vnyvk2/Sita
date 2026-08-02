@@ -16,8 +16,7 @@ export function resolveEffectiveCoverSongs(
   // 1. If auto mode or no custom collage settings provided: delegate to AutoCoverStrategy
   if (!settings || settings.type === 'auto' || !settings.collage) {
     const strategy = getAutoCoverStrategy(settings?.autoStrategy);
-    const targetSize = Math.min(4, maxSize);
-    return strategy.resolveSongs({ songs: playlistSongs, targetSize });
+    return strategy.resolveSongs({ songs: playlistSongs, targetSize: maxSize });
   }
 
   const { size = maxSize, songIds = [] } = settings.collage;

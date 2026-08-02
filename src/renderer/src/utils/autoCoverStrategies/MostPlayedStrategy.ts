@@ -5,6 +5,7 @@ export const MostPlayedStrategy: AutoCoverStrategy = {
   id: 'mostPlayed',
   label: 'Most Played',
   description: 'Select top played songs in playlist',
+  isDeterministic: true,
   resolveSongs(context: AutoCoverContext) {
     const { songs = [], targetSize } = context;
     const sorted = [...songs].sort((a, b) => {

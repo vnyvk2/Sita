@@ -5,5 +5,6 @@ export interface AutoCoverStrategy {
   id: AutoCoverStrategyId;
   label: string;
   description: string;
+  isDeterministic: boolean;
   resolveSongs(context: AutoCoverContext): (SongData | undefined)[];
 }

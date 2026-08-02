@@ -5,6 +5,7 @@ export const RecentlyAddedStrategy: AutoCoverStrategy = {
   id: 'recentlyAdded',
   label: 'Recent',
   description: 'Select most recently added songs',
+  isDeterministic: true,
   resolveSongs(context: AutoCoverContext) {
     const { songs = [], targetSize } = context;
     const sorted = [...songs].sort((a, b) => {

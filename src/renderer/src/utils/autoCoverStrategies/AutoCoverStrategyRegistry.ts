@@ -5,6 +5,13 @@ import { MostPlayedStrategy } from './MostPlayedStrategy';
 import { RecentlyAddedStrategy } from './RecentlyAddedStrategy';
 import { RandomStrategy } from './RandomStrategy';
 
+export const AUTO_COVER_STRATEGIES: readonly AutoCoverStrategy[] = [
+  FirstNStrategy,
+  MostPlayedStrategy,
+  RecentlyAddedStrategy,
+  RandomStrategy
+] as const;
+
 export const AUTO_COVER_STRATEGY_MAP: Record<AutoCoverStrategyId, AutoCoverStrategy> = {
   firstN: FirstNStrategy,
   mostPlayed: MostPlayedStrategy,
@@ -19,6 +26,6 @@ export function getAutoCoverStrategy(strategyId?: AutoCoverStrategyId): AutoCove
   return FirstNStrategy;
 }
 
-export function getAllAutoCoverStrategies(): AutoCoverStrategy[] {
-  return [FirstNStrategy, MostPlayedStrategy, RecentlyAddedStrategy, RandomStrategy];
+export function getAllAutoCoverStrategies(): readonly AutoCoverStrategy[] {
+  return AUTO_COVER_STRATEGIES;
 }

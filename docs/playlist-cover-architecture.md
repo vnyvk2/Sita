@@ -516,3 +516,13 @@ Reverse dependencies are prohibited.
 ## 23. Transient Drag Operation Invariant
 > Drag operations are transient UI interactions. Dragging may modify only the draft slot order. No persistence, resolver mutation, renderer mutation, or application state updates occur until the user explicitly saves.
 
+---
+
+## 24. Strategy Registry Invariant
+> All Auto Cover strategies must be registered exclusively through AutoCoverStrategyRegistry. Resolver logic must never instantiate or reference concrete strategy implementations directly.
+
+---
+
+## 25. Deterministic Strategy Invariant
+> Except for strategies explicitly defined as random, identical inputs must produce identical outputs.
+
