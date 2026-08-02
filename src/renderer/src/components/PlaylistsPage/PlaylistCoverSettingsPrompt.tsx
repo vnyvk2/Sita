@@ -4,7 +4,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
-import { type CoverLayoutVariant, type CoverSlotIndex, type PlaylistCoverDraft, type PlaylistCoverLayout, type PlaylistCoverSettings } from '../../types/playlistCover';
+import type { AutoCoverStrategyId, CoverLayoutVariant, CoverSlotIndex, PlaylistCoverDraft, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
 import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
 import { resolveEffectiveCoverSongs, resolveEffectiveCoverSlots } from '../../utils/resolveEffectiveCoverSongs';
@@ -77,6 +77,13 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         size: 4,
         songIds: []
       }
+    }));
+  }, []);
+
+  const handleStrategyChange = useCallback((autoStrategy: AutoCoverStrategyId) => {
+    setCurrentSettings((prev) => ({
+      ...prev,
+      autoStrategy
     }));
   }, []);
 
@@ -357,7 +364,12 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         {/* Right Column (Scrollable Controls Sidebar ~500px) */}
         <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto pr-1">
           {/* Mode Selector (Auto vs Collage) */}
-          <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />
+          <CoverTypeSelector
+            type={currentSettings.type}
+            autoStrategy={currentSettings.autoStrategy}
+            onChangeType={handleTypeChange}
+            onChangeStrategy={handleStrategyChange}
+          />
 
           {/* Cover Images Count Selector */}
           <div>

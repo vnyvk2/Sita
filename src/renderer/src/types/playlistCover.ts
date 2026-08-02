@@ -2,9 +2,12 @@ export type PlaylistCoverLayout = 'grid' | 'triangle' | 'fan' | 'diamond';
 
 export const COVER_IMAGE_COUNTS = [1, 2, 3, 4, 5] as const;
 
+export type AutoCoverStrategyId = 'firstN' | 'mostPlayed' | 'recentlyAdded' | 'random';
+
 export interface PlaylistCoverSettings {
   version?: number;
   type: 'auto' | 'collage';
+  autoStrategy?: AutoCoverStrategyId;
   collage?: {
     layout: PlaylistCoverLayout;
     variant?: CoverLayoutVariant;
@@ -48,7 +51,6 @@ export interface EffectiveCoverSlot {
   state: CoverSlotState;
   editable: boolean;
   draggable: boolean;
-  isFallback: boolean;
 }
 
 export type LayoutPreset<S extends string> = Record<S, Record<ClipPathArtworkCount, readonly string[]>>;

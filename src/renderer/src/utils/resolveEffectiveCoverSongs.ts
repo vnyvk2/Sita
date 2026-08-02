@@ -1,4 +1,5 @@
 import type { PlaylistCoverSettings } from '../types/playlistCover';
+import { getAutoCoverStrategy } from './autoCoverStrategies/AutoCoverStrategyRegistry';
 
 export function resolveEffectiveCoverSongs(
   settings?: PlaylistCoverSettings,
@@ -12,9 +13,11 @@ export function resolveEffectiveCoverSongs(
     }
   }
 
-  // 1. If auto mode or no custom collage settings provided: default to taking first N playlist songs
+  // 1. If auto mode or no custom collage settings provided: delegate to AutoCoverStrategy
   if (!settings || settings.type === 'auto' || !settings.collage) {
-    return playlistSongs.slice(0, Math.min(4, maxSize));
+    const strategy = getAutoCoverStrategy(settings?.autoStrategy);
+    const targetSize = Math.min(4, maxSize);
+    return strategy.resolveSongs({ songs: playlistSongs, targetSize });
   }
 
   const { size = maxSize, songIds = [] } = settings.collage;
@@ -78,8 +81,7 @@ export function resolveEffectiveCoverSlots(
         song,
         state: song ? 'normal' : 'fallback',
         editable: false,
-        draggable: false,
-        isFallback: true
+        draggable: false
       };
     }
 
@@ -89,8 +91,7 @@ export function resolveEffectiveCoverSlots(
         song,
         state: 'normal',
         editable: true,
-        draggable: true,
-        isFallback: !isExplicitSong
+        draggable: true
       };
     }
 
@@ -99,8 +100,7 @@ export function resolveEffectiveCoverSlots(
       song: undefined,
       state: isExplicitSong ? 'missing' : 'fallback',
       editable: true,
-      draggable: false,
-      isFallback: true
+      draggable: false
     };
   });
 }
