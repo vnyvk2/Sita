@@ -11,6 +11,7 @@ export interface CollectionQueryOptions {
 export interface EntryQueryOptions {
   start: number;
   end: number;
+  sortType?: string;
   sortDefinition?: SortDefinition[];
 }
 

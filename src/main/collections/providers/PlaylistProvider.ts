@@ -81,7 +81,8 @@ export class PlaylistProvider implements CollectionProvider {
     const limit = options.end - options.start;
     const rows = await this.repository.getEntries(playlistId, {
       limit,
-      offset: options.start
+      offset: options.start,
+      sortType: options.sortType
     });
     
     const total = await this.repository.countEntries(playlistId);

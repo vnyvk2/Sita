@@ -19,6 +19,12 @@ export interface RemoveSongsInput {
   songIds: readonly number[];
 }
 
+export interface ReorderSongsInput {
+  playlistId: number;
+  entryId: number;
+  newPosition: number;
+}
+
 export interface RenameInput {
   collectionId: number;
   name: string;

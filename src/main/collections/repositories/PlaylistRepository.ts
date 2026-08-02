@@ -41,9 +41,14 @@ export class PlaylistRepository {
 
   public async getEntries(
     playlistId: number,
-    options: { limit?: number; offset?: number } = {},
+    options: { limit?: number; offset?: number; sortType?: string } = {},
     trx: DB | DBTransaction = db
   ) {
+    const sortColumn =
+      options.sortType === 'originalOrder' || options.sortType === 'addedOrder'
+        ? asc(playlistEntries.id)
+        : asc(playlistEntries.position);
+
     let q = trx
       .select({
         entry: playlistEntries,
@@ -52,7 +57,7 @@ export class PlaylistRepository {
       .from(playlistEntries)
       .innerJoin(songs, eq(playlistEntries.songId, songs.id))
       .where(eq(playlistEntries.playlistId, playlistId))
-      .orderBy(asc(playlistEntries.position))
+      .orderBy(sortColumn)
       .$dynamic();
       
     if (options.limit !== undefined) {

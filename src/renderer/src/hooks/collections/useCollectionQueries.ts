@@ -68,10 +68,10 @@ export const useCollectionArtworks = (songIds: number[]) => {
   });
 };
 
-export const collectionEntriesOptions = (id: number, offset?: number, limit?: number) => {
+export const collectionEntriesOptions = (id: number, offset?: number, limit?: number, sortType?: string) => {
   return queryOptions({
-    queryKey: [...collectionKeys.entries(id), offset, limit],
-    queryFn: () => CollectionClient.getEntries(id, offset, limit)
+    queryKey: [...collectionKeys.entries(id), offset, limit, sortType],
+    queryFn: () => CollectionClient.getEntries(id, offset, limit, sortType)
   });
 };
 

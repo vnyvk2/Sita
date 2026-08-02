@@ -1,15 +1,25 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { CollectionClient } from '@renderer/api/CollectionClient';
+import { collectionKeys } from '@renderer/api/collectionKeys';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
-import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import {
+  canReorder,
+  isPersistentPlaylistOrder,
+  playlistSortOptions,
+  songFilterOptions,
+  type SongSortTypes
+} from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
-import { collectionDetailOptions, collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
+import {
+  collectionDetailOptions,
+  collectionEntriesOptions
+} from '@renderer/hooks/collections/useCollectionQueries';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -22,6 +32,7 @@ import { useTranslation } from 'react-i18next';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import Button from '@renderer/components/Button';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 const SensitiveActionConfirmPrompt = lazy(
   () => import('@renderer/components/SensitiveActionConfirmPrompt')
@@ -48,13 +59,18 @@ function PlaylistInfoPage() {
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
-    (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
+    (state) => state.localStorage.sortingStates?.playlistDetailPage || 'customOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState, filteringOrder = 'notSelected', keyword, scrollTopOffset } = Route.useSearch();
+  const {
+    sortingOrder = playlistSortingState || 'customOrder',
+    filteringOrder = 'notSelected',
+    keyword,
+    scrollTopOffset
+  } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
 
   useEffect(() => {
@@ -66,7 +82,7 @@ function PlaylistInfoPage() {
   );
 
   const { data: collectionEntries = [] } = useQuery({
-    ...collectionEntriesOptions(playlistId, 0, 99999),
+    ...collectionEntriesOptions(playlistId, undefined, undefined, sortingOrder),
     enabled: !!playlistId
   });
 
@@ -80,16 +96,24 @@ function PlaylistInfoPage() {
   });
 
   const playlistSongs = useMemo(() => {
-    if (sortingOrder === 'addedOrder' || !sortingOrder) {
+    if (isPersistentPlaylistOrder(sortingOrder) || !sortingOrder) {
       const songMap = new Map(rawPlaylistSongs.map((s) => [s.songId, s]));
-      const positionOrderedSongs: typeof rawPlaylistSongs = [];
+      const positionOrderedSongs: Array<typeof rawPlaylistSongs[0] & { entryId: number }> = [];
       for (const entry of collectionEntries) {
         const song = songMap.get(entry.songId);
-        if (song) positionOrderedSongs.push(song);
+        if (song) {
+          positionOrderedSongs.push({
+            ...song,
+            entryId: entry.id
+          });
+        }
       }
       return positionOrderedSongs;
     }
-    return rawPlaylistSongs;
+    return rawPlaylistSongs.map((s) => ({
+      ...s,
+      entryId: collectionEntries.find((e) => e.songId === s.songId)?.id ?? 0
+    }));
   }, [collectionEntries, rawPlaylistSongs, sortingOrder]);
 
   const search = usePageSearch({
@@ -118,6 +142,95 @@ function PlaylistInfoPage() {
   }, [playlistSongs, keyword]);
 
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+
+  const handleReorder = useCallback(
+    async (entryId: number, targetPosition: number) => {
+      if (!canReorder(sortingOrder) || !entryId) return;
+
+      try {
+        await CollectionClient.reorderSongs({
+          playlistId,
+          entryId,
+          newPosition: targetPosition
+        });
+        queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+      } catch (err) {
+        console.error('Failed to reorder playlist track:', err);
+      }
+    },
+    [playlistId, sortingOrder]
+  );
+
+  const handleDragEnd = useCallback(
+    (result: DropResult) => {
+      if (!result.destination || !canReorder(sortingOrder)) return;
+      const sourceIndex = result.source.index;
+      const destIndex = result.destination.index;
+      if (sourceIndex === destIndex) return;
+
+      const draggedSong = filteredSongs[sourceIndex];
+      if (draggedSong?.entryId) {
+        handleReorder(draggedSong.entryId, destIndex);
+      }
+    },
+    [filteredSongs, handleReorder, sortingOrder]
+  );
+
+  const getContextMenuItems = useCallback(
+    (item: (typeof filteredSongs)[0], index: number) => {
+      const items: ContextMenuItem[] = [
+        {
+          label: t('playlistsPage.removeFromThisPlaylist', 'Remove from this playlist'),
+          iconName: 'playlist_remove',
+          handlerFunction: () =>
+            CollectionClient.removeSongs({ playlistId: playlistData.id, songIds: [item.songId] })
+              .then(() =>
+                addNewNotifications([
+                  {
+                    id: `${item.songId}Removed`,
+                    duration: 5000,
+                    content: t('playlistsPage.removeSongFromPlaylistSuccess', {
+                      title: item.title,
+                      playlistName: playlistData.name
+                    })
+                  }
+                ])
+              )
+              .catch((err) => console.error(err))
+        }
+      ];
+
+      if (canReorder(sortingOrder)) {
+        if (index > 0) {
+          items.push({
+            label: t('playlist.moveToTop', 'Move to Top'),
+            iconName: 'vertical_align_top',
+            handlerFunction: () => handleReorder(item.entryId, 0)
+          });
+          items.push({
+            label: t('playlist.moveUp', 'Move Up'),
+            iconName: 'arrow_upward',
+            handlerFunction: () => handleReorder(item.entryId, index - 1)
+          });
+        }
+        if (index < filteredSongs.length - 1) {
+          items.push({
+            label: t('playlist.moveDown', 'Move Down'),
+            iconName: 'arrow_downward',
+            handlerFunction: () => handleReorder(item.entryId, index + 1)
+          });
+          items.push({
+            label: t('playlist.moveToBottom', 'Move to Bottom'),
+            iconName: 'vertical_align_bottom',
+            handlerFunction: () => handleReorder(item.entryId, filteredSongs.length - 1)
+          });
+        }
+      }
+
+      return items;
+    },
+    [addNewNotifications, filteredSongs.length, handleReorder, playlistData.id, playlistData.name, sortingOrder, t]
+  );
 
   const openAddSongsPrompt = useCallback(() => {
     changePromptMenuData(
@@ -248,6 +361,32 @@ function PlaylistInfoPage() {
         } else if (e.ctrlKey && e.key === 'a') {
           e.stopPropagation();
           selectAllHandler();
+        } else if (e.ctrlKey && e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            CollectionClient.redo(`local://playlist/${playlistId}`).then(() => {
+              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+            });
+          } else {
+            CollectionClient.undo(`local://playlist/${playlistId}`).then(() => {
+              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+            });
+          }
+        } else if (canReorder(sortingOrder) && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const selectedSongIds = store.getState().multipleSelectionsData.selectedSongIds;
+          if (selectedSongIds.length === 1) {
+            const targetSongId = selectedSongIds[0];
+            const currIdx = filteredSongs.findIndex((s) => s.songId === targetSongId);
+            if (currIdx !== -1) {
+              const targetEntryId = filteredSongs[currIdx].entryId;
+              const newPos = e.key === 'ArrowUp' ? Math.max(0, currIdx - 1) : Math.min(filteredSongs.length - 1, currIdx + 1);
+              if (newPos !== currIdx && targetEntryId) {
+                handleReorder(targetEntryId, newPos);
+              }
+            }
+          }
         }
       }}
     >
@@ -305,7 +444,7 @@ function PlaylistInfoPage() {
             name: 'PlaylistPageSortDropdown',
             type: `${t('common.sortBy')} :`,
             value: sortingOrder,
-            options: songSortOptions,
+            options: playlistSortOptions,
             onChange: (e) => {
               const order = e.currentTarget.value as SongSortTypes;
               navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
@@ -315,61 +454,110 @@ function PlaylistInfoPage() {
         ]}
       />
       {filteredSongs.length > 0 && (
-        <VirtualizedList
-          data={filteredSongs}
-          fixedItemHeight={60}
-          scrollTopOffset={scrollTopOffset}
-          onDebouncedScroll={(range) => {
-            navigate({
-              replace: true,
-              search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-            });
-          }}
-          components={{
-            Header: () => (
-              <PlaylistInfoAndImgContainer
-                playlist={playlistData}
-                songs={playlistSongs}
-                filteredSongs={filteredSongs}
-              />
-            )
-          }}
-          itemContent={(index, item) => {
-            return (
+        canReorder(sortingOrder) ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable
+              droppableId="playlist-droppable"
+              mode="virtual"
+              renderClone={(provided, snapshot, rubric) => {
+                const item = filteredSongs[rubric.source.index];
+                if (!item) return null;
+                return (
+                  <Song
+                    provided={provided}
+                    isDraggable
+                    key={item.entryId || item.songId}
+                    index={rubric.source.index}
+                    isIndexingSongs={preferences.isSongIndexingEnabled}
+                    onPlayClick={handleSongPlayBtnClick}
+                    selectAllHandler={selectAllHandler}
+                    {...item}
+                    trackNo={undefined}
+                    additionalContextMenuItems={getContextMenuItems(item, rubric.source.index)}
+                  />
+                );
+              }}
+            >
+              {(droppableProvided) => (
+                <VirtualizedList
+                  data={filteredSongs}
+                  fixedItemHeight={60}
+                  scrollTopOffset={scrollTopOffset}
+                  onDebouncedScroll={(range) => {
+                    navigate({
+                      replace: true,
+                      search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+                    });
+                  }}
+                  components={{
+                    Header: () => (
+                      <PlaylistInfoAndImgContainer
+                        playlist={playlistData}
+                        songs={playlistSongs}
+                        filteredSongs={filteredSongs}
+                      />
+                    )
+                  }}
+                  itemContent={(index, item) => (
+                    <Draggable
+                      key={item.entryId || item.songId}
+                      draggableId={String(item.entryId || item.songId)}
+                      index={index}
+                    >
+                      {(draggableProvided) => (
+                        <Song
+                          key={item.entryId || item.songId}
+                          index={index}
+                          provided={draggableProvided}
+                          isDraggable
+                          isIndexingSongs={preferences.isSongIndexingEnabled}
+                          onPlayClick={handleSongPlayBtnClick}
+                          selectAllHandler={selectAllHandler}
+                          {...item}
+                          trackNo={undefined}
+                          additionalContextMenuItems={getContextMenuItems(item, index)}
+                        />
+                      )}
+                    </Draggable>
+                  )}
+                />
+              )}
+            </Droppable>
+          </DragDropContext>
+        ) : (
+          <VirtualizedList
+            data={filteredSongs}
+            fixedItemHeight={60}
+            scrollTopOffset={scrollTopOffset}
+            onDebouncedScroll={(range) => {
+              navigate({
+                replace: true,
+                search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
+              });
+            }}
+            components={{
+              Header: () => (
+                <PlaylistInfoAndImgContainer
+                  playlist={playlistData}
+                  songs={playlistSongs}
+                  filteredSongs={filteredSongs}
+                />
+              )
+            }}
+            itemContent={(index, item) => (
               <Song
-                key={index}
+                key={item.entryId || index}
                 index={index}
                 isIndexingSongs={preferences.isSongIndexingEnabled}
                 onPlayClick={handleSongPlayBtnClick}
                 selectAllHandler={selectAllHandler}
                 {...item}
                 trackNo={undefined}
-                additionalContextMenuItems={[
-                  {
-                    label: t('playlistsPage.removeFromThisPlaylist'),
-                    iconName: 'playlist_remove',
-                    handlerFunction: () =>
-                      CollectionClient
-                        .removeSongs({ playlistId: playlistData.id, songIds: [item.songId] })
-                        .then(() =>
-                            addNewNotifications([
-                              {
-                                id: `${item.songId}Removed`,
-                                duration: 5000,
-                                content: t('playlistsPage.removeSongFromPlaylistSuccess', {
-                                  title: item.title,
-                                  playlistName: playlistData.name
-                                })
-                              }
-                            ])
-                        )
-                        .catch((err) => console.error(err))
-                  }
-                ]}
+                additionalContextMenuItems={getContextMenuItems(item, index)}
               />
-            );
-          }}
-        />
+            )}
+          />
+        )
       )}
       {playlistSongs.length > 0 && filteredSongs.length === 0 && (
         <div className="flex h-full grow flex-col">

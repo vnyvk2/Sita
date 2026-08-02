@@ -3,6 +3,7 @@ import type {
   CreatePlaylistInput,
   AddSongsInput,
   RemoveSongsInput,
+  ReorderSongsInput,
   RenameInput,  
   MoveCollectionInput, 
   DeleteInput, 
@@ -19,7 +20,7 @@ export const CollectionClient = {
   // Read
   getCollection: (id: number) => window.api.collections.read.getCollection(id),
   getChildren: (id: number | null) => window.api.collections.read.getChildren(id),
-  getEntries: (id: number, offset?: number, limit?: number) => window.api.collections.read.getEntries(id, offset, limit),
+  getEntries: (id: number, offset?: number, limit?: number, sortType?: string) => window.api.collections.read.getEntries(id, offset, limit, sortType),
   getBreadcrumbs: (id: number) => window.api.collections.read.getBreadcrumbs(id),
   getArtworks: (songIds: number[]) => window.api.collections.read.getArtworks(songIds),
 
@@ -28,6 +29,7 @@ export const CollectionClient = {
   createPlaylist: (input: CreatePlaylistInput) => window.api.collections.write.createPlaylist(input),
   addSongs: (input: AddSongsInput) => window.api.collections.write.addSongs(input),
   removeSongs: (input: RemoveSongsInput) => window.api.collections.write.removeSongs(input),
+  reorderSongs: (input: ReorderSongsInput) => window.api.collections.write.reorder(input),
   rename: (input: RenameInput) => window.api.collections.write.rename(input),
   move: (input: MoveCollectionInput) => window.api.collections.write.move(input),
   delete: (input: DeleteInput) => window.api.collections.write.delete(input),

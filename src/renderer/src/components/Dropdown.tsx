@@ -4,6 +4,8 @@ export interface DropdownOption<T extends string> {
   label: string;
   value: T;
   isDisabled?: boolean;
+  isDivider?: boolean;
+  isHeader?: boolean;
 }
 
 export interface DropdownProp<T extends string> {
@@ -36,16 +38,40 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
 
   const optionComponents = useMemo(
     () =>
-      options.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-          disabled={option.isDisabled}
-          className="bg-context-menu-background/90! text-font-color-black! dark:bg-dark-context-menu-background/90! dark:text-font-color-white!"
-        >
-          {iconName ? option.label : `${type ? `${type} ` : ''}${option.label}`}
-        </option>
-      )),
+      options.map((option, idx) => {
+        if (option.isDivider) {
+          return (
+            <option
+              key={`divider-${idx}`}
+              disabled
+              className="bg-context-menu-background/90! text-font-color-black/40! dark:bg-dark-context-menu-background/90! dark:text-font-color-white/40!"
+            >
+              ───────────────
+            </option>
+          );
+        }
+        if (option.isHeader) {
+          return (
+            <option
+              key={`header-${idx}`}
+              disabled
+              className="bg-context-menu-background/90! font-semibold text-font-color-black/60! dark:bg-dark-context-menu-background/90! dark:text-font-color-white/60!"
+            >
+              ── {option.label} ──
+            </option>
+          );
+        }
+        return (
+          <option
+            key={option.value}
+            value={option.value}
+            disabled={option.isDisabled}
+            className="bg-context-menu-background/90! text-font-color-black! dark:bg-dark-context-menu-background/90! dark:text-font-color-white!"
+          >
+            {iconName ? option.label : `${type ? `${type} ` : ''}${option.label}`}
+          </option>
+        );
+      }),
     [iconName, options, type]
   );
 

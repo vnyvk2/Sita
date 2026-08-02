@@ -33,8 +33,8 @@ export function setupCollectionIpc(
     return children.map(mapPlaylistToDto);
   });
 
-  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number) => {
-    const entries = await repository.getEntries(id, { limit, offset });
+  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number, sortType?: string) => {
+    const entries = await repository.getEntries(id, { limit, offset, sortType });
     return entries.map(mapEntryToDto);
   });
 
@@ -58,6 +58,10 @@ export function setupCollectionIpc(
     const result = await engine.createPlaylist(input);
     const playlist = await repository.getById(result);
     return playlist ? mapPlaylistToDto(playlist) : null;
+  });
+
+  ipcMain.handle('collections/write/reorder', async (_, input: { playlistId: number; entryId: number; newPosition: number }) => {
+    return await engine.reorderSongs(input);
   });
 
   ipcMain.handle('collections/write/addSongs', async (_, input) => {
