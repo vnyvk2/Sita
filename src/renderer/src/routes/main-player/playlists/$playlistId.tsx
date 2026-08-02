@@ -494,6 +494,7 @@ function PlaylistInfoPage() {
                 if (!item) return null;
                 return (
                   <Song
+                    ref={provided.innerRef}
                     provided={provided}
                     isDraggable
                     key={item.entryId || item.songId}
@@ -512,6 +513,7 @@ function PlaylistInfoPage() {
                 <VirtualizedList
                   data={filteredSongs}
                   fixedItemHeight={60}
+                  scrollerRef={droppableProvided.innerRef}
                   scrollTopOffset={scrollTopOffset}
                   onDebouncedScroll={(range) => {
                     navigate({
@@ -538,6 +540,7 @@ function PlaylistInfoPage() {
                         <Song
                           key={item.entryId || item.songId}
                           index={index}
+                          ref={draggableProvided.innerRef}
                           provided={draggableProvided}
                           isDraggable
                           isIndexingSongs={preferences.isSongIndexingEnabled}
