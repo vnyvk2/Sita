@@ -27,7 +27,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
@@ -408,7 +408,7 @@ function PlaylistInfoPage() {
   const openExportPrompt = useCallback(() => {
     changePromptMenuData(
       true,
-      <Suspense fallback={<EditingOptionsSkeleton />}>
+      <Suspense fallback={null}>
         <PlaylistExportSettingsPrompt playlistId={playlistData.id} />
       </Suspense>
     );

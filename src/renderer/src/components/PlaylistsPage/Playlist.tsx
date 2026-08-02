@@ -2,7 +2,7 @@ import { SpecialPlaylists } from '@common/playlists.enum';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
