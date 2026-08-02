@@ -116,6 +116,7 @@ import { recoverLibraryAssets } from './core/recovery';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import { playlistEngine, undoEngine, playlistRepository, hierarchyService } from './collections/setup';
 import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
+import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
@@ -142,17 +143,18 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   // Fire and forget startup recovery sync
   recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
   
-  // Setup Collection IPC & Playlist Import IPC
+  // Setup Collection IPC, Playlist Import IPC, & Playlist Export IPC
   setupCollectionIpc(
     playlistEngine,
     undoEngine,
     playlistRepository,
     hierarchyService,
-    playlistImportWorkflow,
     (channel: string, ...args: any[]) => mainWindow?.webContents?.send(channel, ...args)
   );
 
   setupPlaylistImportIpc(playlistImportWorkflow, importHistoryService);
+
+  setupPlaylistExportIpc(playlistRepository);
 
   if (mainWindow) {
     ipcMain.on('app/close', () => app.quit());

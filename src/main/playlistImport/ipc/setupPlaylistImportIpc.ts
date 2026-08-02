@@ -3,11 +3,21 @@ import type { PlaylistImportWorkflow } from '../workflow/PlaylistImportWorkflow'
 import type { PlaylistImportHistoryService } from '../services/PlaylistImportHistoryService';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
+import type { PlaylistImportIpcOptions } from '../../../common/collections/types';
+import importPlaylist, { analyzePlaylistImport } from '../../core/importPlaylist';
 
 export function setupPlaylistImportIpc(
   workflow: PlaylistImportWorkflow,
   historyService?: PlaylistImportHistoryService
 ): void {
+  ipcMain.handle('collections/analyze', async (_, filePath?: string) => {
+    return await analyzePlaylistImport(workflow, filePath);
+  });
+
+  ipcMain.handle('collections/import', async (_, options?: PlaylistImportIpcOptions) => {
+    return await importPlaylist(workflow, options);
+  });
+
   ipcMain.handle(
     'playlistImport:preview',
     async (_event, filePath: string, options?: PlaylistImportOptions) => {

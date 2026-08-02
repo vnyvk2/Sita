@@ -314,11 +314,11 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         .limit(1000);
 
       for (const fn of chunk) {
-        const fnLower = fn.toLowerCase();
+        const fnNormalized = fn.replaceAll('\\', '/').toLowerCase();
         const matchedForFn: LibrarySongRecord[] = [];
         for (const song of rows) {
-          const songPathLower = song.path.toLowerCase();
-          if (songPathLower.endsWith(fnLower) || songPathLower.endsWith(fnLower.replace(/\\/g, '/'))) {
+          const songPathNormalized = song.path.replaceAll('\\', '/').toLowerCase();
+          if (songPathNormalized.endsWith(fnNormalized) || songPathNormalized.endsWith('/' + fnNormalized)) {
             matchedForFn.push({
               id: song.id,
               path: song.path,

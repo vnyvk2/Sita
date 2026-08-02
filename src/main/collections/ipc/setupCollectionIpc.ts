@@ -3,18 +3,15 @@ import type { PlaylistEngine } from '../engine/PlaylistEngine';
 import type { UndoEngine } from '../engine/UndoEngine';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { HierarchyService } from '../engine/HierarchyService';
-import type { PlaylistImportWorkflow } from '../../playlistImport/workflow/PlaylistImportWorkflow';
 import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
 
-import { ExportService } from '../../playlistExport/services/ExportService';
-import importPlaylist, { analyzePlaylistImport } from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
 import type { OpenDialogOptions } from 'electron';
 import { showOpenDialog } from '../../main';
-import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistBatchExportOptions } from '../../../common/collections/types';
+import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export function setupCollectionIpc(
@@ -22,7 +19,6 @@ export function setupCollectionIpc(
   undoEngine: UndoEngine,
   repository: PlaylistRepository,
   hierarchyService: HierarchyService,
-  workflow: PlaylistImportWorkflow,
   sendMessageToRenderer: (channel: string, ...args: any[]) => void
 ) {
   // Read Endpoints
@@ -43,7 +39,7 @@ export function setupCollectionIpc(
 
   ipcMain.handle('collections/read/getBreadcrumbs', async (_, id: number) => {
     const ancestors = await hierarchyService.getAncestors(id);
-    return ancestors; 
+    return ancestors;
   });
 
   ipcMain.handle('collections/read/getArtworks', async (_, songIds: number[]) => {
@@ -110,7 +106,7 @@ export function setupCollectionIpc(
   ipcMain.handle('collections/write/bulkRestore', async (_, input) => {
     return await engine.bulkRestore(input);
   });
-  
+
   ipcMain.handle('collections/write/pin', async (_, input) => {
     return await engine.pinPlaylist(input);
   });
@@ -138,25 +134,6 @@ export function setupCollectionIpc(
   // Event Forwarding
   collectionEventBus.onEvent((event) => {
     sendMessageToRenderer('collections/event', event);
-  });
-
-  // Import / Export
-  const exportService = new ExportService(repository);
-
-  ipcMain.handle('collections/export', async (_, playlistId: number, options?: PlaylistExportOptions) => {
-    return await exportService.exportPlaylist(playlistId, options || { format: 'm3u8', order: 'customOrder', pathType: 'absolute' });
-  });
-
-  ipcMain.handle('collections/export-batch', async (_, playlistIds: number[], options?: PlaylistBatchExportOptions) => {
-    return await exportService.exportPlaylists(playlistIds, options);
-  });
-
-  ipcMain.handle('collections/analyze', async (_, filePath?: string) => {
-    return await analyzePlaylistImport(workflow, filePath);
-  });
-
-  ipcMain.handle('collections/import', async (_, options?: PlaylistImportIpcOptions) => {
-    return await importPlaylist(workflow, options);
   });
 
   ipcMain.handle('utils/showOpenDialog', async (_, options?: OpenDialogOptions) => {
