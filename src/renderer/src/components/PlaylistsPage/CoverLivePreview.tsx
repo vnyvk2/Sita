@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { CoverLayoutVariant, CoverSlotIndex, PlaylistCoverLayout, ResolvedPlaylistCover } from '../../types/playlistCover';
 import { getLayoutClipPaths } from '../../utils/getLayoutClipPaths';
 import MultipleArtworksCover from './MultipleArtworksCover';
@@ -28,6 +29,7 @@ const CoverLivePreview = ({
   const count = requestedCount ?? resolvedCover.artworks.length ?? 4;
   const activeVariant = variant || resolvedCover.variant;
   const clipPaths = getLayoutClipPaths(resolvedCover.layout as PlaylistCoverLayout, activeVariant, count);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   return (
     <div className="cover-live-preview mb-6 flex flex-col items-center">
@@ -57,8 +59,11 @@ const CoverLivePreview = ({
             return (
               <button
                 key={i}
+                ref={(el) => { buttonRefs.current[i] = el; }}
                 type="button"
                 aria-label={`Cover Slot ${i + 1}`}
+                aria-selected={isActive}
+                aria-current={isActive ? 'true' : undefined}
                 onClick={() => onSelectSlot?.(slotIndex)}
                 onMouseEnter={() => onHoverSlot?.(slotIndex)}
                 onMouseLeave={() => onHoverSlot?.(null)}
@@ -68,10 +73,14 @@ const CoverLivePreview = ({
                     onSelectSlot?.(slotIndex);
                   } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                     e.preventDefault();
-                    onSelectSlot?.(((i + 1) % count) as CoverSlotIndex);
+                    const next = (i + 1) % count;
+                    onSelectSlot?.(next as CoverSlotIndex);
+                    buttonRefs.current[next]?.focus();
                   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                     e.preventDefault();
-                    onSelectSlot?.(((i - 1 + count) % count) as CoverSlotIndex);
+                    const prev = (i - 1 + count) % count;
+                    onSelectSlot?.(prev as CoverSlotIndex);
+                    buttonRefs.current[prev]?.focus();
                   }
                 }}
                 style={{ clipPath }}

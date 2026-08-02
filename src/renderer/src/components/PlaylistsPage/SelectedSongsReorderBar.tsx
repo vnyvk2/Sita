@@ -30,8 +30,12 @@ const SelectedSongsReorderBar = ({
   onSwapSlots,
   onClearSlot
 }: Props) => {
-  const [draggingSlot, setDraggingSlot] = useState<CoverSlotIndex | null>(null);
-  const [dragOverSlot, setDragOverSlot] = useState<CoverSlotIndex | null>(null);
+  const [statusAnnouncement, setStatusAnnouncement] = useState<string>('');
+
+  const handleSwapWithAnnouncement = (from: CoverSlotIndex, to: CoverSlotIndex) => {
+    onSwapSlots(from, to);
+    setStatusAnnouncement(`Moved slot ${from + 1} to position ${to + 1}`);
+  };
 
   const formatArtists = (artists?: any) => {
     if (!Array.isArray(artists) || artists.length === 0) return '';
@@ -43,6 +47,10 @@ const SelectedSongsReorderBar = ({
 
   return (
     <div className="mb-6 flex flex-col gap-2">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {statusAnnouncement}
+      </div>
+
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Selected Cover Slots</label>
         <span className="text-xs font-medium text-neutral-400">
@@ -50,7 +58,7 @@ const SelectedSongsReorderBar = ({
         </span>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800">
+      <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800" role="listbox" aria-label="Cover slots list">
         {Array.from({ length: maxSize }).map((_, i) => {
           const slotIndex = i as CoverSlotIndex;
           const slotData = effectiveSlots ? effectiveSlots[i] : undefined;
@@ -91,7 +99,7 @@ const SelectedSongsReorderBar = ({
                 const fromIndexStr = e.dataTransfer.getData('text/plain');
                 const fromIndex = Number(fromIndexStr);
                 if (!isNaN(fromIndex) && fromIndex !== slotIndex) {
-                  onSwapSlots(fromIndex as CoverSlotIndex, slotIndex);
+                  handleSwapWithAnnouncement(fromIndex as CoverSlotIndex, slotIndex);
                 }
                 setDraggingSlot(null);
                 setDragOverSlot(null);
@@ -101,7 +109,8 @@ const SelectedSongsReorderBar = ({
                 setDragOverSlot(null);
               }}
               tabIndex={0}
-              role="button"
+              role="option"
+              aria-selected={isActive}
               aria-label={`Cover Slot ${i + 1}: ${song?.title || 'Empty'}`}
               onClick={() => onSelectSlot(slotIndex)}
               onMouseEnter={() => onHoverSlot(slotIndex)}
@@ -112,10 +121,10 @@ const SelectedSongsReorderBar = ({
                   onSelectSlot(slotIndex);
                 } else if (e.key === 'ArrowUp' && i > 0) {
                   e.preventDefault();
-                  onSwapSlots(slotIndex, (i - 1) as CoverSlotIndex);
+                  handleSwapWithAnnouncement(slotIndex, (i - 1) as CoverSlotIndex);
                 } else if (e.key === 'ArrowDown' && i < maxSize - 1) {
                   e.preventDefault();
-                  onSwapSlots(slotIndex, (i + 1) as CoverSlotIndex);
+                  handleSwapWithAnnouncement(slotIndex, (i + 1) as CoverSlotIndex);
                 }
               }}
               className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
