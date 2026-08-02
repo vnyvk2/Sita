@@ -18,7 +18,7 @@ Built with Electron and React • Inspired by [Oto Music](https://play.google.co
 
 [![Crowdin](https://badges.crowdin.net/nora/localized.svg)](https://crowdin.com/project/nora)
 
-[Download](https://github.com/Sandakan/Nora/releases/latest) • [Features](#-features) • [Build Guide](#-build-from-source) • [Changelog](/CHANGELOG.md) • [Roadmap](/ROADMAP.md) • [Constitution](/PROJECT_CONSTITUTION.md) • [Discord](https://discord.gg/c5rGKnBs4y)
+[Download](https://github.com/Sandakan/Nora/releases/latest) • [Features](#-features) • [Build Guide](#-build-from-source) • [Changelog](/CHANGELOG.md) • [Roadmap](/ROADMAP.md) • [Constitution](/PROJECT_CONSTITUTION.md) • [Phase 2 Architecture](/PHASE_2_INTELLIGENCE_FOUNDATION.md) • [Discord](https://discord.gg/c5rGKnBs4y)
 
 </div>
 
