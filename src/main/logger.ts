@@ -57,11 +57,19 @@ const getLogFilePath = () => {
 
 export const logFilePath = getLogFilePath();
 
-const DEFAULT_LOGGER_LEVEL = IS_DEVELOPMENT ? 'debug' : 'info';
+const getConsoleLogLevel = () => {
+  if (process.env.CONSOLE_LOG_LEVEL) {
+    return process.env.CONSOLE_LOG_LEVEL;
+  }
+  return IS_DEVELOPMENT ? 'info' : 'warn';
+};
+
+const DEFAULT_FILE_LEVEL = 'silly';
+const DEFAULT_CONSOLE_LEVEL = getConsoleLogLevel();
 
 const transports = {
   console: new winston.transports.Console({
-    level: 'debug',
+    level: DEFAULT_CONSOLE_LEVEL,
     format: winston.format.combine(
       winston.format.timestamp({
         format: 'YYYY-MM-DD hh:mm:ss.SSS A'
@@ -72,7 +80,7 @@ const transports = {
     )
   }),
   file: new winston.transports.File({
-    level: DEFAULT_LOGGER_LEVEL,
+    level: DEFAULT_FILE_LEVEL,
     filename: logFilePath
   })
 };
@@ -107,19 +115,12 @@ const log = winston.createLogger({
 // };
 
 export const toggleVerboseLogs = (isEnabled: boolean) => {
-  // Object.values(transports).forEach((transport) => {
-  //   if (isEnabled) {
-  //     transport.level = 'verbose';
-  //   } else {
-  //     transport.level = DEFAULT_LOGGER_LEVEL;
-  //   }
-  // });
   if (isEnabled) {
     transports.console.level = 'silly';
     transports.file.level = 'silly';
   } else {
-    transports.console.level = DEFAULT_LOGGER_LEVEL;
-    transports.file.level = DEFAULT_LOGGER_LEVEL;
+    transports.console.level = DEFAULT_CONSOLE_LEVEL;
+    transports.file.level = DEFAULT_FILE_LEVEL;
   }
 };
 

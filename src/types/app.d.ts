@@ -896,6 +896,8 @@ declare global {
     prompt: ReactNode;
     className?: string;
     isOneTime?: boolean;
+    mode?: 'dialog' | 'workspace';
+    scrollBehavior?: 'panel' | 'content';
   }
   interface PromptMenuNavigationHistoryData {
     isVisible: boolean;

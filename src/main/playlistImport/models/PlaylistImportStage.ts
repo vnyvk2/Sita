@@ -1,0 +1,11 @@
+export type PlaylistImportStage =
+  | 'IDLE'
+  | 'READING_FILE'
+  | 'PARSING_PLAYLIST'
+  | 'RESOLVING_PATHS'
+  | 'VERIFYING_FILES'
+  | 'MATCHING_LIBRARY'
+  | 'PLANNING_IMPORT'
+  | 'EXECUTING_IMPORT'
+  | 'COMPLETED'
+  | 'FAILED';

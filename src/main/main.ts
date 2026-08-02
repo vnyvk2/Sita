@@ -41,6 +41,9 @@ import { closeAllAbortControllers, saveAbortController } from './fs/controlAbort
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import logger from './logger';
+import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
+import ShutdownLogger from './lifecycle/ShutdownLogger';
+import { ShutdownState } from './lifecycle/ShutdownState';
 import { clearTempArtworkFolder } from './other/artworks';
 import { clearDiscordRpcActivity } from './other/discordRPC';
 import resetAppData from './resetAppData';
@@ -141,6 +144,7 @@ const APP_INFO = {
 };
 
 logger.debug(`Starting up Nora`, { APP_INFO });
+ShutdownLogger.logBootMilestone('Application boot', { APP_INFO });
 
 function launchExtensionBackgroundWorkers(session = electronSession.defaultSession) {
   return Promise.all(
@@ -246,6 +250,7 @@ const createWindow = async () => {
     titleBarStyle: 'hidden',
     show: false
   });
+  ShutdownLogger.logBootMilestone('BrowserWindow created');
 
   if (IS_DEVELOPMENT && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -375,6 +380,7 @@ app
     // ? / / / / / / / / /  IPC RENDERER EVENTS  / / / / / / / / / / / /
     if (mainWindow) {
       initializeIPC(mainWindow, abortController.signal);
+      ShutdownLogger.logBootMilestone('IPC initialized');
       checkForUpdates();
       //  / / / / / / / / / / / GLOBAL SHORTCUTS / / / / / / / / / / / / / /
       // globalShortcut.register('F5', () => {
@@ -395,7 +401,25 @@ app
   .catch((error) => logger.error('Error occurred when starting the app.', { error }));
 
 app.on('window-all-closed', () => {
+  ShutdownLogger.logEventObservation('main.ts:app.on(window-all-closed)');
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  ShutdownLogger.logEventObservation('main.ts:app.on(will-quit)');
+  void closeDatabaseInstance();
+});
+
+process.on('SIGTERM', () => {
+  ShutdownLogger.logEventObservation('process.on(SIGTERM)');
+});
+
+process.on('SIGINT', () => {
+  ShutdownLogger.logEventObservation('process.on(SIGINT)');
+});
+
+process.on('exit', (code) => {
+  ShutdownLogger.logEventObservation(`process.on(exit)[exitCode:${code}]`);
 });
 
 // / / / / / / / / / / / / / / / / / / / / / / / / / / / /
@@ -435,34 +459,32 @@ async function manageWindowFinishLoad() {
   });
 }
 
-let asyncOperationDone = false;
-async function handleBeforeQuit() {
-  if (!asyncOperationDone) {
-    try {
-      try {
-        await clearDiscordRpcActivity();
-      } catch (error) {
-        logger.error('Optional cleanup functions failed when quiting the app.', { error });
-      }
-
-      const promise1 = savePendingSongLyrics(currentSongPath, true);
-      const promise2 = savePendingMetadataUpdates(currentSongPath, true);
-      const promise3 = closeAllAbortControllers();
-      const promise4 = clearTempArtworkFolder();
-
-      await Promise.all([promise1, promise2, promise3, promise4]);
-
-      mainWindow.webContents.send('app/beforeQuitEvent');
-      await closeDatabaseInstance();
-
-      logger.debug(`Quiting Nora`, { uptime: `${Math.floor(process.uptime())} seconds` });
-      asyncOperationDone = true;
-    } catch (error) {
-      asyncOperationDone = true;
-      console.error(error);
-      logger.error('Error occurred when quiting the app.', { error });
-    }
+let isCleaningUp = false;
+let isCleanupComplete = false;
+async function handleBeforeQuit(e: Electron.Event) {
+  if (isCleanupComplete) {
+    ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[allowing-natural-quit]');
+    return;
   }
+
+  e.preventDefault();
+
+  if (isCleaningUp) {
+    ShutdownLogger.logEventObservation('main.ts:handleBeforeQuit[already-in-progress]');
+    return;
+  }
+
+  isCleaningUp = true;
+  void (async () => {
+    try {
+      await ShutdownCoordinator.shutdown('main.ts:handleBeforeQuit', mainWindow, currentSongPath);
+      isCleanupComplete = true;
+      app.quit();
+    } catch (error) {
+      isCleaningUp = false;
+      logger.error('ShutdownCoordinator failed during handleBeforeQuit:', { error });
+    }
+  })();
 }
 
 export function toggleAudioPlayingState(isPlaying: boolean) {

@@ -1,20 +1,37 @@
-import { playlistQuery } from '@renderer/queries/playlists';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useMemo } from 'react';
 
+import type { CoverRendererProps, PlaylistCoverLayout } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
+import GridRenderer from './renderers/GridRenderer';
+import TriangleRenderer from './renderers/TriangleRenderer';
+import FanRenderer from './renderers/FanRenderer';
+import DiamondRenderer from './renderers/DiamondRenderer';
 
 type Props = {
   className?: string;
-  songIds: number[];
+  songIds?: number[];
+  collectionId?: number;
   imgClassName?: string;
   holderClassName?: string;
   type?: number;
   enableImgFadeIns?: boolean;
   artworks?: ArtworkPaths[];
+  resolvedArtworks?: string[];
+  layout?: PlaylistCoverLayout;
+  variant?: CoverLayoutVariant;
+  requestedCount?: number;
+};
+
+const COVER_RENDERERS: Partial<Record<PlaylistCoverLayout, React.ComponentType<CoverRendererProps>>> = {
+  grid: GridRenderer,
+  triangle: TriangleRenderer,
+  fan: FanRenderer,
+  diamond: DiamondRenderer,
 };
 
 const MultipleArtworksCover = (props: Props) => {
@@ -27,33 +44,71 @@ const MultipleArtworksCover = (props: Props) => {
     (state) => state.localStorage.preferences.shuffleArtworkFromSongCovers
   );
   const {
-    className,
-    artworks,
-    imgClassName,
-    holderClassName,
+    className = '',
+    songIds,
+    collectionId,
+    imgClassName = '',
+    holderClassName = '',
     type = 2,
-    enableImgFadeIns = true
+    enableImgFadeIns = true,
+    artworks,
+    resolvedArtworks,
+    layout,
+    variant,
+    requestedCount
   } = props;
 
-  const { data: artworkPaths = artworks ?? [] } = useQuery({
-    ...playlistQuery.songArtworks({ songIds: props.songIds }),
-    enabled: !artworks && enableArtworkFromSongCovers,
-    select: (data) => data?.map((x) => x.artworkPaths)
+  const idsToFetch = useMemo(() => {
+    if (songIds && songIds.length > 0) return songIds;
+    return undefined;
+  }, [songIds]);
+
+  // Legacy TanStack Query for callers passing collectionId or songIds
+  const { data: fetchedArtworkPaths = [] } = useQuery({
+    queryKey: ['multiple-artworks', collectionId, idsToFetch],
+    queryFn: async () => {
+      let idsToFetchArr = songIds || [];
+      if (collectionId !== undefined && idsToFetchArr.length === 0) {
+        const entries = await CollectionClient.getEntries(collectionId, 0, 4);
+        idsToFetchArr = entries.map((e) => e.songId);
+      }
+      if (idsToFetchArr.length === 0) return [];
+      const data = await CollectionClient.getArtworks(idsToFetchArr);
+      return data?.map((x) => x.artworkPaths) || [];
+    },
+    enabled:
+      !resolvedArtworks &&
+      !artworks &&
+      enableArtworkFromSongCovers &&
+      (!!collectionId || (!!songIds && songIds.length > 0))
   });
 
-  // useEffect(() => {
-  //   window.api.playlistsData
-  //     .getArtworksForMultipleArtworksCover(songIds)
-  //     .then((res) => setArtworks(res))
-  //     .catch((err) => console.error(err));
-  // }, [songIds]);
+  // --- 1. Phase 1 & 2 Custom Resolved Collage Layout Renderer Dispatcher ---
+  if (resolvedArtworks !== undefined) {
+    const Renderer = (layout && COVER_RENDERERS[layout]) || GridRenderer;
+    return (
+      <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
+        <Renderer
+          artworks={resolvedArtworks}
+          layout={layout || 'grid'}
+          variant={variant}
+          requestedCount={requestedCount}
+          className={imgClassName}
+          enableImgFadeIns={enableImgFadeIns}
+        />
+      </div>
+    );
+  }
 
-  const images = useMemo(() => {
-    if (artworkPaths.length > 1) {
+  // --- 2. Original Legacy Nora Diamond Grid Rendering ---
+  const legacyArtworks = (artworks as ArtworkPaths[]) ?? fetchedArtworkPaths;
+
+  const legacyImages = useMemo(() => {
+    if (legacyArtworks.length > 1) {
       const repeatedArtworksPaths: string[] = [];
 
       while (repeatedArtworksPaths.length < 10) {
-        repeatedArtworksPaths.push(...artworkPaths.map((art) => art.artworkPath));
+        repeatedArtworksPaths.push(...legacyArtworks.map((art) => art.artworkPath));
       }
 
       if (shuffleArtworkFromSongCovers) {
@@ -85,7 +140,7 @@ const MultipleArtworksCover = (props: Props) => {
         });
     }
     return [];
-  }, [artworkPaths, enableImgFadeIns, imgClassName, shuffleArtworkFromSongCovers, type]);
+  }, [enableImgFadeIns, imgClassName, legacyArtworks, shuffleArtworkFromSongCovers, type]);
 
   return (
     <div className={`relative overflow-hidden rounded-lg shadow-md ${className}`}>
@@ -94,7 +149,7 @@ const MultipleArtworksCover = (props: Props) => {
           type === 1 ? 'grid-cols-5' : 'grid-cols-3'
         } ${holderClassName}`}
       >
-        {images}
+        {legacyImages}
       </div>
     </div>
   );

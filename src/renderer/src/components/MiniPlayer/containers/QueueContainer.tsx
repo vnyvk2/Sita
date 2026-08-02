@@ -60,7 +60,7 @@ const QueueContainer = (props: Props) => {
       listRef.current &&
       viewingQueueIndex === queue.currentQueueIndex
     ) {
-      const activeIndex = activeSongIds.indexOf(currentSongId);
+      const activeIndex = activeQueue?.position ?? -1;
       if (activeIndex >= 0) {
         // Each item is ~52px tall. Scroll so the active item is centered.
         const itemHeight = 52;

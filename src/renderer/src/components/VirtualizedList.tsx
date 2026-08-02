@@ -164,7 +164,7 @@ const List = <T extends object>(props: Props<T>, ref) => {
         ...components
       }}
       ref={ref}
-      initialTopMostItemIndex={scrollTopOffset}
+      {...(typeof scrollTopOffset === 'number' ? { initialTopMostItemIndex: scrollTopOffset } : {})}
       scrollerRef={scrollerRef}
       increaseViewportBy={{
         top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,

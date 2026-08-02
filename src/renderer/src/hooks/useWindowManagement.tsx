@@ -1,12 +1,15 @@
-import { type DragEvent, type RefObject, useCallback, useEffect } from 'react';
-import { lazy } from 'react';
+import { type DragEvent, type RefObject, useCallback, useEffect, Suspense, lazy } from 'react';
 
 import { appPreferences } from '../../../../package.json';
 import { store } from '../store/store';
+import { CollectionClient } from '../api/CollectionClient';
 
 // Lazy load prompts
 const UnsupportedFileMessagePrompt = lazy(
   () => import('../components/UnsupportedFileMessagePrompt')
+);
+const PlaylistImportConflictPrompt = lazy(
+  () => import('../components/PlaylistsPage/PlaylistImportConflictPrompt')
 );
 
 export interface UseWindowManagementOptions {
@@ -133,8 +136,26 @@ export function useWindowManagement(
           const isASupportedAudioFormat = appPreferences.supportedMusicExtensions.some((type) =>
             file?.webkitRelativePath.endsWith(type)
           );
+          const isPlaylistFile = file.name.toLowerCase().endsWith('.m3u') || file.name.toLowerCase().endsWith('.m3u8');
 
-          if (isASupportedAudioFormat && fetchSongFromUnknownSource) {
+          if (isPlaylistFile) {
+            CollectionClient.analyze(filePath).then((analysis) => {
+              if (analysis && changePromptMenuData) {
+                changePromptMenuData(
+                  true,
+                  <Suspense fallback={null}>
+                    <PlaylistImportConflictPrompt
+                      filePath={analysis.filePath}
+                      importedPlaylistName={analysis.playlistName}
+                      totalEntries={analysis.totalEntries}
+                      skippedCount={analysis.skippedCount}
+                      repairedCount={analysis.repairedCount}
+                    />
+                  </Suspense>
+                );
+              }
+            });
+          } else if (isASupportedAudioFormat && fetchSongFromUnknownSource) {
             fetchSongFromUnknownSource(filePath);
           } else if (changePromptMenuData) {
             changePromptMenuData(

@@ -241,30 +241,6 @@ function HistoryPlaylistInfoPage() {
               selectAllHandler={selectAllHandler}
               {...item}
               trackNo={undefined}
-              // additionalContextMenuItems={[
-              //   {
-              //     label: t('playlistsPage.removeFromThisPlaylist'),
-              //     iconName: 'playlist_remove',
-              //     handlerFunction: () =>
-              //       window.api.playlistsData
-              //         .removeSongFromPlaylist(playlistData.playlistId, item.songId)
-              //         .then(
-              //           (res) =>
-              //             res.success &&
-              //             addNewNotifications([
-              //               {
-              //                 id: `${item.songId}Removed`,
-              //                 duration: 5000,
-              //                 content: t('playlistsPage.removeSongFromPlaylistSuccess', {
-              //                   title: item.title,
-              //                   playlistName: playlistData.name
-              //                 })
-              //               }
-              //             ])
-              //         )
-              //         .catch((err) => console.error(err))
-              //   }
-              // ]}
             />
           );
         }}

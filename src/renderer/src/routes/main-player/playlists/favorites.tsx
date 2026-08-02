@@ -16,6 +16,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CollectionClient } from '@renderer/api/CollectionClient';
 
 import { SpecialPlaylists } from '../../../../../common/playlists.enum';
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -85,34 +86,6 @@ function FavoritesPlaylistInfoPage() {
     [createQueue, updateQueueData, t, favoriteSongs]
   );
 
-  // const clearSongHistory = useCallback(() => {
-  //   changePromptMenuData(
-  //     true,
-  //     <SensitiveActionConfirmPrompt
-  //       title={t('settingsPage.confirmSongHistoryDeletion')}
-  //       content={t('settingsPage.songHistoryDeletionDisclaimer')}
-  //       confirmButton={{
-  //         label: t('settingsPage.clearHistory'),
-  //         clickHandler: () =>
-  //           window.api.audioLibraryControls
-  //             .clearSongHistory()
-  //             .then(
-  //               (res) =>
-  //                 res.success &&
-  //                 addNewNotifications([
-  //                   {
-  //                     id: 'queueCleared',
-  //                     duration: 5000,
-  //                     content: t('settingsPage.songHistoryDeletionSuccess')
-  //                   }
-  //                 ])
-  //             )
-  //             .catch((err) => console.error(err))
-  //       }}
-  //     />
-  //   );
-  // }, [addNewNotifications, changePromptMenuData, t]);
-
   const addSongsToQueue = useCallback(() => {
     const validSongIds = favoriteSongs
       .filter((song) => !song.isBlacklisted)
@@ -160,8 +133,8 @@ function FavoritesPlaylistInfoPage() {
   );
 
   const importSongsToFavorites = useCallback(() => {
-    window.api.playlistsData
-      .importPlaylist(SpecialPlaylists.Favorites)
+    CollectionClient
+      .import(SpecialPlaylists.Favorites)
       .then(() => {
         queryClient.invalidateQueries({
           queryKey: songQuery.favorites({ sortType: sortingOrder }).queryKey
@@ -190,13 +163,6 @@ function FavoritesPlaylistInfoPage() {
             iconName: 'download',
             clickHandler: importSongsToFavorites
           },
-          // {
-          //   label: t('settingsPage.clearHistory'),
-          //   iconName: 'clear',
-          //   clickHandler: clearSongHistory,
-          //   isVisible: playlistData.playlistId === 'History',
-          //   isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
-          // },
           {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
@@ -249,37 +215,13 @@ function FavoritesPlaylistInfoPage() {
           return (
             <Song
               key={index}
-              // # Since the first element is the PlaylistInfoAndImgContainer, we need to subtract 1
               index={index - 1}
               isIndexingSongs={preferences.isSongIndexingEnabled}
               onPlayClick={handleSongPlayBtnClick}
               selectAllHandler={selectAllHandler}
               {...item}
               trackNo={undefined}
-              // additionalContextMenuItems={[
-              //   {
-              //     label: t('playlistsPage.removeFromThisPlaylist'),
-              //     iconName: 'playlist_remove',
-              //     handlerFunction: () =>
-              //       window.api.playlistsData
-              //         .removeSongFromPlaylist(playlistData.playlistId, item.songId)
-              //         .then(
-              //           (res) =>
-              //             res.success &&
-              //             addNewNotifications([
-              //               {
-              //                 id: `${item.songId}Removed`,
-              //                 duration: 5000,
-              //                 content: t('playlistsPage.removeSongFromPlaylistSuccess', {
-              //                   title: item.title,
-              //                   playlistName: playlistData.name
-              //                 })
-              //               }
-              //             ])
-              //         )
-              //         .catch((err) => console.error(err))
-              //   }
-              // ]}
+
             />
           );
         }}

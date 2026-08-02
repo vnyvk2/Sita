@@ -56,6 +56,13 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
         const secs = data?.durationSeconds ?? 0;
         this.content = `Library scan completed. Processed ${jobs} assets in ${secs}s.`;
       }
+      if (messageCode === 'PLAYLIST_IMPORT_SUCCESS' && data?.count !== undefined) {
+        const name = data.name || 'Playlist';
+        const count = data.count || 0;
+        const repaired = data.repairedCount ? `, ${data.repairedCount} repaired` : '';
+        const skipped = data.skippedCount ? `, ${data.skippedCount} unavailable` : '';
+        this.content = `Imported "${name}": ${count} tracks imported${repaired}${skipped}.`;
+      }
       return this;
     }
   },

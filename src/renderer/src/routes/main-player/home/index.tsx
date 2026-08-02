@@ -84,35 +84,6 @@ function HomePage() {
       };
     }, [recentlyAddedSongsContainerDiamensions]);
 
-  // const fetchRecentlyPlayedSongs = useCallback(async () => {
-  //   const recentSongs = await window.api.playlistsData
-  //     .getPlaylistData(['History'])
-  //     .catch((err) => console.error(err));
-  //   if (
-  //     Array.isArray(recentSongs) &&
-  //     recentSongs.length > 0 &&
-  //     Array.isArray(recentSongs[0].songs) &&
-  //     recentSongs[0].songs.length > 0
-  //   )
-  //     window.api.audioLibraryControls
-  //       .getSongInfo(
-  //         recentSongs[0].songs,
-  //         undefined,
-  //         undefined,
-  //         noOfRecentandLovedSongCards + 5,
-  //         true
-  //       )
-  //       .then(
-  //         (res) =>
-  //           Array.isArray(res) &&
-  //           dispatch({
-  //             type: 'RECENTLY_PLAYED_SONGS_DATA',
-  //             data: res
-  //           })
-  //       )
-  //       .catch((err) => console.error(err));
-  // }, [noOfRecentandLovedSongCards]);
-
   // const fetchRecentSongArtistsData = useCallback(() => {
   //   if (content.recentlyPlayedSongs.length > 0) {
   //     const artistIds = [
@@ -137,31 +108,6 @@ function HomePage() {
   //         .catch((err) => console.error(err));
   //   }
   // }, [content.recentlyPlayedSongs, noOfRecentandLovedArtists]);
-
-  // // ? Most loved songs are fetched after the user have made at least one favorite song from the library.
-  // const fetchMostLovedSongs = useCallback(() => {
-  //   window.api.playlistsData
-  //     .getPlaylistData(['Favorites'])
-  //     .then((res) => {
-  //       if (Array.isArray(res) && res.length > 0) {
-  //         return window.api.audioLibraryControls.getSongInfo(
-  //           res[0].songs,
-  //           'allTimeMostListened',
-  //           undefined,
-  //           noOfRecentandLovedSongCards + 5,
-  //           true
-  //         );
-  //       }
-  //       return undefined;
-  //     })
-  //     .then(
-  //       (lovedSongs) =>
-  //         Array.isArray(lovedSongs) &&
-  //         lovedSongs.length > 0 &&
-  //         dispatch({ type: 'MOST_LOVED_SONGS', data: lovedSongs })
-  //     )
-  //     .catch((err) => console.error(err));
-  // }, [noOfRecentandLovedSongCards]);
 
   // const fetchMostLovedArtists = useCallback(() => {
   //   if (content.mostLovedSongs.length > 0) {

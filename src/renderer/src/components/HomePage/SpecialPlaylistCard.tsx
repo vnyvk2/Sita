@@ -1,8 +1,13 @@
 import Img from '@renderer/components/Img';
 import NavLink from '@renderer/components/NavLink';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import { useContext, useMemo } from 'react';
+import { CollectionClient } from '@renderer/api/CollectionClient';
+import { lazy, Suspense, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const PlaylistExportSettingsPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/PlaylistExportSettingsPrompt')
+);
 
 interface SpecialPlaylistCardProps {
   playlistId: number;
@@ -19,7 +24,7 @@ export default function SpecialPlaylistCard({
   to,
   className = ''
 }: SpecialPlaylistCardProps) {
-  const { updateContextMenuData } = useContext(AppUpdateContext);
+  const { updateContextMenuData, changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const contextMenus: ContextMenuItem[] = useMemo(
@@ -27,7 +32,14 @@ export default function SpecialPlaylistCard({
       {
         label: t('playlist.exportPlaylist'),
         iconName: 'upload',
-        handlerFunction: () => window.api.playlistsData.exportPlaylist(playlistId)
+        handlerFunction: () => {
+          changePromptMenuData(
+            true,
+            <Suspense fallback={null}>
+              <PlaylistExportSettingsPrompt playlistId={playlistId} />
+            </Suspense>
+          );
+        }
       }
     ],
     [playlistId, t]

@@ -56,7 +56,7 @@ const addNewlyAddedSongsToLibrary = async (
 ) => {
   const folder = await getFolderFromPath(folderPath);
 
-  const mappedSongs = newlyAddedSongPaths.map(songPath => ({
+  const mappedSongs = newlyAddedSongPaths.map((songPath) => ({
     songPath,
     folderId: folder?.id
   }));
@@ -66,38 +66,35 @@ const addNewlyAddedSongsToLibrary = async (
 
 const checkFolderForUnknownModifications = async (folderPath: string) => {
   const relevantFolderSongPaths = await getSongPathsRelativeToFolder(folderPath);
+  const dirs = await getFullPathsOfFolderDirs(folderPath);
 
-  if (relevantFolderSongPaths.length > 0) {
-    const dirs = await getFullPathsOfFolderDirs(folderPath);
+  if (dirs) {
+    // checks for newly added songs that got added before application launch
+    const newlyAddedSongPaths = dirs.filter(
+      (dir) => !relevantFolderSongPaths.some((songPath) => songPath === dir)
+    );
+    // checks for deleted songs that got deleted before application launch
+    const deletedSongPaths = relevantFolderSongPaths.filter(
+      (songPath) => !dirs.some((dir) => dir === songPath)
+    );
 
-    if (dirs) {
-      // checks for newly added songs that got added before application launch
-      const newlyAddedSongPaths = dirs.filter(
-        (dir) => !relevantFolderSongPaths.some((songPath) => songPath === dir)
-      );
-      // checks for deleted songs that got deleted before application launch
-      const deletedSongPaths = relevantFolderSongPaths.filter(
-        (songPath) => !dirs.some((dir) => dir === songPath)
-      );
+    logger.debug(`New song additions/deletions detected.`, {
+      newlyAddedSongPathsCount: newlyAddedSongPaths.length,
+      deletedSongPathsCount: deletedSongPaths.length,
+      newlyAddedSongPaths,
+      deletedSongPaths,
+      folderPath
+    });
 
-      logger.debug(`New song additions/deletions detected.`, {
-        newlyAddedSongPathsCount: newlyAddedSongPaths.length,
-        deletedSongPathsCount: deletedSongPaths.length,
-        newlyAddedSongPaths,
-        deletedSongPaths,
-        folderPath
-      });
+    // Prioritises deleting songs before adding new songs to prevent data clashes.
+    if (deletedSongPaths.length > 0) {
+      // deleting songs from the library that got deleted before application launch
+      await removeDeletedSongsFromLibrary(deletedSongPaths, abortController.signal);
+    }
 
-      // Prioritises deleting songs before adding new songs to prevent data clashes.
-      if (deletedSongPaths.length > 0) {
-        // deleting songs from the library that got deleted before application launch
-        await removeDeletedSongsFromLibrary(deletedSongPaths, abortController.signal);
-      }
-
-      if (newlyAddedSongPaths.length > 0) {
-        // parses new songs that added before application launch
-        await addNewlyAddedSongsToLibrary(folderPath, newlyAddedSongPaths, abortController.signal);
-      }
+    if (newlyAddedSongPaths.length > 0) {
+      // parses new songs that added before application launch
+      await addNewlyAddedSongsToLibrary(folderPath, newlyAddedSongPaths, abortController.signal);
     }
   }
 };

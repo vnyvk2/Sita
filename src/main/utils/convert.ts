@@ -101,11 +101,15 @@ export const convertToAlbum = (album: GetAllAlbumsReturnType[number]) => {
 
 export const convertToPlaylist = (playlist: GetAllPlaylistsReturnType['data'][number]) => {
   const artworks = playlist.artworks.map((a) => a.artwork);
+  const songIds = (playlist as { entries?: { song: { id: number } }[]; songs?: { song: { id: number } }[] }).entries
+    ? (playlist as { entries?: { song: { id: number } }[] }).entries!.map((e) => e.song.id)
+    : ((playlist as { songs?: { song: { id: number } }[] }).songs?.map((s) => s.song.id) ?? []);
+
   return {
     playlistId: playlist.id,
     name: playlist.name,
     artworkPaths: parsePlaylistArtworks(artworks),
-    songs: playlist.songs.map((s) => s.song.id),
+    songs: songIds,
     isArtworkAvailable: artworks.length > 0,
     createdDate: playlist.createdAt
   } satisfies Playlist;

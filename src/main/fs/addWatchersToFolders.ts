@@ -10,8 +10,9 @@ import { dirExistsSync } from '../utils/dirExists';
 import checkFolderForContentModifications from './checkFolderForContentModifications';
 import checkFolderForUnknownModifications from './checkFolderForUnknownContentModifications';
 import checkForFolderModifications from './checkForFolderModifications';
-import { saveAbortController } from './controlAbortControllers';
-import { saveFolderStructures } from './parseFolderStructuresForSongPaths';
+import { getAbortController, saveAbortController, closeAbortController } from './controlAbortControllers';
+import { saveFolderStructures, getAllFoldersFromFolderStructures } from './parseFolderStructuresForSongPaths';
+import { generateFolderStructure } from '../core/getFolderStructures';
 
 const checkForFolderUpdates = async (folder: FolderStructure) => {
   try {
@@ -46,16 +47,41 @@ const folderWatcherFunction = async (
   folder: MusicFolderData,
   abortSignal: AbortSignal
 ) => {
-  // consolelogger.debug(`folder event - '${eventType}' - ${filename}`);
   if (filename) {
     if (eventType === 'rename') {
-      const doesFilenameHasSongExtension = supportedMusicExtensions.includes(
-        path.extname(filename)
-      );
+      const ext = path.extname(filename).toLowerCase();
+      const doesFilenameHasSongExtension = supportedMusicExtensions.includes(ext);
 
       if (doesFilenameHasSongExtension) {
         // possible new song addition
         await checkFolderForContentModifications(folder.path, filename, abortSignal);
+      } else if (!ext || ext.length === 0) {
+        // possible new subfolder creation/copy event
+        const targetSubfolderPath = path.join(folder.path, filename);
+        try {
+          const stats = await fs.stat(targetSubfolderPath);
+          if (stats.isDirectory()) {
+            logger.info(`New subfolder detected in watched directory '${folder.path}': '${filename}'`);
+            
+            // 1. Recursively generate folder tree structure for nested subdirectories
+            const newFolderStructure = await generateFolderStructure(targetSubfolderPath);
+            
+            if (newFolderStructure) {
+              // 2. Persist new folder hierarchy into music_folders table (idempotent upsert)
+              await saveFolderStructures([newFolderStructure], false);
+
+              // 3. Extract all folders in tree, attach watchers idempotently, and scan songs
+              const allNewFolders = getAllFoldersFromFolderStructures([newFolderStructure]);
+              for (const newFolder of allNewFolders) {
+                await addWatcherToFolder(newFolder);
+                await checkFolderForUnknownModifications(newFolder.path);
+              }
+            }
+          }
+        } catch {
+          // Subfolder deleted or renamed
+          await checkFolderForUnknownModifications(folder.path);
+        }
       }
     }
   } else {
@@ -68,6 +94,12 @@ const folderWatcherFunction = async (
 
 export const addWatcherToFolder = async (folder: MusicFolderData) => {
   try {
+    // Avoid duplicate watcher creation on repeated Windows rename events
+    const existingController = getAbortController(folder.path);
+    if (existingController) {
+      return;
+    }
+
     const abortController = new AbortController();
     const watcher = fsSync.watch(
       folder.path,

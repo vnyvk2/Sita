@@ -1,8 +1,8 @@
 import { db } from '@db/db';
-import { playlists } from '@db/schema';
+import { playlists, playlistEntries } from '@db/schema';
 import { convertToPlaylist } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { sql } from 'drizzle-orm';
+import { sql, asc } from 'drizzle-orm';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
@@ -50,7 +50,7 @@ export const PlaylistSearchEngine = {
       orderBy: () => orderByClause,
       limit,
       with: {
-        songs: { with: { song: { columns: { id: true } } } },
+        entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
         artworks: {
           with: {
             artwork: {

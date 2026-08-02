@@ -1,39 +1,49 @@
 /* eslint-disable jsx-a11y/no-autofocus */
 import { useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRenameCollection } from '../../hooks/collections/useCollectionMutations';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
-import Img from '../Img';
+import PlaylistCover from './PlaylistCover';
 
-type Props = { playlistData: Playlist };
+interface Props {
+  playlistData: PlaylistDto;
+}
 
 const RenamePlaylistPrompt = (props: Props) => {
   const { playlistData } = props;
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const { name, playlistId, artworkPaths } = playlistData;
+  const { id, name } = playlistData;
 
   const [input, setInput] = useState(name);
 
+  const renameCollection = useRenameCollection();
+
   const renamePlaylist = useCallback(
-    (newName: string) =>
-      window.api.playlistsData
-        .renameAPlaylist(playlistId, newName)
-        .then(() => changePromptMenuData(false)),
-    [changePromptMenuData, playlistId]
+    (newName: string) => {
+      if (!id) return;
+      renameCollection.mutate(
+        { playlistId: id, newName: newName.trim() },
+        {
+          onSuccess: () => {
+            changePromptMenuData(false);
+          },
+          onError: (err) => {
+            console.error(err);
+          }
+        }
+      );
+    },
+    [changePromptMenuData, id, renameCollection]
   );
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="img-container relative mb-8 max-w-[50%] rounded-xl">
-        <Img
-          src={artworkPaths.artworkPath}
-          alt="Playlist default cover"
-          loading="eager"
-          className="aspect-square w-full max-w-60 rounded-xl shadow-lg"
-        />
+      <div className="img-container relative mb-8 flex h-48 w-48 items-center justify-center overflow-hidden rounded-xl">
+        <PlaylistCover playlist={playlistData} className="h-48 w-48 rounded-xl shadow-lg" />
       </div>
       <span className="mb-4 text-center text-2xl font-medium">
         {t('renamePlaylistPrompt.renamePlaylistWithName', { name })}

@@ -8,6 +8,8 @@ import { citext } from '@electric-sql/pglite/contrib/citext';
 // PostgreSQL Database extensions
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import logger from '@main/logger';
+import ShutdownLogger from '@main/lifecycle/ShutdownLogger';
+import { ShutdownState } from '@main/lifecycle/ShutdownState';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { app } from 'electron';
@@ -21,7 +23,10 @@ logger.debug(`Migrations folder: ${migrationsFolder}`);
 
 mkdirSync(DB_PATH, { recursive: true });
 
+ShutdownLogger.logBootMilestone('PGlite.create() start', { DB_PATH });
 const pgliteInstance = await PGlite.create(DB_PATH, { debug: 1, extensions: { pg_trgm, citext } });
+ShutdownLogger.logBootMilestone('PGlite.create() completed');
+
 pgliteInstance.onNotification((notification) => {
   logger.info('Database notification:', { notification });
 });
@@ -34,12 +39,15 @@ await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
 export const db = drizzle(pgliteInstance, {
   schema
 });
+ShutdownLogger.logBootMilestone('Drizzle ORM initialized');
 
 export const closeDatabaseInstance = async () => {
+  ShutdownLogger.logShutdownTransition(ShutdownState.ClosingDatabase, 'closeDatabaseInstance');
   if (pgliteInstance.closed) return logger.debug('Database instance already closed.');
 
   await pgliteInstance.close();
   logger.debug('Database instance closed.');
+  ShutdownLogger.logShutdownTransition(ShutdownState.DatabaseClosed, 'closeDatabaseInstance');
 };
 
 await migrate(db, { migrationsFolder });

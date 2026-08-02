@@ -57,6 +57,34 @@
       "when": 1785303490776,
       "tag": "0007_mighty_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785338380277,
+      "tag": "0008_amusing_jackpot",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785338380278,
+      "tag": "0009_rename_reverse_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785352788264,
+      "tag": "0010_add_dependencies",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785385500910,
+      "tag": "0011_add_pinned_at",
+      "breakpoints": true
     }
   ]
 }

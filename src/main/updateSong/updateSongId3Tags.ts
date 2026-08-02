@@ -95,9 +95,9 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
   const pathExt = path.extname(currentSongPath).replace(/\W/, '');
   const isASupportedFormat = metadataEditingSupportedExtensions.includes(pathExt);
 
-  if (pendingMetadataUpdates.size === 0) return logger.debug('No pending metadata updates found.');
+  if (pendingMetadataUpdates.size === 0) return logger.verbose('No pending metadata updates found.');
 
-  logger.debug(`Started saving pending metadata updates.`, {
+  logger.verbose(`Started saving pending metadata updates.`, {
     pendingSongs: pendingMetadataUpdates.keys
   });
 

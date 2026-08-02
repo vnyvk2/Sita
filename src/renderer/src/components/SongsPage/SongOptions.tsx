@@ -2,9 +2,10 @@ import i18n from '../../i18n';
 import { type DropdownOption } from '../Dropdown';
 
 export const songSortTypes = [
+  'customOrder',
+  'originalOrder',
   'aToZ',
   'zToA',
-  'addedOrder',
   'dateAddedAscending',
   'dateAddedDescending',
   'dateModifiedAscending',
@@ -26,6 +27,53 @@ export const songSortTypes = [
   'blacklistedSongs',
   'whitelistedSongs'
 ] as const;
+
+export type SongSortTypes = (typeof songSortTypes)[number];
+export type PlaylistViewMode = SongSortTypes;
+
+export function canReorder(viewMode?: PlaylistViewMode | string): boolean {
+  return viewMode === 'customOrder';
+}
+
+export function isPersistentPlaylistOrder(viewMode?: PlaylistViewMode | string): boolean {
+  return viewMode === 'customOrder' || viewMode === 'originalOrder';
+}
+
+export const playlistSortOptions: DropdownOption<SongSortTypes>[] = [
+  { label: i18n.t('sortTypes.customOrder', 'Custom Order'), value: 'customOrder' },
+  { label: i18n.t('sortTypes.originalOrder', 'Original Order'), value: 'originalOrder' },
+  { label: '', value: 'customOrder', isDivider: true },
+  { label: i18n.t('sortTypes.aToZ'), value: 'aToZ' },
+  { label: i18n.t('sortTypes.zToA'), value: 'zToA' },
+  {
+    label: i18n.t('sortTypes.dateAddedAscending'),
+    value: 'dateAddedAscending'
+  },
+  {
+    label: i18n.t('sortTypes.dateAddedDescending'),
+    value: 'dateAddedDescending'
+  },
+  {
+    label: i18n.t('sortTypes.releasedYearAscending'),
+    value: 'releasedYearAscending'
+  },
+  {
+    label: i18n.t('sortTypes.releasedYearDescending'),
+    value: 'releasedYearDescending'
+  },
+  {
+    label: i18n.t('sortTypes.allTimeMostListened'),
+    value: 'allTimeMostListened'
+  },
+  {
+    label: i18n.t('sortTypes.artistNameAscending'),
+    value: 'artistNameAscending'
+  },
+  {
+    label: i18n.t('sortTypes.albumNameAscending'),
+    value: 'albumNameAscending'
+  }
+];
 
 export const songFilterTypes = [
   'notSelected',

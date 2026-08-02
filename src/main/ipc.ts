@@ -1,9 +1,7 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
-import addArtworkToAPlaylist from './core/addArtworkToAPlaylist';
 import addSongsFromFolderStructures from './core/addMusicFolder';
-import addNewPlaylist from './core/addNewPlaylist';
-import addSongsToPlaylist from './core/addSongsToPlaylist';
+
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
 import changeAppTheme from './core/changeAppTheme';
@@ -13,7 +11,7 @@ import clearSearchHistoryResults from './core/clearSeachHistoryResults';
 import clearSongHistory from './core/clearSongHistory';
 import deleteSongsFromSystem from './core/deleteSongsFromSystem';
 import exportAppData from './core/exportAppData';
-import exportPlaylist from './core/exportPlaylist';
+
 import fetchAlbumData from './core/fetchAlbumData';
 import fetchArtistData from './core/fetchArtistData';
 import fetchSongInfoFromLastFM from './core/fetchSongInfoFromLastFM';
@@ -21,7 +19,7 @@ import { getAllFavoriteSongs } from './core/getAllFavoriteSongs';
 import { getAllHistorySongs } from './core/getAllHistorySongs';
 import getAllSongs from './core/getAllSongs';
 import getArtistInfoFromNet from './core/getArtistInfoFromNet';
-import getArtworksForMultipleArtworksCover from './core/getArtworksForMultipleArtworksCover';
+
 import getBlacklistData from './core/getBlacklistData';
 import { getArtistDuplicates } from './core/getDuplicates';
 import { getFolderStructures } from './core/getFolderStructures';
@@ -34,9 +32,7 @@ import getStorageUsage from './core/getStorageUsage';
 import importAppData from './core/importAppData';
 import importPlaylist from './core/importPlaylist';
 import removeMusicFolder from './core/removeMusicFolder';
-import removePlaylists from './core/removePlaylists';
-import removeSongFromPlaylist from './core/removeSongFromPlaylist';
-import renameAPlaylist from './core/renameAPlaylist';
+
 import { resolveArtistDuplicates } from './core/resolveDuplicates';
 import resolveFeaturingArtists from './core/resolveFeaturingArtists';
 import { resolveSeparateArtists } from './core/resolveSeparateArtists';
@@ -45,7 +41,7 @@ import restoreBlacklistedSongs from './core/restoreBlacklistedSongs';
 import saveArtworkToSystem from './core/saveArtworkToSystem';
 import sendAudioData from './core/sendAudioData';
 import sendAudioDataFromPath from './core/sendAudioDataFromPath';
-import sendPlaylistData from './core/sendPlaylistData';
+
 import sendSongID3Tags from './core/sendSongMetadata';
 import toggleBlacklistFolders from './core/toggleBlacklistFolders';
 import toggleLikeArtists from './core/toggleLikeArtists';
@@ -116,6 +112,11 @@ import { libraryScheduler } from './workers/jobScheduler';
 import { registerLibraryChoreography } from './workers/libraryChoreography';
 import { libraryObservability } from './workers/libraryObservability';
 import { recoverLibraryAssets } from './core/recovery';
+import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
+import { playlistEngine, undoEngine, playlistRepository, hierarchyService } from './collections/setup';
+import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
+import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
+import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
@@ -141,16 +142,18 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   // Fire and forget startup recovery sync
   recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
   
-  // Ensure we gracefully drain on shutdown only once
-  let isShuttingDown = false;
-  app.on('before-quit', async (e) => {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    e.preventDefault();
-    await libraryScheduler.stop();
-    adaptivePolicyEngine.stop();
-    app.exit();
-  });
+  // Setup Collection IPC, Playlist Import IPC, & Playlist Export IPC
+  setupCollectionIpc(
+    playlistEngine,
+    undoEngine,
+    playlistRepository,
+    hierarchyService,
+    (channel: string, ...args: any[]) => mainWindow?.webContents?.send(channel, ...args)
+  );
+
+  setupPlaylistImportIpc(playlistImportWorkflow, importHistoryService);
+
+  setupPlaylistExportIpc(playlistRepository);
 
   if (mainWindow) {
     ipcMain.on('app/close', () => app.quit());
@@ -444,12 +447,6 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         fetchAlbumData(albumTitlesOrIds, sortType, start, end)
     );
 
-    ipcMain.handle(
-      'app/getPlaylistData',
-      (_, playlistIds?: string[], sortType?: AlbumSortTypes, start?: number, end?: number) =>
-        sendPlaylistData(playlistIds, sortType, start, end)
-    );
-
     ipcMain.handle('app/getArtistDuplicates', (_, artistName: string) =>
       getArtistDuplicates(artistName)
     );
@@ -474,32 +471,6 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/getQueueInfo', (_, queueType: QueueTypes, id: string) =>
       getQueueInfo(queueType, id)
-    );
-
-    ipcMain.handle(
-      'app/addNewPlaylist',
-      (_, playlistName: string, songIds?: string[], artworkPath?: string) =>
-        addNewPlaylist(playlistName, songIds, artworkPath)
-    );
-
-    ipcMain.handle('app/removePlaylists', (_, playlistIds: number[]) =>
-      removePlaylists(playlistIds)
-    );
-
-    ipcMain.handle('app/addSongsToPlaylist', (_, playlistId: number, songIds: number[]) =>
-      addSongsToPlaylist(playlistId, songIds)
-    );
-
-    ipcMain.handle('app/removeSongFromPlaylist', (_, playlistId: number, songId: number) =>
-      removeSongFromPlaylist(playlistId, songId)
-    );
-
-    ipcMain.handle('app/addArtworkToAPlaylist', (_, playlistId: number, artworkPath: string) =>
-      addArtworkToAPlaylist(playlistId, artworkPath)
-    );
-
-    ipcMain.handle('app/renameAPlaylist', (_, playlistId: number, newName: string) =>
-      renameAPlaylist(playlistId, newName)
     );
 
     ipcMain.handle('app/clearSongHistory', () => clearSongHistory());
@@ -575,13 +546,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       exportAppData(localStorageData)
     );
 
-    ipcMain.handle('app/exportPlaylist', (_, playlistId: number) => exportPlaylist(playlistId));
-
     ipcMain.handle('app/importAppData', importAppData);
-
-    ipcMain.handle('app/importPlaylist', (_, targetPlaylistId?: number) =>
-      importPlaylist(targetPlaylistId)
-    );
 
     ipcMain.handle(
       'app/getRendererLogs',
@@ -670,10 +635,6 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       );
       // isConnectedToInternet = isConnected;
     });
-
-    ipcMain.handle('app/getArtworksForMultipleArtworksCover', (_, songIds: number[]) =>
-      getArtworksForMultipleArtworksCover(songIds)
-    );
 
     ipcMain.on('app/openDevTools', () => {
       logger.info('User requested for devtools.');
