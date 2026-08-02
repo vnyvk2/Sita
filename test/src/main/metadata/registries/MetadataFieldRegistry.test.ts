@@ -5,15 +5,15 @@ import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRe
 
 describe('MetadataFieldRegistry', () => {
   it('should initialize with default field definitions', () => {
-    const registry = MetadataFieldRegistry.getInstance();
+    const registry = new MetadataFieldRegistry();
     expect(registry.has('title')).toBe(true);
     expect(registry.has('artist')).toBe(true);
     expect(registry.has('album')).toBe(true);
     expect(registry.has('genre')).toBe(true);
   });
 
-  it('should allow registering custom plugin fields', () => {
-    const registry = MetadataFieldRegistry.getInstance();
+  it('should allow registering custom plugin fields in instance', () => {
+    const registry = new MetadataFieldRegistry();
     const customField = new MetadataFieldDefinition({
       id: 'emotion',
       displayName: 'Emotion',

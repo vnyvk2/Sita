@@ -4,17 +4,7 @@ import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
 import { MetadataProviderInfo } from '../models/MetadataProviderInfo';
 
 export class MetadataProviderRegistry {
-  private static instance: MetadataProviderRegistry;
   private readonly providers: Map<string, IMetadataProvider> = new Map();
-
-  private constructor() {}
-
-  public static getInstance(): MetadataProviderRegistry {
-    if (!MetadataProviderRegistry.instance) {
-      MetadataProviderRegistry.instance = new MetadataProviderRegistry();
-    }
-    return MetadataProviderRegistry.instance;
-  }
 
   public register(provider: IMetadataProvider): void {
     this.providers.set(provider.info.id, provider);
@@ -44,5 +34,3 @@ export class MetadataProviderRegistry {
     this.providers.clear();
   }
 }
-
-export const metadataProviderRegistry = MetadataProviderRegistry.getInstance();

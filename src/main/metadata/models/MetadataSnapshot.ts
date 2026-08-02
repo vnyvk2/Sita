@@ -11,18 +11,16 @@ export class MetadataSnapshot {
   public readonly identity: MetadataIdentity;
   public readonly fields: Readonly<Record<string, MetadataValue<unknown>>>;
   public readonly timestamp: Date;
-  private isFrozen: boolean = false;
 
   constructor(options: MetadataSnapshotOptions) {
     this.identity = options.identity;
     this.fields = Object.freeze({ ...options.fields });
     this.timestamp = options.timestamp ?? new Date();
+    Object.freeze(this);
   }
 
   public freeze(): MetadataSnapshot {
-    const clone = this.clone();
-    (clone as { isFrozen: boolean }).isFrozen = true;
-    return clone;
+    return this;
   }
 
   public clone(): MetadataSnapshot {
@@ -46,11 +44,25 @@ export class MetadataSnapshot {
       const selfVal = this.fields[key] ?? null;
       const otherVal = other.fields[key] ?? null;
 
-      if (JSON.stringify(selfVal?.value) !== JSON.stringify(otherVal?.value)) {
+      if (!this.areValuesEqual(selfVal?.value, otherVal?.value)) {
         diffs[key] = { current: selfVal, other: otherVal };
       }
     }
 
     return diffs;
+  }
+
+  private areValuesEqual(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      return a.every((val, index) => this.areValuesEqual(val, b[index]));
+    }
+    if (typeof a === 'object' && typeof b === 'object') {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+    return false;
   }
 }

@@ -1,26 +1,20 @@
-import { metadataFieldRegistry } from './registries/MetadataFieldRegistry';
-import { metadataProviderRegistry } from './registries/MetadataProviderRegistry';
+import { CORE_FIELD_DEFINITIONS } from './models/CoreFieldDefinitions';
+import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
+import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
+
+export interface MetadataModule {
+  fieldRegistry: MetadataFieldRegistry;
+  providerRegistry: MetadataProviderRegistry;
+}
 
 export class MetadataBootstrap {
-  private static isInitialized = false;
+  public static bootstrap(): MetadataModule {
+    const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
+    const providerRegistry = new MetadataProviderRegistry();
 
-  public static initialize(): void {
-    if (MetadataBootstrap.isInitialized) {
-      return;
-    }
-
-    // Initialize field registry defaults
-    metadataFieldRegistry.getAll();
-
-    // Reset/clear provider registry for clean container boot
-    metadataProviderRegistry.getAllInfo();
-
-    MetadataBootstrap.isInitialized = true;
-  }
-
-  public static reset(): void {
-    metadataFieldRegistry.clear();
-    metadataProviderRegistry.clear();
-    MetadataBootstrap.isInitialized = false;
+    return {
+      fieldRegistry,
+      providerRegistry
+    };
   }
 }

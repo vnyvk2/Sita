@@ -7,8 +7,7 @@ import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProv
 
 describe('MetadataProviderRegistry', () => {
   it('should register and query providers by capability', () => {
-    const registry = MetadataProviderRegistry.getInstance();
-    registry.clear();
+    const registry = new MetadataProviderRegistry();
 
     const mockProviderInfo = new MetadataProviderInfo({
       id: 'musicbrainz',

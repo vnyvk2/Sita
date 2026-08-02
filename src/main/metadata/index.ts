@@ -5,6 +5,7 @@ export * from './common/utils';
 export * from './events';
 export * from './interfaces';
 export * from './models';
+export * from './models/CoreFieldDefinitions';
 export * from './policies';
 export * from './registries';
 export * from './setup';
