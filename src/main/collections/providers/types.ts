@@ -2,7 +2,7 @@ import type { Collection, CollectionEntry, CollectionId, PlaylistViewMode } from
 import type { SortDefinition } from '../query/ast';
 
 export interface CollectionQueryOptions {
-  sortType?: PlaylistViewMode | string;
+  sortType?: PlaylistViewMode;
   start?: number;
   end?: number;
   filter?: string;

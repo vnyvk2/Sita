@@ -46,7 +46,7 @@ export class PlaylistRepository {
     trx: DB | DBTransaction = db
   ) {
     const sortColumn =
-      options.sortType === 'originalOrder' || options.sortType === 'addedOrder'
+      options.sortType === 'originalOrder'
         ? asc(playlistEntries.id)
         : asc(playlistEntries.position);
 

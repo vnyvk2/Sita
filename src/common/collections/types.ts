@@ -15,7 +15,6 @@ export type CollectionSource = 'local' | 'remote' | 'search' | 'queue' | 'genera
 export type PlaylistViewMode =
   | 'customOrder'
   | 'originalOrder'
-  | 'addedOrder'
   | 'aToZ'
   | 'zToA'
   | 'dateAddedAscending'

@@ -4,7 +4,6 @@ import { type DropdownOption } from '../Dropdown';
 export const songSortTypes = [
   'customOrder',
   'originalOrder',
-  'addedOrder',
   'aToZ',
   'zToA',
   'dateAddedAscending',
@@ -37,7 +36,7 @@ export function canReorder(viewMode?: PlaylistViewMode | string): boolean {
 }
 
 export function isPersistentPlaylistOrder(viewMode?: PlaylistViewMode | string): boolean {
-  return viewMode === 'customOrder' || viewMode === 'originalOrder' || viewMode === 'addedOrder';
+  return viewMode === 'customOrder' || viewMode === 'originalOrder';
 }
 
 export const playlistSortOptions: DropdownOption<SongSortTypes>[] = [
