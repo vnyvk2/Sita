@@ -35,3 +35,4 @@ chrome/
 .git-rewrite/
 old_miniplayer.txt
 diff_output*.txt
+electron.vite.config.*.mjs
