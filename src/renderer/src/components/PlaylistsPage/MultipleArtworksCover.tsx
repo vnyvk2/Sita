@@ -23,6 +23,7 @@ type Props = {
   artworks?: ArtworkPaths[];
   resolvedArtworks?: string[];
   layout?: PlaylistCoverLayout;
+  variant?: CoverLayoutVariant;
   requestedCount?: number;
 };
 
@@ -53,6 +54,7 @@ const MultipleArtworksCover = (props: Props) => {
     artworks,
     resolvedArtworks,
     layout,
+    variant,
     requestedCount
   } = props;
 
@@ -89,6 +91,7 @@ const MultipleArtworksCover = (props: Props) => {
         <Renderer
           artworks={resolvedArtworks}
           layout={layout || 'grid'}
+          variant={variant}
           requestedCount={requestedCount}
           className={imgClassName}
           enableImgFadeIns={enableImgFadeIns}

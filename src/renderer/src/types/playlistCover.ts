@@ -3,24 +3,36 @@ export type PlaylistCoverLayout = 'grid' | 'triangle' | 'fan' | 'diamond';
 export const COVER_IMAGE_COUNTS = [1, 2, 3, 4, 5] as const;
 
 export interface PlaylistCoverSettings {
+  version?: number;
   type: 'auto' | 'collage';
   collage?: {
     layout: PlaylistCoverLayout;
-    size: 1 | 2 | 3 | 4;
+    variant?: CoverLayoutVariant;
+    size: 1 | 2 | 3 | 4 | 5;
     songIds: number[];
   };
 }
 
 export interface ResolvedPlaylistCover {
   layout: PlaylistCoverLayout;
+  variant?: CoverLayoutVariant;
   artworks: string[];
 }
 
 export type ClipPathArtworkCount = 2 | 3 | 4 | 5;
-export type TriangleStyle = 'diagonal' | 'pinwheel' | 'center';
-export type FanStyle = 'standard';
-export type DiamondStyle = 'classic';
-export type CoverLayoutStyle = TriangleStyle | FanStyle | DiamondStyle | undefined;
+export type TriangleVariant = 'diagonal' | 'pinwheel' | 'center';
+export type FanVariant = 'standard' | 'wide' | 'tight';
+export type DiamondVariant = 'classic' | 'hero' | 'rotated';
+export type CoverLayoutVariant = TriangleVariant | FanVariant | DiamondVariant;
+
+/** @deprecated Use TriangleVariant instead */
+export type TriangleStyle = TriangleVariant;
+/** @deprecated Use FanVariant instead */
+export type FanStyle = FanVariant;
+/** @deprecated Use DiamondVariant instead */
+export type DiamondStyle = DiamondVariant;
+/** @deprecated Use CoverLayoutVariant instead */
+export type CoverLayoutStyle = CoverLayoutVariant | undefined;
 
 export type CoverSlotIndex = 0 | 1 | 2 | 3 | 4;
 
@@ -40,7 +52,7 @@ export interface CoverRendererProps {
   artworks: string[];
   layout: PlaylistCoverLayout;
   requestedCount?: number;
-  style?: CoverLayoutStyle;
+  variant?: CoverLayoutVariant;
   className?: string;
   enableImgFadeIns?: boolean;
 }

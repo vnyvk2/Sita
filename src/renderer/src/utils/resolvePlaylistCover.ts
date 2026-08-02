@@ -14,10 +14,11 @@ export function resolvePlaylistCover(
   }
 
   const layout = settings?.collage?.layout || 'grid';
+  const variant = settings?.collage?.variant;
   const size = settings?.collage?.size || 4;
 
   const effectiveSongs = resolveEffectiveCoverSongs(settings, playlistSongs, size);
   const artworks = effectiveSongs.map((s) => s?.artworkPaths?.artworkPath || DefaultImgCover);
 
-  return { layout, artworks };
+  return { layout, variant, artworks };
 }

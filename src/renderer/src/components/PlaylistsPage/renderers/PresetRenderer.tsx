@@ -10,7 +10,7 @@ interface PresetRendererProps<S extends string> extends CoverRendererProps {
 function PresetRenderer<S extends string>({
   artworks = [],
   requestedCount,
-  style,
+  variant,
   className = '',
   enableImgFadeIns = true,
   presets,
@@ -35,7 +35,7 @@ function PresetRenderer<S extends string>({
     );
   }
 
-  const targetStyle = style && style in presets ? (style as S) : defaultStyle;
+  const targetStyle = variant && variant in presets ? (variant as S) : defaultStyle;
   const stylePresets = presets[targetStyle];
   const clipPaths = stylePresets[(count as ClipPathArtworkCount)] || stylePresets[4];
 

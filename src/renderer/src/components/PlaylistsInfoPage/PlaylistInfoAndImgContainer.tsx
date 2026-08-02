@@ -39,7 +39,8 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
   const openCoverSettings = () => {
     changePromptMenuData(
       true,
-      <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={songs} />
+      <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={songs} />,
+      'max-w-[920px] w-full min-w-0'
     );
   };
 

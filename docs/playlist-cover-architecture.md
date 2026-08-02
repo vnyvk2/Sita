@@ -315,3 +315,199 @@ After this refactor, I'd rate the cover system roughly like this:
 - ★★★☆☆ Drag/drop interactions
 
 Compared to where this started (a couple of weeks ago), the architecture has become significantly cleaner. The major architectural work is largely complete now; the remaining phases are mostly about adding capabilities on top of the foundation rather than redesigning it. That usually means future layouts and editing features become much easier to implement.
+
+---
+
+# 🏛️ Playlist Cover System — Architectural & Implementation Invariants
+
+These rules are **non-negotiable**. Every implementation phase must preserve them. Any code violating these invariants introduces architectural drift and should be rejected during review.
+
+---
+
+## 1. Pure Geometry Invariant
+> Geometry preset files define layout shapes only. They must never contain business logic, renderer logic, component state, storage access, or React code.
+
+---
+
+## 2. Preset Data Invariant
+> Preset files are immutable declarative data. They may not contain helper functions, resolver logic, side effects, business rules, or application state.
+
+---
+
+## 3. Backward Compatibility Invariant
+> Existing layouts, variants, and persisted Playlist Cover settings must continue rendering correctly across future releases. Existing presets (`GRID`, `DIAGONAL`, `STANDARD_FAN`, `CLASSIC_DIAMOND`) must remain pixel-identical.
+
+---
+
+## 4. Variant Stability Invariant
+> Variant identifiers (`diagonal`, `pinwheel`, `center`, etc.) are part of the persisted settings contract and must remain stable across releases. Existing identifiers must never be renamed.
+
+---
+
+## 5. Variant vs. Style Boundary
+> `variant` represents geometric layout presets (e.g. `pinwheel`, `wide`, `hero`). `style` is reserved for future visual decoration (spacing, corner radius, shadows, overlays, etc.). These concepts must never be mixed.
+
+---
+
+## 6. Single Source of Truth Invariant
+> Every piece of business logic must have exactly one implementation. Components may compose helpers but must never duplicate resolver logic.
+
+Examples:
+- `resolvePlaylistCover()`
+- `resolveEffectiveCoverSongs()`
+- `resolveAutoCoverArtworks()`
+- `getLayoutClipPaths()`
+
+---
+
+## 7. Resolver Purity Invariant
+> Resolver functions must be deterministic and side-effect free. They must never mutate inputs, access storage, modify React state, perform network requests, or perform persistence.
+
+---
+
+## 8. Renderer Purity Invariant
+> Renderers are pure presentation components. They must never access localStorage, React Context, playlist state, or application services. They render exclusively from props.
+
+---
+
+## 9. Strategy Purity Invariant
+> Auto Cover strategies evaluate available songs and return selections only. Strategies must never mutate playlist state, renderer state, or application state.
+
+---
+
+## 10. Draft vs. Persisted State Invariant
+> During editing, every modification exists only in draft state. Playlist Cover settings are persisted only when the user explicitly saves.
+
+Interaction flow:
+
+```
+User Interaction
+        │
+        ▼
+Draft State
+        │
+        ▼
+Live Preview
+        │
+        ▼
+Save
+        │
+        ▼
+Persistence
+```
+
+---
+
+## 11. No Hidden Persistence Invariant
+> No component, renderer, selector, drag interaction, or preview may write Playlist Cover settings directly. Persistence is performed exclusively by the explicit Save/Apply workflow.
+
+---
+
+## 12. Immediate Preview Invariant
+> Every editing interaction must update the live preview immediately using the current draft state. The preview must always reflect the user's unsaved edits.
+
+---
+
+## 13. Parent Owns State Invariant
+> `PlaylistCoverSettingsPrompt` owns all editor state. Child components are pure presentational or interaction components receiving state through props.
+
+Parent-owned state includes:
+- draft settings
+- active slot
+- hovered slot
+- focused slot
+- selected variant
+- drag state
+
+---
+
+## 14. Component Responsibility Invariant
+> Every component must have exactly one primary responsibility.
+
+Examples:
+
+- `CoverLivePreview` → Preview rendering only
+- `VariantSelector` → Variant selection only
+- `SelectedSongsReorderBar` → Slot reordering only
+- `NumberedSongPicker` → Song selection only
+- `MultipleArtworksCover` → Renderer dispatch only
+
+Components must never absorb responsibilities from neighboring layers.
+
+---
+
+## 15. Dependency Direction Invariant
+> Dependencies must always flow downward through the rendering pipeline.
+
+```
+PlaylistCoverSettingsPrompt
+            │
+            ▼
+Resolvers
+            │
+            ▼
+MultipleArtworksCover
+            │
+            ▼
+Renderer Registry
+            │
+            ▼
+Concrete Renderers
+            │
+            ▼
+PresetRenderer
+            │
+            ▼
+ClipPathRenderer
+            │
+            ▼
+CoverImageTile
+            │
+            ▼
+Geometry Presets
+```
+
+Reverse dependencies are prohibited.
+
+---
+
+## 16. Registry Invariant
+> Renderer selection occurs exclusively through the renderer registry (`MultipleArtworksCover`). No other component may perform layout switching (`switch(layout)` or equivalent renderer dispatch).
+
+---
+
+## 17. Sticky Preview Invariant
+> The workspace's left column remains sticky while the controls column scrolls independently. Large playlists must never push the preview off-screen during editing.
+
+---
+
+## 18. Accessibility Invariant
+> Every interactive editor feature must remain fully accessible using keyboard navigation, visible focus indicators, semantic ARIA attributes, and equivalent non-pointer interactions.
+
+---
+
+## 19. Phase Boundary Invariant
+> Every implementation phase must:
+>
+> - compile successfully
+> - preserve all existing functionality
+> - avoid placeholder implementations
+> - avoid unrelated refactoring
+> - modify only documented scope unless required for compilation
+> - leave the application in a fully usable and testable state
+
+---
+
+## 20. Incremental Evolution Invariant
+> New functionality must extend the existing architecture rather than redesign it. Future features should primarily add geometry presets, strategies, UI components, or editor capabilities without altering established architectural boundaries.
+
+---
+
+## 21. Testability Invariant
+> All resolvers, strategies, geometry helpers, and transformation logic must remain independently testable without requiring React components, UI state, or persistence layers.
+
+---
+
+## 22. Future Compatibility Invariant
+> All new persisted settings must be designed with forward compatibility in mind. Schema evolution should favor additive changes and maintain compatibility with previously saved Playlist Cover configurations.
+

@@ -1,7 +1,7 @@
 import { DIAMOND_PRESETS } from '../constants/diamondPresets';
 import { FAN_PRESETS } from '../constants/fanPresets';
 import { TRIANGLE_PRESETS } from '../constants/trianglePresets';
-import type { ClipPathArtworkCount, CoverLayoutStyle, PlaylistCoverLayout } from '../types/playlistCover';
+import type { ClipPathArtworkCount, CoverLayoutVariant, PlaylistCoverLayout } from '../types/playlistCover';
 
 const GRID_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
   2: [
@@ -30,7 +30,7 @@ const GRID_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 
 export function getLayoutClipPaths(
   layout: PlaylistCoverLayout = 'grid',
-  style?: CoverLayoutStyle,
+  variant?: CoverLayoutVariant,
   count: number = 4
 ): readonly string[] {
   const validCount = (Math.max(2, Math.min(5, count)) as ClipPathArtworkCount);
@@ -40,20 +40,20 @@ export function getLayoutClipPaths(
   }
 
   if (layout === 'triangle') {
-    const targetStyle = style && style in TRIANGLE_PRESETS ? style : 'diagonal';
-    const presets = TRIANGLE_PRESETS[targetStyle as keyof typeof TRIANGLE_PRESETS];
+    const targetVariant = variant && variant in TRIANGLE_PRESETS ? variant : 'diagonal';
+    const presets = TRIANGLE_PRESETS[targetVariant as keyof typeof TRIANGLE_PRESETS];
     return presets[validCount] || presets[4];
   }
 
   if (layout === 'fan') {
-    const targetStyle = style && style in FAN_PRESETS ? style : 'standard';
-    const presets = FAN_PRESETS[targetStyle as keyof typeof FAN_PRESETS];
+    const targetVariant = variant && variant in FAN_PRESETS ? variant : 'standard';
+    const presets = FAN_PRESETS[targetVariant as keyof typeof FAN_PRESETS];
     return presets[validCount] || presets[4];
   }
 
   if (layout === 'diamond') {
-    const targetStyle = style && style in DIAMOND_PRESETS ? style : 'classic';
-    const presets = DIAMOND_PRESETS[targetStyle as keyof typeof DIAMOND_PRESETS];
+    const targetVariant = variant && variant in DIAMOND_PRESETS ? variant : 'classic';
+    const presets = DIAMOND_PRESETS[targetVariant as keyof typeof DIAMOND_PRESETS];
     return presets[validCount] || presets[4];
   }
 

@@ -274,7 +274,8 @@ export const Playlist = (props: PlaylistProp) => {
             .then((songs) => {
               changePromptMenuData(
                 true,
-                <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />
+                <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />,
+                'max-w-[920px] w-full min-w-0'
               );
             })
             .catch((err) => console.error(err));

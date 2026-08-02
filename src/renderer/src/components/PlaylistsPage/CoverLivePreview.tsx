@@ -1,11 +1,11 @@
-import type { CoverLayoutStyle, CoverSlotIndex, PlaylistCoverLayout, ResolvedPlaylistCover } from '../../types/playlistCover';
+import type { CoverLayoutVariant, CoverSlotIndex, PlaylistCoverLayout, ResolvedPlaylistCover } from '../../types/playlistCover';
 import { getLayoutClipPaths } from '../../utils/getLayoutClipPaths';
 import MultipleArtworksCover from './MultipleArtworksCover';
 
 type Props = {
   resolvedCover: ResolvedPlaylistCover;
   requestedCount?: number;
-  style?: CoverLayoutStyle;
+  variant?: CoverLayoutVariant;
   activeSlotIndex?: CoverSlotIndex | null;
   hoveredSlotIndex?: CoverSlotIndex | null;
   focusedSlotIndex?: CoverSlotIndex | null;
@@ -18,7 +18,7 @@ const BADGES = ['①', '②', '③', '④', '⑤'];
 const CoverLivePreview = ({
   resolvedCover,
   requestedCount,
-  style,
+  variant,
   activeSlotIndex,
   hoveredSlotIndex,
   focusedSlotIndex,
@@ -26,7 +26,8 @@ const CoverLivePreview = ({
   onHoverSlot
 }: Props) => {
   const count = requestedCount ?? resolvedCover.artworks.length ?? 4;
-  const clipPaths = getLayoutClipPaths(resolvedCover.layout as PlaylistCoverLayout, style, count);
+  const activeVariant = variant || resolvedCover.variant;
+  const clipPaths = getLayoutClipPaths(resolvedCover.layout as PlaylistCoverLayout, activeVariant, count);
 
   return (
     <div className="cover-live-preview mb-6 flex flex-col items-center">
@@ -40,6 +41,7 @@ const CoverLivePreview = ({
         <MultipleArtworksCover
           resolvedArtworks={resolvedCover.artworks}
           layout={resolvedCover.layout}
+          variant={activeVariant}
           requestedCount={count}
           className="h-full w-full"
         />

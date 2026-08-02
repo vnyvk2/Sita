@@ -4,7 +4,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
-import { type CoverSlotIndex, type PlaylistCoverDraft, type PlaylistCoverLayout, type PlaylistCoverSettings } from '../../types/playlistCover';
+import { type CoverLayoutVariant, type CoverSlotIndex, type PlaylistCoverDraft, type PlaylistCoverLayout, type PlaylistCoverSettings } from '../../types/playlistCover';
 import storage from '../../utils/localStorage';
 import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
 import { resolveEffectiveCoverSongs } from '../../utils/resolveEffectiveCoverSongs';
@@ -14,6 +14,7 @@ import CoverTypeSelector from './CoverTypeSelector';
 import LayoutSelector from './LayoutSelector';
 import NumberedSongPicker from './NumberedSongPicker';
 import SelectedSongsReorderBar from './SelectedSongsReorderBar';
+import VariantSelector from './VariantSelector';
 
 interface Props {
   playlist: PlaylistDto;
@@ -27,16 +28,19 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const { t } = useTranslation();
 
   const originalSettings: PlaylistCoverSettings = useMemo(() => {
-    return (
-      storage.playlistCoverSettings.getSettings(playlist.id) ?? {
-        type: 'auto',
-        collage: {
-          layout: 'grid',
-          size: 4,
-          songIds: []
-        }
+    const loaded = storage.playlistCoverSettings.getSettings(playlist.id);
+    if (loaded) {
+      return { version: 1, ...loaded };
+    }
+    return {
+      version: 1,
+      type: 'auto',
+      collage: {
+        layout: 'grid',
+        size: 4,
+        songIds: []
       }
-    );
+    };
   }, [playlist.id]);
 
   const [currentSettings, setCurrentSettings] = useState<PlaylistCoverSettings>(originalSettings);
@@ -90,11 +94,24 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         ...prev,
         collage: {
           layout: newLayout,
+          variant: undefined,
           size: nextSize,
           songIds: newSongIds
         }
       };
     });
+  }, []);
+
+  const handleVariantChange = useCallback((newVariant: CoverLayoutVariant) => {
+    setCurrentSettings((prev) => ({
+      ...prev,
+      collage: {
+        layout: prev.collage?.layout || 'grid',
+        variant: newVariant,
+        size: prev.collage?.size || 4,
+        songIds: prev.collage?.songIds || []
+      }
+    }));
   }, []);
 
   const handleSizeChange = useCallback((newSize: 1 | 2 | 3 | 4 | 5) => {
@@ -249,7 +266,11 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
   const handleSave = useCallback(() => {
     if (!isDirty || !playlist?.id || SpecialPlaylists.isSpecialPlaylistId(playlist.id)) return;
-    storage.playlistCoverSettings.setSettings(playlist.id, currentSettings);
+    const settingsToSave: PlaylistCoverSettings = {
+      version: 1,
+      ...currentSettings
+    };
+    storage.playlistCoverSettings.setSettings(playlist.id, settingsToSave);
     changePromptMenuData(false);
   }, [changePromptMenuData, isDirty, playlist?.id, currentSettings]);
 
@@ -263,8 +284,9 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [currentSettings, playlistSongs, currentSize]);
 
   return (
-    <div className="flex w-[480px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl">
-      <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3">
+    <div className="flex w-full max-w-[880px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden mx-auto">
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3 shrink-0">
         <span className="text-xl font-bold tracking-tight">
           {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
         </span>
@@ -275,97 +297,115 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         )}
       </div>
 
-      {/* Production-Identical Live Preview */}
-      <CoverLivePreview
-        resolvedCover={resolvedPreviewCover}
-        requestedCount={currentSize}
-        activeSlotIndex={activeSlotIndex}
-        hoveredSlotIndex={hoveredSlotIndex}
-        focusedSlotIndex={focusedSlotIndex}
-        onSelectSlot={handleSelectSlot}
-        onHoverSlot={setHoveredSlotIndex}
-      />
-
-      {/* Targeted Replacement Banner */}
-      {activeSlotIndex !== null && (
-        <div className="mb-5 flex items-center justify-between rounded-xl bg-amber-500/15 border border-amber-500/30 p-3 text-amber-300 shadow-md transition-all duration-200">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 font-bold text-neutral-950 text-xs">
-              {BADGES[activeSlotIndex]}
-            </span>
-            <span className="text-xs font-semibold">
-              Replacing Slot {BADGES[activeSlotIndex]} — Click any song below to assign
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActiveSlotIndex(null)}
-            className="rounded-lg bg-amber-500/20 px-2 py-1 text-xs font-semibold hover:bg-amber-500/30 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Mode Selector (Auto vs Collage) */}
-      <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />
-
-      {/* Cover Images Count Selector */}
-      <div className="mb-6">
-        <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
-        <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
-          {availableCounts.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
-              className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                currentSize === s
-                  ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Custom Collage Options */}
-      {currentSettings.type === 'collage' && (
-        <>
-          {/* Data-Driven Layout Cards */}
-          <LayoutSelector
-            selectedLayout={currentSettings.collage?.layout || 'grid'}
-            onChange={handleLayoutChange}
-          />
-
-          {/* Selected Songs Reorder & Position Swap Bar */}
-          <SelectedSongsReorderBar
-            effectiveSongs={effectiveSongs}
-            maxSize={currentSize}
+      {/* Two-Column Desktop Workstation Shell */}
+      <div className="flex flex-row gap-6 min-h-0 flex-1 overflow-hidden">
+        {/* Left Column (~360px Sticky Preview & Reorder Slot) */}
+        <div className="w-[360px] shrink-0 flex flex-col gap-4 sticky top-0 self-start">
+          {/* Production-Identical Live Preview */}
+          <CoverLivePreview
+            resolvedCover={resolvedPreviewCover}
+            requestedCount={currentSize}
             activeSlotIndex={activeSlotIndex}
             hoveredSlotIndex={hoveredSlotIndex}
             focusedSlotIndex={focusedSlotIndex}
             onSelectSlot={handleSelectSlot}
             onHoverSlot={setHoveredSlotIndex}
-            onSwapSlots={handleSwapSlots}
-            onClearSlot={handleClearSlot}
           />
 
-          {/* Numbered Song Picker */}
-          <NumberedSongPicker
-            playlistSongs={playlistSongs}
-            selectedSongIds={currentSettings.collage?.songIds || []}
-            maxSize={currentSize}
-            activeSlotIndex={activeSlotIndex}
-            onToggleSong={handleToggleSong}
-          />
-        </>
-      )}
+          {/* Targeted Replacement Banner */}
+          {activeSlotIndex !== null && (
+            <div className="flex items-center justify-between rounded-xl bg-amber-500/15 border border-amber-500/30 p-3 text-amber-300 shadow-md transition-all duration-200">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 font-bold text-neutral-950 text-xs">
+                  {BADGES[activeSlotIndex]}
+                </span>
+                <span className="text-xs font-semibold">
+                  Replacing Slot {BADGES[activeSlotIndex]} — Click any song on right
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSlotIndex(null)}
+                className="rounded-lg bg-amber-500/20 px-2 py-1 text-xs font-semibold hover:bg-amber-500/30 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
-      {/* Action Buttons (Reset vs Save) */}
-      <div className="mt-6 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4">
+          {/* Selected Songs Reorder & Position Swap Bar (Collage Mode) */}
+          {currentSettings.type === 'collage' && (
+            <SelectedSongsReorderBar
+              effectiveSongs={effectiveSongs}
+              maxSize={currentSize}
+              activeSlotIndex={activeSlotIndex}
+              hoveredSlotIndex={hoveredSlotIndex}
+              focusedSlotIndex={focusedSlotIndex}
+              onSelectSlot={handleSelectSlot}
+              onHoverSlot={setHoveredSlotIndex}
+              onSwapSlots={handleSwapSlots}
+              onClearSlot={handleClearSlot}
+            />
+          )}
+        </div>
+
+        {/* Right Column (Scrollable Controls Sidebar ~500px) */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto pr-1">
+          {/* Mode Selector (Auto vs Collage) */}
+          <CoverTypeSelector type={currentSettings.type} onChange={handleTypeChange} />
+
+          {/* Cover Images Count Selector */}
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
+            <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
+              {availableCounts.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
+                  className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                    currentSize === s
+                      ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Collage Options */}
+          {currentSettings.type === 'collage' && (
+            <>
+              {/* Data-Driven Layout Cards */}
+              <LayoutSelector
+                selectedLayout={currentSettings.collage?.layout || 'grid'}
+                onChange={handleLayoutChange}
+              />
+
+              {/* Sub-Style Variant Selector */}
+              <VariantSelector
+                layout={currentSettings.collage?.layout || 'grid'}
+                selectedVariant={currentSettings.collage?.variant}
+                onChange={handleVariantChange}
+              />
+
+              {/* Numbered Song Picker */}
+              <NumberedSongPicker
+                playlistSongs={playlistSongs}
+                selectedSongIds={currentSettings.collage?.songIds || []}
+                maxSize={currentSize}
+                activeSlotIndex={activeSlotIndex}
+                onToggleSong={handleToggleSong}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Action Buttons (Reset vs Save) */}
+      <div className="mt-4 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4 shrink-0">
         <Button label={t('common.reset', 'Reset')} isDisabled={!isDirty} clickHandler={handleReset} />
         <Button label={t('common.save', 'Save')} isDisabled={!isDirty} clickHandler={handleSave} />
       </div>
