@@ -275,7 +275,8 @@ export const Playlist = (props: PlaylistProp) => {
               changePromptMenuData(
                 true,
                 <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />,
-                'max-w-[920px] w-full min-w-0'
+                'max-w-5xl w-full min-w-0',
+                { mode: 'workspace', scrollBehavior: 'content' }
               );
             })
             .catch((err) => console.error(err));

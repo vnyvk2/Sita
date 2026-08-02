@@ -12,6 +12,7 @@ import PromptMenuNavigationControlsContainer from './PromptMenuNavigationControl
 
 const PromptMenu = () => {
   const promptMenuData = useStore(store, (state) => state.promptMenuData);
+  const promptMenuNavigationData = useStore(store, (state) => state.promptMenuNavigationData);
   const { changePromptMenuData, updatePromptMenuHistoryIndex } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
@@ -49,37 +50,47 @@ const PromptMenu = () => {
           className="fixed inset-0 h-screen bg-black/25 backdrop-blur-xs transition-opacity data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in"
         />
 
-        <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
-          <div className="flex h-screen items-center justify-center p-4 text-center sm:items-center sm:p-0">
-            <DialogPanel
-              ref={promptMenuRef}
-              transition
-              className="bg-background-color-1 dark:bg-dark-background-color-1 relative h-fit max-h-[80%] min-h-75 w-[80%] max-w-[90%] min-w-[800px] transform overflow-hidden overflow-y-auto rounded-2xl text-left shadow-xl transition-all data-closed:scale-95 data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in sm:my-8 sm:w-full sm:max-w-lg"
-            >
-              <div className="my-4 flex w-full items-center justify-between px-6">
-                <PromptMenuNavigationControlsContainer />
-                <Button
-                  key={0}
-                  className="prompt-menu-close-btn previousPageBtn hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-dark-font-color-highlight m-0! flex h-fit rounded-md! border-0! p-0! px-2! py-1! outline-offset-1 transition-all!"
-                  iconName="close"
-                  tooltipLabel={t('titleBar.close')}
-                  iconClassName="leading-none! text-xl!"
-                  clickHandler={(e) => {
-                    e.stopPropagation();
-                    changePromptMenuData(false);
-                  }}
-                />
+        {/* Active Prompt Data */}
+        {(() => {
+          const currentPrompt = promptMenuNavigationData.prompts[promptMenuNavigationData.currentActiveIndex];
+          const isContentScroll = currentPrompt?.scrollBehavior === 'content' || currentPrompt?.mode === 'workspace';
+
+          return (
+            <div className={`fixed inset-0 z-10 w-screen ${isContentScroll ? 'overflow-hidden flex items-center justify-center' : 'overflow-y-auto'}`}>
+              <div className="flex h-screen w-full items-center justify-center p-4 text-center sm:items-center sm:p-0">
+                <DialogPanel
+                  ref={promptMenuRef}
+                  transition
+                  className={`bg-background-color-1 dark:bg-dark-background-color-1 relative h-fit max-h-[85vh] min-h-75 transform rounded-2xl text-left shadow-xl transition-all data-closed:scale-95 data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in ${
+                    isContentScroll ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'
+                  } ${currentPrompt?.className || 'w-[80%] max-w-[90%] min-w-[800px] sm:my-8 sm:w-full sm:max-w-lg'}`}
+                >
+                  <div className="my-4 flex w-full items-center justify-between px-6 shrink-0">
+                    <PromptMenuNavigationControlsContainer />
+                    <Button
+                      key={0}
+                      className="prompt-menu-close-btn previousPageBtn hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-dark-font-color-highlight m-0! flex h-fit rounded-md! border-0! p-0! px-2! py-1! outline-offset-1 transition-all!"
+                      iconName="close"
+                      tooltipLabel={t('titleBar.close')}
+                      iconClassName="leading-none! text-xl!"
+                      clickHandler={(e) => {
+                        e.stopPropagation();
+                        changePromptMenuData(false);
+                      }}
+                    />
+                  </div>
+                  <MainContainer
+                    className={`prompt-menu-inner text-font-color-black dark:text-font-color-white relative ${
+                      isContentScroll ? 'flex-1 min-h-0 flex flex-col overflow-hidden px-6 pb-6 pt-0' : 'max-h-full min-h-[250px] px-8 pb-2'
+                    }`}
+                  >
+                    <Suspense fallback={<SuspenseLoader />}>{currentPrompt?.prompt}</Suspense>
+                  </MainContainer>
+                </DialogPanel>
               </div>
-              <MainContainer
-                className={`prompt-menu-inner text-font-color-black dark:text-font-color-white relative max-h-full min-h-[250px] px-8 pb-2 ${
-                  promptMenuData.className ?? ''
-                }`}
-              >
-                <Suspense fallback={<SuspenseLoader />}>{promptMenuData.prompt}</Suspense>
-              </MainContainer>
-            </DialogPanel>
-          </div>
-        </div>
+            </div>
+          );
+        })()}
       </Dialog>
 
       {/* <dialog

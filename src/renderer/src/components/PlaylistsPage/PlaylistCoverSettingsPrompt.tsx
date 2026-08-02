@@ -270,7 +270,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [draft, playlistSongs, songMap]);
 
   return (
-    <div className="flex w-full max-w-[880px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden mx-auto">
+    <div className="flex w-full h-full min-h-0 flex-col overflow-hidden text-font-color-black dark:text-font-color-white">
       {/* Header */}
       <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3 shrink-0">
         <span className="text-xl font-bold tracking-tight">

@@ -2,6 +2,8 @@ import { useCallback, type ReactNode } from 'react';
 
 import { dispatch, store } from '../store/store';
 
+import type { PromptMenuDataOptions } from '../components/PromptMenu/types';
+
 /** Return type for the usePromptMenu hook */
 export interface UsePromptMenuReturn {
   /**
@@ -22,11 +24,13 @@ export interface UsePromptMenuReturn {
    * @param isVisible - Whether the prompt menu should be visible
    * @param prompt - The prompt content to display (ReactNode) or null to clear all prompts
    * @param className - Optional CSS class name for the prompt
+   * @param options - Optional configuration for the prompt
    */
   changePromptMenuData: (
     isVisible?: boolean,
     prompt?: ReactNode | null,
-    className?: string
+    className?: string,
+    options?: PromptMenuDataOptions
   ) => void;
 
   /**
@@ -48,9 +52,13 @@ export interface UsePromptMenuReturn {
    *
    *   - 'increment': Move forward in history
    *   - 'decrement': Move back in history
-   *   - 'home': Return to the first prompt
+   *   - 'home': Return to initial prompt
+   * @param promptIndex - Optional index to jump to
    */
-  updatePromptMenuHistoryIndex: (type: 'increment' | 'decrement' | 'home') => void;
+  updatePromptMenuHistoryIndex: (
+    type: 'increment' | 'decrement' | 'home',
+    promptIndex?: number
+  ) => void;
 }
 
 /**
@@ -92,8 +100,13 @@ export interface UsePromptMenuReturn {
  */
 export function usePromptMenu(): UsePromptMenuReturn {
   const changePromptMenuData = useCallback(
-    (isVisible = false, prompt?: ReactNode | null, className = '') => {
-      const promptData: PromptMenuData = { prompt, className };
+    (isVisible = false, prompt?: ReactNode | null, className = '', options?: PromptMenuDataOptions) => {
+      const promptData: PromptMenuData = {
+        prompt,
+        className,
+        mode: options?.mode,
+        scrollBehavior: options?.scrollBehavior
+      };
 
       const data = {
         isVisible,

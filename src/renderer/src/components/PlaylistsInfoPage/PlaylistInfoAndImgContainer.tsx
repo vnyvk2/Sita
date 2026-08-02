@@ -40,7 +40,8 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
     changePromptMenuData(
       true,
       <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={songs} />,
-      'max-w-[920px] w-full min-w-0'
+      'max-w-5xl w-full min-w-0',
+      { mode: 'workspace', scrollBehavior: 'content' }
     );
   };
 

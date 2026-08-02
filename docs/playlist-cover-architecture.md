@@ -551,3 +551,8 @@ Reverse dependencies are prohibited.
 ## 30. Single Assignment Algorithm Invariant
 > All slot assignment and fallback fill rules must be implemented in a single shared assignment resolver layer. Runtime resolvers and editor materializers must consume this shared layer rather than duplicating slot assignment algorithms.
 
+---
+
+## 31. Window Shell Invariant
+> PromptMenu owns only modal presentation (overlay, viewport positioning, chrome, scrolling delegation). Content components own all editor structure, titles, actions, and domain-specific layout.
+

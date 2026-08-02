@@ -9,7 +9,12 @@ export interface AppUpdateContextType {
     pageY?: number,
     contextMenuData?: ContextMenuAdditionalData
   ) => void;
-  changePromptMenuData: (isVisible: boolean, content?: ReactNode, className?: string) => void;
+  changePromptMenuData: (
+    isVisible: boolean,
+    content?: ReactNode,
+    className?: string,
+    options?: import('../components/PromptMenu/types').PromptMenuDataOptions
+  ) => void;
   changeUpNextSongData: (upNextSongData?: AudioPlayerData) => void;
   updatePromptMenuHistoryIndex: (
     type: 'increment' | 'decrement' | 'home',
