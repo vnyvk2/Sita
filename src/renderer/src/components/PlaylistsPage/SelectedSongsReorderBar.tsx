@@ -100,10 +100,25 @@ const SelectedSongsReorderBar = ({
                 setDraggingSlot(null);
                 setDragOverSlot(null);
               }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Cover Slot ${i + 1}: ${song?.title || 'Empty'}`}
               onClick={() => onSelectSlot(slotIndex)}
               onMouseEnter={() => onHoverSlot(slotIndex)}
               onMouseLeave={() => onHoverSlot(null)}
-              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectSlot(slotIndex);
+                } else if (e.key === 'ArrowUp' && i > 0) {
+                  e.preventDefault();
+                  onSwapSlots(slotIndex, (i - 1) as CoverSlotIndex);
+                } else if (e.key === 'ArrowDown' && i < maxSize - 1) {
+                  e.preventDefault();
+                  onSwapSlots(slotIndex, (i + 1) as CoverSlotIndex);
+                }
+              }}
+              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                 isDragging ? 'opacity-40 scale-95 border-dashed border-amber-400' : ''
               } ${
                 isDragOver ? 'ring-2 ring-amber-400 bg-amber-500/20 scale-[1.02]' : ''

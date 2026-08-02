@@ -47,7 +47,7 @@ const CoverLivePreview = ({
         />
 
         {/* Single Source of Truth Interactive Overlay Layer */}
-        <div className="absolute inset-0 pointer-events-auto">
+        <div className="absolute inset-0 pointer-events-auto" role="region" aria-label="Interactive Cover Slots">
           {clipPaths.slice(0, count).map((clipPath, i) => {
             const slotIndex = i as CoverSlotIndex;
             const isActive = activeSlotIndex === slotIndex;
@@ -58,11 +58,24 @@ const CoverLivePreview = ({
               <button
                 key={i}
                 type="button"
+                aria-label={`Cover Slot ${i + 1}`}
                 onClick={() => onSelectSlot?.(slotIndex)}
                 onMouseEnter={() => onHoverSlot?.(slotIndex)}
                 onMouseLeave={() => onHoverSlot?.(null)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectSlot?.(slotIndex);
+                  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    onSelectSlot?.(((i + 1) % count) as CoverSlotIndex);
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    onSelectSlot?.(((i - 1 + count) % count) as CoverSlotIndex);
+                  }
+                }}
                 style={{ clipPath }}
-                className={`absolute inset-0 transition-all duration-150 ease-out cursor-pointer flex items-center justify-center ${
+                className={`absolute inset-0 transition-all duration-150 ease-out cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 z-20 ${
                   isActive
                     ? 'bg-amber-500/25 ring-4 ring-amber-400/90 z-30 shadow-2xl scale-[1.01]'
                     : isHovered
