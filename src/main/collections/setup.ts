@@ -10,6 +10,7 @@ import { OperationRegistry } from './operations/OperationRegistry';
 import { OperationJournalRepository } from './repositories/OperationJournalRepository';
 import { HierarchyService } from './engine/HierarchyService';
 import { DeleteOp } from './operations/DeleteOp';
+import { CreatePlaylistOp } from './operations/CreatePlaylistOp';
 import { CreateFolderOp } from './operations/CreateFolderOp';
 import { DuplicateOp } from './operations/DuplicateOp';
 import { DuplicatePlanner } from './operations/DuplicatePlanner';
@@ -23,6 +24,8 @@ import { RemoveSongsOp } from './operations/RemoveSongsOp';
 import { ReorderOp } from './operations/ReorderOp';
 import { RestoreSongsOp } from './operations/RestoreSongsOp';
 import { SetArtworkOp } from './operations/SetArtworkOp';
+import { BulkDeleteOp, BulkRestoreOp } from './operations/BulkDeleteOp';
+import { PinOp, UnpinOp } from './operations/PinOp';
 
 // Singletons for Collections Backend
 export const playlistRepository = new PlaylistRepository();
@@ -39,6 +42,7 @@ export function registerDefaultOperations(
   hierarchy: HierarchyService
 ) {
   reg.register('playlist.delete', new DeleteOp(repo));
+  reg.register('playlist.createPlaylist', new CreatePlaylistOp(repo));
   reg.register('playlist.createFolder', new CreateFolderOp(repo));
   reg.register('playlist.duplicate', new DuplicateOp(new DuplicatePlanner(hierarchy), new DuplicateExecutor()));
   reg.register('playlist.merge', new MergePlaylistsOp(repo));
@@ -51,6 +55,10 @@ export function registerDefaultOperations(
   reg.register('playlist.reorder', new ReorderOp(repo));
   reg.register('playlist.restoreSongs', new RestoreSongsOp(repo));
   reg.register('playlist.setArtwork', new SetArtworkOp(repo));
+  reg.register('playlist.bulkDelete', new BulkDeleteOp(repo, hierarchy));
+  reg.register('playlist.bulkRestore', new BulkRestoreOp(repo, hierarchy));
+  reg.register('playlist.pin', new PinOp());
+  reg.register('playlist.unpin', new UnpinOp());
 }
 
 export const registry = new OperationRegistry();
