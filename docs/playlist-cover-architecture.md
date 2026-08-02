@@ -531,3 +531,23 @@ Reverse dependencies are prohibited.
 ## 26. Presentation Purity Invariant
 > Phase 4F must not modify resolver logic, strategy logic, persistence, state models, registry structure, or type contracts. All changes are limited to presentation, animation, transitions, visual feedback, and accessibility enhancements.
 
+---
+
+## 27. Materialized Draft Editing Invariant
+> The Playlist Cover editor shall operate on a fully materialized draft representation during an editing session. Upon opening the editor, the persisted `PlaylistCoverSettings` are transformed into a complete editable draft in which every visible slot contains an explicit song assignment. All editor interactions (drag-and-drop, button reordering, keyboard reordering, active slot selection, restore, preview updates) operate exclusively on this materialized draft. The persisted settings remain unchanged until the user explicitly saves. The persisted representation and the editing representation are intentionally different models with different responsibilities.
+
+---
+
+## 28. Single Editable Source of Truth Invariant
+> During an editing session, all interactive editor components must derive their displayed slot order from the materialized draft only. Interactive components must never independently resolve persisted settings or reconstruct fallback slot assignments.
+
+---
+
+## 29. Resolver Boundary Invariant
+> Runtime playlist resolution and editor materialization are independent responsibilities. Runtime resolvers must not be used as interactive editing state, and editor state must not mutate runtime resolver outputs.
+
+---
+
+## 30. Single Assignment Algorithm Invariant
+> All slot assignment and fallback fill rules must be implemented in a single shared assignment resolver layer. Runtime resolvers and editor materializers must consume this shared layer rather than duplicating slot assignment algorithms.
+

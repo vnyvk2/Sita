@@ -1,5 +1,5 @@
-import type { PlaylistCoverSettings } from '../types/playlistCover';
-import { getAutoCoverStrategy } from './autoCoverStrategies/AutoCoverStrategyRegistry';
+import type { EffectiveCoverSlot, PlaylistCoverSettings } from '../types/playlistCover';
+import { resolveCoverSlotAssignments } from './resolveCoverSlotAssignments';
 
 export function resolveEffectiveCoverSongs(
   settings?: PlaylistCoverSettings,
@@ -13,59 +13,15 @@ export function resolveEffectiveCoverSongs(
     }
   }
 
-  // 1. If auto mode or no custom collage settings provided: delegate to AutoCoverStrategy
-  if (!settings || settings.type === 'auto' || !settings.collage) {
-    const strategy = getAutoCoverStrategy(settings?.autoStrategy);
-    return strategy.resolveSongs({ songs: playlistSongs, targetSize: maxSize });
-  }
-
-  const { size = maxSize, songIds = [] } = settings.collage;
-  const targetSize = Math.min(size, maxSize);
-
-  // 2. Map requested songIds directly, preserving index and explicitly preserving undefined for '0'
-  const validSelectedSongs: (SongData | undefined)[] = [];
-  for (const id of songIds) {
-    if (validSelectedSongs.length >= targetSize) break;
-    if (id === 0) {
-      validSelectedSongs.push(undefined);
-    } else {
-      validSelectedSongs.push(songMap.get(id));
-    }
-  }
-
-  // 3. Fill missing slots from playlist songs where elements are undefined
-  const validSongsSet = new Set(validSelectedSongs.filter((s): s is SongData => s !== undefined).map(s => s.songId));
-  let fallbackIndex = 0;
-
-  for (let i = 0; i < targetSize; i++) {
-    if (validSelectedSongs[i] === undefined) {
-      // Find next unused playlist song
-      while (fallbackIndex < playlistSongs.length) {
-        const fallbackSong = playlistSongs[fallbackIndex];
-        fallbackIndex++;
-        
-        if (fallbackSong && !validSongsSet.has(fallbackSong.songId)) {
-          validSelectedSongs[i] = fallbackSong;
-          validSongsSet.add(fallbackSong.songId);
-          break;
-        }
-      }
-    }
-  }
-
-  // 4. Pad array up to targetSize with undefined so downstream renderers receive expected slot count
-  while (validSelectedSongs.length < targetSize) {
-    validSelectedSongs.push(undefined);
-  }
-
-  return validSelectedSongs;
+  const slotIds = resolveCoverSlotAssignments(settings, playlistSongs, maxSize);
+  return slotIds.map((id) => (id === null ? undefined : songMap.get(id)));
 }
 
 export function resolveEffectiveCoverSlots(
   settings?: PlaylistCoverSettings,
   playlistSongs: SongData[] = [],
   maxSize: number = 4
-): import('../types/playlistCover').EffectiveCoverSlot[] {
+): EffectiveCoverSlot[] {
   const effectiveSongs = resolveEffectiveCoverSongs(settings, playlistSongs, maxSize);
   const isAutoMode = !settings || settings.type === 'auto' || !settings.collage;
   const configuredSongIds = settings?.collage?.songIds || [];

@@ -4,10 +4,12 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
-import type { AutoCoverStrategyId, CoverLayoutVariant, CoverSlotIndex, PlaylistCoverDraft, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
+import type { AutoCoverStrategyId, CoverLayoutVariant, CoverSlotIndex, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
+import type { MaterializedCoverDraft } from '../../types/playlistCoverDraft';
+import { buildMaterializedCoverDraft, getDraftSongs } from '../../utils/buildMaterializedCoverDraft';
+import { isDraftEqual } from '../../utils/isDraftEqual';
 import storage from '../../utils/localStorage';
-import { isPlaylistCoverSettingsEqual } from '../../utils/isPlaylistCoverSettingsEqual';
-import { resolveEffectiveCoverSongs, resolveEffectiveCoverSlots } from '../../utils/resolveEffectiveCoverSongs';
+import { serializeDraftToSettings } from '../../utils/serializeDraftToSettings';
 import Button from '../Button';
 import CoverLivePreview from './CoverLivePreview';
 import CoverTypeSelector from './CoverTypeSelector';
@@ -27,97 +29,98 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const originalSettings: PlaylistCoverSettings = useMemo(() => {
+  // Phase 4H Materialized Draft Architecture (Invariants 27, 28, 29, 30)
+  const initialMaterializedDraft: MaterializedCoverDraft = useMemo(() => {
     const loaded = storage.playlistCoverSettings.getSettings(playlist.id);
-    if (loaded) {
-      return { version: 1, ...loaded };
-    }
-    return {
-      version: 1,
-      type: 'auto',
-      collage: {
-        layout: 'grid',
-        size: 4,
-        songIds: []
-      }
-    };
-  }, [playlist.id]);
+    const loadedSettings: PlaylistCoverSettings = loaded
+      ? { version: 1, ...loaded }
+      : {
+          version: 1,
+          type: 'auto',
+          collage: {
+            layout: 'grid',
+            size: 4,
+            songIds: []
+          }
+        };
+    return buildMaterializedCoverDraft(loadedSettings, playlistSongs);
+  }, [playlist.id, playlistSongs]);
 
-  const [currentSettings, setCurrentSettings] = useState<PlaylistCoverSettings>(originalSettings);
+  const [draft, setDraft] = useState<MaterializedCoverDraft>(initialMaterializedDraft);
 
   // Phase 3D Slot Interaction States
   const [activeSlotIndex, setActiveSlotIndex] = useState<CoverSlotIndex | null>(null);
   const [hoveredSlotIndex, setHoveredSlotIndex] = useState<CoverSlotIndex | null>(null);
   const [focusedSlotIndex, setFocusedSlotIndex] = useState<CoverSlotIndex | null>(null);
 
-  const draft: PlaylistCoverDraft = useMemo(() => {
-    return {
-      originalSettings,
-      currentSettings,
-      workingSongs: playlistSongs
-    };
-  }, [originalSettings, currentSettings, playlistSongs]);
-
-  const resolvedPreviewCover = usePlaylistCoverPreview({ draft, playlist });
+  const resolvedPreviewCover = usePlaylistCoverPreview({ draft, playlistSongs });
 
   const isDirty = useMemo(() => {
-    return !isPlaylistCoverSettingsEqual(originalSettings, currentSettings);
-  }, [originalSettings, currentSettings]);
+    return !isDraftEqual(initialMaterializedDraft, draft);
+  }, [initialMaterializedDraft, draft]);
 
   // Reset interactive slot states whenever type, layout, or count changes
-  const handleTypeChange = useCallback((newType: PlaylistCoverSettings['type']) => {
-    setActiveSlotIndex(null);
-    setHoveredSlotIndex(null);
-    setFocusedSlotIndex(null);
-    setCurrentSettings((prev) => ({
-      ...prev,
-      type: newType,
-      collage: prev.collage || {
-        layout: 'grid',
-        size: 4,
-        songIds: []
-      }
-    }));
-  }, []);
+  const handleTypeChange = useCallback(
+    (newType: PlaylistCoverSettings['type']) => {
+      setActiveSlotIndex(null);
+      setHoveredSlotIndex(null);
+      setFocusedSlotIndex(null);
+      setDraft((prev) => {
+        if (newType === 'auto') {
+          return buildMaterializedCoverDraft(
+            { ...serializeDraftToSettings(prev), type: 'auto' },
+            playlistSongs
+          );
+        }
+        return { ...prev, type: 'collage' };
+      });
+    },
+    [playlistSongs]
+  );
 
-  const handleStrategyChange = useCallback((autoStrategy: AutoCoverStrategyId) => {
-    setCurrentSettings((prev) => ({
-      ...prev,
-      autoStrategy
-    }));
-  }, []);
+  const handleStrategyChange = useCallback(
+    (autoStrategy: AutoCoverStrategyId) => {
+      setDraft((prev) => {
+        const updatedSettings: PlaylistCoverSettings = {
+          ...serializeDraftToSettings(prev),
+          type: 'auto',
+          autoStrategy
+        };
+        return buildMaterializedCoverDraft(updatedSettings, playlistSongs);
+      });
+    },
+    [playlistSongs]
+  );
 
   const handleLayoutChange = useCallback((newLayout: PlaylistCoverLayout) => {
     setActiveSlotIndex(null);
     setHoveredSlotIndex(null);
     setFocusedSlotIndex(null);
-    setCurrentSettings((prev) => {
-      const currentSize = prev.collage?.size || 4;
-      const nextSize = (newLayout !== 'diamond' && currentSize > 4 ? 4 : currentSize) as 1 | 2 | 3 | 4 | 5;
-      const currentIds = prev.collage?.songIds || [];
-      const newSongIds = currentIds.length > nextSize ? currentIds.slice(0, nextSize) : currentIds;
+    setDraft((prev) => {
+      const nextSize = (newLayout !== 'diamond' && prev.size > 4 ? 4 : prev.size) as 1 | 2 | 3 | 4 | 5;
+      const nextSlots = [...prev.slots];
+      if (nextSlots.length > nextSize) {
+        nextSlots.splice(nextSize);
+      } else {
+        while (nextSlots.length < nextSize) {
+          nextSlots.push({ songId: null });
+        }
+      }
 
       return {
         ...prev,
-        collage: {
-          layout: newLayout,
-          variant: undefined,
-          size: nextSize,
-          songIds: newSongIds
-        }
+        layout: newLayout,
+        variant: undefined,
+        size: nextSize,
+        slots: nextSlots
       };
     });
   }, []);
 
   const handleVariantChange = useCallback((newVariant: CoverLayoutVariant) => {
-    setCurrentSettings((prev) => ({
+    setDraft((prev) => ({
       ...prev,
-      collage: {
-        layout: prev.collage?.layout || 'grid',
-        variant: newVariant,
-        size: prev.collage?.size || 4,
-        songIds: prev.collage?.songIds || []
-      }
+      variant: newVariant
     }));
   }, []);
 
@@ -125,16 +128,19 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     setActiveSlotIndex(null);
     setHoveredSlotIndex(null);
     setFocusedSlotIndex(null);
-    setCurrentSettings((prev) => {
-      const currentIds = prev.collage?.songIds || [];
-      const newSongIds = currentIds.length > newSize ? currentIds.slice(0, newSize) : currentIds;
+    setDraft((prev) => {
+      const nextSlots = [...prev.slots];
+      if (nextSlots.length > newSize) {
+        nextSlots.splice(newSize);
+      } else {
+        while (nextSlots.length < newSize) {
+          nextSlots.push({ songId: null });
+        }
+      }
       return {
         ...prev,
-        collage: {
-          layout: prev.collage?.layout || 'grid',
-          size: newSize,
-          songIds: newSongIds
-        }
+        size: newSize,
+        slots: nextSlots
       };
     });
   }, []);
@@ -144,46 +150,31 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, []);
 
   const handleSwapSlots = useCallback((fromIndex: CoverSlotIndex, toIndex: CoverSlotIndex) => {
-    setCurrentSettings((prev) => {
-      const currentIds = [...(prev.collage?.songIds || [])];
-      const maxSize = prev.collage?.size || 4;
-
-      // Ensure array has elements up to required swap indices
-      while (currentIds.length <= Math.max(fromIndex, toIndex)) {
-        currentIds.push(0);
-      }
-
-      const temp = currentIds[fromIndex];
-      currentIds[fromIndex] = currentIds[toIndex];
-      currentIds[toIndex] = temp;
+    setDraft((prev) => {
+      const newSlots = [...prev.slots];
+      const temp = newSlots[fromIndex];
+      newSlots[fromIndex] = newSlots[toIndex];
+      newSlots[toIndex] = temp;
 
       return {
         ...prev,
-        collage: {
-          layout: prev.collage?.layout || 'grid',
-          size: maxSize,
-          songIds: currentIds.filter((id) => id !== undefined)
-        }
+        type: 'collage',
+        slots: newSlots
       };
     });
   }, []);
 
   const handleClearSlot = useCallback((slot: CoverSlotIndex) => {
-    setCurrentSettings((prev) => {
-      const currentIds = [...(prev.collage?.songIds || [])];
-      const maxSize = prev.collage?.size || 4;
-
-      if (slot < currentIds.length) {
-        currentIds[slot] = 0;
+    setDraft((prev) => {
+      const newSlots = [...prev.slots];
+      if (slot < newSlots.length) {
+        newSlots[slot] = { songId: null };
       }
 
       return {
         ...prev,
-        collage: {
-          layout: prev.collage?.layout || 'grid',
-          size: maxSize,
-          songIds: currentIds
-        }
+        type: 'collage',
+        slots: newSlots
       };
     });
     setActiveSlotIndex((prev) => (prev === slot ? null : prev));
@@ -191,31 +182,25 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
   const handleToggleSong = useCallback(
     (songId: number) => {
-      setCurrentSettings((prev) => {
-        const currentIds = prev.collage?.songIds || [];
-        const maxSize = prev.collage?.size || 4;
+      setDraft((prev) => {
+        const newSlots = [...prev.slots];
+        const currentIds = newSlots.map((s) => s.songId);
 
         // Targeted Replacement Mode
         if (activeSlotIndex !== null) {
-          const updatedIds = [...currentIds];
-          // Remove existing instance if present to prevent duplicate song assignments
-          const existingIndex = updatedIds.indexOf(songId);
+          const existingIndex = currentIds.indexOf(songId);
           if (existingIndex !== -1 && existingIndex !== activeSlotIndex) {
-            updatedIds[existingIndex] = 0;
+            newSlots[existingIndex] = { songId: null };
           }
-          // Fill empty preceding slots with 0 if necessary
-          while (updatedIds.length < activeSlotIndex) {
-            updatedIds.push(0);
+          while (newSlots.length <= activeSlotIndex) {
+            newSlots.push({ songId: null });
           }
-          updatedIds[activeSlotIndex] = songId;
+          newSlots[activeSlotIndex] = { songId };
 
           return {
             ...prev,
-            collage: {
-              layout: prev.collage?.layout || 'grid',
-              size: maxSize,
-              songIds: updatedIds.filter((id) => id !== undefined)
-            }
+            type: 'collage',
+            slots: newSlots
           };
         }
 
@@ -224,35 +209,23 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         if (isSelected) {
           return {
             ...prev,
-            collage: {
-              layout: prev.collage?.layout || 'grid',
-              size: maxSize,
-              songIds: currentIds.map((id) => id === songId ? 0 : id)
-            }
+            type: 'collage',
+            slots: newSlots.map((s) => (s.songId === songId ? { songId: null } : s))
           };
         }
 
-        // Find the first empty slot if available, otherwise append
-        const emptyIndex = currentIds.indexOf(0);
-        
-        if (emptyIndex === -1 && currentIds.length >= maxSize) {
-          return prev;
-        }
-
-        const updatedIds = [...currentIds];
+        // Find first empty slot (null)
+        const emptyIndex = currentIds.indexOf(null);
         if (emptyIndex !== -1) {
-          updatedIds[emptyIndex] = songId;
-        } else {
-          updatedIds.push(songId);
+          newSlots[emptyIndex] = { songId };
+        } else if (newSlots.length < prev.size) {
+          newSlots.push({ songId });
         }
 
         return {
           ...prev,
-          collage: {
-            layout: prev.collage?.layout || 'grid',
-            size: maxSize,
-            songIds: updatedIds
-          }
+          type: 'collage',
+          slots: newSlots
         };
       });
 
@@ -268,31 +241,24 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     setActiveSlotIndex(null);
     setHoveredSlotIndex(null);
     setFocusedSlotIndex(null);
-    setCurrentSettings(originalSettings);
-  }, [originalSettings]);
+    setDraft(initialMaterializedDraft);
+  }, [initialMaterializedDraft]);
 
   const handleSave = useCallback(() => {
     if (!isDirty || !playlist?.id || SpecialPlaylists.isSpecialPlaylistId(playlist.id)) return;
-    const settingsToSave: PlaylistCoverSettings = {
-      version: 1,
-      ...currentSettings
-    };
+    const settingsToSave = serializeDraftToSettings(draft);
     storage.playlistCoverSettings.setSettings(playlist.id, settingsToSave);
     changePromptMenuData(false);
-  }, [changePromptMenuData, isDirty, playlist?.id, currentSettings]);
+  }, [changePromptMenuData, isDirty, playlist?.id, draft]);
 
-  const currentSize = currentSettings.collage?.size || 4;
-  const isDiamond = currentSettings.collage?.layout === 'diamond';
+  const currentSize = draft.size;
+  const isDiamond = draft.layout === 'diamond';
   const availableCounts = isDiamond ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
 
-  // Single Source of Truth for Effective Cover Songs and Slots
+  // Derived effective songs directly from materialized draft
   const effectiveSongs = useMemo(() => {
-    return resolveEffectiveCoverSongs(currentSettings, playlistSongs, currentSize);
-  }, [currentSettings, playlistSongs, currentSize]);
-
-  const effectiveSlots = useMemo(() => {
-    return resolveEffectiveCoverSlots(currentSettings, playlistSongs, currentSize);
-  }, [currentSettings, playlistSongs, currentSize]);
+    return getDraftSongs(draft, playlistSongs);
+  }, [draft, playlistSongs]);
 
   return (
     <div className="flex w-full max-w-[880px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden mx-auto">
@@ -323,32 +289,10 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
             onHoverSlot={setHoveredSlotIndex}
           />
 
-          {/* Targeted Replacement Banner */}
-          {activeSlotIndex !== null && (
-            <div className="flex items-center justify-between rounded-xl bg-amber-500/15 border border-amber-500/30 p-3 text-amber-300 shadow-md transition-all duration-200">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 font-bold text-neutral-950 text-xs">
-                  {BADGES[activeSlotIndex]}
-                </span>
-                <span className="text-xs font-semibold">
-                  Replacing Slot {BADGES[activeSlotIndex]} — Click any song on right
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveSlotIndex(null)}
-                className="rounded-lg bg-amber-500/20 px-2 py-1 text-xs font-semibold hover:bg-amber-500/30 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Selected Songs Reorder & Position Swap Bar (Collage Mode) */}
-          {currentSettings.type === 'collage' && (
+          {/* Interactive Selected Songs Drag-and-Drop Reorder Bar */}
+          {draft.type === 'collage' && (
             <SelectedSongsReorderBar
               effectiveSongs={effectiveSongs}
-              effectiveSlots={effectiveSlots}
               maxSize={currentSize}
               activeSlotIndex={activeSlotIndex}
               hoveredSlotIndex={hoveredSlotIndex}
@@ -361,70 +305,67 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
           )}
         </div>
 
-        {/* Right Column (Scrollable Controls Sidebar ~500px) */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto pr-1">
-          {/* Mode Selector (Auto vs Collage) */}
+        {/* Right Column (Scrollable Controls & Song Picker) */}
+        <div className="flex-1 min-w-0 overflow-y-auto pr-1 flex flex-col gap-6">
+          {/* Cover Mode Selector */}
           <CoverTypeSelector
-            type={currentSettings.type}
-            autoStrategy={currentSettings.autoStrategy}
-            onChangeType={handleTypeChange}
-            onChangeStrategy={handleStrategyChange}
+            type={draft.type}
+            autoStrategy={draft.autoStrategy}
+            onTypeChange={handleTypeChange}
+            onStrategyChange={handleStrategyChange}
           />
 
-          {/* Cover Images Count Selector */}
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
-            <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
-              {availableCounts.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
-                  className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                    currentSize === s
-                      ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
-                      : 'text-neutral-400 hover:text-neutral-200'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Collage Options */}
-          {currentSettings.type === 'collage' && (
+          {draft.type === 'collage' && (
             <>
-              {/* Data-Driven Layout Cards */}
+              {/* Layout Geometry Preset Selector */}
               <LayoutSelector
-                selectedLayout={currentSettings.collage?.layout || 'grid'}
-                onChange={handleLayoutChange}
+                selectedLayout={draft.layout}
+                selectedSize={currentSize}
+                availableCounts={availableCounts}
+                onLayoutChange={handleLayoutChange}
+                onSizeChange={handleSizeChange}
               />
 
-              {/* Sub-Style Variant Selector */}
+              {/* Sub-style Variant Selector */}
               <VariantSelector
-                layout={currentSettings.collage?.layout || 'grid'}
-                selectedVariant={currentSettings.collage?.variant}
-                onChange={handleVariantChange}
+                layout={draft.layout}
+                selectedVariant={draft.variant}
+                onVariantChange={handleVariantChange}
               />
 
               {/* Numbered Song Picker */}
               <NumberedSongPicker
                 playlistSongs={playlistSongs}
-                selectedSongIds={currentSettings.collage?.songIds || []}
-                maxSize={currentSize}
+                selectedSongIds={draft.slots.map((s) => s.songId).filter((id): id is number => id !== null)}
                 activeSlotIndex={activeSlotIndex}
+                maxSize={currentSize}
                 onToggleSong={handleToggleSong}
+                badges={BADGES}
               />
             </>
           )}
         </div>
       </div>
 
-      {/* Modal Action Buttons (Reset vs Save) */}
-      <div className="mt-4 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4 shrink-0">
-        <Button label={t('common.reset', 'Reset')} isDisabled={!isDirty} clickHandler={handleReset} />
-        <Button label={t('common.save', 'Save')} isDisabled={!isDirty} clickHandler={handleSave} />
+      {/* Footer Controls */}
+      <div className="mt-5 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4 shrink-0">
+        <Button
+          label={t('common.reset', 'Reset')}
+          className="mr-0"
+          clickHandler={handleReset}
+          isDisabled={!isDirty}
+        />
+        <Button
+          label={t('common.cancel', 'Cancel')}
+          className="mr-0"
+          clickHandler={() => changePromptMenuData(false)}
+        />
+        <Button
+          label={t('common.save', 'Save Changes')}
+          className="bg-amber-500! hover:bg-amber-400! text-neutral-950! font-bold! border-none! mr-0"
+          clickHandler={handleSave}
+          isDisabled={!isDirty}
+        />
       </div>
     </div>
   );

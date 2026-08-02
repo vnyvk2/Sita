@@ -1,15 +1,15 @@
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useMemo } from 'react';
-import type { PlaylistCoverDraft, ResolvedPlaylistCover } from '../types/playlistCover';
-import { resolvePlaylistCover } from '../utils/resolvePlaylistCover';
+import type { ResolvedPlaylistCover } from '../types/playlistCover';
+import type { MaterializedCoverDraft } from '../types/playlistCoverDraft';
+import { resolvePlaylistCoverFromDraft } from '../utils/resolvePlaylistCover';
 
 type Params = {
-  draft: PlaylistCoverDraft;
-  playlist: PlaylistDto;
+  draft: MaterializedCoverDraft;
+  playlistSongs?: SongData[];
 };
 
-export function usePlaylistCoverPreview({ draft, playlist }: Params): ResolvedPlaylistCover {
+export function usePlaylistCoverPreview({ draft, playlistSongs = [] }: Params): ResolvedPlaylistCover {
   return useMemo(() => {
-    return resolvePlaylistCover(playlist, draft.currentSettings, draft.workingSongs);
-  }, [playlist, draft.currentSettings, draft.workingSongs]);
+    return resolvePlaylistCoverFromDraft(draft, playlistSongs);
+  }, [draft, playlistSongs]);
 }

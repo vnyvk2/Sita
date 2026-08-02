@@ -1,6 +1,8 @@
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import DefaultImgCover from '../assets/images/webp/song_cover_default.webp';
 import type { PlaylistCoverSettings, ResolvedPlaylistCover } from '../types/playlistCover';
+import type { MaterializedCoverDraft } from '../types/playlistCoverDraft';
+import { getDraftSongs } from './buildMaterializedCoverDraft';
 import { resolveEffectiveCoverSongs } from './resolveEffectiveCoverSongs';
 
 export function resolvePlaylistCover(
@@ -21,4 +23,18 @@ export function resolvePlaylistCover(
   const artworks = effectiveSongs.map((s) => s?.artworkPaths?.artworkPath || DefaultImgCover);
 
   return { layout, variant, artworks };
+}
+
+export function resolvePlaylistCoverFromDraft(
+  draft: MaterializedCoverDraft,
+  playlistSongs: SongData[] = []
+): ResolvedPlaylistCover {
+  const draftSongs = getDraftSongs(draft, playlistSongs);
+  const artworks = draftSongs.map((s) => s?.artworkPaths?.artworkPath || DefaultImgCover);
+
+  return {
+    layout: draft.layout,
+    variant: draft.variant,
+    artworks
+  };
 }
