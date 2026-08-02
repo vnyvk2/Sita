@@ -12,7 +12,7 @@ import { ExportService } from '../../playlistExport/services/ExportService';
 import importPlaylist, { analyzePlaylistImport } from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
-import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions } from '../../../common/collections/types';
+import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistBatchExportOptions } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export function setupCollectionIpc(
@@ -143,6 +143,10 @@ export function setupCollectionIpc(
 
   ipcMain.handle('collections/export', async (_, playlistId: number, options?: PlaylistExportOptions) => {
     return await exportService.exportPlaylist(playlistId, options || { format: 'm3u8', order: 'customOrder', pathType: 'absolute' });
+  });
+
+  ipcMain.handle('collections/export-batch', async (_, playlistIds: number[], options?: PlaylistBatchExportOptions) => {
+    return await exportService.exportPlaylists(playlistIds, options);
   });
 
   ipcMain.handle('collections/analyze', async (_, filePath?: string) => {

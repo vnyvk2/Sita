@@ -1,4 +1,4 @@
-import { playlistEngine } from '../collections/setup';
+import { playlistEngine, playlistRepository } from '../collections/setup';
 import { M3UImporter } from './importers/M3UImporter';
 import { PlaylistImportPipeline } from './pipeline/PlaylistImportPipeline';
 import { PlaylistImportPlanner } from './planner/PlaylistImportPlanner';

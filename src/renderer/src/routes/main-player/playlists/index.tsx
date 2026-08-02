@@ -21,7 +21,7 @@ import PageSearchInput from '@renderer/components/PageSearchInput';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -45,6 +45,9 @@ const NewPlaylistPrompt = lazy(
 );
 const MergePlaylistsPrompt = lazy(
   () => import('@renderer/components/PlaylistsPage/MergePlaylistsPrompt')
+);
+const PlaylistBatchExportSettingsPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/PlaylistBatchExportSettingsPrompt')
 );
 
 const MIN_ITEM_WIDTH = 175;
@@ -180,6 +183,26 @@ function PlaylistsPage() {
                   clickHandler={() => selectAllHandler()}
                   tooltipLabel={t('common.selectAll')}
                 />
+                {multipleSelectionsData.multipleSelections.length > 0 && (
+                  <Button
+                    key="batch-export-playlists-btn"
+                    label={t('playlistsPage.export', 'Export')}
+                    className="batch-export-playlists-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                    iconName="file_upload"
+                    clickHandler={() => {
+                      const selectedPlaylistIds = multipleSelectionsData.multipleSelections.map(Number);
+                      changePromptMenuData(
+                        true,
+                        <Suspense fallback={null}>
+                          <PlaylistBatchExportSettingsPrompt
+                            playlistIds={selectedPlaylistIds}
+                          />
+                        </Suspense>
+                      );
+                    }}
+                    tooltipLabel={t('playlistsPage.exportSelectedPlaylists', 'Export selected playlists')}
+                  />
+                )}
                 {multipleSelectionsData.multipleSelections.length >= 2 && (
                   <Button
                     key="merge-playlists-btn"

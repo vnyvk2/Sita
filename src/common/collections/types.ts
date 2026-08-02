@@ -116,3 +116,31 @@ export interface PlaylistImportAnalysis {
   repairedCount: number;
 }
 
+export interface PlaylistBatchExportOptions {
+  format: PlaylistExportFormat;
+  order: 'customOrder' | 'originalOrder';
+  pathType: 'absolute' | 'relative';
+  includeExtInf?: boolean;
+  destinationDir?: string;
+}
+
+export interface BatchExportItemResult {
+  playlistId: number;
+  playlistName: string;
+  filePath?: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BatchExportResult {
+  totalCount: number;
+  items: BatchExportItemResult[];
+  destinationDir: string;
+}
+
+export interface BatchExportProgressPayload {
+  current: number;
+  total: number;
+  playlistName: string;
+}
+

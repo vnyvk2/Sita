@@ -1,0 +1,194 @@
+import { useContext, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import type { PlaylistExportFormat, PlaylistBatchExportOptions, BatchExportResult, BatchExportProgressPayload } from '@common/collections/types';
+import Button from '../Button';
+import Dropdown from '../Dropdown';
+import { CollectionClient } from '@renderer/api/CollectionClient';
+import BatchExportResultPrompt from './BatchExportResultPrompt';
+
+interface PlaylistBatchExportSettingsPromptProps {
+  playlistIds: number[];
+}
+
+const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPromptProps) => {
+  const { playlistIds } = props;
+  const { t } = useTranslation();
+  const { changePromptMenuData } = useContext(AppUpdateContext);
+
+  const [format, setFormat] = useState<PlaylistExportFormat>('m3u8');
+  const [order, setOrder] = useState<'customOrder' | 'originalOrder'>('customOrder');
+  const [pathType, setPathType] = useState<'absolute' | 'relative'>('absolute');
+  const [destinationDir, setDestinationDir] = useState<string>('');
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [progress, setProgress] = useState<{ current: number; total: number; playlistName: string } | null>(null);
+
+  useEffect(() => {
+    const handleProgress = (event: any, data: BatchExportProgressPayload) => {
+      setProgress(data);
+    };
+
+    const removeListener = window.api.events?.onEvent
+      ? window.api.events.onEvent((_event: any, payload: any) => {
+          if (payload?.messageCode === 'PLAYLIST_BATCH_EXPORT_PROGRESS') {
+            handleProgress(null, payload.data);
+          }
+        })
+      : undefined;
+
+    return () => {
+      if (removeListener) removeListener();
+    };
+  }, []);
+
+  const handleBrowseDirectory = async () => {
+    const dirs = await window.api.utils.showOpenDialog({
+      title: 'Select Destination Folder for Batch Export',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (dirs && dirs.length > 0) {
+      setDestinationDir(dirs[0]);
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    const options: PlaylistBatchExportOptions = {
+      format,
+      order,
+      pathType,
+      destinationDir: destinationDir || undefined
+    };
+
+    try {
+      const result: BatchExportResult = await CollectionClient.exportBatch(playlistIds, options);
+      setIsExporting(false);
+
+      if (result && result.items.length > 0) {
+        changePromptMenuData(
+          true,
+          <BatchExportResultPrompt result={result} />
+        );
+      } else {
+        changePromptMenuData(false);
+      }
+    } catch (err) {
+      setIsExporting(false);
+      changePromptMenuData(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-6 flex items-center pr-4 text-3xl font-medium">
+        {t('playlist.exportBatchTitle', {
+          count: playlistIds.length,
+          defaultValue: `Export ${playlistIds.length} Playlists`
+        })}
+      </div>
+
+      {isExporting && progress ? (
+        <div className="export-progress-box bg-background-color-dim/50 dark:bg-dark-background-color-dim/50 p-6 rounded-md mb-6">
+          <div className="font-semibold text-lg mb-2 text-font-color-highlight dark:text-dark-font-color-highlight">
+            {t('playlist.exportingProgress', 'Exporting playlists...')}
+          </div>
+          <div className="text-sm opacity-80 mb-3">
+            {progress.current} / {progress.total} — <span className="font-medium">{progress.playlistName}</span>
+          </div>
+          <div className="w-full bg-background-color-dim dark:bg-dark-background-color-dim rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-font-color-highlight dark:bg-dark-font-color-highlight h-2.5 transition-all duration-200"
+              style={{ width: `${(progress.current / progress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="description mb-6">
+          <div className="mb-4">
+            <label className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 block font-medium">
+              Format
+            </label>
+            <Dropdown
+              options={[
+                { label: 'M3U8', value: 'm3u8' },
+                { label: 'M3U', value: 'm3u' }
+              ]}
+              name="batch-export-format"
+              value={format}
+              onChange={(e) => setFormat(e.currentTarget.value as PlaylistExportFormat)}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 block font-medium">
+              Playlist Order
+            </label>
+            <Dropdown
+              options={[
+                { label: 'Custom Order', value: 'customOrder' },
+                { label: 'Original Order', value: 'originalOrder' }
+              ]}
+              name="batch-export-order"
+              value={order}
+              onChange={(e) => setOrder(e.currentTarget.value as 'customOrder' | 'originalOrder')}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 block font-medium">
+              Paths
+            </label>
+            <Dropdown
+              options={[
+                { label: 'Absolute Paths', value: 'absolute' },
+                { label: 'Relative Paths', value: 'relative' }
+              ]}
+              name="batch-export-path-type"
+              value={pathType}
+              onChange={(e) => setPathType(e.currentTarget.value as 'absolute' | 'relative')}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 block font-medium">
+              Destination Folder
+            </label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                readOnly
+                placeholder="Default / Prompt on Export"
+                value={destinationDir}
+                className="w-full bg-background-color-dim dark:bg-dark-background-color-dim px-3 py-2 rounded-md text-sm truncate"
+              />
+              <Button
+                label={t('common.browse', 'Browse')}
+                clickHandler={handleBrowseDirectory}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="buttons-container flex items-center justify-end">
+        <Button
+          label={t('common.cancel', 'Cancel')}
+          className="mr-4"
+          isDisabled={isExporting}
+          clickHandler={() => changePromptMenuData(false)}
+        />
+        <Button
+          label={t('playlist.exportPlaylistsBtn', {
+            count: playlistIds.length,
+            defaultValue: `Export ${playlistIds.length} Playlists`
+          })}
+          className="bg-font-color-highlight! text-font-color-white! dark:bg-dark-font-color-highlight! hover:border-font-color-highlight dark:hover:border-dark-font-color-highlight px-4"
+          isDisabled={isExporting}
+          clickHandler={handleExport}
+        />
+      </div>
+    </>
+  );
+};
+
+export default PlaylistBatchExportSettingsPrompt;
