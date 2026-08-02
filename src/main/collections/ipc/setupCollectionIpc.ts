@@ -12,6 +12,8 @@ import { ExportService } from '../../playlistExport/services/ExportService';
 import importPlaylist, { analyzePlaylistImport } from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
+import type { OpenDialogOptions } from 'electron';
+import { showOpenDialog } from '../../main';
 import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistBatchExportOptions } from '../../../common/collections/types';
 import logger from '../../logger';
 
@@ -155,5 +157,9 @@ export function setupCollectionIpc(
 
   ipcMain.handle('collections/import', async (_, options?: PlaylistImportIpcOptions) => {
     return await importPlaylist(workflow, options);
+  });
+
+  ipcMain.handle('utils/showOpenDialog', async (_, options?: OpenDialogOptions) => {
+    return await showOpenDialog(options);
   });
 }

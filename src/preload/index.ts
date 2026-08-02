@@ -572,7 +572,9 @@ const utils = {
   },
   removeDefaultAppProtocolFromFilePath: (filePath: string) => {
     return filePath.replace(/nora:[/\\]{1,2}localfiles[/\\]{1,2}|\?[\w+=\w+&?]+$/gm, '');
-  }
+  },
+  showOpenDialog: (options?: unknown): Promise<string[]> => ipcRenderer.invoke('utils/showOpenDialog', options),
+  openPath: (dirPath: string): void => ipcRenderer.send('app/revealFolderInFileExplorer', dirPath)
 };
 
 const libraryMetrics = {

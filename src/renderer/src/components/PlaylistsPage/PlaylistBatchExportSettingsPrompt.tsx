@@ -157,7 +157,7 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
               <input
                 type="text"
                 readOnly
-                placeholder="Default / Prompt on Export"
+                placeholder={t('playlist.noFolderSelected', 'No folder selected')}
                 value={destinationDir}
                 className="w-full bg-background-color-dim dark:bg-dark-background-color-dim px-3 py-2 rounded-md text-sm truncate"
               />
