@@ -1,4 +1,4 @@
-import type { LibraryLookup } from '../interfaces/LibraryLookup';
+import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
 import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
 import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
 import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
@@ -11,9 +11,28 @@ export class LibraryResolver {
   async resolvePlaylist(playlist: ResolvedPlaylist): Promise<LibraryResolvedPlaylist> {
     const entries: LibraryResolvedPlaylistEntry[] = [];
 
-    for (const entry of playlist.entries) {
-      const resolvedEntry = await this.resolveEntry(entry);
-      entries.push(resolvedEntry);
+    if (this.libraryLookup.findManyByCanonicalPaths) {
+      const targetPaths: string[] = [];
+      for (const entry of playlist.entries) {
+        const { resolution } = entry.resolvedTrack;
+        if (resolution.resolutionStatus !== 'UNRESOLVED' && resolution.resolutionStatus !== 'INVALID_URI') {
+          const targetPath = resolution.resolvedPath ?? entry.resolvedTrack.track.originalLocation;
+          if (targetPath) {
+            targetPaths.push(targetPath);
+          }
+        }
+      }
+
+      const matchMap = await this.libraryLookup.findManyByCanonicalPaths(targetPaths);
+
+      for (const entry of playlist.entries) {
+        entries.push(this.resolveEntryWithMap(entry, matchMap));
+      }
+    } else {
+      for (const entry of playlist.entries) {
+        const resolvedEntry = await this.resolveEntry(entry);
+        entries.push(resolvedEntry);
+      }
     }
 
     return {
@@ -23,6 +42,100 @@ export class LibraryResolver {
       sourceFormat: playlist.sourceFormat,
       sourceFile: playlist.sourceFile,
       createdByImporter: playlist.createdByImporter
+    };
+  }
+
+  private resolveEntryWithMap(
+    entry: ResolvedPlaylistEntry,
+    matchMap: Map<string, LibrarySongRecord>
+  ): LibraryResolvedPlaylistEntry {
+    const { resolution } = entry.resolvedTrack;
+
+    if (resolution.resolutionStatus === 'UNRESOLVED') {
+      return {
+        position: entry.position,
+        sourceLine: entry.sourceLine,
+        dateAdded: entry.dateAdded,
+        comments: entry.comments,
+        trackReference: {
+          resolvedTrack: entry.resolvedTrack,
+          libraryMatch: {
+            status: 'UNRESOLVED',
+            confidence: 0,
+            diagnostics: resolution.diagnostics
+          }
+        }
+      };
+    }
+
+    if (resolution.resolutionStatus === 'INVALID_URI') {
+      return {
+        position: entry.position,
+        sourceLine: entry.sourceLine,
+        dateAdded: entry.dateAdded,
+        comments: entry.comments,
+        trackReference: {
+          resolvedTrack: entry.resolvedTrack,
+          libraryMatch: {
+            status: 'INVALID_URI',
+            confidence: 0,
+            diagnostics: resolution.diagnostics
+          }
+        }
+      };
+    }
+
+    const targetPath = resolution.resolvedPath ?? entry.resolvedTrack.track.originalLocation;
+    if (targetPath) {
+      const matchedSong = matchMap.get(targetPath);
+
+      if (matchedSong) {
+        const diagnostics: string[] = [];
+        if (resolution.verificationStatus === 'MISSING') {
+          diagnostics.push('File missing from original playlist filesystem location, but matched in Nora library');
+        }
+
+        const match: LibraryMatch = {
+          matchedSongId: matchedSong.id,
+          status: 'MATCHED',
+          matchType: 'EXACT',
+          confidence: 100,
+          candidates: [matchedSong],
+          diagnostics: diagnostics.length > 0 ? diagnostics : undefined
+        };
+
+        return {
+          position: entry.position,
+          sourceLine: entry.sourceLine,
+          dateAdded: entry.dateAdded,
+          comments: entry.comments,
+          trackReference: {
+            resolvedTrack: entry.resolvedTrack,
+            libraryMatch: match
+          }
+        };
+      }
+    }
+
+    const status = resolution.verificationStatus === 'MISSING' ? 'MISSING' : 'NOT_IN_LIBRARY';
+    const diagnostics =
+      resolution.verificationStatus === 'MISSING'
+        ? ['File is missing from filesystem and not found in Nora library']
+        : [`File exists at ${targetPath} but is not present in Nora library`];
+
+    return {
+      position: entry.position,
+      sourceLine: entry.sourceLine,
+      dateAdded: entry.dateAdded,
+      comments: entry.comments,
+      trackReference: {
+        resolvedTrack: entry.resolvedTrack,
+        libraryMatch: {
+          status,
+          confidence: 0,
+          diagnostics
+        }
+      }
     };
   }
 

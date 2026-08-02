@@ -9,5 +9,6 @@ export interface LibrarySongRecord {
 
 export interface LibraryLookup {
   findByCanonicalPath(path: string): Promise<LibrarySongRecord | null>;
+  findManyByCanonicalPaths?(paths: string[]): Promise<Map<string, LibrarySongRecord>>;
   findByFilename?(filename: string): Promise<LibrarySongRecord[]>;
 }
