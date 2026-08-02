@@ -61,8 +61,12 @@ export class PlaylistImportExecutor {
       }
 
       if (entriesToImport.length > 0) {
-        logger.info(`PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${playlistId}...`);
-        await this.persistence.addEntries(playlistId, entriesToImport);
+        logger.info(`PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${playlistId} in chunked batches...`);
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < entriesToImport.length; i += CHUNK_SIZE) {
+          const chunk = entriesToImport.slice(i, i + CHUNK_SIZE);
+          await this.persistence.addEntries(playlistId, chunk);
+        }
         logger.info(`PlaylistImportExecutor: entries added successfully.`);
       }
     });
