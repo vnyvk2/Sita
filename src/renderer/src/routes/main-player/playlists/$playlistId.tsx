@@ -40,6 +40,9 @@ const SensitiveActionConfirmPrompt = lazy(
 const AddSongsToTargetPlaylistPrompt = lazy(
   () => import('@renderer/components/PlaylistsPage/AddSongsToTargetPlaylistPrompt')
 );
+const PlaylistExportSettingsPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/PlaylistExportSettingsPrompt')
+);
 
 export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   validateSearch: songSearchSchema,
@@ -402,6 +405,15 @@ function PlaylistInfoPage() {
     [createQueue, playlistData.id, playlistData.name, filteredSongs]
   );
 
+  const openExportPrompt = useCallback(() => {
+    changePromptMenuData(
+      true,
+      <Suspense fallback={<EditingOptionsSkeleton />}>
+        <PlaylistExportSettingsPrompt playlistId={playlistData.id} />
+      </Suspense>
+    );
+  }, [changePromptMenuData, playlistData.id]);
+
   const searchBar = (
     <PageSearchInput
       key="playlist-search-input"
@@ -464,6 +476,15 @@ function PlaylistInfoPage() {
             iconName: 'clear',
             clickHandler: clearSongHistory,
             isVisible: playlistData.id === SpecialPlaylists.History,
+            isDisabled: !(playlistData.itemCount > 0)
+          },
+          {
+            tooltipLabel: t('playlist.exportPlaylist', 'Export Playlist'),
+            iconName: 'file_download',
+            clickHandler: openExportPrompt,
+            isVisible:
+              playlistData.id !== SpecialPlaylists.History &&
+              playlistData.id !== SpecialPlaylists.Favorites,
             isDisabled: !(playlistData.itemCount > 0)
           },
           {

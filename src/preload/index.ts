@@ -18,7 +18,7 @@ import type { MergePlaylistsInput } from '../main/collections/operations/MergePl
 import type { BulkDeleteInput, BulkRestoreInput } from '../main/collections/operations/BulkDeleteOp';
 import type { PinInput, UnpinInput } from '../main/collections/operations/PinOp';
 import type { CollectionEvent } from '../main/collections/events/CollectionEventBus';
-import type { PlaylistViewMode } from '../common/collections/types';
+import type { PlaylistViewMode, PlaylistExportOptions } from '../common/collections/types';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -613,7 +613,7 @@ const collections = {
     onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => ipcRenderer.on('collections/event', callback),
     offEvent: (callback: (...args: any[]) => void) => ipcRenderer.removeListener('collections/event', callback)
   },
-  export: (playlistId: number): Promise<void> => ipcRenderer.invoke('collections/export', playlistId),
+  export: (playlistId: number, options?: PlaylistExportOptions): Promise<void> => ipcRenderer.invoke('collections/export', playlistId, options),
   import: (targetPlaylistId?: number): Promise<void> => ipcRenderer.invoke('collections/import', targetPlaylistId)
 };
 

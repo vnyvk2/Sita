@@ -12,7 +12,7 @@ import clearSearchHistoryResults from './core/clearSeachHistoryResults';
 import clearSongHistory from './core/clearSongHistory';
 import deleteSongsFromSystem from './core/deleteSongsFromSystem';
 import exportAppData from './core/exportAppData';
-import exportPlaylist from './core/exportPlaylist';
+
 import fetchAlbumData from './core/fetchAlbumData';
 import fetchArtistData from './core/fetchArtistData';
 import fetchSongInfoFromLastFM from './core/fetchSongInfoFromLastFM';

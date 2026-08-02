@@ -18,6 +18,7 @@ import PlaylistCover from './PlaylistCover';
 
 const ConfirmDeletePlaylistsPrompt = lazy(() => import('./ConfirmDeletePlaylistsPrompt'));
 const RenamePlaylistPrompt = lazy(() => import('./RenamePlaylistPrompt'));
+const PlaylistExportSettingsPrompt = lazy(() => import('./PlaylistExportSettingsPrompt'));
 
 const getPlaylistSongIds = async (id: number): Promise<number[]> => {
   const entries = await CollectionClient.getEntries(id);
@@ -302,7 +303,14 @@ export const Playlist = (props: PlaylistProp) => {
         {
           label: t('playlist.exportPlaylist'),
           iconName: 'upload',
-          handlerFunction: () => CollectionClient.export(props.id),
+          handlerFunction: () => {
+            changePromptMenuData(
+              true,
+              <Suspense fallback={null}>
+                <PlaylistExportSettingsPrompt playlistId={props.id} />
+              </Suspense>
+            );
+          },
           isDisabled: isMultipleSelectionEnabled
         },
         {

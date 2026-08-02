@@ -8,11 +8,12 @@ import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
 
-import exportPlaylist from '../../core/exportPlaylist';
+import { ExportService } from '../../playlistExport/services/ExportService';
 import importPlaylist from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
 import type { PlaylistViewMode } from '../../../common/collections/types';
+import type { PlaylistExportOptions } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export function setupCollectionIpc(
@@ -139,8 +140,10 @@ export function setupCollectionIpc(
   });
 
   // Import / Export
-  ipcMain.handle('collections/export', async (_, playlistId: number) => {
-    return await exportPlaylist(playlistId, repository);
+  const exportService = new ExportService(repository);
+
+  ipcMain.handle('collections/export', async (_, playlistId: number, options?: PlaylistExportOptions) => {
+    return await exportService.exportPlaylist(playlistId, options || { format: 'm3u8', order: 'customOrder', pathType: 'absolute' });
   });
 
   ipcMain.handle('collections/import', async (_, targetPlaylistId?: number) => {

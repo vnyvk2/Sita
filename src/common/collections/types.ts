@@ -92,3 +92,13 @@ export interface Collection {
   createdAt: Date | string;
   updatedAt: Date | string;
 }
+
+export type PlaylistExportFormat = 'm3u' | 'm3u8' | 'pls' | 'json';
+
+export interface PlaylistExportOptions {
+  format: PlaylistExportFormat;
+  order: 'customOrder' | 'originalOrder';
+  pathType: 'absolute' | 'relative';
+  includeExtInf?: boolean;
+}
+
