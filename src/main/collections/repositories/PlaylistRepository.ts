@@ -148,13 +148,22 @@ export class PlaylistRepository {
   public async getPlaylistsForSongs(songIds: readonly number[], trx: DB | DBTransaction = db): Promise<{ songId: number, playlistId: number }[]> {
     if (songIds.length === 0) return [];
 
-    return await trx
-      .select({ 
-        songId: playlistEntries.songId,
-        playlistId: playlistEntries.playlistId 
-      })
-      .from(playlistEntries)
-      .where(inArray(playlistEntries.songId, songIds as number[]));
+    const CHUNK_SIZE = 500;
+    const results: { songId: number; playlistId: number }[] = [];
+
+    for (let i = 0; i < songIds.length; i += CHUNK_SIZE) {
+      const chunk = songIds.slice(i, i + CHUNK_SIZE);
+      const rows = await trx
+        .select({
+          songId: playlistEntries.songId,
+          playlistId: playlistEntries.playlistId
+        })
+        .from(playlistEntries)
+        .where(inArray(playlistEntries.songId, chunk as number[]));
+      results.push(...rows);
+    }
+
+    return results;
   }
 
   public async createPlaylist(data: NewPlaylist, trx: DB | DBTransaction = db) {
@@ -207,11 +216,20 @@ export class PlaylistRepository {
 
   public async deleteEntries(entryIds: number[], trx: DB | DBTransaction = db) {
     if (entryIds.length === 0) return [];
+
+    const CHUNK_SIZE = 500;
+    const deletedEntries: typeof playlistEntries.$inferSelect[] = [];
+
+    for (let i = 0; i < entryIds.length; i += CHUNK_SIZE) {
+      const chunk = entryIds.slice(i, i + CHUNK_SIZE);
+      const deleted = await trx
+        .delete(playlistEntries)
+        .where(inArray(playlistEntries.id, chunk))
+        .returning();
+      deletedEntries.push(...deleted);
+    }
     
-    return await trx
-      .delete(playlistEntries)
-      .where(inArray(playlistEntries.id, entryIds))
-      .returning();
+    return deletedEntries;
   }
 
   public async clearPlaylistEntries(playlistId: number, trx: DB | DBTransaction = db) {
