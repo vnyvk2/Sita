@@ -40,9 +40,14 @@ export interface ActiveSlot {
   index: CoverSlotIndex;
 }
 
+export type CoverSlotState = 'normal' | 'fallback' | 'missing';
+
 export interface EffectiveCoverSlot {
   slot: CoverSlotIndex;
   song?: SongData;
+  state: CoverSlotState;
+  editable: boolean;
+  draggable: boolean;
   isFallback: boolean;
 }
 

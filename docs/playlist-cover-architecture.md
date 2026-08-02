@@ -511,3 +511,8 @@ Reverse dependencies are prohibited.
 ## 22. Future Compatibility Invariant
 > All new persisted settings must be designed with forward compatibility in mind. Schema evolution should favor additive changes and maintain compatibility with previously saved Playlist Cover configurations.
 
+---
+
+## 23. Transient Drag Operation Invariant
+> Drag operations are transient UI interactions. Dragging may modify only the draft slot order. No persistence, resolver mutation, renderer mutation, or application state updates occur until the user explicitly saves.
+

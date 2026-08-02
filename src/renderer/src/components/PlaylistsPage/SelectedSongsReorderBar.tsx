@@ -1,9 +1,11 @@
-import type { CoverSlotIndex } from '../../types/playlistCover';
+import { useState } from 'react';
+import type { CoverSlotIndex, EffectiveCoverSlot } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 
 interface Props {
-  effectiveSongs: (SongData | undefined)[];
+  effectiveSongs?: (SongData | undefined)[];
+  effectiveSlots?: EffectiveCoverSlot[];
   maxSize: number;
   activeSlotIndex: CoverSlotIndex | null;
   hoveredSlotIndex: CoverSlotIndex | null;
@@ -17,7 +19,8 @@ interface Props {
 const BADGES = ['①', '②', '③', '④', '⑤'];
 
 const SelectedSongsReorderBar = ({
-  effectiveSongs,
+  effectiveSongs = [],
+  effectiveSlots,
   maxSize,
   activeSlotIndex,
   hoveredSlotIndex,
@@ -27,6 +30,9 @@ const SelectedSongsReorderBar = ({
   onSwapSlots,
   onClearSlot
 }: Props) => {
+  const [draggingSlot, setDraggingSlot] = useState<CoverSlotIndex | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<CoverSlotIndex | null>(null);
+
   const formatArtists = (artists?: any) => {
     if (!Array.isArray(artists) || artists.length === 0) return '';
     return artists
@@ -40,26 +46,68 @@ const SelectedSongsReorderBar = ({
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Selected Cover Slots</label>
         <span className="text-xs font-medium text-neutral-400">
-          {effectiveSongs.length} / {maxSize} Slots Filled
+          Drag cards to reorder
         </span>
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800">
         {Array.from({ length: maxSize }).map((_, i) => {
           const slotIndex = i as CoverSlotIndex;
-          const song = effectiveSongs[i];
+          const slotData = effectiveSlots ? effectiveSlots[i] : undefined;
+          const song = slotData ? slotData.song : effectiveSongs[i];
+          const isDraggable = slotData ? slotData.draggable : true;
+
           const isActive = activeSlotIndex === slotIndex;
           const isHovered = hoveredSlotIndex === slotIndex;
           const isFocused = focusedSlotIndex === slotIndex;
+          const isDragging = draggingSlot === slotIndex;
+          const isDragOver = dragOverSlot === slotIndex;
+
           const artistText = formatArtists(song?.artists);
 
           return (
             <div
               key={i}
+              draggable={isDraggable}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', String(slotIndex));
+                e.dataTransfer.effectAllowed = 'move';
+                setDraggingSlot(slotIndex);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverSlot !== slotIndex) {
+                  setDragOverSlot(slotIndex);
+                }
+              }}
+              onDragLeave={() => {
+                if (dragOverSlot === slotIndex) {
+                  setDragOverSlot(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const fromIndexStr = e.dataTransfer.getData('text/plain');
+                const fromIndex = Number(fromIndexStr);
+                if (!isNaN(fromIndex) && fromIndex !== slotIndex) {
+                  onSwapSlots(fromIndex as CoverSlotIndex, slotIndex);
+                }
+                setDraggingSlot(null);
+                setDragOverSlot(null);
+              }}
+              onDragEnd={() => {
+                setDraggingSlot(null);
+                setDragOverSlot(null);
+              }}
               onClick={() => onSelectSlot(slotIndex)}
               onMouseEnter={() => onHoverSlot(slotIndex)}
               onMouseLeave={() => onHoverSlot(null)}
-              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-200 cursor-pointer ${
+              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                isDragging ? 'opacity-40 scale-95 border-dashed border-amber-400' : ''
+              } ${
+                isDragOver ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''
+              } ${
                 isActive
                   ? 'bg-amber-500/15 border-2 border-amber-500/80 shadow-md ring-2 ring-amber-500/30'
                   : isHovered || isFocused
@@ -67,7 +115,12 @@ const SelectedSongsReorderBar = ({
                     : 'bg-neutral-950/60 border border-neutral-800/80 hover:bg-neutral-800/60'
               }`}
             >
-              <div className="flex items-center gap-3 overflow-hidden">
+              <div className="flex items-center gap-2 overflow-hidden">
+                {/* Drag Grip Handle */}
+                <span className="text-neutral-500 text-xs font-mono select-none px-0.5 cursor-grab">
+                  ⋮⋮
+                </span>
+
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-xs font-bold text-neutral-200 shrink-0">
                   {BADGES[i]}
                 </span>

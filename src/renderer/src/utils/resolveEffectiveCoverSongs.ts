@@ -58,3 +58,49 @@ export function resolveEffectiveCoverSongs(
 
   return validSelectedSongs;
 }
+
+export function resolveEffectiveCoverSlots(
+  settings?: PlaylistCoverSettings,
+  playlistSongs: SongData[] = [],
+  maxSize: number = 4
+): import('../types/playlistCover').EffectiveCoverSlot[] {
+  const effectiveSongs = resolveEffectiveCoverSongs(settings, playlistSongs, maxSize);
+  const isAutoMode = !settings || settings.type === 'auto' || !settings.collage;
+  const configuredSongIds = settings?.collage?.songIds || [];
+
+  return effectiveSongs.map((song, index) => {
+    const slot = index as import('../types/playlistCover').CoverSlotIndex;
+    const isExplicitSong = index < configuredSongIds.length && configuredSongIds[index] !== 0;
+
+    if (isAutoMode) {
+      return {
+        slot,
+        song,
+        state: song ? 'normal' : 'fallback',
+        editable: false,
+        draggable: false,
+        isFallback: true
+      };
+    }
+
+    if (song) {
+      return {
+        slot,
+        song,
+        state: 'normal',
+        editable: true,
+        draggable: true,
+        isFallback: !isExplicitSong
+      };
+    }
+
+    return {
+      slot,
+      song: undefined,
+      state: isExplicitSong ? 'missing' : 'fallback',
+      editable: true,
+      draggable: false,
+      isFallback: true
+    };
+  });
+}
