@@ -1,9 +1,9 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { db } from '@db/db';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
-import { playlistsSongs, playlists, songs, playHistory } from '../schema';
+import { playlistEntries, playlists, songs, playHistory } from '../schema';
 
 export type GetAllPlaylistsReturnType = Awaited<ReturnType<typeof getAllPlaylists>>;
 const defaultGetAllPlaylistsOptions = {
@@ -34,7 +34,7 @@ export const getAllPlaylists = async (
       return and(...filters);
     },
     with: {
-      songs: { with: { song: { columns: { id: true } } } },
+      entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
       artworks: {
         with: {
           artwork: {
@@ -72,7 +72,7 @@ export const getPlaylistById = async (id: number, trx: DB | DBTransaction = db) 
   const data = await trx.query.playlists.findFirst({
     where: eq(playlists.id, id),
     with: {
-      songs: { with: { song: { columns: { id: true } } } },
+      entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
       artworks: {
         with: {
           artwork: {
@@ -97,7 +97,7 @@ export const getPlaylistByName = async (name: string, trx: DB | DBTransaction = 
   const data = await trx.query.playlists.findFirst({
     where: eq(playlists.name, name),
     with: {
-      songs: { with: { song: { columns: { id: true } } } },
+      entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
       artworks: {
         with: {
           artwork: {
@@ -123,7 +123,7 @@ export const getFavoritesPlaylist = async (trx: DB | DBTransaction = db) => {
   const data = await trx.query.playlists.findFirst({
     where: (s) => eq(s.name, 'Favorites'),
     with: {
-      songs: { with: { song: { columns: { id: true } } } },
+      entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
       artworks: {
         with: {
           artwork: {
@@ -150,7 +150,7 @@ export const getHistoryPlaylist = async (trx: DB | DBTransaction = db) => {
   const data = await trx.query.playlists.findFirst({
     where: (s) => eq(s.name, 'History'),
     with: {
-      songs: { with: { song: { columns: { id: true } } } },
+      entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
       artworks: {
         with: {
           artwork: {
@@ -177,12 +177,23 @@ export const linkSongsWithPlaylist = async (
   playlistId: number,
   trx: DB | DBTransaction = db
 ) => {
-  const records = songIds.map((songId) => ({
+  if (songIds.length === 0) return;
+
+  const [maxRes] = await trx
+    .select({ maxPos: sql<number>`max(${playlistEntries.position})` })
+    .from(playlistEntries)
+    .where(eq(playlistEntries.playlistId, playlistId));
+
+  const startIndex = (maxRes?.maxPos ?? -1) + 1;
+
+  const records = songIds.map((songId, index) => ({
     playlistId: playlistId,
-    songId: songId
+    songId: songId,
+    position: startIndex + index,
+    source: 'manual' as const
   }));
 
-  await trx.insert(playlistsSongs).values(records);
+  await trx.insert(playlistEntries).values(records);
 };
 
 export const unlinkSongsFromPlaylist = async (
@@ -190,9 +201,11 @@ export const unlinkSongsFromPlaylist = async (
   playlistId: number,
   trx: DB | DBTransaction = db
 ) => {
+  if (songIds.length === 0) return;
+
   await trx
-    .delete(playlistsSongs)
-    .where(and(inArray(playlistsSongs.songId, songIds), eq(playlistsSongs.playlistId, playlistId)));
+    .delete(playlistEntries)
+    .where(and(inArray(playlistEntries.songId, songIds), eq(playlistEntries.playlistId, playlistId)));
 };
 
 export const getPlaylistWithSongPaths = async (
@@ -202,7 +215,7 @@ export const getPlaylistWithSongPaths = async (
   const playlist = await trx.query.playlists.findFirst({
     where: eq(playlists.id, playlistId),
     with: {
-      songs: { with: { song: { columns: { path: true } } } }
+      entries: { with: { song: { columns: { path: true } } }, orderBy: asc(playlistEntries.position) }
     }
   });
 

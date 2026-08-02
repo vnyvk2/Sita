@@ -991,6 +991,7 @@ export const genresRelations = relations(genres, ({ many }) => ({
 }));
 
 export const playlistsRelations = relations(playlists, ({ many }) => ({
+  entries: many(playlistEntries),
   songs: many(playlistsSongs),
   artworks: many(artworksPlaylists)
 }));
