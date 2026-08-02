@@ -158,8 +158,21 @@ function PlaylistInfoPage() {
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleReorder = useCallback(
-    async (entryId: number, targetPosition: number) => {
+    async (entryId: number, targetPosition: number, sourceIndex?: number) => {
       if (!canReorder(sortingOrder) || !entryId) return;
+
+      const entriesQuery = collectionEntriesOptions(playlistId, undefined, undefined, sortingOrder);
+      const previousEntries = queryClient.getQueryData(entriesQuery.queryKey);
+
+      if (sourceIndex !== undefined && previousEntries && Array.isArray(previousEntries)) {
+        queryClient.setQueryData(entriesQuery.queryKey, (oldEntries: typeof previousEntries) => {
+          if (!oldEntries) return oldEntries;
+          const next = [...oldEntries];
+          const [moved] = next.splice(sourceIndex, 1);
+          next.splice(targetPosition, 0, moved);
+          return next;
+        });
+      }
 
       try {
         await CollectionClient.reorderSongs({
@@ -167,17 +180,21 @@ function PlaylistInfoPage() {
           entryId,
           newPosition: targetPosition
         });
-        queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
       } catch (err) {
         console.error('Failed to reorder playlist track:', err);
+        if (previousEntries) {
+          queryClient.setQueryData(entriesQuery.queryKey, previousEntries);
+        }
+      } finally {
+        queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
       }
     },
     [playlistId, sortingOrder]
   );
 
   const moveSongAbsolute = useCallback(
-    (entryId: number, targetIndex: number) => {
-      handleReorder(entryId, targetIndex);
+    (entryId: number, targetIndex: number, sourceIndex?: number) => {
+      handleReorder(entryId, targetIndex, sourceIndex);
     },
     [handleReorder]
   );
@@ -186,7 +203,7 @@ function PlaylistInfoPage() {
     (entryId: number, currentIndex: number, delta: number) => {
       const newPos = Math.max(0, Math.min(filteredSongs.length - 1, currentIndex + delta));
       if (newPos !== currentIndex) {
-        handleReorder(entryId, newPos);
+        handleReorder(entryId, newPos, currentIndex);
       }
     },
     [filteredSongs.length, handleReorder]
@@ -201,7 +218,7 @@ function PlaylistInfoPage() {
 
       const draggedSong = filteredSongs[sourceIndex];
       if (draggedSong?.entryId) {
-        moveSongAbsolute(draggedSong.entryId, destIndex);
+        moveSongAbsolute(draggedSong.entryId, destIndex, sourceIndex);
       }
     },
     [filteredSongs, moveSongAbsolute, sortingOrder]
