@@ -1,7 +1,8 @@
 import { db } from '@db/db';
-import { playlists, playlistEntries, songs } from '@db/schema';
+import { playlists, playlistEntries, songs, artists, artistsSongs } from '@db/schema';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 import type { PlaylistViewMode } from '../../../common/collections/types';
+import type { ExportEntry } from '../../playlistExport/formatters/PlaylistFormatter';
 import logger from '../../logger';
 
 export type NewPlaylist = typeof playlists.$inferInsert;
@@ -70,6 +71,43 @@ export class PlaylistRepository {
     
     return await q;
   }
+
+  public async getExportEntries(
+    playlistId: number,
+    options: { sortType?: PlaylistViewMode } = {},
+    trx: DB | DBTransaction = db
+  ): Promise<ExportEntry[]> {
+    const entries = await this.getEntries(playlistId, options, trx);
+    if (entries.length === 0) return [];
+
+    const songIds = entries.map((e) => e.song.id);
+
+    const songArtistsRecords = await trx
+      .select({ songId: artistsSongs.songId, artistName: artists.name })
+      .from(artistsSongs)
+      .innerJoin(artists, eq(artistsSongs.artistId, artists.id))
+      .where(inArray(artistsSongs.songId, songIds));
+
+    const artistsMap = new Map<number, string[]>();
+    for (const record of songArtistsRecords) {
+      const existing = artistsMap.get(record.songId) || [];
+      existing.push(record.artistName);
+      artistsMap.set(record.songId, existing);
+    }
+
+    return entries.map((e) => {
+      const songArtists = artistsMap.get(e.song.id);
+      const artist = songArtists && songArtists.length > 0 ? songArtists.join(', ') : undefined;
+
+      return {
+        title: e.song.title,
+        artist,
+        duration: Number(e.song.duration),
+        resolvedPath: e.song.path
+      };
+    });
+  }
+
 
   public async getMaxPosition(playlistId: number, trx: DB | DBTransaction = db): Promise<number> {
     const [result] = await trx

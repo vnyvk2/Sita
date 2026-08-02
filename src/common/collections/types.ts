@@ -93,7 +93,7 @@ export interface Collection {
   updatedAt: Date | string;
 }
 
-export type PlaylistExportFormat = 'm3u' | 'm3u8' | 'pls' | 'json';
+export type PlaylistExportFormat = 'm3u' | 'm3u8';
 
 export interface PlaylistExportOptions {
   format: PlaylistExportFormat;

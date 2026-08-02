@@ -1,14 +1,17 @@
 import { SaveDialogOptions, shell } from 'electron';
 import { writeFile } from 'fs/promises';
-import { inArray, eq } from 'drizzle-orm';
-import { db } from '@main/db/db';
-import { artists, artistsSongs } from '@main/db/schema';
 import type { PlaylistExportOptions, PlaylistExportFormat } from '@common/collections/types';
 import logger from '../../logger';
 import { sendMessageToRenderer, showSaveDialog } from '../../main';
 import type { PlaylistRepository } from '../../collections/repositories/PlaylistRepository';
-import type { ExportEntry } from '../formatters/PlaylistFormatter';
 import { defaultFormatterRegistry, FormatterRegistry } from '../formatters/FormatterRegistry';
+
+const DEFAULT_OPTIONS: PlaylistExportOptions = {
+  format: 'm3u8',
+  order: 'customOrder',
+  pathType: 'absolute',
+  includeExtInf: true
+};
 
 export class ExportService {
   constructor(
@@ -18,8 +21,13 @@ export class ExportService {
 
   async exportPlaylist(
     playlistId: number,
-    options: PlaylistExportOptions
+    options?: Partial<PlaylistExportOptions>
   ): Promise<void> {
+    const finalOptions: PlaylistExportOptions = {
+      ...DEFAULT_OPTIONS,
+      ...options
+    };
+
     const collection = await this.repository.getById(playlistId);
 
     if (!collection) {
@@ -31,7 +39,7 @@ export class ExportService {
     }
 
     const playlistName = collection.name;
-    const saveOptions = this.generateSaveDialogOptions(playlistName, options.format);
+    const saveOptions = this.generateSaveDialogOptions(playlistName, finalOptions.format);
 
     try {
       const destination = await showSaveDialog(saveOptions);
@@ -45,9 +53,10 @@ export class ExportService {
         return;
       }
 
-      const entries = await this.repository.getEntries(playlistId, { sortType: options.order });
+      // Delegate database querying and entry transformation directly to repository
+      const exportEntries = await this.repository.getExportEntries(playlistId, { sortType: finalOptions.order });
 
-      if (entries.length === 0) {
+      if (exportEntries.length === 0) {
         logger.warn("Failed to export playlist because requested playlist didn't have any songs.", {
           playlistId
         });
@@ -55,43 +64,12 @@ export class ExportService {
         return;
       }
 
-      const songIds = entries.map((e) => e.song.id);
-
-      // Fetch artists to include in EXTINF
-      const songArtistsRecords = await db
-        .select({ songId: artistsSongs.songId, artistName: artists.name })
-        .from(artistsSongs)
-        .innerJoin(artists, eq(artistsSongs.artistId, artists.id))
-        .where(inArray(artistsSongs.songId, songIds));
-
-      const artistsMap = new Map<number, string[]>();
-      for (const record of songArtistsRecords) {
-        const existing = artistsMap.get(record.songId) || [];
-        existing.push(record.artistName);
-        artistsMap.set(record.songId, existing);
-      }
-
-      // Map to ExportEntry
-      const exportEntries: ExportEntry[] = entries.map((e) => {
-        const songArtists = artistsMap.get(e.song.id);
-        const artist = songArtists && songArtists.length > 0 ? songArtists.join(', ') : undefined;
-
-        let resolvedPath = e.song.path;
-
-        return {
-          title: e.song.title,
-          artist,
-          duration: Number(e.song.duration),
-          resolvedPath
-        };
-      });
-
-      const formatter = this.formatterRegistry.get(options.format);
+      const formatter = this.formatterRegistry.get(finalOptions.format);
       const fileData = formatter.format(exportEntries, {
-        includeExtInf: options.includeExtInf ?? true
+        includeExtInf: finalOptions.includeExtInf
       });
 
-      // Save file as UTF-8
+      // Save file as UTF-8 (Modern audio players standard for .m3u / .m3u8)
       await writeFile(destination, fileData, 'utf-8');
 
       logger.debug(`Exported playlist successfully.`, { playlistId, playlistName, destination });
@@ -101,7 +79,7 @@ export class ExportService {
         data: { playlistName }
       });
 
-      // Feature: Open exported file location after success
+      // Open exported file location after success
       shell.showItemInFolder(destination);
 
     } catch (error) {
