@@ -9,11 +9,10 @@ import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
 
 import { ExportService } from '../../playlistExport/services/ExportService';
-import importPlaylist from '../../core/importPlaylist';
+import importPlaylist, { analyzePlaylistImport } from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
-import type { PlaylistViewMode } from '../../../common/collections/types';
-import type { PlaylistExportOptions } from '../../../common/collections/types';
+import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export function setupCollectionIpc(
@@ -146,7 +145,11 @@ export function setupCollectionIpc(
     return await exportService.exportPlaylist(playlistId, options || { format: 'm3u8', order: 'customOrder', pathType: 'absolute' });
   });
 
-  ipcMain.handle('collections/import', async (_, targetPlaylistId?: number) => {
-    return await importPlaylist(workflow, targetPlaylistId);
+  ipcMain.handle('collections/analyze', async (_, filePath?: string) => {
+    return await analyzePlaylistImport(workflow, filePath);
+  });
+
+  ipcMain.handle('collections/import', async (_, options?: PlaylistImportIpcOptions) => {
+    return await importPlaylist(workflow, options);
   });
 }

@@ -102,3 +102,17 @@ export interface PlaylistExportOptions {
   includeExtInf?: boolean;
 }
 
+export interface PlaylistImportIpcOptions {
+  targetPlaylistId?: number;
+  filePath?: string;
+  mode?: 'create' | 'merge' | 'replace';
+}
+
+export interface PlaylistImportAnalysis {
+  filePath: string;
+  playlistName: string;
+  totalEntries: number;
+  skippedCount: number;
+  repairedCount: number;
+}
+

@@ -1,7 +1,11 @@
 import type { PlaylistImportResult } from '../models/PlaylistImportResult';
 import type { PlaylistImportContext } from './PlaylistImportContext';
 
-export type PlaylistImportOptions = Record<string, unknown>;
+export interface PlaylistImportOptions {
+  targetPlaylistId?: number;
+  mode?: 'create' | 'merge' | 'replace';
+  [key: string]: unknown;
+}
 
 export interface PlaylistImporter {
   readonly id: string;

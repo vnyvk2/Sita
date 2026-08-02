@@ -213,6 +213,13 @@ export class PlaylistRepository {
       .returning();
   }
 
+  public async clearPlaylistEntries(playlistId: number, trx: DB | DBTransaction = db) {
+    return await trx
+      .delete(playlistEntries)
+      .where(eq(playlistEntries.playlistId, playlistId))
+      .returning();
+  }
+
   public async shiftPositions(playlistId: number, startPos: number, offset: number, trx: DB | DBTransaction = db) {
     await trx
       .update(playlistEntries)

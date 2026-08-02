@@ -1,4 +1,4 @@
-import type { PlaylistViewMode, PlaylistExportOptions } from '@common/collections/types';
+import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis } from '@common/collections/types';
 import type { 
   CreateFolderInput,
   CreatePlaylistInput,
@@ -52,5 +52,7 @@ export const CollectionClient = {
 
   // Import / Export
   export: (playlistId: number, options?: PlaylistExportOptions) => window.api.collections.export(playlistId, options),
-  import: (targetPlaylistId?: number) => window.api.collections.import(targetPlaylistId),
+  analyze: (filePath?: string) => window.api.collections.analyze(filePath),
+  import: (options?: PlaylistImportIpcOptions) =>
+    window.api.collections.import(options),
 };

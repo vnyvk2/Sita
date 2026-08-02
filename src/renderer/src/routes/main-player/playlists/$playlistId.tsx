@@ -43,6 +43,9 @@ const AddSongsToTargetPlaylistPrompt = lazy(
 const PlaylistExportSettingsPrompt = lazy(
   () => import('@renderer/components/PlaylistsPage/PlaylistExportSettingsPrompt')
 );
+const PlaylistImportConflictPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/PlaylistImportConflictPrompt')
+);
 
 export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   validateSearch: songSearchSchema,
@@ -414,6 +417,26 @@ function PlaylistInfoPage() {
     );
   }, [changePromptMenuData, playlistData.id]);
 
+  const openImportPrompt = useCallback(async () => {
+    const analysis = await CollectionClient.analyze();
+    if (!analysis) return;
+
+    changePromptMenuData(
+      true,
+      <Suspense fallback={null}>
+        <PlaylistImportConflictPrompt
+          filePath={analysis.filePath}
+          targetPlaylistId={playlistData.id}
+          playlistName={playlistData.name}
+          importedPlaylistName={analysis.playlistName}
+          totalEntries={analysis.totalEntries}
+          skippedCount={analysis.skippedCount}
+          repairedCount={analysis.repairedCount}
+        />
+      </Suspense>
+    );
+  }, [changePromptMenuData, playlistData.id, playlistData.name]);
+
   const searchBar = (
     <PageSearchInput
       key="playlist-search-input"
@@ -486,6 +509,14 @@ function PlaylistInfoPage() {
               playlistData.id !== SpecialPlaylists.History &&
               playlistData.id !== SpecialPlaylists.Favorites,
             isDisabled: !(playlistData.itemCount > 0)
+          },
+          {
+            tooltipLabel: t('playlistsPage.importPlaylist', 'Import Playlist'),
+            iconName: 'file_upload',
+            clickHandler: openImportPrompt,
+            isVisible:
+              playlistData.id !== SpecialPlaylists.History &&
+              playlistData.id !== SpecialPlaylists.Favorites
           },
           {
             tooltipLabel: t('playlist.addSongs', 'Add songs'),

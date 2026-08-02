@@ -3,6 +3,7 @@ import type { OpenDialogOptions } from 'electron';
 import logger from '../logger';
 import { sendMessageToRenderer, showOpenDialog } from '../main';
 import type { PlaylistImportWorkflow } from '../playlistImport/workflow/PlaylistImportWorkflow';
+import type { PlaylistImportIpcOptions, PlaylistImportAnalysis } from '../../common/collections/types';
 
 const DEFAULT_IMPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   title: 'Select a Playlist file to import',
@@ -14,34 +15,67 @@ const DEFAULT_IMPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   ]
 };
 
+const resolveImportFilePath = async (filePathInput?: string): Promise<string | null> => {
+  let filePath = filePathInput;
+
+  if (!filePath) {
+    const destinations = await showOpenDialog(DEFAULT_IMPORT_DIALOG_OPTIONS);
+
+    if (!destinations || destinations.length === 0) {
+      logger.warn(`Playlist import cancelled: user didn't select a file.`);
+      return null;
+    }
+
+    [filePath] = destinations;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext !== '.m3u8' && ext !== '.m3u') {
+    logger.warn(`Import failed: selected file type wasn't '.m3u' or '.m3u8'.`, { filePath });
+    return null;
+  }
+
+  return filePath;
+};
+
+export const analyzePlaylistImport = async (
+  workflow: PlaylistImportWorkflow,
+  filePathInput?: string
+): Promise<PlaylistImportAnalysis | null> => {
+  const filePath = await resolveImportFilePath(filePathInput);
+  if (!filePath) return null;
+
+  const plan = await workflow.createPlanFromFile(filePath);
+  return {
+    filePath,
+    playlistName: plan.playlistName,
+    totalEntries: plan.statistics.totalEntries,
+    skippedCount: plan.statistics.skippedEntries,
+    repairedCount: plan.statistics.repairedEntries
+  };
+};
+
 /**
  * Lightweight compatibility wrapper delegating playlist import execution
  * exclusively to the canonical PlaylistImportWorkflow framework via Dependency Injection.
  */
 const importPlaylist = async (
   workflow: PlaylistImportWorkflow,
-  targetPlaylistId?: number
+  options?: PlaylistImportIpcOptions
 ) => {
   try {
-    const destinations = await showOpenDialog(DEFAULT_IMPORT_DIALOG_OPTIONS);
+    const filePath = await resolveImportFilePath(options?.filePath);
 
-    if (!destinations || destinations.length === 0) {
-      logger.warn(`Playlist import cancelled: user didn't select a file.`);
+    if (!filePath) {
       return sendMessageToRenderer({ messageCode: 'DESTINATION_NOT_SELECTED' });
     }
 
-    const [filePath] = destinations;
-    const ext = path.extname(filePath).toLowerCase();
-
-    if (ext !== '.m3u8' && ext !== '.m3u') {
-      logger.warn(`Import failed: selected file type wasn't '.m3u' or '.m3u8'.`, { filePath });
-      return sendMessageToRenderer({
-        messageCode: 'PLAYLIST_IMPORT_FAILED_DUE_TO_INVALID_FILE_EXTENSION'
-      });
-    }
-
     // Delegate analysis, planning, and execution exclusively to PlaylistImportWorkflow
-    const summary = await workflow.importFile(filePath, { targetPlaylistId });
+    const summary = await workflow.importFile(filePath, {
+      targetPlaylistId: options?.targetPlaylistId,
+      mode: options?.mode
+    });
 
     if (summary.importedCount > 0) {
       logger.info(`Imported playlist '${summary.playlistName}' successfully.`, { summary });

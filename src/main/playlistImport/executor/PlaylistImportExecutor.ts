@@ -11,7 +11,7 @@ export class PlaylistImportExecutor {
     private transactionRunner: TransactionRunner
   ) {}
 
-  async execute(plan: PlaylistImportPlan, options?: { targetPlaylistId?: number }): Promise<PlaylistImportExecutionResult> {
+  async execute(plan: PlaylistImportPlan, options?: { targetPlaylistId?: number; mode?: 'create' | 'merge' | 'replace' }): Promise<PlaylistImportExecutionResult> {
     const startTime = Date.now();
     logger.info(`PlaylistImportExecutor: starting execution for '${plan.playlistName}'...`);
 
@@ -43,7 +43,8 @@ export class PlaylistImportExecutor {
       })
     );
 
-    let playlistId = options?.targetPlaylistId || 0;
+    const mode = options?.mode || (options?.targetPlaylistId ? 'merge' : 'create');
+    let playlistId = mode === 'create' ? 0 : options?.targetPlaylistId || 0;
 
     // Execute playlist creation & song insertion via TransactionRunner
     await this.transactionRunner.runInTransaction(async () => {
@@ -52,7 +53,11 @@ export class PlaylistImportExecutor {
         playlistId = await this.persistence.createPlaylist(plan.playlistName, plan.description);
         logger.info(`PlaylistImportExecutor: playlist created with ID ${playlistId}.`);
       } else {
-        logger.info(`PlaylistImportExecutor: using existing target playlist ID ${playlistId}...`);
+        logger.info(`PlaylistImportExecutor: using existing target playlist ID ${playlistId} with mode ${mode}...`);
+        if (mode === 'replace' && this.persistence.clearEntries) {
+          await this.persistence.clearEntries(playlistId);
+          logger.info(`PlaylistImportExecutor: cleared existing entries for playlist ${playlistId}.`);
+        }
       }
 
       if (entriesToImport.length > 0) {

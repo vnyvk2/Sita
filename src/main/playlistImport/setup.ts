@@ -56,7 +56,7 @@ export const importPipeline = new PlaylistImportPipeline(
 );
 
 // 6. Persistence & Executor
-export const enginePersistence = new EnginePlaylistPersistence(playlistEngine);
+export const enginePersistence = new EnginePlaylistPersistence(playlistEngine, playlistRepository);
 export const transactionRunner = new DrizzleTransactionRunner();
 export const importExecutor = new PlaylistImportExecutor(enginePersistence, transactionRunner);
 
