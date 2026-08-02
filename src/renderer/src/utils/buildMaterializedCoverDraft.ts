@@ -27,12 +27,16 @@ export function buildMaterializedCoverDraft(
 
 export function getDraftSongs(
   draft: MaterializedCoverDraft,
-  playlistSongs: SongData[] = []
+  playlistSongs: SongData[] = [],
+  cachedMap?: Map<number, SongData>
 ): (SongData | undefined)[] {
-  const songMap = new Map<number, SongData>();
-  for (const song of playlistSongs) {
-    if (song && song.songId !== undefined) {
-      songMap.set(song.songId, song);
+  let songMap = cachedMap;
+  if (!songMap) {
+    songMap = new Map<number, SongData>();
+    for (const song of playlistSongs) {
+      if (song && song.songId !== undefined) {
+        songMap.set(song.songId, song);
+      }
     }
   }
 

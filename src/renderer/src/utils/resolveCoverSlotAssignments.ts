@@ -7,6 +7,7 @@ export function resolveCoverSlotAssignments(
   maxSize: number = 4
 ): (number | null)[] {
   const isAuto = !settings || settings.type === 'auto' || !settings.collage;
+  // Clamp requested size to layout bounds (maxSize) to prevent rendering overflow
   const targetSize = Math.min(settings?.collage?.size || maxSize, maxSize);
 
   if (isAuto) {
@@ -15,10 +16,11 @@ export function resolveCoverSlotAssignments(
     return resolvedSongs.map((s) => (s?.songId !== undefined ? s.songId : null));
   }
 
-  const songMap = new Map<number, SongData>();
+  // Set of valid song IDs available in the playlist for fast membership validation
+  const availableSongIds = new Set<number>();
   for (const song of playlistSongs) {
     if (song && song.songId !== undefined) {
-      songMap.set(song.songId, song);
+      availableSongIds.add(song.songId);
     }
   }
 
@@ -29,7 +31,7 @@ export function resolveCoverSlotAssignments(
   // 1. Map explicit configured song IDs
   for (let i = 0; i < targetSize; i++) {
     const id = songIds[i];
-    if (id && id !== 0 && songMap.has(id)) {
+    if (id && id !== 0 && availableSongIds.has(id)) {
       assignedIds.push(id);
       validSongsSet.add(id);
     } else {

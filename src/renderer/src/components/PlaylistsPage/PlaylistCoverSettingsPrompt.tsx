@@ -23,8 +23,6 @@ interface Props {
   playlistSongs: SongData[];
 }
 
-const BADGES = ['①', '②', '③', '④', '⑤'];
-
 const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -151,7 +149,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
 
   const handleSwapSlots = useCallback((fromIndex: CoverSlotIndex, toIndex: CoverSlotIndex) => {
     setDraft((prev) => {
-      const newSlots = [...prev.slots];
+      const newSlots = prev.slots.map((s) => ({ ...s }));
       const temp = newSlots[fromIndex];
       newSlots[fromIndex] = newSlots[toIndex];
       newSlots[toIndex] = temp;
@@ -255,10 +253,21 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   const isDiamond = draft.layout === 'diamond';
   const availableCounts = isDiamond ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
 
+  // Memoized Song Map for efficient lookup without re-allocating Map on every render
+  const songMap = useMemo(() => {
+    const map = new Map<number, SongData>();
+    for (const song of playlistSongs) {
+      if (song && song.songId !== undefined) {
+        map.set(song.songId, song);
+      }
+    }
+    return map;
+  }, [playlistSongs]);
+
   // Derived effective songs directly from materialized draft
   const effectiveSongs = useMemo(() => {
-    return getDraftSongs(draft, playlistSongs);
-  }, [draft, playlistSongs]);
+    return getDraftSongs(draft, playlistSongs, songMap);
+  }, [draft, playlistSongs, songMap]);
 
   return (
     <div className="flex w-full max-w-[880px] flex-col p-6 text-font-color-black dark:text-font-color-white max-h-[85vh] bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden mx-auto">
@@ -311,26 +320,44 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
           <CoverTypeSelector
             type={draft.type}
             autoStrategy={draft.autoStrategy}
-            onTypeChange={handleTypeChange}
-            onStrategyChange={handleStrategyChange}
+            onChangeType={handleTypeChange}
+            onChangeStrategy={handleStrategyChange}
           />
 
           {draft.type === 'collage' && (
             <>
+              {/* Cover Images Count Selector */}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
+                <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
+                  {availableCounts.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
+                      className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                        currentSize === s
+                          ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
+                          : 'text-neutral-400 hover:text-neutral-200'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Layout Geometry Preset Selector */}
               <LayoutSelector
                 selectedLayout={draft.layout}
-                selectedSize={currentSize}
-                availableCounts={availableCounts}
-                onLayoutChange={handleLayoutChange}
-                onSizeChange={handleSizeChange}
+                onChange={handleLayoutChange}
               />
 
               {/* Sub-style Variant Selector */}
               <VariantSelector
                 layout={draft.layout}
                 selectedVariant={draft.variant}
-                onVariantChange={handleVariantChange}
+                onChange={handleVariantChange}
               />
 
               {/* Numbered Song Picker */}
@@ -340,7 +367,6 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
                 activeSlotIndex={activeSlotIndex}
                 maxSize={currentSize}
                 onToggleSong={handleToggleSong}
-                badges={BADGES}
               />
             </>
           )}
