@@ -951,7 +951,7 @@ export const songsRelations = relations(songs, ({ one, many }) => ({
   albums: many(albumsSongs),
   genres: many(genresSongs),
   artworks: many(artworksSongs),
-  playlists: many(playlistsSongs),
+  playlists: many(playlistEntries),
   playHistory: many(playHistory),
   playEvents: many(playEvents),
   seekEvents: many(seekEvents),
@@ -992,7 +992,6 @@ export const genresRelations = relations(genres, ({ many }) => ({
 
 export const playlistsRelations = relations(playlists, ({ many }) => ({
   entries: many(playlistEntries),
-  songs: many(playlistsSongs),
   artworks: many(artworksPlaylists)
 }));
 
