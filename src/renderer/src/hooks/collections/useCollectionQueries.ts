@@ -1,3 +1,4 @@
+import type { PlaylistViewMode } from '@common/collections/types';
 import type { PlaylistDto } from '@main/collections/ipc/dtos';
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
@@ -68,7 +69,7 @@ export const useCollectionArtworks = (songIds: number[]) => {
   });
 };
 
-export const collectionEntriesOptions = (id: number, offset?: number, limit?: number, sortType?: string) => {
+export const collectionEntriesOptions = (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode) => {
   return queryOptions({
     queryKey: [...collectionKeys.entries(id), offset, limit, sortType],
     queryFn: () => CollectionClient.getEntries(id, offset, limit, sortType)

@@ -12,6 +12,7 @@ import exportPlaylist from '../../core/exportPlaylist';
 import importPlaylist from '../../core/importPlaylist';
 import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
+import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export function setupCollectionIpc(
@@ -33,7 +34,7 @@ export function setupCollectionIpc(
     return children.map(mapPlaylistToDto);
   });
 
-  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number, sortType?: string) => {
+  ipcMain.handle('collections/read/getEntries', async (_, id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode) => {
     const entries = await repository.getEntries(id, { limit, offset, sortType });
     return entries.map(mapEntryToDto);
   });

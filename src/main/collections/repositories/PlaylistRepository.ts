@@ -1,6 +1,7 @@
 import { db } from '@db/db';
 import { playlists, playlistEntries, songs } from '@db/schema';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
+import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
 
 export type NewPlaylist = typeof playlists.$inferInsert;
@@ -41,7 +42,7 @@ export class PlaylistRepository {
 
   public async getEntries(
     playlistId: number,
-    options: { limit?: number; offset?: number; sortType?: string } = {},
+    options: { limit?: number; offset?: number; sortType?: PlaylistViewMode } = {},
     trx: DB | DBTransaction = db
   ) {
     const sortColumn =

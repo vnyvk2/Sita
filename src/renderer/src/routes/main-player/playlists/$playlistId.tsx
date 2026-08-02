@@ -110,10 +110,24 @@ function PlaylistInfoPage() {
       }
       return positionOrderedSongs;
     }
-    return rawPlaylistSongs.map((s) => ({
-      ...s,
-      entryId: collectionEntries.find((e) => e.songId === s.songId)?.id ?? 0
-    }));
+
+    // For temporary computed view sorts (Artist, Album, Year, A-Z):
+    // Build an O(1) queue map of songId -> entry.id array to accurately preserve duplicate track occurrences
+    const entryQueueMap = new Map<number, number[]>();
+    for (const entry of collectionEntries) {
+      const q = entryQueueMap.get(entry.songId) || [];
+      q.push(entry.id);
+      entryQueueMap.set(entry.songId, q);
+    }
+
+    return rawPlaylistSongs.map((song) => {
+      const q = entryQueueMap.get(song.songId);
+      const entryId = q && q.length > 0 ? q.shift()! : 0;
+      return {
+        ...song,
+        entryId
+      };
+    });
   }, [collectionEntries, rawPlaylistSongs, sortingOrder]);
 
   const search = usePageSearch({
@@ -161,6 +175,23 @@ function PlaylistInfoPage() {
     [playlistId, sortingOrder]
   );
 
+  const moveSongAbsolute = useCallback(
+    (entryId: number, targetIndex: number) => {
+      handleReorder(entryId, targetIndex);
+    },
+    [handleReorder]
+  );
+
+  const moveSongRelative = useCallback(
+    (entryId: number, currentIndex: number, delta: number) => {
+      const newPos = Math.max(0, Math.min(filteredSongs.length - 1, currentIndex + delta));
+      if (newPos !== currentIndex) {
+        handleReorder(entryId, newPos);
+      }
+    },
+    [filteredSongs.length, handleReorder]
+  );
+
   const handleDragEnd = useCallback(
     (result: DropResult) => {
       if (!result.destination || !canReorder(sortingOrder)) return;
@@ -170,10 +201,10 @@ function PlaylistInfoPage() {
 
       const draggedSong = filteredSongs[sourceIndex];
       if (draggedSong?.entryId) {
-        handleReorder(draggedSong.entryId, destIndex);
+        moveSongAbsolute(draggedSong.entryId, destIndex);
       }
     },
-    [filteredSongs, handleReorder, sortingOrder]
+    [filteredSongs, moveSongAbsolute, sortingOrder]
   );
 
   const getContextMenuItems = useCallback(
@@ -205,31 +236,31 @@ function PlaylistInfoPage() {
           items.push({
             label: t('playlist.moveToTop', 'Move to Top'),
             iconName: 'vertical_align_top',
-            handlerFunction: () => handleReorder(item.entryId, 0)
+            handlerFunction: () => moveSongAbsolute(item.entryId, 0)
           });
           items.push({
             label: t('playlist.moveUp', 'Move Up'),
             iconName: 'arrow_upward',
-            handlerFunction: () => handleReorder(item.entryId, index - 1)
+            handlerFunction: () => moveSongRelative(item.entryId, index, -1)
           });
         }
         if (index < filteredSongs.length - 1) {
           items.push({
             label: t('playlist.moveDown', 'Move Down'),
             iconName: 'arrow_downward',
-            handlerFunction: () => handleReorder(item.entryId, index + 1)
+            handlerFunction: () => moveSongRelative(item.entryId, index, 1)
           });
           items.push({
             label: t('playlist.moveToBottom', 'Move to Bottom'),
             iconName: 'vertical_align_bottom',
-            handlerFunction: () => handleReorder(item.entryId, filteredSongs.length - 1)
+            handlerFunction: () => moveSongAbsolute(item.entryId, filteredSongs.length - 1)
           });
         }
       }
 
       return items;
     },
-    [addNewNotifications, filteredSongs.length, handleReorder, playlistData.id, playlistData.name, sortingOrder, t]
+    [addNewNotifications, filteredSongs.length, moveSongAbsolute, moveSongRelative, playlistData.id, playlistData.name, sortingOrder, t]
   );
 
   const openAddSongsPrompt = useCallback(() => {
@@ -381,9 +412,8 @@ function PlaylistInfoPage() {
             const currIdx = filteredSongs.findIndex((s) => s.songId === targetSongId);
             if (currIdx !== -1) {
               const targetEntryId = filteredSongs[currIdx].entryId;
-              const newPos = e.key === 'ArrowUp' ? Math.max(0, currIdx - 1) : Math.min(filteredSongs.length - 1, currIdx + 1);
-              if (newPos !== currIdx && targetEntryId) {
-                handleReorder(targetEntryId, newPos);
+              if (targetEntryId) {
+                moveSongRelative(targetEntryId, currIdx, e.key === 'ArrowUp' ? -1 : 1);
               }
             }
           }

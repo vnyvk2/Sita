@@ -1,8 +1,8 @@
-import type { Collection, CollectionEntry, CollectionId } from '../../../common/collections/types';
+import type { Collection, CollectionEntry, CollectionId, PlaylistViewMode } from '../../../common/collections/types';
 import type { SortDefinition } from '../query/ast';
 
 export interface CollectionQueryOptions {
-  sortType?: string;
+  sortType?: PlaylistViewMode | string;
   start?: number;
   end?: number;
   filter?: string;
@@ -11,7 +11,7 @@ export interface CollectionQueryOptions {
 export interface EntryQueryOptions {
   start: number;
   end: number;
-  sortType?: string;
+  sortType?: PlaylistViewMode;
   sortDefinition?: SortDefinition[];
 }
 

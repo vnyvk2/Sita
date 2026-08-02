@@ -12,6 +12,33 @@ export type CollectionType =
 
 export type CollectionSource = 'local' | 'remote' | 'search' | 'queue' | 'generated';
 
+export type PlaylistViewMode =
+  | 'customOrder'
+  | 'originalOrder'
+  | 'addedOrder'
+  | 'aToZ'
+  | 'zToA'
+  | 'dateAddedAscending'
+  | 'dateAddedDescending'
+  | 'dateModifiedAscending'
+  | 'dateModifiedDescending'
+  | 'releasedYearAscending'
+  | 'releasedYearDescending'
+  | 'trackNoAscending'
+  | 'trackNoDescending'
+  | 'artistNameAscending'
+  | 'artistNameDescending'
+  | 'allTimeMostListened'
+  | 'allTimeLeastListened'
+  | 'monthlyMostListened'
+  | 'monthlyLeastListened'
+  | 'albumNameAscending'
+  | 'albumNameDescending'
+  | 'mostSkipped'
+  | 'leastSkipped'
+  | 'blacklistedSongs'
+  | 'whitelistedSongs';
+
 export interface CollectionId {
   uri: string;
   source: CollectionSource;

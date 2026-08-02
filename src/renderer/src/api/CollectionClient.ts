@@ -1,3 +1,4 @@
+import type { PlaylistViewMode } from '@common/collections/types';
 import type { 
   CreateFolderInput,
   CreatePlaylistInput,
@@ -20,7 +21,7 @@ export const CollectionClient = {
   // Read
   getCollection: (id: number) => window.api.collections.read.getCollection(id),
   getChildren: (id: number | null) => window.api.collections.read.getChildren(id),
-  getEntries: (id: number, offset?: number, limit?: number, sortType?: string) => window.api.collections.read.getEntries(id, offset, limit, sortType),
+  getEntries: (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode) => window.api.collections.read.getEntries(id, offset, limit, sortType),
   getBreadcrumbs: (id: number) => window.api.collections.read.getBreadcrumbs(id),
   getArtworks: (songIds: number[]) => window.api.collections.read.getArtworks(songIds),
 
