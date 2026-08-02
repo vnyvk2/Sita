@@ -9,7 +9,9 @@ export const MetadataFields = {
   Year: 'year'
 } as const;
 
-export type BuiltInMetadataFieldId =
+export type BuiltInFieldId =
   (typeof MetadataFields)[keyof typeof MetadataFields];
 
-export type MetadataFieldId = BuiltInMetadataFieldId | string;
+export type FieldId = BuiltInFieldId | string;
+
+export type MetadataFieldId = FieldId;
