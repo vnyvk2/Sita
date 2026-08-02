@@ -80,19 +80,20 @@ export class PlaylistRepository {
     const entries = await this.getEntries(playlistId, options, trx);
     if (entries.length === 0) return [];
 
-    const songIds = entries.map((e) => e.song.id);
-
     const songArtistsRecords = await trx
-      .select({ songId: artistsSongs.songId, artistName: artists.name })
+      .selectDistinct({ songId: artistsSongs.songId, artistName: artists.name })
       .from(artistsSongs)
       .innerJoin(artists, eq(artistsSongs.artistId, artists.id))
-      .where(inArray(artistsSongs.songId, songIds));
+      .innerJoin(playlistEntries, eq(artistsSongs.songId, playlistEntries.songId))
+      .where(eq(playlistEntries.playlistId, playlistId));
 
     const artistsMap = new Map<number, string[]>();
     for (const record of songArtistsRecords) {
       const existing = artistsMap.get(record.songId) || [];
-      existing.push(record.artistName);
-      artistsMap.set(record.songId, existing);
+      if (!existing.includes(record.artistName)) {
+        existing.push(record.artistName);
+        artistsMap.set(record.songId, existing);
+      }
     }
 
     return entries.map((e) => {
@@ -272,10 +273,18 @@ export class PlaylistRepository {
   public async computeStatisticsDelta(songIds: readonly number[], trx: DB | DBTransaction = db): Promise<{ itemCountDelta: number; durationDelta: number }> {
     if (songIds.length === 0) return { itemCountDelta: 0, durationDelta: 0 };
 
-    const songRows = await trx
-      .select({ id: songs.id, duration: songs.duration })
-      .from(songs)
-      .where(inArray(songs.id, Array.from(new Set(songIds))));
+    const uniqueSongIds = Array.from(new Set(songIds));
+    const CHUNK_SIZE = 500;
+    const songRows: { id: number; duration: number | null }[] = [];
+
+    for (let i = 0; i < uniqueSongIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueSongIds.slice(i, i + CHUNK_SIZE);
+      const rows = await trx
+        .select({ id: songs.id, duration: songs.duration })
+        .from(songs)
+        .where(inArray(songs.id, chunk));
+      songRows.push(...rows);
+    }
 
     const durationMap = new Map(songRows.map(r => [r.id, r.duration || 0]));
     
