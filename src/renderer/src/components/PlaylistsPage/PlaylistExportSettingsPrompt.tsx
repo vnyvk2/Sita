@@ -69,7 +69,8 @@ const PlaylistExportSettingsPrompt = (props: PlaylistExportSettingsPromptProps) 
           </label>
           <Dropdown
             options={[
-              { label: 'Absolute Paths', value: 'absolute' }
+              { label: 'Absolute Paths', value: 'absolute' },
+              { label: 'Relative Paths', value: 'relative' }
             ]}
             name="export-path-type"
             value={pathType}

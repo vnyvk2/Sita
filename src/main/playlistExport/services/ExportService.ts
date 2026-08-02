@@ -1,5 +1,6 @@
 import { SaveDialogOptions, shell } from 'electron';
 import { writeFile } from 'fs/promises';
+import { dirname, relative, isAbsolute, parse } from 'path';
 import type { PlaylistExportOptions, PlaylistExportFormat } from '@common/collections/types';
 import logger from '../../logger';
 import { sendMessageToRenderer, showSaveDialog } from '../../main';
@@ -64,8 +65,31 @@ export class ExportService {
         return;
       }
 
+      let processedEntries = exportEntries;
+
+      if (finalOptions.pathType === 'relative') {
+        const destinationDir = dirname(destination);
+        const destinationRoot = parse(destinationDir).root.toLowerCase();
+
+        processedEntries = exportEntries.map((entry) => {
+          const songRoot = parse(entry.resolvedPath).root.toLowerCase();
+
+          // If on different drive letters (e.g. C:\ vs D:\), gracefully fallback to absolute path
+          if (destinationRoot !== songRoot) {
+            return entry;
+          }
+
+          const relPath = relative(destinationDir, entry.resolvedPath).replace(/\\/g, '/');
+
+          return {
+            ...entry,
+            resolvedPath: relPath
+          };
+        });
+      }
+
       const formatter = this.formatterRegistry.get(finalOptions.format);
-      const fileData = formatter.format(exportEntries, {
+      const fileData = formatter.format(processedEntries, {
         includeExtInf: finalOptions.includeExtInf
       });
 
