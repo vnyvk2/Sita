@@ -94,7 +94,7 @@ function PlaylistsPage() {
     storage.sortingStates.setSortingStates('playlistsPage', sortingOrder);
   }, [sortingOrder]);
 
-  const selectAllHandler = useSelectAllHandler(filteredPlaylists, 'playlist', 'playlistId');
+  const selectAllHandler = useSelectAllHandler(filteredPlaylists, 'playlist', 'id');
 
   const createNewPlaylist = useCallback(
     () =>
