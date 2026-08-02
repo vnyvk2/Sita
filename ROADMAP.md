@@ -1,206 +1,442 @@
-# Nora — Platform Roadmap & Architectural Vision
+# Phase A — Final Core Cleanup (1–2 weeks)
 
-> **Vision**: Transform Nora from a desktop music player into a unified, intelligent music platform where every subsystem feeds into a shared engine pipeline.
+These are the last architectural cleanup items I'd do before moving on.
 
----
+### Must-do
 
-## 🏗️ High-Level Platform Architecture
+- ✅ Finish `OperationRegistry` registrations (undo/redo completeness).
+- ✅ Remove the legacy `playlists_songs` schema after a migration.
+- ✅ Review orphaned IPC handlers (`playlistImport:*`) and remove or expose them intentionally.
+- ✅ Audit remaining TODOs and FIXME comments.
+- ✅ Add a few integration tests around import/export and playlist operations.
 
-```
-                        User
-                          │
-                    Music Library
-                          │
-            ┌─────────────┴─────────────┐
-            │                           │
-      Metadata Layer              User Layer
-            │                           │
-            └─────────────┬─────────────┘
-                          │
-                 Music Intelligence
-                          │
-          ┌───────────────┼────────────────┐
-          │               │                │
-     Rules Engine     Smart Engine     Recommendation
-          │               │                │
-          └───────────────┴────────────────┘
-                          │
-                  Dynamic Experience
-```
+After this, I would consider the **Collections architecture "v1 complete."**
 
 ---
 
-## 🏛️ Shared Engine Pipeline Principle
+# Phase B — Metadata Platform ⭐⭐⭐⭐⭐
 
-Every feature in Nora plugs into a shared engine pipeline rather than being built as an isolated, feature-specific implementation.
+This is where I'd invest next.
+
+Not genres.
+
+Not tags.
+
+Not smart playlists.
+
+Instead, build the thing everything else will depend on.
 
 ```
 Metadata Providers
-        │
-        ▼
-Metadata Layer
-        │
-        ▼
-Tag Engine
-        │
-        ▼
-Rules Engine
-        │
-        ▼
-Smart Playlists
-        │
-        ▼
-Dynamic Collections
-        │
-        ▼
-Recommendations
-        │
-        ▼
-Automation
-        │
-        ▼
-AI
+
+↓
+
+Metadata Engine
+
+↓
+
+Metadata Store
 ```
 
-*Adding a new metadata provider, AI tagger, or custom tag automatically propagates throughout the entire system—from smart playlists to dynamic collections and recommendations—without writing one-off integration logic.*
+This is probably the most important architectural decision for Nora's future.
 
 ---
 
-## 🎯 Phase Breakdown
+## Build the Metadata Engine
 
-### Phase 0 — Foundation (Completed) ✅
-The core collections engine and backend infrastructure is fully operational:
-- **Collections Backend**: Full CRUD operations, playlist hierarchy support, undo/redo system, transaction/operation framework, central event bus, repository layer, and engine abstraction.
-- **Playlist Import Framework**: Multi-format parser, repair engine, track resolver, execution planner, import executor, merge/create/replace modes, and import analysis.
-- **Playlist Export**: M3U and M3U8 format writers, batch export, path collision resolution, and relative path support.
-- **Artwork**: Dynamic playlist artwork pipeline, engine integration, and atomic transactions.
-- **Search Engine**: Fast multi-field library search engine and filter pipeline.
-- **Performance**: SQLite parameter chunking, batch lookups, import batching, and query/repository optimizations.
+It should answer questions like:
 
----
+```
+Where did this genre come from?
 
-### Phase 1 — Rules Engine 🧠 *(Next Immediate Priority)*
-Replaces hardcoded logic (Favorites, History, Recently Added, Most Played) with a universal AST-compiled rules engine.
-- **Pipeline**: `Rule Definition` ➔ `AST Compiler` ➔ `Optimizer` ➔ `Evaluator` ➔ `Song IDs`
-- **Expressions**: Boolean logic (`AND`, `OR`, `NOT`), field comparisons (`Genre = 'Rock'`, `Rating >= 4`), temporal constraints (`Last Played < 30 days`), and event flags (`Not Skipped`).
+Who supplied this BPM?
 
----
+Which provider has higher confidence?
 
-### Phase 2 — Smart Playlists ⚡
-Builds dynamic playlists powered by the Rules Engine.
-- **Fully Configurable**: Zero hardcoded smart playlists.
-- **Examples**:
-  - *Road Trip*: `Energy > 80 AND Genre = 'Rock' AND Tempo > 120`
-  - *Study*: `Instrumental AND Rating > 4 AND NOT Genre = 'Metal'`
-  - *Monthly Discoveries*: `Added This Month AND Not Played`
+Should user edits override Spotify?
+
+When was this metadata updated?
+```
+
+Every future feature depends on this.
 
 ---
 
-### Phase 3 — Dynamic Collections 📂
-Extends the collection concept beyond traditional playlists into dynamically generated views.
-- **Dynamic Categories**: Albums, Artists, Genres, Folders, Tags, Years, Labels, Languages, Moods.
-- **Automated Organization**: Rendered on-the-fly based on underlying metadata and rules.
+# Phase C — Tag Engine ⭐⭐⭐⭐⭐
+
+Then build the Tag Engine.
+
+This is much bigger than "tags."
+
+```
+Manual
+
+Automatic
+
+AI
+
+Online
+
+Plugin
+```
+
+All become the same thing.
+
+Then later
+
+```
+tag:Workout
+
+tag:Night
+
+tag:Driving
+
+tag:Happy
+```
+
+become usable everywhere.
 
 ---
 
-### Phase 4 — Genre Intelligence 🎸
-Evolves simple text genre strings into a multi-layered classification framework.
-- **Rich Schema**: Multi-genre assignments, confidence scores, genre hierarchies (e.g., `Rock` ➔ `Alternative Rock` ➔ `Indie Rock`), aliases, and regional/custom user genres.
-- **Providers**: MusicBrainz, Spotify, Discogs, Last.fm, AcousticBrainz, and manual user overrides.
+# Phase D — Rule Engine ⭐⭐⭐⭐⭐
+
+This is the biggest feature after Collections.
+
+Instead of writing
+
+```
+Smart Playlist
+```
+
+you build
+
+```
+Rule
+
+↓
+
+AST
+
+↓
+
+Evaluator
+```
+
+Then
+
+Smart Playlists
+
+Dynamic Collections
+
+Search Filters
+
+Recommendations
+
+AI
+
+all use the same engine.
 
 ---
 
-### Phase 5 — Tagging Framework 🏷️
-Treats tags as rich, structured domain objects rather than plain strings.
-- **Tag Attributes**: `id`, `name`, `type`, `source`, `confidence`, `creator`, `timestamp`, `color`, `icon`, `visibility`.
-- **Sources**: `Manual`, `Auto`, `AI`, `Imported`, `Metadata`, `Online`.
-- **Types**: `Mood`, `Situation`, `Language`, `Instrument`, `Energy`, `Workout`, `Driving`, `Study`, `Sleep`, `Favorite`, `Personal`.
+# Phase E — Genre Intelligence
+
+Now comes genre.
+
+Because now
+
+Genre is just another provider.
+
+```
+MusicBrainz
+
+↓
+
+Metadata
+
+↓
+
+Genre
+
+↓
+
+Tag Engine
+
+↓
+
+Rule Engine
+```
+
+No special logic.
 
 ---
 
-### Phase 6 — Auto-Tagging Pipeline 🤖
-Automates library tagging via multi-source data ingestion.
-- **Sources**: MusicBrainz, Spotify, Last.fm, Discogs, AcousticBrainz, Lyrics, Wikipedia, AI model inference.
-- **Pipeline**: `Song` ➔ `Existing Metadata` ➔ `Online Providers` ➔ `Merge & Conflict Resolution` ➔ `Confidence Calculation` ➔ `Tag Engine`.
+# Phase F — Provider Ecosystem
+
+Now implement
+
+```
+MusicBrainz
+
+Discogs
+
+Spotify
+
+Last.fm
+
+Wikipedia
+```
+
+Each becomes
+
+```
+MetadataProvider
+```
+
+Nothing else.
 
 ---
 
-### Phase 7 — Metadata Intelligence 📊
-Deepens track metadata coverage beyond basic ID3 tags.
-- **Attributes**: Label, Producer, Composer, Country, Mood, Era, Popularity, Release History, Awards, Live Version status, Remaster flag, Explicit flag, Acousticness, BPM, Key, Camelot Key, ReplayGain, Loudness.
+# Phase G — Audio Analysis
+
+After metadata.
+
+```
+Audio
+
+↓
+
+Analysis
+
+↓
+
+Feature Store
+```
+
+Produces
+
+```
+BPM
+
+Mood
+
+Energy
+
+Danceability
+
+Key
+
+ReplayGain
+
+Embedding
+```
 
 ---
 
-### Phase 8 — Audio Analysis 🎵
-Performs offline local audio processing and feature extraction.
-- **Signal Processing**: Tempo, BPM, Musical Key detection, Danceability, Energy, Instrumentalness, Speechiness, Loudness, Dynamics.
-- **Vector Embeddings**: Local AI embeddings for acoustic similarity queries.
+# Phase H — Smart Collections
+
+Almost free now.
+
+Because you already have
+
+```
+Collections
+
+Membership Engine
+
+Rule Engine
+```
 
 ---
 
-### Phase 9 — Recommendation Engine 💡
-Provides contextual and intelligent track recommendations.
-- **Contextual Signals**: Listening history, active tags, genre graphs, time of day, weather, location (optional), mood state, favorites, and skip habits.
-- **Context Prompts**: *Friday Night*, *Morning Focus*, *Rainy Afternoon*.
+# Phase I — Recommendations
+
+Now recommendations become easy.
+
+```
+Metadata
+
++
+
+History
+
++
+
+Features
+
++
+
+Tags
+
++
+
+Rules
+```
+
+↓
+
+Recommendation Engine
 
 ---
 
-### Phase 10 — Statistics Engine 📈
-Delivers deep analytics on listening habits.
-- **Metrics**: Most replayed, most skipped, growing artists, forgotten gems, monthly discovery trends, genre evolution timelines, listening heat maps, and interactive timelines.
+# Phase J — Automation
+
+```
+Trigger
+
+↓
+
+Condition
+
+↓
+
+Action
+```
+
+Examples
+
+```
+Import Finished
+
+↓
+
+Fetch Metadata
+
+↓
+
+Analyze
+
+↓
+
+Tag
+
+↓
+
+Refresh Rules
+```
 
 ---
 
-### Phase 11 — Automation Engine ⚙️
-Enables user-defined automated workflows and trigger-action rules.
-- **Trigger/Action Examples**:
-  - `IF (Rating > 4 AND Not Played in 60 Days) THEN Notify User`
-  - `EVERY Friday THEN Generate Weekend Mix Playlist`
-  - `EVERY Month THEN Archive Unheard Imports`
+# Phase K — AI
+
+Only now.
+
+Because AI becomes
+
+```
+Translate Intent
+```
+
+not
+
+```
+Business Logic
+```
 
 ---
 
-### Phase 12 — Plugin SDK 🔌
-Exposes an extensible SDK for community plugins and custom integrations.
-- **Extension Points**: Metadata Providers, Importers/Exporters, Rule Evaluators, Visualizations, Lyrics Fetchers, DSP Effects, AI Services.
+# Phase L — Knowledge Graph
+
+Final destination.
+
+Everything you've built naturally forms a graph.
 
 ---
 
-### Phase 13 — Cloud Layer (Optional) ☁️
-Provides seamless cross-device synchronization.
-- **Sync Targets**: Tags, rules, playlists, metadata corrections, play history, and recommendation preferences across devices.
+# Things I would intentionally postpone
+
+Don't rush these.
+
+### Streaming export
+
+Probably unnecessary until someone exports 100k songs.
 
 ---
 
-### Phase 14 — Natural Language & AI Layer 🔮
-Integrates natural language processing and advanced AI interfaces.
-- **Capabilities**:
-  - Conversational playlist generation (e.g., *"Create a playlist for a rainy evening with Telugu melodies and soft piano"*).
-  - Acoustic similarity searches (e.g., *"Find songs similar to this one but happier"*).
-  - Automated library organization and missing metadata remediation.
+### Keyset pagination
+
+Great architecture.
+
+No user benefit today.
 
 ---
 
-### Phase 15 — Music Knowledge Graph 🌐
-Connects all entities within Nora into a unified graph database model.
-- **Graph Nodes & Edges**:
-  `Song` ↔ `Artist` ↔ `Album` ↔ `Genre` ↔ `Mood` ↔ `Tags` ↔ `Contributors` ↔ `Label` ↔ `Country` ↔ `History` ↔ `Recommendations`.
+### Accessibility overhaul
+
+Should happen before a stable release.
+
+Not before Intelligence.
 
 ---
 
-## 📋 Priority Execution Queue
+### Micro-optimizations
 
-1. **Phase 1 — Rules Engine** (AST, Parser, Evaluator, Optimizer)
-2. **Phase 2 — Smart Playlists**
-3. **Phase 3 — Dynamic Collections**
-4. **Phase 4 — Genre Intelligence**
-5. **Phase 5 — Tagging Framework** (Manual + Auto-ready)
-6. **Phase 6 — Metadata Provider Framework**
-7. **Phase 7 — Auto-Tagging Pipeline**
-8. **Phase 8 — Audio Analysis**
-9. **Phase 9 — Recommendation Engine**
-10. **Phase 10 — Statistics & Insights**
-11. **Phase 11 — Automation Engine**
-12. **Phase 12 — Plugin SDK Expansion**
-13. **Phase 13 — AI Layer**
-14. **Phase 14 — Music Knowledge Graph**
+Only optimize after profiling.
+
+---
+
+# One thing I would do differently than most projects
+
+I would write **design documents before code**.
+
+For every major engine:
+
+```
+Metadata Engine
+
+Tag Engine
+
+Rule Engine
+
+Recommendation Engine
+
+Automation Engine
+```
+
+create a document answering:
+
+- Problem statement
+- Data model
+- Responsibilities
+- Boundaries
+- Provider interfaces
+- Event flow
+- Future extensions
+- What it explicitly does **not** do
+
+Those documents will save you from architectural drift.
+
+---
+
+# The roadmap I'd follow
+
+```
+Current
+│
+├── Final Cleanup (100%)
+│
+├── Metadata Engine
+│
+├── Tag Engine
+│
+├── Rule Engine
+│
+├── Genre Intelligence
+│
+├── Provider Ecosystem
+│
+├── Feature Store
+│
+├── Smart Collections
+│
+├── Recommendation Engine
+│
+├── Automation
+│
+├── AI Integration
+│
+└── Knowledge Graph
+```
+
+## One final recommendation
+
+Before writing the first line of the Metadata Engine, I'd spend a few days designing the **Intelligence Architecture** with the same care you put into the Collections backend. That design will influence the next several years of Nora's evolution. If the Collections architecture was the foundation that made playlist management robust, the Metadata → Tags → Rules pipeline will become the foundation that everything else—smart playlists, genre intelligence, recommendations, automation, and AI—builds upon. I would treat it as the second major architectural milestone of the project.
