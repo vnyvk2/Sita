@@ -526,3 +526,8 @@ Reverse dependencies are prohibited.
 ## 25. Deterministic Strategy Invariant
 > Except for strategies explicitly defined as random, identical inputs must produce identical outputs.
 
+---
+
+## 26. Presentation Purity Invariant
+> Phase 4F must not modify resolver logic, strategy logic, persistence, state models, registry structure, or type contracts. All changes are limited to presentation, animation, transitions, visual feedback, and accessibility enhancements.
+

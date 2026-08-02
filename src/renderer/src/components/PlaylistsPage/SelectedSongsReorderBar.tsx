@@ -103,15 +103,15 @@ const SelectedSongsReorderBar = ({
               onClick={() => onSelectSlot(slotIndex)}
               onMouseEnter={() => onHoverSlot(slotIndex)}
               onMouseLeave={() => onHoverSlot(null)}
-              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-200 cursor-grab active:cursor-grabbing ${
+              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
                 isDragging ? 'opacity-40 scale-95 border-dashed border-amber-400' : ''
               } ${
-                isDragOver ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''
+                isDragOver ? 'ring-2 ring-amber-400 bg-amber-500/20 scale-[1.02]' : ''
               } ${
                 isActive
-                  ? 'bg-amber-500/15 border-2 border-amber-500/80 shadow-md ring-2 ring-amber-500/30'
+                  ? 'bg-amber-500/15 border-2 border-amber-500/80 shadow-lg ring-2 ring-amber-500/30 scale-[1.01]'
                   : isHovered || isFocused
-                    ? 'bg-neutral-800 border border-neutral-700'
+                    ? 'bg-neutral-800 border border-neutral-700 scale-[1.01] shadow-md'
                     : 'bg-neutral-950/60 border border-neutral-800/80 hover:bg-neutral-800/60'
               }`}
             >

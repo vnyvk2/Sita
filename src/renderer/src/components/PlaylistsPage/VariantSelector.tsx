@@ -24,7 +24,7 @@ const VariantSelector = ({ layout, selectedVariant, onChange }: Props) => {
             type="button"
             onClick={() => onChange(v.id)}
             title={v.description}
-            className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
+            className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-150 ease-out cursor-pointer hover:scale-[1.02] ${
               activeVariant === v.id
                 ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
                 : 'text-neutral-400 hover:text-neutral-200'
