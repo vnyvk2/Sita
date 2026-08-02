@@ -19,6 +19,7 @@ export type OperationType =
   | 'playlist.duplicate'
   | 'playlist.merge'
   | 'playlist.snapshot'
+  | 'playlist.setArtwork'
   | 'playlist.updateSidebarPositions'
   | 'playlist.restoreSidebarPositions';
 

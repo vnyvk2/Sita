@@ -7,7 +7,6 @@ import { collectionEventBus } from '../events/CollectionEventBus';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import { parseCollectionUri } from '../../../common/collections/id';
 
-import addArtworkToAPlaylist from '../../core/addArtworkToAPlaylist';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
 import type { OpenDialogOptions } from 'electron';
 import { showOpenDialog } from '../../main';
@@ -116,8 +115,7 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('collections/write/setArtwork', async (_, input: { playlistId: number, artworkPath: string }) => {
-    // Delegate to existing legacy implementation
-    return await addArtworkToAPlaylist(input.playlistId, input.artworkPath);
+    return await engine.setArtwork(input);
   });
 
   // History Endpoints

@@ -22,6 +22,7 @@ import { AddSongsOp } from './operations/AddSongsOp';
 import { RemoveSongsOp } from './operations/RemoveSongsOp';
 import { ReorderOp } from './operations/ReorderOp';
 import { RestoreSongsOp } from './operations/RestoreSongsOp';
+import { SetArtworkOp } from './operations/SetArtworkOp';
 
 // Singletons for Collections Backend
 export const playlistRepository = new PlaylistRepository();
@@ -49,6 +50,7 @@ export function registerDefaultOperations(
   reg.register('playlist.removeSongs', new RemoveSongsOp(repo));
   reg.register('playlist.reorder', new ReorderOp(repo));
   reg.register('playlist.restoreSongs', new RestoreSongsOp(repo));
+  reg.register('playlist.setArtwork', new SetArtworkOp(repo));
 }
 
 export const registry = new OperationRegistry();

@@ -19,6 +19,7 @@ import { DuplicateExecutor } from '../operations/DuplicateExecutor';
 import { MergePlaylistsOp, type MergePlaylistsInput } from '../operations/MergePlaylistsOp';
 import { MoveCollectionOp, type MoveCollectionInput } from '../operations/MoveCollectionOp';
 import { BulkDeleteOp, BulkRestoreOp, type BulkDeleteInput, type BulkRestoreInput } from '../operations/BulkDeleteOp';
+import { SetArtworkOp, type SetArtworkInput } from '../operations/SetArtworkOp';
 import { FolderStatisticsService } from './FolderStatisticsService';
 import { HierarchyService } from './HierarchyService';
 import { collectionEventBus } from '../events/CollectionEventBus';
@@ -43,6 +44,7 @@ export class PlaylistEngine {
   private readonly moveOp: MoveCollectionOp;
   private readonly bulkDeleteOp: BulkDeleteOp;
   private readonly bulkRestoreOp: BulkRestoreOp;
+  private readonly setArtworkOp: SetArtworkOp;
   
   private readonly folderStats: FolderStatisticsService;
   private readonly hierarchyService: HierarchyService;
@@ -72,6 +74,7 @@ export class PlaylistEngine {
     this.moveOp = new MoveCollectionOp(this.hierarchyService);
     this.bulkDeleteOp = new BulkDeleteOp(this.repository);
     this.bulkRestoreOp = new BulkRestoreOp(this.repository, this.hierarchyService);
+    this.setArtworkOp = new SetArtworkOp(this.repository);
     
     this.folderStats = new FolderStatisticsService();
   }
@@ -215,6 +218,15 @@ export class PlaylistEngine {
     });
     this.invalidateCache(result.affectedSongIds);
     collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { action: 'bulkRestore' } });
+    return result.data;
+  }
+
+  public async setArtwork(input: SetArtworkInput) {
+    const result = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      return await this.executor.execute(this.setArtworkOp, input, ctx);
+    });
+    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'setArtwork' } });
     return result.data;
   }
 

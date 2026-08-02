@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
-import addArtworkToAPlaylist from './core/addArtworkToAPlaylist';
 import addSongsFromFolderStructures from './core/addMusicFolder';
 
 import blacklistFolders from './core/blacklistFolders';
