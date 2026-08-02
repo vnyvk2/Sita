@@ -31,6 +31,7 @@ export class ReorderOp implements CollectionOperation<ReorderInput, void> {
     }
 
     const oldPosition = targetEntry.entry.position;
+    console.log('[ReorderOp] Executing reorder:', { playlistId, entryId, oldPosition, newPosition });
 
     if (oldPosition === newPosition) {
       // Nothing to do

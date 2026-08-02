@@ -155,6 +155,22 @@ function PlaylistInfoPage() {
     });
   }, [playlistSongs, keyword]);
 
+  useEffect(() => {
+    console.log('[Pipeline Stage 3: collectionEntries]', collectionEntries.map((e) => ({ id: e.id, songId: e.songId, pos: e.position })));
+  }, [collectionEntries]);
+
+  useEffect(() => {
+    console.log('[Pipeline Stage 4: rawPlaylistSongs]', rawPlaylistSongs.map((s) => s.songId));
+  }, [rawPlaylistSongs]);
+
+  useEffect(() => {
+    console.log('[Pipeline Stage 5: playlistSongs]', playlistSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title })));
+  }, [playlistSongs]);
+
+  useEffect(() => {
+    console.log('[Pipeline Stage 6: filteredSongs]', filteredSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title })));
+  }, [filteredSongs]);
+
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleReorder = useCallback(
@@ -217,6 +233,7 @@ function PlaylistInfoPage() {
       if (sourceIndex === destIndex) return;
 
       const draggedSong = filteredSongs[sourceIndex];
+      console.log('[Pipeline Stage 1: handleDragEnd]', { sourceIndex, destIndex, draggedEntryId: draggedSong?.entryId });
       if (draggedSong?.entryId) {
         moveSongAbsolute(draggedSong.entryId, destIndex, sourceIndex);
       }

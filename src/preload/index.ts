@@ -9,6 +9,7 @@ import type { CreateFolderInput } from '../main/collections/operations/CreateFol
 import type { CreatePlaylistInput } from '../main/collections/operations/CreatePlaylistOp';
 import type { AddSongsInput } from '../main/collections/operations/AddSongsOp';
 import type { RemoveSongsInput } from '../main/collections/operations/RemoveSongsOp';
+import type { ReorderInput as ReorderSongsInput } from '../main/collections/operations/ReorderOp';
 import type { RenameInput } from '../main/collections/operations/RenameOp';
 import type { MoveCollectionInput } from '../main/collections/operations/MoveCollectionOp';
 import type { DeleteInput } from '../main/collections/operations/DeleteOp';
@@ -17,6 +18,7 @@ import type { MergePlaylistsInput } from '../main/collections/operations/MergePl
 import type { BulkDeleteInput, BulkRestoreInput } from '../main/collections/operations/BulkDeleteOp';
 import type { PinInput, UnpinInput } from '../main/collections/operations/PinOp';
 import type { CollectionEvent } from '../main/collections/events/CollectionEventBus';
+import type { PlaylistViewMode } from '../common/collections/types';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -583,7 +585,7 @@ const collections = {
   read: {
     getCollection: (id: number): Promise<CollectionDto | null> => ipcRenderer.invoke('collections/read/getCollection', id),
     getChildren: (id: number): Promise<CollectionDto[]> => ipcRenderer.invoke('collections/read/getChildren', id),
-    getEntries: (id: number, offset: number, limit: number): Promise<PlaylistEntryDto[]> => ipcRenderer.invoke('collections/read/getEntries', id, offset, limit),
+    getEntries: (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode): Promise<PlaylistEntryDto[]> => ipcRenderer.invoke('collections/read/getEntries', id, offset, limit, sortType),
     getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> => ipcRenderer.invoke('collections/read/getBreadcrumbs', id)
   },
   write: {
@@ -591,6 +593,7 @@ const collections = {
     createPlaylist: (input: CreatePlaylistInput): Promise<number> => ipcRenderer.invoke('collections/write/createPlaylist', input),
     addSongs: (input: AddSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/addSongs', input),
     removeSongs: (input: RemoveSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/removeSongs', input),
+    reorder: (input: ReorderSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/reorder', input),
     rename: (input: RenameInput): Promise<void> => ipcRenderer.invoke('collections/write/rename', input),
     move: (input: MoveCollectionInput): Promise<void> => ipcRenderer.invoke('collections/write/move', input),
     delete: (input: DeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/delete', input),
