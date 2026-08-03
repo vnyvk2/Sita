@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
-import { DefaultProviderMergePolicy } from '@main/metadata/providers/policies/DefaultProviderMergePolicy';
+import { DefaultMetadataMergePolicy } from '@main/metadata/providers/policies/DefaultMetadataMergePolicy';
 
-describe('DefaultProviderMergePolicy', () => {
-  it('should merge provider payload fields based on confidence and provider priority', () => {
-    const policy = new DefaultProviderMergePolicy();
+describe('DefaultMetadataMergePolicy', () => {
+  it('should merge provider payload fields based on provider priority', () => {
+    const policy = new DefaultMetadataMergePolicy();
     const localInfo = new MetadataProviderInfo({ id: 'local', displayName: 'Local', version: '1.0', priority: 80 });
     const musicBrainzInfo = new MetadataProviderInfo({ id: 'musicbrainz', displayName: 'MusicBrainz', version: '1.0', priority: 90 });
 
@@ -28,7 +28,7 @@ describe('DefaultProviderMergePolicy', () => {
     const merged = policy.merge([localResult, musicBrainzResult]) as any;
 
     expect(merged).not.toBeNull();
-    expect(merged.title).toBe('MB Title'); // Higher confidence MB Title wins
+    expect(merged.title).toBe('MB Title'); // Higher priority MB Title wins
     expect(merged.year).toBe(2020); // Local year preserved
     expect(merged.genre).toBe('Rock'); // MB genre merged
   });

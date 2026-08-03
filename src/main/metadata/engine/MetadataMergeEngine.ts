@@ -2,6 +2,7 @@ import type { MetadataCapability } from '../common/types';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { ProviderResult } from '../models/ProviderResult';
+import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
 import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergePolicy';
 import type { IProviderSelectionStrategy } from '../providers/strategies/IProviderSelectionStrategy';
 import type { IProviderExecutionStrategy } from '../providers/strategies/IProviderExecutionStrategy';
@@ -32,26 +33,26 @@ export class MetadataMergeEngine {
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
   ): Promise<TDTO | null> {
-    const allProviders = this.registry.getAll();
-    const targetProviders = this.selectionStrategy.selectProviders(
-      allProviders,
-      capability
+    return this.executeMerge<TDTO>(identity, capability, execContext, (provider, id, ctx) =>
+      provider.fetch<TDTO>(id, ctx)
     );
-
-    const providerResults = await this.executionStrategy.execute<TDTO>(
-      targetProviders,
-      identity,
-      execContext,
-      (provider, id, ctx) => provider.fetch<TDTO>(id, ctx)
-    );
-
-    return this.mergePolicy.merge<TDTO>(providerResults);
   }
 
   public async refreshAndMergeEntity<TDTO = unknown>(
     identity: MetadataIdentity,
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
+  ): Promise<TDTO | null> {
+    return this.executeMerge<TDTO>(identity, capability, execContext, (provider, id, ctx) =>
+      provider.refresh<TDTO>(id, ctx)
+    );
+  }
+
+  private async executeMerge<TDTO = unknown>(
+    identity: MetadataIdentity,
+    capability: MetadataCapability,
+    execContext: ProviderExecutionContext | undefined,
+    operation: (provider: IMetadataProvider, id: MetadataIdentity, ctx?: ProviderExecutionContext) => Promise<ProviderResult<TDTO>>
   ): Promise<TDTO | null> {
     const allProviders = this.registry.getAll();
     const targetProviders = this.selectionStrategy.selectProviders(
@@ -63,7 +64,7 @@ export class MetadataMergeEngine {
       targetProviders,
       identity,
       execContext,
-      (provider, id, ctx) => provider.refresh<TDTO>(id, ctx)
+      operation
     );
 
     return this.mergePolicy.merge<TDTO>(providerResults);

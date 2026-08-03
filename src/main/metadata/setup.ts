@@ -27,7 +27,6 @@ import { ProviderExecutionPipelineBuilder } from './providers/execution/Provider
 import { ProviderHealthManager } from './providers/health/ProviderHealthManager';
 import { LocalMetadataProvider } from './providers/LocalMetadataProvider';
 import { MetadataProviderExecutor } from './providers/MetadataProviderExecutor';
-import { DefaultProviderMergePolicy } from './providers/policies/DefaultProviderMergePolicy';
 import { ProviderDiagnosticsTracker } from './providers/ProviderDiagnosticsTracker';
 import { ProviderRetryPolicy } from './providers/retry/ProviderRetryPolicy';
 import { DefaultProviderExecutionStrategy } from './providers/strategies/DefaultProviderExecutionStrategy';
@@ -58,7 +57,7 @@ export interface MetadataContainer {
   executionPipeline: ProviderExecutionPipeline;
   executionStrategy: DefaultProviderExecutionStrategy;
   selectionStrategy: DefaultProviderSelectionStrategy;
-  providerMergePolicy: DefaultProviderMergePolicy;
+  providerMergePolicy: DefaultMetadataMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   mapperRegistry: MapperRegistry;
@@ -204,7 +203,7 @@ export class MetadataBootstrap {
       executionPipeline,
       executionStrategy,
       selectionStrategy,
-      providerMergePolicy: providerMergePolicy as any,
+      providerMergePolicy,
       planner,
       pipeline,
       mapperRegistry,

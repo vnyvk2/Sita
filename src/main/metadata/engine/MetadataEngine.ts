@@ -10,14 +10,15 @@ import type { ProviderExecutionContext } from '../models/ProviderExecutionContex
 import type { ProviderResult } from '../models/ProviderResult';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
-import type { ProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
+import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergePolicy';
 
 import type { MetadataMergeEngine } from './MetadataMergeEngine';
-import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
+import { DefaultMetadataMergePolicy } from '../providers/policies/DefaultMetadataMergePolicy';
 
 export interface MetadataEngineOptions {
   executor: IMetadataProviderExecutor;
-  mergePolicy?: ProviderMergePolicy;
+  // TODO Phase 10: Remove executor+mergePolicy path once MergeEngine fully replaces legacy flow.
+  mergePolicy?: IMetadataMergePolicy;
   mergeEngine?: MetadataMergeEngine;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
@@ -27,8 +28,9 @@ export interface MetadataEngineOptions {
 }
 
 export class MetadataEngine implements IMetadataGateway {
+  // TODO Phase 10: Remove executor+mergePolicy path once MergeEngine fully replaces legacy flow.
   private readonly executor: IMetadataProviderExecutor;
-  private readonly mergePolicy: ProviderMergePolicy;
+  private readonly mergePolicy: IMetadataMergePolicy;
   private readonly mergeEngine?: MetadataMergeEngine;
   private readonly planner: MetadataQueryPlanner;
   private readonly pipeline: MetadataPipeline;
@@ -38,7 +40,7 @@ export class MetadataEngine implements IMetadataGateway {
 
   constructor(options: MetadataEngineOptions) {
     this.executor = options.executor;
-    this.mergePolicy = options.mergePolicy ?? new DefaultProviderMergePolicy();
+    this.mergePolicy = options.mergePolicy ?? new DefaultMetadataMergePolicy();
     this.mergeEngine = options.mergeEngine;
     this.planner = options.planner;
     this.pipeline = options.pipeline;

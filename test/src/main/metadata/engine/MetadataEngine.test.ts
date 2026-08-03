@@ -27,7 +27,7 @@ import { DefaultConflictPolicy } from '@main/metadata/policies/DefaultConflictPo
 import { DefaultValidationPolicy } from '@main/metadata/policies/DefaultValidationPolicy';
 import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
 import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
-import { DefaultProviderMergePolicy } from '@main/metadata/providers/policies/DefaultProviderMergePolicy';
+import { DefaultMetadataMergePolicy } from '@main/metadata/providers/policies/DefaultMetadataMergePolicy';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
 import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
@@ -68,7 +68,7 @@ describe('MetadataEngine with Provider Resolution Pipeline', () => {
 
     const engine = new MetadataEngine({
       executor,
-      mergePolicy: new DefaultProviderMergePolicy(),
+      mergePolicy: new DefaultMetadataMergePolicy(),
       planner,
       pipeline,
       cache,
