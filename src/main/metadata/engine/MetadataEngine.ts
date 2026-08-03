@@ -102,49 +102,32 @@ export class MetadataEngine implements IMetadataGateway {
       }
     }
 
-    // Step 2: Batch fetch cache misses grouped by entityKind via executor.executeMany
+    // Step 2: Batch fetch cache misses via executor.executeMany using ProviderBatchResult
     if (cacheMisses.length > 0) {
-      const groupedMisses = new Map<string, MetadataIdentity[]>();
-      for (const identity of cacheMisses) {
-        const list = groupedMisses.get(identity.entityKind) ?? [];
-        list.push(identity);
-        groupedMisses.set(identity.entityKind, list);
-      }
+      const batchResultsList = await this.executor.executeMany<unknown>(
+        cacheMisses,
+        'ReadDatabase',
+        execContext
+      );
 
-      for (const [_, kindIdentities] of groupedMisses.entries()) {
-        const providerResultsList = await this.executor.executeMany<unknown>(
-          kindIdentities,
-          'ReadDatabase',
-          execContext
-        );
+      for (let i = 0; i < cacheMisses.length; i++) {
+        const identity = cacheMisses[i];
 
-        const numIdentities = kindIdentities.length;
-        const numProviders = Math.max(1, Math.floor(providerResultsList.length / numIdentities));
+        const singleProviderResults: ProviderResult[] = batchResultsList
+          .map((batch) => batch.results[i])
+          .filter((res): res is ProviderResult => res !== undefined && res !== null);
 
-        // Process fetched results in batch
-        for (let i = 0; i < numIdentities; i++) {
-          const identity = kindIdentities[i];
-          const singleProviderResults: ProviderResult[] = [];
-
-          for (let p = 0; p < numProviders; p++) {
-            const pr = providerResultsList[p * numIdentities + i];
-            if (pr) {
-              singleProviderResults.push(pr);
-            }
-          }
-
-          const mergedPayload = this.mergePolicy.merge(singleProviderResults);
-          if (mergedPayload) {
-            const entity = await this.pipeline.processDTO(
-              identity.entityKind,
-              mergedPayload,
-              null
-            );
-            if (entity) {
-              this.cache.set(entity);
-              this.publishEntity(entity, 'MetadataLoaded');
-              loadedEntitiesMap.set(identity.metadataId, entity);
-            }
+        const mergedPayload = this.mergePolicy.merge(singleProviderResults);
+        if (mergedPayload) {
+          const entity = await this.pipeline.processDTO(
+            identity.entityKind,
+            mergedPayload,
+            null
+          );
+          if (entity) {
+            this.cache.set(entity);
+            this.publishEntity(entity, 'MetadataLoaded');
+            loadedEntitiesMap.set(identity.metadataId, entity);
           }
         }
       }

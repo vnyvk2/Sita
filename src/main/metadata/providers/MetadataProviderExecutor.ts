@@ -9,6 +9,7 @@ import type { MetadataProviderRegistry } from '../registries/MetadataProviderReg
 import type { IProviderExecutionStrategy } from './strategies/IProviderExecutionStrategy';
 import type { IProviderSelectionStrategy } from './strategies/IProviderSelectionStrategy';
 
+import { ProviderBatchResult } from '../models/ProviderBatchResult';
 import { DefaultProviderExecutionStrategy } from './strategies/DefaultProviderExecutionStrategy';
 import { DefaultProviderSelectionStrategy } from './strategies/DefaultProviderSelectionStrategy';
 
@@ -55,7 +56,7 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     identities: MetadataIdentity[],
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
-  ): Promise<ProviderResult<TDTO>[]> {
+  ): Promise<ProviderBatchResult<TDTO>[]> {
     if (identities.length === 0) return [];
     const allProviders = this.registry.getAll();
     const targetProviders = this.selectionStrategy.selectProviders(
@@ -63,12 +64,27 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
       capability
     );
 
-    return this.executionStrategy.executeMany<TDTO>(
-      targetProviders,
-      identities,
-      execContext,
-      (provider, ids, ctx) => provider.fetchMany<TDTO>(ids, ctx)
-    );
+    // Group identities by entityKind inside executor
+    const groupedMisses = new Map<string, MetadataIdentity[]>();
+    for (const identity of identities) {
+      const list = groupedMisses.get(identity.entityKind) ?? [];
+      list.push(identity);
+      groupedMisses.set(identity.entityKind, list);
+    }
+
+    const aggregatedBatchResults: ProviderBatchResult<TDTO>[] = [];
+
+    for (const [_, kindIdentities] of groupedMisses.entries()) {
+      const batchResults = await this.executionStrategy.executeMany<TDTO>(
+        targetProviders,
+        kindIdentities,
+        execContext,
+        (provider, ids, ctx) => provider.fetchMany<TDTO>(ids, ctx)
+      );
+      aggregatedBatchResults.push(...batchResults);
+    }
+
+    return aggregatedBatchResults;
   }
 
   public async refresh<TDTO = unknown>(
@@ -94,7 +110,7 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     identities: MetadataIdentity[],
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
-  ): Promise<ProviderResult<TDTO>[]> {
+  ): Promise<ProviderBatchResult<TDTO>[]> {
     if (identities.length === 0) return [];
     const allProviders = this.registry.getAll();
     const targetProviders = this.selectionStrategy.selectProviders(
@@ -102,11 +118,25 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
       capability
     );
 
-    return this.executionStrategy.executeMany<TDTO>(
-      targetProviders,
-      identities,
-      execContext,
-      (provider, ids, ctx) => provider.refreshMany<TDTO>(ids, ctx)
-    );
+    const groupedMisses = new Map<string, MetadataIdentity[]>();
+    for (const identity of identities) {
+      const list = groupedMisses.get(identity.entityKind) ?? [];
+      list.push(identity);
+      groupedMisses.set(identity.entityKind, list);
+    }
+
+    const aggregatedBatchResults: ProviderBatchResult<TDTO>[] = [];
+
+    for (const [_, kindIdentities] of groupedMisses.entries()) {
+      const batchResults = await this.executionStrategy.executeMany<TDTO>(
+        targetProviders,
+        kindIdentities,
+        execContext,
+        (provider, ids, ctx) => provider.refreshMany<TDTO>(ids, ctx)
+      );
+      aggregatedBatchResults.push(...batchResults);
+    }
+
+    return aggregatedBatchResults;
   }
 }

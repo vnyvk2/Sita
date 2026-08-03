@@ -7,6 +7,7 @@ import type { ProviderExecutionPipeline } from '../execution/ProviderExecutionPi
 import type { IProviderExecutionStrategy } from './IProviderExecutionStrategy';
 
 import { MetadataConfidence } from '../../models/MetadataConfidence';
+import { ProviderBatchResult } from '../../models/ProviderBatchResult';
 import { ProviderResult as ConcreteProviderResult } from '../../models/ProviderResult';
 import { ProviderExecutionPipeline as ConcreteExecutionPipeline } from '../execution/ProviderExecutionPipeline';
 import { ProviderExecutionStageContext } from '../execution/ProviderExecutionStageContext';
@@ -127,9 +128,9 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
       identities: MetadataIdentity[],
       context?: ProviderExecutionContext
     ) => Promise<ProviderResult<TDTO>[]>
-  ): Promise<ProviderResult<TDTO>[]> {
+  ): Promise<ProviderBatchResult<TDTO>[]> {
     if (identities.length === 0) return [];
-    const results: ProviderResult<TDTO>[] = [];
+    const batchResults: ProviderBatchResult<TDTO>[] = [];
 
     for (const provider of providers) {
       const isCancelled =
@@ -137,15 +138,8 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
         execContext?.cancellationToken?.isCancellationRequested?.();
 
       if (isCancelled) {
-        for (const identity of identities) {
-          this.eventBus.emit('ProviderSkipped', {
-            providerInfo: provider.info,
-            identity,
-            status: 'skipped',
-            latencyMs: 0,
-            error: 'Execution cancelled by CancellationToken'
-          });
-          results.push(
+        const skippedResults = identities.map(
+          (identity) =>
             new ConcreteProviderResult<TDTO>({
               payload: null,
               confidence: MetadataConfidence.low(),
@@ -154,15 +148,25 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
               status: 'skipped',
               error: 'Execution cancelled by CancellationToken'
             })
-          );
-        }
+        );
+        batchResults.push(
+          new ProviderBatchResult<TDTO>({
+            providerInfo: provider.info,
+            results: skippedResults
+          })
+        );
         continue;
       }
 
-      const batchResults = await action(provider, identities, execContext);
-      results.push(...batchResults);
+      const results = await action(provider, identities, execContext);
+      batchResults.push(
+        new ProviderBatchResult<TDTO>({
+          providerInfo: provider.info,
+          results
+        })
+      );
     }
 
-    return results;
+    return batchResults;
   }
 }

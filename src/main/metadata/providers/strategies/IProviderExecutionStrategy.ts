@@ -1,5 +1,6 @@
 import type { IMetadataProvider } from '../../interfaces/IMetadataProvider';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
+import type { ProviderBatchResult } from '../../models/ProviderBatchResult';
 import type { ProviderExecutionContext } from '../../models/ProviderExecutionContext';
 import type { ProviderResult } from '../../models/ProviderResult';
 
@@ -24,5 +25,5 @@ export interface IProviderExecutionStrategy {
       identities: MetadataIdentity[],
       context?: ProviderExecutionContext
     ) => Promise<ProviderResult<TDTO>[]>
-  ): Promise<ProviderResult<TDTO>[]>;
+  ): Promise<ProviderBatchResult<TDTO>[]>;
 }
