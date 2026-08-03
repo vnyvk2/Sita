@@ -20,32 +20,38 @@ export class RetryStage implements IProviderExecutionStage {
     const baseDelayMs = context.config.baseDelayMs;
     const backoffMultiplier = context.config.backoffMultiplier;
 
-    return this.retryPolicy.execute(
-      async () => {
-        const result = await next();
-        if (result.status === 'failed' || result.status === 'timeout') {
-          throw new Error(result.error ?? `Provider result status: ${result.status}`);
+    let lastResult: ProviderResult<TDTO> | undefined;
+
+    try {
+      return await this.retryPolicy.execute(
+        async () => {
+          lastResult = await next();
+          if (lastResult.status === 'failed' || lastResult.status === 'timeout') {
+            throw new Error(lastResult.error ?? `Provider result status: ${lastResult.status}`);
+          }
+          return lastResult;
+        },
+        {
+          maxAttempts,
+          baseDelayMs,
+          backoffMultiplier,
+          retryPredicate: () => true,
+          onRetry: (attempt, maxAttemptsCount, delayMs, error) => {
+            context.eventBus.emit('ProviderRetry', {
+              providerInfo: context.provider.info,
+              attempt,
+              maxAttempts: maxAttemptsCount,
+              delayMs,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
         }
-        return result;
-      },
-      {
-        maxAttempts,
-        baseDelayMs,
-        backoffMultiplier,
-        retryPredicate: () => true,
-        onRetry: (attempt, maxAttemptsCount, delayMs, error) => {
-          context.eventBus.emit('ProviderRetry', {
-            providerInfo: context.provider.info,
-            attempt,
-            maxAttempts: maxAttemptsCount,
-            delayMs,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        }
+      );
+    } catch (_err) {
+      if (lastResult) {
+        return lastResult;
       }
-    ).catch(async (finalErr) => {
-      // Return the final failed ProviderResult after retries are exhausted
-      return next();
-    });
+      throw _err;
+    }
   }
 }

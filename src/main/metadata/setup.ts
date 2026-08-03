@@ -17,10 +17,8 @@ import { DefaultProviderPriorityPolicy } from './policies/DefaultProviderPriorit
 import { DefaultValidationPolicy } from './policies/DefaultValidationPolicy';
 
 import { ProviderCircuitBreakerRegistry } from './providers/circuitbreaker/ProviderCircuitBreakerRegistry';
-import { CircuitBreakerStage } from './providers/execution/stages/CircuitBreakerStage';
-import { RetryStage } from './providers/execution/stages/RetryStage';
-import { TimeoutStage } from './providers/execution/stages/TimeoutStage';
 import { ProviderExecutionPipeline } from './providers/execution/ProviderExecutionPipeline';
+import { ProviderExecutionPipelineBuilder } from './providers/execution/ProviderExecutionPipelineBuilder';
 import { ProviderHealthManager } from './providers/health/ProviderHealthManager';
 import { LocalMetadataProvider } from './providers/LocalMetadataProvider';
 import { MetadataProviderExecutor } from './providers/MetadataProviderExecutor';
@@ -99,11 +97,11 @@ export class MetadataBootstrap {
     const timeoutPolicy = new ProviderTimeoutPolicy();
     const retryPolicy = new ProviderRetryPolicy();
 
-    const executionPipeline = new ProviderExecutionPipeline([
-      new CircuitBreakerStage(circuitBreakerRegistry),
-      new RetryStage(retryPolicy),
-      new TimeoutStage(timeoutPolicy)
-    ]);
+    const executionPipeline = new ProviderExecutionPipelineBuilder()
+      .withCircuitBreaker(circuitBreakerRegistry)
+      .withRetry(retryPolicy)
+      .withTimeout(timeoutPolicy)
+      .build();
 
     const selectionStrategy = new DefaultProviderSelectionStrategy();
     const executionStrategy = new DefaultProviderExecutionStrategy(eventBus, executionPipeline);
