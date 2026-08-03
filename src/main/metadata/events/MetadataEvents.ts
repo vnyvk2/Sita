@@ -22,6 +22,7 @@ export interface ProviderLifecycleEvent {
 }
 
 export interface MetadataEventMap {
+  MetadataLoaded: (event: MetadataEntityEvent) => void;
   MetadataCreated: (event: MetadataEntityEvent) => void;
   MetadataChanged: (event: MetadataFieldChangedEvent) => void;
   MetadataDeleted: (event: MetadataEntityEvent) => void;

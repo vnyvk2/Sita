@@ -1,4 +1,5 @@
 import type { MetadataCache } from '../cache/MetadataCache';
+import type { MetadataEventMap } from '../events/MetadataEvents';
 import type { MetadataEventBus } from '../events/MetadataEventBus';
 import type { IMetadataEngine } from '../interfaces/IMetadataEngine';
 import type { MetadataContext } from '../models/MetadataContext';
@@ -50,8 +51,7 @@ export class MetadataEngine implements IMetadataEngine {
 
     const entity = await this.pipeline.processDTO(identity.entityKind, dto, null);
     if (entity) {
-      this.cache.set(entity);
-      this.eventBus.emit('MetadataCreated', { identity: entity.identity, entity });
+      this.publishEntity(entity, 'MetadataLoaded');
     }
 
     return entity;
@@ -72,8 +72,7 @@ export class MetadataEngine implements IMetadataEngine {
       dtos.map(async (dto) => {
         const entity = await this.pipeline.processDTO(query.kind, dto, null);
         if (entity) {
-          this.cache.set(entity);
-          this.eventBus.emit('MetadataCreated', { identity: entity.identity, entity });
+          this.publishEntity(entity, 'MetadataLoaded');
         }
         return entity;
       })
@@ -96,9 +95,16 @@ export class MetadataEngine implements IMetadataEngine {
       throw new Error(`Failed to process DTO during metadata refresh for ${identity.metadataId}`);
     }
 
-    this.cache.set(entity);
-    this.eventBus.emit('MetadataRefreshed', { identity: entity.identity, entity });
+    this.publishEntity(entity, 'MetadataRefreshed');
 
     return entity;
+  }
+
+  private publishEntity(
+    entity: MetadataEntity,
+    eventType: keyof Pick<MetadataEventMap, 'MetadataLoaded' | 'MetadataCreated' | 'MetadataRefreshed'>
+  ): void {
+    this.cache.set(entity);
+    this.eventBus.emit(eventType, { identity: entity.identity, entity });
   }
 }
