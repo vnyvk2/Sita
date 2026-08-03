@@ -1,10 +1,10 @@
+import type { IMetadataRepository } from '../interfaces/IMetadataRepository';
 import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataKind } from '../models/MetadataKind';
 import type { IEntityLoader } from './strategies/IEntityLoader';
 
 import { MetadataRepositoryError } from '../common/errors';
-import { IMetadataRepository } from '../interfaces/IMetadataRepository';
 import { MetadataIdentity as ConcreteIdentity } from '../models/MetadataIdentity';
 import { LoaderRegistry } from './LoaderRegistry';
 
@@ -56,7 +56,7 @@ export class DatabaseMetadataRepository implements IMetadataRepository {
       groups.set(id.entityKind, list);
     }
 
-    // Map storing loaded DTOs keyed by metadataId ("Kind:Id")
+    // Map storing loaded DTOs keyed by metadataId ("kind:id")
     const loadedMap = new Map<string, T>();
 
     for (const [kind, ids] of groups.entries()) {

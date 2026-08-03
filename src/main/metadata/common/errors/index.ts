@@ -32,3 +32,10 @@ export class MetadataValidationError extends MetadataError {
     this.name = 'MetadataValidationError';
   }
 }
+
+export class MetadataRepositoryError extends MetadataError {
+  constructor(message: string) {
+    super(`Metadata repository error: ${message}`);
+    this.name = 'MetadataRepositoryError';
+  }
+}
