@@ -13,7 +13,7 @@ export interface MetadataEntityOptions {
 
 export class MetadataEntity {
   public readonly identity: MetadataIdentity;
-  public rawPayload?: unknown;
+  public readonly rawPayload?: unknown;
   private readonly fieldsMap: Map<FieldId, MetadataValue<unknown>>;
 
   constructor(options: MetadataEntityOptions) {

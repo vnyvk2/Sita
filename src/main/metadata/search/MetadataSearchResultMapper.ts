@@ -1,3 +1,4 @@
+import logger from '@main/logger';
 import {
   convertToAlbum,
   convertToArtist,
@@ -35,11 +36,14 @@ export class MetadataSearchResultMapper {
         default:
           dto = { ...(entity.rawPayload as Record<string, unknown>) };
       }
-    } catch {
+    } catch (err) {
+      logger.error(`Failed to map MetadataEntity to DTO for ${entity.identity.entityKind}:${entity.identity.entityId}`, {
+        error: err
+      });
       dto = { ...(entity.rawPayload as Record<string, unknown>) };
     }
 
-    // Attach kind and id for SearchCoordinator lookup
+    // Attach kind and id for SearchCoordinator indexing
     dto.kind = entity.identity.entityKind;
     dto.id = entity.identity.entityId;
 
