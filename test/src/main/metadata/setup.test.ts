@@ -1,12 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@db/db', () => ({
+  db: {
+    query: {
+      songs: { findFirst: vi.fn(), findMany: vi.fn() },
+      artists: { findFirst: vi.fn(), findMany: vi.fn() },
+      albums: { findFirst: vi.fn(), findMany: vi.fn() },
+      genres: { findFirst: vi.fn(), findMany: vi.fn() },
+      playlists: { findFirst: vi.fn(), findMany: vi.fn() }
+    }
+  }
+}));
 
 import { MetadataBootstrap } from '@main/metadata/setup';
 
 describe('MetadataBootstrap', () => {
-  it('should bootstrap metadata module container with default registries', () => {
-    const metadataModule = MetadataBootstrap.bootstrap();
-    expect(metadataModule.fieldRegistry).toBeDefined();
-    expect(metadataModule.providerRegistry).toBeDefined();
-    expect(metadataModule.fieldRegistry.getAll().length).toBeGreaterThan(0);
+  it('should bootstrap metadata module container with default registries and pipeline', () => {
+    const container = MetadataBootstrap.bootstrap();
+    expect(container.engine).toBeDefined();
+    expect(container.repository).toBeDefined();
+    expect(container.planner).toBeDefined();
+    expect(container.pipeline).toBeDefined();
+    expect(container.mapperRegistry).toBeDefined();
+    expect(container.fieldRegistry).toBeDefined();
+    expect(container.cache).toBeDefined();
+    expect(container.eventBus).toBeDefined();
   });
 });

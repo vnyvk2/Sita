@@ -1,5 +1,7 @@
 export * from './CoreFieldDefinitions';
+export * from './dtos';
 export * from './MetadataConfidence';
+export * from './MetadataContext';
 export * from './MetadataEntity';
 export * from './MetadataFieldDefinition';
 export * from './MetadataFieldId';

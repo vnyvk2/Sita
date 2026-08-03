@@ -8,6 +8,7 @@ export interface MetadataFieldDefinitionOptions {
   valueType: FieldValueType;
   multiValue?: boolean;
   searchable?: boolean;
+  searchWeight?: number;
   filterable?: boolean;
   sortable?: boolean;
   providerEditable?: boolean;
@@ -22,6 +23,7 @@ export class MetadataFieldDefinition {
   public readonly valueType: FieldValueType;
   public readonly multiValue: boolean;
   public readonly searchable: boolean;
+  public readonly searchWeight: number;
   public readonly filterable: boolean;
   public readonly sortable: boolean;
   public readonly providerEditable: boolean;
@@ -35,6 +37,7 @@ export class MetadataFieldDefinition {
     this.valueType = options.valueType;
     this.multiValue = options.multiValue ?? false;
     this.searchable = options.searchable ?? true;
+    this.searchWeight = options.searchWeight ?? (this.searchable ? 1.0 : 0.0);
     this.filterable = options.filterable ?? true;
     this.sortable = options.sortable ?? false;
     this.providerEditable = options.providerEditable ?? true;

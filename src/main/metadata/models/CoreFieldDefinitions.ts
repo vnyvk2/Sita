@@ -7,6 +7,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     displayName: 'Title',
     valueType: 'string',
     searchable: true,
+    searchWeight: 1.0,
     filterable: true,
     sortable: true,
     indexed: true
@@ -17,6 +18,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     valueType: 'string',
     multiValue: true,
     searchable: true,
+    searchWeight: 0.95,
     filterable: true,
     sortable: true,
     indexed: true
@@ -26,6 +28,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     displayName: 'Album',
     valueType: 'string',
     searchable: true,
+    searchWeight: 0.8,
     filterable: true,
     sortable: true,
     indexed: true
@@ -36,6 +39,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     valueType: 'string',
     multiValue: true,
     searchable: true,
+    searchWeight: 0.6,
     filterable: true,
     sortable: true,
     indexed: true
@@ -45,6 +49,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     displayName: 'BPM',
     valueType: 'number',
     searchable: false,
+    searchWeight: 0.0,
     filterable: true,
     sortable: true
   }),
@@ -53,6 +58,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     displayName: 'Year',
     valueType: 'number',
     searchable: true,
+    searchWeight: 0.5,
     filterable: true,
     sortable: true
   }),
@@ -62,6 +68,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     valueType: 'string',
     multiValue: true,
     searchable: true,
+    searchWeight: 0.9,
     filterable: true,
     sortable: false,
     indexed: true
@@ -72,6 +79,7 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     valueType: 'string',
     multiValue: true,
     searchable: true,
+    searchWeight: 0.4,
     filterable: true,
     sortable: false,
     indexed: true
