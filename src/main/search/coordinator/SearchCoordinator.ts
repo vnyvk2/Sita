@@ -1,22 +1,23 @@
+import type { MatchTierValue } from '../../../common/search/MatchTier';
+import type { MetadataSearchGateway } from '@main/metadata/search/MetadataSearchGateway';
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
 import logger from '@main/logger';
 import { dataUpdateEvent } from '@main/main';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-
+import { MATCH_TIER } from '../../../common/search/MatchTier';
 import { AlbumSearchEngine } from '../engines/AlbumSearchEngine';
 import { ArtistSearchEngine } from '../engines/ArtistSearchEngine';
 import { GenreSearchEngine } from '../engines/GenreSearchEngine';
 import { PlaylistSearchEngine } from '../engines/PlaylistSearchEngine';
 import { SongSearchEngine } from '../engines/SongSearchEngine';
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 import { normalizeQuery } from '../normalize/normalizeQuery';
-import { MATCH_TIER } from '../../../common/search/MatchTier';
-import type { MatchTierValue, SearchMatch } from '../../../common/search/MatchTier';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const EMPTY_MATCHES: SearchMatch<never>[] = [];
+const EMPTY_REFERENCES: SearchMatchReference[] = [];
 
 // ---------------------------------------------------------------------------
 // Recent search history
@@ -25,8 +26,18 @@ const EMPTY_MATCHES: SearchMatch<never>[] = [];
 let recentSearchesTimeoutId: NodeJS.Timeout;
 
 // ---------------------------------------------------------------------------
-// Search Coordinator
+// Search Coordinator Options & Interface
 // ---------------------------------------------------------------------------
+
+export interface SearchCoordinatorOptions {
+  keyword: string;
+  filter?: 'All' | 'Songs' | 'Artists' | 'Albums' | 'Playlists' | 'Genres';
+  updateSearchHistory?: boolean;
+  isSimilaritySearchEnabled?: boolean;
+  limit?: number;
+  metadata?: boolean | { artist?: boolean; album?: boolean };
+  searchGateway?: MetadataSearchGateway;
+}
 
 /**
  * Nora's central search coordinator.
@@ -34,17 +45,9 @@ let recentSearchesTimeoutId: NodeJS.Timeout;
  * Owns:
  * - Query normalization
  * - Engine selection (based on filter)
- * - Parallel engine execution
- * - Section confidence computation
- * - Recent search history management
- *
- * Does NOT own:
- * - How entities are searched (that's the engines' job)
- * - How results are presented (that's the frontend's job)
- *
- * Usage:
- * - Global search:  `query({ keyword, filter: 'All', updateSearchHistory: true })`
- * - Songs page:     `query({ keyword, filter: 'Songs', updateSearchHistory: false, limit: SEARCH_LIMITS.PAGE })`
+ * - Parallel engine execution (returning SearchMatchReference[])
+ * - Single-pass batched hydration via MetadataSearchGateway.hydrateReferences()
+ * - Section confidence computation & history tracking
  */
 const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> => {
   const {
@@ -53,7 +56,8 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     updateSearchHistory = true,
     isSimilaritySearchEnabled = true,
     limit,
-    metadata
+    metadata,
+    searchGateway
   } = options;
 
   const timer = timeStart();
@@ -74,50 +78,84 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
   const engineOptions: import('../../../common/search/MatchTier').SearchEngineOptions = {
     fuzzy: isSimilaritySearchEnabled,
     limit,
-    metadata: typeof metadata === 'boolean'
-      ? (metadata ? { artist: true, album: true } : undefined)
-      : metadata
+    metadata:
+      typeof metadata === 'boolean'
+        ? metadata
+          ? { artist: true, album: true }
+          : undefined
+        : metadata
   };
 
-  // Run only the engines that match the active filter — in parallel
-  const [songMatches, artistMatches, albumMatches, playlistMatches, genreMatches] =
-    await Promise.all([
-      filter === 'All' || filter === 'Songs'
-        ? SongSearchEngine.search(query, engineOptions)
-        : EMPTY_MATCHES,
-      filter === 'All' || filter === 'Artists'
-        ? ArtistSearchEngine.search(query, engineOptions)
-        : EMPTY_MATCHES,
-      filter === 'All' || filter === 'Albums'
-        ? AlbumSearchEngine.search(query, engineOptions)
-        : EMPTY_MATCHES,
-      filter === 'All' || filter === 'Playlists'
-        ? PlaylistSearchEngine.search(query, engineOptions)
-        : EMPTY_MATCHES,
-      filter === 'All' || filter === 'Genres'
-        ? GenreSearchEngine.search(query, engineOptions)
-        : EMPTY_MATCHES
-    ]);
+  // 1. Run engine discovery in parallel — returning SearchMatchReference[]
+  const [songRefs, artistRefs, albumRefs, playlistRefs, genreRefs] = await Promise.all([
+    filter === 'All' || filter === 'Songs'
+      ? SongSearchEngine.search(query, engineOptions)
+      : EMPTY_REFERENCES,
+    filter === 'All' || filter === 'Artists'
+      ? ArtistSearchEngine.search(query, engineOptions)
+      : EMPTY_REFERENCES,
+    filter === 'All' || filter === 'Albums'
+      ? AlbumSearchEngine.search(query, engineOptions)
+      : EMPTY_REFERENCES,
+    filter === 'All' || filter === 'Playlists'
+      ? PlaylistSearchEngine.search(query, engineOptions)
+      : EMPTY_REFERENCES,
+    filter === 'All' || filter === 'Genres'
+      ? GenreSearchEngine.search(query, engineOptions)
+      : EMPTY_REFERENCES
+  ]);
 
-  timeEnd(timer, 'Total Search');
+  timeEnd(timer, 'Engine Identity Discovery');
 
-  // Unwrap SearchMatch<T>[] → T[] for the result contract
-  const songs = songMatches.map((m) => m.item);
-  const artists = artistMatches.map((m) => m.item);
-  const albums = albumMatches.map((m) => m.item);
-  const playlists = playlistMatches.map((m) => m.item);
-  const genres = genreMatches.map((m) => m.item);
+  // 2. Aggregate ALL search references into ONE single batched pass across all engines
+  const allReferences = [
+    ...songRefs,
+    ...artistRefs,
+    ...albumRefs,
+    ...playlistRefs,
+    ...genreRefs
+  ];
 
-  // Compute section confidence — coordinator's responsibility, not the engines'
-  const bestTierOf = (matches: SearchMatch<unknown>[]): MatchTierValue =>
-    matches.length > 0 ? matches[0].tier : MATCH_TIER.NONE;
+  let hydratedResults: unknown[] = [];
+  if (searchGateway && allReferences.length > 0) {
+    hydratedResults = await searchGateway.hydrateReferences(allReferences);
+  }
+
+  // 3. Map hydrated DTOs back into sections preserving original engine ordering
+  const hydratedMap = new Map<string, unknown>();
+  for (const item of hydratedResults) {
+    if (item && typeof item === 'object' && 'kind' in item && 'id' in item) {
+      const key = `${(item as Record<string, unknown>).kind}:${(item as Record<string, unknown>).id}`;
+      hydratedMap.set(key, item);
+    }
+  }
+
+  const songs = songRefs
+    .map((ref) => hydratedMap.get(`song:${ref.id}`))
+    .filter(Boolean);
+  const artists = artistRefs
+    .map((ref) => hydratedMap.get(`artist:${ref.id}`))
+    .filter(Boolean);
+  const albums = albumRefs
+    .map((ref) => hydratedMap.get(`album:${ref.id}`))
+    .filter(Boolean);
+  const playlists = playlistRefs
+    .map((ref) => hydratedMap.get(`playlist:${ref.id}`))
+    .filter(Boolean);
+  const genres = genreRefs
+    .map((ref) => hydratedMap.get(`genre:${ref.id}`))
+    .filter(Boolean);
+
+  // 4. Compute section confidence from match tiers
+  const bestTierOf = (refs: SearchMatchReference[]): MatchTierValue =>
+    refs.length > 0 ? refs[0].tier : MATCH_TIER.NONE;
 
   const confidence = {
-    songs: bestTierOf(songMatches),
-    artists: bestTierOf(artistMatches),
-    albums: bestTierOf(albumMatches),
-    playlists: bestTierOf(playlistMatches),
-    genres: bestTierOf(genreMatches)
+    songs: bestTierOf(songRefs),
+    artists: bestTierOf(artistRefs),
+    albums: bestTierOf(albumRefs),
+    playlists: bestTierOf(playlistRefs),
+    genres: bestTierOf(genreRefs)
   };
 
   logger.debug(`Searching for results.`, {
@@ -133,7 +171,7 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     confidence
   });
 
-  // Recent search history (debounced — same logic as before)
+  // 5. Recent search history
   if (updateSearchHistory) {
     if (recentSearchesTimeoutId) clearTimeout(recentSearchesTimeoutId);
     recentSearchesTimeoutId = setTimeout(async () => {
@@ -162,7 +200,7 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     albums,
     playlists,
     genres,
-    availableResults: [], // @deprecated — no longer needed with improved matching
+    availableResults: [],
     confidence
   };
 };
