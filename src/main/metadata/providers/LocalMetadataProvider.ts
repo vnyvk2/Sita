@@ -81,23 +81,34 @@ export class LocalMetadataProvider implements IMetadataProvider {
 
   public async fetchMany<TDTO = unknown>(
     identities: MetadataIdentity[],
-    execContext?: ProviderExecutionContext
+    _execContext?: ProviderExecutionContext
   ): Promise<ProviderResult<TDTO>[]> {
     const startTime = Date.now();
     try {
-      const dtos = await this.repository.loadMany<TDTO>(identities);
+      const rawResults = await this.repository.loadMany<TDTO>(identities);
       const latencyMs = Date.now() - startTime;
 
-      return dtos.map(
-        (dto) =>
-          new ProviderResult<TDTO>({
-            payload: dto,
-            confidence: MetadataConfidence.verified(),
+      return identities.map((identity, i) => {
+        const dto = rawResults[i];
+        if (!dto) {
+          return new ProviderResult<TDTO>({
+            payload: null,
+            confidence: MetadataConfidence.low(),
             providerInfo: this.info,
             latencyMs,
-            status: 'success'
-          })
-      );
+            status: 'failed',
+            error: `Local entity not found for identity: ${identity.toString()}`
+          });
+        }
+
+        return new ProviderResult<TDTO>({
+          payload: dto,
+          confidence: MetadataConfidence.verified(),
+          providerInfo: this.info,
+          latencyMs,
+          status: 'success'
+        });
+      });
     } catch (err) {
       const latencyMs = Date.now() - startTime;
       return identities.map(

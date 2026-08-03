@@ -33,7 +33,8 @@ export class DatabaseMetadataRepository implements IMetadataRepository {
 
   public async findManyDTO<T = unknown>(kind: MetadataKind, ids: (string | number)[]): Promise<T[]> {
     const identities = ids.map((id) => new ConcreteIdentity({ entityKind: kind, entityId: id }));
-    return this.loadMany<T>(identities);
+    const results = await this.loadMany<T>(identities);
+    return results.filter((item): item is T => item !== null);
   }
 
   public async loadRawData<T = unknown>(identity: MetadataIdentity): Promise<T | null> {
@@ -44,29 +45,35 @@ export class DatabaseMetadataRepository implements IMetadataRepository {
     return (await loader.load(identity.entityId)) as T | null;
   }
 
-  public async loadMany<T = unknown>(identities: MetadataIdentity[]): Promise<T[]> {
+  public async loadMany<T = unknown>(identities: MetadataIdentity[]): Promise<(T | null)[]> {
     if (identities.length === 0) return [];
 
     // Group identities by entityKind
-    const groups = new Map<string, MetadataIdentity[]>();
+    const groups = new Map<string, (string | number)[]>();
     for (const id of identities) {
       const list = groups.get(id.entityKind) ?? [];
-      list.push(id);
+      list.push(id.entityId);
       groups.set(id.entityKind, list);
     }
 
-    const results: T[] = [];
+    // Map storing loaded DTOs keyed by metadataId ("Kind:Id")
+    const loadedMap = new Map<string, T>();
 
-    for (const [kind, groupIdentities] of groups.entries()) {
+    for (const [kind, ids] of groups.entries()) {
       const loader = this.loaderRegistry.get<T>(kind as MetadataKind);
       if (!loader) continue;
 
-      const entityIds = groupIdentities.map((i) => i.entityId);
-      const loadedDTOs = await loader.loadMany(entityIds);
-      results.push(...loadedDTOs);
+      const loadedDTOs = await loader.loadMany(ids);
+      for (const dto of loadedDTOs) {
+        if (dto && typeof dto === 'object' && 'id' in dto) {
+          const key = `${kind}:${(dto as Record<string, unknown>).id}`;
+          loadedMap.set(key, dto);
+        }
+      }
     }
 
-    return results;
+    // Map back in exact original order requested by identities
+    return identities.map((identity) => loadedMap.get(identity.metadataId) ?? null);
   }
 
   public async store(_entity: MetadataEntity): Promise<void> {

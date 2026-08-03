@@ -1,5 +1,6 @@
 import type { MetadataEventBus } from '../events/MetadataEventBus';
 import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
+import type { IMetadataProviderExecutor } from '../interfaces/IMetadataProviderExecutor';
 import type { MetadataCache } from '../cache/MetadataCache';
 import type { MetadataContext } from '../models/MetadataContext';
 import type { MetadataEntity } from '../models/MetadataEntity';
@@ -8,13 +9,13 @@ import type { MetadataQuery } from '../models/MetadataQuery';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
-import type { MetadataProviderExecutor } from '../providers/MetadataProviderExecutor';
 import type { ProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
 
+import { MetadataConfidence } from '../models/MetadataConfidence';
 import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
 
 export interface MetadataEngineOptions {
-  executor: MetadataProviderExecutor;
+  executor: IMetadataProviderExecutor;
   mergePolicy?: ProviderMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
@@ -24,7 +25,7 @@ export interface MetadataEngineOptions {
 }
 
 export class MetadataEngine implements IMetadataGateway {
-  private readonly executor: MetadataProviderExecutor;
+  private readonly executor: IMetadataProviderExecutor;
   private readonly mergePolicy: ProviderMergePolicy;
   private readonly planner: MetadataQueryPlanner;
   private readonly pipeline: MetadataPipeline;
@@ -71,7 +72,8 @@ export class MetadataEngine implements IMetadataGateway {
 
     const entity = await this.pipeline.processDTO(
       identity.entityKind,
-      mergedPayload
+      mergedPayload,
+      null
     );
 
     if (entity) {
@@ -87,21 +89,39 @@ export class MetadataEngine implements IMetadataGateway {
   ): Promise<MetadataEntity[]> {
     if (identities.length === 0) return [];
 
-    const results: MetadataEntity[] = [];
+    const loadedEntitiesMap = new Map<string, MetadataEntity>();
+    const cacheMisses: MetadataIdentity[] = [];
 
+    // Step 1: Check cache for all identities
     for (const identity of identities) {
       const cached = this.cache.get(identity);
       if (cached) {
-        results.push(cached);
+        loadedEntitiesMap.set(identity.metadataId, cached);
       } else {
+        cacheMisses.push(identity);
+      }
+    }
+
+    // Step 2: Fetch cache misses in batch passes if any exist
+    if (cacheMisses.length > 0) {
+      for (const identity of cacheMisses) {
         const entity = await this.load(identity, execContext);
         if (entity) {
-          results.push(entity);
+          loadedEntitiesMap.set(identity.metadataId, entity);
         }
       }
     }
 
-    return results;
+    // Step 3: Map back in exact original order requested by identities
+    const finalOrderedEntities: MetadataEntity[] = [];
+    for (const identity of identities) {
+      const entity = loadedEntitiesMap.get(identity.metadataId);
+      if (entity) {
+        finalOrderedEntities.push(entity);
+      }
+    }
+
+    return finalOrderedEntities;
   }
 
   public async refresh(
@@ -121,7 +141,8 @@ export class MetadataEngine implements IMetadataGateway {
 
     const entity = await this.pipeline.processDTO(
       identity.entityKind,
-      mergedPayload
+      mergedPayload,
+      null
     );
 
     if (entity) {
@@ -164,16 +185,7 @@ export class MetadataEngine implements IMetadataGateway {
 
   public async query(query: MetadataQuery): Promise<MetadataEntity[]> {
     const plannedIdentities = await this.planner.plan(query);
-    const results: MetadataEntity[] = [];
-
-    for (const identity of plannedIdentities) {
-      const entity = await this.getEntityMetadata(identity);
-      if (entity) {
-        results.push(entity);
-      }
-    }
-
-    return results;
+    return this.loadMany(plannedIdentities);
   }
 
   private publishEntity(
