@@ -29,4 +29,8 @@ export class MetadataConfidence {
   public static default(): MetadataConfidence {
     return new MetadataConfidence(METADATA_CONSTANTS.CONFIDENCE_DEFAULT);
   }
+
+  public static low(): MetadataConfidence {
+    return new MetadataConfidence(METADATA_CONSTANTS.CONFIDENCE_MIN);
+  }
 }

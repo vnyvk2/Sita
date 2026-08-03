@@ -16,48 +16,44 @@ import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
-import { ProviderExecutionContext } from '@main/metadata/models/ProviderExecutionContext';
 import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
-import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
-import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
+import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
+import { RetryStage } from '@main/metadata/providers/execution/stages/RetryStage';
+import { TimeoutStage } from '@main/metadata/providers/execution/stages/TimeoutStage';
+import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
+import { ProviderExecutionStageContext } from '@main/metadata/providers/execution/ProviderExecutionStageContext';
 import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
 
-describe('MetadataProviderExecutor', () => {
-  it('should execute registered providers sorted by priority and handle cancellation', async () => {
+describe('ProviderExecutionPipeline', () => {
+  it('should process provider execution through pipeline stages', async () => {
     const mockLoader: IEntityLoader<SongPersistenceDTO> = {
       kind: MetadataKinds.Song,
-      load: async (id) => ({ id: Number(id), title: 'Starman' }),
-      loadMany: async (ids) => ids.map((id) => ({ id: Number(id), title: 'Starman' }))
+      load: async (id) => ({ id: Number(id), title: 'Pipeline Test Song' }),
+      loadMany: async (ids) => ids.map((id) => ({ id: Number(id), title: 'Pipeline Test Song' }))
     };
 
     const repository = new DatabaseMetadataRepository([mockLoader as IEntityLoader<unknown>]);
     const localProvider = new LocalMetadataProvider(repository);
     await localProvider.initialize();
 
-    const registry = new MetadataProviderRegistry();
-    registry.register(localProvider);
-
     const eventBus = new MetadataEventBus();
-    const executor = new MetadataProviderExecutor({ registry, eventBus });
+    const pipeline = new ProviderExecutionPipeline([
+      new CircuitBreakerStage(),
+      new RetryStage(),
+      new TimeoutStage()
+    ]);
 
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 1 });
-    const results = await executor.execute<SongPersistenceDTO>(identity, 'ReadDatabase');
-
-    expect(results.length).toBe(1);
-    expect(results[0].payload?.title).toBe('Starman');
-
-    // Test cancellation token skip
-    let skippedFired = false;
-    eventBus.on('ProviderSkipped', () => {
-      skippedFired = true;
+    const context = new ProviderExecutionStageContext<SongPersistenceDTO>({
+      provider: localProvider,
+      identity,
+      eventBus,
+      action: (p, id) => p.fetch<SongPersistenceDTO>(id)
     });
 
-    const cancelledContext = new ProviderExecutionContext({ cancellationToken: { isCancelled: true } });
-    const skippedResults = await executor.execute<SongPersistenceDTO>(identity, 'ReadDatabase', cancelledContext);
-
-    expect(skippedResults.length).toBe(1);
-    expect(skippedResults[0].status).toBe('skipped');
-    expect(skippedFired).toBe(true);
+    const result = await pipeline.process<SongPersistenceDTO>(context);
+    expect(result.status).toBe('success');
+    expect(result.payload?.title).toBe('Pipeline Test Song');
   });
 });

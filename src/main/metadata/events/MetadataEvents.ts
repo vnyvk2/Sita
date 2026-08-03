@@ -30,6 +30,28 @@ export interface ProviderExecutionEvent {
   error?: string;
 }
 
+export interface ProviderHealthEvent {
+  providerId: string;
+  previousState?: string;
+  currentState: string;
+  reason?: string;
+  timestamp: Date;
+}
+
+export interface ProviderRetryEvent {
+  providerInfo: MetadataProviderInfo;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error?: string;
+}
+
+export interface ProviderCircuitEvent {
+  providerId: string;
+  state: 'Closed' | 'Open' | 'HalfOpen';
+  reason?: string;
+}
+
 export interface MetadataEventMap {
   MetadataLoaded: (event: MetadataEntityEvent) => void;
   MetadataCreated: (event: MetadataEntityEvent) => void;
@@ -45,4 +67,11 @@ export interface MetadataEventMap {
   ProviderCompleted: (event: ProviderExecutionEvent) => void;
   ProviderTimeout: (event: ProviderExecutionEvent) => void;
   ProviderSkipped: (event: ProviderExecutionEvent) => void;
+  ProviderOnline: (event: ProviderHealthEvent) => void;
+  ProviderOffline: (event: ProviderHealthEvent) => void;
+  ProviderRecovered: (event: ProviderHealthEvent) => void;
+  ProviderDegraded: (event: ProviderHealthEvent) => void;
+  ProviderRetry: (event: ProviderRetryEvent) => void;
+  ProviderCircuitOpened: (event: ProviderCircuitEvent) => void;
+  ProviderCircuitClosed: (event: ProviderCircuitEvent) => void;
 }

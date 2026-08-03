@@ -15,10 +15,21 @@ import { DefaultMergePolicy } from './policies/DefaultMergePolicy';
 import { DefaultOverwritePolicy } from './policies/DefaultOverwritePolicy';
 import { DefaultProviderPriorityPolicy } from './policies/DefaultProviderPriorityPolicy';
 import { DefaultValidationPolicy } from './policies/DefaultValidationPolicy';
+
+import { CircuitBreakerStage } from './providers/execution/stages/CircuitBreakerStage';
+import { RetryStage } from './providers/execution/stages/RetryStage';
+import { TimeoutStage } from './providers/execution/stages/TimeoutStage';
+import { ProviderExecutionPipeline } from './providers/execution/ProviderExecutionPipeline';
+import { ProviderHealthManager } from './providers/health/ProviderHealthManager';
 import { LocalMetadataProvider } from './providers/LocalMetadataProvider';
 import { MetadataProviderExecutor } from './providers/MetadataProviderExecutor';
 import { DefaultProviderMergePolicy } from './providers/policies/DefaultProviderMergePolicy';
 import { ProviderDiagnosticsTracker } from './providers/ProviderDiagnosticsTracker';
+import { ProviderRetryPolicy } from './providers/retry/ProviderRetryPolicy';
+import { DefaultProviderExecutionStrategy } from './providers/strategies/DefaultProviderExecutionStrategy';
+import { DefaultProviderSelectionStrategy } from './providers/strategies/DefaultProviderSelectionStrategy';
+import { ProviderTimeoutPolicy } from './providers/timeout/ProviderTimeoutPolicy';
+
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
@@ -30,7 +41,13 @@ export interface MetadataContainer {
   loaderRegistry: LoaderRegistry;
   localProvider: LocalMetadataProvider;
   executor: MetadataProviderExecutor;
+  healthManager: ProviderHealthManager;
   diagnosticsTracker: ProviderDiagnosticsTracker;
+  timeoutPolicy: ProviderTimeoutPolicy;
+  retryPolicy: ProviderRetryPolicy;
+  executionPipeline: ProviderExecutionPipeline;
+  executionStrategy: DefaultProviderExecutionStrategy;
+  selectionStrategy: DefaultProviderSelectionStrategy;
   providerMergePolicy: DefaultProviderMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
@@ -73,12 +90,28 @@ export class MetadataBootstrap {
 
     providerRegistry.register(localProvider);
 
+    const healthManager = new ProviderHealthManager(eventBus);
+    const diagnosticsTracker = new ProviderDiagnosticsTracker(eventBus);
+
+    const timeoutPolicy = new ProviderTimeoutPolicy();
+    const retryPolicy = new ProviderRetryPolicy();
+
+    const executionPipeline = new ProviderExecutionPipeline([
+      new CircuitBreakerStage(),
+      new RetryStage(retryPolicy),
+      new TimeoutStage(timeoutPolicy)
+    ]);
+
+    const selectionStrategy = new DefaultProviderSelectionStrategy();
+    const executionStrategy = new DefaultProviderExecutionStrategy(eventBus, executionPipeline);
+
     const executor = new MetadataProviderExecutor({
       registry: providerRegistry,
-      eventBus
+      eventBus,
+      selectionStrategy,
+      executionStrategy
     });
 
-    const diagnosticsTracker = new ProviderDiagnosticsTracker(eventBus);
     const providerMergePolicy = new DefaultProviderMergePolicy();
     const planner = new MetadataQueryPlanner(repository);
 
@@ -125,7 +158,13 @@ export class MetadataBootstrap {
       loaderRegistry,
       localProvider,
       executor,
+      healthManager,
       diagnosticsTracker,
+      timeoutPolicy,
+      retryPolicy,
+      executionPipeline,
+      executionStrategy,
+      selectionStrategy,
       providerMergePolicy,
       planner,
       pipeline,
