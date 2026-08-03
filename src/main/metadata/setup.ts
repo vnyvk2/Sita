@@ -34,6 +34,8 @@ import { DefaultProviderExecutionStrategy } from './providers/strategies/Default
 import { DefaultProviderSelectionStrategy } from './providers/strategies/DefaultProviderSelectionStrategy';
 import { ProviderTimeoutPolicy } from './providers/timeout/ProviderTimeoutPolicy';
 
+import { MetadataMergeEngine } from './engine/MetadataMergeEngine';
+import { DefaultMetadataMergePolicy } from './providers/policies/DefaultMetadataMergePolicy';
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
@@ -43,6 +45,7 @@ import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 export interface MetadataContainer {
   engine: MetadataEngine;
   searchGateway: MetadataSearchGateway;
+  mergeEngine: MetadataMergeEngine;
   repository: DatabaseMetadataRepository;
   loaderRegistry: LoaderRegistry;
   localProvider: LocalMetadataProvider;
@@ -136,8 +139,15 @@ export class MetadataBootstrap {
       executionStrategy
     });
 
-    const providerMergePolicy = new DefaultProviderMergePolicy();
+    const providerMergePolicy = new DefaultMetadataMergePolicy();
     const planner = new MetadataQueryPlanner(repository);
+
+    const mergeEngine = new MetadataMergeEngine({
+      registry: providerRegistry,
+      mergePolicy: providerMergePolicy,
+      selectionStrategy,
+      executionStrategy
+    });
 
     const pipeline = new MetadataPipeline({
       mapperRegistry,
@@ -150,6 +160,7 @@ export class MetadataBootstrap {
     const engine = new MetadataEngine({
       executor,
       mergePolicy: providerMergePolicy,
+      mergeEngine,
       planner,
       pipeline,
       cache,
@@ -180,6 +191,7 @@ export class MetadataBootstrap {
     return {
       engine,
       searchGateway,
+      mergeEngine,
       repository,
       loaderRegistry,
       localProvider,
@@ -192,7 +204,7 @@ export class MetadataBootstrap {
       executionPipeline,
       executionStrategy,
       selectionStrategy,
-      providerMergePolicy,
+      providerMergePolicy: providerMergePolicy as any,
       planner,
       pipeline,
       mapperRegistry,
