@@ -11,6 +11,7 @@ export * from './models';
 export * from './pipeline';
 export * from './planner';
 export * from './policies';
+export * from './providers';
 export * from './registries';
 export * from './repository';
 export * from './setup';

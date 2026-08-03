@@ -15,10 +15,14 @@ vi.mock('@db/db', () => ({
 import { MetadataBootstrap } from '@main/metadata/setup';
 
 describe('MetadataBootstrap', () => {
-  it('should bootstrap metadata module container with default registries and pipeline', () => {
+  it('should bootstrap metadata module container with provider executor and diagnostics tracker', () => {
     const container = MetadataBootstrap.bootstrap();
     expect(container.engine).toBeDefined();
     expect(container.repository).toBeDefined();
+    expect(container.localProvider).toBeDefined();
+    expect(container.executor).toBeDefined();
+    expect(container.diagnosticsTracker).toBeDefined();
+    expect(container.providerMergePolicy).toBeDefined();
     expect(container.planner).toBeDefined();
     expect(container.pipeline).toBeDefined();
     expect(container.mapperRegistry).toBeDefined();

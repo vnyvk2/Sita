@@ -12,3 +12,7 @@ export * from './MetadataQuery';
 export * from './MetadataSnapshot';
 export * from './MetadataSource';
 export * from './MetadataValue';
+export * from './ProviderExecutionContext';
+export * from './ProviderResult';
+export * from './ProviderResultStatus';
+export * from './ProviderState';

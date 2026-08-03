@@ -2,16 +2,23 @@ import type { MetadataCache } from '../cache/MetadataCache';
 import type { MetadataEventMap } from '../events/MetadataEvents';
 import type { MetadataEventBus } from '../events/MetadataEventBus';
 import type { IMetadataEngine } from '../interfaces/IMetadataEngine';
+import type { IMetadataProviderExecutor } from '../interfaces/IMetadataProviderExecutor';
 import type { MetadataContext } from '../models/MetadataContext';
 import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataQuery } from '../models/MetadataQuery';
+import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
+import type { IProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
 import type { DatabaseMetadataRepository } from '../repository/DatabaseMetadataRepository';
+
+import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
 
 export interface MetadataEngineOptions {
   repository: DatabaseMetadataRepository;
+  executor: IMetadataProviderExecutor;
+  mergePolicy?: IProviderMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   cache: MetadataCache;
@@ -21,6 +28,8 @@ export interface MetadataEngineOptions {
 
 export class MetadataEngine implements IMetadataEngine {
   private readonly repository: DatabaseMetadataRepository;
+  private readonly executor: IMetadataProviderExecutor;
+  private readonly mergePolicy: IProviderMergePolicy;
   private readonly planner: MetadataQueryPlanner;
   private readonly pipeline: MetadataPipeline;
   private readonly cache: MetadataCache;
@@ -29,6 +38,8 @@ export class MetadataEngine implements IMetadataEngine {
 
   constructor(options: MetadataEngineOptions) {
     this.repository = options.repository;
+    this.executor = options.executor;
+    this.mergePolicy = options.mergePolicy ?? new DefaultProviderMergePolicy();
     this.planner = options.planner;
     this.pipeline = options.pipeline;
     this.cache = options.cache;
@@ -36,20 +47,29 @@ export class MetadataEngine implements IMetadataEngine {
     this.context = options.context;
   }
 
-  public async getEntityMetadata(identity: MetadataIdentity): Promise<MetadataEntity | null> {
+  public async getEntityMetadata(
+    identity: MetadataIdentity,
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity | null> {
     const cached = this.cache.get(identity);
     if (cached) {
       this.context.logger.debug(`Cache hit for metadata: ${identity.metadataId}`);
       return cached;
     }
 
-    const dto = await this.repository.findDTO(identity);
-    if (!dto) {
-      this.context.logger.debug(`No DTO found for identity: ${identity.metadataId}`);
+    const providerResults = await this.executor.execute(
+      identity,
+      'ReadDatabase',
+      execContext
+    );
+
+    const mergedDTO = this.mergePolicy.merge(providerResults);
+    if (!mergedDTO) {
+      this.context.logger.debug(`No provider DTO resolved for identity: ${identity.metadataId}`);
       return null;
     }
 
-    const entity = await this.pipeline.processDTO(identity.entityKind, dto, null);
+    const entity = await this.pipeline.processDTO(identity.entityKind, mergedDTO, null);
     if (entity) {
       this.publishEntity(entity, 'MetadataLoaded');
     }
@@ -85,12 +105,14 @@ export class MetadataEngine implements IMetadataEngine {
     const existing = this.cache.get(identity);
     this.cache.delete(identity);
 
-    const dto = await this.repository.findDTO(identity);
-    if (!dto) {
-      throw new Error(`Cannot refresh metadata. DTO not found for identity ${identity.metadataId}`);
+    const providerResults = await this.executor.execute(identity, 'ReadDatabase');
+    const mergedDTO = this.mergePolicy.merge(providerResults);
+
+    if (!mergedDTO) {
+      throw new Error(`Cannot refresh metadata. No provider DTO resolved for identity ${identity.metadataId}`);
     }
 
-    const entity = await this.pipeline.processDTO(identity.entityKind, dto, existing);
+    const entity = await this.pipeline.processDTO(identity.entityKind, mergedDTO, existing);
     if (!entity) {
       throw new Error(`Failed to process DTO during metadata refresh for ${identity.metadataId}`);
     }

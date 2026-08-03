@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { MetadataCapabilities } from '@main/metadata/common/types';
 import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
+import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
 
 describe('MetadataProviderRegistry', () => {
@@ -11,18 +13,28 @@ describe('MetadataProviderRegistry', () => {
 
     const mockProviderInfo = new MetadataProviderInfo({
       id: 'musicbrainz',
-      name: 'MusicBrainz',
+      displayName: 'MusicBrainz',
       version: '1.0.0',
       priority: 80,
-      capabilities: new Set([MetadataCapabilities.Genre, MetadataCapabilities.BPM])
+      capabilities: [MetadataCapabilities.Genre, MetadataCapabilities.BPM]
     });
 
     const mockProvider: IMetadataProvider = {
       info: mockProviderInfo,
       initialize: async () => {},
       supports: (cap) => mockProviderInfo.supports(cap),
-      fetch: async () => null,
-      refresh: async () => null,
+      fetch: async () =>
+        new ProviderResult({
+          payload: null,
+          confidence: MetadataConfidence.low(),
+          providerInfo: mockProviderInfo
+        }),
+      refresh: async () =>
+        new ProviderResult({
+          payload: null,
+          confidence: MetadataConfidence.low(),
+          providerInfo: mockProviderInfo
+        }),
       shutdown: async () => {},
       getCapabilities: () => mockProviderInfo.capabilities
     };
@@ -32,7 +44,7 @@ describe('MetadataProviderRegistry', () => {
 
     const genreProviders = registry.getProvidersForCapability(MetadataCapabilities.Genre);
     expect(genreProviders.length).toBe(1);
-    expect(genreProviders[0].info.name).toBe('MusicBrainz');
+    expect(genreProviders[0].info.displayName).toBe('MusicBrainz');
 
     const lyricProviders = registry.getProvidersForCapability(MetadataCapabilities.Lyrics);
     expect(lyricProviders.length).toBe(0);

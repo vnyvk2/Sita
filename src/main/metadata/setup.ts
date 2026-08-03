@@ -15,6 +15,10 @@ import { DefaultMergePolicy } from './policies/DefaultMergePolicy';
 import { DefaultOverwritePolicy } from './policies/DefaultOverwritePolicy';
 import { DefaultProviderPriorityPolicy } from './policies/DefaultProviderPriorityPolicy';
 import { DefaultValidationPolicy } from './policies/DefaultValidationPolicy';
+import { LocalMetadataProvider } from './providers/LocalMetadataProvider';
+import { MetadataProviderExecutor } from './providers/MetadataProviderExecutor';
+import { DefaultProviderMergePolicy } from './providers/policies/DefaultProviderMergePolicy';
+import { ProviderDiagnosticsTracker } from './providers/ProviderDiagnosticsTracker';
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
@@ -24,6 +28,10 @@ export interface MetadataContainer {
   engine: MetadataEngine;
   repository: DatabaseMetadataRepository;
   loaderRegistry: LoaderRegistry;
+  localProvider: LocalMetadataProvider;
+  executor: MetadataProviderExecutor;
+  diagnosticsTracker: ProviderDiagnosticsTracker;
+  providerMergePolicy: DefaultProviderMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   mapperRegistry: MapperRegistry;
@@ -60,6 +68,18 @@ export class MetadataBootstrap {
     };
 
     const repository = new DatabaseMetadataRepository(loaderRegistry);
+    const localProvider = new LocalMetadataProvider(repository);
+    localProvider.initialize();
+
+    providerRegistry.register(localProvider);
+
+    const executor = new MetadataProviderExecutor({
+      registry: providerRegistry,
+      eventBus
+    });
+
+    const diagnosticsTracker = new ProviderDiagnosticsTracker(eventBus);
+    const providerMergePolicy = new DefaultProviderMergePolicy();
     const planner = new MetadataQueryPlanner(repository);
 
     const pipeline = new MetadataPipeline({
@@ -72,6 +92,8 @@ export class MetadataBootstrap {
 
     const engine = new MetadataEngine({
       repository,
+      executor,
+      mergePolicy: providerMergePolicy,
       planner,
       pipeline,
       cache,
@@ -102,6 +124,10 @@ export class MetadataBootstrap {
       engine,
       repository,
       loaderRegistry,
+      localProvider,
+      executor,
+      diagnosticsTracker,
+      providerMergePolicy,
       planner,
       pipeline,
       mapperRegistry,

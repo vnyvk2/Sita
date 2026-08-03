@@ -1,6 +1,7 @@
 import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataProviderInfo } from '../models/MetadataProviderInfo';
+import type { ProviderResultStatus } from '../models/ProviderResultStatus';
 
 export interface MetadataEntityEvent {
   identity: MetadataIdentity;
@@ -21,6 +22,14 @@ export interface ProviderLifecycleEvent {
   reason?: string;
 }
 
+export interface ProviderExecutionEvent {
+  providerInfo: MetadataProviderInfo;
+  identity: MetadataIdentity;
+  status: ProviderResultStatus;
+  latencyMs: number;
+  error?: string;
+}
+
 export interface MetadataEventMap {
   MetadataLoaded: (event: MetadataEntityEvent) => void;
   MetadataCreated: (event: MetadataEntityEvent) => void;
@@ -32,4 +41,8 @@ export interface MetadataEventMap {
   ProviderRegistered: (event: ProviderLifecycleEvent) => void;
   ProviderFailed: (event: ProviderLifecycleEvent) => void;
   ProviderUpdated: (event: ProviderLifecycleEvent) => void;
+  ProviderStarted: (event: ProviderExecutionEvent) => void;
+  ProviderCompleted: (event: ProviderExecutionEvent) => void;
+  ProviderTimeout: (event: ProviderExecutionEvent) => void;
+  ProviderSkipped: (event: ProviderExecutionEvent) => void;
 }

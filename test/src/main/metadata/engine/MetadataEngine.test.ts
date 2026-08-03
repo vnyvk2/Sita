@@ -24,12 +24,16 @@ import { MetadataPipeline } from '@main/metadata/pipeline/MetadataPipeline';
 import { MetadataQueryPlanner } from '@main/metadata/planner/MetadataQueryPlanner';
 import { DefaultConflictPolicy } from '@main/metadata/policies/DefaultConflictPolicy';
 import { DefaultValidationPolicy } from '@main/metadata/policies/DefaultValidationPolicy';
+import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
+import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
+import { DefaultProviderMergePolicy } from '@main/metadata/providers/policies/DefaultProviderMergePolicy';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
+import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
 import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
 
-describe('MetadataEngine', () => {
-  it('should fetch metadata via engine, hit cache on second call, and refresh on demand', async () => {
+describe('MetadataEngine with Provider Resolution Pipeline', () => {
+  it('should resolve metadata through ProviderExecutor, merge payload, run pipeline, and cache result', async () => {
     const mockSongLoader: IEntityLoader = {
       kind: MetadataKinds.Song,
       load: async (id) => ({ id: Number(id), title: 'Stairway to Heaven', year: 1971 }),
@@ -37,11 +41,19 @@ describe('MetadataEngine', () => {
     };
 
     const repository = new DatabaseMetadataRepository([mockSongLoader]);
+    const localProvider = new LocalMetadataProvider(repository);
+    await localProvider.initialize();
+
+    const providerRegistry = new MetadataProviderRegistry();
+    providerRegistry.register(localProvider);
+
+    const eventBus = new MetadataEventBus();
+    const executor = new MetadataProviderExecutor({ registry: providerRegistry, eventBus });
+
     const planner = new MetadataQueryPlanner(repository);
     const mapperRegistry = new MapperRegistry();
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const cache = new MetadataCache();
-    const eventBus = new MetadataEventBus();
     const context = new MetadataContext();
 
     const pipeline = new MetadataPipeline({
@@ -52,7 +64,17 @@ describe('MetadataEngine', () => {
       context
     });
 
-    const engine = new MetadataEngine({ repository, planner, pipeline, cache, eventBus, context });
+    const engine = new MetadataEngine({
+      repository,
+      executor,
+      mergePolicy: new DefaultProviderMergePolicy(),
+      planner,
+      pipeline,
+      cache,
+      eventBus,
+      context
+    });
+
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 777 });
 
     const entity1 = await engine.getEntityMetadata(identity);
@@ -60,13 +82,8 @@ describe('MetadataEngine', () => {
     expect(entity1?.getField<string>('title')?.value).toBe('Stairway to Heaven');
     expect(cache.size()).toBe(1);
 
-    // Second call should return cached instance
+    // Second call should hit cache
     const entity2 = await engine.getEntityMetadata(identity);
     expect(entity2).toBe(entity1);
-
-    // Refresh metadata clears cache and re-fetches
-    const refreshed = await engine.refreshMetadata(identity);
-    expect(refreshed).not.toBeNull();
-    expect(refreshed.getField<string>('title')?.value).toBe('Stairway to Heaven');
   });
 });

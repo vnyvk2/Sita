@@ -14,6 +14,10 @@ export class MetadataProviderRegistry {
     return this.providers.get(id);
   }
 
+  public getAll(): IMetadataProvider[] {
+    return Array.from(this.providers.values());
+  }
+
   public unregister(id: string): boolean {
     return this.providers.delete(id);
   }
