@@ -14,37 +14,40 @@ export class MetadataSearchResultMapper {
   public static mapEntityToDTO<TDTO = unknown>(entity: MetadataEntity): TDTO | null {
     if (!entity || !entity.rawPayload) return null;
 
+    const payload = entity.rawPayload as Record<string, unknown>;
     let dto: Record<string, unknown>;
 
-    try {
-      switch (entity.identity.entityKind) {
-        case MetadataKinds.Song:
-          dto = convertToSongData(entity.rawPayload as any) as any;
-          break;
-        case MetadataKinds.Artist:
-          dto = convertToArtist(entity.rawPayload as any) as any;
-          break;
-        case MetadataKinds.Album:
-          dto = convertToAlbum(entity.rawPayload as any) as any;
-          break;
-        case MetadataKinds.Playlist:
-          dto = convertToPlaylist(entity.rawPayload as any) as any;
-          break;
-        case MetadataKinds.Genre:
-          dto = convertToGenre(entity.rawPayload as any) as any;
-          break;
-        default:
-          dto = { ...(entity.rawPayload as Record<string, unknown>) };
-      }
-    } catch (err) {
-      if (
-        entity.rawPayload &&
-        typeof entity.rawPayload === 'object' &&
-        !('artworks' in (entity.rawPayload as object))
-      ) {
-        // Synthetic test payload or simplified DTO
-        dto = { ...(entity.rawPayload as Record<string, unknown>) };
-      } else {
+    // If payload is already a fully constructed Nora DTO, pass through
+    if (
+      'songId' in payload ||
+      'artistId' in payload ||
+      'albumId' in payload ||
+      'playlistId' in payload ||
+      'genreId' in payload
+    ) {
+      dto = { ...payload };
+    } else {
+      try {
+        switch (entity.identity.entityKind) {
+          case MetadataKinds.Song:
+            dto = convertToSongData(payload as any) as any;
+            break;
+          case MetadataKinds.Artist:
+            dto = convertToArtist(payload as any) as any;
+            break;
+          case MetadataKinds.Album:
+            dto = convertToAlbum(payload as any) as any;
+            break;
+          case MetadataKinds.Playlist:
+            dto = convertToPlaylist(payload as any) as any;
+            break;
+          case MetadataKinds.Genre:
+            dto = convertToGenre(payload as any) as any;
+            break;
+          default:
+            dto = { ...payload };
+        }
+      } catch (err) {
         logger.error(
           `Failed to map MetadataEntity to DTO for ${entity.identity.entityKind}:${entity.identity.entityId}`,
           { error: err }

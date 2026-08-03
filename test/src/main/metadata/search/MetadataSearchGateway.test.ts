@@ -23,8 +23,30 @@ describe('MetadataSearchGateway', () => {
   it('should hydrate search results via IMetadataGateway and MetadataEngine batch loading', async () => {
     const mockLoader: IEntityLoader<SongPersistenceDTO> = {
       kind: MetadataKinds.Song,
-      load: async (id) => ({ id: Number(id), title: `Gateway Song ${id}` }),
-      loadMany: async (ids) => ids.map((id) => ({ id: Number(id), title: `Gateway Song ${id}` }))
+      load: async (id) => ({
+        id: Number(id),
+        title: `Gateway Song ${id}`,
+        duration: 180,
+        path: '/test.mp3',
+        artworks: [],
+        artists: [],
+        albums: [],
+        genres: []
+      } as any),
+      loadMany: async (ids) =>
+        ids.map(
+          (id) =>
+            ({
+              id: Number(id),
+              title: `Gateway Song ${id}`,
+              duration: 180,
+              path: '/test.mp3',
+              artworks: [],
+              artists: [],
+              albums: [],
+              genres: []
+            }) as any
+        )
     };
 
     const container = await MetadataBootstrap.bootstrap();
