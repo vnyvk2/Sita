@@ -15,8 +15,8 @@ vi.mock('@db/db', () => ({
 import { MetadataBootstrap } from '@main/metadata/setup';
 
 describe('MetadataBootstrap', () => {
-  it('should bootstrap metadata module container with provider executor and diagnostics tracker', () => {
-    const container = MetadataBootstrap.bootstrap();
+  it('should bootstrap metadata module container with provider executor and diagnostics tracker', async () => {
+    const container = await MetadataBootstrap.bootstrap();
     expect(container.engine).toBeDefined();
     expect(container.repository).toBeDefined();
     expect(container.localProvider).toBeDefined();

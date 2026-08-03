@@ -65,7 +65,6 @@ describe('MetadataEngine with Provider Resolution Pipeline', () => {
     });
 
     const engine = new MetadataEngine({
-      repository,
       executor,
       mergePolicy: new DefaultProviderMergePolicy(),
       planner,

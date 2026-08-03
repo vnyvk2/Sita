@@ -9,4 +9,9 @@ export interface IMetadataProviderExecutor {
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
   ): Promise<ProviderResult<TDTO>[]>;
+  refresh<TDTO = unknown>(
+    identity: MetadataIdentity,
+    capability: MetadataCapability,
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]>;
 }

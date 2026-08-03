@@ -25,7 +25,7 @@ export class LocalMetadataProvider implements IMetadataProvider {
   }
 
   public async initialize(): Promise<void> {
-    this.info.state = 'Ready';
+    this.info.setState('Ready');
   }
 
   public supports(capability: MetadataCapability): boolean {
@@ -79,7 +79,7 @@ export class LocalMetadataProvider implements IMetadataProvider {
   }
 
   public async shutdown(): Promise<void> {
-    this.info.state = 'Disabled';
+    this.info.setState('Disabled');
   }
 
   public getCapabilities(): Set<MetadataCapability> {

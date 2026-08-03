@@ -50,7 +50,7 @@ export interface MetadataContainer {
 }
 
 export class MetadataBootstrap {
-  public static bootstrap(contextOptions?: Partial<MetadataContext>): MetadataContainer {
+  public static async bootstrap(contextOptions?: Partial<MetadataContext>): Promise<MetadataContainer> {
     const context = new MetadataContext(contextOptions);
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const providerRegistry = new MetadataProviderRegistry();
@@ -69,7 +69,7 @@ export class MetadataBootstrap {
 
     const repository = new DatabaseMetadataRepository(loaderRegistry);
     const localProvider = new LocalMetadataProvider(repository);
-    localProvider.initialize();
+    await localProvider.initialize();
 
     providerRegistry.register(localProvider);
 
@@ -91,7 +91,6 @@ export class MetadataBootstrap {
     });
 
     const engine = new MetadataEngine({
-      repository,
       executor,
       mergePolicy: providerMergePolicy,
       planner,

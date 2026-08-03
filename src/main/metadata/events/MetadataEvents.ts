@@ -25,7 +25,7 @@ export interface ProviderLifecycleEvent {
 export interface ProviderExecutionEvent {
   providerInfo: MetadataProviderInfo;
   identity: MetadataIdentity;
-  status: ProviderResultStatus;
+  status?: ProviderResultStatus;
   latencyMs: number;
   error?: string;
 }

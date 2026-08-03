@@ -11,12 +11,10 @@ import type { ProviderExecutionContext } from '../models/ProviderExecutionContex
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
 import type { IProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
-import type { DatabaseMetadataRepository } from '../repository/DatabaseMetadataRepository';
 
 import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
 
 export interface MetadataEngineOptions {
-  repository: DatabaseMetadataRepository;
   executor: IMetadataProviderExecutor;
   mergePolicy?: IProviderMergePolicy;
   planner: MetadataQueryPlanner;
@@ -27,7 +25,6 @@ export interface MetadataEngineOptions {
 }
 
 export class MetadataEngine implements IMetadataEngine {
-  private readonly repository: DatabaseMetadataRepository;
   private readonly executor: IMetadataProviderExecutor;
   private readonly mergePolicy: IProviderMergePolicy;
   private readonly planner: MetadataQueryPlanner;
@@ -37,7 +34,6 @@ export class MetadataEngine implements IMetadataEngine {
   private readonly context: MetadataContext;
 
   constructor(options: MetadataEngineOptions) {
-    this.repository = options.repository;
     this.executor = options.executor;
     this.mergePolicy = options.mergePolicy ?? new DefaultProviderMergePolicy();
     this.planner = options.planner;
@@ -105,7 +101,7 @@ export class MetadataEngine implements IMetadataEngine {
     const existing = this.cache.get(identity);
     this.cache.delete(identity);
 
-    const providerResults = await this.executor.execute(identity, 'ReadDatabase');
+    const providerResults = await this.executor.refresh(identity, 'ReadDatabase');
     const mergedDTO = this.mergePolicy.merge(providerResults);
 
     if (!mergedDTO) {

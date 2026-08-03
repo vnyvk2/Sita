@@ -34,6 +34,31 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     capability: MetadataCapability,
     execContext?: ProviderExecutionContext
   ): Promise<ProviderResult<TDTO>[]> {
+    return this.runOnProviders<TDTO>(identity, capability, execContext, (p, id, ctx) =>
+      p.fetch<TDTO>(id, ctx)
+    );
+  }
+
+  public async refresh<TDTO = unknown>(
+    identity: MetadataIdentity,
+    capability: MetadataCapability,
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]> {
+    return this.runOnProviders<TDTO>(identity, capability, execContext, (p, id, ctx) =>
+      p.refresh<TDTO>(id, ctx)
+    );
+  }
+
+  private async runOnProviders<TDTO>(
+    identity: MetadataIdentity,
+    capability: MetadataCapability,
+    execContext: ProviderExecutionContext | undefined,
+    action: (
+      provider: IMetadataProvider,
+      identity: MetadataIdentity,
+      context?: ProviderExecutionContext
+    ) => Promise<ProviderResult<TDTO>>
+  ): Promise<ProviderResult<TDTO>[]> {
     const allProviders = this.registry.getAll();
     const targetProviders = this.selectionStrategy.selectProviders(
       allProviders,
@@ -54,17 +79,27 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
         continue;
       }
 
-      const result = await this.executeProvider<TDTO>(provider, identity, execContext);
+      const result = await this.executeSingleProvider<TDTO>(
+        provider,
+        identity,
+        execContext,
+        action
+      );
       results.push(result);
     }
 
     return results;
   }
 
-  private async executeProvider<TDTO>(
+  private async executeSingleProvider<TDTO>(
     provider: IMetadataProvider,
     identity: MetadataIdentity,
-    execContext?: ProviderExecutionContext
+    execContext: ProviderExecutionContext | undefined,
+    action: (
+      provider: IMetadataProvider,
+      identity: MetadataIdentity,
+      context?: ProviderExecutionContext
+    ) => Promise<ProviderResult<TDTO>>
   ): Promise<ProviderResult<TDTO>> {
     const timeoutMs = execContext?.timeoutMs ?? 5000;
     const startTime = Date.now();
@@ -72,7 +107,6 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     this.eventBus.emit('ProviderStarted', {
       providerInfo: provider.info,
       identity,
-      status: 'success',
       latencyMs: 0
     });
 
@@ -93,8 +127,8 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
         }, timeoutMs);
       });
 
-      const fetchPromise = provider.fetch<TDTO>(identity, execContext);
-      const res = await Promise.race([fetchPromise, timeoutPromise]);
+      const providerPromise = action(provider, identity, execContext);
+      const res = await Promise.race([providerPromise, timeoutPromise]);
       clearTimeout(timeoutHandle!);
 
       if (res.status === 'timeout') {
