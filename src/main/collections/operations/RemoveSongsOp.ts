@@ -1,6 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
+import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 
 export interface RemoveSongsInput {
   playlistId: number;
@@ -40,6 +41,15 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
     // Compute delta using repository
     const removedSongIds = removedEntries.map(e => e.songId);
     const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(removedSongIds, ctx.trx);
+
+    MembershipBootstrap.getInstance().then((c) => {
+      c.service.notifyMembershipChanged({
+        type: 'removed',
+        collection: { kind: 'playlist', id: playlistId },
+        memberKind: 'song',
+        members: affectedSongIds.map((id) => ({ kind: 'song', id }))
+      });
+    });
 
     return {
       data: { 

@@ -1,6 +1,7 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
+import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 
 export interface AddSongsInput {
   playlistId: number;
@@ -42,6 +43,15 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
 
     // Compute delta using repository
     const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(songIds, ctx.trx);
+
+    MembershipBootstrap.getInstance().then((c) => {
+      c.service.notifyMembershipChanged({
+        type: 'added',
+        collection: { kind: 'playlist', id: playlistId },
+        memberKind: 'song',
+        members: songIds.map((id) => ({ kind: 'song', id }))
+      });
+    });
 
     return {
       data: { addedCount: inserted.length, deltaCount: itemCountDelta, deltaDuration: durationDelta },
