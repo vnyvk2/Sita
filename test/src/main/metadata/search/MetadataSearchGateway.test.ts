@@ -32,9 +32,9 @@ describe('MetadataSearchGateway', () => {
     container.mapperRegistry.register(new SongMapper());
 
     const gateway = container.searchGateway;
-    const hydrated = await gateway.hydrateSearchResults<SongPersistenceDTO>([
-      { kind: 'song', id: 1 },
-      { kind: 'song', id: 2 }
+    const hydrated = await gateway.hydrateReferences<SongPersistenceDTO>([
+      { kind: 'song', id: 1, tier: 6 },
+      { kind: 'song', id: 2, tier: 6 }
     ]);
 
     expect(hydrated.length).toBe(2);

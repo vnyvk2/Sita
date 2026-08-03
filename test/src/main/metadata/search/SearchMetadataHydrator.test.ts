@@ -17,7 +17,7 @@ describe('SearchMetadataHydrator', () => {
     };
 
     const hydrator = new SearchMetadataHydrator(mockGateway);
-    const references = Array.from({ length: 60 }, (_, i) => ({ kind: 'song', id: i + 1 }));
+    const references = Array.from({ length: 60 }, (_, i) => ({ kind: 'song' as const, id: i + 1, tier: 6 as const }));
 
     await hydrator.hydrateMatches(references);
 

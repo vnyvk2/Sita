@@ -1,12 +1,8 @@
+import type { SearchMatchReference } from '@main/search/models/SearchMatchReference';
 import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
 
 import { MetadataSearchResultMapper } from './MetadataSearchResultMapper';
 import { SearchEntityResolver } from './SearchEntityResolver';
-
-export interface SearchMatchReference {
-  kind: string;
-  id: string | number;
-}
 
 export class SearchMetadataHydrator {
   private readonly gateway: IMetadataGateway;

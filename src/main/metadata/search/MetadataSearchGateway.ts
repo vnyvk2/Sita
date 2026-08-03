@@ -1,7 +1,7 @@
+import type { SearchMatchReference } from '@main/search/models/SearchMatchReference';
 import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
 
 import { MetadataSearchResolver } from './MetadataSearchResolver';
-import { SearchMatchReference } from './SearchMetadataHydrator';
 
 export interface MetadataSearchGatewayOptions {
   gateway: IMetadataGateway;
@@ -16,7 +16,7 @@ export class MetadataSearchGateway {
     this.resolver = new MetadataSearchResolver(options.gateway);
   }
 
-  public async hydrateSearchResults<TDTO = unknown>(
+  public async hydrateReferences<TDTO = unknown>(
     references: SearchMatchReference[]
   ): Promise<TDTO[]> {
     return this.resolver.resolveBatch<TDTO>(references);

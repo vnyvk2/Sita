@@ -1,3 +1,4 @@
+import type { SearchMatchReference } from '@main/search/models/SearchMatchReference';
 import { MetadataIdentity } from '../models/MetadataIdentity';
 import { MetadataKinds } from '../models/MetadataKind';
 
@@ -21,11 +22,11 @@ export class SearchEntityResolver {
       case 'playlists':
         return new MetadataIdentity({ entityKind: MetadataKinds.Playlist, entityId: id });
       default:
-        return new MetadataIdentity({ entityKind: kindName, entityId: id });
+        return new MetadataIdentity({ entityKind: kindName as any, entityId: id });
     }
   }
 
-  public static toMetadataIdentities(items: Array<{ kind: string; id: string | number }>): MetadataIdentity[] {
+  public static toMetadataIdentities(items: SearchMatchReference[]): MetadataIdentity[] {
     return items.map((item) => this.toMetadataIdentity(item.kind, item.id));
   }
 }
