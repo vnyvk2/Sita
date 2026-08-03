@@ -1,31 +1,22 @@
 import { db } from '@db/db';
 import { albums } from '@db/schema';
-import { convertToAlbum } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
   NormalizedQuery,
-  SearchEngineOptions,
-  SearchMatch
+  SearchEngineOptions
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Album Search Engine
-// ---------------------------------------------------------------------------
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 
 export const AlbumSearchEngine = {
   async search(
     query: NormalizedQuery,
     options: SearchEngineOptions = {},
     trx: DB | DBTransaction = db
-  ): Promise<SearchMatch<Album>[]> {
+  ): Promise<SearchMatchReference[]> {
     const { fuzzy = true, limit = SEARCH_LIMITS.GLOBAL } = options;
     const { escaped, normalized } = query;
 
@@ -46,33 +37,17 @@ export const AlbumSearchEngine = {
     ) DESC, similarity(${albums.titleCI}, ${normalized}) DESC`;
 
     const results = await trx.query.albums.findMany({
+      columns: { id: true, title: true },
       where: () => whereClause,
       orderBy: () => orderByClause,
-      limit,
-      with: {
-        artists: {
-          with: {
-            artist: {
-              columns: {
-                name: true,
-                id: true
-              }
-            }
-          }
-        },
-        songs: { with: { song: { columns: { id: true, title: true } } } },
-        artworks: {
-          with: {
-            artwork: {}
-          }
-        }
-      }
+      limit
     });
 
     timeEnd(timer, 'Search Albums');
 
     return results.map((raw) => ({
-      item: convertToAlbum(raw),
+      kind: 'album' as const,
+      id: raw.id,
       tier: computeTier(raw.title, normalized)
     }));
   }

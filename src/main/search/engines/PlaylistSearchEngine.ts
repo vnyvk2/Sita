@@ -1,31 +1,22 @@
 import { db } from '@db/db';
-import { playlists, playlistEntries } from '@db/schema';
-import { convertToPlaylist } from '@main/utils/convert';
+import { playlists } from '@db/schema';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { sql, asc } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
   NormalizedQuery,
-  SearchEngineOptions,
-  SearchMatch
+  SearchEngineOptions
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Playlist Search Engine
-// ---------------------------------------------------------------------------
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 
 export const PlaylistSearchEngine = {
   async search(
     query: NormalizedQuery,
     options: SearchEngineOptions = {},
     trx: DB | DBTransaction = db
-  ): Promise<SearchMatch<Playlist>[]> {
+  ): Promise<SearchMatchReference[]> {
     const { fuzzy = true, limit = SEARCH_LIMITS.GLOBAL } = options;
     const { escaped, normalized } = query;
 
@@ -46,32 +37,17 @@ export const PlaylistSearchEngine = {
     ) DESC, similarity(${playlists.nameCI}, ${normalized}) DESC`;
 
     const results = await trx.query.playlists.findMany({
+      columns: { id: true, name: true },
       where: () => whereClause,
       orderBy: () => orderByClause,
-      limit,
-      with: {
-        entries: { with: { song: { columns: { id: true } } }, orderBy: asc(playlistEntries.position) },
-        artworks: {
-          with: {
-            artwork: {
-              with: {
-                palette: {
-                  columns: { id: true },
-                  with: {
-                    swatches: {}
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+      limit
     });
 
     timeEnd(timer, 'Search Playlists');
 
     return results.map((raw) => ({
-      item: convertToPlaylist(raw),
+      kind: 'playlist' as const,
+      id: raw.id,
       tier: computeTier(raw.name, normalized)
     }));
   }

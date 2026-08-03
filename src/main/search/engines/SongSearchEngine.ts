@@ -1,94 +1,22 @@
 import { db } from '@db/db';
 import { songs } from '@db/schema';
-import { convertToSongData } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
 import { MATCH_TIER, SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
   NormalizedQuery,
-  SearchEngineOptions,
-  SearchMatch
+  SearchEngineOptions
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Shared relation config for song queries — eagerly loads artists, albums, genres, artworks, playlists. */
-const SONG_RELATIONS = {
-  artists: {
-    with: {
-      artist: {
-        columns: { id: true, name: true }
-      }
-    }
-  },
-  albums: {
-    with: {
-      album: {
-        columns: { id: true, title: true },
-        with: {
-          artists: {
-            with: {
-              artist: {
-                columns: { id: true, name: true }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  genres: {
-    with: {
-      genre: {
-        columns: { id: true, name: true }
-      }
-    }
-  },
-  artworks: {
-    with: {
-      artwork: {
-        with: {
-          palette: {
-            columns: { id: true },
-            with: {
-              swatches: {}
-            }
-          }
-        }
-      }
-    }
-  },
-  playlists: {
-    with: {
-      playlist: {
-        columns: { id: true, name: true }
-      }
-    }
-  }
-} as const;
-
-// ---------------------------------------------------------------------------
-// Song Search Engine
-// ---------------------------------------------------------------------------
-
-/**
- * Searches songs by title. Optionally also searches by related artist/album names
- * (cross-metadata search) when `options.metadata` is provided.
- *
- * Usage:
- * - Global search: `SongSearchEngine.search(query, { metadata: { artist: true, album: true } })`
- * - Songs page:    `SongSearchEngine.search(query, { metadata: undefined })`
- */
 export const SongSearchEngine = {
   async search(
     query: NormalizedQuery,
     options: SearchEngineOptions = {},
     trx: DB | DBTransaction = db
-  ): Promise<SearchMatch<SongData>[]> {
+  ): Promise<SearchMatchReference[]> {
     const { fuzzy = true, limit = SEARCH_LIMITS.GLOBAL, metadata } = options;
     const { escaped, normalized } = query;
 
@@ -109,11 +37,12 @@ export const SongSearchEngine = {
       END
     ) DESC, similarity(${songs.titleCI}, ${normalized}) DESC`;
 
+    // Select ONLY id and title for tier computation (no relation joins!)
     const titleResults = await trx.query.songs.findMany({
+      columns: { id: true, title: true },
       where: () => titleWhereClause,
       orderBy: () => titleOrderBy,
-      limit,
-      with: SONG_RELATIONS
+      limit
     });
 
     const titleMatchIds = new Set(titleResults.map((s) => s.id));
@@ -124,7 +53,6 @@ export const SongSearchEngine = {
     if (metadata && (metadata.artist || metadata.album) && titleResults.length < limit) {
       const remaining = Math.min(limit - titleResults.length, SEARCH_LIMITS.METADATA);
 
-      // Build WHERE conditions based on which metadata fields are enabled
       const metaConditions: ReturnType<typeof sql>[] = [];
       if (metadata.artist) {
         metaConditions.push(sql`(a.name_ci ILIKE ${'%' + escaped + '%'} OR regexp_replace(a.name_ci, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`);
@@ -139,7 +67,6 @@ export const SongSearchEngine = {
           : sql`(${sql.join(metaConditions, sql` OR `)})`;
 
       try {
-        // Lightweight query: just song IDs via joins
         const metaIdRows = await trx.execute<{ id: number }>(sql`
           SELECT DISTINCT s.id FROM songs s
           LEFT JOIN artists_songs ars ON s.id = ars.song_id
@@ -155,15 +82,14 @@ export const SongSearchEngine = {
           .filter((id) => !titleMatchIds.has(id))
           .slice(0, remaining);
 
-        // Fetch full song data for metadata-matched IDs
         if (newIds.length > 0) {
           metadataResults = await trx.query.songs.findMany({
+            columns: { id: true, title: true },
             where: () =>
               sql`${songs.id} IN (${sql.join(
                 newIds.map((id) => sql`${id}`),
                 sql`, `
               )})`,
-            with: SONG_RELATIONS,
             limit: newIds.length
           });
         }
@@ -176,22 +102,25 @@ export const SongSearchEngine = {
 
     timeEnd(timer, 'Search Songs');
 
-    // --- BUILD RESULTS with per-item tiers ---
-    const results: SearchMatch<SongData>[] = [];
+    const references: SearchMatchReference[] = [];
 
-    // Title-matched songs: compute tier from title comparison
     for (const raw of titleResults) {
-      const song = convertToSongData(raw);
       const tier = computeTier(raw.title, normalized);
-      results.push({ item: song, tier });
+      references.push({
+        kind: 'song',
+        id: raw.id,
+        tier
+      });
     }
 
-    // Metadata-matched songs: always tier METADATA
     for (const raw of metadataResults) {
-      const song = convertToSongData(raw);
-      results.push({ item: song, tier: MATCH_TIER.METADATA });
+      references.push({
+        kind: 'song',
+        id: raw.id,
+        tier: MATCH_TIER.METADATA
+      });
     }
 
-    return results;
+    return references;
   }
 };

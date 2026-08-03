@@ -1,31 +1,22 @@
 import { db } from '@db/db';
 import { genres } from '@db/schema';
-import { convertToGenre } from '@main/utils/convert';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 import type {
   NormalizedQuery,
-  SearchEngineOptions,
-  SearchMatch
+  SearchEngineOptions
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Genre Search Engine
-// ---------------------------------------------------------------------------
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 
 export const GenreSearchEngine = {
   async search(
     query: NormalizedQuery,
     options: SearchEngineOptions = {},
     trx: DB | DBTransaction = db
-  ): Promise<SearchMatch<Genre>[]> {
+  ): Promise<SearchMatchReference[]> {
     const { fuzzy = true, limit = SEARCH_LIMITS.GLOBAL } = options;
     const { escaped, normalized } = query;
 
@@ -46,32 +37,17 @@ export const GenreSearchEngine = {
     ) DESC, similarity(${genres.nameCI}, ${normalized}) DESC`;
 
     const results = await trx.query.genres.findMany({
+      columns: { id: true, name: true },
       where: () => whereClause,
       orderBy: () => orderByClause,
-      limit,
-      with: {
-        songs: { with: { song: { columns: { id: true, title: true } } } },
-        artworks: {
-          with: {
-            artwork: {
-              with: {
-                palette: {
-                  columns: { id: true },
-                  with: {
-                    swatches: {}
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+      limit
     });
 
     timeEnd(timer, 'Search Genres');
 
     return results.map((raw) => ({
-      item: convertToGenre(raw),
+      kind: 'genre' as const,
+      id: raw.id,
       tier: computeTier(raw.name, normalized)
     }));
   }
