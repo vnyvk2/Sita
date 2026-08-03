@@ -68,7 +68,11 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     const results: ProviderResult<TDTO>[] = [];
 
     for (const provider of targetProviders) {
-      if (execContext?.cancellationToken?.isCancelled) {
+      const isCancelled =
+        execContext?.cancellationToken?.isCancelled ||
+        execContext?.cancellationToken?.isCancellationRequested?.();
+
+      if (isCancelled) {
         this.eventBus.emit('ProviderSkipped', {
           providerInfo: provider.info,
           identity,

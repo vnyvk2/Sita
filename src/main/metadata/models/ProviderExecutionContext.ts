@@ -2,6 +2,7 @@ import type { MetadataContext } from './MetadataContext';
 
 export interface CancellationToken {
   readonly isCancelled: boolean;
+  isCancellationRequested?(): boolean;
 }
 
 export interface ProviderExecutionContextOptions {
