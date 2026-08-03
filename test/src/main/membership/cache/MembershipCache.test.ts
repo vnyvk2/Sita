@@ -22,8 +22,33 @@ describe('MembershipCache', () => {
     expect(collections?.length).toBe(1);
     expect(collections?.[0].id).toBe(1);
 
-    // Granular invalidation
+    // Granular invalidation cleans forward and reverse
     cache.invalidateCollection('playlist', 1);
     expect(cache.hasMembers('playlist', 1, 'song')).toBe(false);
+    expect(cache.getCollectionsContaining('song', 10, 'playlist')).toBeUndefined();
+  });
+
+  it('should clean up stale reverse map entries when setMembers replaces a playlist', () => {
+    const cache = new MembershipCache();
+
+    // Initial playlist has songs 10, 11, 12
+    const initialEntries: MembershipEntry[] = [
+      { collectionKind: 'playlist', collectionId: 100, memberKind: 'song', memberId: 10, position: 1 },
+      { collectionKind: 'playlist', collectionId: 100, memberKind: 'song', memberId: 11, position: 2 },
+      { collectionKind: 'playlist', collectionId: 100, memberKind: 'song', memberId: 12, position: 3 }
+    ];
+    cache.setMembers('playlist', 100, 'song', initialEntries);
+
+    expect(cache.getCollectionsContaining('song', 12, 'playlist')?.length).toBe(1);
+
+    // Replacement playlist removes song 12
+    const updatedEntries: MembershipEntry[] = [
+      { collectionKind: 'playlist', collectionId: 100, memberKind: 'song', memberId: 10, position: 1 },
+      { collectionKind: 'playlist', collectionId: 100, memberKind: 'song', memberId: 11, position: 2 }
+    ];
+    cache.setMembers('playlist', 100, 'song', updatedEntries);
+
+    // Song 12 must no longer be associated with playlist 100
+    expect(cache.getCollectionsContaining('song', 12, 'playlist')).toBeUndefined();
   });
 });

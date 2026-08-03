@@ -61,7 +61,8 @@ export class MembershipCache {
   }
 
   /**
-   * Atomically sets members for a collection and updates reverse index entries.
+   * Atomically sets members for a collection and updates reverse index entries cleanly.
+   * Removes previous reverse map entries for this collection before setting new entries.
    */
   public setMembers(
     collectionKind: MembershipEntityKind,
@@ -70,22 +71,38 @@ export class MembershipCache {
     entries: MembershipEntry[]
   ): void {
     const forwardKey = this.buildForwardKey(collectionKind, collectionId, memberKind);
+    const prevEntries = this.forwardMap.get(forwardKey) ?? [];
+
+    // Remove previous collection references from reverseMap
+    for (const prev of prevEntries) {
+      const revKey = this.buildReverseKey(prev.memberKind, prev.memberId, collectionKind);
+      const existingRev = this.reverseMap.get(revKey);
+      if (existingRev) {
+        const filtered = existingRev.filter((r) => String(r.id) !== String(collectionId));
+        if (filtered.length > 0) {
+          this.reverseMap.set(revKey, filtered);
+        } else {
+          this.reverseMap.delete(revKey);
+        }
+      }
+    }
+
+    // Set new forward entry
     this.forwardMap.set(forwardKey, [...entries]);
 
+    // Set new reverse entries
     const collectionRef: MembershipReference = { kind: collectionKind, id: collectionId };
-
-    // Update reverse map entries for each member
     for (const entry of entries) {
-      const reverseKey = this.buildReverseKey(entry.memberKind, entry.memberId, collectionKind);
-      const existing = this.reverseMap.get(reverseKey) ?? [];
-      if (!existing.some((r) => String(r.id) === String(collectionId))) {
-        this.reverseMap.set(reverseKey, [...existing, collectionRef]);
+      const revKey = this.buildReverseKey(entry.memberKind, entry.memberId, collectionKind);
+      const existingRev = this.reverseMap.get(revKey) ?? [];
+      if (!existingRev.some((r) => String(r.id) === String(collectionId))) {
+        this.reverseMap.set(revKey, [...existingRev, collectionRef]);
       }
     }
   }
 
   /**
-   * Atomically sets collections containing a member and updates forward index entries.
+   * Atomically sets collections containing a member and updates reverse index.
    */
   public setCollectionsContaining(
     memberKind: MembershipEntityKind,
@@ -98,22 +115,35 @@ export class MembershipCache {
   }
 
   /**
-   * Granular invalidation for a specific collection.
+   * Granular invalidation for a specific collection across BOTH forward and reverse maps.
    */
   public invalidateCollection(
     collectionKind: MembershipEntityKind,
     collectionId: string | number
   ): void {
     const prefix = `${collectionKind}:${collectionId}:`;
-    for (const key of this.forwardMap.keys()) {
-      if (key.startsWith(prefix)) {
-        this.forwardMap.delete(key);
+    for (const [forwardKey, entries] of this.forwardMap.entries()) {
+      if (forwardKey.startsWith(prefix)) {
+        // Clean corresponding reverse entries pointing to this collection
+        for (const entry of entries) {
+          const revKey = this.buildReverseKey(entry.memberKind, entry.memberId, collectionKind);
+          const existingRev = this.reverseMap.get(revKey);
+          if (existingRev) {
+            const filtered = existingRev.filter((r) => String(r.id) !== String(collectionId));
+            if (filtered.length > 0) {
+              this.reverseMap.set(revKey, filtered);
+            } else {
+              this.reverseMap.delete(revKey);
+            }
+          }
+        }
+        this.forwardMap.delete(forwardKey);
       }
     }
   }
 
   /**
-   * Granular invalidation for a specific member.
+   * Granular invalidation for a specific member across BOTH reverse and forward maps.
    */
   public invalidateMember(
     memberKind: MembershipEntityKind,
@@ -123,6 +153,14 @@ export class MembershipCache {
     for (const key of this.reverseMap.keys()) {
       if (key.startsWith(prefix)) {
         this.reverseMap.delete(key);
+      }
+    }
+
+    // Filter member from all cached forward entries
+    for (const [forwardKey, entries] of this.forwardMap.entries()) {
+      const filtered = entries.filter((e) => !(e.memberKind === memberKind && String(e.memberId) === String(memberId)));
+      if (filtered.length !== entries.length) {
+        this.forwardMap.set(forwardKey, filtered);
       }
     }
   }
