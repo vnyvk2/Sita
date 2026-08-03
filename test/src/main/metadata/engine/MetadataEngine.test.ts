@@ -49,11 +49,10 @@ describe('MetadataEngine', () => {
       fieldRegistry,
       validationPolicy: new DefaultValidationPolicy(),
       conflictPolicy: new DefaultConflictPolicy(),
-      cache,
-      eventBus
+      context
     });
 
-    const engine = new MetadataEngine({ repository, planner, pipeline, cache, context });
+    const engine = new MetadataEngine({ repository, planner, pipeline, cache, eventBus, context });
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 777 });
 
     const entity1 = await engine.getEntityMetadata(identity);

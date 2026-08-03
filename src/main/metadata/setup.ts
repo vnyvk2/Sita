@@ -18,10 +18,12 @@ import { DefaultValidationPolicy } from './policies/DefaultValidationPolicy';
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
+import { LoaderRegistry } from './repository/LoaderRegistry';
 
 export interface MetadataContainer {
   engine: MetadataEngine;
   repository: DatabaseMetadataRepository;
+  loaderRegistry: LoaderRegistry;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   mapperRegistry: MapperRegistry;
@@ -45,6 +47,7 @@ export class MetadataBootstrap {
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const providerRegistry = new MetadataProviderRegistry();
     const mapperRegistry = new MapperRegistry();
+    const loaderRegistry = new LoaderRegistry();
     const eventBus = new MetadataEventBus();
     const cache = new MetadataCache();
 
@@ -56,7 +59,7 @@ export class MetadataBootstrap {
       priority: new DefaultProviderPriorityPolicy()
     };
 
-    const repository = new DatabaseMetadataRepository();
+    const repository = new DatabaseMetadataRepository(loaderRegistry);
     const planner = new MetadataQueryPlanner(repository);
 
     const pipeline = new MetadataPipeline({
@@ -64,8 +67,7 @@ export class MetadataBootstrap {
       fieldRegistry,
       validationPolicy: policies.validation,
       conflictPolicy: policies.conflict,
-      cache,
-      eventBus
+      context
     });
 
     const engine = new MetadataEngine({
@@ -73,6 +75,7 @@ export class MetadataBootstrap {
       planner,
       pipeline,
       cache,
+      eventBus,
       context
     });
 
@@ -98,6 +101,7 @@ export class MetadataBootstrap {
     return {
       engine,
       repository,
+      loaderRegistry,
       planner,
       pipeline,
       mapperRegistry,

@@ -1,4 +1,5 @@
 export * from './DatabaseMetadataRepository';
+export * from './LoaderRegistry';
 export * from './strategies/AlbumLoader';
 export * from './strategies/ArtistLoader';
 export * from './strategies/GenreLoader';

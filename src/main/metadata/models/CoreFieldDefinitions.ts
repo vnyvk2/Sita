@@ -49,7 +49,6 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     displayName: 'BPM',
     valueType: 'number',
     searchable: false,
-    searchWeight: 0.0,
     filterable: true,
     sortable: true
   }),

@@ -1,6 +1,8 @@
 import type { MetadataFieldDefinition } from '../models/MetadataFieldDefinition';
 import type { IValidationPolicy, ValidationResult } from './ValidationPolicy';
 
+import { MetadataFields } from '../models/MetadataFieldId';
+
 export class DefaultValidationPolicy implements IValidationPolicy {
   public validate(definition: MetadataFieldDefinition, value: unknown): ValidationResult {
     if (value === undefined || value === null) {
@@ -11,11 +13,11 @@ export class DefaultValidationPolicy implements IValidationPolicy {
       if (typeof value !== 'number' || isNaN(value)) {
         return { valid: false, message: `Field '${definition.id}' must be a valid number` };
       }
-      if (definition.id === 'year' && (value < 1000 || value > 3000)) {
-        return { valid: false, message: `Field 'year' must be between 1000 and 3000` };
+      if (definition.id === MetadataFields.Year && (value < 1000 || value > 3000)) {
+        return { valid: false, message: `Field '${MetadataFields.Year}' must be between 1000 and 3000` };
       }
-      if (definition.id === 'bpm' && value < 0) {
-        return { valid: false, message: `Field 'bpm' must be non-negative` };
+      if (definition.id === MetadataFields.BPM && value < 0) {
+        return { valid: false, message: `Field '${MetadataFields.BPM}' must be non-negative` };
       }
     }
 

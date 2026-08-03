@@ -5,28 +5,23 @@ import type { MetadataKind } from '../models/MetadataKind';
 import type { MetadataQuery } from '../models/MetadataQuery';
 import type { IEntityLoader } from './strategies/IEntityLoader';
 
-import { MetadataKinds } from '../models/MetadataKind';
-import { AlbumLoader } from './strategies/AlbumLoader';
-import { ArtistLoader } from './strategies/ArtistLoader';
-import { GenreLoader } from './strategies/GenreLoader';
-import { PlaylistLoader } from './strategies/PlaylistLoader';
-import { SongLoader } from './strategies/SongLoader';
+import { LoaderRegistry } from './LoaderRegistry';
 
 export class DatabaseMetadataRepository implements IMetadataRepository {
-  private readonly loaders: Map<MetadataKind, IEntityLoader<unknown>> = new Map();
+  private readonly loaderRegistry: LoaderRegistry;
 
-  constructor(customLoaders?: IEntityLoader<unknown>[]) {
-    if (customLoaders) {
-      for (const loader of customLoaders) {
-        this.loaders.set(loader.kind, loader);
-      }
+  constructor(loaderRegistryOrCustomLoaders?: LoaderRegistry | IEntityLoader<unknown>[]) {
+    if (loaderRegistryOrCustomLoaders instanceof LoaderRegistry) {
+      this.loaderRegistry = loaderRegistryOrCustomLoaders;
+    } else if (Array.isArray(loaderRegistryOrCustomLoaders)) {
+      this.loaderRegistry = new LoaderRegistry(loaderRegistryOrCustomLoaders);
     } else {
-      this.registerDefaultLoaders();
+      this.loaderRegistry = new LoaderRegistry();
     }
   }
 
   public getLoader<T>(kind: MetadataKind): IEntityLoader<T> | undefined {
-    return this.loaders.get(kind) as IEntityLoader<T> | undefined;
+    return this.loaderRegistry.get<T>(kind);
   }
 
   public async findDTO<T>(identity: MetadataIdentity): Promise<T | null> {
@@ -61,13 +56,5 @@ export class DatabaseMetadataRepository implements IMetadataRepository {
 
   public async search(_query: MetadataQuery): Promise<MetadataEntity[]> {
     throw new Error('Use MetadataQueryPlanner and MetadataEngine.query() for query execution.');
-  }
-
-  private registerDefaultLoaders(): void {
-    this.loaders.set(MetadataKinds.Song, new SongLoader() as IEntityLoader<unknown>);
-    this.loaders.set(MetadataKinds.Artist, new ArtistLoader() as IEntityLoader<unknown>);
-    this.loaders.set(MetadataKinds.Album, new AlbumLoader() as IEntityLoader<unknown>);
-    this.loaders.set(MetadataKinds.Genre, new GenreLoader() as IEntityLoader<unknown>);
-    this.loaders.set(MetadataKinds.Playlist, new PlaylistLoader() as IEntityLoader<unknown>);
   }
 }

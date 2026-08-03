@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { MetadataCache } from '@main/metadata/cache/MetadataCache';
-import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { MapperRegistry } from '@main/metadata/mappers/MapperRegistry';
 import { CORE_FIELD_DEFINITIONS } from '@main/metadata/models/CoreFieldDefinitions';
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
@@ -12,34 +10,24 @@ import { DefaultValidationPolicy } from '@main/metadata/policies/DefaultValidati
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
 
 describe('MetadataPipeline', () => {
-  it('should process DTO, validate fields, cache entity, and emit event', () => {
+  it('should process DTO into MetadataEntity deterministically using pipeline stages', async () => {
     const mapperRegistry = new MapperRegistry();
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const validationPolicy = new DefaultValidationPolicy();
     const conflictPolicy = new DefaultConflictPolicy();
-    const cache = new MetadataCache();
-    const eventBus = new MetadataEventBus();
-
-    let createdEventFired = false;
-    eventBus.on('MetadataCreated', () => {
-      createdEventFired = true;
-    });
 
     const pipeline = new MetadataPipeline({
       mapperRegistry,
       fieldRegistry,
       validationPolicy,
-      conflictPolicy,
-      cache,
-      eventBus
+      conflictPolicy
     });
 
     const dto: SongPersistenceDTO = { id: 101, title: 'Comfortably Numb', year: 1979 };
-    const entity = pipeline.processDTO(MetadataKinds.Song, dto);
+    const entity = await pipeline.processDTO(MetadataKinds.Song, dto);
 
     expect(entity).not.toBeNull();
     expect(entity?.getField<string>('title')?.value).toBe('Comfortably Numb');
-    expect(cache.size()).toBe(1);
-    expect(createdEventFired).toBe(true);
+    expect(entity?.getField<number>('year')?.value).toBe(1979);
   });
 });
