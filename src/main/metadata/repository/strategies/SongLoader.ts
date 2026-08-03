@@ -18,13 +18,43 @@ const SONG_RELATIONS = {
   albums: {
     with: {
       album: {
-        columns: { id: true, title: true }
+        columns: { id: true, title: true },
+        with: {
+          artists: {
+            with: {
+              artist: {
+                columns: { id: true, name: true }
+              }
+            }
+          }
+        }
       }
     }
   },
   genres: {
     with: {
       genre: {
+        columns: { id: true, name: true }
+      }
+    }
+  },
+  artworks: {
+    with: {
+      artwork: {
+        with: {
+          palette: {
+            columns: { id: true },
+            with: {
+              swatches: {}
+            }
+          }
+        }
+      }
+    }
+  },
+  playlists: {
+    with: {
+      playlist: {
         columns: { id: true, name: true }
       }
     }

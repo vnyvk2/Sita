@@ -8,14 +8,17 @@ import { MetadataValue } from './MetadataValue';
 export interface MetadataEntityOptions {
   identity: MetadataIdentity;
   fields?: Map<FieldId, MetadataValue<unknown>> | Record<FieldId, MetadataValue<unknown>>;
+  rawPayload?: unknown;
 }
 
 export class MetadataEntity {
   public readonly identity: MetadataIdentity;
+  public rawPayload?: unknown;
   private readonly fieldsMap: Map<FieldId, MetadataValue<unknown>>;
 
   constructor(options: MetadataEntityOptions) {
     this.identity = options.identity;
+    this.rawPayload = options.rawPayload;
     this.fieldsMap = new Map();
 
     if (options.fields) {
@@ -47,20 +50,12 @@ export class MetadataEntity {
     return this.fieldsMap.has(fieldId);
   }
 
-  public removeField(fieldId: FieldId): boolean {
-    return this.fieldsMap.delete(fieldId);
-  }
-
-  public getFieldsMap(): Map<FieldId, MetadataValue<unknown>> {
-    return new Map(this.fieldsMap);
-  }
-
-  public getAllFields(): Record<FieldId, MetadataValue<unknown>> {
-    const obj: Record<FieldId, MetadataValue<unknown>> = {};
-    for (const [key, val] of this.fieldsMap.entries()) {
-      obj[key] = val;
+  public getAllFields(): Record<string, MetadataValue<unknown>> {
+    const result: Record<string, MetadataValue<unknown>> = {};
+    for (const [key, value] of this.fieldsMap.entries()) {
+      result[key] = value;
     }
-    return obj;
+    return result;
   }
 
   public createSnapshot(): MetadataSnapshot {

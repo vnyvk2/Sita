@@ -1,20 +1,47 @@
+import {
+  convertToAlbum,
+  convertToArtist,
+  convertToGenre,
+  convertToPlaylist,
+  convertToSongData
+} from '@main/utils/convert';
+
 import type { MetadataEntity } from '../models/MetadataEntity';
+import { MetadataKinds } from '../models/MetadataKind';
 
 export class MetadataSearchResultMapper {
   public static mapEntityToDTO<TDTO = unknown>(entity: MetadataEntity): TDTO | null {
-    if (!entity) return null;
+    if (!entity || !entity.rawPayload) return null;
 
-    const dto: Record<string, unknown> = {
-      id: entity.identity.entityId,
-      kind: entity.identity.entityKind
-    };
+    let dto: Record<string, unknown>;
 
-    const fields = entity.getAllFields();
-    for (const [key, fieldVal] of Object.entries(fields)) {
-      if (fieldVal && fieldVal.value !== undefined) {
-        dto[key] = fieldVal.value;
+    try {
+      switch (entity.identity.entityKind) {
+        case MetadataKinds.Song:
+          dto = convertToSongData(entity.rawPayload as any) as any;
+          break;
+        case MetadataKinds.Artist:
+          dto = convertToArtist(entity.rawPayload as any) as any;
+          break;
+        case MetadataKinds.Album:
+          dto = convertToAlbum(entity.rawPayload as any) as any;
+          break;
+        case MetadataKinds.Playlist:
+          dto = convertToPlaylist(entity.rawPayload as any) as any;
+          break;
+        case MetadataKinds.Genre:
+          dto = convertToGenre(entity.rawPayload as any) as any;
+          break;
+        default:
+          dto = { ...(entity.rawPayload as Record<string, unknown>) };
       }
+    } catch {
+      dto = { ...(entity.rawPayload as Record<string, unknown>) };
     }
+
+    // Attach kind and id for SearchCoordinator lookup
+    dto.kind = entity.identity.entityKind;
+    dto.id = entity.identity.entityId;
 
     return dto as TDTO;
   }

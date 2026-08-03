@@ -21,7 +21,7 @@ export class AlbumMapper implements IMetadataMapper<AlbumPersistenceDTO> {
     const source = new MetadataSource({ type: MetadataSourceTypes.LocalTags });
     const confidence = MetadataConfidence.verified();
 
-    const entity = new MetadataEntity({ identity });
+    const entity = new MetadataEntity({ identity, rawPayload: dto });
 
     if (dto.title) {
       entity.setField(

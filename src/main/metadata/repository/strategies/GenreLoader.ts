@@ -14,6 +14,20 @@ const GENRE_RELATIONS = {
         columns: { id: true, title: true }
       }
     }
+  },
+  artworks: {
+    with: {
+      artwork: {
+        with: {
+          palette: {
+            columns: { id: true },
+            with: {
+              swatches: {}
+            }
+          }
+        }
+      }
+    }
   }
 } as const;
 

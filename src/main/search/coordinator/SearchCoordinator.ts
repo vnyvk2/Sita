@@ -199,6 +199,15 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     }, 2000);
   }
 
+  console.log("SEARCH RETURN", {
+    songs,
+    artists,
+    albums,
+    playlists,
+    genres,
+    confidence,
+  });
+
   return {
     songs,
     artists,

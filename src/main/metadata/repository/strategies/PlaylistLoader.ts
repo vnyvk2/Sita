@@ -1,11 +1,32 @@
 import { db } from '@db/db';
-import { playlists } from '@db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { playlists, playlistEntries } from '@db/schema';
+import { eq, inArray, asc } from 'drizzle-orm';
 
 import type { PlaylistPersistenceDTO } from '../../models/dtos';
 import type { IEntityLoader } from './IEntityLoader';
 
 import { MetadataKinds } from '../../models/MetadataKind';
+
+const PLAYLIST_RELATIONS = {
+  entries: {
+    with: { song: { columns: { id: true } } },
+    orderBy: asc(playlistEntries.position)
+  },
+  artworks: {
+    with: {
+      artwork: {
+        with: {
+          palette: {
+            columns: { id: true },
+            with: {
+              swatches: {}
+            }
+          }
+        }
+      }
+    }
+  }
+} as const;
 
 export class PlaylistLoader implements IEntityLoader<PlaylistPersistenceDTO> {
   public readonly kind = MetadataKinds.Playlist;
@@ -18,7 +39,8 @@ export class PlaylistLoader implements IEntityLoader<PlaylistPersistenceDTO> {
     if (isNaN(playlistId)) return null;
 
     const row = await trx.query.playlists.findFirst({
-      where: eq(playlists.id, playlistId)
+      where: eq(playlists.id, playlistId),
+      with: PLAYLIST_RELATIONS
     });
 
     return row ?? null;
@@ -36,7 +58,8 @@ export class PlaylistLoader implements IEntityLoader<PlaylistPersistenceDTO> {
     if (playlistIds.length === 0) return [];
 
     const rows = await trx.query.playlists.findMany({
-      where: inArray(playlists.id, playlistIds)
+      where: inArray(playlists.id, playlistIds),
+      with: PLAYLIST_RELATIONS
     });
 
     return rows;
