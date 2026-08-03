@@ -3,6 +3,7 @@ import type { MetadataSearchGateway } from '@main/metadata/search/MetadataSearch
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
 import logger from '@main/logger';
 import { dataUpdateEvent } from '@main/main';
+import { MetadataBootstrap } from '@main/metadata/setup';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { MATCH_TIER } from '../../../common/search/MatchTier';
 import { AlbumSearchEngine } from '../engines/AlbumSearchEngine';
@@ -116,9 +117,13 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     ...genreRefs
   ];
 
+  // Fallback to MetadataBootstrap singleton searchGateway if not explicitly passed
+  const activeGateway =
+    searchGateway ?? (await MetadataBootstrap.getInstance()).searchGateway;
+
   let hydratedResults: unknown[] = [];
-  if (searchGateway && allReferences.length > 0) {
-    hydratedResults = await searchGateway.hydrateReferences(allReferences);
+  if (activeGateway && allReferences.length > 0) {
+    hydratedResults = await activeGateway.hydrateReferences(allReferences);
   }
 
   // 3. Map hydrated DTOs back into sections preserving original engine ordering

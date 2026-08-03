@@ -3,7 +3,12 @@ import { libraryEventBus } from '@main/events/LibraryEventBus';
 import { MetadataCache } from './cache/MetadataCache';
 import { MetadataEngine } from './engine/MetadataEngine';
 import { MetadataEventBus } from './events/MetadataEventBus';
+import { AlbumMapper } from './mappers/AlbumMapper';
+import { ArtistMapper } from './mappers/ArtistMapper';
+import { GenreMapper } from './mappers/GenreMapper';
 import { MapperRegistry } from './mappers/MapperRegistry';
+import { PlaylistMapper } from './mappers/PlaylistMapper';
+import { SongMapper } from './mappers/SongMapper';
 import { CORE_FIELD_DEFINITIONS } from './models/CoreFieldDefinitions';
 import { MetadataContext } from './models/MetadataContext';
 import { MetadataIdentity } from './models/MetadataIdentity';
@@ -69,6 +74,15 @@ export interface MetadataContainer {
 }
 
 export class MetadataBootstrap {
+  private static instancePromise: Promise<MetadataContainer> | null = null;
+
+  public static async getInstance(contextOptions?: Partial<MetadataContext>): Promise<MetadataContainer> {
+    if (!this.instancePromise) {
+      this.instancePromise = this.bootstrap(contextOptions);
+    }
+    return this.instancePromise;
+  }
+
   public static async bootstrap(contextOptions?: Partial<MetadataContext>): Promise<MetadataContainer> {
     const context = new MetadataContext(contextOptions);
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
@@ -77,6 +91,13 @@ export class MetadataBootstrap {
     const loaderRegistry = new LoaderRegistry();
     const eventBus = new MetadataEventBus();
     const cache = new MetadataCache();
+
+    // Register default entity mappers
+    mapperRegistry.register(new SongMapper());
+    mapperRegistry.register(new ArtistMapper());
+    mapperRegistry.register(new AlbumMapper());
+    mapperRegistry.register(new GenreMapper());
+    mapperRegistry.register(new PlaylistMapper());
 
     const policies = {
       validation: new DefaultValidationPolicy(),
@@ -138,7 +159,6 @@ export class MetadataBootstrap {
 
     const searchGateway = new MetadataSearchGateway({ gateway: engine });
 
-    // Subscribe directly to public LibraryEventBus events to trigger metadata refreshes/invalidations
     libraryEventBus.onEvent('SongMetadataChanged', (event) => {
       const identity = new MetadataIdentity({
         entityKind: MetadataKinds.Song,
