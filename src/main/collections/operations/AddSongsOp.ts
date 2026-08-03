@@ -44,13 +44,12 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
     // Compute delta using repository
     const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(songIds, ctx.trx);
 
-    MembershipBootstrap.getInstance().then((c) => {
-      c.service.notifyMembershipChanged({
-        type: 'added',
-        collection: { kind: 'playlist', id: playlistId },
-        memberKind: 'song',
-        members: songIds.map((id) => ({ kind: 'song', id }))
-      });
+    const container = await MembershipBootstrap.getInstance();
+    container.service.notifyMembershipChanged({
+      type: 'added',
+      collection: { kind: 'playlist', id: playlistId },
+      memberKind: 'song',
+      members: songIds.map((id) => ({ kind: 'song', id }))
     });
 
     return {

@@ -42,13 +42,12 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
     const removedSongIds = removedEntries.map(e => e.songId);
     const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(removedSongIds, ctx.trx);
 
-    MembershipBootstrap.getInstance().then((c) => {
-      c.service.notifyMembershipChanged({
-        type: 'removed',
-        collection: { kind: 'playlist', id: playlistId },
-        memberKind: 'song',
-        members: affectedSongIds.map((id) => ({ kind: 'song', id }))
-      });
+    const container = await MembershipBootstrap.getInstance();
+    container.service.notifyMembershipChanged({
+      type: 'removed',
+      collection: { kind: 'playlist', id: playlistId },
+      memberKind: 'song',
+      members: affectedSongIds.map((id) => ({ kind: 'song', id }))
     });
 
     return {

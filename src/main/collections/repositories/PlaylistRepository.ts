@@ -120,7 +120,15 @@ export class PlaylistRepository {
     return result?.maxPos ?? -1;
   }
 
-  public async countEntries(playlistId: number): Promise<number> {
+  public async countEntries(playlistId: number, trx: DB | DBTransaction = db): Promise<number> {
+    if (trx !== db) {
+      const [result] = await trx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(playlistEntries)
+        .where(eq(playlistEntries.playlistId, playlistId));
+      return result?.count ?? 0;
+    }
+
     const container = await MembershipBootstrap.getInstance();
     return container.service.countMembers({ kind: 'playlist', id: playlistId }, 'song');
   }
@@ -133,7 +141,15 @@ export class PlaylistRepository {
     return result?.count ?? 0;
   }
 
-  public async getPlaylistsForSong(songId: number): Promise<number[]> {
+  public async getPlaylistsForSong(songId: number, trx: DB | DBTransaction = db): Promise<number[]> {
+    if (trx !== db) {
+      const results = await trx
+        .select({ playlistId: playlistEntries.playlistId })
+        .from(playlistEntries)
+        .where(eq(playlistEntries.songId, songId));
+      return results.map((r) => r.playlistId);
+    }
+
     const container = await MembershipBootstrap.getInstance();
     const collections = await container.service.getCollectionsContaining(
       { kind: 'song', id: songId },
@@ -143,9 +159,27 @@ export class PlaylistRepository {
   }
 
   public async getPlaylistsForSongs(
-    songIds: readonly number[]
+    songIds: readonly number[],
+    trx: DB | DBTransaction = db
   ): Promise<{ songId: number; playlistId: number }[]> {
     if (songIds.length === 0) return [];
+
+    if (trx !== db) {
+      const CHUNK_SIZE = 500;
+      const results: { songId: number; playlistId: number }[] = [];
+      for (let i = 0; i < songIds.length; i += CHUNK_SIZE) {
+        const chunk = songIds.slice(i, i + CHUNK_SIZE);
+        const rows = await trx
+          .select({
+            songId: playlistEntries.songId,
+            playlistId: playlistEntries.playlistId
+          })
+          .from(playlistEntries)
+          .where(inArray(playlistEntries.songId, chunk as number[]));
+        results.push(...rows);
+      }
+      return results;
+    }
 
     const container = await MembershipBootstrap.getInstance();
     const songRefs = songIds.map((id) => ({ kind: 'song' as const, id }));
