@@ -46,8 +46,16 @@ export class MetadataEntity {
     this.fieldsMap.set(fieldId, value as MetadataValue<unknown>);
   }
 
+  public removeField(fieldId: FieldId): boolean {
+    return this.fieldsMap.delete(fieldId);
+  }
+
   public hasField(fieldId: FieldId): boolean {
     return this.fieldsMap.has(fieldId);
+  }
+
+  public getFieldsMap(): Map<FieldId, MetadataValue<unknown>> {
+    return new Map(this.fieldsMap);
   }
 
   public getAllFields(): Record<string, MetadataValue<unknown>> {
