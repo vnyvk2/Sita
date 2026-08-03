@@ -12,6 +12,11 @@ export interface IMembershipRepository {
     collectionKind: MembershipEntityKind
   ): Promise<MembershipEntry[]>;
 
+  getCollectionsContainingMany(
+    members: MembershipReference[],
+    collectionKind: MembershipEntityKind
+  ): Promise<MembershipEntry[]>;
+
   contains(
     collection: MembershipReference,
     member: MembershipReference

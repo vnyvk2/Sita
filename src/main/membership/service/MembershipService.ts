@@ -64,6 +64,48 @@ export class MembershipService {
   }
 
   /**
+   * Returns collections containing any of the specified members in a single batched pass.
+   */
+  public async getCollectionsContainingMany(
+    members: MembershipReference[],
+    collectionKind: MembershipEntityKind
+  ): Promise<Map<string | number, MembershipReference[]>> {
+    const resultMap = new Map<string | number, MembershipReference[]>();
+    const uncachedMembers: MembershipReference[] = [];
+
+    for (const member of members) {
+      const cached = this.cache.getCollectionsContaining(member.kind, member.id, collectionKind);
+      if (cached !== undefined) {
+        resultMap.set(member.id, cached);
+      } else {
+        uncachedMembers.push(member);
+      }
+    }
+
+    if (uncachedMembers.length === 0) {
+      return resultMap;
+    }
+
+    const entries = await this.repository.getCollectionsContainingMany(uncachedMembers, collectionKind);
+
+    // Group fetched entries by memberId
+    const fetchedMap = new Map<string | number, MembershipReference[]>();
+    for (const e of entries) {
+      const list = fetchedMap.get(e.memberId) ?? [];
+      list.push({ kind: e.collectionKind, id: e.collectionId });
+      fetchedMap.set(e.memberId, list);
+    }
+
+    for (const member of uncachedMembers) {
+      const collections = fetchedMap.get(member.id) ?? [];
+      this.cache.setCollectionsContaining(member.kind, member.id, collectionKind, collections);
+      resultMap.set(member.id, collections);
+    }
+
+    return resultMap;
+  }
+
+  /**
    * Checks if a collection contains a specific member.
    */
   public async contains(

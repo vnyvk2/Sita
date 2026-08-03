@@ -148,14 +148,13 @@ export class PlaylistRepository {
     if (songIds.length === 0) return [];
 
     const container = await MembershipBootstrap.getInstance();
-    const results: { songId: number; playlistId: number }[] = [];
+    const songRefs = songIds.map((id) => ({ kind: 'song' as const, id }));
+    const collectionsMap = await container.service.getCollectionsContainingMany(songRefs, 'playlist');
 
+    const results: { songId: number; playlistId: number }[] = [];
     for (const songId of songIds) {
-      const collections = await container.service.getCollectionsContaining(
-        { kind: 'song', id: songId },
-        'playlist'
-      );
-      for (const col of collections) {
+      const cols = collectionsMap.get(songId) ?? [];
+      for (const col of cols) {
         results.push({ songId, playlistId: Number(col.id) });
       }
     }

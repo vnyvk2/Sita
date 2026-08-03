@@ -160,6 +160,77 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     }
   }
 
+  public async getCollectionsContainingMany(
+    members: MembershipReference[],
+    collectionKind: MembershipEntityKind
+  ): Promise<MembershipEntry[]> {
+    if (members.length === 0) return [];
+
+    const memberIds = members
+      .map((m) => (typeof m.id === 'number' ? m.id : parseInt(String(m.id), 10)))
+      .filter((id) => !isNaN(id));
+
+    if (memberIds.length === 0) return [];
+
+    switch (collectionKind) {
+      case 'playlist': {
+        const rows = await this.database.query.playlistEntries.findMany({
+          where: inArray(playlistEntries.songId, memberIds),
+          orderBy: [asc(playlistEntries.playlistId)]
+        });
+        return rows.map((r) => ({
+          collectionKind: 'playlist',
+          collectionId: r.playlistId,
+          memberKind: 'song',
+          memberId: r.songId,
+          position: r.position
+        }));
+      }
+
+      case 'album': {
+        const rows = await this.database.query.albumsSongs.findMany({
+          where: inArray(albumsSongs.songId, memberIds),
+          orderBy: [asc(albumsSongs.albumId)]
+        });
+        return rows.map((r) => ({
+          collectionKind: 'album',
+          collectionId: r.albumId,
+          memberKind: 'song',
+          memberId: r.songId
+        }));
+      }
+
+      case 'artist': {
+        const rows = await this.database.query.artistsSongs.findMany({
+          where: inArray(artistsSongs.songId, memberIds),
+          orderBy: [asc(artistsSongs.artistId)]
+        });
+        return rows.map((r) => ({
+          collectionKind: 'artist',
+          collectionId: r.artistId,
+          memberKind: 'song',
+          memberId: r.songId
+        }));
+      }
+
+      case 'genre': {
+        const rows = await this.database.query.genresSongs.findMany({
+          where: inArray(genresSongs.songId, memberIds),
+          orderBy: [asc(genresSongs.genreId)]
+        });
+        return rows.map((r) => ({
+          collectionKind: 'genre',
+          collectionId: r.genreId,
+          memberKind: 'song',
+          memberId: r.songId
+        }));
+      }
+
+      default:
+        return [];
+    }
+  }
+
   public async contains(
     collection: MembershipReference,
     member: MembershipReference
