@@ -624,6 +624,19 @@ const collections = {
     ipcRenderer.invoke('collections/import', options)
 };
 
+const membership = {
+  getMembers: (collection: { kind: string; id: string | number }, memberKind: string) =>
+    ipcRenderer.invoke('membership:getMembers', collection, memberKind),
+  getCollectionsContaining: (member: { kind: string; id: string | number }, collectionKind: string) =>
+    ipcRenderer.invoke('membership:getCollectionsContaining', member, collectionKind),
+  contains: (collection: { kind: string; id: string | number }, member: { kind: string; id: string | number }) =>
+    ipcRenderer.invoke('membership:contains', collection, member),
+  containsMany: (collection: { kind: string; id: string | number }, members: { kind: string; id: string | number }[]) =>
+    ipcRenderer.invoke('membership:containsMany', collection, members),
+  count: (collection: { kind: string; id: string | number }, memberKind: string) =>
+    ipcRenderer.invoke('membership:count', collection, memberKind)
+};
+
 export const api = {
   properties,
   windowControls,
@@ -655,7 +668,8 @@ export const api = {
   utils,
   queue,
   libraryMetrics,
-  collections
+  collections,
+  membership
 };
 
 contextBridge.exposeInMainWorld('api', api);
