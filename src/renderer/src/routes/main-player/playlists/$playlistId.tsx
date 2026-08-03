@@ -254,7 +254,7 @@ function PlaylistInfoPage() {
           label: t('playlistsPage.removeFromThisPlaylist', 'Remove from this playlist'),
           iconName: 'playlist_remove',
           handlerFunction: () =>
-            CollectionClient.removeSongs({ playlistId: playlistData.id, songIds: [item.songId] })
+            CollectionClient.removeSongs({ playlistId: playlistData.id, entryIds: [item.entryId] })
               .then(() =>
                 addNewNotifications([
                   {

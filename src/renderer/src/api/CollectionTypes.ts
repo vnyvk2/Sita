@@ -16,7 +16,7 @@ export interface AddSongsInput {
 
 export interface RemoveSongsInput {
   playlistId: number;
-  songIds: readonly number[];
+  entryIds: readonly number[];
 }
 
 export interface ReorderSongsInput {
