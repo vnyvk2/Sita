@@ -16,29 +16,36 @@ export class RetryStage implements IProviderExecutionStage {
     context: ProviderExecutionStageContext<TDTO>,
     next: () => Promise<ProviderResult<TDTO>>
   ): Promise<ProviderResult<TDTO>> {
-    const maxAttempts = context.config?.maxRetries ?? 2;
-    const baseDelayMs = context.config?.baseDelayMs ?? 100;
-    const backoffMultiplier = context.config?.backoffMultiplier ?? 2;
+    const maxAttempts = context.config.maxRetries;
+    const baseDelayMs = context.config.baseDelayMs;
+    const backoffMultiplier = context.config.backoffMultiplier;
 
     return this.retryPolicy.execute(
       async () => {
-        return next();
+        const result = await next();
+        if (result.status === 'failed' || result.status === 'timeout') {
+          throw new Error(result.error ?? `Provider result status: ${result.status}`);
+        }
+        return result;
       },
       {
         maxAttempts,
         baseDelayMs,
         backoffMultiplier,
-        retryPredicate: (err) => err !== undefined,
-        onRetry: (attempt, maxAttempts, delayMs, error) => {
+        retryPredicate: () => true,
+        onRetry: (attempt, maxAttemptsCount, delayMs, error) => {
           context.eventBus.emit('ProviderRetry', {
             providerInfo: context.provider.info,
             attempt,
-            maxAttempts,
+            maxAttempts: maxAttemptsCount,
             delayMs,
             error: error instanceof Error ? error.message : String(error)
           });
         }
       }
-    );
+    ).catch(async (finalErr) => {
+      // Return the final failed ProviderResult after retries are exhausted
+      return next();
+    });
   }
 }

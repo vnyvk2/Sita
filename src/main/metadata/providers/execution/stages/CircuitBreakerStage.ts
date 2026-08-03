@@ -1,4 +1,5 @@
 import type { ProviderResult } from '../../../models/ProviderResult';
+import type { ProviderCircuitBreakerRegistry } from '../../circuitbreaker/ProviderCircuitBreakerRegistry';
 import type { IProviderExecutionStage } from '../IProviderExecutionStage';
 import type { ProviderExecutionStageContext } from '../ProviderExecutionStageContext';
 
@@ -8,16 +9,24 @@ import { ProviderCircuitBreaker } from '../../circuitbreaker/ProviderCircuitBrea
 
 export class CircuitBreakerStage implements IProviderExecutionStage {
   public readonly name = 'CircuitBreakerStage';
-  private readonly breakers: Map<string, ProviderCircuitBreaker> = new Map();
+  private readonly registry?: ProviderCircuitBreakerRegistry;
+  private readonly fallbackBreakers: Map<string, ProviderCircuitBreaker> = new Map();
+
+  constructor(registry?: ProviderCircuitBreakerRegistry) {
+    this.registry = registry;
+  }
 
   public getCircuitBreaker(providerId: string, context: ProviderExecutionStageContext): ProviderCircuitBreaker {
-    let breaker = this.breakers.get(providerId);
+    if (this.registry) {
+      return this.registry.getOrCreate(providerId, context.config);
+    }
+    let breaker = this.fallbackBreakers.get(providerId);
     if (!breaker) {
       breaker = new ProviderCircuitBreaker(providerId, context.eventBus, {
-        failureThreshold: context.config?.circuitBreakerFailureThreshold,
-        cooldownMs: context.config?.circuitBreakerCooldownMs
+        failureThreshold: context.config.circuitBreakerFailureThreshold,
+        cooldownMs: context.config.circuitBreakerCooldownMs
       });
-      this.breakers.set(providerId, breaker);
+      this.fallbackBreakers.set(providerId, breaker);
     }
     return breaker;
   }

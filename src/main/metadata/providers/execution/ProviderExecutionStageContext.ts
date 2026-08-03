@@ -2,7 +2,8 @@ import type { MetadataEventBus } from '../../events/MetadataEventBus';
 import type { IMetadataProvider } from '../../interfaces/IMetadataProvider';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
 import type { ProviderExecutionContext } from '../../models/ProviderExecutionContext';
-import type { MetadataProviderConfig } from '../config/MetadataProviderConfig';
+
+import { MetadataProviderConfig } from '../config/MetadataProviderConfig';
 
 export interface ProviderExecutionStageContextOptions<TDTO = unknown> {
   provider: IMetadataProvider;
@@ -21,7 +22,7 @@ export class ProviderExecutionStageContext<TDTO = unknown> {
   public readonly provider: IMetadataProvider;
   public readonly identity: MetadataIdentity;
   public readonly execContext?: ProviderExecutionContext;
-  public readonly config?: MetadataProviderConfig;
+  public readonly config: MetadataProviderConfig;
   public readonly eventBus: MetadataEventBus;
   public readonly action: (
     provider: IMetadataProvider,
@@ -33,7 +34,7 @@ export class ProviderExecutionStageContext<TDTO = unknown> {
     this.provider = options.provider;
     this.identity = options.identity;
     this.execContext = options.execContext;
-    this.config = options.config;
+    this.config = options.config ?? new MetadataProviderConfig();
     this.eventBus = options.eventBus;
     this.action = options.action;
   }

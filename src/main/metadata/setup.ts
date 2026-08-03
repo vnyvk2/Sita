@@ -16,6 +16,7 @@ import { DefaultOverwritePolicy } from './policies/DefaultOverwritePolicy';
 import { DefaultProviderPriorityPolicy } from './policies/DefaultProviderPriorityPolicy';
 import { DefaultValidationPolicy } from './policies/DefaultValidationPolicy';
 
+import { ProviderCircuitBreakerRegistry } from './providers/circuitbreaker/ProviderCircuitBreakerRegistry';
 import { CircuitBreakerStage } from './providers/execution/stages/CircuitBreakerStage';
 import { RetryStage } from './providers/execution/stages/RetryStage';
 import { TimeoutStage } from './providers/execution/stages/TimeoutStage';
@@ -42,6 +43,7 @@ export interface MetadataContainer {
   localProvider: LocalMetadataProvider;
   executor: MetadataProviderExecutor;
   healthManager: ProviderHealthManager;
+  circuitBreakerRegistry: ProviderCircuitBreakerRegistry;
   diagnosticsTracker: ProviderDiagnosticsTracker;
   timeoutPolicy: ProviderTimeoutPolicy;
   retryPolicy: ProviderRetryPolicy;
@@ -91,13 +93,14 @@ export class MetadataBootstrap {
     providerRegistry.register(localProvider);
 
     const healthManager = new ProviderHealthManager(eventBus);
+    const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
     const diagnosticsTracker = new ProviderDiagnosticsTracker(eventBus);
 
     const timeoutPolicy = new ProviderTimeoutPolicy();
     const retryPolicy = new ProviderRetryPolicy();
 
     const executionPipeline = new ProviderExecutionPipeline([
-      new CircuitBreakerStage(),
+      new CircuitBreakerStage(circuitBreakerRegistry),
       new RetryStage(retryPolicy),
       new TimeoutStage(timeoutPolicy)
     ]);
@@ -159,6 +162,7 @@ export class MetadataBootstrap {
       localProvider,
       executor,
       healthManager,
+      circuitBreakerRegistry,
       diagnosticsTracker,
       timeoutPolicy,
       retryPolicy,

@@ -17,6 +17,7 @@ interface MutableHealthData {
   lastSuccessfulRequestAt?: Date;
   lastFailedRequestAt?: Date;
   currentState: 'Online' | 'Offline' | 'Degraded';
+  cachedHealth?: ProviderHealth;
 }
 
 export class ProviderHealthManager {
@@ -32,6 +33,13 @@ export class ProviderHealthManager {
     const data = this.healthMap.get(providerId);
     if (!data) return undefined;
 
+    if (!data.cachedHealth) {
+      data.cachedHealth = this.calculateHealth(data);
+    }
+    return data.cachedHealth;
+  }
+
+  private calculateHealth(data: MutableHealthData): ProviderHealth {
     const availabilityPercent =
       data.totalRequests === 0
         ? 100
@@ -63,11 +71,16 @@ export class ProviderHealthManager {
     });
   }
 
+  private invalidateCache(data: MutableHealthData): void {
+    data.cachedHealth = undefined;
+  }
+
   private subscribeToEvents(): void {
     this.eventBus.on('ProviderStarted', (event) => {
       const data = this.getOrCreateData(event.providerInfo.id);
       data.totalRequests++;
       data.lastSeenAt = new Date();
+      this.invalidateCache(data);
     });
 
     this.eventBus.on('ProviderCompleted', (event) => {
@@ -94,6 +107,7 @@ export class ProviderHealthManager {
           timestamp: new Date()
         });
       }
+      this.invalidateCache(data);
     });
 
     this.eventBus.on('ProviderFailed', (event) => {
@@ -117,6 +131,7 @@ export class ProviderHealthManager {
         reason: event.reason ?? 'Circuit breaker opened',
         timestamp: new Date()
       });
+      this.invalidateCache(data);
     });
   }
 
@@ -143,6 +158,7 @@ export class ProviderHealthManager {
         timestamp: new Date()
       });
     }
+    this.invalidateCache(data);
   }
 
   private getOrCreateData(providerId: string): MutableHealthData {
