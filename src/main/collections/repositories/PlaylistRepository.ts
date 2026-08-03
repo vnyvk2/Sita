@@ -2,6 +2,7 @@ import { db } from '@db/db';
 import { playlists, playlistEntries, songs, artists, artistsSongs } from '@db/schema';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 import type { PlaylistViewMode } from '../../../common/collections/types';
+import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 import type { ExportEntry } from '../../playlistExport/formatters/PlaylistFormatter';
 import logger from '../../logger';
 
@@ -119,13 +120,9 @@ export class PlaylistRepository {
     return result?.maxPos ?? -1;
   }
 
-  public async countEntries(playlistId: number, trx: DB | DBTransaction = db): Promise<number> {
-    const [result] = await trx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(playlistEntries)
-      .where(eq(playlistEntries.playlistId, playlistId));
-      
-    return result?.count ?? 0;
+  public async countEntries(playlistId: number): Promise<number> {
+    const container = await MembershipBootstrap.getInstance();
+    return container.service.countMembers({ kind: 'playlist', id: playlistId }, 'song');
   }
 
   public async countAll(trx: DB | DBTransaction = db): Promise<number> {
@@ -136,31 +133,31 @@ export class PlaylistRepository {
     return result?.count ?? 0;
   }
 
-  public async getPlaylistsForSong(songId: number, trx: DB | DBTransaction = db): Promise<number[]> {
-    const results = await trx
-      .select({ playlistId: playlistEntries.playlistId })
-      .from(playlistEntries)
-      .where(eq(playlistEntries.songId, songId));
-      
-    return results.map(r => r.playlistId);
+  public async getPlaylistsForSong(songId: number): Promise<number[]> {
+    const container = await MembershipBootstrap.getInstance();
+    const collections = await container.service.getCollectionsContaining(
+      { kind: 'song', id: songId },
+      'playlist'
+    );
+    return collections.map((c) => Number(c.id));
   }
 
-  public async getPlaylistsForSongs(songIds: readonly number[], trx: DB | DBTransaction = db): Promise<{ songId: number, playlistId: number }[]> {
+  public async getPlaylistsForSongs(
+    songIds: readonly number[]
+  ): Promise<{ songId: number; playlistId: number }[]> {
     if (songIds.length === 0) return [];
 
-    const CHUNK_SIZE = 500;
+    const container = await MembershipBootstrap.getInstance();
     const results: { songId: number; playlistId: number }[] = [];
 
-    for (let i = 0; i < songIds.length; i += CHUNK_SIZE) {
-      const chunk = songIds.slice(i, i + CHUNK_SIZE);
-      const rows = await trx
-        .select({
-          songId: playlistEntries.songId,
-          playlistId: playlistEntries.playlistId
-        })
-        .from(playlistEntries)
-        .where(inArray(playlistEntries.songId, chunk as number[]));
-      results.push(...rows);
+    for (const songId of songIds) {
+      const collections = await container.service.getCollectionsContaining(
+        { kind: 'song', id: songId },
+        'playlist'
+      );
+      for (const col of collections) {
+        results.push({ songId, playlistId: Number(col.id) });
+      }
     }
 
     return results;
