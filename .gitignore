@@ -28,6 +28,7 @@ tsconfig.node.tsbuildinfo
 tsconfig.web.tsbuildinfo
 .idea/workspace.xml
 chrome/
+graphify-out/
 
 # Ignore patches, diffs, and untracked files
 *.patch
