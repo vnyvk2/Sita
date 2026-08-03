@@ -172,42 +172,6 @@ export const getHistoryPlaylist = async (trx: DB | DBTransaction = db) => {
   return data;
 };
 
-export const linkSongsWithPlaylist = async (
-  songIds: number[],
-  playlistId: number,
-  trx: DB | DBTransaction = db
-) => {
-  if (songIds.length === 0) return;
-
-  const [maxRes] = await trx
-    .select({ maxPos: sql<number>`max(${playlistEntries.position})` })
-    .from(playlistEntries)
-    .where(eq(playlistEntries.playlistId, playlistId));
-
-  const startIndex = (maxRes?.maxPos ?? -1) + 1;
-
-  const records = songIds.map((songId, index) => ({
-    playlistId: playlistId,
-    songId: songId,
-    position: startIndex + index,
-    source: 'manual' as const
-  }));
-
-  await trx.insert(playlistEntries).values(records);
-};
-
-export const unlinkSongsFromPlaylist = async (
-  songIds: number[],
-  playlistId: number,
-  trx: DB | DBTransaction = db
-) => {
-  if (songIds.length === 0) return;
-
-  await trx
-    .delete(playlistEntries)
-    .where(and(inArray(playlistEntries.songId, songIds), eq(playlistEntries.playlistId, playlistId)));
-};
-
 export const getPlaylistWithSongPaths = async (
   playlistId: number,
   trx: DB | DBTransaction = db
