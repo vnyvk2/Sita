@@ -12,10 +12,18 @@ export interface IMetadataProvider {
     identity: MetadataIdentity,
     execContext?: ProviderExecutionContext
   ): Promise<ProviderResult<TDTO>>;
+  fetchMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]>;
   refresh<TDTO = unknown>(
     identity: MetadataIdentity,
     execContext?: ProviderExecutionContext
   ): Promise<ProviderResult<TDTO>>;
+  refreshMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]>;
   shutdown(): Promise<void>;
   getCapabilities(): Set<MetadataCapability>;
 }

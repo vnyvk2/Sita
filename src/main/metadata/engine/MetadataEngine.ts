@@ -1,8 +1,6 @@
-import type { MetadataCache } from '../cache/MetadataCache';
-import type { MetadataEventMap } from '../events/MetadataEvents';
 import type { MetadataEventBus } from '../events/MetadataEventBus';
-import type { IMetadataEngine } from '../interfaces/IMetadataEngine';
-import type { IMetadataProviderExecutor } from '../interfaces/IMetadataProviderExecutor';
+import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
+import type { MetadataCache } from '../cache/MetadataCache';
 import type { MetadataContext } from '../models/MetadataContext';
 import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
@@ -10,13 +8,14 @@ import type { MetadataQuery } from '../models/MetadataQuery';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
-import type { IProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
+import type { MetadataProviderExecutor } from '../providers/MetadataProviderExecutor';
+import type { ProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
 
 import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
 
 export interface MetadataEngineOptions {
-  executor: IMetadataProviderExecutor;
-  mergePolicy?: IProviderMergePolicy;
+  executor: MetadataProviderExecutor;
+  mergePolicy?: ProviderMergePolicy;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   cache: MetadataCache;
@@ -24,9 +23,9 @@ export interface MetadataEngineOptions {
   context: MetadataContext;
 }
 
-export class MetadataEngine implements IMetadataEngine {
-  private readonly executor: IMetadataProviderExecutor;
-  private readonly mergePolicy: IProviderMergePolicy;
+export class MetadataEngine implements IMetadataGateway {
+  private readonly executor: MetadataProviderExecutor;
+  private readonly mergePolicy: ProviderMergePolicy;
   private readonly planner: MetadataQueryPlanner;
   private readonly pipeline: MetadataPipeline;
   private readonly cache: MetadataCache;
@@ -47,9 +46,15 @@ export class MetadataEngine implements IMetadataEngine {
     identity: MetadataIdentity,
     execContext?: ProviderExecutionContext
   ): Promise<MetadataEntity | null> {
+    return this.load(identity, execContext);
+  }
+
+  public async load(
+    identity: MetadataIdentity,
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity | null> {
     const cached = this.cache.get(identity);
     if (cached) {
-      this.context.logger.debug(`Cache hit for metadata: ${identity.metadataId}`);
       return cached;
     }
 
@@ -59,70 +64,125 @@ export class MetadataEngine implements IMetadataEngine {
       execContext
     );
 
-    const mergedDTO = this.mergePolicy.merge(providerResults);
-    if (!mergedDTO) {
-      this.context.logger.debug(`No provider DTO resolved for identity: ${identity.metadataId}`);
+    const mergedPayload = this.mergePolicy.merge(providerResults);
+    if (!mergedPayload) {
       return null;
     }
 
-    const entity = await this.pipeline.processDTO(identity.entityKind, mergedDTO, null);
+    const entity = await this.pipeline.processDTO(
+      identity.entityKind,
+      mergedPayload
+    );
+
     if (entity) {
+      this.cache.set(entity);
       this.publishEntity(entity, 'MetadataLoaded');
     }
-
     return entity;
   }
 
-  public async getEntitiesMetadata(identities: MetadataIdentity[]): Promise<MetadataEntity[]> {
-    const results = await Promise.all(
-      identities.map((identity) => this.getEntityMetadata(identity))
+  public async loadMany(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity[]> {
+    if (identities.length === 0) return [];
+
+    const results: MetadataEntity[] = [];
+
+    for (const identity of identities) {
+      const cached = this.cache.get(identity);
+      if (cached) {
+        results.push(cached);
+      } else {
+        const entity = await this.load(identity, execContext);
+        if (entity) {
+          results.push(entity);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  public async refresh(
+    identity: MetadataIdentity,
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity | null> {
+    const providerResults = await this.executor.refresh(
+      identity,
+      'ReadDatabase',
+      execContext
     );
-    return results.filter((entity): entity is MetadataEntity => entity !== null);
+
+    const mergedPayload = this.mergePolicy.merge(providerResults);
+    if (!mergedPayload) {
+      return null;
+    }
+
+    const entity = await this.pipeline.processDTO(
+      identity.entityKind,
+      mergedPayload
+    );
+
+    if (entity) {
+      this.cache.set(entity);
+      this.publishEntity(entity, 'MetadataRefreshed');
+    }
+    return entity;
+  }
+
+  public async refreshMany(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity[]> {
+    if (identities.length === 0) return [];
+    const refreshedEntities: MetadataEntity[] = [];
+    for (const identity of identities) {
+      const refreshed = await this.refresh(identity, execContext);
+      if (refreshed) refreshedEntities.push(refreshed);
+    }
+    return refreshedEntities;
+  }
+
+  public async refreshMetadata(
+    identity: MetadataIdentity,
+    execContext?: ProviderExecutionContext
+  ): Promise<MetadataEntity | null> {
+    return this.refresh(identity, execContext);
+  }
+
+  public preload(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): void {
+    if (identities.length === 0) return;
+    // Non-blocking background cache warming
+    this.loadMany(identities, execContext).catch((err) => {
+      this.context.logger.warn('Failed background preload', { err });
+    });
   }
 
   public async query(query: MetadataQuery): Promise<MetadataEntity[]> {
-    const planResult = await this.planner.executePlan(query);
-    const dtos = planResult.dtos;
+    const plannedIdentities = await this.planner.plan(query);
+    const results: MetadataEntity[] = [];
 
-    const entities = await Promise.all(
-      dtos.map(async (dto) => {
-        const entity = await this.pipeline.processDTO(query.kind, dto, null);
-        if (entity) {
-          this.publishEntity(entity, 'MetadataLoaded');
-        }
-        return entity;
-      })
-    );
-
-    return entities.filter((entity): entity is MetadataEntity => entity !== null);
-  }
-
-  public async refreshMetadata(identity: MetadataIdentity): Promise<MetadataEntity> {
-    const existing = this.cache.get(identity);
-    this.cache.delete(identity);
-
-    const providerResults = await this.executor.refresh(identity, 'ReadDatabase');
-    const mergedDTO = this.mergePolicy.merge(providerResults);
-
-    if (!mergedDTO) {
-      throw new Error(`Cannot refresh metadata. No provider DTO resolved for identity ${identity.metadataId}`);
+    for (const identity of plannedIdentities) {
+      const entity = await this.getEntityMetadata(identity);
+      if (entity) {
+        results.push(entity);
+      }
     }
 
-    const entity = await this.pipeline.processDTO(identity.entityKind, mergedDTO, existing);
-    if (!entity) {
-      throw new Error(`Failed to process DTO during metadata refresh for ${identity.metadataId}`);
-    }
-
-    this.publishEntity(entity, 'MetadataRefreshed');
-
-    return entity;
+    return results;
   }
 
   private publishEntity(
     entity: MetadataEntity,
-    eventType: keyof Pick<MetadataEventMap, 'MetadataLoaded' | 'MetadataCreated' | 'MetadataRefreshed'>
+    eventType: 'MetadataLoaded' | 'MetadataCreated' | 'MetadataRefreshed'
   ): void {
-    this.cache.set(entity);
-    this.eventBus.emit(eventType, { identity: entity.identity, entity });
+    this.eventBus.emit(eventType, {
+      identity: entity.identity,
+      entity
+    });
   }
 }

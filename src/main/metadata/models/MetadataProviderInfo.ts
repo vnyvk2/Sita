@@ -52,6 +52,19 @@ export class MetadataProviderInfo {
     this._enabled = enabled;
   }
 
+  public setReady(): void {
+    this._state = ProviderStates.Ready;
+  }
+
+  public setDisabled(): void {
+    this._state = ProviderStates.Disabled;
+    this._enabled = false;
+  }
+
+  public setFailed(): void {
+    this._state = ProviderStates.Failed;
+  }
+
   public supports(capability: MetadataCapability): boolean {
     return this.capabilities.has(capability);
   }

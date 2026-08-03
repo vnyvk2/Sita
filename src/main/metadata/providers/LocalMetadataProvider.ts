@@ -11,25 +11,32 @@ import { ProviderResult } from '../models/ProviderResult';
 export class LocalMetadataProvider implements IMetadataProvider {
   public readonly info: MetadataProviderInfo;
   private readonly repository: DatabaseMetadataRepository;
+  private readonly capabilities: Set<MetadataCapability>;
 
   constructor(repository: DatabaseMetadataRepository) {
     this.repository = repository;
     this.info = new MetadataProviderInfo({
       id: 'local',
-      displayName: 'Local Metadata Repository',
+      displayName: 'Local Database Provider',
       version: '1.0.0',
-      priority: 80,
-      capabilities: ['ReadTags', 'ReadDatabase'],
-      isOnline: false
+      priority: 100
     });
+    this.capabilities = new Set<MetadataCapability>([
+      'ReadDatabase',
+      'QueryLocal'
+    ]);
   }
 
   public async initialize(): Promise<void> {
-    this.info.setState('Ready');
+    this.info.setReady();
   }
 
   public supports(capability: MetadataCapability): boolean {
-    return this.info.supports(capability);
+    return this.capabilities.has(capability);
+  }
+
+  public getCapabilities(): Set<MetadataCapability> {
+    return this.capabilities;
   }
 
   public async fetch<TDTO = unknown>(
@@ -38,7 +45,7 @@ export class LocalMetadataProvider implements IMetadataProvider {
   ): Promise<ProviderResult<TDTO>> {
     const startTime = Date.now();
     try {
-      const dto = await this.repository.findDTO<TDTO>(identity);
+      const dto = await this.repository.loadRawData<TDTO>(identity);
       const latencyMs = Date.now() - startTime;
 
       if (!dto) {
@@ -47,7 +54,8 @@ export class LocalMetadataProvider implements IMetadataProvider {
           confidence: MetadataConfidence.low(),
           providerInfo: this.info,
           latencyMs,
-          status: 'success'
+          status: 'failed',
+          error: `Local entity not found for identity: ${identity.toString()}`
         });
       }
 
@@ -71,6 +79,41 @@ export class LocalMetadataProvider implements IMetadataProvider {
     }
   }
 
+  public async fetchMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]> {
+    const startTime = Date.now();
+    try {
+      const dtos = await this.repository.loadMany<TDTO>(identities);
+      const latencyMs = Date.now() - startTime;
+
+      return dtos.map(
+        (dto) =>
+          new ProviderResult<TDTO>({
+            payload: dto,
+            confidence: MetadataConfidence.verified(),
+            providerInfo: this.info,
+            latencyMs,
+            status: 'success'
+          })
+      );
+    } catch (err) {
+      const latencyMs = Date.now() - startTime;
+      return identities.map(
+        () =>
+          new ProviderResult<TDTO>({
+            payload: null,
+            confidence: MetadataConfidence.low(),
+            providerInfo: this.info,
+            latencyMs,
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err)
+          })
+      );
+    }
+  }
+
   public async refresh<TDTO = unknown>(
     identity: MetadataIdentity,
     execContext?: ProviderExecutionContext
@@ -78,11 +121,14 @@ export class LocalMetadataProvider implements IMetadataProvider {
     return this.fetch<TDTO>(identity, execContext);
   }
 
-  public async shutdown(): Promise<void> {
-    this.info.setState('Disabled');
+  public async refreshMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]> {
+    return this.fetchMany<TDTO>(identities, execContext);
   }
 
-  public getCapabilities(): Set<MetadataCapability> {
-    return this.info.capabilities;
+  public async shutdown(): Promise<void> {
+    this.info.setDisabled();
   }
 }

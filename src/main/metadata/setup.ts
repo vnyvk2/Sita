@@ -33,9 +33,11 @@ import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
 import { LoaderRegistry } from './repository/LoaderRegistry';
+import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 
 export interface MetadataContainer {
   engine: MetadataEngine;
+  searchGateway: MetadataSearchGateway;
   repository: DatabaseMetadataRepository;
   loaderRegistry: LoaderRegistry;
   localProvider: LocalMetadataProvider;
@@ -134,6 +136,8 @@ export class MetadataBootstrap {
       context
     });
 
+    const searchGateway = new MetadataSearchGateway({ gateway: engine });
+
     // Subscribe directly to public LibraryEventBus events to trigger metadata refreshes/invalidations
     libraryEventBus.onEvent('SongMetadataChanged', (event) => {
       const identity = new MetadataIdentity({
@@ -155,6 +159,7 @@ export class MetadataBootstrap {
 
     return {
       engine,
+      searchGateway,
       repository,
       loaderRegistry,
       localProvider,

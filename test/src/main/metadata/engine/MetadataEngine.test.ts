@@ -16,6 +16,7 @@ import { MetadataCache } from '@main/metadata/cache/MetadataCache';
 import { MetadataEngine } from '@main/metadata/engine/MetadataEngine';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { MapperRegistry } from '@main/metadata/mappers/MapperRegistry';
+import { SongMapper } from '@main/metadata/mappers/SongMapper';
 import { CORE_FIELD_DEFINITIONS } from '@main/metadata/models/CoreFieldDefinitions';
 import { MetadataContext } from '@main/metadata/models/MetadataContext';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
@@ -52,6 +53,7 @@ describe('MetadataEngine with Provider Resolution Pipeline', () => {
 
     const planner = new MetadataQueryPlanner(repository);
     const mapperRegistry = new MapperRegistry();
+    mapperRegistry.register(new SongMapper());
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const cache = new MetadataCache();
     const context = new MetadataContext();
