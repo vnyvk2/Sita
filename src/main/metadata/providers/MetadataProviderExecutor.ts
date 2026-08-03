@@ -51,6 +51,26 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
     );
   }
 
+  public async executeMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    capability: MetadataCapability,
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]> {
+    if (identities.length === 0) return [];
+    const allProviders = this.registry.getAll();
+    const targetProviders = this.selectionStrategy.selectProviders(
+      allProviders,
+      capability
+    );
+
+    return this.executionStrategy.executeMany<TDTO>(
+      targetProviders,
+      identities,
+      execContext,
+      (provider, ids, ctx) => provider.fetchMany<TDTO>(ids, ctx)
+    );
+  }
+
   public async refresh<TDTO = unknown>(
     identity: MetadataIdentity,
     capability: MetadataCapability,
@@ -67,6 +87,26 @@ export class MetadataProviderExecutor implements IMetadataProviderExecutor {
       identity,
       execContext,
       (provider, id, ctx) => provider.refresh<TDTO>(id, ctx)
+    );
+  }
+
+  public async refreshMany<TDTO = unknown>(
+    identities: MetadataIdentity[],
+    capability: MetadataCapability,
+    execContext?: ProviderExecutionContext
+  ): Promise<ProviderResult<TDTO>[]> {
+    if (identities.length === 0) return [];
+    const allProviders = this.registry.getAll();
+    const targetProviders = this.selectionStrategy.selectProviders(
+      allProviders,
+      capability
+    );
+
+    return this.executionStrategy.executeMany<TDTO>(
+      targetProviders,
+      identities,
+      execContext,
+      (provider, ids, ctx) => provider.refreshMany<TDTO>(ids, ctx)
     );
   }
 }

@@ -117,4 +117,52 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
 
     return results;
   }
+
+  public async executeMany<TDTO = unknown>(
+    providers: IMetadataProvider[],
+    identities: MetadataIdentity[],
+    execContext: ProviderExecutionContext | undefined,
+    action: (
+      provider: IMetadataProvider,
+      identities: MetadataIdentity[],
+      context?: ProviderExecutionContext
+    ) => Promise<ProviderResult<TDTO>[]>
+  ): Promise<ProviderResult<TDTO>[]> {
+    if (identities.length === 0) return [];
+    const results: ProviderResult<TDTO>[] = [];
+
+    for (const provider of providers) {
+      const isCancelled =
+        execContext?.cancellationToken?.isCancelled ||
+        execContext?.cancellationToken?.isCancellationRequested?.();
+
+      if (isCancelled) {
+        for (const identity of identities) {
+          this.eventBus.emit('ProviderSkipped', {
+            providerInfo: provider.info,
+            identity,
+            status: 'skipped',
+            latencyMs: 0,
+            error: 'Execution cancelled by CancellationToken'
+          });
+          results.push(
+            new ConcreteProviderResult<TDTO>({
+              payload: null,
+              confidence: MetadataConfidence.low(),
+              providerInfo: provider.info,
+              latencyMs: 0,
+              status: 'skipped',
+              error: 'Execution cancelled by CancellationToken'
+            })
+          );
+        }
+        continue;
+      }
+
+      const batchResults = await action(provider, identities, execContext);
+      results.push(...batchResults);
+    }
+
+    return results;
+  }
 }

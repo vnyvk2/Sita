@@ -14,4 +14,15 @@ export interface IProviderExecutionStrategy {
       context?: ProviderExecutionContext
     ) => Promise<ProviderResult<TDTO>>
   ): Promise<ProviderResult<TDTO>[]>;
+
+  executeMany<TDTO = unknown>(
+    providers: IMetadataProvider[],
+    identities: MetadataIdentity[],
+    execContext: ProviderExecutionContext | undefined,
+    action: (
+      provider: IMetadataProvider,
+      identities: MetadataIdentity[],
+      context?: ProviderExecutionContext
+    ) => Promise<ProviderResult<TDTO>[]>
+  ): Promise<ProviderResult<TDTO>[]>;
 }

@@ -7,11 +7,11 @@ import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataQuery } from '../models/MetadataQuery';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
+import type { ProviderResult } from '../models/ProviderResult';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
 import type { ProviderMergePolicy } from '../providers/policies/ProviderMergePolicy';
 
-import { MetadataConfidence } from '../models/MetadataConfidence';
 import { DefaultProviderMergePolicy } from '../providers/policies/DefaultProviderMergePolicy';
 
 export interface MetadataEngineOptions {
@@ -92,7 +92,7 @@ export class MetadataEngine implements IMetadataGateway {
     const loadedEntitiesMap = new Map<string, MetadataEntity>();
     const cacheMisses: MetadataIdentity[] = [];
 
-    // Step 1: Check cache for all identities
+    // Step 1: Partition into cache hits and cache misses
     for (const identity of identities) {
       const cached = this.cache.get(identity);
       if (cached) {
@@ -102,17 +102,55 @@ export class MetadataEngine implements IMetadataGateway {
       }
     }
 
-    // Step 2: Fetch cache misses in batch passes if any exist
+    // Step 2: Batch fetch cache misses grouped by entityKind via executor.executeMany
     if (cacheMisses.length > 0) {
+      const groupedMisses = new Map<string, MetadataIdentity[]>();
       for (const identity of cacheMisses) {
-        const entity = await this.load(identity, execContext);
-        if (entity) {
-          loadedEntitiesMap.set(identity.metadataId, entity);
+        const list = groupedMisses.get(identity.entityKind) ?? [];
+        list.push(identity);
+        groupedMisses.set(identity.entityKind, list);
+      }
+
+      for (const [_, kindIdentities] of groupedMisses.entries()) {
+        const providerResultsList = await this.executor.executeMany<unknown>(
+          kindIdentities,
+          'ReadDatabase',
+          execContext
+        );
+
+        const numIdentities = kindIdentities.length;
+        const numProviders = Math.max(1, Math.floor(providerResultsList.length / numIdentities));
+
+        // Process fetched results in batch
+        for (let i = 0; i < numIdentities; i++) {
+          const identity = kindIdentities[i];
+          const singleProviderResults: ProviderResult[] = [];
+
+          for (let p = 0; p < numProviders; p++) {
+            const pr = providerResultsList[p * numIdentities + i];
+            if (pr) {
+              singleProviderResults.push(pr);
+            }
+          }
+
+          const mergedPayload = this.mergePolicy.merge(singleProviderResults);
+          if (mergedPayload) {
+            const entity = await this.pipeline.processDTO(
+              identity.entityKind,
+              mergedPayload,
+              null
+            );
+            if (entity) {
+              this.cache.set(entity);
+              this.publishEntity(entity, 'MetadataLoaded');
+              loadedEntitiesMap.set(identity.metadataId, entity);
+            }
+          }
         }
       }
     }
 
-    // Step 3: Map back in exact original order requested by identities
+    // Step 3: Reconstruct final list in exact original requested order
     const finalOrderedEntities: MetadataEntity[] = [];
     for (const identity of identities) {
       const entity = loadedEntitiesMap.get(identity.metadataId);
