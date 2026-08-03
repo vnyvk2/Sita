@@ -40,7 +40,7 @@ export class MetadataSearchResultMapper {
       logger.error(`Failed to map MetadataEntity to DTO for ${entity.identity.entityKind}:${entity.identity.entityId}`, {
         error: err
       });
-      dto = { ...(entity.rawPayload as Record<string, unknown>) };
+      throw err;
     }
 
     // Attach kind and id for SearchCoordinator indexing
