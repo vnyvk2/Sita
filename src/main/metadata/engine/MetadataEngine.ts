@@ -102,7 +102,7 @@ export class MetadataEngine implements IMetadataGateway {
       }
     }
 
-    // Step 2: Batch fetch cache misses via executor.executeMany using ProviderBatchResult
+    // Step 2: Batch fetch cache misses via executor.executeMany using Map-based getResult
     if (cacheMisses.length > 0) {
       const batchResultsList = await this.executor.executeMany<unknown>(
         cacheMisses,
@@ -110,11 +110,9 @@ export class MetadataEngine implements IMetadataGateway {
         execContext
       );
 
-      for (let i = 0; i < cacheMisses.length; i++) {
-        const identity = cacheMisses[i];
-
+      for (const identity of cacheMisses) {
         const singleProviderResults: ProviderResult[] = batchResultsList
-          .map((batch) => batch.results[i])
+          .map((batch) => batch.getResult(identity))
           .filter((res): res is ProviderResult => res !== undefined && res !== null);
 
         const mergedPayload = this.mergePolicy.merge(singleProviderResults);

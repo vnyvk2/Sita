@@ -138,8 +138,10 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
         execContext?.cancellationToken?.isCancellationRequested?.();
 
       if (isCancelled) {
-        const skippedResults = identities.map(
-          (identity) =>
+        const resultsByIdentity = new Map<string, ProviderResult<TDTO>>();
+        identities.forEach((identity) => {
+          resultsByIdentity.set(
+            identity.metadataId,
             new ConcreteProviderResult<TDTO>({
               payload: null,
               confidence: MetadataConfidence.low(),
@@ -148,21 +150,30 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
               status: 'skipped',
               error: 'Execution cancelled by CancellationToken'
             })
-        );
+          );
+        });
         batchResults.push(
           new ProviderBatchResult<TDTO>({
             providerInfo: provider.info,
-            results: skippedResults
+            resultsByIdentity
           })
         );
         continue;
       }
 
-      const results = await action(provider, identities, execContext);
+      const rawResults = await action(provider, identities, execContext);
+      const resultsByIdentity = new Map<string, ProviderResult<TDTO>>();
+      identities.forEach((identity, index) => {
+        const res = rawResults[index];
+        if (res) {
+          resultsByIdentity.set(identity.metadataId, res);
+        }
+      });
+
       batchResults.push(
         new ProviderBatchResult<TDTO>({
           providerInfo: provider.info,
-          results
+          resultsByIdentity
         })
       );
     }
