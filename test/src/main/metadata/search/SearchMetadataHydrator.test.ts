@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('@db/db', () => ({
+  db: {
+    query: {
+      songs: { findFirst: vi.fn(), findMany: vi.fn() },
+      artists: { findFirst: vi.fn(), findMany: vi.fn() },
+      albums: { findFirst: vi.fn(), findMany: vi.fn() },
+      genres: { findFirst: vi.fn(), findMany: vi.fn() },
+      playlists: { findFirst: vi.fn(), findMany: vi.fn() }
+    }
+  }
+}));
+
 import type { IMetadataGateway } from '@main/metadata/interfaces/IMetadataGateway';
 import { SearchMetadataHydrator } from '@main/metadata/search/SearchMetadataHydrator';
 
