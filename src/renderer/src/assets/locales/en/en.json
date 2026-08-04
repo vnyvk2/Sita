@@ -654,6 +654,8 @@
     "rating": "Rating",
     "tags": "Tags",
     "addTagPlaceholder": "Add a tag (e.g. Rock, Favorite, Chill)...",
+    "addTag": "Add",
+    "addTagAriaLabel": "Add tag",
     "comment": "Comment",
     "commentPlaceholder": "Add personal notes or comments...",
     "searchMetadataOnInternet": "Search metadata on the internet",

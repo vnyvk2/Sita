@@ -80,11 +80,11 @@ const SongTagsInput = (props: Props) => {
         <button
           type="button"
           onClick={handleAddTag}
-          aria-label="Add tag"
+          aria-label={t('songTagsEditingPage.addTagAriaLabel')}
           className="px-4 py-2.5 rounded-3xl bg-font-color-highlight dark:bg-dark-font-color-highlight text-white font-medium hover:opacity-90 transition-opacity text-sm flex items-center space-x-1"
         >
           <span className="material-icons-round text-base" aria-hidden="true">add</span>
-          <span>Add</span>
+          <span>{t('songTagsEditingPage.addTag')}</span>
         </button>
       </div>
     </div>

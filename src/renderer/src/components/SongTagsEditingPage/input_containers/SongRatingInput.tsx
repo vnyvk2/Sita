@@ -14,8 +14,8 @@ const SongRatingInput = (props: Props) => {
   const { t } = useTranslation();
 
   const handleStarClick = (starValue: number) => {
-    // Toggle off (click same star twice) → undefined means "no override stored",
-    // whereas 0 would mean "override with zero", which are semantically different.
+    // Toggle off (click the active star again): undefined means no override is
+    // stored, while 0 would mean "override with zero" — semantically different.
     const nextRating: number | undefined = rating === starValue ? undefined : starValue;
     updateSongInfo((prevData) => ({ ...prevData, rating: nextRating }));
   };
@@ -49,7 +49,7 @@ const SongRatingInput = (props: Props) => {
           </button>
         ))}
         <span className="ml-3 text-sm opacity-70">
-          {rating !== undefined && rating > 0 ? `${rating} / 5` : ''}
+          {rating ? `${rating} / 5` : ''}
         </span>
       </div>
     </div>
