@@ -12,10 +12,10 @@ export const metadataQuery = createQueryKeys('metadata', {
   merged: (data: { entityKind: string; entityId: string | number }) => {
     const { entityKind, entityId } = data;
     return {
-      queryKey: [`kind=${entityKind}`, `id=${entityId}`],
+      queryKey: [entityKind, String(entityId)],
       queryFn: async (): Promise<MergedMetadataResponse | null> => {
         try {
-          const result = await window.api.metadata.getMerged({ entityKind, entityId });
+          const result = await window.api.metadata.load({ entityKind, entityId });
           return result ?? null;
         } catch (error) {
           console.error('[metadataQuery] Error fetching merged metadata:', error);

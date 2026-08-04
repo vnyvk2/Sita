@@ -11,39 +11,44 @@ vi.mock('electron', () => ({
   }
 }));
 
-vi.mock('@db/db', () => ({
-  db: {}
-}));
-
 import { registerMetadataIPCHandlers } from '@main/metadata/ipc/metadataIpc';
-import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
+import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
-import { MetadataBootstrap } from '@main/metadata/setup';
 
 describe('metadataIpc', () => {
+  let mockEngine: any;
+  let mockUserService: any;
+
   beforeEach(() => {
     handlersMap.clear();
+    mockEngine = {
+      load: vi.fn()
+    };
+    mockUserService = {
+      setField: vi.fn().mockResolvedValue(undefined),
+      setOverrides: vi.fn().mockResolvedValue(undefined),
+      removeOverride: vi.fn().mockResolvedValue(undefined),
+      clearOverrides: vi.fn().mockResolvedValue(undefined)
+    };
   });
 
-  it('should register all metadata IPC channels', () => {
-    registerMetadataIPCHandlers();
+  it('should register all namespaced metadata IPC channels with injected dependencies', () => {
+    registerMetadataIPCHandlers(mockEngine, mockUserService);
 
-    expect(handlersMap.has('metadata:getMerged')).toBe(true);
-    expect(handlersMap.has('metadata:setField')).toBe(true);
-    expect(handlersMap.has('metadata:setFields')).toBe(true);
-    expect(handlersMap.has('metadata:removeField')).toBe(true);
-    expect(handlersMap.has('metadata:clearOverrides')).toBe(true);
+    expect(handlersMap.has('metadata.load')).toBe(true);
+    expect(handlersMap.has('metadata.override.set')).toBe(true);
+    expect(handlersMap.has('metadata.override.setBatch')).toBe(true);
+    expect(handlersMap.has('metadata.override.remove')).toBe(true);
+    expect(handlersMap.has('metadata.override.clear')).toBe(true);
   });
 
-  it('should handle metadata:setFields and metadata:getMerged IPC calls', async () => {
-    registerMetadataIPCHandlers();
+  it('should handle metadata.override.setBatch and metadata.load IPC calls with MetadataSnapshotSerializer DTOs', async () => {
+    registerMetadataIPCHandlers(mockEngine, mockUserService);
 
-    const container = await MetadataBootstrap.getInstance();
-    const setFieldsHandler = handlersMap.get('metadata:setFields')!;
-    const getMergedHandler = handlersMap.get('metadata:getMerged')!;
+    const setBatchHandler = handlersMap.get('metadata.override.setBatch')!;
+    const loadHandler = handlersMap.get('metadata.load')!;
 
-    // Mock local repository for getMerged return
-    vi.spyOn(container.engine, 'load').mockImplementation(async (identity: MetadataIdentity) => {
+    mockEngine.load.mockImplementation(async (identity: MetadataIdentity) => {
       return {
         kind: identity.entityKind,
         identity,
@@ -51,23 +56,21 @@ describe('metadataIpc', () => {
           title: { value: 'IPC Overridden Title', source: 'user', confidence: 1 },
           language: { value: 'Telugu', source: 'user', confidence: 1 }
         })
-      } as any;
+      };
     });
-
-    const setFieldsSpy = vi.spyOn(container.userService, 'setOverrides').mockResolvedValue();
 
     const identityPayload = { entityKind: MetadataKinds.Song, entityId: 101 };
 
-    // 1. Invoke setFields
-    const setResult = await setFieldsHandler(null, {
+    // 1. Invoke setBatch
+    const setResult = await setBatchHandler(null, {
       identity: identityPayload,
       overrides: { title: 'IPC Overridden Title', language: 'Telugu' }
     });
     expect(setResult).toEqual({ success: true });
-    expect(setFieldsSpy).toHaveBeenCalled();
+    expect(mockUserService.setOverrides).toHaveBeenCalled();
 
-    // 2. Invoke getMerged
-    const getResult = await getMergedHandler(null, identityPayload);
+    // 2. Invoke load
+    const getResult = await loadHandler(null, identityPayload);
     expect(getResult).not.toBeNull();
     expect(getResult.fields.title.value).toBe('IPC Overridden Title');
     expect(getResult.fields.language.value).toBe('Telugu');

@@ -638,16 +638,16 @@ const membership = {
 };
 
 const metadata = {
-  getMerged: (identity: { entityKind: string; entityId: string | number }) =>
-    ipcRenderer.invoke('metadata:getMerged', identity),
+  load: (identity: { entityKind: string; entityId: string | number }) =>
+    ipcRenderer.invoke('metadata.load', identity),
   setField: (identity: { entityKind: string; entityId: string | number }, fieldId: string, value: unknown) =>
-    ipcRenderer.invoke('metadata:setField', { identity, fieldId, value }),
+    ipcRenderer.invoke('metadata.override.set', { identity, fieldId, value }),
   setFields: (identity: { entityKind: string; entityId: string | number }, overrides: Record<string, unknown>) =>
-    ipcRenderer.invoke('metadata:setFields', { identity, overrides }),
+    ipcRenderer.invoke('metadata.override.setBatch', { identity, overrides }),
   removeField: (identity: { entityKind: string; entityId: string | number }, fieldId: string) =>
-    ipcRenderer.invoke('metadata:removeField', { identity, fieldId }),
+    ipcRenderer.invoke('metadata.override.remove', { identity, fieldId }),
   clearOverrides: (identity: { entityKind: string; entityId: string | number }) =>
-    ipcRenderer.invoke('metadata:clearOverrides', { identity })
+    ipcRenderer.invoke('metadata.override.clear', { identity })
 };
 
 export const api = {
