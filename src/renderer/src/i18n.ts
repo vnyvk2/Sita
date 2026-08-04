@@ -26,7 +26,8 @@ export const supportedLanguagesDropdownOptions: DropdownOption<keyof typeof reso
   { label: `Français`, value: 'fr' }
 ];
 
-const { language } = await window.api.settings.getUserSettings();
+const userSettings = await window.api?.settings?.getUserSettings?.().catch(() => null);
+const language = userSettings?.language;
 
 // eslint-disable-next-line import/no-named-as-default-member
 i18n.use(initReactI18next).init({

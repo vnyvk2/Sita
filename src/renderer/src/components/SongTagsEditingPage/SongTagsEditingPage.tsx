@@ -122,6 +122,23 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
             setDefaultValues(data);
             setSongInfo(data);
             setIsMetadataUpdatesPending(!!data.isMetadataSavePending);
+
+            if (songId) {
+              window.api.metadata
+                .load({ entityKind: 'song', entityId: songId })
+                .then((merged) => {
+                  if (merged?.fields) {
+                    setSongInfo((prev) => ({
+                      ...prev,
+                      title: (merged.fields.title?.value as string) ?? prev.title,
+                      composer: (merged.fields.composer?.value as string) ?? prev.composer,
+                      comment: (merged.fields.comment?.value as string) ?? prev.comment
+                    }));
+                  }
+                  return undefined;
+                })
+                .catch((err) => console.error('[SongTagsEditingPage] Metadata override load error:', err));
+            }
           }
           return undefined;
         })
@@ -317,6 +334,19 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
               ...prevData,
               ...updatedData
             }));
+          }
+
+          if (songId) {
+            window.api.metadata
+              .setFields(
+                { entityKind: 'song', entityId: songId },
+                {
+                  title: songInfo.title || undefined,
+                  composer: songInfo.composer || undefined,
+                  comment: songInfo.comment || undefined
+                }
+              )
+              .catch((err) => console.error('[SongTagsEditingPage] Metadata override save error:', err));
           }
           // addNewNotifications([
           //   {
