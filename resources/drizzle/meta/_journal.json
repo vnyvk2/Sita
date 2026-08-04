@@ -85,6 +85,13 @@
       "when": 1785385500910,
       "tag": "0011_add_pinned_at",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785800000000,
+      "tag": "0012_add_metadata_overrides",
+      "breakpoints": true
     }
   ]
 }
