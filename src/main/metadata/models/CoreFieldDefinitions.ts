@@ -119,5 +119,13 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     searchWeight: 0.5,
     filterable: true,
     sortable: true
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.DiscNumber,
+    displayName: 'Disc Number',
+    valueType: 'number',
+    searchable: false,
+    filterable: true,
+    sortable: true
   })
 ];

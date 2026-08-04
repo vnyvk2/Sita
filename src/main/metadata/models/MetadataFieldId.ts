@@ -10,7 +10,9 @@ export const MetadataFields = {
   Language: 'language',
   Comment: 'comment',
   Rating: 'rating',
-  Composer: 'composer'
+  Composer: 'composer',
+  DiscNumber: 'discNumber',
+  TrackNumber: 'trackNumber'
 } as const;
 
 export type BuiltInFieldId =

@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { EditableSongTags } from '../types';
+
+
 type Props = {
   tags?: string[];
-  updateSongInfo: (_callback: (_prevSongInfo: SongTags & { tags?: string[] }) => SongTags & { tags?: string[] }) => void;
+  updateSongInfo: (_callback: (_prevSongInfo: EditableSongTags) => EditableSongTags) => void;
   onReset?: () => void;
 };
 
@@ -14,7 +17,7 @@ const SongTagsInput = (props: Props) => {
 
   const handleAddTag = () => {
     const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
+    if (trimmed && !tags.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
       const updatedTags = [...tags, trimmed];
       updateSongInfo((prevData) => ({ ...prevData, tags: updatedTags }));
       setNewTagInput('');
@@ -29,14 +32,14 @@ const SongTagsInput = (props: Props) => {
   return (
     <div className="tag-input flex max-w-2xl min-w-[10rem] flex-col col-span-2">
       <div className="flex items-center justify-between mr-[5%] mb-2">
-        <label>{t('songTagsEditingPage.tags', 'Tags')}</label>
+        <label>{t('songTagsEditingPage.tags')}</label>
         {onReset && (
           <button
             type="button"
             onClick={onReset}
             className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight hover:underline opacity-80"
           >
-            {t('common.reset', 'Reset')}
+            {t('resetTagsToDefaultPrompt.resetToDefault')}
           </button>
         )}
       </div>
@@ -63,7 +66,7 @@ const SongTagsInput = (props: Props) => {
         <input
           type="text"
           className="border-background-color-2 bg-background-color-2 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-2 dark:text-font-color-white dark:focus:border-dark-font-color-highlight rounded-3xl border-[.15rem] px-4 py-2.5 flex-1 transition-colors"
-          placeholder={t('songTagsEditingPage.addTagPlaceholder', 'Add a tag (e.g. Rock, Favorite, Chill)...')}
+          placeholder={t('songTagsEditingPage.addTagPlaceholder')}
           value={newTagInput}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -77,10 +80,11 @@ const SongTagsInput = (props: Props) => {
         <button
           type="button"
           onClick={handleAddTag}
+          aria-label="Add tag"
           className="px-4 py-2.5 rounded-3xl bg-font-color-highlight dark:bg-dark-font-color-highlight text-white font-medium hover:opacity-90 transition-opacity text-sm flex items-center space-x-1"
         >
-          <span className="material-icons-round text-base">add</span>
-          <span>{t('common.add', 'Add Tag')}</span>
+          <span className="material-icons-round text-base" aria-hidden="true">add</span>
+          <span>Add</span>
         </button>
       </div>
     </div>

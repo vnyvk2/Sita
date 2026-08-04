@@ -25,6 +25,7 @@ import SongTagsInput from './input_containers/SongTagsInput';
 import SongTrackNumberInput from './input_containers/SongTrackNumberInput';
 import SongYearInput from './input_containers/SongYearInput';
 import SongArtwork from './SongArtwork';
+import type { EditableSongTags, OverridableFieldId } from './types';
 
 const SongMetadataResultsSelectPage = lazy(() => import('./SongMetadataResultsSelectPrompt'));
 const ResetTagsToDefaultPrompt = lazy(() => import('./ResetTagsToDefaultPrompt'));
@@ -54,6 +55,8 @@ type GenreResult = { genreId?: number; name: string; artworkPath?: string };
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
+
+
 interface SongTagsEditingPageProps {
   routeParams?: { songId: number };
 }
@@ -68,12 +71,12 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
 
   const { isOnline } = useNetworkConnectivity();
 
-  const [songInfo, setSongInfo] = useState({
+  const [songInfo, setSongInfo] = useState<EditableSongTags>({
     title: ''
-  } as SongTags);
-  const [defaultValues, setDefaultValues] = useState({
+  });
+  const [defaultValues, setDefaultValues] = useState<EditableSongTags>({
     title: ''
-  } as SongTags);
+  });
 
   const [artistKeyword, setArtistKeyword] = useState('');
   const [artistResults, setArtistResults] = useState<ArtistResult[]>([]);
@@ -137,11 +140,11 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                       ...prev,
                       title: (merged.fields.title?.value as string) ?? prev.title,
                       composer: (merged.fields.composer?.value as string) ?? prev.composer,
-                      comment: (merged.fields.comment?.value as string) ?? (prev as any).comment,
-                      language: (merged.fields.language?.value as string) ?? (prev as any).language,
-                      discNumber: (merged.fields.discNumber?.value as number) ?? (prev as any).discNumber,
-                      rating: (merged.fields.rating?.value as number) ?? (prev as any).rating,
-                      tags: (merged.fields.tags?.value as string[]) ?? (prev as any).tags
+                      comment: (merged.fields.comment?.value as string) ?? prev.comment,
+                      language: (merged.fields.language?.value as string) ?? prev.language,
+                      discNumber: (merged.fields.discNumber?.value as number) ?? prev.discNumber,
+                      rating: (merged.fields.rating?.value as number) ?? prev.rating,
+                      tags: (merged.fields.tags?.value as string[]) ?? prev.tags
                     }));
                   }
                   return undefined;
@@ -155,7 +158,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   }, [isKnownSource, songId, songPath]);
 
   const handleResetField = useCallback(
-    (fieldId: string) => {
+    (fieldId: OverridableFieldId) => {
       if (songId) {
         window.api.metadata
           .removeField({ entityKind: 'song', entityId: songId }, fieldId)
@@ -361,18 +364,17 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           }
 
           if (songId) {
-            const extra = songInfo as any;
             window.api.metadata
               .setFields(
                 { entityKind: 'song', entityId: songId },
                 {
                   title: songInfo.title || undefined,
                   composer: songInfo.composer || undefined,
-                  comment: extra.comment || undefined,
-                  language: extra.language || undefined,
-                  discNumber: extra.discNumber || undefined,
-                  rating: extra.rating || undefined,
-                  tags: extra.tags && extra.tags.length > 0 ? extra.tags : undefined
+                  comment: songInfo.comment || undefined,
+                  language: songInfo.language || undefined,
+                  discNumber: songInfo.discNumber || undefined,
+                  rating: songInfo.rating || undefined,
+                  tags: songInfo.tags && songInfo.tags.length > 0 ? songInfo.tags : undefined
                 }
               )
               .catch((err) => console.error('[SongTagsEditingPage] Metadata override save error:', err));
@@ -426,9 +428,19 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           resetButtonHandler={() => {
             changePromptMenuData(false);
             if (songId) {
-              window.api.metadata.clearOverrides({ identity: { entityKind: 'song', entityId: songId } }).catch(console.error);
+              // Clear storage overrides then re-fetch the real ID3 values so the
+              // UI reflects the original embedded metadata, not the merged state
+              // that was cached in defaultValues (which may itself be overridden).
+              window.api.metadata
+                .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
+                .then(() => {
+                  getSongId3Tags();
+                  return undefined;
+                })
+                .catch(console.error);
+            } else {
+              getSongId3Tags();
             }
-            setSongInfo(defaultValues);
             setAlbumKeyword('');
             setAlbumResults([]);
             setArtistKeyword('');
@@ -514,7 +526,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
             </div>
             <div className="mb-6 p-3 px-4 rounded-xl bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10 border border-font-color-highlight/20 text-xs flex items-center space-x-2 text-font-color-highlight dark:text-dark-font-color-highlight">
               <span className="material-icons-round text-base">info</span>
-              <span>Changes are stored locally in Nora and do not modify the original audio files.</span>
+              <span>{t('songTagsEditingPage.localOverrideNotice')}</span>
             </div>
 
             <div className="inputs-container text-font-color-black dark:text-font-color-white grid grid-flow-row grid-cols-2 content-around gap-8">
@@ -562,31 +574,31 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
               />
               {/* SONG DISC NUMBER */}
               <SongDiscNumberInput
-                discNumber={(songInfo as any).discNumber}
+                discNumber={songInfo.discNumber}
                 updateSongInfo={updateSongInfo}
                 onReset={() => handleResetField('discNumber')}
               />
               {/* SONG LANGUAGE */}
               <SongLanguageInput
-                songLanguage={(songInfo as any).language}
+                songLanguage={songInfo.language}
                 updateSongInfo={updateSongInfo}
                 onReset={() => handleResetField('language')}
               />
               {/* SONG RATING */}
               <SongRatingInput
-                rating={(songInfo as any).rating}
+                rating={songInfo.rating}
                 updateSongInfo={updateSongInfo}
                 onReset={() => handleResetField('rating')}
               />
               {/* SONG TAGS */}
               <SongTagsInput
-                tags={(songInfo as any).tags}
+                tags={songInfo.tags}
                 updateSongInfo={updateSongInfo}
                 onReset={() => handleResetField('tags')}
               />
               {/* SONG COMMENT */}
               <SongCommentInput
-                comment={(songInfo as any).comment}
+                comment={songInfo.comment}
                 updateSongInfo={updateSongInfo}
                 onReset={() => handleResetField('comment')}
               />
