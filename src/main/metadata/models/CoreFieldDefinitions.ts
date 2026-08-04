@@ -82,5 +82,53 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     filterable: true,
     sortable: false,
     indexed: true
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.Tags,
+    displayName: 'Tags',
+    valueType: 'string',
+    multiValue: true,
+    searchable: true,
+    searchWeight: 0.9,
+    filterable: true,
+    sortable: false,
+    indexed: true
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.Language,
+    displayName: 'Language',
+    valueType: 'string',
+    searchable: true,
+    searchWeight: 0.7,
+    filterable: true,
+    sortable: true,
+    indexed: true
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.Comment,
+    displayName: 'Comment',
+    valueType: 'string',
+    searchable: true,
+    searchWeight: 0.3,
+    filterable: false,
+    sortable: false
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.Rating,
+    displayName: 'Rating',
+    valueType: 'number',
+    searchable: false,
+    filterable: true,
+    sortable: true,
+    indexed: true
+  }),
+  new MetadataFieldDefinition({
+    id: MetadataFields.Composer,
+    displayName: 'Composer',
+    valueType: 'string',
+    searchable: true,
+    searchWeight: 0.5,
+    filterable: true,
+    sortable: true
   })
 ];

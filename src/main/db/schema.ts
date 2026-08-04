@@ -483,6 +483,26 @@ export const playHistory = pgTable(
   ]
 );
 
+export const metadataOverrides = pgTable(
+  'metadata_overrides',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    entityKind: varchar('entity_kind', { length: 64 }).notNull(),
+    entityId: varchar('entity_id', { length: 256 }).notNull(),
+    fieldId: varchar('field_id', { length: 64 }).notNull(),
+    stringValue: text('string_value'),
+    numberValue: doublePrecision('number_value'),
+    booleanValue: boolean('boolean_value'),
+    jsonValue: text('json_value'),
+    createdAt: timestamp('created_at', { withTimezone: false }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: false }).notNull().defaultNow()
+  },
+  (t) => [
+    index('idx_metadata_overrides_lookup').on(t.entityKind, t.entityId, t.fieldId),
+    index('idx_metadata_overrides_entity').on(t.entityKind, t.entityId)
+  ]
+);
+
 export const userSettings = pgTable(
   'user_settings',
   {

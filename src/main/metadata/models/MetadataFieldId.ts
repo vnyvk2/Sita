@@ -5,8 +5,13 @@ export const MetadataFields = {
   Genre: 'genre',
   Mood: 'mood',
   Tag: 'tag',
+  Tags: 'tags',
   BPM: 'bpm',
-  Year: 'year'
+  Year: 'year',
+  Language: 'language',
+  Comment: 'comment',
+  Rating: 'rating',
+  Composer: 'composer'
 } as const;
 
 export type BuiltInFieldId =

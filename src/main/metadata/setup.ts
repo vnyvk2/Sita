@@ -35,17 +35,23 @@ import { ProviderTimeoutPolicy } from './providers/timeout/ProviderTimeoutPolicy
 
 import { MetadataMergeEngine } from './engine/MetadataMergeEngine';
 import { DefaultMetadataMergePolicy } from './providers/policies/DefaultMetadataMergePolicy';
+import { UserMetadataProvider } from './providers/UserMetadataProvider';
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from './registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from './repository/DatabaseMetadataRepository';
 import { LoaderRegistry } from './repository/LoaderRegistry';
+import { UserMetadataRepository } from './repository/UserMetadataRepository';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
+import { UserMetadataService } from './services/UserMetadataService';
 
 export interface MetadataContainer {
   engine: MetadataEngine;
   searchGateway: MetadataSearchGateway;
   mergeEngine: MetadataMergeEngine;
   repository: DatabaseMetadataRepository;
+  userRepository: UserMetadataRepository;
+  userProvider: UserMetadataProvider;
+  userService: UserMetadataService;
   loaderRegistry: LoaderRegistry;
   localProvider: LocalMetadataProvider;
   executor: MetadataProviderExecutor;
@@ -113,7 +119,14 @@ export class MetadataBootstrap {
     const localProvider = new LocalMetadataProvider(repository);
     await localProvider.initialize();
 
+    const userRepository = new UserMetadataRepository();
+    const userProvider = new UserMetadataProvider(userRepository);
+    await userProvider.initialize();
+
     providerRegistry.register(localProvider);
+    providerRegistry.register(userProvider);
+
+    const userService = new UserMetadataService(userRepository, eventBus);
 
     const healthManager = new ProviderHealthManager(eventBus);
     const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
@@ -192,6 +205,9 @@ export class MetadataBootstrap {
       searchGateway,
       mergeEngine,
       repository,
+      userRepository,
+      userProvider,
+      userService,
       loaderRegistry,
       localProvider,
       executor,

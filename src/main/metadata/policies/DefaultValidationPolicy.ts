@@ -22,14 +22,12 @@ export class DefaultValidationPolicy implements IValidationPolicy {
     }
 
     if (definition.valueType === 'string') {
-      if (typeof value !== 'string') {
+      if (definition.multiValue) {
+        if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+          return { valid: false, message: `Field '${definition.id}' must be an array of strings` };
+        }
+      } else if (typeof value !== 'string') {
         return { valid: false, message: `Field '${definition.id}' must be a string` };
-      }
-    }
-
-    if (definition.valueType === 'string[]') {
-      if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
-        return { valid: false, message: `Field '${definition.id}' must be an array of strings` };
       }
     }
 

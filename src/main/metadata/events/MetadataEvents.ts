@@ -60,6 +60,7 @@ export interface MetadataEventMap {
   MetadataMerged: (event: MetadataEntityEvent) => void;
   MetadataImported: (event: MetadataImportedEvent) => void;
   MetadataRefreshed: (event: MetadataEntityEvent) => void;
+  MetadataOverrideChanged: (event: MetadataEntityEvent) => void;
   ProviderRegistered: (event: ProviderLifecycleEvent) => void;
   ProviderFailed: (event: ProviderLifecycleEvent) => void;
   ProviderUpdated: (event: ProviderLifecycleEvent) => void;

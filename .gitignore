@@ -37,3 +37,4 @@ graphify-out/
 old_miniplayer.txt
 diff_output*.txt
 electron.vite.config.*.mjs
+*.zip

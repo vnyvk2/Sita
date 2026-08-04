@@ -10,6 +10,11 @@ export interface SongPersistenceDTO {
   bitrate?: number | null;
   sampleRate?: number | null;
   fileModifiedAt?: Date | null;
+  language?: string | null;
+  tags?: string[] | null;
+  comment?: string | null;
+  rating?: number | null;
+  composer?: string | null;
 }
 
 export interface ArtistPersistenceDTO {

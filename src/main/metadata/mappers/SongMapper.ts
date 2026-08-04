@@ -67,6 +67,41 @@ export class SongMapper implements IMetadataMapper<SongPersistenceDTO> {
       );
     }
 
+    if (dto.language != null) {
+      entity.setField(
+        MetadataFields.Language,
+        new MetadataValue<string>({ value: dto.language, source, confidence })
+      );
+    }
+
+    if (dto.tags != null && Array.isArray(dto.tags)) {
+      entity.setField(
+        MetadataFields.Tags,
+        new MetadataValue<string[]>({ value: dto.tags, source, confidence })
+      );
+    }
+
+    if (dto.comment != null) {
+      entity.setField(
+        MetadataFields.Comment,
+        new MetadataValue<string>({ value: dto.comment, source, confidence })
+      );
+    }
+
+    if (dto.rating != null) {
+      entity.setField(
+        MetadataFields.Rating,
+        new MetadataValue<number>({ value: dto.rating, source, confidence })
+      );
+    }
+
+    if (dto.composer != null) {
+      entity.setField(
+        MetadataFields.Composer,
+        new MetadataValue<string>({ value: dto.composer, source, confidence })
+      );
+    }
+
     return entity;
   }
 }
