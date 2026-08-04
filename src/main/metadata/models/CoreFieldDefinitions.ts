@@ -62,17 +62,6 @@ export const CORE_FIELD_DEFINITIONS: MetadataFieldDefinition[] = [
     sortable: true
   }),
   new MetadataFieldDefinition({
-    id: MetadataFields.Tag,
-    displayName: 'Tag',
-    valueType: 'string',
-    multiValue: true,
-    searchable: true,
-    searchWeight: 0.9,
-    filterable: true,
-    sortable: false,
-    indexed: true
-  }),
-  new MetadataFieldDefinition({
     id: MetadataFields.Mood,
     displayName: 'Mood',
     valueType: 'string',

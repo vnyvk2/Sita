@@ -47,10 +47,6 @@ export class MetadataEngine implements IMetadataGateway {
     this.cache = options.cache;
     this.eventBus = options.eventBus;
     this.context = options.context;
-
-    this.eventBus.on('MetadataOverrideChanged', (event) => {
-      this.cache.delete(event.identity);
-    });
   }
 
   public async getEntityMetadata(

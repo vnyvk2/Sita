@@ -116,7 +116,17 @@ describe('UserMetadataIntegration (Phase 10A Platform Verification)', () => {
               let value: any = val.stringValue ?? val.numberValue ?? val.booleanValue;
               if (val.jsonValue) value = JSON.parse(val.jsonValue);
               overridesStore.set(key, value);
-              return Promise.resolve();
+              return {
+                onConflictDoUpdate: (config: any) => {
+                  if (config?.set) {
+                    let setVal: any = config.set.stringValue ?? config.set.numberValue ?? config.set.booleanValue;
+                    if (config.set.jsonValue) setVal = JSON.parse(config.set.jsonValue);
+                    overridesStore.set(key, setVal);
+                  }
+                  return Promise.resolve();
+                },
+                then: (resolve: any) => resolve()
+              };
             }
           }),
           update: () => ({
@@ -189,6 +199,7 @@ describe('UserMetadataIntegration (Phase 10A Platform Verification)', () => {
     });
 
     const cache = new MetadataCache();
+    eventBus.on('MetadataOverrideChanged', (e) => cache.delete(e.identity));
     const planner = new MetadataQueryPlanner(dbRepository);
 
     engine = new MetadataEngine({

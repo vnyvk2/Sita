@@ -14,6 +14,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   varchar
 } from 'drizzle-orm/pg-core';
 
@@ -498,7 +499,7 @@ export const metadataOverrides = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: false }).notNull().defaultNow()
   },
   (t) => [
-    index('idx_metadata_overrides_lookup').on(t.entityKind, t.entityId, t.fieldId),
+    uniqueIndex('idx_metadata_overrides_lookup').on(t.entityKind, t.entityId, t.fieldId),
     index('idx_metadata_overrides_entity').on(t.entityKind, t.entityId)
   ]
 );

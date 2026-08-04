@@ -200,6 +200,10 @@ export class MetadataBootstrap {
       cache.delete(identity);
     });
 
+    eventBus.on('MetadataOverrideChanged', (event) => {
+      cache.delete(event.identity);
+    });
+
     return {
       engine,
       searchGateway,

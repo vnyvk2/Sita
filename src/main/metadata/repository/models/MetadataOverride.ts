@@ -1,4 +1,5 @@
 import type { MetadataFieldId } from '../../models/MetadataFieldId';
+import type { MetadataKind } from '../../models/MetadataKind';
 
 export type MetadataOverrideValue =
   | string
@@ -9,7 +10,7 @@ export type MetadataOverrideValue =
 
 export interface MetadataOverride {
   id?: number;
-  entityKind: string;
+  entityKind: MetadataKind;
   entityId: string;
   fieldId: MetadataFieldId;
   value: MetadataOverrideValue;

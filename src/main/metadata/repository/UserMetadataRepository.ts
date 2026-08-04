@@ -5,6 +5,7 @@ import { metadataOverrides } from '../../db/schema';
 import type { MetadataFieldId } from '../models/MetadataFieldId';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataOverride, MetadataOverrideValue } from './models/MetadataOverride';
+import { MetadataOverrideSerializer } from './models/MetadataOverrideSerializer';
 
 export class UserMetadataRepository {
   private readonly database: typeof db;
@@ -27,7 +28,7 @@ export class UserMetadataRepository {
         )
       );
 
-    return rows.map((row) => this.mapRowToOverride(row));
+    return rows.map((row) => MetadataOverrideSerializer.deserializeRow(row));
   }
 
   public async getOverridesForMany(
@@ -62,7 +63,7 @@ export class UserMetadataRepository {
         if (!resultMap.has(key)) {
           resultMap.set(key, []);
         }
-        resultMap.get(key)!.push(this.mapRowToOverride(row));
+        resultMap.get(key)!.push(MetadataOverrideSerializer.deserializeRow(row));
       }
     }
 
@@ -91,56 +92,25 @@ export class UserMetadataRepository {
           continue;
         }
 
-        let stringValue: string | null = null;
-        let numberValue: number | null = null;
-        let booleanValue: boolean | null = null;
-        let jsonValue: string | null = null;
+        const serialized = MetadataOverrideSerializer.serializeValue(val);
 
-        if (typeof val === 'string') {
-          stringValue = val;
-        } else if (typeof val === 'number') {
-          numberValue = val;
-        } else if (typeof val === 'boolean') {
-          booleanValue = val;
-        } else if (typeof val === 'object') {
-          jsonValue = JSON.stringify(val);
-        }
-
-        const existing = await tx
-          .select({ id: metadataOverrides.id })
-          .from(metadataOverrides)
-          .where(
-            and(
-              eq(metadataOverrides.entityKind, kind),
-              eq(metadataOverrides.entityId, id),
-              eq(metadataOverrides.fieldId, fieldId)
-            )
-          );
-
-        if (existing.length > 0) {
-          await tx
-            .update(metadataOverrides)
-            .set({
-              stringValue,
-              numberValue,
-              booleanValue,
-              jsonValue,
-              updatedAt: new Date()
-            })
-            .where(eq(metadataOverrides.id, existing[0].id));
-        } else {
-          await tx.insert(metadataOverrides).values({
+        await tx
+          .insert(metadataOverrides)
+          .values({
             entityKind: kind,
             entityId: id,
             fieldId,
-            stringValue,
-            numberValue,
-            booleanValue,
-            jsonValue,
+            ...serialized,
             createdAt: new Date(),
             updatedAt: new Date()
+          })
+          .onConflictDoUpdate({
+            target: [metadataOverrides.entityKind, metadataOverrides.entityId, metadataOverrides.fieldId],
+            set: {
+              ...serialized,
+              updatedAt: new Date()
+            }
           });
-        }
       }
     });
   }
@@ -175,33 +145,5 @@ export class UserMetadataRepository {
           eq(metadataOverrides.entityId, id)
         )
       );
-  }
-
-  private mapRowToOverride(row: typeof metadataOverrides.$inferSelect): MetadataOverride {
-    let value: MetadataOverrideValue = null as any;
-
-    if (row.stringValue !== null && row.stringValue !== undefined) {
-      value = row.stringValue;
-    } else if (row.numberValue !== null && row.numberValue !== undefined) {
-      value = row.numberValue;
-    } else if (row.booleanValue !== null && row.booleanValue !== undefined) {
-      value = row.booleanValue;
-    } else if (row.jsonValue !== null && row.jsonValue !== undefined) {
-      try {
-        value = JSON.parse(row.jsonValue);
-      } catch {
-        value = row.jsonValue;
-      }
-    }
-
-    return {
-      id: row.id,
-      entityKind: row.entityKind,
-      entityId: row.entityId,
-      fieldId: row.fieldId as MetadataFieldId,
-      value,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt
-    };
   }
 }

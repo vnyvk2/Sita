@@ -38,8 +38,23 @@ describe('UserMetadataRepository', () => {
           }),
           insert: () => ({
             values: (val: any) => {
-              mockStore.push({ id: mockStore.length + 1, ...val });
-              return Promise.resolve();
+              const existingIdx = mockStore.findIndex(
+                (item) => item.entityKind === val.entityKind && item.entityId === val.entityId && item.fieldId === val.fieldId
+              );
+              if (existingIdx >= 0) {
+                mockStore[existingIdx] = { ...mockStore[existingIdx], ...val };
+              } else {
+                mockStore.push({ id: mockStore.length + 1, ...val });
+              }
+              return {
+                onConflictDoUpdate: (config: any) => {
+                  if (config?.set && existingIdx >= 0) {
+                    mockStore[existingIdx] = { ...mockStore[existingIdx], ...config.set };
+                  }
+                  return Promise.resolve();
+                },
+                then: (resolve: any) => resolve()
+              };
             }
           }),
           update: () => ({

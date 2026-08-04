@@ -4,7 +4,6 @@ export const MetadataFields = {
   Album: 'album',
   Genre: 'genre',
   Mood: 'mood',
-  Tag: 'tag',
   Tags: 'tags',
   BPM: 'bpm',
   Year: 'year',
