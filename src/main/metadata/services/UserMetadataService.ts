@@ -13,6 +13,15 @@ export class UserMetadataService {
     this.eventBus = eventBus;
   }
 
+  public async setField(
+    identity: MetadataIdentity,
+    fieldId: MetadataFieldId,
+    value: MetadataOverrideValue
+  ): Promise<void> {
+    await this.repository.setOverrides(identity, { [fieldId]: value } as Record<MetadataFieldId, MetadataOverrideValue>);
+    this.eventBus.emit('MetadataOverrideChanged', { identity });
+  }
+
   public async setOverrides(
     identity: MetadataIdentity,
     overrides: Record<MetadataFieldId, MetadataOverrideValue>

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron
 
 import addSongsFromFolderStructures from './core/addMusicFolder';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
+import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
 
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
@@ -156,6 +157,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
   setupPlaylistExportIpc(playlistRepository);
   registerMembershipIPCHandlers();
+  registerMetadataIPCHandlers();
 
   if (mainWindow) {
     ipcMain.on('app/close', () => app.quit());
