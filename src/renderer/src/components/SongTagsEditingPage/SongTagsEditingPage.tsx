@@ -13,10 +13,15 @@ import MainContainer from '../MainContainer';
 import SongAlbumArtistsInput from './input_containers/SongAlbumArtistInput';
 import SongAlbumInput from './input_containers/SongAlbumInput';
 import SongArtistsInput from './input_containers/SongArtistsInput';
+import SongCommentInput from './input_containers/SongCommentInput';
 import SongComposerInput from './input_containers/SongComposerInput';
+import SongDiscNumberInput from './input_containers/SongDiscNumberInput';
 import SongGenresInput from './input_containers/SongGenresInput';
+import SongLanguageInput from './input_containers/SongLanguageInput';
 import SongLyricsEditorInput from './input_containers/SongLyricsEditorInput';
 import SongNameInput from './input_containers/SongNameInput';
+import SongRatingInput from './input_containers/SongRatingInput';
+import SongTagsInput from './input_containers/SongTagsInput';
 import SongTrackNumberInput from './input_containers/SongTrackNumberInput';
 import SongYearInput from './input_containers/SongYearInput';
 import SongArtwork from './SongArtwork';
@@ -132,7 +137,11 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                       ...prev,
                       title: (merged.fields.title?.value as string) ?? prev.title,
                       composer: (merged.fields.composer?.value as string) ?? prev.composer,
-                      comment: (merged.fields.comment?.value as string) ?? prev.comment
+                      comment: (merged.fields.comment?.value as string) ?? (prev as any).comment,
+                      language: (merged.fields.language?.value as string) ?? (prev as any).language,
+                      discNumber: (merged.fields.discNumber?.value as number) ?? (prev as any).discNumber,
+                      rating: (merged.fields.rating?.value as number) ?? (prev as any).rating,
+                      tags: (merged.fields.tags?.value as string[]) ?? (prev as any).tags
                     }));
                   }
                   return undefined;
@@ -144,6 +153,21 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
         })
         .catch((err) => console.error(err));
   }, [isKnownSource, songId, songPath]);
+
+  const handleResetField = useCallback(
+    (fieldId: string) => {
+      if (songId) {
+        window.api.metadata
+          .removeField({ entityKind: 'song', entityId: songId }, fieldId)
+          .then(() => {
+            getSongId3Tags();
+            return undefined;
+          })
+          .catch((err) => console.error(`[SongTagsEditingPage] Failed to reset field ${fieldId}:`, err));
+      }
+    },
+    [songId, getSongId3Tags]
+  );
 
   useEffect(() => {
     getSongId3Tags();
@@ -337,13 +361,18 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           }
 
           if (songId) {
+            const extra = songInfo as any;
             window.api.metadata
               .setFields(
                 { entityKind: 'song', entityId: songId },
                 {
                   title: songInfo.title || undefined,
                   composer: songInfo.composer || undefined,
-                  comment: songInfo.comment || undefined
+                  comment: extra.comment || undefined,
+                  language: extra.language || undefined,
+                  discNumber: extra.discNumber || undefined,
+                  rating: extra.rating || undefined,
+                  tags: extra.tags && extra.tags.length > 0 ? extra.tags : undefined
                 }
               )
               .catch((err) => console.error('[SongTagsEditingPage] Metadata override save error:', err));
@@ -396,6 +425,9 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           dataEntries={entries}
           resetButtonHandler={() => {
             changePromptMenuData(false);
+            if (songId) {
+              window.api.metadata.clearOverrides({ identity: { entityKind: 'song', entityId: songId } }).catch(console.error);
+            }
             setSongInfo(defaultValues);
             setAlbumKeyword('');
             setAlbumResults([]);
@@ -480,6 +512,11 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                 />
               </div>
             </div>
+            <div className="mb-6 p-3 px-4 rounded-xl bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10 border border-font-color-highlight/20 text-xs flex items-center space-x-2 text-font-color-highlight dark:text-dark-font-color-highlight">
+              <span className="material-icons-round text-base">info</span>
+              <span>Changes are stored locally in Nora and do not modify the original audio files.</span>
+            </div>
+
             <div className="inputs-container text-font-color-black dark:text-font-color-white grid grid-flow-row grid-cols-2 content-around gap-8">
               <SongNameInput songTitle={songInfo.title} updateSongInfo={updateSongInfo} />
               <SongYearInput songYear={songInfo.releasedYear} updateSongInfo={updateSongInfo} />
@@ -522,6 +559,36 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
               <SongTrackNumberInput
                 songTrackNumber={songInfo.trackNumber}
                 updateSongInfo={updateSongInfo}
+              />
+              {/* SONG DISC NUMBER */}
+              <SongDiscNumberInput
+                discNumber={(songInfo as any).discNumber}
+                updateSongInfo={updateSongInfo}
+                onReset={() => handleResetField('discNumber')}
+              />
+              {/* SONG LANGUAGE */}
+              <SongLanguageInput
+                songLanguage={(songInfo as any).language}
+                updateSongInfo={updateSongInfo}
+                onReset={() => handleResetField('language')}
+              />
+              {/* SONG RATING */}
+              <SongRatingInput
+                rating={(songInfo as any).rating}
+                updateSongInfo={updateSongInfo}
+                onReset={() => handleResetField('rating')}
+              />
+              {/* SONG TAGS */}
+              <SongTagsInput
+                tags={(songInfo as any).tags}
+                updateSongInfo={updateSongInfo}
+                onReset={() => handleResetField('tags')}
+              />
+              {/* SONG COMMENT */}
+              <SongCommentInput
+                comment={(songInfo as any).comment}
+                updateSongInfo={updateSongInfo}
+                onReset={() => handleResetField('comment')}
               />
               <hr className="horizontal-rule bg-background-color-2 dark:bg-dark-background-color-2 col-span-2 h-[0.1rem] w-[95%] border-0" />
               {/* SONG LYRICS EDITOR */}
