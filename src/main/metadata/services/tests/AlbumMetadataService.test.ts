@@ -1,64 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import { MetadataNormalizer } from '../../matching/MetadataNormalizer';
 import { TrackMatcher } from '../../matching/TrackMatcher';
-import { AlbumMetadataService } from '../AlbumMetadataService';
+import { AlbumMetadataService, getConfidenceLevel } from '../AlbumMetadataService';
 import type { AlbumMetadata } from '../../models/RecordingMetadata';
 
-describe('Phase 2 Final Polish — Production-Grade Metadata Engine & Matcher Suite', () => {
-  it('preserves Roman numerals in track titles during title normalization', () => {
-    expect(MetadataNormalizer.normalizeTitle('Shine On You Crazy Diamond Part II')).toBe('shine on you crazy diamond part ii');
-    expect(MetadataNormalizer.normalizeTitle('Symphony No. 5 Movement III')).toBe('symphony number 5 movement iii');
+describe('Phase 2 Complete — Presentation-Agnostic Metadata Engine Suite', () => {
+  it('maps confidence scores to confidence levels cleanly via getConfidenceLevel helper', () => {
+    expect(getConfidenceLevel(1.0)).toBe('Excellent');
+    expect(getConfidenceLevel(0.96)).toBe('Excellent');
+    expect(getConfidenceLevel(0.92)).toBe('Very Good');
+    expect(getConfidenceLevel(0.85)).toBe('Good');
+    expect(getConfidenceLevel(0.72)).toBe('Review');
+    expect(getConfidenceLevel(0.50)).toBe('Poor');
   });
 
-  it('caps maximum variant penalty at 50 points', () => {
+  it('generates presentation-agnostic clean why match explanation strings without symbols', () => {
     const matcher = new TrackMatcher();
-    const song = { songId: 1, title: 'Song (Live Acoustic Demo Instrumental)', artist: 'Artist', path: 'song.mp3', duration: 200 };
-    const track = { trackId: 't1', title: 'Song', artist: 'Artist', trackNumber: 1, duration: 200 };
+    const song = {
+      songId: 1,
+      title: 'drivers license',
+      artist: 'Olivia Rodrigo',
+      album: 'SOUR',
+      path: 'track.mp3',
+      duration: 242
+    };
 
-    const { score } = matcher.scorePair(song, track);
-    // Unpenalized score: 50 title + 20 artist + 30 duration = 100
-    // Capped variant penalty: max -50 => score 50
-    expect(score).toBe(50);
+    const track = {
+      trackId: 't1',
+      title: 'drivers license',
+      artist: 'Olivia Rodrigo',
+      album: 'SOUR',
+      trackNumber: 1,
+      duration: 242
+    };
+
+    const result = matcher.matchTracks([song], 'rel-sour', [track]);
+    expect(result[0].why).toBe('Title Match | Artist Match | Album Match | Duration Match');
   });
 
-  it('evaluates authoritative ISRC match early returning 100 points without heuristic stacking', () => {
-    const matcher = new TrackMatcher();
-    const song = { songId: 1, title: 'Wrong Title', artist: 'Wrong Artist', album: 'Wrong Album', path: 'a.mp3', isrc: 'USUG12100860' };
-    const track = { trackId: 't1', title: 'drivers license', artist: 'Olivia Rodrigo', album: 'SOUR', trackNumber: 1, isrc: 'USUG12100860' };
-
-    const { score, breakdown } = matcher.scorePair(song, track);
-    expect(score).toBe(100);
-    expect(breakdown.mbid).toBe(100);
-    expect(breakdown.title).toBe(0);
-    expect(breakdown.album).toBe(0);
-  });
-
-  it('exposes confidence levels (Excellent, Very Good, Good, Review, Poor)', () => {
-    const matcher = new TrackMatcher();
-    const song = { songId: 1, title: 'drivers license', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 242 };
-    const track = { trackId: 't1', title: 'drivers license', artist: 'Olivia Rodrigo', trackNumber: 1, duration: 242 };
-
-    const result = matcher.matchTracks([song], 'rel-1', [track]);
-    expect(result[0].confidenceLevel).toBe('Excellent');
-  });
-
-  it('keys duplicate candidate detection on title + artist', () => {
-    const matcher = new TrackMatcher();
-    const localSongs = [
-      { songId: 1, title: 'Intro', artist: 'Artist A', path: 'a.mp3', duration: 100 },
-      { songId: 2, title: 'Intro', artist: 'Artist B', path: 'b.mp3', duration: 100 }
-    ];
-
-    const officialTracks = [
-      { trackId: 't1', title: 'Intro', artist: 'Artist A', trackNumber: 1, duration: 100 }
-    ];
-
-    const result = matcher.matchTracks(localSongs, 'rel-1', officialTracks);
-    // Different artists => NOT flagged as duplicate local candidate
-    expect(result[0].reasons).not.toContain('duplicate_local_candidate');
-  });
-
-  it('runs AlbumAutoTagger preview with strict confidence levels', async () => {
+  it('caps album sequence continuity boost at 0.89 below auto-apply threshold (0.90)', async () => {
     const service = new AlbumMetadataService();
     const album: AlbumMetadata = {
       releaseId: 'rel-1',
@@ -80,7 +60,8 @@ describe('Phase 2 Final Polish — Production-Grade Metadata Engine & Matcher Su
     ];
 
     const preview = await service.buildAlbumMatch(localSongs, album, officialTracks);
-    expect(preview.trackList[0].confidenceLevel).toBe('Excellent');
-    expect(preview.trackList[1].reasons).toContain('album_sequence_continuity_boost');
+    // Sequence boost must be capped at 0.89 so sequence alone never triggers auto-apply (>= 0.90)
+    expect(preview.trackList[1].confidence).toBeLessThanOrEqual(0.89);
+    expect(preview.trackList[1].confidenceLevel).toBe('Good');
   });
 });

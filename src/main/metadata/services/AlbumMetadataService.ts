@@ -25,6 +25,17 @@ export interface ScoreBreakdown {
 
 export type ConfidenceLevel = 'Excellent' | 'Very Good' | 'Good' | 'Review' | 'Poor';
 
+/**
+ * Pure helper function returning presentation-agnostic confidence level.
+ */
+export const getConfidenceLevel = (confidence: number): ConfidenceLevel => {
+  if (confidence >= 0.95) return 'Excellent';
+  if (confidence >= 0.90) return 'Very Good';
+  if (confidence >= 0.80) return 'Good';
+  if (confidence >= 0.70) return 'Review';
+  return 'Poor';
+};
+
 export interface TrackMatchPair {
   localSong: LocalSongInput;
   remoteTrack: MetadataCandidate;
@@ -124,16 +135,12 @@ export class AlbumMetadataService implements IAlbumMetadataService {
             prevTrackNo + 1 === currentTrackNo &&
             currentTrackNo + 1 === nextTrackNo
           ) {
-            const boostedConfidence = Math.min(0.95, pair.confidence + 0.15);
-            let confidenceLevel: ConfidenceLevel = 'Review';
-            if (boostedConfidence >= 0.95) confidenceLevel = 'Excellent';
-            else if (boostedConfidence >= 0.90) confidenceLevel = 'Very Good';
-            else if (boostedConfidence >= 0.80) confidenceLevel = 'Good';
-
+            // Sequence continuity can increase confidence but must never override poor evidence or trigger auto-apply (capped at 0.89)
+            const boostedConfidence = Math.min(0.89, pair.confidence + 0.15);
             return {
               ...pair,
               confidence: boostedConfidence,
-              confidenceLevel,
+              confidenceLevel: getConfidenceLevel(boostedConfidence),
               reasons: [...pair.reasons, 'album_sequence_continuity_boost']
             };
           }

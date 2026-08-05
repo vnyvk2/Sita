@@ -1,5 +1,5 @@
 import type { MatchCriterion, MetadataCandidate, RecordingMetadata } from '../models/RecordingMetadata';
-import type { TrackMatchPair, ScoreBreakdown } from '../services/AlbumMetadataService';
+import { getConfidenceLevel, type TrackMatchPair, type ScoreBreakdown } from '../services/AlbumMetadataService';
 import { MetadataNormalizer, type RecordingVariant } from './MetadataNormalizer';
 
 export interface LocalSongInput {
@@ -159,38 +159,32 @@ export class TrackMatcher {
         }
       };
 
-      // Construct rich human-readable "why" match explanation from reasons
+      // Construct presentation-agnostic clean "why" match explanation strings without icons/emojis
       const whyParts: string[] = [];
-      if (pair.reasons.includes('mbid_exact_match')) whyParts.push('✓ Exact MBID Match');
-      else if (pair.reasons.includes('isrc_exact_match')) whyParts.push('✓ Exact ISRC Match');
+      if (pair.reasons.includes('mbid_exact_match')) whyParts.push('Exact MBID Match');
+      else if (pair.reasons.includes('isrc_exact_match')) whyParts.push('Exact ISRC Match');
       else {
-        if (pair.breakdown.title > 0) whyParts.push('✓ Title Match');
-        if (pair.breakdown.artist > 0) whyParts.push('✓ Artist Match');
-        if (pair.breakdown.album && pair.breakdown.album > 0) whyParts.push('✓ Album Match');
-        if (pair.breakdown.duration > 0) whyParts.push('✓ Duration Match');
-        if (pair.breakdown.year && pair.breakdown.year > 0) whyParts.push('✓ Year Match');
+        if (pair.breakdown.title > 0) whyParts.push('Title Match');
+        if (pair.breakdown.artist > 0) whyParts.push('Artist Match');
+        if (pair.breakdown.album && pair.breakdown.album > 0) whyParts.push('Album Match');
+        if (pair.breakdown.duration > 0) whyParts.push('Duration Match');
+        if (pair.breakdown.year && pair.breakdown.year > 0) whyParts.push('Year Match');
       }
 
       if (pair.reasons.some((r) => r.startsWith('variant_mismatch'))) {
-        whyParts.push('⚠ Variant Mismatch');
+        whyParts.push('Variant Mismatch');
       }
       if (pair.reasons.includes('duplicate_local_candidate')) {
-        whyParts.push('⚠ Duplicate Candidate');
+        whyParts.push('Duplicate Candidate');
       }
 
       const why = whyParts.length > 0 ? whyParts.join(' | ') : 'Matched Criteria';
-
-      let confidenceLevel: TrackMatchPair['confidenceLevel'] = 'Poor';
-      if (normalizedScore >= 0.95) confidenceLevel = 'Excellent';
-      else if (normalizedScore >= 0.90) confidenceLevel = 'Very Good';
-      else if (normalizedScore >= 0.80) confidenceLevel = 'Good';
-      else if (normalizedScore >= 0.70) confidenceLevel = 'Review';
 
       assignedPairs.push({
         localSong: pair.localSong,
         remoteTrack: candidate,
         confidence: normalizedScore,
-        confidenceLevel,
+        confidenceLevel: getConfidenceLevel(normalizedScore),
         scoreBreakdown: pair.breakdown,
         why,
         matchedBy: pair.matchedBy,
