@@ -10,14 +10,34 @@ export interface ArtworkPreviewCardProps {
   onToggleReplaceArtwork: (replace: boolean) => void;
 }
 
+const formatProviderDisplayName = (providerId?: string): string => {
+  if (!providerId) return 'Online Source';
+  switch (providerId.toLowerCase()) {
+    case 'musicbrainz':
+      return 'MusicBrainz';
+    case 'discogs':
+      return 'Discogs';
+    case 'spotify':
+      return 'Spotify';
+    case 'lastfm':
+      return 'Last.fm';
+    default:
+      return providerId.charAt(0).toUpperCase() + providerId.slice(1);
+  }
+};
+
 export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
   currentArtworkUrl,
   suggestedArtworkUrl,
   artworkMetadata,
-  providerName = 'MusicBrainz',
+  providerName,
   replaceArtwork,
   onToggleReplaceArtwork
 }) => {
+  const providerDisplay = formatProviderDisplayName(providerName);
+  const dimensionsDisplay =
+    artworkMetadata?.primaryPath ? 'Local Embedded' : 'Online Release';
+
   return (
     <div
       style={{
@@ -36,7 +56,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
             Cover Artwork Preview
           </span>
           <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 500 }}>
-            {providerName}
+            {providerDisplay}
           </span>
         </div>
 
@@ -143,7 +163,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
             )}
           </div>
           <span style={{ fontSize: '0.75rem', color: '#34d399' }}>
-            1200×1200 HD ({providerName})
+            {dimensionsDisplay} ({providerDisplay})
           </span>
         </div>
       </div>

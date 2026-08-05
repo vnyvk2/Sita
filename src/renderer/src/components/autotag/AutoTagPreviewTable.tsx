@@ -175,9 +175,9 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                     track={track}
                     selectedFieldMap={selectedFieldMap}
                     userEditedValues={userEditedValues}
-                    onToggleField={onToggleField}
-                    onFieldChanged={onFieldChanged}
-                    onResetField={onResetField}
+                    onToggleField={(fieldId) => onToggleField(track.localSongId, fieldId)}
+                    onFieldChanged={(fieldId, val) => onFieldChanged(track.localSongId, fieldId, val)}
+                    onResetField={(fieldId) => onResetField(track.localSongId, fieldId)}
                   />
                 </div>
               )}
