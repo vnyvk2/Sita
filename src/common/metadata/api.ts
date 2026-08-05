@@ -10,12 +10,3 @@ export interface MetadataAutoTagApi {
   cancelAutoTag: (operationId?: string) => void;
   onProgress: (callback: (payload: ProgressEventPayload) => void) => () => void;
 }
-
-declare global {
-  interface Window {
-    api?: {
-      metadataAutoTag?: MetadataAutoTagApi;
-      [key: string]: unknown;
-    };
-  }
-}
