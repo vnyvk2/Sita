@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AlbumMetadata } from '../../../../main/metadata/models/RecordingMetadata';
+import type { AlbumMetadata } from '../../../common/metadata/types';
 
 export interface ReleaseSearchPanelProps {
   initialAlbumName?: string;
@@ -132,7 +132,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
               </span>
 
               <button
-                onClick={() => cand.releaseId && onSelectRelease(cand.releaseId, cand.provider)}
+                onClick={() => cand.releaseId && onSelectRelease(cand.releaseId, cand.provider ?? 'musicbrainz')}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',

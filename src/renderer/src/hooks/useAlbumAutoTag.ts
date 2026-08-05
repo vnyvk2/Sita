@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AlbumMetadata, MetadataProviderId } from '../../../main/metadata/models/RecordingMetadata';
 import type {
+  AlbumMetadata,
   AlbumTagPreview,
   AutoTagStage,
   MetadataFieldId,
+  MetadataProviderId,
   ProgressEventPayload,
   TrackMatchPreview
 } from '../../../common/metadata/types';

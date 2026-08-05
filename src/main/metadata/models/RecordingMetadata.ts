@@ -1,7 +1,6 @@
-/**
- * Strongly typed provider identifier union.
- */
-export type MetadataProviderId = 'musicbrainz' | 'spotify' | 'discogs' | 'local' | 'user';
+import type { AlbumMetadata, MetadataProviderId, OfficialTrackInput, ResolvedAlbumRelease } from '../../../common/metadata/types';
+
+export type { AlbumMetadata, MetadataProviderId, OfficialTrackInput, ResolvedAlbumRelease };
 
 /**
  * Strongly typed criterion used during metadata matching.
@@ -35,45 +34,6 @@ export interface RecordingMetadata {
   totalDiscs?: number;
   composer?: string;
   duration?: number;
-}
-
-/**
- * Pure domain model for core album metadata.
- */
-export interface AlbumMetadata {
-  title: string;
-  artist: string;
-  year?: number;
-  label?: string;
-  releaseType?: string;
-  artwork?: ArtworkMetadata;
-  discCount?: number;
-  trackCount?: number;
-  releaseId?: string;
-  provider?: MetadataProviderId;
-}
-
-export interface OfficialTrackInput {
-  trackId?: string;
-  title: string;
-  artist?: string;
-  album?: string;
-  year?: number;
-  trackNumber: number;
-  discNumber?: number;
-  duration?: number;
-  isrc?: string;
-  musicBrainzRecordingId?: string;
-}
-
-/**
- * Dedicated domain model representing a resolved album release with official track listing.
- */
-export interface ResolvedAlbumRelease {
-  album: AlbumMetadata;
-  tracks: OfficialTrackInput[];
-  provider: MetadataProviderId;
-  providerReleaseId: string;
 }
 
 /**
