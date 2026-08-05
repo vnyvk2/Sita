@@ -17,31 +17,33 @@ const fetchAlbumData = async (
     end: 0
   };
 
-  if (albumTitlesOrIds && albumTitlesOrIds.length > 0) {
-    logger.debug(`Requested albums data for ids`, { albumTitlesOrIds });
+  logger.debug(`Requested albums data`, {
+    albumTitlesOrIdsCount: albumTitlesOrIds.length,
+    sortType
+  });
 
-    const numericIds = albumTitlesOrIds
-      .map((x) => Number(x))
-      .filter((x) => !isNaN(x));
+  const numericIds = albumTitlesOrIds
+    .map((x) => Number(x))
+    .filter((x) => !isNaN(x));
 
-    if (numericIds.length === 0) {
-      return result;
-    }
-
-    const albums = await getAllAlbums({
-      albumIds: numericIds,
-      sortType,
-      start,
-      end
-    });
-
-    const output = albums.data.map((x) => convertToAlbum(x));
-
-    result.data = output;
-    result.total = albums.data.length;
-    result.start = albums.start;
-    result.end = albums.end;
+  if (albumTitlesOrIds.length > 0 && numericIds.length === 0) {
+    return result;
   }
+
+  const albums = await getAllAlbums({
+    albumIds: numericIds,
+    sortType,
+    start,
+    end
+  });
+
+  const output = albums.data.map((x) => convertToAlbum(x));
+
+  result.data = output;
+  result.total = albums.data.length;
+  result.start = albums.start;
+  result.end = albums.end;
+
   return result;
 };
 
