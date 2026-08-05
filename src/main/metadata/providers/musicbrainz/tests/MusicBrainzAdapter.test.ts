@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { IdentityResolutionCache } from '@main/metadata/cache/IdentityResolutionCache';
 import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
@@ -41,8 +42,8 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     const target = { title: 'Bohemian Rhapsody', artist: 'Queen', durationSeconds: 354 };
 
     const matchResult = matcher.findBestMatch(target, [
-      { id: '1', title: 'Bohemian Rhapsody (Live)', length: 360000, 'artist-credit': [{ name: 'Queen' }] },
-      { id: '2', title: 'Bohemian Rhapsody', length: 354000, 'artist-credit': [{ name: 'Queen' }] }
+      { id: '1', title: 'Bohemian Rhapsody (Live)', durationSeconds: 360, artists: ['Queen'] },
+      { id: '2', title: 'Bohemian Rhapsody', durationSeconds: 354, artists: ['Queen'] }
     ]);
 
     expect(matchResult).not.toBeNull();
@@ -53,7 +54,8 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
   it('performs lookup by query and maps RecordingDto to ProviderResult with match confidence', async () => {
     const mockPipeline = new MockRequestPipeline();
     const apiClient = new MusicBrainzApiClient(mockPipeline as unknown as RequestPipeline);
-    const adapter = new MusicBrainzAdapter(apiClient);
+    const cache = new IdentityResolutionCache();
+    const adapter = new MusicBrainzAdapter(apiClient, { cache });
 
     const identity = new MetadataIdentity({
       entityKind: MetadataKinds.Song,
@@ -73,6 +75,9 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     expect(payload.album).toBe('A Night at the Opera');
     expect(payload.year).toBe(1975);
     expect(payload.tags).toContain('rock');
+
+    // Verify MBID was cached in IdentityResolutionCache
+    expect(cache.get<string>('musicbrainz', 'Bohemian Rhapsody:Queen')).toBe('b10bbbfc-cf9e-42e0-be17-e2c3e1d52000');
   });
 
   it('performs direct MBID lookup when entityId is UUID', async () => {

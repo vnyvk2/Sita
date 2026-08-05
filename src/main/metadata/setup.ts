@@ -147,7 +147,7 @@ export class MetadataBootstrap {
         retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
       });
       const client = new MusicBrainzApiClient(pipeline);
-      return new MusicBrainzAdapter(client);
+      return new MusicBrainzAdapter(client, { cache: identityCache });
     });
 
     await providerDiscovery.discoverAll({

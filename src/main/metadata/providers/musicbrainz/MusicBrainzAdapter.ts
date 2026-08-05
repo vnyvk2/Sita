@@ -1,11 +1,18 @@
 import type { IMetadataProviderAdapter } from '@main/metadata/contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '@main/metadata/contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '@main/metadata/contracts/ProviderIdentity';
-import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
+import type { IdentityResolutionCache } from '@main/metadata/cache/IdentityResolutionCache';
+import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
 import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import type { MusicBrainzRecordingDto } from './dto/RecordingDto';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
+
+export interface MusicBrainzAdapterOptions {
+  matcher?: MetadataMatcher;
+  cache?: IdentityResolutionCache;
+}
 
 export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   public readonly identity: ProviderIdentity = {
@@ -27,13 +34,15 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
 
   private readonly apiClient: MusicBrainzApiClient;
   private readonly matcher: MetadataMatcher;
+  private readonly cache?: IdentityResolutionCache;
   private readonly recordingMapper = new MusicBrainzRecordingMapper();
   private readonly releaseMapper = new MusicBrainzReleaseMapper();
   private readonly artistMapper = new MusicBrainzArtistMapper();
 
-  constructor(apiClient: MusicBrainzApiClient, matcher?: MetadataMatcher) {
+  constructor(apiClient: MusicBrainzApiClient, options?: MusicBrainzAdapterOptions) {
     this.apiClient = apiClient;
-    this.matcher = matcher ?? new MetadataMatcher(0.35);
+    this.matcher = options?.matcher ?? new MetadataMatcher(0.35);
+    this.cache = options?.cache;
   }
 
   public supports(capability: ProviderCapability): boolean {
@@ -43,7 +52,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   public async lookup<TDTO = unknown>(identity: MetadataIdentity): Promise<ProviderResult<TDTO>> {
     const rawId = String(identity.entityId);
 
-    // If identity looks like a UUID (MBID), fetch directly
+    // 1. Direct MBID lookup
     if (this.isMbid(rawId)) {
       const recording = await this.apiClient.getRecordingById(rawId);
       if (recording) {
@@ -51,7 +60,22 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       }
     }
 
-    // Otherwise, perform title/artist search query
+    const title = identity.getSearchTitle();
+    const artist = identity.getSearchArtist();
+    const cacheKey = title && artist ? `${title}:${artist}` : null;
+
+    // 2. Identity Resolution Cache lookup
+    if (this.cache && cacheKey) {
+      const cachedMbid = this.cache.get<string>(this.identity.id, cacheKey);
+      if (cachedMbid) {
+        const cachedRecording = await this.apiClient.getRecordingById(cachedMbid);
+        if (cachedRecording) {
+          return this.recordingMapper.toProviderResult(cachedRecording, 1.0) as ProviderResult<TDTO>;
+        }
+      }
+    }
+
+    // 3. Search query lookup
     const searchQuery = this.buildSearchQuery(identity);
     if (!searchQuery) {
       return new ProviderResult({
@@ -70,17 +94,31 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       }) as ProviderResult<TDTO>;
     }
 
+    // Adapt MusicBrainz DTOs to provider-generic CandidateItems
+    const adaptedCandidates: Array<CandidateItem & { original: MusicBrainzRecordingDto }> = candidates.map((c) => ({
+      id: c.id,
+      title: c.title,
+      artists: c['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean),
+      durationSeconds: c.length ? c.length / 1000 : undefined,
+      original: c
+    }));
+
     const matchResult = this.matcher.findBestMatch(
       {
-        title: identity.getSearchTitle() ?? rawId,
-        artist: identity.getSearchArtist(),
+        title: title ?? rawId,
+        artist,
         durationSeconds: identity.getSearchDuration()
       },
-      candidates
+      adaptedCandidates
     );
 
-    const recordingToMap = matchResult?.candidate ?? candidates[0];
+    const recordingToMap = matchResult?.candidate.original ?? candidates[0];
     const confidenceScore = matchResult?.score ?? 0.5;
+
+    // 4. Cache resolved MBID on high-confidence match
+    if (this.cache && cacheKey && matchResult && confidenceScore >= 0.5) {
+      this.cache.set(this.identity.id, cacheKey, matchResult.candidate.id);
+    }
 
     return this.recordingMapper.toProviderResult(recordingToMap, confidenceScore) as ProviderResult<TDTO>;
   }

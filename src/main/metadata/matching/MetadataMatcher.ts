@@ -9,8 +9,8 @@ export interface MatchTarget {
 export interface CandidateItem {
   id: string;
   title: string;
-  length?: number;
-  'artist-credit'?: Array<{ name?: string; artist?: { name?: string } }>;
+  artists?: string[];
+  durationSeconds?: number;
   [key: string]: unknown;
 }
 
@@ -65,11 +65,9 @@ export class MetadataMatcher {
     }
 
     // Artist match (up to 35 points)
-    if (target.artist && candidate['artist-credit'] && candidate['artist-credit'].length > 0) {
+    if (target.artist && candidate.artists && candidate.artists.length > 0) {
       const normTargetArtist = this.normalize(target.artist);
-      const candArtists = candidate['artist-credit']
-        .map((ac) => this.normalize(ac.name ?? ac.artist?.name ?? ''))
-        .filter(Boolean);
+      const candArtists = candidate.artists.map((a) => this.normalize(a)).filter(Boolean);
 
       if (candArtists.some((ca) => ca === normTargetArtist || normTargetArtist.includes(ca))) {
         score += 35;
@@ -78,9 +76,8 @@ export class MetadataMatcher {
     }
 
     // Duration match (up to 20 points)
-    if (target.durationSeconds && candidate.length) {
-      const candSecs = candidate.length / 1000;
-      const diffSecs = Math.abs(target.durationSeconds - candSecs);
+    if (target.durationSeconds && candidate.durationSeconds) {
+      const diffSecs = Math.abs(target.durationSeconds - candidate.durationSeconds);
 
       if (diffSecs <= 3) {
         score += 20;
