@@ -1,4 +1,4 @@
-import type { IMetadataProviderAdapter } from '../contracts/IMetadataProviderAdapter';
+import type { IMetadataProviderAdapter, IProviderLifecycle } from '../contracts/IMetadataProviderAdapter';
 import type { ProviderConfiguration } from '../contracts/ProviderConfiguration';
 import { ProviderState, type ProviderStatus } from '../contracts/ProviderStatus';
 
@@ -58,7 +58,10 @@ export class MetadataProviderRuntime {
 
     this.statusState.state = ProviderState.Initializing;
     try {
-      await this.adapter.initialize(this.config);
+      const lifecycle = this.adapter as unknown as IProviderLifecycle;
+      if (typeof lifecycle.initialize === 'function') {
+        await lifecycle.initialize(this.config);
+      }
       this.statusState = {
         state: ProviderState.Healthy,
         consecutiveFailures: 0,
@@ -78,7 +81,10 @@ export class MetadataProviderRuntime {
 
   public async shutdown(): Promise<void> {
     try {
-      await this.adapter.shutdown();
+      const lifecycle = this.adapter as unknown as IProviderLifecycle;
+      if (typeof lifecycle.shutdown === 'function') {
+        await lifecycle.shutdown();
+      }
     } finally {
       this.statusState.state = ProviderState.Uninitialized;
     }

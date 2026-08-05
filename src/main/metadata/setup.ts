@@ -42,6 +42,8 @@ import { DatabaseMetadataRepository } from './repository/DatabaseMetadataReposit
 import { LoaderRegistry } from './repository/LoaderRegistry';
 import { UserMetadataRepository } from './repository/UserMetadataRepository';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
+import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter';
+import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
 import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
 import { UserMetadataService } from './services/UserMetadataService';
@@ -132,6 +134,17 @@ export class MetadataBootstrap {
 
     providerRegistry.register(localProvider);
     providerRegistry.register(userProvider);
+
+    const localAdapter = new LocalMetadataAdapter(localProvider);
+    const userAdapter = new UserMetadataAdapter(userProvider);
+
+    providerDiscovery.registerFactory('local-file-provider', () => localAdapter);
+    providerDiscovery.registerFactory('user-override-provider', () => userAdapter);
+
+    await providerDiscovery.discoverAll({
+      'local-file-provider': { enabled: true, priority: 100 },
+      'user-override-provider': { enabled: true, priority: 1000 }
+    });
 
     const userService = new UserMetadataService(userRepository, eventBus);
 

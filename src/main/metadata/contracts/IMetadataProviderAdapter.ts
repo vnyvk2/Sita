@@ -1,19 +1,17 @@
 import type { MetadataIdentity } from '../models/MetadataIdentity';
-import type { MetadataProviderInfo } from '../models/MetadataProviderInfo';
 import type { ProviderResult } from '../models/ProviderResult';
 import type { ProviderCapabilities, ProviderCapability } from './ProviderCapabilities';
 import type { ProviderConfiguration } from './ProviderConfiguration';
 import type { ProviderIdentity } from './ProviderIdentity';
-import type { ProviderStatus } from './ProviderStatus';
+
+export interface IProviderLifecycle {
+  initialize?(config?: ProviderConfiguration): Promise<void>;
+  shutdown?(): Promise<void>;
+}
 
 export interface IMetadataProviderAdapter {
   readonly identity: ProviderIdentity;
   readonly capabilities: ProviderCapabilities;
-  readonly status: ProviderStatus;
-  readonly legacyInfo: MetadataProviderInfo;
-
-  initialize(config?: ProviderConfiguration): Promise<void>;
-  shutdown(): Promise<void>;
 
   supports(capability: ProviderCapability): boolean;
 

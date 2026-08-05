@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
+import type { IMetadataProviderAdapter, IProviderLifecycle } from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import { ProviderState } from '../../contracts/ProviderStatus';
 import { MetadataProviderRuntime } from '../MetadataProviderRuntime';
 
-const mockAdapter: IMetadataProviderAdapter = {
+const initSpy = vi.fn().mockResolvedValue(undefined);
+const shutdownSpy = vi.fn().mockResolvedValue(undefined);
+
+const mockAdapter: IMetadataProviderAdapter & IProviderLifecycle = {
   identity: {
     id: 'mock-provider',
     name: 'Mock Provider',
@@ -12,15 +15,8 @@ const mockAdapter: IMetadataProviderAdapter = {
     providerType: 'online'
   },
   capabilities: new ProviderCapabilities([ProviderCapability.Lookup, ProviderCapability.Artwork]),
-  status: { state: ProviderState.Uninitialized, consecutiveFailures: 0 },
-  legacyInfo: {
-    id: 'mock-provider',
-    name: 'Mock Provider',
-    version: '1.0.0',
-    capabilities: new Set()
-  },
-  initialize: vi.fn().mockResolvedValue(undefined),
-  shutdown: vi.fn().mockResolvedValue(undefined),
+  initialize: initSpy,
+  shutdown: shutdownSpy,
   supports: (cap) => cap === ProviderCapability.Lookup || cap === ProviderCapability.Artwork,
   lookup: vi.fn().mockResolvedValue({ providerId: 'mock-provider', success: true }),
   search: vi.fn().mockResolvedValue([])
@@ -32,6 +28,7 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
     expect(runtime.status.state).toBe(ProviderState.Uninitialized);
 
     await runtime.initialize();
+    expect(initSpy).toHaveBeenCalled();
     expect(runtime.status.state).toBe(ProviderState.Healthy);
     expect(runtime.isAvailable()).toBe(true);
   });

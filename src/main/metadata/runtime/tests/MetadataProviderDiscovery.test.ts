@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
-import { ProviderState } from '../../contracts/ProviderStatus';
 import { MetadataProviderDiscovery } from '../MetadataProviderDiscovery';
 import { MetadataProviderRegistry } from '../MetadataProviderRegistry';
 
@@ -13,15 +12,6 @@ const createAdapter = (id: string, capabilities: ProviderCapability[]): IMetadat
     providerType: 'online'
   },
   capabilities: new ProviderCapabilities(capabilities),
-  status: { state: ProviderState.Uninitialized, consecutiveFailures: 0 },
-  legacyInfo: {
-    id,
-    name: `Adapter ${id}`,
-    version: '1.0.0',
-    capabilities: new Set()
-  },
-  initialize: vi.fn().mockResolvedValue(undefined),
-  shutdown: vi.fn().mockResolvedValue(undefined),
   supports: (cap) => capabilities.includes(cap),
   lookup: vi.fn().mockResolvedValue({ providerId: id, success: true }),
   search: vi.fn().mockResolvedValue([])

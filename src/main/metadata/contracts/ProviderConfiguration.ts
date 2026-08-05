@@ -1,10 +1,8 @@
 export interface ProviderConfiguration {
   enabled: boolean;
   priority: number;
-  baseUrl?: string;
-  apiKey?: string;
-  timeoutMs?: number;
-  rateLimitMaxRequests?: number;
-  rateLimitPerIntervalMs?: number;
+  language?: string;
+  country?: string;
+  strictMatching?: boolean;
   options?: Record<string, unknown>;
 }
