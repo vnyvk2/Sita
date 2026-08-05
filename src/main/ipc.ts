@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron
 import addSongsFromFolderStructures from './core/addMusicFolder';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
+import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import { MetadataBootstrap } from './metadata/setup';
 
 import blacklistFolders from './core/blacklistFolders';
@@ -161,6 +162,28 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   
   MetadataBootstrap.getInstance().then((metadataContainer) => {
     registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
+
+    // Auto-Tag Service: create runtime from the same MusicBrainz infrastructure
+    const { MusicBrainzAdapter, MusicBrainzApiClient } = require('./metadata/providers/musicbrainz');
+    const { MetadataProviderRuntime } = require('./metadata/runtime/MetadataProviderRuntime');
+    const { AlbumMetadataService } = require('./metadata/services/AlbumMetadataService');
+    const { AlbumAutoTagService } = require('./metadata/services/AlbumAutoTagService');
+    const { PlatformBootstrap } = require('./platform/PlatformBootstrap');
+    const { RateLimiter, RetryPolicy } = require('./platform/networking');
+
+    const platform = PlatformBootstrap.getInstance();
+    const requestPipeline = platform.createRequestPipeline({
+      rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
+      retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
+    });
+    const mbApiClient = new MusicBrainzApiClient(requestPipeline);
+    const mbAdapter = new MusicBrainzAdapter(mbApiClient, { cache: metadataContainer.identityCache });
+    const providerRuntime = new MetadataProviderRuntime(mbAdapter);
+    providerRuntime.initialize().then(() => {
+      const albumMetadataService = new AlbumMetadataService(providerRuntime);
+      const autoTagService = new AlbumAutoTagService({ albumMetadataService });
+      registerMetadataHandlers(autoTagService, mainWindow);
+    });
   });
 
   if (mainWindow) {
