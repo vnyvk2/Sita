@@ -1,4 +1,4 @@
-import type { AlbumMetadata, MetadataProviderId } from './RecordingMetadata';
+import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from './RecordingMetadata';
 import type { MetadataFieldDiff } from './MetadataDiff';
 import type { ConfidenceLevel } from '../services/AlbumMetadataService';
 
@@ -17,6 +17,7 @@ export interface ProgressEventPayload {
   stage: AutoTagStage;
   message: string;
   progressPercent?: number;
+  operationId?: string;
 }
 
 export interface TrackMatchPreview {
@@ -47,4 +48,5 @@ export interface AlbumTagPreview {
   confidenceLevel: ConfidenceLevel;
   provider: MetadataProviderId;
   providerReleaseId: string;
+  resolvedRelease?: ResolvedAlbumRelease;
 }

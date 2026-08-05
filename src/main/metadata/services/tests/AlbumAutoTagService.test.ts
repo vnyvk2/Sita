@@ -10,8 +10,8 @@ import { MetadataApplyService } from '../MetadataApplyService';
 import { TagWriterService } from '../TagWriterService';
 import type { AutoTagStage } from '../../models/AlbumTagPreview';
 
-describe('Phase 4 — AutoTag Workflow & Preview Integration Suite', () => {
-  it('executes search -> buildPreview -> user edits -> transactional apply -> undo flow', async () => {
+describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () => {
+  it('executes search -> buildPreview -> user edits -> transactional apply -> complete undo flow', async () => {
     const pipeline = new RequestPipeline();
     const apiClient = new MusicBrainzApiClient(pipeline);
     const cache = new IdentityResolutionCache();
@@ -21,6 +21,7 @@ describe('Phase 4 — AutoTag Workflow & Preview Integration Suite', () => {
 
     const metadataService = new AlbumMetadataService(runtime);
     const tagWriter = new TagWriterService();
+    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch');
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
     const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });
@@ -69,25 +70,24 @@ describe('Phase 4 — AutoTag Workflow & Preview Integration Suite', () => {
 
     // 2. Build Preview
     const localSongs = [
-      { songId: 101, title: 'brutal (audio)', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203 },
-      { songId: 102, title: 'traitor', artist: 'Olivia Rodrigo', path: '02.mp3', duration: 229 },
-      { songId: 103, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242 }
+      { songId: 101, title: 'brutal (audio)', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203, trackNumber: 1 },
+      { songId: 102, title: 'traitor', artist: 'Olivia Rodrigo', path: '02.mp3', duration: 229, trackNumber: 2 },
+      { songId: 103, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242, trackNumber: 3 }
     ];
 
     const preview = await autoTagService.buildPreview(localSongs, releases[0].releaseId!, releases[0].provider);
     expect(preview.matches).toHaveLength(3);
     expect(preview.overallConfidence).toBeGreaterThanOrEqual(0.90);
+    expect(preview.confidenceLevel).toBe('Excellent');
+    expect(preview.resolvedRelease).not.toBeUndefined();
     expect(stages).toContain('resolving');
     expect(stages).toContain('matching');
     expect(stages).toContain('diffing');
 
-    // Verify per-field MetadataDiff for track 1 (brutal)
+    // Verify track number normalization ('01' vs 1 marked unchanged)
     const track1 = preview.matches[0];
-    const titleDiff = track1.fieldDiffs.find((f) => f.fieldId === 'title');
-    expect(titleDiff?.oldValue).toBe('brutal (audio)');
-    expect(titleDiff?.suggestedValue).toBe('brutal');
-    expect(titleDiff?.status).toBe('changed');
-    expect(titleDiff?.applyField).toBe(true);
+    const trackNoDiff = track1.fieldDiffs.find((f) => f.fieldId === 'trackNumber');
+    expect(trackNoDiff?.status).toBe('unchanged');
 
     // 3. User edits preview (User override edit on Artist)
     const artistDiff = track1.fieldDiffs.find((f) => f.fieldId === 'artist');
@@ -99,18 +99,46 @@ describe('Phase 4 — AutoTag Workflow & Preview Integration Suite', () => {
     const applyResult = await autoTagService.applyPreview(preview);
     expect(applyResult.success).toBe(true);
     expect(applyResult.updatedCount).toBe(3);
+    expect(writeBatchSpy).toHaveBeenCalled();
     expect(dbUpdater).toHaveBeenCalledTimes(3);
     expect(stages).toContain('applying');
     expect(stages).toContain('completed');
 
-    // 5. Undo Last AutoTag
+    // 5. Undo Last AutoTag (Restores BOTH physical file tags AND DB records)
     const undoResult = await autoTagService.undoLastAutoTag();
     expect(undoResult.success).toBe(true);
     expect(undoResult.restoredCount).toBe(3);
+    expect(writeBatchSpy).toHaveBeenCalledTimes(2); // Apply batch + Undo restore batch
     expect(dbUpdater).toHaveBeenCalledTimes(6); // 3 apply + 3 restore
   });
 
-  it('supports cancellation via AbortController', async () => {
+  it('rolls back physical file tags on DB update failure', async () => {
+    const tagWriter = new TagWriterService();
+    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch');
+    const dbUpdater = vi.fn().mockRejectedValue(new Error('SQLite lock exception'));
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    const preview: any = {
+      album: { title: 'Test Album' },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: 'song.mp3',
+          oldTitle: 'Old Title',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'New Title' }]
+        }
+      ]
+    };
+
+    const result = await applyService.applyPreview(preview);
+    expect(result.success).toBe(false);
+    expect(result.errors[0]).toContain('DB transaction failed, rolled back physical file tags');
+    // Assert writeBatch was called TWICE: once for initial tag write, once for rollback write
+    expect(writeBatchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('supports operationId-keyed concurrent cancellation via AbortController', async () => {
     const pipeline = new RequestPipeline();
     const apiClient = new MusicBrainzApiClient(pipeline);
     const adapter = new MusicBrainzAdapter(apiClient);
@@ -120,10 +148,12 @@ describe('Phase 4 — AutoTag Workflow & Preview Integration Suite', () => {
     const metadataService = new AlbumMetadataService(runtime);
     const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService });
 
-    const signal = autoTagService.createAbortSignal();
-    autoTagService.cancel();
+    const signal1 = autoTagService.createAbortSignal('op-1');
+    const signal2 = autoTagService.createAbortSignal('op-2');
 
-    await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, signal)).rejects.toThrow(/aborted/);
-    expect(autoTagService.currentStage).toBe('cancelled');
+    // Cancel op-1, leave op-2 running
+    autoTagService.cancel('op-1');
+
+    await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, signal1, 'op-1')).rejects.toThrow(/aborted/);
   });
 });

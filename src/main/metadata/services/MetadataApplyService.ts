@@ -38,7 +38,7 @@ export class MetadataApplyService {
 
   /**
    * Applies metadata changes from AlbumTagPreview inside a safe transaction flow:
-   * Validate -> Snapshot -> Write Disk Tags -> Update SQLite DB -> Return ApplyResult
+   * Validate -> Snapshot -> Write Disk Tags -> Update SQLite DB -> Rollback on Failure
    */
   public async applyPreview(preview: AlbumTagPreview): Promise<ApplyResult> {
     if (!preview || !preview.matches || preview.matches.length === 0) {
@@ -50,15 +50,29 @@ export class MetadataApplyService {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
 
-    // 1. Build snapshots for Undo History
+    // 1. Build snapshots for Undo History & Rollback
     const previousSnapshots: SongMetadataSnapshot[] = [];
     const updatedSnapshots: SongMetadataSnapshot[] = [];
     const tagPayloads: TagWritePayload[] = [];
+    const rollbackPayloads: TagWritePayload[] = [];
 
     for (const track of tracksToApply) {
       previousSnapshots.push({
         songId: track.localSongId,
         path: track.songPath,
+        title: track.oldTitle,
+        artist: track.oldArtist,
+        album: track.oldAlbum,
+        year: track.oldYear,
+        trackNumber: track.oldTrackNumber,
+        discNumber: track.oldDiscNumber,
+        genre: track.oldGenre,
+        isrc: track.oldIsrc,
+        musicBrainzRecordingId: track.oldMbid
+      });
+
+      rollbackPayloads.push({
+        filePath: track.songPath,
         title: track.oldTitle,
         artist: track.oldArtist,
         album: track.oldAlbum,
@@ -134,15 +148,14 @@ export class MetadataApplyService {
       previousSongs: previousSnapshots,
       updatedSongs: updatedSnapshots
     };
-    this.historyService.pushSnapshot(historySnapshot);
 
-    // 4. Update Database Metadata
+    // 4. Update Database Metadata with Rollback Guard
     let updatedCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
 
-    for (const snap of updatedSnapshots) {
-      try {
+    try {
+      for (const snap of updatedSnapshots) {
         if (this.dbUpdater) {
           await this.dbUpdater(snap.songId, {
             title: snap.title,
@@ -158,11 +171,15 @@ export class MetadataApplyService {
           });
         }
         updatedCount++;
-      } catch (err: unknown) {
-        failedCount++;
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`Failed DB update for song ${snap.songId}: ${msg}`);
       }
+      this.historyService.pushSnapshot(historySnapshot);
+    } catch (err: unknown) {
+      // ROLLBACK PHYSICAL DISK TAGS ON DB FAILURE
+      await this.tagWriter.writeBatch(rollbackPayloads);
+      failedCount = updatedSnapshots.length;
+      updatedCount = 0;
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`DB transaction failed, rolled back physical file tags: ${msg}`);
     }
 
     return {
@@ -174,7 +191,7 @@ export class MetadataApplyService {
   }
 
   /**
-   * Undoes the last AutoTag transaction restoring original song metadata.
+   * Undoes the last AutoTag transaction restoring BOTH physical file tags AND database records.
    */
   public async undoLastAutoTag(): Promise<{ success: boolean; restoredCount: number }> {
     const snapshot = this.historyService.popUndo();
@@ -182,6 +199,22 @@ export class MetadataApplyService {
       return { success: false, restoredCount: 0 };
     }
 
+    // 1. Restore Physical Tags on Disk
+    const rollbackPayloads: TagWritePayload[] = snapshot.previousSongs.map((prev) => ({
+      filePath: prev.path,
+      title: prev.title,
+      artist: prev.artist,
+      album: prev.album,
+      year: prev.year,
+      trackNumber: prev.trackNumber,
+      discNumber: prev.discNumber,
+      genre: prev.genre,
+      isrc: prev.isrc,
+      musicBrainzRecordingId: prev.musicBrainzRecordingId
+    }));
+    await this.tagWriter.writeBatch(rollbackPayloads);
+
+    // 2. Restore SQLite Database Records
     let restoredCount = 0;
     for (const prev of snapshot.previousSongs) {
       if (this.dbUpdater) {

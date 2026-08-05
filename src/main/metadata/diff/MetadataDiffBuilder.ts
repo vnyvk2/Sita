@@ -64,9 +64,16 @@ export class MetadataDiffBuilder {
     } else if (strOld && !strNew) {
       status = 'missing';
       applyField = false;
-    } else if (strOld && strNew && strOld.toLowerCase() !== strNew.toLowerCase()) {
-      status = 'changed';
-      applyField = true;
+    } else if (strOld && strNew) {
+      const isNumericField = fieldId === 'trackNumber' || fieldId === 'discNumber' || fieldId === 'year';
+      const isDifferent = isNumericField
+        ? Number(strOld) !== Number(strNew)
+        : strOld.toLowerCase().replace(/\s+/g, ' ') !== strNew.toLowerCase().replace(/\s+/g, ' ');
+
+      if (isDifferent) {
+        status = 'changed';
+        applyField = true;
+      }
     }
 
     return {

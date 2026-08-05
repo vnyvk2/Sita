@@ -23,11 +23,15 @@ export interface MetadataHistorySnapshot {
 export class MetadataHistoryService {
   private readonly undoStack: MetadataHistorySnapshot[] = [];
   private readonly redoStack: MetadataHistorySnapshot[] = [];
-  private static readonly MAX_STACK_SIZE = 20;
+  private readonly maxStackSize: number;
+
+  constructor(maxStackSize = 20) {
+    this.maxStackSize = maxStackSize;
+  }
 
   public pushSnapshot(snapshot: MetadataHistorySnapshot): void {
     this.undoStack.push(snapshot);
-    if (this.undoStack.length > MetadataHistoryService.MAX_STACK_SIZE) {
+    if (this.undoStack.length > this.maxStackSize) {
       this.undoStack.shift();
     }
     this.redoStack.length = 0; // Clear redo stack on new action
