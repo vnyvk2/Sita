@@ -1,5 +1,6 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import type { TrackMatchPair } from '../services/AlbumMetadataService';
+import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 
 export class MetadataDiffBuilder {
   /**
@@ -10,10 +11,12 @@ export class MetadataDiffBuilder {
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
 
+    const suggestedAlbum = AlbumSuffixPreserver.preserveAlbumSuffix(song.album, recording.album);
+
     const fieldDiffs: MetadataFieldDiff[] = [
       this.compareField('title', 'Title', song.title, recording.title),
       this.compareField('artist', 'Artist', song.artist, recording.artist),
-      this.compareField('album', 'Album', song.album, recording.album),
+      this.compareField('album', 'Album', song.album, suggestedAlbum),
       this.compareField('year', 'Year', song.year, recording.year),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber),
