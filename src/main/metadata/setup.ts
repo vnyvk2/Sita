@@ -42,8 +42,11 @@ import { DatabaseMetadataRepository } from './repository/DatabaseMetadataReposit
 import { LoaderRegistry } from './repository/LoaderRegistry';
 import { UserMetadataRepository } from './repository/UserMetadataRepository';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
+import { PlatformBootstrap } from '../platform/PlatformBootstrap';
+import { RateLimiter, RetryPolicy } from '../platform/networking';
 import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter';
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
+import { MusicBrainzAdapter, MusicBrainzApiClient } from './providers/musicbrainz';
 import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
 import { UserMetadataService } from './services/UserMetadataService';
@@ -137,10 +140,20 @@ export class MetadataBootstrap {
 
     providerDiscovery.registerFactory('local-file-provider', () => new LocalMetadataAdapter(localProvider));
     providerDiscovery.registerFactory('user-override-provider', () => new UserMetadataAdapter(userProvider));
+    providerDiscovery.registerFactory('musicbrainz', () => {
+      const platform = PlatformBootstrap.getInstance();
+      const pipeline = platform.createRequestPipeline({
+        rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
+        retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
+      });
+      const client = new MusicBrainzApiClient(pipeline);
+      return new MusicBrainzAdapter(client);
+    });
 
     await providerDiscovery.discoverAll({
       'local-file-provider': { enabled: true, priority: 100 },
-      'user-override-provider': { enabled: true, priority: 1000 }
+      'user-override-provider': { enabled: true, priority: 1000 },
+      'musicbrainz': { enabled: true, priority: 500 }
     });
 
     const userService = new UserMetadataService(userRepository, eventBus);

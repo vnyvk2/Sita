@@ -1,30 +1,28 @@
 import { FetchHttpClient, RequestPipeline, type RequestPipelineOptions } from './networking';
 
-export interface PlatformContainer {
-  httpClient: FetchHttpClient;
-  requestPipeline: RequestPipeline;
-}
-
 export class PlatformBootstrap {
-  private static containerPromise: Promise<PlatformContainer> | null = null;
+  private static instance: PlatformBootstrap | null = null;
+  private readonly sharedHttpClient: FetchHttpClient;
 
-  public static async getInstance(options?: RequestPipelineOptions): Promise<PlatformContainer> {
-    if (!this.containerPromise) {
-      this.containerPromise = this.bootstrap(options);
-    }
-    return this.containerPromise;
+  private constructor() {
+    this.sharedHttpClient = new FetchHttpClient();
   }
 
-  public static async bootstrap(options?: RequestPipelineOptions): Promise<PlatformContainer> {
-    const httpClient = new FetchHttpClient();
-    const requestPipeline = new RequestPipeline({
-      client: httpClient,
+  public static getInstance(): PlatformBootstrap {
+    if (!this.instance) {
+      this.instance = new PlatformBootstrap();
+    }
+    return this.instance;
+  }
+
+  public get httpClient(): FetchHttpClient {
+    return this.sharedHttpClient;
+  }
+
+  public createRequestPipeline(options?: Partial<RequestPipelineOptions>): RequestPipeline {
+    return new RequestPipeline({
+      client: this.sharedHttpClient,
       ...options
     });
-
-    return {
-      httpClient,
-      requestPipeline
-    };
   }
 }
