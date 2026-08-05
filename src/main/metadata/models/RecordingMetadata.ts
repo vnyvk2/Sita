@@ -1,4 +1,24 @@
 /**
+ * Strongly typed provider identifier union.
+ */
+export type MetadataProviderId = 'musicbrainz' | 'spotify' | 'discogs' | 'local' | 'user';
+
+/**
+ * Strongly typed criterion used during metadata matching.
+ */
+export type MatchCriterion =
+  | 'title'
+  | 'title_partial'
+  | 'artist'
+  | 'album'
+  | 'duration'
+  | 'duration_close'
+  | 'year'
+  | 'track'
+  | 'index'
+  | 'musicbrainz_recording_search';
+
+/**
  * Pure domain model for core audio recording metadata.
  */
 export interface RecordingMetadata {
@@ -15,6 +35,21 @@ export interface RecordingMetadata {
   totalDiscs?: number;
   composer?: string;
   duration?: number;
+}
+
+/**
+ * Pure domain model for core album metadata.
+ */
+export interface AlbumMetadata {
+  title: string;
+  artist: string;
+  year?: number;
+  label?: string;
+  releaseType?: string;
+  artwork?: ArtworkMetadata;
+  discCount?: number;
+  trackCount?: number;
+  releaseId?: string;
 }
 
 /**
@@ -41,7 +76,7 @@ export interface LyricsMetadata {
  * Metadata provided by external identity/discovery providers (MusicBrainz, Spotify, Discogs, etc.).
  */
 export interface ProviderMetadata {
-  provider: string; // e.g. 'musicbrainz' | 'spotify' | 'discogs'
+  provider: MetadataProviderId;
   providerRecordingId?: string;
   providerReleaseId?: string;
   providerArtistId?: string;
@@ -50,7 +85,7 @@ export interface ProviderMetadata {
   releaseType?: string;
   explicit?: boolean;
   confidence?: number; // 0.0 to 1.0
-  matchedBy?: string[];
+  matchedBy?: MatchCriterion[];
   reasons?: string[];
 }
 

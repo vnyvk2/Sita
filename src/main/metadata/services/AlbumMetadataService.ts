@@ -1,15 +1,4 @@
-import type { MetadataCandidate } from '../models/RecordingMetadata';
-
-export interface AlbumReleaseMatch {
-  releaseId: string;
-  title: string;
-  artist: string;
-  year?: number;
-  label?: string;
-  trackCount: number;
-  mediaCount: number;
-  artworkUrl?: string;
-}
+import type { MetadataCandidate, MatchCriterion, AlbumMetadata } from '../models/RecordingMetadata';
 
 export interface TrackMatchPair {
   localSong: {
@@ -21,26 +10,21 @@ export interface TrackMatchPair {
   };
   remoteTrack: MetadataCandidate;
   confidence: number; // 0.0 to 1.0
-  matchedBy: string[];
+  matchedBy: MatchCriterion[];
   reasons: string[];
 }
 
 export interface AlbumPreview {
-  release: AlbumReleaseMatch;
-  cover?: string;
-  artist: string;
-  year?: number;
-  label?: string;
+  album: AlbumMetadata;
   trackList: TrackMatchPair[];
-  discCount: number;
   warnings: string[];
   confidence: number;
   changesCount: number;
 }
 
 export interface IAlbumMetadataService {
-  search(albumName: string, artistName?: string): Promise<AlbumReleaseMatch[]>;
-  resolveRelease(releaseId: string): Promise<AlbumReleaseMatch | null>;
+  search(albumName: string, artistName?: string): Promise<AlbumMetadata[]>;
+  resolveRelease(releaseId: string): Promise<AlbumMetadata | null>;
   buildAlbumMatch(
     localSongs: Array<{ songId: number; title: string; artist?: string; path: string; duration?: number }>,
     releaseId: string
@@ -49,11 +33,11 @@ export interface IAlbumMetadataService {
 }
 
 export class AlbumMetadataService implements IAlbumMetadataService {
-  public async search(_albumName: string, _artistName?: string): Promise<AlbumReleaseMatch[]> {
+  public async search(_albumName: string, _artistName?: string): Promise<AlbumMetadata[]> {
     throw new Error('AlbumMetadataService.search is not implemented yet.');
   }
 
-  public async resolveRelease(_releaseId: string): Promise<AlbumReleaseMatch | null> {
+  public async resolveRelease(_releaseId: string): Promise<AlbumMetadata | null> {
     throw new Error('AlbumMetadataService.resolveRelease is not implemented yet.');
   }
 

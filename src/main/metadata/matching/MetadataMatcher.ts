@@ -1,4 +1,9 @@
-import type { RecordingMetadata, ProviderMetadata, MetadataCandidate } from '@main/metadata/models/RecordingMetadata';
+import type {
+  RecordingMetadata,
+  ProviderMetadata,
+  MetadataCandidate,
+  MatchCriterion
+} from '@main/metadata/models/RecordingMetadata';
 
 export interface MatchTarget {
   title: string;
@@ -19,7 +24,7 @@ export interface CandidateItem {
 export interface MatchScoreResult<T extends CandidateItem = CandidateItem> {
   candidate: T;
   score: number; // 0.0 to 1.0
-  matchedBy: string[];
+  matchedBy: MatchCriterion[];
   reasons: string[];
 }
 
@@ -53,7 +58,7 @@ export class MetadataMatcher {
   ): MatchScoreResult<T> {
     let score = 0;
     const maxScore = 100;
-    const matchedBy: string[] = [];
+    const matchedBy: MatchCriterion[] = [];
     const reasons: string[] = [];
 
     const normTargetTitle = this.normalize(target.title);
