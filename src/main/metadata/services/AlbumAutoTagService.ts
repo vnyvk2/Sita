@@ -175,9 +175,9 @@ export class AlbumAutoTagService extends EventEmitter {
     const controller = this.activeOperations.get(operationId);
     if (controller) {
       controller.abort();
+      this.emitProgress('cancelled', `Operation '${operationId}' cancelled by user.`, 0, operationId);
       this.activeOperations.delete(operationId);
       this.operationStages.delete(operationId);
-      this.emitProgress('cancelled', `Operation '${operationId}' cancelled by user.`, 0, operationId);
     }
   }
 
