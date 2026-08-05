@@ -37,8 +37,18 @@ export class MetadataNormalizer {
   ];
 
   /**
+   * Evaluates if a track title is missing or a useless placeholder (e.g. "Track 01", "Unknown", "Audio Track").
+   */
+  public static isUselessTitle(title?: string): boolean {
+    if (!title || !title.trim()) return true;
+    const lower = title.trim().toLowerCase();
+    const uselessRegex = /^(track\s*\d*|audio\s*track|unknown(\s*title)?|untitled|song\s*\d*)$/i;
+    return uselessRegex.test(lower);
+  }
+
+  /**
    * Normalizes track title by stripping cosmetic noise (Official Video, Lyrics, etc.)
-   * and stripping recording variants (Live, Acoustic, Remix, etc.) for pure title comparison.
+   * while preserving meaningful tokens without deleting variants.
    */
   public static normalizeTitle(title: string): string {
     if (!title) return '';

@@ -6,6 +6,7 @@ export interface LocalSongInput {
   title: string;
   artist?: string;
   album?: string;
+  year?: number;
   path: string;
   duration?: number;
   isrc?: string;
@@ -15,6 +16,8 @@ export interface LocalSongInput {
 export interface ScoreBreakdown {
   title: number;
   artist: number;
+  album?: number;
+  year?: number;
   duration: number;
   mbid: number;
   total: number;
@@ -25,6 +28,7 @@ export interface TrackMatchPair {
   remoteTrack: MetadataCandidate;
   confidence: number; // 0.0 to 1.0
   scoreBreakdown?: ScoreBreakdown;
+  why?: string;
   matchedBy: MatchCriterion[];
   reasons: string[];
 }
@@ -79,6 +83,8 @@ export class AlbumMetadataService implements IAlbumMetadataService {
       trackId?: string;
       title: string;
       artist?: string;
+      album?: string;
+      year?: number;
       trackNumber: number;
       discNumber?: number;
       duration?: number;
@@ -91,10 +97,11 @@ export class AlbumMetadataService implements IAlbumMetadataService {
       albumTitle: album.title,
       discCount: album.discCount,
       trackCount: album.trackCount,
-      releaseType: album.releaseType
+      releaseType: album.releaseType,
+      year: album.year
     });
 
-    // Album Sequence Continuity Assistance (MusicBee Feature)
+    // Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers)
     const highConfidenceCount = trackList.filter((t) => t.confidence >= 0.90).length;
     const isHighAlbumAgreement = trackList.length > 0 && highConfidenceCount / trackList.length >= 0.65;
 
@@ -103,7 +110,17 @@ export class AlbumMetadataService implements IAlbumMetadataService {
         if (pair.confidence < 0.90 && idx > 0 && idx < trackList.length - 1) {
           const prevPair = trackList[idx - 1];
           const nextPair = trackList[idx + 1];
-          if (prevPair.confidence >= 0.90 && nextPair.confidence >= 0.90) {
+          const prevTrackNo = prevPair.remoteTrack.recording.trackNumber ?? 0;
+          const currentTrackNo = pair.remoteTrack.recording.trackNumber ?? 0;
+          const nextTrackNo = nextPair.remoteTrack.recording.trackNumber ?? 0;
+
+          // Strict consecutive track number check: Track N-1, Track N, Track N+1
+          if (
+            prevPair.confidence >= 0.90 &&
+            nextPair.confidence >= 0.90 &&
+            prevTrackNo + 1 === currentTrackNo &&
+            currentTrackNo + 1 === nextTrackNo
+          ) {
             const boostedConfidence = Math.min(0.95, pair.confidence + 0.15);
             return {
               ...pair,
@@ -121,6 +138,9 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
     for (const pair of trackList) {
       totalConfidence += pair.confidence;
+      if (pair.reasons.includes('duplicate_local_candidate')) {
+        warnings.push(`Duplicate local track title detected for "${pair.localSong.title}". Manual verification recommended.`);
+      }
       if (pair.confidence < 0.75) {
         warnings.push(`Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Manual review required.`);
       } else if (pair.confidence < 0.90) {
