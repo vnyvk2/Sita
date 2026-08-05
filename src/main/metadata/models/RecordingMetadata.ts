@@ -1,5 +1,5 @@
 /**
- * Pure domain model for editable track metadata.
+ * Pure domain model for core audio recording metadata.
  */
 export interface RecordingMetadata {
   title: string;
@@ -15,10 +15,26 @@ export interface RecordingMetadata {
   totalDiscs?: number;
   composer?: string;
   duration?: number;
-  artworkPath?: string;
-  artworkUrls?: string[];
+}
+
+/**
+ * Metadata defining downloadable artwork assets.
+ */
+export interface ArtworkMetadata {
+  primaryPath?: string;
+  optimizedPath?: string;
+  onlineUrls?: string[];
+  palette?: Record<string, string>;
+}
+
+/**
+ * Metadata defining synchronized and unsynchronized lyrics.
+ */
+export interface LyricsMetadata {
   synchronizedLyrics?: string;
   unsynchronizedLyrics?: string;
+  language?: string;
+  copyright?: string;
 }
 
 /**
@@ -44,4 +60,6 @@ export interface ProviderMetadata {
 export interface MetadataCandidate {
   recording: RecordingMetadata;
   provider: ProviderMetadata;
+  artwork?: ArtworkMetadata;
+  lyrics?: LyricsMetadata;
 }
