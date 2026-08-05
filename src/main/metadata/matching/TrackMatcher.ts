@@ -11,84 +11,100 @@ export interface LocalSongInput {
   musicBrainzRecordingId?: string;
 }
 
+export interface OfficialTrackInput {
+  trackId?: string;
+  title: string;
+  artist?: string;
+  trackNumber: number;
+  discNumber?: number;
+  duration?: number;
+  isrc?: string;
+  musicBrainzRecordingId?: string;
+}
+
 export class TrackMatcher {
   /**
    * Matches an array of local songs against official release tracks.
+   * Enforces strict ONE-TO-ONE candidate assignment (no two local songs can claim the same official track).
    * Uses title fuzzy matching, artist matching, duration tolerance, and MBID matching.
    * Filename numbers contribute 0 points to matching score.
    */
   public matchTracks(
     localSongs: LocalSongInput[],
     releaseId: string,
-    officialTracks: Array<{
-      trackId?: string;
-      title: string;
-      artist?: string;
-      trackNumber: number;
-      discNumber?: number;
-      duration?: number;
-      isrc?: string;
-      musicBrainzRecordingId?: string;
-    }>
+    officialTracks: OfficialTrackInput[]
   ): TrackMatchPair[] {
-    return localSongs.map((song) => {
-      let bestCandidateTrack = officialTracks[0];
-      let maxScore = -1;
-      let bestMatchedBy: MatchCriterion[] = [];
-      let bestReasons: string[] = [];
+    interface PairScore {
+      localSong: LocalSongInput;
+      track: OfficialTrackInput;
+      score: number;
+      matchedBy: MatchCriterion[];
+      reasons: string[];
+    }
 
+    const allPairs: PairScore[] = [];
+
+    for (const song of localSongs) {
       for (const track of officialTracks) {
         const { score, matchedBy, reasons } = this.scorePair(song, track);
-        if (score > maxScore) {
-          maxScore = score;
-          bestCandidateTrack = track;
-          bestMatchedBy = matchedBy;
-          bestReasons = reasons;
-        }
+        allPairs.push({ localSong: song, track, score, matchedBy, reasons });
+      }
+    }
+
+    // Sort all candidate pairs in descending order of matching score
+    allPairs.sort((a, b) => b.score - a.score);
+
+    const claimedSongIds = new Set<number>();
+    const claimedTrackIds = new Set<string | number>();
+    const assignedPairs: TrackMatchPair[] = [];
+
+    for (const pair of allPairs) {
+      const trackKey = pair.track.trackId ?? pair.track.trackNumber;
+      if (claimedSongIds.has(pair.localSong.songId) || claimedTrackIds.has(trackKey)) {
+        continue; // Skip already claimed local song or official track
       }
 
-      const normalizedScore = Math.min(1.0, Math.max(0.0, maxScore / 100));
+      claimedSongIds.add(pair.localSong.songId);
+      claimedTrackIds.add(trackKey);
+
+      const normalizedScore = Math.min(1.0, Math.max(0.0, pair.score / 100));
 
       const recording: RecordingMetadata = {
-        title: bestCandidateTrack?.title ?? song.title,
-        artist: bestCandidateTrack?.artist ?? song.artist,
-        trackNumber: bestCandidateTrack?.trackNumber,
-        discNumber: bestCandidateTrack?.discNumber,
-        duration: bestCandidateTrack?.duration
+        title: pair.track.title,
+        artist: pair.track.artist ?? pair.localSong.artist,
+        trackNumber: pair.track.trackNumber,
+        discNumber: pair.track.discNumber,
+        duration: pair.track.duration
       };
 
       const candidate: MetadataCandidate = {
         recording,
         provider: {
           provider: 'musicbrainz',
-          providerRecordingId: bestCandidateTrack?.musicBrainzRecordingId ?? bestCandidateTrack?.trackId,
+          providerRecordingId: pair.track.musicBrainzRecordingId ?? pair.track.trackId,
           providerReleaseId: releaseId,
-          isrc: bestCandidateTrack?.isrc,
+          isrc: pair.track.isrc,
           confidence: normalizedScore,
-          matchedBy: bestMatchedBy,
-          reasons: bestReasons
+          matchedBy: pair.matchedBy,
+          reasons: pair.reasons
         }
       };
 
-      return {
-        localSong: song,
+      assignedPairs.push({
+        localSong: pair.localSong,
         remoteTrack: candidate,
         confidence: normalizedScore,
-        matchedBy: bestMatchedBy,
-        reasons: bestReasons
-      };
-    });
+        matchedBy: pair.matchedBy,
+        reasons: pair.reasons
+      });
+    }
+
+    return assignedPairs;
   }
 
   public scorePair(
     song: LocalSongInput,
-    track: {
-      trackId?: string;
-      title: string;
-      artist?: string;
-      duration?: number;
-      musicBrainzRecordingId?: string;
-    }
+    track: OfficialTrackInput
   ): { score: number; matchedBy: MatchCriterion[]; reasons: string[] } {
     let score = 0;
     const matchedBy: MatchCriterion[] = [];

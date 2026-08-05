@@ -47,46 +47,15 @@ export class AlbumMetadataService implements IAlbumMetadataService {
   /**
    * Stage 2 — Search Album Releases
    */
-  public async search(albumName: string, artistName?: string): Promise<AlbumMetadata[]> {
-    const formattedArtist = artistName ? artistName.trim() : 'Unknown Artist';
-    return [
-      {
-        releaseId: 'mb-release-sour-std',
-        title: albumName.trim(),
-        artist: formattedArtist,
-        year: 2021,
-        label: 'Geffen Records',
-        releaseType: 'Album',
-        discCount: 1,
-        trackCount: 11
-      },
-      {
-        releaseId: 'mb-release-sour-deluxe',
-        title: `${albumName.trim()} (Deluxe Edition)`,
-        artist: formattedArtist,
-        year: 2021,
-        label: 'Geffen Records',
-        releaseType: 'Album',
-        discCount: 1,
-        trackCount: 15
-      }
-    ];
+  public async search(_albumName: string, _artistName?: string): Promise<AlbumMetadata[]> {
+    throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime connection.');
   }
 
   /**
    * Stage 3 — Download Complete Release
    */
-  public async resolveRelease(releaseId: string): Promise<AlbumMetadata | null> {
-    return {
-      releaseId,
-      title: 'SOUR',
-      artist: 'Olivia Rodrigo',
-      year: 2021,
-      label: 'Geffen Records',
-      releaseType: 'Album',
-      discCount: 1,
-      trackCount: 11
-    };
+  public async resolveRelease(_releaseId: string): Promise<AlbumMetadata | null> {
+    throw new Error('AlbumMetadataService.resolveRelease requires active MetadataProviderRuntime connection.');
   }
 
   /**
@@ -94,32 +63,30 @@ export class AlbumMetadataService implements IAlbumMetadataService {
    */
   public async buildAlbumMatch(
     localSongs: LocalSongInput[],
-    releaseId: string
+    album: AlbumMetadata,
+    officialTracks: Array<{
+      trackId?: string;
+      title: string;
+      artist?: string;
+      trackNumber: number;
+      discNumber?: number;
+      duration?: number;
+      isrc?: string;
+      musicBrainzRecordingId?: string;
+    }>
   ): Promise<AlbumPreview> {
-    const album = await this.resolveRelease(releaseId);
-    if (!album) {
-      throw new Error(`Release not found for ID: ${releaseId}`);
-    }
-
-    const officialTracks = [
-      { trackId: 'mb-rec-1', title: 'brutal', artist: album.artist, trackNumber: 1, duration: 203 },
-      { trackId: 'mb-rec-2', title: 'traitor', artist: album.artist, trackNumber: 2, duration: 229 },
-      { trackId: 'mb-rec-3', title: 'drivers license', artist: album.artist, trackNumber: 3, duration: 242 },
-      { trackId: 'mb-rec-4', title: '1 step forward, 3 steps back', artist: album.artist, trackNumber: 4, duration: 163 },
-      { trackId: 'mb-rec-5', title: 'deja vu', artist: album.artist, trackNumber: 5, duration: 215 },
-      { trackId: 'mb-rec-6', title: 'good 4 u', artist: album.artist, trackNumber: 6, duration: 178 },
-      { trackId: 'mb-rec-7', title: 'enough for you', artist: album.artist, trackNumber: 7, duration: 202 }
-    ];
-
-    const trackList = this.trackMatcher.matchTracks(localSongs, releaseId, officialTracks);
+    // Run 1-to-1 TrackMatcher assignment
+    const trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks);
 
     const warnings: string[] = [];
     let totalConfidence = 0;
 
     for (const pair of trackList) {
       totalConfidence += pair.confidence;
-      if (pair.confidence < 0.7) {
-        warnings.push(`Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}"`);
+      if (pair.confidence < 0.75) {
+        warnings.push(`Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Manual review required.`);
+      } else if (pair.confidence < 0.90) {
+        warnings.push(`Uncertain match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Confirmation recommended.`);
       }
     }
 
@@ -136,6 +103,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
   /**
    * Stage 7 — Apply & Stage 8 — Verify
+   * Strict Confidence Threshold: Auto-apply ONLY if confidence >= 0.90
    */
   public async applyAlbum(preview: AlbumPreview): Promise<{ success: boolean; updatedSongCount: number }> {
     if (!preview.trackList || preview.trackList.length === 0) {
@@ -144,7 +112,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
     let updatedCount = 0;
     for (const pair of preview.trackList) {
-      if (pair.confidence >= 0.4) {
+      if (pair.confidence >= 0.90) {
         updatedCount++;
       }
     }
