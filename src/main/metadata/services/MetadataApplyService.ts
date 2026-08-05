@@ -1,4 +1,4 @@
-import type { AlbumTagPreview } from '../../../common/metadata/types';
+import type { AlbumTagPreview, TrackMatchPreview } from '../../../common/metadata/types';
 import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { TagWriterService, type TagWritePayload } from './TagWriterService';
@@ -7,20 +7,6 @@ export class MetadataError extends Error {
   constructor(message: string, public readonly code: string) {
     super(message);
     this.name = 'MetadataError';
-  }
-}
-
-export class NetworkError extends MetadataError {
-  constructor(message: string) {
-    super(message, 'NETWORK_ERROR');
-    this.name = 'NetworkError';
-  }
-}
-
-export class RateLimitError extends MetadataError {
-  constructor(message: string) {
-    super(message, 'RATE_LIMIT_ERROR');
-    this.name = 'RateLimitError';
   }
 }
 
@@ -42,6 +28,13 @@ export class CancelledError extends MetadataError {
   constructor(message: string) {
     super(message, 'CANCELLED');
     this.name = 'CancelledError';
+  }
+}
+
+export class RollbackError extends MetadataError {
+  constructor(message: string) {
+    super(message, 'ROLLBACK_FAILED');
+    this.name = 'RollbackError';
   }
 }
 
@@ -82,10 +75,10 @@ export class MetadataApplyService {
   }
 
   /**
-   * Applies metadata changes from AlbumTagPreview using chunked batched transactions:
-   * Chunking (default 50 items/batch) -> Validate -> Snapshot -> Disk Write -> DB Transaction -> Revert Disk on Error
+   * Applies metadata changes from AlbumTagPreview using chunked batched transactions with AbortSignal cancellation support:
+   * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction -> Revert Disk on Error
    */
-  public async applyPreview(preview: AlbumTagPreview): Promise<ApplyResult> {
+  public async applyPreview(preview: AlbumTagPreview, signal?: AbortSignal): Promise<ApplyResult> {
     if (!preview || !preview.matches || preview.matches.length === 0) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
@@ -101,6 +94,10 @@ export class MetadataApplyService {
 
     // Split selected matches into chunks of batchChunkSize (default 50)
     for (let i = 0; i < selectedMatches.length; i += this.batchChunkSize) {
+      if (signal?.aborted) {
+        throw new CancelledError('Apply operation aborted by user.');
+      }
+
       const chunkMatches = selectedMatches.slice(i, i + this.batchChunkSize);
       const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title);
 
@@ -121,7 +118,7 @@ export class MetadataApplyService {
     };
   }
 
-  private async applyMatchChunk(chunkMatches: any[], albumTitle: string): Promise<ApplyResult> {
+  private async applyMatchChunk(chunkMatches: TrackMatchPreview[], albumTitle: string): Promise<ApplyResult> {
     const previousSongs: SongMetadataSnapshot[] = [];
     const updatedSongs: SongMetadataSnapshot[] = [];
     const tagWritePayloads: TagWritePayload[] = [];
@@ -139,7 +136,8 @@ export class MetadataApplyService {
         trackNumber: match.oldTrackNumber,
         discNumber: match.oldDiscNumber,
         genre: match.oldGenre,
-        isrc: match.oldIsrc
+        isrc: match.oldIsrc,
+        musicBrainzRecordingId: match.oldMbid
       };
       previousSongs.push(previousSnapshot);
 
@@ -179,6 +177,10 @@ export class MetadataApplyService {
             payloadTags.trackNumber = Number(val);
             updatedSnapshot.trackNumber = Number(val);
             break;
+          case 'discNumber':
+            payloadTags.discNumber = Number(val);
+            updatedSnapshot.discNumber = Number(val);
+            break;
           case 'genre':
             payloadTags.genre = String(val);
             updatedSnapshot.genre = String(val);
@@ -189,6 +191,7 @@ export class MetadataApplyService {
       tagWritePayloads.push(payloadTags as TagWritePayload);
       updatedSongs.push(updatedSnapshot);
 
+      // Complete rollback payload restoring ALL metadata fields
       rollbackPayloads.push({
         filePath: match.songPath,
         title: match.oldTitle,
@@ -196,6 +199,7 @@ export class MetadataApplyService {
         album: match.oldAlbum,
         year: match.oldYear,
         trackNumber: match.oldTrackNumber,
+        discNumber: match.oldDiscNumber,
         genre: match.oldGenre
       });
     }
@@ -292,6 +296,7 @@ export class MetadataApplyService {
       album: s.album,
       year: s.year,
       trackNumber: s.trackNumber,
+      discNumber: s.discNumber,
       genre: s.genre
     }));
 

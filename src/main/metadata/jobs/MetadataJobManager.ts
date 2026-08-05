@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
-import type { AutoTagStage, ProgressEventPayload } from '../../../common/metadata/types';
+import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload, TrackMatchPreview } from '../../../common/metadata/types';
+import { MetadataApplyService, type ApplyResult } from '../services/MetadataApplyService';
+import { MetadataDiagnosticsService } from './MetadataDiagnosticsService';
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -16,18 +18,27 @@ export interface MetadataJob {
   completedAt?: number;
   error?: string;
   abortController: AbortController;
+  preview?: AlbumTagPreview;
 }
 
 export class MetadataJobManager extends EventEmitter {
   private readonly jobs: Map<string, MetadataJob> = new Map();
+  private readonly queue: string[] = [];
+  private readonly activeJobs: Set<string> = new Set();
   private readonly maxConcurrentJobs: number;
+  private readonly diagnosticsService: MetadataDiagnosticsService;
 
-  constructor(maxConcurrentJobs = 3) {
+  constructor(maxConcurrentJobs = 3, diagnosticsService?: MetadataDiagnosticsService) {
     super();
     this.maxConcurrentJobs = maxConcurrentJobs;
+    this.diagnosticsService = diagnosticsService ?? new MetadataDiagnosticsService();
   }
 
-  public createJob(jobId: string, albumTitle: string, artistName?: string): MetadataJob {
+  public get diagnostics(): MetadataDiagnosticsService {
+    return this.diagnosticsService;
+  }
+
+  public createJob(jobId: string, albumTitle: string, artistName?: string, preview?: AlbumTagPreview): MetadataJob {
     if (this.jobs.has(jobId)) {
       return this.jobs.get(jobId)!;
     }
@@ -41,11 +52,15 @@ export class MetadataJobManager extends EventEmitter {
       progressPercent: 0,
       message: 'Job queued in background',
       createdAt: Date.now(),
-      abortController: new AbortController()
+      abortController: new AbortController(),
+      preview
     };
 
     this.jobs.set(jobId, job);
+    this.queue.push(jobId);
     this.emit('job:created', job);
+
+    this.processQueue();
     return job;
   }
 
@@ -75,6 +90,8 @@ export class MetadataJobManager extends EventEmitter {
     }
     if (stage === 'completed' || stage === 'failed' || stage === 'cancelled') {
       job.completedAt = Date.now();
+      this.activeJobs.delete(jobId);
+      this.processQueue(); // Trigger queue processing when an active slot opens
     }
 
     const payload: ProgressEventPayload = {
@@ -85,6 +102,59 @@ export class MetadataJobManager extends EventEmitter {
     };
 
     this.emit('job:progress', payload);
+  }
+
+  public async executeApplyJob(jobId: string, applyService: MetadataApplyService): Promise<ApplyResult> {
+    const job = this.jobs.get(jobId);
+    if (!job || !job.preview) {
+      throw new Error(`Job '${jobId}' not found or missing preview data`);
+    }
+
+    const startTime = Date.now();
+    this.updateJobProgress(jobId, 'applying', `Applying metadata updates for ${job.albumTitle}...`, 20);
+
+    try {
+      const result = await applyService.applyPreview(job.preview, job.abortController.signal);
+      const durationMs = Date.now() - startTime;
+
+      // Record Telemetry
+      this.diagnosticsService.recordOperation({
+        operationId: jobId,
+        providerId: job.preview.provider,
+        durationMs,
+        songsProcessed: job.preview.matches.length,
+        matchesCount: job.preview.matches.filter((m) => m.applyTrack).length,
+        warningsCount: job.preview.warnings.length,
+        errorsCount: result.errors.length,
+        success: result.success
+      });
+
+      if (result.success) {
+        this.updateJobProgress(jobId, 'completed', `Successfully updated ${result.updatedCount} tracks.`, 100);
+      } else {
+        this.updateJobProgress(jobId, 'failed', `Apply failed: ${result.errors.join('; ')}`, 100);
+      }
+
+      return result;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.updateJobProgress(jobId, err instanceof Error && err.name === 'CancelledError' ? 'cancelled' : 'failed', msg, 0);
+
+      this.diagnosticsService.recordOperation({
+        operationId: jobId,
+        providerId: job.preview.provider,
+        durationMs: Date.now() - startTime,
+        songsProcessed: job.preview.matches.length,
+        matchesCount: job.preview.matches.filter((m) => m.applyTrack).length,
+        warningsCount: job.preview.warnings.length,
+        errorsCount: 1,
+        success: false
+      });
+
+      throw err;
+    } finally {
+      this.cleanCompletedJobs();
+    }
   }
 
   public cancelJob(jobId: string): boolean {
@@ -98,11 +168,29 @@ export class MetadataJobManager extends EventEmitter {
     return true;
   }
 
-  public cleanCompletedJobs(maxAgeMs = 1000 * 60 * 30): void {
+  public cleanCompletedJobs(maxAgeMs = 1000 * 60 * 30, maxRetainedJobs = 50): void {
     const now = Date.now();
-    for (const [id, job] of this.jobs.entries()) {
-      if (job.completedAt && now - job.completedAt > maxAgeMs) {
-        this.jobs.delete(id);
+    const finished = Array.from(this.jobs.values()).filter(
+      (j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled'
+    );
+
+    // Evict old finished jobs exceeding maxAgeMs or maxRetainedJobs LRU bound
+    for (const job of finished) {
+      if ((job.completedAt && now - job.completedAt > maxAgeMs) || finished.length > maxRetainedJobs) {
+        this.jobs.delete(job.jobId);
+      }
+    }
+  }
+
+  private processQueue(): void {
+    while (this.activeJobs.size < this.maxConcurrentJobs && this.queue.length > 0) {
+      const jobId = this.queue.shift()!;
+      const job = this.jobs.get(jobId);
+
+      if (job && job.status === 'queued') {
+        this.activeJobs.add(jobId);
+        job.status = 'running';
+        this.updateJobProgress(jobId, 'running', `Processing job ${jobId}...`, 10);
       }
     }
   }
