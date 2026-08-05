@@ -850,13 +850,41 @@ const updateSongId3Tags = async (
   try {
     logger.debug(`Started the song data updating process for song '${songIdOrPath}'`);
 
-    // Get song data by ID or path
-    const song =
-      typeof songIdOrPath === 'number'
-        ? await getSongById(songIdOrPath)
-        : await getSongByPath(songIdOrPath);
+    const isNumericId =
+      typeof songIdOrPath === 'number' ||
+      (!isNaN(Number(songIdOrPath)) &&
+        !String(songIdOrPath).includes('/') &&
+        !String(songIdOrPath).includes('\\'));
+
+    console.log('[updateSongId3Tags] Lookup Arguments:', {
+      originalSongIdOrPath: songIdOrPath,
+      typeofOriginal: typeof songIdOrPath,
+      isNumericId,
+      lookupId: isNumericId ? Number(songIdOrPath) : songIdOrPath,
+      lookupMethod: isNumericId ? 'getSongById' : 'getSongByPath'
+    });
+
+    let song = isNumericId
+      ? await getSongById(Number(songIdOrPath))
+      : await getSongByPath(String(songIdOrPath));
+
+    if (!song && isNumericId) {
+      console.log('[updateSongId3Tags] getSongById yielded no result, attempting getSongByPath fallback for:', songIdOrPath);
+      song = await getSongByPath(String(songIdOrPath));
+    }
+
+    console.log('[updateSongId3Tags] Lookup Result:', {
+      found: !!song,
+      songId: song?.id,
+      songTitle: song?.title,
+      songPath: song?.path
+    });
 
     if (!song) {
+      console.error('[updateSongId3Tags] Exact location: Song not found in database', {
+        songIdOrPath,
+        typeofSongIdOrPath: typeof songIdOrPath
+      });
       logger.error('Song not found in database', { songIdOrPath });
       throw new Error('Song not found in database');
     }

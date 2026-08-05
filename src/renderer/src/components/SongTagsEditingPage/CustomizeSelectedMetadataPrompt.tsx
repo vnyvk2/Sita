@@ -90,26 +90,36 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
       isReleasedYearSelected
     } = selectedMetadata;
 
-    const albumData = isAlbumSelected
-      ? album
-        ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
-        : []
+    const albumData = isAlbumSelected && album?.trim()
+      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
       : undefined;
-    const artistData = isArtistsSelected
-      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+
+    const artistData = isArtistsSelected && Array.isArray(artists) && artists.length > 0
+      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
       : undefined;
-    const genreData = isGenresSelected
-      ? genres
-        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
-        : []
+
+    const genreData = isGenresSelected && Array.isArray(genres) && genres.length > 0
+      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
       : undefined;
 
     updateSongInfo((prevData): SongTags => {
+      const newAlbum = (isAlbumSelected && album?.trim())
+        ? manageAlbumData(albumData ?? [], album, selectedArtwork || prevData?.artworkPath)
+        : undefined;
+
+      const newArtists = (isArtistsSelected && Array.isArray(artists) && artists.length > 0)
+        ? manageArtistsData(artistData ?? [], artists)
+        : undefined;
+
+      const newGenres = (isGenresSelected && Array.isArray(genres) && genres.length > 0)
+        ? manageGenresData(genreData ?? [], genres)
+        : undefined;
+
       return {
         ...prevData,
-        title: isTitleSelected && title ? title : prevData?.title,
+        title: isTitleSelected && title?.trim() ? title : prevData?.title,
         releasedYear:
-          isReleasedYearSelected && typeof releasedYear === 'number'
+          isReleasedYearSelected && typeof releasedYear === 'number' && releasedYear > 0
             ? releasedYear
             : prevData?.releasedYear,
         synchronizedLyrics:
@@ -121,13 +131,9 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
             ? lyrics
             : prevData?.unsynchronizedLyrics,
         artworkPath: selectedArtwork || prevData?.artworkPath,
-        albums: albumData
-          ? [manageAlbumData(albumData, album, selectedArtwork || prevData?.artworkPath)].filter(
-              (x): x is SongTagsAlbumData => x !== undefined
-            )
-          : prevData.albums,
-        artists: artistData ? manageArtistsData(artistData, artists) : prevData.artists,
-        genres: genreData ? manageGenresData(genreData, genres) : prevData.genres
+        albums: newAlbum ? [newAlbum] : prevData.albums,
+        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
+        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
       };
     });
   }, [
@@ -147,29 +153,39 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
   const updateAllMetadata = useCallback(async () => {
     changePromptMenuData(false, undefined, '');
 
-    const albumData = album
-      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
+    const albumData = album?.trim()
+      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
       : [];
-    const artistData = await window.api.artistsData.getArtistData(artists).then((res) => res.data);
-    const genreData = genres
-      ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+    const artistData = Array.isArray(artists) && artists.length > 0
+      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
+      : [];
+    const genreData = Array.isArray(genres) && genres.length > 0
+      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
       : [];
 
     updateSongInfo((prevData) => {
       const artworkPath = selectedArtwork || prevData?.artworkPath;
+      const newAlbum = album?.trim()
+        ? manageAlbumData(albumData, album, artworkPath)
+        : undefined;
+      const newArtists = Array.isArray(artists) && artists.length > 0
+        ? manageArtistsData(artistData, artists)
+        : undefined;
+      const newGenres = Array.isArray(genres) && genres.length > 0
+        ? manageGenresData(genreData, genres)
+        : undefined;
+
       return {
         ...prevData,
-        title: title || prevData?.title,
-        releasedYear: releasedYear ?? prevData?.releasedYear,
+        title: title?.trim() || prevData?.title,
+        releasedYear: (typeof releasedYear === 'number' && releasedYear > 0) ? releasedYear : prevData?.releasedYear,
         synchronizedLyrics: isLyricsSynchronised && lyrics ? lyrics : prevData?.synchronizedLyrics,
         unsynchronizedLyrics:
           !isLyricsSynchronised && lyrics ? lyrics : prevData?.unsynchronizedLyrics,
         artworkPath,
-        artists: manageArtistsData(artistData, artists),
-        albums: [manageAlbumData(albumData, album, artworkPath)].filter(
-          (x): x is SongTagsAlbumData => x !== undefined
-        ),
-        genres: manageGenresData(genreData, genres)
+        albums: newAlbum ? [newAlbum] : prevData.albums,
+        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
+        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
       } as SongTags;
     });
   }, [

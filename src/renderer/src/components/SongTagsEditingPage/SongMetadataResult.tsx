@@ -34,12 +34,14 @@ function SongMetadataResult(props: SongMetadataResultProp) {
     props;
 
   const addToMetadata = useCallback(async () => {
-    const albumData = album
-      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
+    const albumData = album?.trim()
+      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
       : [];
-    const artistData = await window.api.artistsData.getArtistData(artists).then((res) => res.data);
-    const genreData = genres
-      ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+    const artistData = Array.isArray(artists) && artists.length > 0
+      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
+      : [];
+    const genreData = Array.isArray(genres) && genres.length > 0
+      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
       : [];
 
     updateSongInfo((prevData): SongTags => {
@@ -48,19 +50,28 @@ function SongMetadataResult(props: SongMetadataResultProp) {
       const artworkPath = manageArtworks(prevData, artworkPaths);
       const isLyricsSynchronised = isLyricsSynced(lyrics || '');
 
+      const newAlbum = album?.trim()
+        ? manageAlbumData(albumData, album, artworkPath)
+        : undefined;
+
+      const newArtists = Array.isArray(artists) && artists.length > 0
+        ? manageArtistsData(artistData, artists)
+        : undefined;
+
+      const newGenres = Array.isArray(genres) && genres.length > 0
+        ? manageGenresData(genreData, genres)
+        : undefined;
+
       return {
         ...prevData,
-        title: title || prevData.title,
-        releasedYear: releasedYear || prevData.releasedYear,
+        title: title?.trim() || prevData.title,
+        releasedYear: (typeof releasedYear === 'number' && releasedYear > 0) ? releasedYear : prevData.releasedYear,
         synchronizedLyrics: lyrics && isLyricsSynchronised ? lyrics : prevData.synchronizedLyrics,
-        unsynchronizedLyrics:
-          lyrics && !isLyricsSynchronised ? lyrics : prevData.unsynchronizedLyrics,
-        artworkPath,
-        albums: [manageAlbumData(albumData, album, artworkPath)].filter(
-          (x): x is SongTagsAlbumData => x !== undefined
-        ),
-        artists: manageArtistsData(artistData, artists),
-        genres: manageGenresData(genreData, genres)
+        unsynchronizedLyrics: lyrics && !isLyricsSynchronised ? lyrics : prevData.unsynchronizedLyrics,
+        artworkPath: artworkPath || prevData.artworkPath,
+        albums: newAlbum ? [newAlbum] : prevData.albums,
+        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
+        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
       };
     });
   }, [

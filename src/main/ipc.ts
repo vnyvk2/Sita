@@ -506,8 +506,16 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/updateSongId3Tags',
-      (_, songIdOrPath: string, tags: SongTags, sendUpdatedData?: boolean, isKnownSource = true) =>
-        updateSongId3Tags(songIdOrPath, tags, sendUpdatedData, isKnownSource)
+      (_, songIdOrPath: string, tags: SongTags, sendUpdatedData?: boolean, isKnownSource = true) => {
+        console.log('[IPC app/updateSongId3Tags] Received payload:', {
+          songIdOrPath,
+          typeofSongIdOrPath: typeof songIdOrPath,
+          tagsTitle: tags?.title,
+          sendUpdatedData,
+          isKnownSource
+        });
+        return updateSongId3Tags(songIdOrPath, tags, sendUpdatedData, isKnownSource);
+      }
     );
 
     ipcMain.handle('app/getImgFileLocation', getImagefileLocation);

@@ -366,7 +366,13 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   ) => {
     setIsDisabled(true);
     setIsPending(true);
-    console.log(songInfo);
+    console.log('[Renderer saveTags] Payload sending to IPC:', {
+      songIdOrPath: isKnownSource ? String(songId) : songPath,
+      songId,
+      songPath,
+      isKnownSource,
+      songInfo
+    });
     window.api.songUpdates
       .updateSongId3Tags(
         isKnownSource ? String(songId) : songPath,
@@ -413,7 +419,8 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
             isKnownSource
           );
         }
-        throw new Error('Error ocurred when updating song ID3 tags.');
+        console.error('[SongTagsEditingPage] updateSongId3Tags returned failure:', res);
+        throw new Error(res.reason || 'Error occurred when updating song ID3 tags.');
       })
       .then((res) => {
         setSongInfo(res);
