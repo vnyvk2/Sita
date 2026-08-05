@@ -496,36 +496,45 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
     }
   }, [isKnownSource, songId, songPath]);
 
+  const clearSearchState = useCallback(() => {
+    setAlbumKeyword('');
+    setAlbumResults([]);
+    setArtistKeyword('');
+    setArtistResults([]);
+    setGenreKeyword('');
+    setGenreResults([]);
+  }, []);
+
   const resetDataToDefaults = () => {
     const data = hasDataChanged(defaultValues, songInfo);
-    const entries = Object.entries(data);
+    const isModified = !Object.values(data).every((x) => !x.isModified);
 
-    changePromptMenuData(
-      true,
-      <ResetTagsToDefaultPrompt
-        dataEntries={entries}
-        restoreSessionHandler={() => {
-          changePromptMenuData(false);
-          setSongInfo(defaultValues);
-          setAlbumKeyword('');
-          setAlbumResults([]);
-          setArtistKeyword('');
-          setArtistResults([]);
-          setGenreKeyword('');
-          setGenreResults([]);
-        }}
-        restoreOriginalHandler={() => {
-          changePromptMenuData(false);
-          reloadOriginalTags();
-          setAlbumKeyword('');
-          setAlbumResults([]);
-          setArtistKeyword('');
-          setArtistResults([]);
-          setGenreKeyword('');
-          setGenreResults([]);
-        }}
-      />
-    );
+    if (isModified || isMetadataUpdatesPending) {
+      const entries = Object.entries(data);
+      changePromptMenuData(
+        true,
+        <ResetTagsToDefaultPrompt
+          dataEntries={entries}
+          restoreSessionHandler={() => {
+            changePromptMenuData(false);
+            setSongInfo(defaultValues);
+            clearSearchState();
+          }}
+          restoreOriginalHandler={() => {
+            changePromptMenuData(false);
+            reloadOriginalTags();
+            clearSearchState();
+          }}
+        />
+      );
+    } else {
+      addNewNotifications([
+        {
+          id: 'songDataUnedited',
+          content: t('notifications.noSongDataEdits')
+        }
+      ]);
+    }
   };
 
   const areThereDataChanges = useMemo(
