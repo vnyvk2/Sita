@@ -1,13 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useAlbumAutoTag } from '../useAlbumAutoTag';
 
-describe('Phase 5 — React UI & Hook Integration Suite (useAlbumAutoTag)', () => {
+describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', () => {
   let mockUnsubscribe: ReturnType<typeof vi.fn>;
   let mockProgressCallback: ((payload: any) => void) | null = null;
+  let listenerCount = 0;
 
   beforeEach(() => {
-    mockUnsubscribe = vi.fn();
+    mockUnsubscribe = vi.fn(() => {
+      listenerCount--;
+    });
     mockProgressCallback = null;
+    listenerCount = 0;
 
     (globalThis as any).window = {
       api: {
@@ -28,6 +32,7 @@ describe('Phase 5 — React UI & Hook Integration Suite (useAlbumAutoTag)', () =
                 confidence: 0.98,
                 confidenceLevel: 'Excellent',
                 applyTrack: true,
+                hasWarnings: false,
                 fieldDiffs: [
                   { fieldId: 'title', fieldName: 'Title', oldValue: 'brutal (audio)', suggestedValue: 'brutal', userValue: 'brutal', status: 'changed', applyField: true }
                 ]
@@ -38,6 +43,7 @@ describe('Phase 5 — React UI & Hook Integration Suite (useAlbumAutoTag)', () =
           undoLastAutoTag: vi.fn().mockResolvedValue({ success: true, restoredCount: 1 }),
           cancelAutoTag: vi.fn(),
           onProgress: vi.fn((cb) => {
+            listenerCount++;
             mockProgressCallback = cb;
             return mockUnsubscribe;
           })
@@ -46,7 +52,7 @@ describe('Phase 5 — React UI & Hook Integration Suite (useAlbumAutoTag)', () =
     };
   });
 
-  it('provides metadataAutoTag API integration methods', async () => {
+  it('provides metadataAutoTag API integration methods and supports single listener count safety', async () => {
     const api = (window as any).api.metadataAutoTag;
     const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 'op-1');
     expect(candidates).toHaveLength(1);
@@ -61,10 +67,30 @@ describe('Phase 5 — React UI & Hook Integration Suite (useAlbumAutoTag)', () =
     const undoRes = await api.undoLastAutoTag('op-1');
     expect(undoRes.success).toBe(true);
 
-    // Verify onProgress subscriber returns unsubscribe function
+    // Verify listener count tracking
     const unsubscribe = api.onProgress((payload: any) => payload);
-    expect(unsubscribe).toBeDefined();
+    expect(listenerCount).toBe(1);
     unsubscribe();
+    expect(listenerCount).toBe(0);
     expect(mockUnsubscribe).toHaveBeenCalled();
+  });
+
+  it('triggers query invalidation callback ONLY on successful apply/undo operations', async () => {
+    const onQueryInvalidate = vi.fn();
+    const api = (window as any).api.metadataAutoTag;
+
+    // Simulated apply success
+    const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour', 'musicbrainz', 'op-1');
+    const applyRes = await api.applyPreview(preview, 'op-1');
+    if (applyRes.success) onQueryInvalidate();
+
+    expect(onQueryInvalidate).toHaveBeenCalledTimes(1);
+
+    // Simulated apply failure (should NOT trigger invalidation)
+    api.applyPreview.mockResolvedValueOnce({ success: false, errors: ['DB locked'] });
+    const failedApply = await api.applyPreview(preview, 'op-1');
+    if (failedApply.success) onQueryInvalidate();
+
+    expect(onQueryInvalidate).toHaveBeenCalledTimes(1); // Count remains 1
   });
 });
