@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import type { TrackMatchPreview } from '../../../../main/metadata/models/AlbumTagPreview';
-import type { MetadataFieldId } from '../../../../main/metadata/models/MetadataDiff';
+import type { MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';

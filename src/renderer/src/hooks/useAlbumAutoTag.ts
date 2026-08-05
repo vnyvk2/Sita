@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AlbumMetadata, MetadataProviderId } from '../../../main/metadata/models/RecordingMetadata';
-import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload, TrackMatchPreview } from '../../../main/metadata/models/AlbumTagPreview';
-import type { MetadataFieldId } from '../../../main/metadata/models/MetadataDiff';
+import type {
+  AlbumTagPreview,
+  AutoTagStage,
+  MetadataFieldId,
+  ProgressEventPayload,
+  TrackMatchPreview
+} from '../../../common/metadata/types';
+import { metadataApi } from '../services/metadataApi';
 
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
 export type PreviewFilterOption = 'all' | 'changed' | 'low_confidence' | 'warnings';
@@ -14,6 +20,7 @@ export interface UseAlbumAutoTagState {
   progressPercent: number;
   searchCandidates: AlbumMetadata[];
   preview: AlbumTagPreview | null;
+  filteredMatches: TrackMatchPreview[];
   loading: boolean;
   error: string | null;
   canUndo: boolean;
@@ -28,7 +35,7 @@ export interface UseAlbumAutoTagState {
 
 export interface UseAlbumAutoTagActions {
   searchReleases: (album: string, artist?: string) => Promise<void>;
-  buildPreview: (localSongs: any[], releaseId: string, providerId?: MetadataProviderId) => Promise<void>;
+  buildPreview: (localSongs: unknown[], releaseId: string, providerId?: MetadataProviderId) => Promise<void>;
   applyPreview: () => Promise<boolean>;
   undoLastAutoTag: () => Promise<boolean>;
   cancel: () => void;
@@ -45,7 +52,7 @@ export interface UseAlbumAutoTagActions {
 }
 
 export function useAlbumAutoTag(initialOperationId?: string) {
-  const [operationId] = useState(() => initialOperationId ?? `op_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  const [operationId] = useState(() => initialOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`));
   const [step, setStep] = useState<AutoTagStep>('search');
   const [stage, setStage] = useState<AutoTagStage>('idle');
   const [progressMessage, setProgressMessage] = useState('');
@@ -65,13 +72,10 @@ export function useAlbumAutoTag(initialOperationId?: string) {
   const [filter, setFilter] = useState<PreviewFilterOption>('all');
   const [sort, setSort] = useState<PreviewSortOption>('trackNumber');
 
-  // IPC Progress Event Listener Subscription with operationId filtering
+  // IPC Progress Event Listener Subscription with operationId filtering guard
   useEffect(() => {
-    const api = (window as any).api?.metadataAutoTag;
-    if (!api || typeof api.onProgress !== 'function') return;
-
-    const unsubscribe = api.onProgress((payload: ProgressEventPayload) => {
-      if (payload.operationId === operationId) {
+    const unsubscribe = metadataApi.onProgress((payload: ProgressEventPayload) => {
+      if (payload && payload.operationId && payload.operationId === operationId) {
         setStage(payload.stage);
         if (payload.message) setProgressMessage(payload.message);
         if (payload.progressPercent !== undefined) setProgressPercent(payload.progressPercent);
@@ -89,22 +93,21 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     setError(null);
     setStep('search');
     try {
-      const api = (window as any).api?.metadataAutoTag;
-      const results = api ? await api.searchAlbums(album, artist, 10, operationId) : [];
+      const results = await metadataApi.searchAlbums(album, artist, 10, operationId);
       setSearchCandidates(results);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to search releases');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }, [operationId]);
 
-  const buildPreview = useCallback(async (localSongs: any[], releaseId: string, providerId?: MetadataProviderId) => {
+  const buildPreview = useCallback(async (localSongs: unknown[], releaseId: string, providerId?: MetadataProviderId) => {
     setLoading(true);
     setError(null);
     try {
-      const api = (window as any).api?.metadataAutoTag;
-      const res: AlbumTagPreview = api ? await api.buildPreview(localSongs, releaseId, providerId, operationId) : null;
+      const res = await metadataApi.buildPreview(localSongs, releaseId, providerId, operationId);
 
       if (res) {
         setPreview(res);
@@ -132,8 +135,9 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setSelectedFieldMap(newFieldMap);
         setUserEditedValues(newEdits);
       }
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to build preview');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -160,9 +164,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       });
 
       const payload: AlbumTagPreview = { ...preview, matches: effectiveMatches };
-
-      const api = (window as any).api?.metadataAutoTag;
-      const res = api ? await api.applyPreview(payload, operationId) : { success: false, errors: ['No API'] };
+      const res = await metadataApi.applyPreview(payload, operationId);
 
       if (res.success) {
         setStep('complete');
@@ -172,8 +174,9 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setError(res.errors?.join('; ') ?? 'Apply failed');
         return false;
       }
-    } catch (err: any) {
-      setError(err?.message ?? 'Apply failed');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
       return false;
     } finally {
       setLoading(false);
@@ -183,16 +186,16 @@ export function useAlbumAutoTag(initialOperationId?: string) {
   const undoLastAutoTag = useCallback(async (): Promise<boolean> => {
     setLoading(true);
     try {
-      const api = (window as any).api?.metadataAutoTag;
-      const res = api ? await api.undoLastAutoTag(operationId) : { success: false, restoredCount: 0 };
+      const res = await metadataApi.undoLastAutoTag(operationId);
       if (res.success) {
         setCanUndo(false);
         setLastRestoredCount(res.restoredCount);
         return true;
       }
       return false;
-    } catch (err: any) {
-      setError(err?.message ?? 'Undo failed');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
       return false;
     } finally {
       setLoading(false);
@@ -200,8 +203,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
   }, [operationId]);
 
   const cancel = useCallback(() => {
-    const api = (window as any).api?.metadataAutoTag;
-    if (api) api.cancelAutoTag(operationId);
+    metadataApi.cancelAutoTag(operationId);
     setLoading(false);
     setStage('cancelled');
   }, [operationId]);
@@ -296,7 +298,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     } else if (filter === 'low_confidence') {
       result = result.filter((m) => m.confidence < 0.80);
     } else if (filter === 'warnings') {
-      result = result.filter((m) => m.reasons && m.reasons.some((r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch')));
+      result = result.filter((m) => m.hasWarnings);
     }
 
     // Sort

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ConfidenceLevel } from '../../../../main/metadata/services/AlbumMetadataService';
+import type { ConfidenceLevel } from '../../../common/metadata/types';
 
 export interface ConfidenceBadgeProps {
   level: ConfidenceLevel;
@@ -15,21 +15,21 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
           bg: 'rgba(16, 185, 129, 0.15)',
           border: 'rgba(16, 185, 129, 0.4)',
           text: '#34d399',
-          icon: '🟢'
+          iconColor: '#10b981'
         };
       case 'Good':
         return {
           bg: 'rgba(59, 130, 246, 0.15)',
           border: 'rgba(59, 130, 246, 0.4)',
           text: '#60a5fa',
-          icon: '🔵'
+          iconColor: '#3b82f6'
         };
       case 'Review':
         return {
           bg: 'rgba(245, 158, 11, 0.15)',
           border: 'rgba(245, 158, 11, 0.4)',
           text: '#fbbf24',
-          icon: '🟡'
+          iconColor: '#f59e0b'
         };
       case 'Poor':
       default:
@@ -37,7 +37,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
           bg: 'rgba(239, 68, 68, 0.15)',
           border: 'rgba(239, 68, 68, 0.4)',
           text: '#f87171',
-          icon: '🔴'
+          iconColor: '#ef4444'
         };
     }
   };
@@ -61,7 +61,9 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
         userSelect: 'none'
       }}
     >
-      <span>{style.icon}</span>
+      <svg width="8" height="8" viewBox="0 0 8 8">
+        <circle cx="4" cy="4" r="4" fill={style.iconColor} />
+      </svg>
       <span>{level}</span>
       {percentText && <span style={{ opacity: 0.8, fontSize: '0.72rem' }}>({percentText})</span>}
     </span>

@@ -1,5 +1,4 @@
-import type { MetadataFieldDiff, MetadataFieldId } from '../models/MetadataDiff';
-import type { TrackMatchPreview } from '../models/AlbumTagPreview';
+import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import type { TrackMatchPair } from '../services/AlbumMetadataService';
 
 export class MetadataDiffBuilder {
@@ -25,6 +24,10 @@ export class MetadataDiffBuilder {
 
     const applyTrack = pair.confidence >= 0.75; // Default apply for Good+ matches
 
+    const warnings = pair.reasons.filter(
+      (r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch') || r.toLowerCase().includes('duplicate')
+    );
+
     return {
       localSongId: song.songId,
       songPath: song.path,
@@ -42,7 +45,9 @@ export class MetadataDiffBuilder {
       why: pair.why ?? 'Matched Criteria',
       reasons: pair.reasons,
       fieldDiffs,
-      applyTrack
+      applyTrack,
+      hasWarnings: warnings.length > 0,
+      warningCount: warnings.length
     };
   }
 
