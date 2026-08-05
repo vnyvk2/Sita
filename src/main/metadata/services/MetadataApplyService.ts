@@ -76,7 +76,7 @@ export class MetadataApplyService {
 
   /**
    * Applies metadata changes from AlbumTagPreview using chunked batched transactions with AbortSignal cancellation support:
-   * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction -> Revert Disk on Error
+   * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction & ReParse -> Revert Disk on Error
    */
   public async applyPreview(preview: AlbumTagPreview, signal?: AbortSignal): Promise<ApplyResult> {
     if (!preview || !preview.matches || preview.matches.length === 0) {
@@ -229,7 +229,7 @@ export class MetadataApplyService {
       throw new CancelledError('Apply operation aborted by user, reverted physical file tags.');
     }
 
-    // Step 2: Database Atomic Commit
+    // Step 2: Database Atomic Commit & Relational Re-parsing
     let updatedCount = 0;
     let failedCount = 0;
 
@@ -243,21 +243,36 @@ export class MetadataApplyService {
           });
         }
       } else {
-        const { getDb } = await import('../../db');
-        const db = getDb();
+        // Module resolution check separated from execution
+        let reParseSongModule: ((path: string) => Promise<unknown>) | undefined;
+        try {
+          reParseSongModule = (await import('../../parseSong/reParseSong')).default;
+        } catch {
+          reParseSongModule = undefined;
+        }
 
-        await db.transaction(async (trx) => {
+        if (reParseSongModule) {
           for (const snap of updatedSongs) {
-            await trx('songs')
-              .where('songId', snap.songId)
-              .update({
-                title: snap.title,
-                year: snap.year,
-                trackNumber: snap.trackNumber,
-                updatedAt: new Date()
-              });
+            await reParseSongModule(snap.path);
           }
-        });
+        } else {
+          // Direct DB query fallback ONLY if module cannot be resolved (e.g. isolated test runner)
+          const { getDb } = await import('../../db');
+          const db = getDb();
+
+          await db.transaction(async (trx) => {
+            for (const snap of updatedSongs) {
+              await trx('songs')
+                .where('songId', snap.songId)
+                .update({
+                  title: snap.title,
+                  year: snap.year,
+                  trackNumber: snap.trackNumber,
+                  updatedAt: new Date()
+                });
+            }
+          });
+        }
       }
 
       updatedCount = updatedSongs.length;
@@ -333,21 +348,34 @@ export class MetadataApplyService {
           });
         }
       } else {
-        const { getDb } = await import('../../db');
-        const db = getDb();
+        let reParseSongModule: ((path: string) => Promise<unknown>) | undefined;
+        try {
+          reParseSongModule = (await import('../../parseSong/reParseSong')).default;
+        } catch {
+          reParseSongModule = undefined;
+        }
 
-        await db.transaction(async (trx) => {
+        if (reParseSongModule) {
           for (const snap of snapshot.previousSongs) {
-            await trx('songs')
-              .where('songId', snap.songId)
-              .update({
-                title: snap.title,
-                year: snap.year,
-                trackNumber: snap.trackNumber,
-                updatedAt: new Date()
-              });
+            await reParseSongModule(snap.path);
           }
-        });
+        } else {
+          const { getDb } = await import('../../db');
+          const db = getDb();
+
+          await db.transaction(async (trx) => {
+            for (const snap of snapshot.previousSongs) {
+              await trx('songs')
+                .where('songId', snap.songId)
+                .update({
+                  title: snap.title,
+                  year: snap.year,
+                  trackNumber: snap.trackNumber,
+                  updatedAt: new Date()
+                });
+            }
+          });
+        }
       }
 
       return { success: true, restoredCount: snapshot.previousSongs.length };
