@@ -52,7 +52,7 @@ export interface UseAlbumAutoTagActions {
   reset: () => void;
 }
 
-export function useAlbumAutoTag(initialOperationId?: string) {
+export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?: () => void) {
   const [operationId] = useState(() => initialOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`));
   const [step, setStep] = useState<AutoTagStep>('search');
   const [stage, setStage] = useState<AutoTagStage>('idle');
@@ -170,6 +170,10 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       if (res.success) {
         setStep('complete');
         setCanUndo(true);
+
+        // Targeted Query Invalidation ON SUCCESS ONLY
+        if (onQueryInvalidate) onQueryInvalidate();
+
         return true;
       } else {
         setError(res.errors?.join('; ') ?? 'Apply failed');
@@ -182,7 +186,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, operationId]);
+  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, operationId, onQueryInvalidate]);
 
   const undoLastAutoTag = useCallback(async (): Promise<boolean> => {
     setLoading(true);
@@ -191,6 +195,10 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       if (res.success) {
         setCanUndo(false);
         setLastRestoredCount(res.restoredCount);
+
+        // Targeted Query Invalidation ON UNDO SUCCESS ONLY
+        if (onQueryInvalidate) onQueryInvalidate();
+
         return true;
       }
       return false;
@@ -201,7 +209,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [operationId]);
+  }, [operationId, onQueryInvalidate]);
 
   const cancel = useCallback(() => {
     metadataApi.cancelAutoTag(operationId);
