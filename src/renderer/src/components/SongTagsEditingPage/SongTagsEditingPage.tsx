@@ -454,12 +454,19 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
         true,
         <ResetTagsToDefaultPrompt
           dataEntries={entries}
-          resetButtonHandler={() => {
+          restoreSessionHandler={() => {
+            changePromptMenuData(false);
+            setSongInfo(defaultValues);
+            setAlbumKeyword('');
+            setAlbumResults([]);
+            setArtistKeyword('');
+            setArtistResults([]);
+            setGenreKeyword('');
+            setGenreResults([]);
+          }}
+          restoreOriginalHandler={() => {
             changePromptMenuData(false);
             if (songId) {
-              // Clear storage overrides then re-fetch the real ID3 values so the
-              // UI reflects the original embedded metadata, not the merged state
-              // that was cached in defaultValues (which may itself be overridden).
               window.api.metadata
                 .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
                 .then(() => {

@@ -6,14 +6,15 @@ import Button from '../Button';
 
 type Props = {
   dataEntries: [string, unknown][];
-  resetButtonHandler: () => void;
+  restoreSessionHandler: () => void;
+  restoreOriginalHandler: () => void;
 };
 
 const ResetTagsToDefaultPrompt = (props: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const { resetButtonHandler, dataEntries } = props;
+  const { restoreSessionHandler, restoreOriginalHandler, dataEntries } = props;
 
   const entries = (dataEntries.filter((x) => x[1]) ?? []).map(([x], i) => (
     <div key={i}>
@@ -31,16 +32,25 @@ const ResetTagsToDefaultPrompt = (props: Props) => {
       </div>
       <div className="description">{t('resetTagsToDefaultPrompt.description')}</div>
       <div className="mt-4 pl-4">{entries}</div>
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex justify-end space-x-3">
         <Button
           label={t('common.cancel')}
-          className="w-32"
+          className="w-28"
           clickHandler={() => changePromptMenuData(false)}
         />
         <Button
-          label={t('resetTagsToDefaultPrompt.resetToDefault')}
-          className="bg-background-color-3! text-font-color-black! hover:border-background-color-3 dark:bg-dark-background-color-3! dark:text-font-color-black dark:hover:border-background-color-3 w-[12rem]"
-          clickHandler={resetButtonHandler}
+          label="Undo Session Edits"
+          iconName="undo"
+          className="bg-background-color-2! text-font-color-black! hover:border-background-color-3 dark:bg-dark-background-color-2! dark:text-font-color-white dark:hover:border-background-color-3 px-4"
+          clickHandler={restoreSessionHandler}
+          tooltipLabel="Revert edits made during this session back to the loaded state"
+        />
+        <Button
+          label="Restore Original Tags"
+          iconName="restart_alt"
+          className="bg-background-color-3! text-font-color-black! hover:border-background-color-3 dark:bg-dark-background-color-3! dark:text-font-color-black dark:hover:border-background-color-3 px-4 font-medium"
+          clickHandler={restoreOriginalHandler}
+          tooltipLabel="Discard all overrides and reload original tags stored on disk"
         />
       </div>
     </div>
