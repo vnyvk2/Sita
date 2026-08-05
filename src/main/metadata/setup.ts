@@ -42,6 +42,8 @@ import { DatabaseMetadataRepository } from './repository/DatabaseMetadataReposit
 import { LoaderRegistry } from './repository/LoaderRegistry';
 import { UserMetadataRepository } from './repository/UserMetadataRepository';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
+import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
+import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
 import { UserMetadataService } from './services/UserMetadataService';
 
 export interface MetadataContainer {
@@ -54,6 +56,8 @@ export interface MetadataContainer {
   userService: UserMetadataService;
   loaderRegistry: LoaderRegistry;
   localProvider: LocalMetadataProvider;
+  identityCache: IdentityResolutionCache;
+  providerDiscovery: MetadataProviderDiscovery;
   executor: MetadataProviderExecutor;
   healthManager: ProviderHealthManager;
   circuitBreakerRegistry: ProviderCircuitBreakerRegistry;
@@ -99,6 +103,9 @@ export class MetadataBootstrap {
     const loaderRegistry = new LoaderRegistry();
     const eventBus = new MetadataEventBus();
     const cache = new MetadataCache();
+
+    const identityCache = new IdentityResolutionCache();
+    const providerDiscovery = new MetadataProviderDiscovery(providerRegistry);
 
     // Register default entity mappers
     mapperRegistry.register(new SongMapper());
@@ -214,6 +221,8 @@ export class MetadataBootstrap {
       userService,
       loaderRegistry,
       localProvider,
+      identityCache,
+      providerDiscovery,
       executor,
       healthManager,
       circuitBreakerRegistry,

@@ -2801,3 +2801,599 @@ Recommendations / AI
 ```
 
 I think this is the right trajectory. It keeps building from the bottom up, avoids painting yourselves into a corner, and ensures that when you eventually implement things like "Play only Telugu songs rated 4★+, excluding live recordings with tag 'concert'", the underlying metadata infrastructure is already solid enough to support it cleanly.
+
+Yes. This feels much more like where we were during Phases 5–10.
+
+Let's forget features for a moment and think like platform architects again.
+
+Every engine we've built followed this pattern:
+
+```
+Need
+
+↓
+
+Abstract capability
+
+↓
+
+Platform
+
+↓
+
+Consumers
+```
+
+For example:
+
+```
+Need:
+Playlists need song membership
+
+↓
+
+Membership Engine
+
+↓
+
+Playlist Repository
+```
+
+Not
+
+```
+Playlist
+↓
+
+Membership
+```
+
+The engine came first.
+
+---
+
+# So what is the real problem now?
+
+Today the Metadata Engine can merge multiple providers.
+
+But all providers are still essentially **local**.
+
+```
+Embedded Provider
+
+User Override Provider
+```
+
+Future providers are completely different.
+
+```
+MusicBrainz
+
+Discogs
+
+Last.fm
+
+Spotify
+
+Lyrics
+
+AcousticBrainz
+
+AI
+```
+
+These introduce problems we've never solved before.
+
+---
+
+## Problems every online provider has
+
+Not MusicBrainz-specific.
+
+Every provider needs:
+
+```
+HTTP
+
+Authentication
+
+Rate Limits
+
+Retries
+
+Timeouts
+
+Caching
+
+Provider availability
+
+Offline mode
+
+Background refresh
+
+Cancellation
+
+Error isolation
+
+Provider versioning
+```
+
+Those aren't metadata problems.
+
+They're **provider platform** problems.
+
+---
+
+# Therefore I think Phase 11 should NOT be MusicBrainz.
+
+It should be:
+
+# **Phase 11 — External Metadata Provider Platform**
+
+Goal:
+
+> Allow Nora to consume any external metadata provider without the provider implementing networking, caching, retries, scheduling or lifecycle management.
+
+Exactly the same philosophy as Metadata Engine.
+
+---
+
+# Architecture
+
+```
+                 Metadata Engine
+                        │
+                        ▼
+              Provider Registry
+                        │
+      ┌─────────────────┴─────────────────┐
+      ▼                                   ▼
+Embedded Provider                 External Provider
+                                        │
+                                        ▼
+                          External Provider Platform
+                                        │
+       ┌────────────┬────────────┬────────────┐
+       ▼            ▼            ▼            ▼
+ Authentication  HTTP Client   Cache   Rate Limiter
+       │
+       ▼
+ Scheduler
+       │
+       ▼
+ Retry Policy
+       │
+       ▼
+ Normalized Result
+```
+
+Notice something.
+
+The provider shouldn't know how HTTP works.
+
+It shouldn't know retry logic.
+
+It shouldn't know cache logic.
+
+Exactly like MetadataProvider doesn't know merge logic.
+
+---
+
+# User Review Required
+
+> [!IMPORTANT]
+>
+> ## Phase 11 — External Metadata Provider Platform
+>
+> **Goal**
+>
+> Introduce a reusable platform for all external metadata providers.
+>
+> Providers become pure metadata adapters.
+>
+> The platform owns:
+>
+> - networking
+> - retries
+> - caching
+> - scheduling
+> - authentication
+> - lifecycle
+> - offline behavior
+>
+> The Metadata Engine remains unchanged.
+
+---
+
+# Architectural Rules
+
+### 1
+
+MetadataEngine never performs HTTP.
+
+---
+
+### 2
+
+Providers never create HTTP clients.
+
+---
+
+### 3
+
+Providers never cache responses.
+
+---
+
+### 4
+
+Providers never retry requests.
+
+---
+
+### 5
+
+Providers never schedule refreshes.
+
+---
+
+### 6
+
+Providers remain stateless.
+
+---
+
+### 7
+
+Everything network-related belongs to the platform.
+
+---
+
+### 8
+
+MetadataMergeEngine remains unchanged.
+
+---
+
+### 9
+
+Provider interface remains unchanged.
+
+This is important.
+
+MusicBrainz shouldn't require new MetadataEngine APIs.
+
+---
+
+### 10
+
+Backward compatibility.
+
+Embedded/User providers continue working.
+
+---
+
+# Micro Phases
+
+---
+
+## Phase 11A — External Provider Contracts
+
+New abstractions only.
+
+```
+IExternalProvider
+
+ProviderIdentity
+
+ProviderCapabilities
+
+ProviderConfiguration
+
+ProviderStatus
+```
+
+No implementation.
+
+---
+
+## Phase 11B — Provider Runtime
+
+Platform responsible for
+
+```
+Provider lifecycle
+
+Initialization
+
+Shutdown
+
+Availability
+
+Health
+
+Configuration
+```
+
+Providers become services.
+
+---
+
+## Phase 11C — Request Pipeline
+
+One request pipeline for every provider.
+
+```
+Request
+
+↓
+
+Authentication
+
+↓
+
+Cache
+
+↓
+
+Rate Limiter
+
+↓
+
+HTTP
+
+↓
+
+Retry
+
+↓
+
+Response
+
+↓
+
+Normalization
+```
+
+Every provider automatically gets it.
+
+---
+
+## Phase 11D — Provider Cache
+
+Separate from Metadata Cache.
+
+Caches
+
+```
+HTTP responses
+
+Provider lookups
+
+Resolved IDs
+
+Search responses
+```
+
+No MetadataEntity here.
+
+---
+
+## Phase 11E — Scheduler
+
+Future providers need
+
+```
+Refresh artwork
+
+Refresh genres
+
+Refresh artist data
+
+Background enrichment
+```
+
+Scheduler belongs to platform.
+
+Not providers.
+
+---
+
+## Phase 11F — Health Monitoring
+
+Platform knows
+
+```
+MusicBrainz offline
+
+↓
+
+Skip provider
+
+↓
+
+Continue merge
+```
+
+instead of crashing.
+
+---
+
+## Phase 11G — Provider Bootstrap
+
+MetadataBootstrap now creates
+
+```
+ExternalProviderPlatform
+
+↓
+
+Registers external providers
+
+↓
+
+MetadataEngine
+```
+
+No MetadataEngine changes.
+
+---
+
+## Phase 11H — Integration Tests
+
+Verify
+
+```
+Offline
+
+Timeout
+
+Retry
+
+Cancellation
+
+Rate limits
+
+Cache
+
+Multiple providers
+
+Bootstrap
+
+Backward compatibility
+```
+
+---
+
+# What is NOT part of Phase 11
+
+No MusicBrainz.
+
+No Discogs.
+
+No Last.fm.
+
+No Lyrics.
+
+No AI.
+
+No HTTP endpoints specific to any service.
+
+Those belong to Phase 12+.
+
+---
+
+# Phase 12
+
+Now this becomes tiny.
+
+```
+MusicBrainzProvider
+
+implements
+
+IExternalProvider
+```
+
+Almost all work is already done.
+
+---
+
+Phase 13
+
+```
+DiscogsProvider
+```
+
+Again...
+
+No infrastructure.
+
+---
+
+Phase 14
+
+```
+LyricsProvider
+```
+
+Same.
+
+---
+
+Phase 15
+
+```
+LanguageDetectionProvider
+```
+
+Same.
+
+---
+
+Phase 16
+
+```
+AITagProvider
+```
+
+Same.
+
+---
+
+# Why I like this
+
+Look at what we've built so far.
+
+```
+Metadata Engine
+
+↓
+
+Search Engine
+
+↓
+
+Membership Engine
+
+↓
+
+Merge Framework
+
+↓
+
+Override Platform
+```
+
+Every one of those removed complexity from future work.
+
+Phase 11 should do exactly the same.
+
+It shouldn't fetch metadata.
+
+It should make **fetching metadata** almost trivial.
+
+Then every future provider becomes just another plugin into the platform.
+
+---
+
+## One thing I would add to our original philosophy
+
+When we designed the Metadata Engine, we made providers **data sources**.
+
+For external providers, I'd make them **adapters**.
+
+Meaning a MusicBrainz provider shouldn't know about:
+
+- retries,
+- HTTP client configuration,
+- exponential backoff,
+- rate limiting,
+- cache invalidation,
+- provider health.
+
+It should only know:
+
+> "Given this song identity, how do I translate a MusicBrainz response into Nora's metadata model?"
+
+That's an even stronger separation of concerns than we've used so far, and I think it fits perfectly with the architecture we've been building since Phase 5.
