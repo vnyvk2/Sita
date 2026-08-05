@@ -137,6 +137,11 @@ export class UserMetadataRepository {
     const kind = identity.entityKind;
     const id = String(identity.entityId);
 
+    console.log('[STAGE 2: Repository clearOverrides] Executing DELETE FROM metadata_overrides for:', {
+      entityKind: kind,
+      entityId: id
+    });
+
     await this.database
       .delete(metadataOverrides)
       .where(
@@ -145,5 +150,10 @@ export class UserMetadataRepository {
           eq(metadataOverrides.entityId, id)
         )
       );
+
+    console.log('[STAGE 2: Repository clearOverrides] Successfully deleted overrides for:', {
+      entityKind: kind,
+      entityId: id
+    });
   }
 }

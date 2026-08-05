@@ -1,3 +1,5 @@
+import type { RecordingMetadata, ProviderMetadata, MetadataCandidate } from '@main/metadata/models/RecordingMetadata';
+
 export interface MatchTarget {
   title: string;
   artist?: string;
@@ -17,6 +19,7 @@ export interface CandidateItem {
 export interface MatchScoreResult<T extends CandidateItem = CandidateItem> {
   candidate: T;
   score: number; // 0.0 to 1.0
+  matchedBy: string[];
   reasons: string[];
 }
 
@@ -50,6 +53,7 @@ export class MetadataMatcher {
   ): MatchScoreResult<T> {
     let score = 0;
     const maxScore = 100;
+    const matchedBy: string[] = [];
     const reasons: string[] = [];
 
     const normTargetTitle = this.normalize(target.title);
@@ -58,9 +62,11 @@ export class MetadataMatcher {
     // Title match (up to 45 points)
     if (normTargetTitle === normCandTitle) {
       score += 45;
+      matchedBy.push('title');
       reasons.push('exact_title_match');
     } else if (normTargetTitle.includes(normCandTitle) || normCandTitle.includes(normTargetTitle)) {
       score += 30;
+      matchedBy.push('title_partial');
       reasons.push('partial_title_match');
     }
 
@@ -71,6 +77,7 @@ export class MetadataMatcher {
 
       if (candArtists.some((ca) => ca === normTargetArtist || normTargetArtist.includes(ca))) {
         score += 35;
+        matchedBy.push('artist');
         reasons.push('artist_match');
       }
     }
@@ -81,9 +88,11 @@ export class MetadataMatcher {
 
       if (diffSecs <= 3) {
         score += 20;
+        matchedBy.push('duration');
         reasons.push('exact_duration_match');
       } else if (diffSecs <= 10) {
         score += 10;
+        matchedBy.push('duration_close');
         reasons.push('close_duration_match');
       }
     }
@@ -92,8 +101,16 @@ export class MetadataMatcher {
     return {
       candidate,
       score: normalizedScore,
+      matchedBy,
       reasons
     };
+  }
+
+  public createMetadataCandidate(
+    recording: RecordingMetadata,
+    provider: ProviderMetadata
+  ): MetadataCandidate {
+    return { recording, provider };
   }
 
   private normalize(str: string): string {

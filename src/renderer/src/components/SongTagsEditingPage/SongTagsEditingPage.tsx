@@ -446,9 +446,10 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   };
 
   const reloadOriginalTags = useCallback(() => {
-    const fetchTags = () => {
+    const target = songId || songPath;
+    const fetchTagsFromFile = () => {
       return window.api.songUpdates
-        .getSongId3Tags(isKnownSource ? String(songId) : songPath, isKnownSource)
+        .reloadSongFromFile(target)
         .then((res) => {
           if (res) {
             const data = {
@@ -462,39 +463,22 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           return undefined;
         })
         .catch((err) => {
-          console.warn('[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:', err);
-          return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
-            if (songs?.[0]) {
-              const song = songs[0];
-              const fallbackData: EditableSongTags = {
-                title: song.title,
-                artists: song.artists,
-                albumArtists: song.albumArtists,
-                albums: song.album ? [{ title: song.album.name, albumId: song.album.albumId }] : undefined,
-                genres: song.genres,
-                trackNumber: song.trackNo,
-                releasedYear: song.year,
-                artworkPath: song.artworkPaths?.artworkPath
-              };
-              setDefaultValues(fallbackData);
-              setSongInfo(fallbackData);
-            }
-          });
+          console.error('[SongTagsEditingPage] reloadSongFromFile failed:', err);
         });
     };
 
     if (songId) {
       window.api.metadata
         .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
-        .then(fetchTags)
+        .then(fetchTagsFromFile)
         .catch((err) => {
           console.error('[SongTagsEditingPage] Failed to clear overrides:', err);
-          fetchTags();
+          fetchTagsFromFile();
         });
     } else {
-      fetchTags();
+      fetchTagsFromFile();
     }
-  }, [isKnownSource, songId, songPath]);
+  }, [songId, songPath]);
 
   const clearSearchState = useCallback(() => {
     setAlbumKeyword('');

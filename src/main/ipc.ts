@@ -534,6 +534,23 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/reParseSong', (_, songPath: string) => reParseSong(songPath));
 
+    ipcMain.handle('app/reloadSongFromFile', async (_, songIdOrPath: number | string) => {
+      const isNumeric = typeof songIdOrPath === 'number' || (!isNaN(Number(songIdOrPath)) && !String(songIdOrPath).includes('/') && !String(songIdOrPath).includes('\\'));
+      let songPath = String(songIdOrPath);
+      let targetId = isNumeric ? Number(songIdOrPath) : undefined;
+
+      if (isNumeric) {
+        const song = await getSongById(Number(songIdOrPath));
+        if (song) {
+          songPath = song.path;
+          targetId = song.id;
+        }
+      }
+
+      await reParseSong(songPath);
+      return sendSongID3Tags(targetId ?? songPath, true);
+    });
+
     ipcMain.on('app/resetApp', () => resetApp(!IS_DEVELOPMENT));
 
     ipcMain.on('app/openLogFile', () => shell.openPath(logFilePath));

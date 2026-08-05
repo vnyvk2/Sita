@@ -278,6 +278,8 @@ const songUpdates = {
     ipcRenderer.invoke('app/updateSongId3Tags', songIdOrPath, tags, sendUpdatedData, isKnownSource),
   reParseSong: (songPath: string): Promise<SavableSongData | undefined> =>
     ipcRenderer.invoke('app/reParseSong', songPath),
+  reloadSongFromFile: (songIdOrPath: string | number): Promise<SongTags> =>
+    ipcRenderer.invoke('app/reloadSongFromFile', songIdOrPath),
   getSongId3Tags: (songIdOrPath: string, isKnownSource: boolean): Promise<SongTags> =>
     ipcRenderer.invoke('app/getSongId3Tags', songIdOrPath, isKnownSource),
   getImgFileLocation: (): Promise<string> => ipcRenderer.invoke('app/getImgFileLocation'),

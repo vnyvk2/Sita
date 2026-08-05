@@ -52,6 +52,14 @@ const sendSongMetadata = async (
     const songId = songIdOrPath as number;
     const song = await getSongByIdForSongMetadata(songId);
 
+    console.log('[STAGE 3: sendSongMetadata] DB Lookup Result for songId:', songId, {
+      foundInDb: !!song,
+      dbTitle: song?.title,
+      dbArtists: song?.artists?.map((a) => a.artist.name),
+      dbAlbums: song?.albums?.map((a) => a.album.title),
+      dbGenres: song?.genres?.map((g) => g.genre.name)
+    });
+
     if (song) {
       let songMetadata: any = null;
       try {
@@ -60,6 +68,14 @@ const sendSongMetadata = async (
       } catch (err) {
         logger.warn(`TagLib read skipped/failed for ${song.path}:`, err);
       }
+
+      console.log('[STAGE 4: sendSongMetadata] TagLib File Reader Result:', {
+        fileReadTitle: songMetadata?.title,
+        fileReadPerformers: songMetadata?.performers,
+        fileReadAlbum: songMetadata?.album,
+        fileReadGenres: songMetadata?.genres,
+        fileReadYear: songMetadata?.year
+      });
 
       const songAlbums: SongTags['albums'] =
         song.albums.length > 0
@@ -151,6 +167,15 @@ const sendSongMetadata = async (
         isLyricsSavePending: isLyricsSavePending(song.path),
         isMetadataSavePending: isMetadataUpdatesPending(song.path)
       };
+
+      console.log('[STAGE 5: sendSongMetadata] Final Payload returning to IPC:', {
+        finalTitle: res.title,
+        finalArtists: res.artists?.map((a) => a.name),
+        finalAlbums: res.albums?.map((a) => a.title),
+        finalGenres: res.genres?.map((g) => g.name),
+        sourceOrigin: 'SQLite DB Tables (songs/artists/albums)'
+      });
+
       return res;
     }
   } else {
