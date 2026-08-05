@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import type { MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
+import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
-import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
+import { ArtworkPreviewCard } from './ArtworkPreviewCard';
 
 export interface AutoTagPreviewTableProps {
   matches: TrackMatchPreview[];
   selectedTrackIds: Set<number>;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
-  filter: PreviewFilterOption;
-  sort: PreviewSortOption;
+  filter: string;
+  sort: string;
   onToggleTrack: (songId: number) => void;
   onToggleField: (songId: number, fieldId: MetadataFieldId) => void;
   onFieldChanged: (songId: number, fieldId: MetadataFieldId, value: string | number) => void;
@@ -18,8 +18,8 @@ export interface AutoTagPreviewTableProps {
   onSelectAll: () => void;
   onSelectChanged: () => void;
   onClearSelections: () => void;
-  onFilterChange: (filter: PreviewFilterOption) => void;
-  onSortChange: (sort: PreviewSortOption) => void;
+  onFilterChange: (filter: any) => void;
+  onSortChange: (sort: any) => void;
 }
 
 export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
@@ -39,76 +39,97 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
   onFilterChange,
   onSortChange
 }) => {
-  const [expandedSongId, setExpandedSongId] = useState<number | null>(null);
+  const [expandedTrackId, setExpandedTrackId] = useState<number | null>(null);
+  const [replaceArtwork, setReplaceArtwork] = useState(true);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', color: '#f3f4f6' }}>
-      {/* Controls & Bulk Actions Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Cover Artwork Preview Card */}
+      <ArtworkPreviewCard
+        replaceArtwork={replaceArtwork}
+        onToggleReplaceArtwork={setReplaceArtwork}
+      />
+
+      {/* Toolbar Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onSelectAll} style={btnStyle}>Select All</button>
-          <button onClick={onSelectChanged} style={btnStyle}>Select Changed Only</button>
-          <button onClick={onClearSelections} style={btnStyle}>Clear</button>
+          <button
+            onClick={onSelectAll}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            Select All
+          </button>
+          <button
+            onClick={onSelectChanged}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            Select Changed Only
+          </button>
+          <button
+            onClick={onClearSelections}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#9ca3af', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            Clear Selections
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.82rem' }}>
-            <span style={{ opacity: 0.7 }}>Filter:</span>
+          <label style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            Filter:
             <select
               value={filter}
-              onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              style={selectStyle}
+              onChange={(e) => onFilterChange(e.target.value)}
+              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
               <option value="low_confidence">Low Confidence</option>
-              <option value="warnings">Warnings</option>
+              <option value="warnings">Warnings Only</option>
             </select>
-          </div>
+          </label>
 
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.82rem' }}>
-            <span style={{ opacity: 0.7 }}>Sort:</span>
+          <label style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            Sort:
             <select
               value={sort}
-              onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              style={selectStyle}
+              onChange={(e) => onSortChange(e.target.value)}
+              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="trackNumber">Track Number</option>
               <option value="confidence">Confidence</option>
               <option value="title">Title</option>
             </select>
-          </div>
+          </label>
         </div>
       </div>
 
       {/* Track Grid Table */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {matches.map((track) => {
           const isSelected = selectedTrackIds.has(track.localSongId);
-          const isExpanded = expandedSongId === track.localSongId;
+          const isExpanded = expandedTrackId === track.localSongId;
           const changedCount = track.fieldDiffs.filter((d) => d.status === 'changed' || d.status === 'new').length;
 
           return (
             <div
               key={track.localSongId}
               style={{
-                display: 'flex',
-                flexDirection: 'column',
                 borderRadius: '8px',
-                background: isExpanded ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: isSelected ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
+                background: isSelected ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
                 overflow: 'hidden'
               }}
             >
+              {/* Main Track Row */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '40px 60px 1fr 1fr 140px 100px 80px',
+                  display: 'flex',
                   alignItems: 'center',
-                  padding: '10px 14px',
+                  padding: '12px 16px',
+                  gap: '12px',
                   cursor: 'pointer'
                 }}
-                onClick={() => setExpandedSongId(isExpanded ? null : track.localSongId)}
+                onClick={() => setExpandedTrackId(isExpanded ? null : track.localSongId)}
               >
                 <input
                   type="checkbox"
@@ -117,59 +138,53 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                     e.stopPropagation();
                     onToggleTrack(track.localSongId);
                   }}
-                  style={{ cursor: 'pointer', accentColor: '#3b82f6' }}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
 
-                <span style={{ fontSize: '0.82rem', opacity: 0.7 }}>
-                  #{track.oldTrackNumber ?? '-'}
+                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#9ca3af', width: '28px' }}>
+                  {track.oldTrackNumber ? String(track.oldTrackNumber).padStart(2, '0') : '--'}
                 </span>
 
-                <span style={{ fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {track.oldTitle}
-                </span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>{track.oldTitle}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{track.oldArtist}</span>
+                </div>
 
-                <span style={{ fontSize: '0.88rem', color: '#60a5fa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {track.fieldDiffs.find((d) => d.fieldId === 'title')?.userValue ?? track.fieldDiffs.find((d) => d.fieldId === 'title')?.suggestedValue ?? track.oldTitle}
-                </span>
+                {changedCount > 0 && (
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', fontWeight: 500 }}>
+                    {changedCount} diff(s)
+                  </span>
+                )}
+
+                {track.hasWarnings && (
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', fontWeight: 500 }}>
+                    ⚠️ Warning
+                  </span>
+                )}
 
                 <ConfidenceBadge level={track.confidenceLevel} confidence={track.confidence} />
 
-                <span style={{ fontSize: '0.78rem', opacity: 0.8 }}>
-                  {changedCount > 0 ? (
-                    <span style={{ color: '#fbbf24', fontWeight: 600 }}>{changedCount} Changes</span>
-                  ) : (
-                    <span style={{ opacity: 0.5 }}>Unchanged</span>
-                  )}
-                </span>
-
                 <button
+                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setExpandedSongId(isExpanded ? null : track.localSongId);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#60a5fa',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
+                    setExpandedTrackId(isExpanded ? null : track.localSongId);
                   }}
                 >
-                  {isExpanded ? 'Hide Diffs' : 'Edit Diffs'}
+                  {isExpanded ? '▲' : '▼'}
                 </button>
               </div>
 
-              {/* Inline Granular Diff Viewer */}
+              {/* Expanded Granular Diff Viewer */}
               {isExpanded && (
-                <div style={{ padding: '14px 18px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', background: 'rgba(0, 0, 0, 0.3)' }}>
                   <MetadataDiffViewer
                     track={track}
                     selectedFieldMap={selectedFieldMap}
                     userEditedValues={userEditedValues}
-                    onFieldChanged={(fieldId, val) => onFieldChanged(track.localSongId, fieldId, val)}
-                    onToggleField={(fieldId) => onToggleField(track.localSongId, fieldId)}
-                    onResetField={(fieldId) => onResetField(track.localSongId, fieldId)}
+                    onToggleField={onToggleField}
+                    onFieldChanged={onFieldChanged}
+                    onResetField={onResetField}
                   />
                 </div>
               )}
@@ -179,25 +194,4 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
       </div>
     </div>
   );
-};
-
-const btnStyle: React.CSSProperties = {
-  padding: '6px 12px',
-  borderRadius: '6px',
-  background: 'rgba(255, 255, 255, 0.08)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  color: '#f3f4f6',
-  fontSize: '0.78rem',
-  fontWeight: 500,
-  cursor: 'pointer'
-};
-
-const selectStyle: React.CSSProperties = {
-  padding: '4px 8px',
-  borderRadius: '6px',
-  background: 'rgba(0,0,0,0.4)',
-  border: '1px solid rgba(255, 255, 255, 0.15)',
-  color: '#f3f4f6',
-  fontSize: '0.78rem',
-  outline: 'none'
 };

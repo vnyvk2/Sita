@@ -5,6 +5,7 @@ import { ReleaseSearchPanel } from './ReleaseSearchPanel';
 import { AutoTagPreviewTable } from './AutoTagPreviewTable';
 import { AutoTagProgressOverlay } from './AutoTagProgressOverlay';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { FinalReviewSummaryCard } from './FinalReviewSummaryCard';
 
 export interface AlbumAutoTagDialogProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 }) => {
   const { state, actions } = useAlbumAutoTag(operationId);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [replaceArtwork] = useState(true);
   const previousFocusRef = useRef<Element | null>(null);
 
   // Focus preservation
@@ -71,6 +73,8 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
   }, [isOpen, initialAlbumName, initialArtistName]);
 
   if (!isOpen) return null;
+
+  const selectedMatches = state.filteredMatches.filter((m) => state.selectedTrackIds.has(m.localSongId));
 
   return createPortal(
     <div
@@ -164,25 +168,33 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
             />
           )}
 
-          {/* Step 2: Preview & Diff Table */}
+          {/* Step 2: Preview, Summary & Diff Table */}
           {state.step === 'preview' && state.preview && (
-            <AutoTagPreviewTable
-              matches={state.filteredMatches}
-              selectedTrackIds={state.selectedTrackIds}
-              selectedFieldMap={state.selectedFieldMap}
-              userEditedValues={state.userEditedValues}
-              filter={state.filter}
-              sort={state.sort}
-              onToggleTrack={actions.toggleTrack}
-              onToggleField={actions.toggleField}
-              onFieldChanged={actions.setFieldValue}
-              onResetField={actions.resetFieldValue}
-              onSelectAll={actions.selectAllTracks}
-              onSelectChanged={actions.selectChangedTracks}
-              onClearSelections={actions.clearTrackSelections}
-              onFilterChange={actions.setFilter}
-              onSortChange={actions.setSort}
-            />
+            <>
+              <FinalReviewSummaryCard
+                preview={state.preview}
+                selectedMatches={selectedMatches}
+                replaceArtwork={replaceArtwork}
+              />
+
+              <AutoTagPreviewTable
+                matches={state.filteredMatches}
+                selectedTrackIds={state.selectedTrackIds}
+                selectedFieldMap={state.selectedFieldMap}
+                userEditedValues={state.userEditedValues}
+                filter={state.filter}
+                sort={state.sort}
+                onToggleTrack={actions.toggleTrack}
+                onToggleField={actions.toggleField}
+                onFieldChanged={actions.setFieldValue}
+                onResetField={actions.resetFieldValue}
+                onSelectAll={actions.selectAllTracks}
+                onSelectChanged={actions.selectChangedTracks}
+                onClearSelections={actions.clearTrackSelections}
+                onFilterChange={actions.setFilter}
+                onSortChange={actions.setSort}
+              />
+            </>
           )}
 
           {/* Step 3: Complete & Undo Snackbar */}
