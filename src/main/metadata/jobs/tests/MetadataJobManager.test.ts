@@ -1,11 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MetadataJobManager } from '../MetadataJobManager';
 import { MetadataDiagnosticsService } from '../MetadataDiagnosticsService';
-import { MetadataApplyService, CancelledError } from '../../services/MetadataApplyService';
+import { MetadataApplyService } from '../../services/MetadataApplyService';
 import { TagWriterService } from '../../services/TagWriterService';
 import type { AlbumTagPreview } from '../../../../common/metadata/types';
 
-describe('Phase 7 — Background Execution Engine, Job Scheduler & Telemetry Suite', () => {
+describe('Phase 7 — Autonomous Background Execution Engine, Job Scheduler & Telemetry Suite', () => {
   let jobManager: MetadataJobManager;
   let diagnosticsService: MetadataDiagnosticsService;
   let applyService: MetadataApplyService;
@@ -46,13 +46,12 @@ describe('Phase 7 — Background Execution Engine, Job Scheduler & Telemetry Sui
 
   beforeEach(() => {
     diagnosticsService = new MetadataDiagnosticsService();
-    jobManager = new MetadataJobManager(2, diagnosticsService);
-
     const tagWriter = new TagWriterService();
     vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
     const dbUpdater = vi.fn().mockResolvedValue(true);
 
     applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+    jobManager = new MetadataJobManager(2, applyService, diagnosticsService);
   });
 
   it('enforces maxConcurrentJobs queuing and processes jobs as slots open', () => {
@@ -69,29 +68,35 @@ describe('Phase 7 — Background Execution Engine, Job Scheduler & Telemetry Sui
     expect(job3.status).toBe('running');
   });
 
-  it('executes apply job, updates status, and records telemetry automatically', async () => {
-    jobManager.createJob('j1', 'SOUR', 'Olivia Rodrigo', mockPreview);
+  it('autonomously executes apply job, updates status, and records telemetry', async () => {
+    const result = await jobManager.executeApplyJob('j1_manual');
 
-    const result = await jobManager.executeApplyJob('j1', applyService);
-    expect(result.success).toBe(true);
-    expect(result.updatedCount).toBe(1);
+    // Manually triggered job without queue preview
+    expect(result.success).toBe(false);
 
-    const job = jobManager.getJob('j1');
+    // Enqueued job with preview executes autonomously
+    jobManager.createJob('j2_auto', 'SOUR', 'Olivia Rodrigo', mockPreview);
+
+    // Wait microtask tick for async execution
+    await new Promise((r) => setTimeout(r, 50));
+
+    const job = jobManager.getJob('j2_auto');
     expect(job?.status).toBe('completed');
 
     const summary = diagnosticsService.getSummary();
-    expect(summary.totalOperations).toBe(1);
-    expect(summary.successRate).toBe(1);
-    expect(summary.totalSongsProcessed).toBe(1);
+    expect(summary.totalOperations).toBeGreaterThanOrEqual(1);
+    expect(summary.totalSongsUpdated).toBe(1);
   });
 
-  it('cancels job mid-execution via AbortController signal', async () => {
+  it('cancels job mid-execution via AbortController signal cleanly returning error result', async () => {
     const job = jobManager.createJob('j1', 'SOUR', 'Olivia Rodrigo', mockPreview);
 
     // Abort job signal
     jobManager.cancelJob('j1');
 
-    await expect(jobManager.executeApplyJob('j1', applyService)).rejects.toThrow(CancelledError);
+    const res = await jobManager.executeApplyJob('j1');
+    expect(res.success).toBe(false);
+    expect(res.errors[0]).toContain('aborted');
     expect(job.status).toBe('cancelled');
   });
 

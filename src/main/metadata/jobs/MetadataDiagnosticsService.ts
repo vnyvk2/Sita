@@ -4,8 +4,9 @@ export interface OperationTelemetry {
   operationId: string;
   providerId?: MetadataProviderId;
   durationMs: number;
-  songsProcessed: number;
-  matchesCount: number;
+  songsTotal: number;
+  songsSelected: number;
+  songsUpdated: number;
   warningsCount: number;
   errorsCount: number;
   timestamp: number;
@@ -37,18 +38,18 @@ export class MetadataDiagnosticsService {
   public getSummary() {
     const totalOps = this.telemetryRecords.length;
     if (totalOps === 0) {
-      return { totalOperations: 0, successRate: 1, averageDurationMs: 0, totalSongsProcessed: 0 };
+      return { totalOperations: 0, successRate: 1, averageDurationMs: 0, totalSongsUpdated: 0 };
     }
 
     const successfulOps = this.telemetryRecords.filter((r) => r.success).length;
     const totalDuration = this.telemetryRecords.reduce((acc, r) => acc + r.durationMs, 0);
-    const totalSongs = this.telemetryRecords.reduce((acc, r) => acc + r.songsProcessed, 0);
+    const totalUpdated = this.telemetryRecords.reduce((acc, r) => acc + r.songsUpdated, 0);
 
     return {
       totalOperations: totalOps,
       successRate: successfulOps / totalOps,
       averageDurationMs: totalDuration / totalOps,
-      totalSongsProcessed: totalSongs
+      totalSongsUpdated: totalUpdated
     };
   }
 

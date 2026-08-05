@@ -99,7 +99,7 @@ export class MetadataApplyService {
       }
 
       const chunkMatches = selectedMatches.slice(i, i + this.batchChunkSize);
-      const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title);
+      const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title, signal);
 
       totalUpdated += chunkResult.updatedCount;
       totalFailed += chunkResult.failedCount;
@@ -118,7 +118,7 @@ export class MetadataApplyService {
     };
   }
 
-  private async applyMatchChunk(chunkMatches: TrackMatchPreview[], albumTitle: string): Promise<ApplyResult> {
+  private async applyMatchChunk(chunkMatches: TrackMatchPreview[], albumTitle: string, signal?: AbortSignal): Promise<ApplyResult> {
     const previousSongs: SongMetadataSnapshot[] = [];
     const updatedSongs: SongMetadataSnapshot[] = [];
     const tagWritePayloads: TagWritePayload[] = [];
@@ -204,6 +204,10 @@ export class MetadataApplyService {
       });
     }
 
+    if (signal?.aborted) {
+      throw new CancelledError('Apply operation aborted by user prior to file write.');
+    }
+
     // Step 1: Write Physical Disk Tags
     const tagWriteResults = await this.tagWriter.writeBatch(tagWritePayloads);
     const failedWrite = tagWriteResults.find((r) => !r.success);
@@ -215,6 +219,12 @@ export class MetadataApplyService {
         failedCount: chunkMatches.length,
         errors: [`Physical file tag write failed for ${failedWrite.filePath}: ${failedWrite.error}`]
       };
+    }
+
+    if (signal?.aborted) {
+      // Revert disk tags immediately if cancelled right after file write
+      await this.tagWriter.writeBatch(rollbackPayloads);
+      throw new CancelledError('Apply operation aborted by user, reverted physical file tags.');
     }
 
     // Step 2: Database Atomic Commit

@@ -27,10 +27,16 @@ export class MetadataJobManager extends EventEmitter {
   private readonly activeJobs: Set<string> = new Set();
   private readonly maxConcurrentJobs: number;
   private readonly diagnosticsService: MetadataDiagnosticsService;
+  private readonly applyService: MetadataApplyService;
 
-  constructor(maxConcurrentJobs = 3, diagnosticsService?: MetadataDiagnosticsService) {
+  constructor(
+    maxConcurrentJobs = 3,
+    applyService?: MetadataApplyService,
+    diagnosticsService?: MetadataDiagnosticsService
+  ) {
     super();
     this.maxConcurrentJobs = maxConcurrentJobs;
+    this.applyService = applyService ?? new MetadataApplyService();
     this.diagnosticsService = diagnosticsService ?? new MetadataDiagnosticsService();
   }
 
@@ -104,26 +110,29 @@ export class MetadataJobManager extends EventEmitter {
     this.emit('job:progress', payload);
   }
 
-  public async executeApplyJob(jobId: string, applyService: MetadataApplyService): Promise<ApplyResult> {
+  public async executeApplyJob(jobId: string): Promise<ApplyResult> {
     const job = this.jobs.get(jobId);
     if (!job || !job.preview) {
-      throw new Error(`Job '${jobId}' not found or missing preview data`);
+      return { success: false, updatedCount: 0, failedCount: 0, errors: [`Job '${jobId}' not found or missing preview`] };
     }
 
     const startTime = Date.now();
     this.updateJobProgress(jobId, 'applying', `Applying metadata updates for ${job.albumTitle}...`, 20);
 
     try {
-      const result = await applyService.applyPreview(job.preview, job.abortController.signal);
+      const result = await this.applyService.applyPreview(job.preview, job.abortController.signal);
       const durationMs = Date.now() - startTime;
+
+      const selectedMatches = job.preview.matches.filter((m) => m.applyTrack);
 
       // Record Telemetry
       this.diagnosticsService.recordOperation({
         operationId: jobId,
         providerId: job.preview.provider,
         durationMs,
-        songsProcessed: job.preview.matches.length,
-        matchesCount: job.preview.matches.filter((m) => m.applyTrack).length,
+        songsTotal: job.preview.matches.length,
+        songsSelected: selectedMatches.length,
+        songsUpdated: result.updatedCount,
         warningsCount: job.preview.warnings.length,
         errorsCount: result.errors.length,
         success: result.success
@@ -138,20 +147,28 @@ export class MetadataJobManager extends EventEmitter {
       return result;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.updateJobProgress(jobId, err instanceof Error && err.name === 'CancelledError' ? 'cancelled' : 'failed', msg, 0);
+      const isCancelled = err instanceof Error && err.name === 'CancelledError';
+
+      this.updateJobProgress(jobId, isCancelled ? 'cancelled' : 'failed', msg, 0);
 
       this.diagnosticsService.recordOperation({
         operationId: jobId,
-        providerId: job.preview.provider,
+        providerId: job.preview?.provider,
         durationMs: Date.now() - startTime,
-        songsProcessed: job.preview.matches.length,
-        matchesCount: job.preview.matches.filter((m) => m.applyTrack).length,
-        warningsCount: job.preview.warnings.length,
+        songsTotal: job.preview?.matches.length ?? 0,
+        songsSelected: job.preview?.matches.filter((m) => m.applyTrack).length ?? 0,
+        songsUpdated: 0,
+        warningsCount: job.preview?.warnings.length ?? 0,
         errorsCount: 1,
         success: false
       });
 
-      throw err;
+      return {
+        success: false,
+        updatedCount: 0,
+        failedCount: job.preview?.matches.length ?? 0,
+        errors: [msg]
+      };
     } finally {
       this.cleanCompletedJobs();
     }
@@ -170,13 +187,16 @@ export class MetadataJobManager extends EventEmitter {
 
   public cleanCompletedJobs(maxAgeMs = 1000 * 60 * 30, maxRetainedJobs = 50): void {
     const now = Date.now();
-    const finished = Array.from(this.jobs.values()).filter(
-      (j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled'
-    );
+    const finished = Array.from(this.jobs.values())
+      .filter((j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled')
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)); // Sort newest first
 
-    // Evict old finished jobs exceeding maxAgeMs or maxRetainedJobs LRU bound
-    for (const job of finished) {
-      if ((job.completedAt && now - job.completedAt > maxAgeMs) || finished.length > maxRetainedJobs) {
+    for (let i = 0; i < finished.length; i++) {
+      const job = finished[i];
+      const isExpired = job.completedAt && now - job.completedAt > maxAgeMs;
+      const exceedsCapacity = i >= maxRetainedJobs;
+
+      if (isExpired || exceedsCapacity) {
         this.jobs.delete(job.jobId);
       }
     }
@@ -191,6 +211,11 @@ export class MetadataJobManager extends EventEmitter {
         this.activeJobs.add(jobId);
         job.status = 'running';
         this.updateJobProgress(jobId, 'running', `Processing job ${jobId}...`, 10);
+
+        if (job.preview) {
+          // Autonomous Queue Execution
+          this.executeApplyJob(jobId).catch(() => {});
+        }
       }
     }
   }
