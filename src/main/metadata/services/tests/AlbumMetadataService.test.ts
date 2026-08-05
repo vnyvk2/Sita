@@ -7,9 +7,11 @@ import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapt
 import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
 import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
+import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
+import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import type { AlbumMetadata } from '../../models/RecordingMetadata';
 
-describe('Phase 3 Complete — Metadata Provider Runtime & Live MusicBrainz Pipeline Suite', () => {
+describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider Runtime Suite', () => {
   it('maps confidence scores to confidence levels cleanly via getConfidenceLevel helper', () => {
     expect(getConfidenceLevel(1.0)).toBe('Excellent');
     expect(getConfidenceLevel(0.96)).toBe('Excellent');
@@ -41,6 +43,45 @@ describe('Phase 3 Complete — Metadata Provider Runtime & Live MusicBrainz Pipe
 
     const result = matcher.matchTracks([song], 'rel-sour', [track]);
     expect(result[0].why).toBe('Title Match | Artist Match | Album Match | Duration Match');
+  });
+
+  it('handles empty provider list gracefully returning empty array [] without throwing', async () => {
+    const runtime = new MetadataProviderRuntime([]);
+    await runtime.initialize();
+    const service = new AlbumMetadataService(runtime);
+
+    const albums = await service.search('SOUR', 'Olivia Rodrigo');
+    expect(albums).toEqual([]);
+  });
+
+  it('tolerates provider failures: when Provider 1 throws, Provider 2 succeeds cleanly', async () => {
+    const failingAdapter: IMetadataProviderAdapter = {
+      identity: { id: 'discogs', name: 'Discogs Provider', version: '1.0.0', providerType: 'online' },
+      capabilities: new ProviderCapabilities([ProviderCapability.Search]),
+      supports: () => true,
+      lookup: vi.fn(),
+      search: vi.fn(),
+      searchAlbums: vi.fn().mockRejectedValue(new Error('Network Timeout'))
+    };
+
+    const successfulAdapter: IMetadataProviderAdapter = {
+      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      capabilities: new ProviderCapabilities([ProviderCapability.Search]),
+      supports: () => true,
+      lookup: vi.fn(),
+      search: vi.fn(),
+      searchAlbums: vi.fn().mockResolvedValue([
+        { title: 'SOUR', artist: 'Olivia Rodrigo', releaseId: 'mb-sour', provider: 'musicbrainz' }
+      ])
+    };
+
+    const runtime = new MetadataProviderRuntime([failingAdapter, successfulAdapter]);
+    await runtime.initialize();
+    const service = new AlbumMetadataService(runtime);
+
+    const albums = await service.search('SOUR', 'Olivia Rodrigo');
+    expect(albums).toHaveLength(1);
+    expect(albums[0].releaseId).toBe('mb-sour');
   });
 
   it('executes full end-to-end provider pipeline: search -> resolve -> cache hit -> build match', async () => {

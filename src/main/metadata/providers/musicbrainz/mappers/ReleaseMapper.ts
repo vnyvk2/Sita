@@ -1,23 +1,74 @@
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import type { AlbumMetadata, OfficialTrackInput, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
 import type { MusicBrainzReleaseDto } from '../dto/ReleaseDto';
 
 export class MusicBrainzReleaseMapper {
-  public toProviderResult(dto: MusicBrainzReleaseDto): ProviderResult<Record<string, unknown>> {
-    const artists = dto['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean) ?? [];
-    const year = dto.date ? parseInt(dto.date.split('-')[0], 10) : undefined;
+  public toAlbumMetadata(dto: MusicBrainzReleaseDto, requestedArtist?: string): AlbumMetadata {
+    const artistName =
+      dto['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean).join(', ') ||
+      requestedArtist ||
+      'Unknown Artist';
 
-    const fields: Record<string, unknown> = {
+    const year = dto.date ? parseInt(dto.date.substring(0, 4), 10) : undefined;
+    const trackCount = dto.media?.reduce((acc, m) => acc + (m['track-count'] ?? m.tracks?.length ?? 0), 0) || undefined;
+
+    return {
       title: dto.title,
-      artists,
+      artist: artistName,
       year: isNaN(year!) ? undefined : year,
-      country: dto.country,
-      status: dto.status,
-      barcode: dto.barcode,
-      primaryType: dto['release-group']?.['primary-type']
+      label: dto['label-info']?.[0]?.label?.name,
+      releaseType: dto['release-group']?.['primary-type'] ?? dto.status,
+      discCount: dto.media?.length ?? 1,
+      trackCount,
+      releaseId: dto.id,
+      provider: 'musicbrainz'
     };
+  }
+
+  public toResolvedAlbumRelease(dto: MusicBrainzReleaseDto): ResolvedAlbumRelease {
+    const album = this.toAlbumMetadata(dto);
+    const officialTracks: OfficialTrackInput[] = [];
+
+    if (dto.media) {
+      for (const media of dto.media) {
+        const discNumber = media.position ?? 1;
+        if (media.tracks) {
+          for (const track of media.tracks) {
+            const trackNo = track.position ?? (track.number ? parseInt(track.number, 10) : officialTracks.length + 1);
+            const trackArtist =
+              track['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean).join(', ') ||
+              album.artist;
+            const duration = track.length ? track.length / 1000 : track.recording?.length ? track.recording.length / 1000 : undefined;
+
+            officialTracks.push({
+              trackId: track.id,
+              title: track.title ?? track.recording?.title ?? '',
+              artist: trackArtist,
+              album: dto.title,
+              year: album.year,
+              trackNumber: isNaN(trackNo) ? officialTracks.length + 1 : trackNo,
+              discNumber,
+              duration,
+              musicBrainzRecordingId: track.recording?.id
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      album,
+      tracks: officialTracks,
+      provider: 'musicbrainz',
+      providerReleaseId: dto.id
+    };
+  }
+
+  public toProviderResult(dto: MusicBrainzReleaseDto): ProviderResult<Record<string, unknown>> {
+    const album = this.toAlbumMetadata(dto);
 
     return new ProviderResult({
-      payload: fields,
+      payload: album as unknown as Record<string, unknown>,
       confidence: 0.9,
       providerInfo: {
         id: 'musicbrainz',

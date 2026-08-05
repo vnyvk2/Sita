@@ -2,6 +2,7 @@ import type { IMetadataProviderAdapter, IProviderLifecycle } from '../contracts/
 import type { ProviderConfiguration } from '../contracts/ProviderConfiguration';
 import { ProviderState, type ProviderStatus } from '../contracts/ProviderStatus';
 import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from '../models/RecordingMetadata';
+import { MetadataNormalizer } from '../matching/MetadataNormalizer';
 
 export interface ProviderRuntimeOptions {
   failureThresholdBeforeDegraded?: number;
@@ -17,13 +18,15 @@ export class MetadataProviderRuntime {
   private statusState: ProviderStatus;
 
   constructor(
-    adapters: IMetadataProviderAdapter | IMetadataProviderAdapter[],
+    adapters?: IMetadataProviderAdapter | IMetadataProviderAdapter[],
     config?: Partial<ProviderConfiguration>,
     options?: ProviderRuntimeOptions
   ) {
-    const adapterList = Array.isArray(adapters) ? adapters : [adapters];
+    const adapterList = adapters ? (Array.isArray(adapters) ? adapters : [adapters]) : [];
     for (const adapter of adapterList) {
-      this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+      if (adapter && adapter.identity) {
+        this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+      }
     }
 
     this.config = {
@@ -44,17 +47,36 @@ export class MetadataProviderRuntime {
   }
 
   public registerProvider(adapter: IMetadataProviderAdapter): void {
-    this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+    if (adapter && adapter.identity) {
+      this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+    }
   }
 
   public getProvider(providerId: string): IMetadataProviderAdapter | undefined {
     return this.providers.get(providerId.toLowerCase());
   }
 
+  public getProviders(): IMetadataProviderAdapter[] {
+    return this.getSortedAdapters();
+  }
+
+  /**
+   * Primary adapter instance accessor for single-provider registry compatibility.
+   */
   public get adapterInstance(): IMetadataProviderAdapter {
-    const first = this.providers.values().next().value;
-    if (!first) throw new Error('No registered metadata provider adapters found.');
-    return first;
+    const primary = this.getSortedAdapters()[0];
+    if (!primary) {
+      throw new Error('No registered metadata provider adapters found in runtime.');
+    }
+    return primary;
+  }
+
+  public getProviderStatuses(): Map<string, ProviderStatus> {
+    const map = new Map<string, ProviderStatus>();
+    for (const [id] of this.providers.entries()) {
+      map.set(id, this.status);
+    }
+    return map;
   }
 
   public get status(): ProviderStatus {
@@ -73,7 +95,7 @@ export class MetadataProviderRuntime {
 
     this.statusState.state = ProviderState.Initializing;
     try {
-      for (const adapter of this.providers.values()) {
+      for (const adapter of this.getSortedAdapters()) {
         const lifecycle = adapter as unknown as IProviderLifecycle;
         if (typeof lifecycle.initialize === 'function') {
           await lifecycle.initialize(this.config);
@@ -98,7 +120,7 @@ export class MetadataProviderRuntime {
 
   public async shutdown(): Promise<void> {
     try {
-      for (const adapter of this.providers.values()) {
+      for (const adapter of this.getSortedAdapters()) {
         const lifecycle = adapter as unknown as IProviderLifecycle;
         if (typeof lifecycle.shutdown === 'function') {
           await lifecycle.shutdown();
@@ -110,26 +132,36 @@ export class MetadataProviderRuntime {
   }
 
   /**
-   * Search albums across active metadata providers.
+   * Search albums concurrently across registered providers sorted by priority.
+   * Merges, deduplicates by normalized title::artist, and ranks search results cleanly.
    */
   public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {
-    if (!this.isAvailable()) return [];
+    if (!this.isAvailable() || this.providers.size === 0) return [];
 
-    const allAlbums: AlbumMetadata[] = [];
-    for (const adapter of this.providers.values()) {
+    const adapters = this.getSortedAdapters();
+    const searchPromises = adapters.map(async (adapter) => {
       if (typeof adapter.searchAlbums === 'function') {
-        try {
-          const results = await adapter.searchAlbums(album, artist, limit);
-          this.recordSuccess();
-          allAlbums.push(...results);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          this.recordFailure(msg);
-        }
+        return adapter.searchAlbums(album, artist, limit);
+      }
+      return [];
+    });
+
+    const results = await Promise.allSettled(searchPromises);
+    const rawAlbums: AlbumMetadata[] = [];
+
+    for (let i = 0; i < results.length; i++) {
+      const res = results[i];
+      if (res.status === 'fulfilled') {
+        rawAlbums.push(...res.value);
+        this.recordSuccess();
+      } else {
+        const msg = res.reason instanceof Error ? res.reason.message : String(res.reason);
+        this.recordFailure(msg);
       }
     }
 
-    return allAlbums;
+    // Deduplicate and rank search results
+    return this.deduplicateAndRankAlbums(rawAlbums, album, artist);
   }
 
   /**
@@ -142,7 +174,7 @@ export class MetadataProviderRuntime {
     if (!this.isAvailable() || !providerReleaseId) return null;
 
     const targetProviderId = providerId?.toLowerCase() ?? 'musicbrainz';
-    const adapter = this.providers.get(targetProviderId) ?? this.providers.values().next().value;
+    const adapter = this.providers.get(targetProviderId) ?? this.getSortedAdapters()[0];
 
     if (adapter && typeof adapter.resolveRelease === 'function') {
       try {
@@ -193,5 +225,46 @@ export class MetadataProviderRuntime {
       this.statusState.state === ProviderState.Healthy ||
       this.statusState.state === ProviderState.Degraded
     );
+  }
+
+  private getSortedAdapters(): IMetadataProviderAdapter[] {
+    return Array.from(this.providers.values()).sort((a, b) => {
+      const prioA = (a as unknown as { configuration?: ProviderConfiguration }).configuration?.priority ?? 500;
+      const priob = (b as unknown as { configuration?: ProviderConfiguration }).configuration?.priority ?? 500;
+      return prioA - priob;
+    });
+  }
+
+  private deduplicateAndRankAlbums(albums: AlbumMetadata[], targetAlbum: string, targetArtist?: string): AlbumMetadata[] {
+    const seen = new Set<string>();
+    const deduplicated: AlbumMetadata[] = [];
+
+    for (const alb of albums) {
+      const normTitle = MetadataNormalizer.normalizeAlbum(alb.title);
+      const normArtist = MetadataNormalizer.normalizeArtist(alb.artist);
+      const key = `${normTitle}::${normArtist}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push(alb);
+      }
+    }
+
+    const normTargetAlbum = MetadataNormalizer.normalizeAlbum(targetAlbum);
+    const normTargetArtist = targetArtist ? MetadataNormalizer.normalizeArtist(targetArtist) : '';
+
+    deduplicated.sort((a, b) => {
+      const titleMatchA = MetadataNormalizer.normalizeAlbum(a.title) === normTargetAlbum ? 50 : 0;
+      const titleMatchB = MetadataNormalizer.normalizeAlbum(b.title) === normTargetAlbum ? 50 : 0;
+      const artistMatchA = normTargetArtist && MetadataNormalizer.normalizeArtist(a.artist) === normTargetArtist ? 20 : 0;
+      const artistMatchB = normTargetArtist && MetadataNormalizer.normalizeArtist(b.artist) === normTargetArtist ? 20 : 0;
+
+      const scoreA = titleMatchA + artistMatchA;
+      const scoreB = titleMatchB + artistMatchB;
+
+      return scoreB - scoreA;
+    });
+
+    return deduplicated;
   }
 }

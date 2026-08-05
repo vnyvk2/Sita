@@ -5,8 +5,8 @@ import type { IdentityResolutionCache } from '@main/metadata/cache/IdentityResol
 import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
 import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
-import type { AlbumMetadata, OfficialTrackInput, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
-import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from './dto';
+import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
+import type { MusicBrainzRecordingDto } from './dto';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
 
@@ -65,23 +65,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }
 
     const releases = await this.apiClient.searchReleases(queryParts.join(' AND '), limit);
-    const results: AlbumMetadata[] = releases.map((rel) => {
-      const artistName = rel['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean).join(', ') || artist || 'Unknown Artist';
-      const year = rel.date ? parseInt(rel.date.substring(0, 4), 10) : undefined;
-      const trackCount = rel.media?.reduce((acc, m) => acc + (m['track-count'] ?? m.tracks?.length ?? 0), 0) || undefined;
-
-      return {
-        title: rel.title,
-        artist: artistName,
-        year: isNaN(year!) ? undefined : year,
-        label: rel['label-info']?.[0]?.label?.name,
-        releaseType: rel['release-group']?.['primary-type'] ?? rel.status,
-        discCount: rel.media?.length ?? 1,
-        trackCount,
-        releaseId: rel.id,
-        provider: 'musicbrainz'
-      };
-    });
+    const results: AlbumMetadata[] = releases.map((rel) => this.releaseMapper.toAlbumMetadata(rel, artist));
 
     if (this.cache && results.length > 0) {
       this.cache.set(this.identity.id, cacheKey, results);
@@ -102,54 +86,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     const rel = await this.apiClient.getReleaseById(providerReleaseId);
     if (!rel) return null;
 
-    const artistName = rel['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean).join(', ') || 'Unknown Artist';
-    const year = rel.date ? parseInt(rel.date.substring(0, 4), 10) : undefined;
-
-    const officialTracks: OfficialTrackInput[] = [];
-
-    if (rel.media) {
-      for (const media of rel.media) {
-        const discNumber = media.position ?? 1;
-        if (media.tracks) {
-          for (const track of media.tracks) {
-            const trackNo = track.position ?? (track.number ? parseInt(track.number, 10) : officialTracks.length + 1);
-            const trackArtist = track['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean).join(', ') || artistName;
-            const duration = track.length ? track.length / 1000 : track.recording?.length ? track.recording.length / 1000 : undefined;
-
-            officialTracks.push({
-              trackId: track.id,
-              title: track.title ?? track.recording?.title ?? '',
-              artist: trackArtist,
-              album: rel.title,
-              year: isNaN(year!) ? undefined : year,
-              trackNumber: isNaN(trackNo) ? officialTracks.length + 1 : trackNo,
-              discNumber,
-              duration,
-              musicBrainzRecordingId: track.recording?.id
-            });
-          }
-        }
-      }
-    }
-
-    const album: AlbumMetadata = {
-      title: rel.title,
-      artist: artistName,
-      year: isNaN(year!) ? undefined : year,
-      label: rel['label-info']?.[0]?.label?.name,
-      releaseType: rel['release-group']?.['primary-type'] ?? rel.status,
-      discCount: rel.media?.length ?? 1,
-      trackCount: officialTracks.length,
-      releaseId: rel.id,
-      provider: 'musicbrainz'
-    };
-
-    const resolved: ResolvedAlbumRelease = {
-      album,
-      tracks: officialTracks,
-      provider: 'musicbrainz',
-      providerReleaseId: rel.id
-    };
+    const resolved = this.releaseMapper.toResolvedAlbumRelease(rel);
 
     if (this.cache) {
       this.cache.set(this.identity.id, cacheKey, resolved);
