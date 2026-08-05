@@ -1,5 +1,6 @@
 import { TrackMatcher } from '../matching/TrackMatcher';
-import type { MetadataCandidate, MatchCriterion, AlbumMetadata } from '../models/RecordingMetadata';
+import type { MetadataCandidate, MatchCriterion, AlbumMetadata, ResolvedAlbumRelease, OfficialTrackInput, MetadataProviderId } from '../models/RecordingMetadata';
+import type { MetadataProviderRuntime } from '../runtime/MetadataProviderRuntime';
 
 export interface LocalSongInput {
   songId: number;
@@ -56,34 +57,43 @@ export interface AlbumPreview {
 }
 
 export interface IAlbumMetadataService {
-  search(albumName: string, artistName?: string): Promise<AlbumMetadata[]>;
-  resolveRelease(releaseId: string): Promise<AlbumMetadata | null>;
+  search(albumName: string, artistName?: string, limit?: number): Promise<AlbumMetadata[]>;
+  resolveRelease(releaseId: string, providerId?: MetadataProviderId): Promise<ResolvedAlbumRelease | null>;
   buildAlbumMatch(
     localSongs: LocalSongInput[],
-    releaseId: string
+    album: AlbumMetadata,
+    officialTracks: OfficialTrackInput[]
   ): Promise<AlbumPreview>;
   applyAlbum(preview: AlbumPreview): Promise<{ success: boolean; updatedSongCount: number }>;
 }
 
 export class AlbumMetadataService implements IAlbumMetadataService {
   private readonly trackMatcher: TrackMatcher;
+  private readonly runtime?: MetadataProviderRuntime;
 
-  constructor(trackMatcher = new TrackMatcher()) {
+  constructor(runtime?: MetadataProviderRuntime, trackMatcher = new TrackMatcher()) {
+    this.runtime = runtime;
     this.trackMatcher = trackMatcher;
   }
 
   /**
-   * Stage 2 — Search Album Releases
+   * Stage 2 — Search Album Releases via MetadataProviderRuntime
    */
-  public async search(_albumName: string, _artistName?: string): Promise<AlbumMetadata[]> {
-    throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime connection.');
+  public async search(albumName: string, artistName?: string, limit = 10): Promise<AlbumMetadata[]> {
+    if (!this.runtime) {
+      throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime instance.');
+    }
+    return this.runtime.searchAlbums(albumName, artistName, limit);
   }
 
   /**
-   * Stage 3 — Download Complete Release
+   * Stage 3 — Download Complete Release via MetadataProviderRuntime
    */
-  public async resolveRelease(_releaseId: string): Promise<AlbumMetadata | null> {
-    throw new Error('AlbumMetadataService.resolveRelease requires active MetadataProviderRuntime connection.');
+  public async resolveRelease(releaseId: string, providerId?: MetadataProviderId): Promise<ResolvedAlbumRelease | null> {
+    if (!this.runtime) {
+      throw new Error('AlbumMetadataService.resolveRelease requires active MetadataProviderRuntime instance.');
+    }
+    return this.runtime.resolveRelease(releaseId, providerId);
   }
 
   /**
@@ -93,18 +103,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
   public async buildAlbumMatch(
     localSongs: LocalSongInput[],
     album: AlbumMetadata,
-    officialTracks: Array<{
-      trackId?: string;
-      title: string;
-      artist?: string;
-      album?: string;
-      year?: number;
-      trackNumber: number;
-      discNumber?: number;
-      duration?: number;
-      isrc?: string;
-      musicBrainzRecordingId?: string;
-    }>
+    officialTracks: OfficialTrackInput[]
   ): Promise<AlbumPreview> {
     // Run 1-to-1 TrackMatcher assignment
     let trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {

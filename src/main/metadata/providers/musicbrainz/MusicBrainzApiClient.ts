@@ -12,6 +12,13 @@ export interface MusicBrainzApiClientOptions {
   userAgent?: string;
 }
 
+export interface MusicBrainzReleaseSearchResultDto {
+  created?: string;
+  count?: number;
+  offset?: number;
+  releases?: MusicBrainzReleaseDto[];
+}
+
 export class MusicBrainzApiClient {
   private readonly pipeline: RequestPipeline;
   private readonly baseUrl: string;
@@ -44,6 +51,28 @@ export class MusicBrainzApiClient {
     });
 
     return response.data.recordings ?? [];
+  }
+
+  public async searchReleases(
+    query: string,
+    limit = 10
+  ): Promise<MusicBrainzReleaseDto[]> {
+    const url = `${this.baseUrl}/release`;
+    const response = await this.pipeline.execute<MusicBrainzReleaseSearchResultDto>({
+      url,
+      method: 'GET',
+      headers: {
+        'User-Agent': this.userAgent,
+        Accept: 'application/json'
+      },
+      params: {
+        query,
+        limit,
+        fmt: 'json'
+      }
+    });
+
+    return response.data.releases ?? [];
   }
 
   public async getRecordingById(mbid: string): Promise<MusicBrainzRecordingDto | null> {
@@ -81,7 +110,7 @@ export class MusicBrainzApiClient {
           Accept: 'application/json'
         },
         params: {
-          inc: 'artists record-level-relations release-groups media',
+          inc: 'artists recordings record-level-relations release-groups media discids tags genres',
           fmt: 'json'
         }
       });

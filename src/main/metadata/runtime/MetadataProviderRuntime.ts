@@ -1,6 +1,7 @@
 import type { IMetadataProviderAdapter, IProviderLifecycle } from '../contracts/IMetadataProviderAdapter';
 import type { ProviderConfiguration } from '../contracts/ProviderConfiguration';
 import { ProviderState, type ProviderStatus } from '../contracts/ProviderStatus';
+import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from '../models/RecordingMetadata';
 
 export interface ProviderRuntimeOptions {
   failureThresholdBeforeDegraded?: number;
@@ -9,18 +10,22 @@ export interface ProviderRuntimeOptions {
 }
 
 export class MetadataProviderRuntime {
-  private readonly adapter: IMetadataProviderAdapter;
+  private readonly providers: Map<string, IMetadataProviderAdapter> = new Map();
   private readonly config: ProviderConfiguration;
   private readonly options: ProviderRuntimeOptions;
 
   private statusState: ProviderStatus;
 
   constructor(
-    adapter: IMetadataProviderAdapter,
+    adapters: IMetadataProviderAdapter | IMetadataProviderAdapter[],
     config?: Partial<ProviderConfiguration>,
     options?: ProviderRuntimeOptions
   ) {
-    this.adapter = adapter;
+    const adapterList = Array.isArray(adapters) ? adapters : [adapters];
+    for (const adapter of adapterList) {
+      this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+    }
+
     this.config = {
       enabled: config?.enabled ?? true,
       priority: config?.priority ?? 500,
@@ -38,8 +43,18 @@ export class MetadataProviderRuntime {
     };
   }
 
+  public registerProvider(adapter: IMetadataProviderAdapter): void {
+    this.providers.set(adapter.identity.id.toLowerCase(), adapter);
+  }
+
+  public getProvider(providerId: string): IMetadataProviderAdapter | undefined {
+    return this.providers.get(providerId.toLowerCase());
+  }
+
   public get adapterInstance(): IMetadataProviderAdapter {
-    return this.adapter;
+    const first = this.providers.values().next().value;
+    if (!first) throw new Error('No registered metadata provider adapters found.');
+    return first;
   }
 
   public get status(): ProviderStatus {
@@ -58,9 +73,11 @@ export class MetadataProviderRuntime {
 
     this.statusState.state = ProviderState.Initializing;
     try {
-      const lifecycle = this.adapter as unknown as IProviderLifecycle;
-      if (typeof lifecycle.initialize === 'function') {
-        await lifecycle.initialize(this.config);
+      for (const adapter of this.providers.values()) {
+        const lifecycle = adapter as unknown as IProviderLifecycle;
+        if (typeof lifecycle.initialize === 'function') {
+          await lifecycle.initialize(this.config);
+        }
       }
       this.statusState = {
         state: ProviderState.Healthy,
@@ -81,13 +98,66 @@ export class MetadataProviderRuntime {
 
   public async shutdown(): Promise<void> {
     try {
-      const lifecycle = this.adapter as unknown as IProviderLifecycle;
-      if (typeof lifecycle.shutdown === 'function') {
-        await lifecycle.shutdown();
+      for (const adapter of this.providers.values()) {
+        const lifecycle = adapter as unknown as IProviderLifecycle;
+        if (typeof lifecycle.shutdown === 'function') {
+          await lifecycle.shutdown();
+        }
       }
     } finally {
       this.statusState.state = ProviderState.Uninitialized;
     }
+  }
+
+  /**
+   * Search albums across active metadata providers.
+   */
+  public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {
+    if (!this.isAvailable()) return [];
+
+    const allAlbums: AlbumMetadata[] = [];
+    for (const adapter of this.providers.values()) {
+      if (typeof adapter.searchAlbums === 'function') {
+        try {
+          const results = await adapter.searchAlbums(album, artist, limit);
+          this.recordSuccess();
+          allAlbums.push(...results);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.recordFailure(msg);
+        }
+      }
+    }
+
+    return allAlbums;
+  }
+
+  /**
+   * Resolve album release details preserved by specific provider identity.
+   */
+  public async resolveRelease(
+    providerReleaseId: string,
+    providerId?: MetadataProviderId
+  ): Promise<ResolvedAlbumRelease | null> {
+    if (!this.isAvailable() || !providerReleaseId) return null;
+
+    const targetProviderId = providerId?.toLowerCase() ?? 'musicbrainz';
+    const adapter = this.providers.get(targetProviderId) ?? this.providers.values().next().value;
+
+    if (adapter && typeof adapter.resolveRelease === 'function') {
+      try {
+        const resolved = await adapter.resolveRelease(providerReleaseId);
+        if (resolved) {
+          this.recordSuccess();
+          return resolved;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.recordFailure(msg);
+      }
+    }
+
+    return null;
   }
 
   public recordSuccess(latencyMs?: number): void {

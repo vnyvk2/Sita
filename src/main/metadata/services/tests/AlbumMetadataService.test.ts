@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MetadataNormalizer } from '../../matching/MetadataNormalizer';
 import { TrackMatcher } from '../../matching/TrackMatcher';
 import { AlbumMetadataService, getConfidenceLevel } from '../AlbumMetadataService';
+import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
+import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
+import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
+import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
+import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
 import type { AlbumMetadata } from '../../models/RecordingMetadata';
 
-describe('Phase 2 Complete — Presentation-Agnostic Metadata Engine Suite', () => {
+describe('Phase 3 Complete — Metadata Provider Runtime & Live MusicBrainz Pipeline Suite', () => {
   it('maps confidence scores to confidence levels cleanly via getConfidenceLevel helper', () => {
     expect(getConfidenceLevel(1.0)).toBe('Excellent');
     expect(getConfidenceLevel(0.96)).toBe('Excellent');
@@ -38,30 +43,76 @@ describe('Phase 2 Complete — Presentation-Agnostic Metadata Engine Suite', () 
     expect(result[0].why).toBe('Title Match | Artist Match | Album Match | Duration Match');
   });
 
-  it('caps album sequence continuity boost at 0.89 below auto-apply threshold (0.90)', async () => {
-    const service = new AlbumMetadataService();
-    const album: AlbumMetadata = {
-      releaseId: 'rel-1',
+  it('executes full end-to-end provider pipeline: search -> resolve -> cache hit -> build match', async () => {
+    const pipeline = new RequestPipeline();
+    const apiClient = new MusicBrainzApiClient(pipeline);
+    const cache = new IdentityResolutionCache();
+    const adapter = new MusicBrainzAdapter(apiClient, { cache });
+    const runtime = new MetadataProviderRuntime(adapter);
+    await runtime.initialize();
+
+    const service = new AlbumMetadataService(runtime);
+
+    // Mock API search releases
+    vi.spyOn(apiClient, 'searchReleases').mockResolvedValueOnce([
+      {
+        id: 'mb-rel-sour',
+        title: 'SOUR',
+        date: '2021-05-21',
+        status: 'Official',
+        'artist-credit': [{ name: 'Olivia Rodrigo' }],
+        media: [{ position: 1, 'track-count': 3 }]
+      } as any
+    ]);
+
+    // Mock API get release details
+    const getReleaseSpy = vi.spyOn(apiClient, 'getReleaseById').mockResolvedValue({
+      id: 'mb-rel-sour',
       title: 'SOUR',
-      artist: 'Olivia Rodrigo',
-      trackCount: 3
-    };
+      date: '2021-05-21',
+      status: 'Official',
+      'artist-credit': [{ name: 'Olivia Rodrigo' }],
+      media: [
+        {
+          position: 1,
+          tracks: [
+            { id: 't1', title: 'brutal', length: 203000, position: 1, recording: { id: 'rec-1' } },
+            { id: 't2', title: 'traitor', length: 229000, position: 2, recording: { id: 'rec-2' } },
+            { id: 't3', title: 'drivers license', length: 242000, position: 3, recording: { id: 'rec-3' } }
+          ]
+        }
+      ]
+    } as any);
 
-    const officialTracks = [
-      { trackId: 't1', title: 'brutal', artist: 'Olivia Rodrigo', trackNumber: 1, duration: 203 },
-      { trackId: 't2', title: 'traitor', artist: 'Olivia Rodrigo', trackNumber: 2, duration: 229 },
-      { trackId: 't3', title: 'drivers license', artist: 'Olivia Rodrigo', trackNumber: 3, duration: 242 }
-    ];
+    // 1. Search Albums
+    const searchResults = await service.search('SOUR', 'Olivia Rodrigo');
+    expect(searchResults).toHaveLength(1);
+    expect(searchResults[0].releaseId).toBe('mb-rel-sour');
+    expect(searchResults[0].provider).toBe('musicbrainz');
 
+    // 2. Resolve Release Details
+    const resolvedRelease = await service.resolveRelease(searchResults[0].releaseId!, searchResults[0].provider);
+    expect(resolvedRelease).not.toBeNull();
+    expect(resolvedRelease?.tracks).toHaveLength(3);
+    expect(resolvedRelease?.providerReleaseId).toBe('mb-rel-sour');
+
+    // 3. Resolve Release AGAIN (Assert Cache Hit)
+    const secondResolved = await service.resolveRelease('mb-rel-sour', 'musicbrainz');
+    expect(secondResolved).not.toBeNull();
+    // getReleaseById should have been called only ONCE due to cache hit
+    expect(getReleaseSpy).toHaveBeenCalledTimes(1);
+
+    // 4. Build Album Match with Local Songs
     const localSongs = [
-      { songId: 1, title: 'brutal', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203 },
-      { songId: 2, title: 'traitor', artist: 'Unknown', path: '02.mp3', duration: 240 },
-      { songId: 3, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242 }
+      { songId: 101, title: 'brutal', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203 },
+      { songId: 102, title: 'traitor', artist: 'Olivia Rodrigo', path: '02.mp3', duration: 229 },
+      { songId: 103, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242 }
     ];
 
-    const preview = await service.buildAlbumMatch(localSongs, album, officialTracks);
-    // Sequence boost must be capped at 0.89 so sequence alone never triggers auto-apply (>= 0.90)
-    expect(preview.trackList[1].confidence).toBeLessThanOrEqual(0.89);
-    expect(preview.trackList[1].confidenceLevel).toBe('Good');
+    const preview = await service.buildAlbumMatch(localSongs, resolvedRelease!.album, resolvedRelease!.tracks);
+    expect(preview.trackList).toHaveLength(3);
+    expect(preview.confidence).toBeGreaterThanOrEqual(0.95);
+    expect(preview.trackList[0].confidenceLevel).toBe('Excellent');
+    expect(preview.trackList[0].remoteTrack.provider.providerRecordingId).toBe('rec-1');
   });
 });

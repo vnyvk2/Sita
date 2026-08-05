@@ -1,3 +1,4 @@
+import type { AlbumMetadata, ResolvedAlbumRelease } from '../models/RecordingMetadata';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderResult } from '../models/ProviderResult';
 import type { ProviderCapabilities, ProviderCapability } from './ProviderCapabilities';
@@ -17,4 +18,14 @@ export interface IMetadataProviderAdapter {
 
   lookup<TDTO = unknown>(identity: MetadataIdentity): Promise<ProviderResult<TDTO>>;
   search<TDTO = unknown>(query: string, options?: Record<string, unknown>): Promise<ProviderResult<TDTO>[]>;
+
+  /**
+   * Structured album search returning domain AlbumMetadata[].
+   */
+  searchAlbums?(album: string, artist?: string, limit?: number): Promise<AlbumMetadata[]>;
+
+  /**
+   * Resolves release details and official track listing into ResolvedAlbumRelease domain model.
+   */
+  resolveRelease?(providerReleaseId: string): Promise<ResolvedAlbumRelease | null>;
 }
