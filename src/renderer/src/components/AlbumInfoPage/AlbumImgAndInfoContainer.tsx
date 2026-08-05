@@ -73,6 +73,22 @@ const AlbumImgAndInfoContainer = (props: Props) => {
                 {t(`common.songWithCount`, { count: albumData.songs.length })}
               </div>
               {albumData.year && <div className="album-year">{albumData.year}</div>}
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('nora:open-autotag', {
+                      detail: {
+                        songs: songsData,
+                        albumName: albumData.title,
+                        artistName: albumData.artists?.[0]?.name
+                      }
+                    })
+                  );
+                }}
+                className="mt-3 flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-blue-500 hover:to-indigo-500 cursor-pointer"
+              >
+                <span>✨</span> Auto Tag Album
+              </button>
             </div>
           )}
         </div>

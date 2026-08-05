@@ -410,6 +410,22 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
         isDisabled: isMultipleSelectionsEnabled
       },
       {
+        label: 'Auto Tag Album',
+        class: 'auto-tag',
+        iconName: 'auto_awesome',
+        handlerFunction: () => {
+          window.dispatchEvent(
+            new CustomEvent('nora:open-autotag', {
+              detail: {
+                songs: [{ songId, title, artist: artists?.[0]?.name, album: album?.title, path }],
+                albumName: album?.title ?? title,
+                artistName: artists?.[0]?.name
+              }
+            })
+          );
+        }
+      },
+      {
         label: t('song.reparseSong'),
         class: 'sync',
         iconName: 'sync',

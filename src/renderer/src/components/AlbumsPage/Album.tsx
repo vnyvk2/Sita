@@ -254,6 +254,21 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: showAlbumInfoPage
       },
       {
+        label: 'Auto Tag Album',
+        iconName: 'auto_awesome',
+        handlerFunction: () => {
+          window.dispatchEvent(
+            new CustomEvent('nora:open-autotag', {
+              detail: {
+                songs: props.songs,
+                albumName: props.title,
+                artistName: props.artists?.[0]?.name
+              }
+            })
+          );
+        }
+      },
+      {
         label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
         iconName: 'checklist',
         handlerFunction: () => {
