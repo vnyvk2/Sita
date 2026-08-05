@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAlbumAutoTag } from '../../hooks/useAlbumAutoTag';
 import { ReleaseSearchPanel } from './ReleaseSearchPanel';
 import { AutoTagPreviewTable } from './AutoTagPreviewTable';
@@ -10,6 +10,7 @@ export interface AlbumAutoTagDialogProps {
   localSongs: any[];
   initialAlbumName?: string;
   initialArtistName?: string;
+  operationId?: string;
   onClose: () => void;
 }
 
@@ -18,11 +19,57 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
   localSongs,
   initialAlbumName = '',
   initialArtistName = '',
+  operationId: sessionOperationId,
   onClose
 }) => {
-  const { state, actions } = useAlbumAutoTag();
+  // Session-owned operationId generated on open/session change
+  const [operationId, setOperationId] = useState(() => sessionOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`));
+  const { state, actions } = useAlbumAutoTag(operationId);
 
-  // Initial release search on open
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  // Focus preservation & restoration
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement;
+      // Generate a fresh session operationId on open
+      const newOpId = sessionOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`);
+      setOperationId(newOpId);
+      setShowErrorDetails(false);
+    }
+  }, [isOpen, sessionOperationId]);
+
+  // Unified Close Handler with focus restoration
+  const handleClose = () => {
+    actions.reset();
+    onClose();
+
+    // Focus restoration safety check
+    setTimeout(() => {
+      const prev = previousFocusRef.current;
+      if (prev instanceof HTMLElement && document.contains(prev)) {
+        prev.focus();
+      }
+    }, 50);
+  };
+
+  // Keyboard Accessibility (ESC key close)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  // Initial search trigger on open
   useEffect(() => {
     if (isOpen && initialAlbumName) {
       actions.searchReleases(initialAlbumName, initialArtistName);
@@ -33,6 +80,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 
   return (
     <div
+      onClick={handleClose}
       style={{
         position: 'fixed',
         top: 0,
@@ -48,6 +96,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()} // Prevent backdrop close when clicking modal body
         style={{
           width: '90%',
           maxWidth: '960px',
@@ -69,7 +118,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
             {state.preview && <ConfidenceBadge level={state.preview.confidenceLevel} confidence={state.preview.overallConfidence} />}
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '1.2rem', cursor: 'pointer' }}
           >
             ✕
@@ -88,10 +137,24 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
             />
           )}
 
-          {/* Error Banner */}
+          {/* Expandable Error UX Drawer */}
           {state.error && (
-            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', fontSize: '0.85rem' }}>
-              {state.error}
+            <div style={{ padding: '14px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.88rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600 }}>Couldn't update metadata.</span>
+                <button
+                  onClick={() => setShowErrorDetails((prev) => !prev)}
+                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
+                </button>
+              </div>
+
+              {showErrorDetails && (
+                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'rgba(0, 0, 0, 0.4)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: '#fca5a5' }}>
+                  {state.error}
+                </div>
+              )}
             </div>
           )}
 
@@ -145,7 +208,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   style={{ padding: '10px 24px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Done
@@ -173,7 +236,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 style={{ padding: '8px 16px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', fontSize: '0.85rem', cursor: 'pointer' }}
               >
                 Cancel
