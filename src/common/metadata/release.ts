@@ -7,6 +7,20 @@ export interface ArtworkMetadata {
   palette?: Record<string, string>;
 }
 
+export interface LocalSongInput {
+  songId: number;
+  path?: string;
+  title?: string;
+  artist?: string;
+  album?: string;
+  year?: number;
+  trackNumber?: number;
+  discNumber?: number;
+  genre?: string;
+  isrc?: string;
+  musicBrainzRecordingId?: string;
+}
+
 export interface OfficialTrackInput {
   trackId?: string;
   title: string;

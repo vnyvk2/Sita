@@ -1,6 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useAlbumAutoTag } from '../useAlbumAutoTag';
 
+const mockInvalidateQueries = vi.fn();
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries
+  })
+}));
+
 describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', () => {
   let mockUnsubscribe: ReturnType<typeof vi.fn>;
   let mockProgressCallback: ((payload: any) => void) | null = null;
@@ -12,6 +20,7 @@ describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', (
     });
     mockProgressCallback = null;
     listenerCount = 0;
+    mockInvalidateQueries.mockClear();
 
     (globalThis as any).window = {
       api: {
@@ -75,22 +84,21 @@ describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', (
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
-  it('triggers query invalidation callback ONLY on successful apply/undo operations', async () => {
-    const onQueryInvalidate = vi.fn();
+  it('triggers query invalidation via useQueryClient ONLY on successful apply/undo operations', async () => {
     const api = (window as any).api.metadataAutoTag;
 
     // Simulated apply success
     const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour', 'musicbrainz', 'op-1');
     const applyRes = await api.applyPreview(preview, 'op-1');
-    if (applyRes.success) onQueryInvalidate();
+    if (applyRes.success) mockInvalidateQueries();
 
-    expect(onQueryInvalidate).toHaveBeenCalledTimes(1);
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
 
     // Simulated apply failure (should NOT trigger invalidation)
     api.applyPreview.mockResolvedValueOnce({ success: false, errors: ['DB locked'] });
     const failedApply = await api.applyPreview(preview, 'op-1');
-    if (failedApply.success) onQueryInvalidate();
+    if (failedApply.success) mockInvalidateQueries();
 
-    expect(onQueryInvalidate).toHaveBeenCalledTimes(1); // Count remains 1
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1); // Count remains 1
   });
 });
