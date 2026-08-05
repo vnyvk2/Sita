@@ -15,7 +15,7 @@ export class AlbumAutoTagService extends EventEmitter {
   private readonly metadataService: AlbumMetadataService;
   private readonly applyService: MetadataApplyService;
   private readonly activeOperations: Map<string, AbortController> = new Map();
-  private stageState: AutoTagStage = 'idle';
+  private readonly operationStages: Map<string, AutoTagStage> = new Map();
 
   constructor(options: AlbumAutoTagServiceOptions) {
     super();
@@ -23,8 +23,8 @@ export class AlbumAutoTagService extends EventEmitter {
     this.applyService = options.applyService ?? new MetadataApplyService();
   }
 
-  public get currentStage(): AutoTagStage {
-    return this.stageState;
+  public getStage(operationId = 'default'): AutoTagStage {
+    return this.operationStages.get(operationId) ?? 'idle';
   }
 
   public get applyManager(): MetadataApplyService {
@@ -41,12 +41,12 @@ export class AlbumAutoTagService extends EventEmitter {
     signal?: AbortSignal,
     operationId = 'default'
   ): Promise<AlbumMetadata[]> {
-    this.checkCancelled(signal, operationId);
+    this.checkCancelled(signal);
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
       const results = await this.metadataService.search(albumName, artistName, limit);
-      this.checkCancelled(signal, operationId);
+      this.checkCancelled(signal);
       this.emitProgress('idle', `Found ${results.length} release candidates.`, 100, operationId);
       return results;
     } catch (err: unknown) {
@@ -56,6 +56,8 @@ export class AlbumAutoTagService extends EventEmitter {
       }
       this.emitProgress('failed', `Search failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
+    } finally {
+      this.activeOperations.delete(operationId);
     }
   }
 
@@ -69,12 +71,12 @@ export class AlbumAutoTagService extends EventEmitter {
     signal?: AbortSignal,
     operationId = 'default'
   ): Promise<AlbumTagPreview> {
-    this.checkCancelled(signal, operationId);
+    this.checkCancelled(signal);
     this.emitProgress('resolving', `Resolving release details for ${releaseId}...`, 30, operationId);
 
     try {
       const resolved = await this.metadataService.resolveRelease(releaseId, providerId);
-      this.checkCancelled(signal, operationId);
+      this.checkCancelled(signal);
 
       if (!resolved) {
         throw new Error(`Unable to resolve release details for ID '${releaseId}'`);
@@ -82,7 +84,7 @@ export class AlbumAutoTagService extends EventEmitter {
 
       this.emitProgress('matching', `Matching ${localSongs.length} local songs against release tracks...`, 60, operationId);
       const albumPreview = await this.metadataService.buildAlbumMatch(localSongs, resolved.album, resolved.tracks);
-      this.checkCancelled(signal, operationId);
+      this.checkCancelled(signal);
 
       this.emitProgress('diffing', 'Building presentation-friendly metadata diffs...', 85, operationId);
       const trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
@@ -109,6 +111,8 @@ export class AlbumAutoTagService extends EventEmitter {
       }
       this.emitProgress('failed', `Preview build failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
+    } finally {
+      this.activeOperations.delete(operationId);
     }
   }
 
@@ -116,12 +120,12 @@ export class AlbumAutoTagService extends EventEmitter {
    * Apply preview changes to disk and database.
    */
   public async applyPreview(preview: AlbumTagPreview, signal?: AbortSignal, operationId = 'default'): Promise<ApplyResult> {
-    this.checkCancelled(signal, operationId);
+    this.checkCancelled(signal);
     this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
 
     try {
       const result = await this.applyService.applyPreview(preview);
-      this.checkCancelled(signal, operationId);
+      this.checkCancelled(signal);
 
       if (result.success) {
         this.emitProgress('completed', `Successfully updated ${result.updatedCount} songs.`, 100, operationId);
@@ -137,6 +141,8 @@ export class AlbumAutoTagService extends EventEmitter {
       }
       this.emitProgress('failed', `Apply failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
+    } finally {
+      this.activeOperations.delete(operationId);
     }
   }
 
@@ -145,13 +151,17 @@ export class AlbumAutoTagService extends EventEmitter {
    */
   public async undoLastAutoTag(operationId = 'default'): Promise<{ success: boolean; restoredCount: number }> {
     this.emitProgress('applying', 'Undoing last AutoTag operation...', 50, operationId);
-    const res = await this.applyService.undoLastAutoTag();
-    if (res.success) {
-      this.emitProgress('completed', `Restored original metadata for ${res.restoredCount} songs.`, 100, operationId);
-    } else {
-      this.emitProgress('failed', 'No AutoTag operations available to undo.', 0, operationId);
+    try {
+      const res = await this.applyService.undoLastAutoTag();
+      if (res.success) {
+        this.emitProgress('completed', `Restored original metadata for ${res.restoredCount} songs.`, 100, operationId);
+      } else {
+        this.emitProgress('failed', 'No AutoTag operations available to undo.', 0, operationId);
+      }
+      return res;
+    } finally {
+      this.activeOperations.delete(operationId);
     }
-    return res;
   }
 
   /**
@@ -174,13 +184,13 @@ export class AlbumAutoTagService extends EventEmitter {
   }
 
   private emitProgress(stage: AutoTagStage, message: string, progressPercent?: number, operationId = 'default'): void {
-    this.stageState = stage;
+    this.operationStages.set(operationId, stage);
     const payload: ProgressEventPayload = { stage, message, progressPercent, operationId };
     this.emit('progress', payload);
   }
 
-  private checkCancelled(signal?: AbortSignal, operationId = 'default'): void {
-    if (signal?.aborted || this.activeOperations.get(operationId)?.signal.aborted) {
+  private checkCancelled(signal?: AbortSignal): void {
+    if (signal?.aborted) {
       const err = new Error('Operation aborted');
       err.name = 'AbortError';
       throw err;

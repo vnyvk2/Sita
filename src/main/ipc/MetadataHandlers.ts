@@ -4,13 +4,18 @@ import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
 import type { AlbumTagPreview, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
 
+let isProgressListenerRegistered = false;
+
 export function registerMetadataHandlers(autoTagService: AlbumAutoTagService, mainWindow?: BrowserWindow): void {
-  // Listen for progress events from AlbumAutoTagService and send over IPC to renderer
-  autoTagService.on('progress', (payload: ProgressEventPayload) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('metadata/progress', payload);
-    }
-  });
+  // Listen for progress events from AlbumAutoTagService and send over IPC to renderer (safeguarded single registration)
+  if (!isProgressListenerRegistered) {
+    isProgressListenerRegistered = true;
+    autoTagService.on('progress', (payload: ProgressEventPayload) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('metadata/progress', payload);
+      }
+    });
+  }
 
   // 1. Search Albums
   ipcMain.handle(
