@@ -4,12 +4,12 @@ import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
 import type { AlbumTagPreview, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
 
-let isProgressListenerRegistered = false;
+const activeProgressListeners = new WeakSet<AlbumAutoTagService>();
 
 export function registerMetadataHandlers(autoTagService: AlbumAutoTagService, mainWindow?: BrowserWindow): void {
-  // Listen for progress events from AlbumAutoTagService and send over IPC to renderer (safeguarded single registration)
-  if (!isProgressListenerRegistered) {
-    isProgressListenerRegistered = true;
+  // Listen for progress events from AlbumAutoTagService and send over IPC to renderer
+  if (!activeProgressListeners.has(autoTagService)) {
+    activeProgressListeners.add(autoTagService);
     autoTagService.on('progress', (payload: ProgressEventPayload) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('metadata/progress', payload);

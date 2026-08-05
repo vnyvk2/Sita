@@ -3,6 +3,11 @@ import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/M
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { TagWriterService, type TagWritePayload } from './TagWriterService';
 
+/**
+ * Optional database updater function injection.
+ * NOTE: Primarily intended for unit testing dependency injection. If supplied in production,
+ * the caller must ensure its own transactional rollback semantics.
+ */
 export type SongDbUpdater = (
   songId: number,
   data: { title?: string; year?: number; trackNumber?: number }
@@ -186,12 +191,20 @@ export class MetadataApplyService {
 
       this.historyService.pushSnapshot(historySnapshot);
     } catch (err: unknown) {
-      // ROLLBACK PHYSICAL DISK TAGS ON DB TRANSACTION FAILURE
-      await this.tagWriter.writeBatch(rollbackPayloads);
+      // ROLLBACK PHYSICAL DISK TAGS ON DB TRANSACTION FAILURE & VERIFY ROLLBACK
+      const rollbackResults = await this.tagWriter.writeBatch(rollbackPayloads);
+      const failedRollbacks = rollbackResults.filter((r) => !r.success);
+
       failedCount = updatedSnapshots.length;
       updatedCount = 0;
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`DB transaction failed, rolled back physical file tags: ${msg}`);
+
+      if (failedRollbacks.length > 0) {
+        for (const f of failedRollbacks) {
+          errors.push(`Tag rollback failed for ${f.filePath}: ${f.error}`);
+        }
+      }
     }
 
     return {

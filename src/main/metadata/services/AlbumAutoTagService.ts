@@ -47,7 +47,7 @@ export class AlbumAutoTagService extends EventEmitter {
     try {
       const results = await this.metadataService.search(albumName, artistName, limit);
       this.checkCancelled(signal);
-      this.emitProgress('idle', `Found ${results.length} release candidates.`, 100, operationId);
+      this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);
       return results;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
@@ -58,6 +58,7 @@ export class AlbumAutoTagService extends EventEmitter {
       throw err;
     } finally {
       this.activeOperations.delete(operationId);
+      this.operationStages.delete(operationId);
     }
   }
 
@@ -102,7 +103,7 @@ export class AlbumAutoTagService extends EventEmitter {
         resolvedRelease: resolved
       };
 
-      this.emitProgress('idle', 'Preview ready for review.', 100, operationId);
+      this.emitProgress('completed', 'Preview ready for review.', 100, operationId);
       return preview;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
@@ -113,6 +114,7 @@ export class AlbumAutoTagService extends EventEmitter {
       throw err;
     } finally {
       this.activeOperations.delete(operationId);
+      this.operationStages.delete(operationId);
     }
   }
 
@@ -143,6 +145,7 @@ export class AlbumAutoTagService extends EventEmitter {
       throw err;
     } finally {
       this.activeOperations.delete(operationId);
+      this.operationStages.delete(operationId);
     }
   }
 
@@ -161,6 +164,7 @@ export class AlbumAutoTagService extends EventEmitter {
       return res;
     } finally {
       this.activeOperations.delete(operationId);
+      this.operationStages.delete(operationId);
     }
   }
 
@@ -172,6 +176,7 @@ export class AlbumAutoTagService extends EventEmitter {
     if (controller) {
       controller.abort();
       this.activeOperations.delete(operationId);
+      this.operationStages.delete(operationId);
       this.emitProgress('cancelled', `Operation '${operationId}' cancelled by user.`, 0, operationId);
     }
   }
