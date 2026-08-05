@@ -687,16 +687,23 @@ export const api = {
   membership,
   metadata,
   metadataAutoTag: {
-    searchAlbums: (albumName: string, artistName?: string, limit?: number) =>
-      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit),
-    buildPreview: (localSongs: unknown[], releaseId: string, providerId?: string) =>
-      ipcRenderer.invoke('metadata/buildPreview', localSongs, releaseId, providerId),
-    applyPreview: (preview: unknown) =>
-      ipcRenderer.invoke('metadata/applyPreview', preview),
-    undoLastAutoTag: () =>
-      ipcRenderer.invoke('metadata/undoLastAutoTag'),
-    cancelAutoTag: () =>
-      ipcRenderer.invoke('metadata/cancelAutoTag')
+    searchAlbums: (albumName: string, artistName?: string, limit?: number, operationId?: string) =>
+      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, operationId),
+    buildPreview: (localSongs: unknown[], releaseId: string, providerId?: string, operationId?: string) =>
+      ipcRenderer.invoke('metadata/buildPreview', localSongs, releaseId, providerId, operationId),
+    applyPreview: (preview: unknown, operationId?: string) =>
+      ipcRenderer.invoke('metadata/applyPreview', preview, operationId),
+    undoLastAutoTag: (operationId?: string) =>
+      ipcRenderer.invoke('metadata/undoLastAutoTag', operationId),
+    cancelAutoTag: (operationId?: string) =>
+      ipcRenderer.invoke('metadata/cancelAutoTag', operationId),
+    onProgress: (callback: (payload: any) => void) => {
+      const listener = (_: unknown, data: any) => callback(data);
+      ipcRenderer.on('metadata/progress', listener);
+      return () => {
+        ipcRenderer.removeListener('metadata/progress', listener);
+      };
+    }
   }
 };
 
