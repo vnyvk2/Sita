@@ -17,6 +17,7 @@ export interface MetadataJob {
   startedAt?: number;
   completedAt?: number;
   error?: string;
+  isExecuting?: boolean;
   abortController: AbortController;
   preview?: AlbumTagPreview;
 }
@@ -58,6 +59,7 @@ export class MetadataJobManager extends EventEmitter {
       progressPercent: 0,
       message: 'Job queued in background',
       createdAt: Date.now(),
+      isExecuting: false,
       abortController: new AbortController(),
       preview
     };
@@ -80,6 +82,10 @@ export class MetadataJobManager extends EventEmitter {
     );
   }
 
+  /**
+   * Updates job stage/status and progress percentage.
+   * NOTE: Completing, failing, or cancelling a job removes it from activeJobs and automatically calls processQueue() to schedule the next queued job.
+   */
   public updateJobProgress(jobId: string, stage: AutoTagStage, message: string, progressPercent?: number): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
@@ -96,8 +102,9 @@ export class MetadataJobManager extends EventEmitter {
     }
     if (stage === 'completed' || stage === 'failed' || stage === 'cancelled') {
       job.completedAt = Date.now();
+      job.isExecuting = false;
       this.activeJobs.delete(jobId);
-      this.processQueue(); // Trigger queue processing when an active slot opens
+      this.processQueue(); // Queue recursion: Schedule next job as active slot opens
     }
 
     const payload: ProgressEventPayload = {
@@ -116,6 +123,12 @@ export class MetadataJobManager extends EventEmitter {
       return { success: false, updatedCount: 0, failedCount: 0, errors: [`Job '${jobId}' not found or missing preview`] };
     }
 
+    // Duplicate Execution Guard
+    if (job.isExecuting) {
+      return { success: false, updatedCount: 0, failedCount: 0, errors: [`Job '${jobId}' is already executing.`] };
+    }
+
+    job.isExecuting = true;
     const startTime = Date.now();
     this.updateJobProgress(jobId, 'applying', `Applying metadata updates for ${job.albumTitle}...`, 20);
 
@@ -170,6 +183,7 @@ export class MetadataJobManager extends EventEmitter {
         errors: [msg]
       };
     } finally {
+      job.isExecuting = false;
       this.cleanCompletedJobs();
     }
   }
@@ -213,8 +227,11 @@ export class MetadataJobManager extends EventEmitter {
         this.updateJobProgress(jobId, 'running', `Processing job ${jobId}...`, 10);
 
         if (job.preview) {
-          // Autonomous Queue Execution
-          this.executeApplyJob(jobId).catch(() => {});
+          // Autonomous Queue Execution with error event emission visibility
+          this.executeApplyJob(jobId).catch((err: unknown) => {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            this.emit('job:error', { jobId, error: errorMsg });
+          });
         }
       }
     }

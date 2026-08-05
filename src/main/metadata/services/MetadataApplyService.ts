@@ -200,7 +200,9 @@ export class MetadataApplyService {
         year: match.oldYear,
         trackNumber: match.oldTrackNumber,
         discNumber: match.oldDiscNumber,
-        genre: match.oldGenre
+        genre: match.oldGenre,
+        isrc: match.oldIsrc,
+        musicBrainzRecordingId: match.oldMbid
       });
     }
 
