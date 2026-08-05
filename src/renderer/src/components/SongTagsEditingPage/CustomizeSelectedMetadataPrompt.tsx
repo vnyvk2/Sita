@@ -3,13 +3,8 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import isLyricsSynced from '../../../../common/isLyricsSynced';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import {
-  manageAlbumData,
-  manageArtistsData,
-  manageGenresData
-} from '../../utils/manageMetadataResults';
+import { mergeSongMetadata } from '../../utils/manageMetadataResults';
 import Button from '../Button';
 import Checkbox from '../Checkbox';
 import Img from '../Img';
@@ -76,72 +71,46 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
     });
   }, [artworkPaths, selectedArtwork, t]);
 
-  const isLyricsSynchronised = useMemo(() => isLyricsSynced(lyrics || ''), [lyrics]);
-
   const updateSelectedMetadata = useCallback(async () => {
-    changePromptMenuData(false, undefined, '');
+    try {
+      changePromptMenuData(false, undefined, '');
 
-    const {
-      isTitleSelected,
-      isAlbumSelected,
-      isArtistsSelected,
-      isGenresSelected,
-      isLyricsSelected,
-      isReleasedYearSelected
-    } = selectedMetadata;
+      const {
+        isTitleSelected,
+        isAlbumSelected,
+        isArtistsSelected,
+        isGenresSelected
+      } = selectedMetadata;
 
-    const albumData = isAlbumSelected && album?.trim()
-      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
-      : undefined;
-
-    const artistData = isArtistsSelected && Array.isArray(artists) && artists.length > 0
-      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
-      : undefined;
-
-    const genreData = isGenresSelected && Array.isArray(genres) && genres.length > 0
-      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
-      : undefined;
-
-    updateSongInfo((prevData): SongTags => {
-      const newAlbum = (isAlbumSelected && album?.trim())
-        ? manageAlbumData(albumData ?? [], album, selectedArtwork || prevData?.artworkPath)
+      const albumData = isAlbumSelected && album?.trim()
+        ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
         : undefined;
 
-      const newArtists = (isArtistsSelected && Array.isArray(artists) && artists.length > 0)
-        ? manageArtistsData(artistData ?? [], artists)
+      const artistData = isArtistsSelected && Array.isArray(artists) && artists.length > 0
+        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
         : undefined;
 
-      const newGenres = (isGenresSelected && Array.isArray(genres) && genres.length > 0)
-        ? manageGenresData(genreData ?? [], genres)
+      const genreData = isGenresSelected && Array.isArray(genres) && genres.length > 0
+        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
         : undefined;
 
-      return {
-        ...prevData,
-        title: isTitleSelected && title?.trim() ? title : prevData?.title,
-        releasedYear:
-          isReleasedYearSelected && typeof releasedYear === 'number' && releasedYear > 0
-            ? releasedYear
-            : prevData?.releasedYear,
-        synchronizedLyrics:
-          isLyricsSelected && lyrics && isLyricsSynchronised
-            ? lyrics
-            : prevData?.synchronizedLyrics,
-        unsynchronizedLyrics:
-          isLyricsSelected && lyrics && !isLyricsSynchronised
-            ? lyrics
-            : prevData?.unsynchronizedLyrics,
-        artworkPath: selectedArtwork || prevData?.artworkPath,
-        albums: newAlbum ? [newAlbum] : prevData.albums,
-        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
-        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
-      };
-    });
+      updateSongInfo((prevData): SongTags => {
+        return mergeSongMetadata(
+          prevData,
+          { title, artists, album, genres, releasedYear, lyrics, artworkPaths, selectedArtwork },
+          { albumData, artistData, genreData },
+          selectedMetadata
+        );
+      });
+    } catch (err) {
+      console.error('[CustomizeSelectedMetadataPrompt] Failed to update selected metadata:', err);
+    }
   }, [
     album,
     artists,
+    artworkPaths,
     changePromptMenuData,
     genres,
-    isLyricsSynchronised,
     lyrics,
     releasedYear,
     selectedArtwork,
@@ -151,49 +120,35 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
   ]);
 
   const updateAllMetadata = useCallback(async () => {
-    changePromptMenuData(false, undefined, '');
+    try {
+      changePromptMenuData(false, undefined, '');
 
-    const albumData = album?.trim()
-      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
-      : [];
-    const artistData = Array.isArray(artists) && artists.length > 0
-      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
-      : [];
-    const genreData = Array.isArray(genres) && genres.length > 0
-      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
-      : [];
+      const albumData = album?.trim()
+        ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
+        : [];
+      const artistData = Array.isArray(artists) && artists.length > 0
+        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+        : [];
+      const genreData = Array.isArray(genres) && genres.length > 0
+        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+        : [];
 
-    updateSongInfo((prevData) => {
-      const artworkPath = selectedArtwork || prevData?.artworkPath;
-      const newAlbum = album?.trim()
-        ? manageAlbumData(albumData, album, artworkPath)
-        : undefined;
-      const newArtists = Array.isArray(artists) && artists.length > 0
-        ? manageArtistsData(artistData, artists)
-        : undefined;
-      const newGenres = Array.isArray(genres) && genres.length > 0
-        ? manageGenresData(genreData, genres)
-        : undefined;
-
-      return {
-        ...prevData,
-        title: title?.trim() || prevData?.title,
-        releasedYear: (typeof releasedYear === 'number' && releasedYear > 0) ? releasedYear : prevData?.releasedYear,
-        synchronizedLyrics: isLyricsSynchronised && lyrics ? lyrics : prevData?.synchronizedLyrics,
-        unsynchronizedLyrics:
-          !isLyricsSynchronised && lyrics ? lyrics : prevData?.unsynchronizedLyrics,
-        artworkPath,
-        albums: newAlbum ? [newAlbum] : prevData.albums,
-        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
-        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
-      } as SongTags;
-    });
+      updateSongInfo((prevData) => {
+        return mergeSongMetadata(
+          prevData,
+          { title, artists, album, genres, releasedYear, lyrics, artworkPaths, selectedArtwork },
+          { albumData, artistData, genreData }
+        );
+      });
+    } catch (err) {
+      console.error('[CustomizeSelectedMetadataPrompt] Failed to update all metadata:', err);
+    }
   }, [
     album,
     artists,
+    artworkPaths,
     changePromptMenuData,
     genres,
-    isLyricsSynchronised,
     lyrics,
     releasedYear,
     selectedArtwork,
@@ -407,14 +362,14 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
                 <div className="title text-xs uppercase opacity-50">{t('common.lyrics')}</div>
                 <div className="data line-clamp-2 truncate overflow-hidden text-lg">
                   <div className="flex">
-                    {isLyricsSynchronised && (
+                    {isLyricsSynced(lyrics || '') && (
                       <span className="material-icons-round-outlined text-font-color-highlight dark:text-dark-font-color-highlight mr-2">
                         verified
                       </span>
                     )}{' '}
                     {t(
                       `customizeSelectedMetadataPrompt.${
-                        isLyricsSynchronised ? 'syncedLyricsAvailable' : 'unsyncedLyricsAvailable'
+                        isLyricsSynced(lyrics || '') ? 'syncedLyricsAvailable' : 'unsyncedLyricsAvailable'
                       }`
                     )}
                     <Button

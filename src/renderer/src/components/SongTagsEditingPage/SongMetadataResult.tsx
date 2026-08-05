@@ -1,15 +1,9 @@
 import { lazy, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import isLyricsSynced from '../../../../common/isLyricsSynced';
 import DefaultSongImage from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import {
-  manageArtworks,
-  manageAlbumData,
-  manageArtistsData,
-  manageGenresData
-} from '../../utils/manageMetadataResults';
+import { mergeSongMetadata } from '../../utils/manageMetadataResults';
 import Button from '../Button';
 import Img from '../Img';
 
@@ -34,46 +28,28 @@ function SongMetadataResult(props: SongMetadataResultProp) {
     props;
 
   const addToMetadata = useCallback(async () => {
-    const albumData = album?.trim()
-      ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data).catch(() => [])
-      : [];
-    const artistData = Array.isArray(artists) && artists.length > 0
-      ? await window.api.artistsData.getArtistData(artists).then((res) => res.data).catch(() => [])
-      : [];
-    const genreData = Array.isArray(genres) && genres.length > 0
-      ? await window.api.genresData.getGenresData(genres).then((res) => res.data).catch(() => [])
-      : [];
+    try {
+      const albumData = album?.trim()
+        ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
+        : [];
+      const artistData = Array.isArray(artists) && artists.length > 0
+        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+        : [];
+      const genreData = Array.isArray(genres) && genres.length > 0
+        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+        : [];
 
-    updateSongInfo((prevData): SongTags => {
-      changePromptMenuData(false, undefined, '');
-
-      const artworkPath = manageArtworks(prevData, artworkPaths);
-      const isLyricsSynchronised = isLyricsSynced(lyrics || '');
-
-      const newAlbum = album?.trim()
-        ? manageAlbumData(albumData, album, artworkPath)
-        : undefined;
-
-      const newArtists = Array.isArray(artists) && artists.length > 0
-        ? manageArtistsData(artistData, artists)
-        : undefined;
-
-      const newGenres = Array.isArray(genres) && genres.length > 0
-        ? manageGenresData(genreData, genres)
-        : undefined;
-
-      return {
-        ...prevData,
-        title: title?.trim() || prevData.title,
-        releasedYear: (typeof releasedYear === 'number' && releasedYear > 0) ? releasedYear : prevData.releasedYear,
-        synchronizedLyrics: lyrics && isLyricsSynchronised ? lyrics : prevData.synchronizedLyrics,
-        unsynchronizedLyrics: lyrics && !isLyricsSynchronised ? lyrics : prevData.unsynchronizedLyrics,
-        artworkPath: artworkPath || prevData.artworkPath,
-        albums: newAlbum ? [newAlbum] : prevData.albums,
-        artists: (newArtists && newArtists.length > 0) ? newArtists : prevData.artists,
-        genres: (newGenres && newGenres.length > 0) ? newGenres : prevData.genres
-      };
-    });
+      updateSongInfo((prevData): SongTags => {
+        changePromptMenuData(false, undefined, '');
+        return mergeSongMetadata(
+          prevData,
+          { title, artists, album, genres, releasedYear, lyrics, artworkPaths },
+          { albumData, artistData, genreData }
+        );
+      });
+    } catch (err) {
+      console.error('[SongMetadataResult] Failed to fetch metadata entity details:', err);
+    }
   }, [
     album,
     artists,
