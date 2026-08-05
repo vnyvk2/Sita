@@ -445,54 +445,87 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
       });
   };
 
+  const reloadOriginalTags = useCallback(() => {
+    const fetchTags = () => {
+      return window.api.songUpdates
+        .getSongId3Tags(isKnownSource ? String(songId) : songPath, isKnownSource)
+        .then((res) => {
+          if (res) {
+            const data = {
+              ...res,
+              title: res.title
+            };
+            setDefaultValues(data);
+            setSongInfo(data);
+            setIsMetadataUpdatesPending(!!data.isMetadataSavePending);
+          }
+          return undefined;
+        })
+        .catch((err) => {
+          console.warn('[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:', err);
+          return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
+            if (songs?.[0]) {
+              const song = songs[0];
+              const fallbackData: EditableSongTags = {
+                title: song.title,
+                artists: song.artists,
+                albumArtists: song.albumArtists,
+                albums: song.album ? [{ title: song.album.name, albumId: song.album.albumId }] : undefined,
+                genres: song.genres,
+                trackNumber: song.trackNo,
+                releasedYear: song.year,
+                artworkPath: song.artworkPaths?.artworkPath
+              };
+              setDefaultValues(fallbackData);
+              setSongInfo(fallbackData);
+            }
+          });
+        });
+    };
+
+    if (songId) {
+      window.api.metadata
+        .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
+        .then(fetchTags)
+        .catch((err) => {
+          console.error('[SongTagsEditingPage] Failed to clear overrides:', err);
+          fetchTags();
+        });
+    } else {
+      fetchTags();
+    }
+  }, [isKnownSource, songId, songPath]);
+
   const resetDataToDefaults = () => {
     const data = hasDataChanged(defaultValues, songInfo);
     const entries = Object.entries(data);
 
-    if (!Object.values(data).every((x) => !x.isModified)) {
-      changePromptMenuData(
-        true,
-        <ResetTagsToDefaultPrompt
-          dataEntries={entries}
-          restoreSessionHandler={() => {
-            changePromptMenuData(false);
-            setSongInfo(defaultValues);
-            setAlbumKeyword('');
-            setAlbumResults([]);
-            setArtistKeyword('');
-            setArtistResults([]);
-            setGenreKeyword('');
-            setGenreResults([]);
-          }}
-          restoreOriginalHandler={() => {
-            changePromptMenuData(false);
-            if (songId) {
-              window.api.metadata
-                .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
-                .then(() => {
-                  getSongId3Tags();
-                  return undefined;
-                })
-                .catch(console.error);
-            } else {
-              getSongId3Tags();
-            }
-            setAlbumKeyword('');
-            setAlbumResults([]);
-            setArtistKeyword('');
-            setArtistResults([]);
-            setGenreKeyword('');
-            setGenreResults([]);
-          }}
-        />
-      );
-    } else
-      addNewNotifications([
-        {
-          id: 'songDataUnedited',
-          content: t('notifications.noSongDataEdits')
-        }
-      ]);
+    changePromptMenuData(
+      true,
+      <ResetTagsToDefaultPrompt
+        dataEntries={entries}
+        restoreSessionHandler={() => {
+          changePromptMenuData(false);
+          setSongInfo(defaultValues);
+          setAlbumKeyword('');
+          setAlbumResults([]);
+          setArtistKeyword('');
+          setArtistResults([]);
+          setGenreKeyword('');
+          setGenreResults([]);
+        }}
+        restoreOriginalHandler={() => {
+          changePromptMenuData(false);
+          reloadOriginalTags();
+          setAlbumKeyword('');
+          setAlbumResults([]);
+          setArtistKeyword('');
+          setArtistResults([]);
+          setGenreKeyword('');
+          setGenreResults([]);
+        }}
+      />
+    );
   };
 
   const areThereDataChanges = useMemo(
