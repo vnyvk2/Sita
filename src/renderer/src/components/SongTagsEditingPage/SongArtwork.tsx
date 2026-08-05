@@ -18,12 +18,14 @@ const SongArtwork = (props: Props) => {
       <Img
         src={
           artworkPath
-            ? /(^$|(http(s)?:\/\/)([\w-]+\.)+[\w-]+([\w- ;,./?%&=]*))/gm.test(artworkPath)
+            ? artworkPath.startsWith('nora://') ||
+              artworkPath.startsWith('http://') ||
+              artworkPath.startsWith('https://') ||
+              artworkPath.startsWith('data:') ||
+              artworkPath.startsWith('file://')
               ? artworkPath
               : `nora://localfiles/${artworkPath}`
             : DefaultSongArtwork
-          // : songArtworkPath
-          // ? `nora://localfiles/${songArtworkPath}`
         }
         alt="Song Artwork"
         className="song-artwork aspect-square w-full rounded-xl object-cover object-center"

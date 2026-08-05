@@ -31,14 +31,14 @@ const SongAlbumInput = (props: Props) => {
                 <Img
                   src={
                     songAlbum.artworkPath
-                      ? /(^$|(http(s)?:\/\/)([\w-]+\.)+[\w-]+([\w- ;,./?%&=]*))/gm.test(
-                          songAlbum.artworkPath
-                        )
+                      ? songAlbum.artworkPath.startsWith('nora://') ||
+                        songAlbum.artworkPath.startsWith('http://') ||
+                        songAlbum.artworkPath.startsWith('https://') ||
+                        songAlbum.artworkPath.startsWith('data:') ||
+                        songAlbum.artworkPath.startsWith('file://')
                         ? songAlbum.artworkPath
                         : `nora://localfiles/${songAlbum.artworkPath}`
                       : DefaultSongArtwork
-                    // : songArtworkPath
-                    // ? `nora://localfiles/${songArtworkPath}`
                   }
                   className="aspect-square w-16 rounded-lg"
                   alt=""

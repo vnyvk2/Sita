@@ -53,14 +53,13 @@ const sendSongMetadata = async (
     const song = await getSongByIdForSongMetadata(songId);
 
     if (song) {
-      const pathExt = path.extname(song.path).replace(/\W/, '');
-      const isASupporedFormat = metadataEditingSupportedExtensions.includes(pathExt);
-
-      if (!isASupporedFormat)
-        throw new Error(`No support for editing song metadata in '${pathExt}' format.`);
-
-      const songFile = getSongFileObject(song.path);
-      const songMetadata = songFile.tag;
+      let songMetadata: any = null;
+      try {
+        const songFile = getSongFileObject(song.path);
+        songMetadata = songFile.tag;
+      } catch (err) {
+        logger.warn(`TagLib read skipped/failed for ${song.path}:`, err);
+      }
 
       const songAlbums: SongTags['albums'] =
         song.albums.length > 0
@@ -72,7 +71,7 @@ const sendSongMetadata = async (
               artworkPath: parseAlbumArtworks(a.album.artworks.map((artwork) => artwork.artwork))
                 .artworkPath
             }))
-          : songMetadata.album
+          : songMetadata?.album
             ? [
                 {
                   title: songMetadata.album ?? 'Unknown Album',
@@ -80,17 +79,18 @@ const sendSongMetadata = async (
                 }
               ]
             : undefined;
-      const songArtists: SongTags['artists'] = song.artists
-        ? song.artists.map((artist) => ({
-            name: artist.artist.name,
-            artistId: artist.artist.id,
-            artworkPath: parseArtistArtworks(artist.artist.artworks.map((aw) => aw.artwork))
-              .artworkPath,
-            onlineArtworkPaths: parseArtistOnlineArtworks(
-              artist.artist.artworks.map((aw) => aw.artwork)
-            )
-          }))
-        : undefined;
+      const songArtists: SongTags['artists'] =
+        song.artists && song.artists.length > 0
+          ? song.artists.map((artist) => ({
+              name: artist.artist.name,
+              artistId: artist.artist.id,
+              artworkPath: parseArtistArtworks(artist.artist.artworks.map((aw) => aw.artwork))
+                .artworkPath,
+              onlineArtworkPaths: parseArtistOnlineArtworks(
+                artist.artist.artworks.map((aw) => aw.artwork)
+              )
+            }))
+          : undefined;
       const songAlbumArtists: SongTags['albumArtists'] = song.albums
         .map((album) =>
           album.album.artists.map((artist) => ({
@@ -104,53 +104,54 @@ const sendSongMetadata = async (
           }))
         )
         .flat();
-      const songGenres: SongTags['genres'] = song.genres
-        ? song.genres.map((genre) => ({
-            name: genre.genre.name,
-            genreId: genre.genre.id,
-            artworkPath: parseGenreArtworks(genre.genre.artworks.map((aw) => aw.artwork))
-              .artworkPath
-          }))
-        : undefined;
+      const songGenres: SongTags['genres'] =
+        song.genres && song.genres.length > 0
+          ? song.genres.map((genre) => ({
+              name: genre.genre.name,
+              genreId: genre.genre.id,
+              artworkPath: parseGenreArtworks(genre.genre.artworks.map((aw) => aw.artwork))
+                .artworkPath
+            }))
+          : undefined;
 
-      if (songMetadata) {
-        const title = song.title ?? songMetadata.title ?? 'Unknown Title';
-        const tagArtists =
-          songArtists ??
-          songMetadata.performers?.map((artist) => ({
-            name: artist.trim(),
-            artistId: undefined
-          }));
-        const tagAlbumArtists =
-          songAlbumArtists ??
-          songMetadata.albumArtists?.map((artist) => ({
-            name: artist.trim(),
-            artistId: undefined
-          }));
-        const tagGenres =
-          songGenres ??
-          songMetadata.genres?.map((genre) => ({ genreId: undefined, name: genre.trim() }));
-        const trackNumber = song.trackNumber ?? songMetadata.trackCount;
-        const artworks = song.artworks.map((a) => a.artwork);
+      const title = song.title ?? songMetadata?.title ?? 'Unknown Title';
+      const tagArtists =
+        songArtists && songArtists.length > 0
+          ? songArtists
+          : songMetadata?.performers?.map((artist: string) => ({
+              name: artist.trim(),
+              artistId: undefined
+            }));
+      const tagAlbumArtists =
+        songAlbumArtists && songAlbumArtists.length > 0
+          ? songAlbumArtists
+          : songMetadata?.albumArtists?.map((artist: string) => ({
+              name: artist.trim(),
+              artistId: undefined
+            }));
+      const tagGenres =
+        songGenres && songGenres.length > 0
+          ? songGenres
+          : songMetadata?.genres?.map((genre: string) => ({ genreId: undefined, name: genre.trim() }));
+      const trackNumber = song.trackNumber ?? songMetadata?.trackCount;
+      const releasedYear = Number(songMetadata?.year) || song.year || undefined;
+      const artworks = song.artworks.map((a) => a.artwork);
 
-        const res: SongTags = {
-          title,
-          artists: tagArtists,
-          albumArtists: tagAlbumArtists,
-          albums: songAlbums,
-          genres: tagGenres,
-          releasedYear: Number(songMetadata.year) || undefined,
-          composer: songMetadata.composers ? songMetadata.composers.join(', ') : undefined,
-          // synchronizedLyrics: getSynchronizedLyricsFromSongID3Tags(songMetadata),
-          // unsynchronizedLyrics: getUnsynchronizedLyricsFromSongID3Tags(songMetadata),
-          artworkPath: parseSongArtworks(artworks).artworkPath,
-          duration: parseFloat(song.duration),
-          trackNumber,
-          isLyricsSavePending: isLyricsSavePending(song.path),
-          isMetadataSavePending: isMetadataUpdatesPending(song.path)
-        };
-        return res;
-      }
+      const res: SongTags = {
+        title,
+        artists: tagArtists,
+        albumArtists: tagAlbumArtists,
+        albums: songAlbums,
+        genres: tagGenres,
+        releasedYear,
+        composer: songMetadata?.composers ? songMetadata.composers.join(', ') : undefined,
+        artworkPath: parseSongArtworks(artworks).artworkPath,
+        duration: parseFloat(song.duration),
+        trackNumber,
+        isLyricsSavePending: isLyricsSavePending(song.path),
+        isMetadataSavePending: isMetadataUpdatesPending(song.path)
+      };
+      return res;
     }
   } else {
     const songPathWithDefaultUrl = songIdOrPath as string;

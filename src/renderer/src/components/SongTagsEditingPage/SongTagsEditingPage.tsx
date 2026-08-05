@@ -139,13 +139,14 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
             if (songs?.[0]) {
               const song = songs[0];
-              const fallbackData: SongInfo = {
+              const fallbackData: EditableSongTags = {
                 title: song.title,
                 artists: song.artists,
-                album: song.album,
+                albumArtists: song.albumArtists,
+                albums: song.album ? [{ title: song.album.name, albumId: song.album.albumId }] : undefined,
                 genres: song.genres,
-                trackNumber: song.trackNumber,
-                year: song.year,
+                trackNumber: song.trackNo,
+                releasedYear: song.year,
                 artworkPath: song.artworkPaths?.artworkPath
               };
               setDefaultValues(fallbackData);
