@@ -5,6 +5,14 @@ export interface MetadataIdentityOptions {
   entityId: string | number;
   metadataId?: string;
   version?: number;
+  fields?: {
+    title?: string;
+    artist?: string;
+    artists?: string[];
+    duration?: number;
+    album?: string;
+    year?: number;
+  };
 }
 
 export class MetadataIdentity {
@@ -12,6 +20,14 @@ export class MetadataIdentity {
   public readonly entityId: string | number;
   public readonly metadataId: string;
   public readonly version: number;
+  public readonly fields?: {
+    title?: string;
+    artist?: string;
+    artists?: string[];
+    duration?: number;
+    album?: string;
+    year?: number;
+  };
 
   constructor(options: MetadataIdentityOptions) {
     this.entityKind = options.entityKind;
@@ -19,6 +35,19 @@ export class MetadataIdentity {
     this.metadataId =
       options.metadataId ?? `${options.entityKind}:${options.entityId}`;
     this.version = options.version ?? 1;
+    this.fields = options.fields;
+  }
+
+  public getSearchTitle(): string | undefined {
+    return this.fields?.title;
+  }
+
+  public getSearchArtist(): string | undefined {
+    return this.fields?.artist ?? this.fields?.artists?.[0];
+  }
+
+  public getSearchDuration(): number | undefined {
+    return this.fields?.duration;
   }
 
   public nextVersion(): MetadataIdentity {
@@ -26,7 +55,8 @@ export class MetadataIdentity {
       entityKind: this.entityKind,
       entityId: this.entityId,
       metadataId: this.metadataId,
-      version: this.version + 1
+      version: this.version + 1,
+      fields: this.fields
     });
   }
 

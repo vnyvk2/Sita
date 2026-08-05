@@ -2,7 +2,10 @@ import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import type { MusicBrainzRecordingDto } from '../dto/RecordingDto';
 
 export class MusicBrainzRecordingMapper {
-  public toProviderResult(dto: MusicBrainzRecordingDto): ProviderResult<Record<string, unknown>> {
+  public toProviderResult(
+    dto: MusicBrainzRecordingDto,
+    confidence = 0.9
+  ): ProviderResult<Record<string, unknown>> {
     const artists = dto['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean) ?? [];
     const yearStr = dto['first-release-date'] ?? dto.releases?.[0]?.date;
     const year = yearStr ? parseInt(yearStr.split('-')[0], 10) : undefined;
@@ -25,7 +28,7 @@ export class MusicBrainzRecordingMapper {
 
     return new ProviderResult({
       payload: fields,
-      confidence: 0.9,
+      confidence,
       providerInfo: {
         id: 'musicbrainz',
         name: 'MusicBrainz Provider',

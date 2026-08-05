@@ -1,3 +1,4 @@
+import { HttpError } from '@main/platform/networking/FetchHttpClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 import type {
   MusicBrainzArtistDto,
@@ -62,7 +63,10 @@ export class MusicBrainzApiClient {
       });
       return response.data;
     } catch (err) {
-      return null;
+      if (err instanceof HttpError && err.status === 404) {
+        return null;
+      }
+      throw err;
     }
   }
 
@@ -83,7 +87,10 @@ export class MusicBrainzApiClient {
       });
       return response.data;
     } catch (err) {
-      return null;
+      if (err instanceof HttpError && err.status === 404) {
+        return null;
+      }
+      throw err;
     }
   }
 
@@ -104,7 +111,10 @@ export class MusicBrainzApiClient {
       });
       return response.data;
     } catch (err) {
-      return null;
+      if (err instanceof HttpError && err.status === 404) {
+        return null;
+      }
+      throw err;
     }
   }
 }

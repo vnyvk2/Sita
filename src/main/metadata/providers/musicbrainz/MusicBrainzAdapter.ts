@@ -1,10 +1,9 @@
 import type { IMetadataProviderAdapter } from '@main/metadata/contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '@main/metadata/contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '@main/metadata/contracts/ProviderIdentity';
+import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
 import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
-import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
-import { MetadataMatcher } from './MetadataMatcher';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
 
@@ -48,7 +47,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     if (this.isMbid(rawId)) {
       const recording = await this.apiClient.getRecordingById(rawId);
       if (recording) {
-        return this.recordingMapper.toProviderResult(recording) as ProviderResult<TDTO>;
+        return this.recordingMapper.toProviderResult(recording, 1.0) as ProviderResult<TDTO>;
       }
     }
 
@@ -71,23 +70,25 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       }) as ProviderResult<TDTO>;
     }
 
-    const bestMatch = this.matcher.findBestMatch(
+    const matchResult = this.matcher.findBestMatch(
       {
-        title: (identity as any).fields?.title ?? rawId,
-        artist: (identity as any).fields?.artist,
-        durationSeconds: (identity as any).fields?.duration
+        title: identity.getSearchTitle() ?? rawId,
+        artist: identity.getSearchArtist(),
+        durationSeconds: identity.getSearchDuration()
       },
       candidates
     );
 
-    const recordingToMap = bestMatch ?? candidates[0];
-    return this.recordingMapper.toProviderResult(recordingToMap) as ProviderResult<TDTO>;
+    const recordingToMap = matchResult?.candidate ?? candidates[0];
+    const confidenceScore = matchResult?.score ?? 0.5;
+
+    return this.recordingMapper.toProviderResult(recordingToMap, confidenceScore) as ProviderResult<TDTO>;
   }
 
   public async search<TDTO = unknown>(query: string, options?: Record<string, unknown>): Promise<ProviderResult<TDTO>[]> {
     const limit = (options?.limit as number) ?? 10;
     const candidates = await this.apiClient.searchRecordings(query, limit);
-    return candidates.map((c) => this.recordingMapper.toProviderResult(c) as ProviderResult<TDTO>);
+    return candidates.map((c) => this.recordingMapper.toProviderResult(c, 0.8) as ProviderResult<TDTO>);
   }
 
   private isMbid(str: string): boolean {
@@ -95,9 +96,8 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   }
 
   private buildSearchQuery(identity: MetadataIdentity): string {
-    const fields = (identity as any).fields ?? {};
-    const title = fields.title ?? (typeof identity.entityId === 'string' ? identity.entityId : '');
-    const artist = fields.artist ?? fields.artists?.[0];
+    const title = identity.getSearchTitle() ?? (typeof identity.entityId === 'string' ? identity.entityId : '');
+    const artist = identity.getSearchArtist();
 
     if (title && artist) {
       return `recording:"${title}" AND artist:"${artist}"`;
