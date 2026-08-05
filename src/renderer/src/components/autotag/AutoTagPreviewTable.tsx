@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
+import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
-import { ArtworkPreviewCard } from './ArtworkPreviewCard';
 
 export interface AutoTagPreviewTableProps {
   matches: TrackMatchPreview[];
   selectedTrackIds: Set<number>;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
-  filter: string;
-  sort: string;
+  filter: PreviewFilterOption;
+  sort: PreviewSortOption;
   onToggleTrack: (songId: number) => void;
   onToggleField: (songId: number, fieldId: MetadataFieldId) => void;
   onFieldChanged: (songId: number, fieldId: MetadataFieldId, value: string | number) => void;
@@ -18,8 +18,8 @@ export interface AutoTagPreviewTableProps {
   onSelectAll: () => void;
   onSelectChanged: () => void;
   onClearSelections: () => void;
-  onFilterChange: (filter: any) => void;
-  onSortChange: (sort: any) => void;
+  onFilterChange: (filter: PreviewFilterOption) => void;
+  onSortChange: (sort: PreviewSortOption) => void;
 }
 
 export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
@@ -40,16 +40,9 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
   onSortChange
 }) => {
   const [expandedTrackId, setExpandedTrackId] = useState<number | null>(null);
-  const [replaceArtwork, setReplaceArtwork] = useState(true);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Cover Artwork Preview Card */}
-      <ArtworkPreviewCard
-        replaceArtwork={replaceArtwork}
-        onToggleReplaceArtwork={setReplaceArtwork}
-      />
-
       {/* Toolbar Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -78,7 +71,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
             Filter:
             <select
               value={filter}
-              onChange={(e) => onFilterChange(e.target.value)}
+              onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="all">All Tracks</option>
@@ -92,7 +85,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
             Sort:
             <select
               value={sort}
-              onChange={(e) => onSortChange(e.target.value)}
+              onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="trackNumber">Track Number</option>

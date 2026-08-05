@@ -5,6 +5,7 @@ export interface ArtworkPreviewCardProps {
   currentArtworkUrl?: string;
   suggestedArtworkUrl?: string;
   artworkMetadata?: ArtworkMetadata;
+  providerName?: string;
   replaceArtwork: boolean;
   onToggleReplaceArtwork: (replace: boolean) => void;
 }
@@ -12,6 +13,8 @@ export interface ArtworkPreviewCardProps {
 export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
   currentArtworkUrl,
   suggestedArtworkUrl,
+  artworkMetadata,
+  providerName = 'MusicBrainz',
   replaceArtwork,
   onToggleReplaceArtwork
 }) => {
@@ -28,9 +31,15 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
-          Cover Artwork Preview
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+            Cover Artwork Preview
+          </span>
+          <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 500 }}>
+            {providerName}
+          </span>
+        </div>
+
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => onToggleReplaceArtwork(false)}
@@ -98,7 +107,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎵</span>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Local Library</span>
+          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Local Embedded File</span>
         </div>
 
         {/* Suggested Artwork */}
@@ -133,7 +142,9 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎨</span>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#34d399' }}>HD Online Release</span>
+          <span style={{ fontSize: '0.75rem', color: '#34d399' }}>
+            1200×1200 HD ({providerName})
+          </span>
         </div>
       </div>
     </div>

@@ -33,6 +33,7 @@ export interface UseAlbumAutoTagState {
   selectedTrackIds: Set<number>;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
+  replaceArtwork: boolean;
   filter: PreviewFilterOption;
   sort: PreviewSortOption;
   operationId: string;
@@ -48,6 +49,7 @@ export interface UseAlbumAutoTagActions {
   toggleField: (songId: number, fieldId: MetadataFieldId) => void;
   setFieldValue: (songId: number, fieldId: MetadataFieldId, value: string | number) => void;
   resetFieldValue: (songId: number, fieldId: MetadataFieldId) => void;
+  setReplaceArtwork: (replace: boolean) => void;
   selectAllTracks: () => void;
   selectChangedTracks: () => void;
   clearTrackSelections: () => void;
@@ -79,6 +81,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [selectedFieldMap, setSelectedFieldMap] = useState<Map<string, boolean>>(new Map());
   const [userEditedValues, setUserEditedValues] = useState<Map<string, string | number>>(new Map());
+  const [replaceArtwork, setReplaceArtwork] = useState<boolean>(true);
 
   const [filter, setFilter] = useState<PreviewFilterOption>('all');
   const [sort, setSort] = useState<PreviewSortOption>('trackNumber');
@@ -312,6 +315,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     setSelectedTrackIds(new Set());
     setSelectedFieldMap(new Map());
     setUserEditedValues(new Map());
+    setReplaceArtwork(true);
     // Regenerate session operationId on reset to ensure fresh session state
     setOperationId(generateSessionOperationId());
   }, []);
@@ -360,6 +364,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       selectedTrackIds,
       selectedFieldMap,
       userEditedValues,
+      replaceArtwork,
       filter,
       sort,
       operationId
@@ -374,6 +379,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       toggleField,
       setFieldValue,
       resetFieldValue,
+      setReplaceArtwork,
       selectAllTracks,
       selectChangedTracks,
       clearTrackSelections,

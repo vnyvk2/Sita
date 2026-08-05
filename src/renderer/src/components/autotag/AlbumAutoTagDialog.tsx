@@ -6,6 +6,7 @@ import { AutoTagPreviewTable } from './AutoTagPreviewTable';
 import { AutoTagProgressOverlay } from './AutoTagProgressOverlay';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { FinalReviewSummaryCard } from './FinalReviewSummaryCard';
+import { ArtworkPreviewCard } from './ArtworkPreviewCard';
 
 export interface AlbumAutoTagDialogProps {
   isOpen: boolean;
@@ -26,7 +27,6 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 }) => {
   const { state, actions } = useAlbumAutoTag(operationId);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
-  const [replaceArtwork] = useState(true);
   const previousFocusRef = useRef<Element | null>(null);
 
   // Focus preservation
@@ -168,13 +168,19 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
             />
           )}
 
-          {/* Step 2: Preview, Summary & Diff Table */}
+          {/* Step 2: Preview, Summary, Artwork & Diff Table */}
           {state.step === 'preview' && state.preview && (
             <>
               <FinalReviewSummaryCard
                 preview={state.preview}
                 selectedMatches={selectedMatches}
-                replaceArtwork={replaceArtwork}
+                replaceArtwork={state.replaceArtwork}
+              />
+
+              <ArtworkPreviewCard
+                replaceArtwork={state.replaceArtwork}
+                providerName={state.preview.provider}
+                onToggleReplaceArtwork={actions.setReplaceArtwork}
               />
 
               <AutoTagPreviewTable

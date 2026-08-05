@@ -25,6 +25,10 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
     m.fieldDiffs.some((d) => d.fieldId === 'year' && d.applyField && d.status === 'changed')
   ).length;
 
+  const totalFieldChanges = selectedMatches.reduce((acc, m) => {
+    return acc + m.fieldDiffs.filter((d) => d.applyField && (d.status === 'changed' || d.status === 'new')).length;
+  }, 0);
+
   const totalWarnings = selectedMatches.reduce((acc, m) => acc + m.warningCount, 0);
 
   return (
@@ -45,9 +49,9 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
           <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>Pre-Apply Summary</span>
           <ConfidenceBadge level={preview.confidenceLevel} confidence={preview.overallConfidence} />
         </div>
-        <span style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 500 }}>
-          {selectedMatches.length} / {preview.matches.length} Tracks Selected
-        </span>
+        <div style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
+          {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
