@@ -135,11 +135,8 @@ export class MetadataBootstrap {
     providerRegistry.register(localProvider);
     providerRegistry.register(userProvider);
 
-    const localAdapter = new LocalMetadataAdapter(localProvider);
-    const userAdapter = new UserMetadataAdapter(userProvider);
-
-    providerDiscovery.registerFactory('local-file-provider', () => localAdapter);
-    providerDiscovery.registerFactory('user-override-provider', () => userAdapter);
+    providerDiscovery.registerFactory('local-file-provider', () => new LocalMetadataAdapter(localProvider));
+    providerDiscovery.registerFactory('user-override-provider', () => new UserMetadataAdapter(userProvider));
 
     await providerDiscovery.discoverAll({
       'local-file-provider': { enabled: true, priority: 100 },

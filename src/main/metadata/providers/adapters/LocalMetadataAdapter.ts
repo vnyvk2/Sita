@@ -2,7 +2,6 @@ import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProvider
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '../../contracts/ProviderIdentity';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
-import type { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
 import type { ProviderResult } from '../../models/ProviderResult';
 import type { LocalMetadataProvider } from '../LocalMetadataProvider';
 
@@ -26,10 +25,6 @@ export class LocalMetadataAdapter implements IMetadataProviderAdapter {
 
   constructor(localProvider: LocalMetadataProvider) {
     this.localProvider = localProvider;
-  }
-
-  public get legacyInfo(): MetadataProviderInfo {
-    return this.localProvider.info;
   }
 
   public supports(capability: ProviderCapability): boolean {

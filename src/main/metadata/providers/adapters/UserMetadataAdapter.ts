@@ -2,7 +2,6 @@ import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProvider
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '../../contracts/ProviderIdentity';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
-import type { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
 import type { ProviderResult } from '../../models/ProviderResult';
 import type { UserMetadataProvider } from '../UserMetadataProvider';
 
@@ -25,10 +24,6 @@ export class UserMetadataAdapter implements IMetadataProviderAdapter {
 
   constructor(userProvider: UserMetadataProvider) {
     this.userProvider = userProvider;
-  }
-
-  public get legacyInfo(): MetadataProviderInfo {
-    return this.userProvider.info;
   }
 
   public supports(capability: ProviderCapability): boolean {
