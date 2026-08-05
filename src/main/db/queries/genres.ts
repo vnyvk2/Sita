@@ -18,13 +18,14 @@ export type GetAllGenresReturnType = Awaited<ReturnType<typeof getAllGenres>>;
 
 const defaultGetAllGenresOptions = {
   genreIds: [] as number[],
+  genreNames: [] as string[],
   start: 0,
   end: 0,
   sortType: 'aToZ' as GenreSortTypes
 };
 export type GetAllGenresOptions = Partial<typeof defaultGetAllGenresOptions>;
 export const getAllGenres = async (options: GetAllGenresOptions, trx: DB | DBTransaction = db) => {
-  const { genreIds = [], start = 0, end = 0, sortType = 'aToZ' } = options;
+  const { genreIds = [], genreNames = [], start = 0, end = 0, sortType = 'aToZ' } = options;
 
   const limit = end - start === 0 ? undefined : end - start;
 
@@ -35,6 +36,11 @@ export const getAllGenres = async (options: GetAllGenresOptions, trx: DB | DBTra
       // Filter by genre IDs
       if (genreIds && genreIds.length > 0) {
         filters.push(inArray(s.id, genreIds));
+      }
+
+      // Filter by genre names (case-insensitive)
+      if (genreNames && genreNames.length > 0) {
+        filters.push(inArray(s.nameCI, genreNames.map((n) => n.toLowerCase())));
       }
 
       return and(...filters);

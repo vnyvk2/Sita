@@ -118,6 +118,7 @@ export const getLinkedSongArtist = async (
 export type GetAllArtistsReturnType = Awaited<ReturnType<typeof getAllArtists>>['data'];
 const defaultGetAllArtistsOptions = {
   artistIds: [] as number[],
+  artistNames: [] as string[],
   start: 0,
   end: 0,
   filterType: 'notSelected' as ArtistFilterTypes,
@@ -131,6 +132,7 @@ export const getAllArtists = async (
 ) => {
   const {
     artistIds = [],
+    artistNames = [],
     start = 0,
     end = 0,
     filterType = 'notSelected',
@@ -145,6 +147,11 @@ export const getAllArtists = async (
       // Filter by artist IDs
       if (artistIds && artistIds.length > 0) {
         filters.push(inArray(s.id, artistIds));
+      }
+
+      // Filter by artist names (case-insensitive)
+      if (artistNames && artistNames.length > 0) {
+        filters.push(inArray(s.nameCI, artistNames.map((n) => n.toLowerCase())));
       }
 
       // Apply additional filters based on filterType

@@ -24,13 +24,30 @@ const fetchArtistData = async (
     sortType,
     limit
   });
+
+  const numericIds = artistIdsOrNames
+    .map((id) => Number(id))
+    .filter((id) => !isNaN(id));
+  const stringNames = artistIdsOrNames.filter((item) => isNaN(Number(item)));
+
+  // If specific artist IDs or names were requested but none valid exist in query, return empty result
+  if (artistIdsOrNames.length > 0 && numericIds.length === 0 && stringNames.length === 0) {
+    return result;
+  }
+
   const artists = await getAllArtists({
-    artistIds: artistIdsOrNames.map((id) => Number(id)).filter((id) => !isNaN(id)),
+    artistIds: numericIds,
+    artistNames: stringNames,
     start,
     end,
     filterType,
     sortType
   });
+
+  // If specific artists were requested but none matched in DB, return empty result instead of all artists
+  if (artistIdsOrNames.length > 0 && numericIds.length === 0 && stringNames.length > 0 && artists.data.length === 0) {
+    return result;
+  }
 
   const results: Artist[] = artists.data.map((artist) => convertToArtist(artist));
 

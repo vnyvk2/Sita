@@ -17,10 +17,19 @@ const fetchAlbumData = async (
     end: 0
   };
 
-  if (albumTitlesOrIds) {
+  if (albumTitlesOrIds && albumTitlesOrIds.length > 0) {
     logger.debug(`Requested albums data for ids`, { albumTitlesOrIds });
+
+    const numericIds = albumTitlesOrIds
+      .map((x) => Number(x))
+      .filter((x) => !isNaN(x));
+
+    if (numericIds.length === 0) {
+      return result;
+    }
+
     const albums = await getAllAlbums({
-      albumIds: albumTitlesOrIds.map((x) => Number(x)),
+      albumIds: numericIds,
       sortType,
       start,
       end
