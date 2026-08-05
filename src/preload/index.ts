@@ -685,7 +685,19 @@ export const api = {
   libraryMetrics,
   collections,
   membership,
-  metadata
+  metadata,
+  metadataAutoTag: {
+    searchAlbums: (albumName: string, artistName?: string, limit?: number) =>
+      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit),
+    buildPreview: (localSongs: unknown[], releaseId: string, providerId?: string) =>
+      ipcRenderer.invoke('metadata/buildPreview', localSongs, releaseId, providerId),
+    applyPreview: (preview: unknown) =>
+      ipcRenderer.invoke('metadata/applyPreview', preview),
+    undoLastAutoTag: () =>
+      ipcRenderer.invoke('metadata/undoLastAutoTag'),
+    cancelAutoTag: () =>
+      ipcRenderer.invoke('metadata/cancelAutoTag')
+  }
 };
 
 contextBridge.exposeInMainWorld('api', api);
