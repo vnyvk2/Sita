@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type {
   AlbumMetadata,
   AlbumTagPreview,
+  AutoTagSongInput,
   AutoTagStage,
-  LocalSongInput,
   MetadataFieldId,
   MetadataProviderId,
   ProgressEventPayload,
@@ -40,7 +40,7 @@ export interface UseAlbumAutoTagState {
 
 export interface UseAlbumAutoTagActions {
   searchReleases: (album: string, artist?: string) => Promise<void>;
-  buildPreview: (localSongs: LocalSongInput[], releaseId: string, providerId?: MetadataProviderId) => Promise<void>;
+  buildPreview: (localSongs: AutoTagSongInput[], releaseId: string, providerId?: MetadataProviderId) => Promise<void>;
   applyPreview: () => Promise<boolean>;
   undoLastAutoTag: () => Promise<boolean>;
   cancel: () => void;
@@ -83,13 +83,6 @@ export function useAlbumAutoTag(initialOperationId?: string) {
   const [filter, setFilter] = useState<PreviewFilterOption>('all');
   const [sort, setSort] = useState<PreviewSortOption>('trackNumber');
 
-  // Sync operationId prop if explicit session ID changes
-  useEffect(() => {
-    if (initialOperationId) {
-      setOperationId(initialOperationId);
-    }
-  }, [initialOperationId]);
-
   // IPC Progress Event Listener Subscription with operationId filtering guard
   useEffect(() => {
     const unsubscribe = metadataApi.onProgress((payload: ProgressEventPayload) => {
@@ -105,11 +98,15 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     };
   }, [operationId]);
 
-  // Target Query Cache Invalidation
+  // Targeted Query Cache Invalidation
   const invalidateQueryCache = useCallback(() => {
+    if (preview?.album?.releaseId && !isNaN(Number(preview.album.releaseId))) {
+      const albumId = Number(preview.album.releaseId);
+      queryClient.invalidateQueries({ queryKey: albumQuery.single({ albumId }).queryKey });
+    }
     queryClient.invalidateQueries({ queryKey: albumQuery._def });
     queryClient.invalidateQueries({ queryKey: songQuery._def });
-  }, [queryClient]);
+  }, [preview, queryClient]);
 
   // Actions
   const searchReleases = useCallback(async (album: string, artist?: string) => {
@@ -127,7 +124,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     }
   }, [operationId]);
 
-  const buildPreview = useCallback(async (localSongs: LocalSongInput[], releaseId: string, providerId?: MetadataProviderId) => {
+  const buildPreview = useCallback(async (localSongs: AutoTagSongInput[], releaseId: string, providerId?: MetadataProviderId) => {
     setLoading(true);
     setError(null);
     try {
@@ -194,7 +191,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setStep('complete');
         setCanUndo(true);
 
-        // Invalidate TanStack Query cache ON SUCCESS ONLY
+        // Targeted Query Invalidation ON SUCCESS ONLY
         invalidateQueryCache();
 
         return true;
@@ -219,7 +216,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setCanUndo(false);
         setLastRestoredCount(res.restoredCount);
 
-        // Invalidate TanStack Query cache ON UNDO SUCCESS ONLY
+        // Targeted Query Invalidation ON UNDO SUCCESS ONLY
         invalidateQueryCache();
 
         return true;
@@ -304,6 +301,9 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     setSelectedTrackIds(new Set());
   }, []);
 
+  /**
+   * Resets both UI presentation state AND generates a fresh session operationId.
+   */
   const reset = useCallback(() => {
     setStep('search');
     setStage('idle');
