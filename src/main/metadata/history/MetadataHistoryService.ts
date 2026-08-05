@@ -16,6 +16,8 @@ export interface MetadataHistorySnapshot {
   id: string;
   timestamp: number;
   description: string;
+  albumTitle?: string;
+  songIds?: number[];
   previousSongs: SongMetadataSnapshot[];
   updatedSongs: SongMetadataSnapshot[];
 }
@@ -37,8 +39,18 @@ export class MetadataHistoryService {
     this.redoStack.length = 0; // Clear redo stack on new action
   }
 
-  public popUndo(): MetadataHistorySnapshot | undefined {
-    const snapshot = this.undoStack.pop();
+  public popUndo(targetSongId?: number): MetadataHistorySnapshot | undefined {
+    if (this.undoStack.length === 0) return undefined;
+
+    let index = this.undoStack.length - 1;
+    if (targetSongId !== undefined) {
+      const foundIdx = this.undoStack.findLastIndex(
+        (snap) => snap.songIds?.includes(targetSongId) || snap.previousSongs.some((s) => s.songId === targetSongId)
+      );
+      if (foundIdx !== -1) index = foundIdx;
+    }
+
+    const [snapshot] = this.undoStack.splice(index, 1);
     if (snapshot) {
       this.redoStack.push(snapshot);
     }

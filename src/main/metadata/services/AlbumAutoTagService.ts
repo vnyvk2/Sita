@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import type { AlbumMetadata, MetadataProviderId } from '../models/RecordingMetadata';
-import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload } from '../models/AlbumTagPreview';
+import type { AlbumTagPreview, ApplyPreviewOptions, AutoTagStage, ProgressEventPayload } from '../models/AlbumTagPreview';
 import type { LocalSongInput } from './AlbumMetadataService';
 import { AlbumMetadataService, getConfidenceLevel } from './AlbumMetadataService';
 import { MetadataDiffBuilder } from '../diff/MetadataDiffBuilder';
@@ -121,12 +121,17 @@ export class AlbumAutoTagService extends EventEmitter {
   /**
    * Apply preview changes to disk and database.
    */
-  public async applyPreview(preview: AlbumTagPreview, signal?: AbortSignal, operationId = 'default'): Promise<ApplyResult> {
+  public async applyPreview(
+    preview: AlbumTagPreview,
+    options?: ApplyPreviewOptions,
+    signal?: AbortSignal,
+    operationId = 'default'
+  ): Promise<ApplyResult> {
     this.checkCancelled(signal);
     this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
 
     try {
-      const result = await this.applyService.applyPreview(preview);
+      const result = await this.applyService.applyPreview(preview, options, signal);
       this.checkCancelled(signal);
 
       if (result.success) {

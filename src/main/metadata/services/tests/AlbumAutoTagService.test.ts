@@ -135,4 +135,102 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, signal1, 'op-1')).rejects.toThrow(/aborted/);
   });
+
+  it('updates all 7 metadata fields in DB fallback when applyPreview is called', async () => {
+    const tagWriter = new TagWriterService();
+    vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    const preview: any = {
+      album: { title: 'Test Album' },
+      matches: [
+        {
+          localSongId: 42,
+          songPath: 'song.mp3',
+          oldTitle: 'Old Title',
+          oldArtist: 'Old Artist',
+          applyTrack: true,
+          fieldDiffs: [
+            { fieldId: 'title', applyField: true, userValue: 'New Title' },
+            { fieldId: 'artist', applyField: true, userValue: 'New Artist' },
+            { fieldId: 'album', applyField: true, userValue: 'Test Album' },
+            { fieldId: 'genre', applyField: true, userValue: 'Pop' },
+            { fieldId: 'year', applyField: true, userValue: 2024 },
+            { fieldId: 'trackNumber', applyField: true, userValue: 1 },
+            { fieldId: 'discNumber', applyField: true, userValue: 2 }
+          ]
+        }
+      ]
+    };
+
+    const result = await applyService.applyPreview(preview, { replaceArtwork: false });
+    expect(result.success).toBe(true);
+    expect(dbUpdater).toHaveBeenCalledWith(42, {
+      title: 'New Title',
+      artist: 'New Artist',
+      album: 'Test Album',
+      genre: 'Pop',
+      year: 2024,
+      trackNumber: 1,
+      discNumber: 2
+    });
+  });
+
+  it('omits artworkBuffer when replaceArtwork is false', async () => {
+    const tagWriter = new TagWriterService();
+    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    const preview: any = {
+      album: { title: 'Test Album', artwork: { primaryPath: 'http://example.com/cover.jpg' } },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: 'song.mp3',
+          oldTitle: 'Old Title',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, userValue: 'New Title' }]
+        }
+      ]
+    };
+
+    const result = await applyService.applyPreview(preview, { replaceArtwork: false });
+    expect(result.success).toBe(true);
+    const passedPayload = writeBatchSpy.mock.calls[0][0][0];
+    expect(passedPayload.artworkBuffer).toBeUndefined();
+  });
+
+  it('applies text metadata successfully even when artwork download fails or times out', async () => {
+    const tagWriter = new TagWriterService();
+    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    // Mock fetch to simulate 404 / network failure
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    const preview: any = {
+      album: { title: 'Test Album' },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: 'song.mp3',
+          oldTitle: 'Old Title',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, userValue: 'New Title' }]
+        }
+      ]
+    };
+
+    const result = await applyService.applyPreview(preview, { replaceArtwork: true, artworkUrl: 'http://invalid.url/404.jpg' });
+    expect(result.success).toBe(true);
+    expect(result.updatedCount).toBe(1);
+
+    const passedPayload = writeBatchSpy.mock.calls[0][0][0];
+    expect(passedPayload.artworkBuffer).toBeUndefined();
+
+    vi.unstubAllGlobals();
+  });
 });

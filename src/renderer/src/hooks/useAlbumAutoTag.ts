@@ -184,7 +184,11 @@ export function useAlbumAutoTag(initialOperationId?: string) {
       });
 
       const payload: AlbumTagPreview = { ...preview, matches: effectiveMatches };
-      const res = await metadataApi.applyPreview(payload, operationId);
+      const options = {
+        replaceArtwork,
+        artworkUrl: preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0]
+      };
+      const res = await metadataApi.applyPreview(payload, options, operationId);
 
       if (res.success) {
         setStep('complete');
@@ -205,7 +209,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, operationId, invalidateQueryCache]);
+  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, replaceArtwork, operationId, invalidateQueryCache]);
 
   const undoLastAutoTag = useCallback(async (): Promise<boolean> => {
     setLoading(true);

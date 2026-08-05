@@ -1,4 +1,4 @@
-import type { AlbumMetadata, AlbumTagPreview, MetadataAutoTagApi, MetadataProviderId, ProgressEventPayload } from '../../../common/metadata/types';
+import type { AlbumMetadata, AlbumTagPreview, ApplyPreviewOptions, MetadataAutoTagApi, MetadataProviderId, ProgressEventPayload } from '../../../common/metadata/types';
 
 export const metadataApi = {
   searchAlbums: async (albumName: string, artistName?: string, limit?: number, operationId?: string): Promise<AlbumMetadata[]> => {
@@ -13,10 +13,10 @@ export const metadataApi = {
     return api.buildPreview(localSongs, releaseId, providerId, operationId);
   },
 
-  applyPreview: async (preview: AlbumTagPreview, operationId?: string): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
+  applyPreview: async (preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId?: string): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api) return { success: false, updatedCount: 0, failedCount: 0, errors: ['Metadata API unavailable'] };
-    return api.applyPreview(preview, operationId);
+    return api.applyPreview(preview, options, operationId);
   },
 
   undoLastAutoTag: async (operationId?: string): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> => {

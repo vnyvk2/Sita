@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ArtworkMetadata } from '../../../../common/metadata/types';
 
 export interface ArtworkPreviewCardProps {
@@ -34,6 +34,9 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
   replaceArtwork,
   onToggleReplaceArtwork
 }) => {
+  const [currentImgErr, setCurrentImgErr] = useState(false);
+  const [suggestedImgErr, setSuggestedImgErr] = useState(false);
+
   const providerDisplay = formatProviderDisplayName(providerName);
   const dimensionsDisplay =
     artworkMetadata?.primaryPath ? 'Local Embedded' : 'Online Release';
@@ -121,8 +124,13 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               justifyContent: 'center'
             }}
           >
-            {currentArtworkUrl ? (
-              <img src={currentArtworkUrl} alt="Current Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {currentArtworkUrl && !currentImgErr ? (
+              <img
+                src={currentArtworkUrl}
+                alt="Current Cover"
+                onError={() => setCurrentImgErr(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             ) : (
               <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎵</span>
             )}
@@ -156,8 +164,13 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               justifyContent: 'center'
             }}
           >
-            {suggestedArtworkUrl ? (
-              <img src={suggestedArtworkUrl} alt="Suggested Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {suggestedArtworkUrl && !suggestedImgErr ? (
+              <img
+                src={suggestedArtworkUrl}
+                alt="Suggested Cover"
+                onError={() => setSuggestedImgErr(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             ) : (
               <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎨</span>
             )}

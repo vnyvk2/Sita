@@ -75,6 +75,9 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
   if (!isOpen) return null;
 
   const selectedMatches = state.filteredMatches.filter((m) => state.selectedTrackIds.has(m.localSongId));
+  const artworkSong = localSongs.find((s) => s.artworkPath || s.artworkUrl || s.artwork);
+  const currentArtworkUrl = artworkSong?.artworkPath || artworkSong?.artworkUrl;
+  const suggestedArtworkUrl = state.preview?.album.artwork?.primaryPath || state.preview?.album.artwork?.onlineUrls?.[0];
 
   return createPortal(
     <div
@@ -178,6 +181,9 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
               />
 
               <ArtworkPreviewCard
+                currentArtworkUrl={currentArtworkUrl}
+                suggestedArtworkUrl={suggestedArtworkUrl}
+                artworkMetadata={state.preview.album.artwork}
                 replaceArtwork={state.replaceArtwork}
                 providerName={state.preview.provider}
                 onToggleReplaceArtwork={actions.setReplaceArtwork}

@@ -691,8 +691,8 @@ export const api = {
       ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, operationId),
     buildPreview: (localSongs: unknown[], releaseId: string, providerId?: string, operationId?: string) =>
       ipcRenderer.invoke('metadata/buildPreview', localSongs, releaseId, providerId, operationId),
-    applyPreview: (preview: unknown, operationId?: string) =>
-      ipcRenderer.invoke('metadata/applyPreview', preview, operationId),
+    applyPreview: (preview: unknown, options?: unknown, operationId?: string) =>
+      ipcRenderer.invoke('metadata/applyPreview', preview, options, operationId),
     undoLastAutoTag: (operationId?: string) =>
       ipcRenderer.invoke('metadata/undoLastAutoTag', operationId),
     cancelAutoTag: (operationId?: string) =>

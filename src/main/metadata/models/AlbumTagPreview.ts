@@ -40,6 +40,12 @@ export interface TrackMatchPreview {
   applyTrack: boolean; // Track-level apply toggle
 }
 
+export interface ApplyPreviewOptions {
+  replaceArtwork?: boolean;
+  artworkUrl?: string;
+  operationId?: string;
+}
+
 export interface AlbumTagPreview {
   album: AlbumMetadata;
   matches: TrackMatchPreview[];

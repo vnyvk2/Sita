@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MetadataJobManager } from '../MetadataJobManager';
 import { MetadataDiagnosticsService } from '../MetadataDiagnosticsService';
 import { MetadataApplyService } from '../../services/MetadataApplyService';
-import { TagWriterService } from '../../services/TagWriterService';
 import type { AlbumTagPreview } from '../../../../common/metadata/types';
 
 describe('Phase 7 — Autonomous Background Execution Engine, Job Scheduler & Telemetry Suite', () => {
@@ -46,11 +45,14 @@ describe('Phase 7 — Autonomous Background Execution Engine, Job Scheduler & Te
 
   beforeEach(() => {
     diagnosticsService = new MetadataDiagnosticsService();
-    const tagWriter = new TagWriterService();
-    vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
-    const dbUpdater = vi.fn().mockResolvedValue(true);
+    applyService = new MetadataApplyService();
+    vi.spyOn(applyService, 'applyPreview').mockImplementation(async (_prev, _opts, signal) => {
+      if (signal?.aborted) {
+        return { success: false, updatedCount: 0, failedCount: 1, errors: ['Operation aborted'] };
+      }
+      return { success: true, updatedCount: 1, failedCount: 0, errors: [] };
+    });
 
-    applyService = new MetadataApplyService({ tagWriter, dbUpdater });
     jobManager = new MetadataJobManager(2, applyService, diagnosticsService);
   });
 

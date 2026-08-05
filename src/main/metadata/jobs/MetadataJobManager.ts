@@ -1,25 +1,22 @@
 import { EventEmitter } from 'events';
-import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload, TrackMatchPreview } from '../../../common/metadata/types';
-import { MetadataApplyService, type ApplyResult } from '../services/MetadataApplyService';
-import { MetadataDiagnosticsService } from './MetadataDiagnosticsService';
-
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload } from '../../../common/metadata/types';
+import type { MetadataApplyService, ApplyResult } from '../services/MetadataApplyService';
+import type { MetadataDiagnosticsService } from './MetadataDiagnosticsService';
 
 export interface MetadataJob {
-  jobId: string;
+  id: string;
   albumTitle: string;
-  artistName?: string;
-  status: JobStatus;
+  artistName: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   stage: AutoTagStage;
-  progressPercent: number;
   message: string;
+  progressPercent: number;
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
-  error?: string;
-  isExecuting?: boolean;
+  preview: AlbumTagPreview;
   abortController: AbortController;
-  preview?: AlbumTagPreview;
+  isExecuting?: boolean;
 }
 
 export class MetadataJobManager extends EventEmitter {
@@ -27,8 +24,8 @@ export class MetadataJobManager extends EventEmitter {
   private readonly queue: string[] = [];
   private readonly activeJobs: Set<string> = new Set();
   private readonly maxConcurrentJobs: number;
-  private readonly diagnosticsService: MetadataDiagnosticsService;
   private readonly applyService: MetadataApplyService;
+  private readonly diagnosticsService: MetadataDiagnosticsService;
 
   constructor(
     maxConcurrentJobs = 3,
@@ -37,39 +34,61 @@ export class MetadataJobManager extends EventEmitter {
   ) {
     super();
     this.maxConcurrentJobs = maxConcurrentJobs;
-    this.applyService = applyService ?? new MetadataApplyService();
-    this.diagnosticsService = diagnosticsService ?? new MetadataDiagnosticsService();
+    this.applyService = applyService ?? (new (require('../services/MetadataApplyService').MetadataApplyService)());
+    this.diagnosticsService = diagnosticsService ?? (new (require('./MetadataDiagnosticsService').MetadataDiagnosticsService)());
   }
 
-  public get diagnostics(): MetadataDiagnosticsService {
-    return this.diagnosticsService;
-  }
-
-  public createJob(jobId: string, albumTitle: string, artistName?: string, preview?: AlbumTagPreview): MetadataJob {
-    if (this.jobs.has(jobId)) {
-      return this.jobs.get(jobId)!;
-    }
+  /**
+   * Enqueues a new metadata apply job.
+   */
+  public createJob(
+    jobId: string,
+    albumTitle: string,
+    artistName: string,
+    preview: AlbumTagPreview
+  ): MetadataJob {
+    const abortController = new AbortController();
 
     const job: MetadataJob = {
-      jobId,
+      id: jobId,
       albumTitle,
       artistName,
       status: 'queued',
       stage: 'idle',
+      message: 'Job enqueued',
       progressPercent: 0,
-      message: 'Job queued in background',
       createdAt: Date.now(),
-      isExecuting: false,
-      abortController: new AbortController(),
-      preview
+      preview,
+      abortController
     };
 
     this.jobs.set(jobId, job);
     this.queue.push(jobId);
-    this.emit('job:created', job);
 
     this.processQueue();
     return job;
+  }
+
+  /**
+   * Process the autonomous job queue up to maxConcurrentJobs threshold.
+   */
+  public processQueue(): void {
+    while (this.activeJobs.size < this.maxConcurrentJobs && this.queue.length > 0) {
+      const nextJobId = this.queue.shift();
+      if (!nextJobId) break;
+
+      const job = this.jobs.get(nextJobId);
+      if (job && job.status === 'queued') {
+        this.activeJobs.add(nextJobId);
+        job.status = 'running';
+        job.startedAt = Date.now();
+
+        // Autonomously execute the job in background
+        this.executeApplyJob(nextJobId).catch((err) => {
+          this.emit('job:error', { jobId: nextJobId, error: err });
+        });
+      }
+    }
   }
 
   public getJob(jobId: string): MetadataJob | undefined {
@@ -114,18 +133,32 @@ export class MetadataJobManager extends EventEmitter {
       operationId: jobId
     };
 
-    this.emit('job:progress', payload);
+    this.emit('progress', payload);
   }
 
+  /**
+   * Cancels an active or queued job.
+   */
+  public cancelJob(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    job.abortController.abort();
+    this.updateJobProgress(jobId, 'cancelled', 'Job cancelled by user', 0);
+  }
+
+  /**
+   * Executes a job through MetadataApplyService.
+   */
   public async executeApplyJob(jobId: string): Promise<ApplyResult> {
     const job = this.jobs.get(jobId);
-    if (!job || !job.preview) {
-      return { success: false, updatedCount: 0, failedCount: 0, errors: [`Job '${jobId}' not found or missing preview`] };
+    if (!job) {
+      return { success: false, updatedCount: 0, failedCount: 0, errors: ['Job not found'] };
     }
 
     // Duplicate Execution Guard
     if (job.isExecuting) {
-      return { success: false, updatedCount: 0, failedCount: 0, errors: [`Job '${jobId}' is already executing.`] };
+      return { success: false, updatedCount: 0, failedCount: 0, errors: ['Job is already executing'] };
     }
 
     job.isExecuting = true;
@@ -133,7 +166,7 @@ export class MetadataJobManager extends EventEmitter {
     this.updateJobProgress(jobId, 'applying', `Applying metadata updates for ${job.albumTitle}...`, 20);
 
     try {
-      const result = await this.applyService.applyPreview(job.preview, job.abortController.signal);
+      const result = await this.applyService.applyPreview(job.preview, undefined, job.abortController.signal);
       const durationMs = Date.now() - startTime;
 
       const selectedMatches = job.preview.matches.filter((m) => m.applyTrack);
@@ -154,13 +187,14 @@ export class MetadataJobManager extends EventEmitter {
       if (result.success) {
         this.updateJobProgress(jobId, 'completed', `Successfully updated ${result.updatedCount} tracks.`, 100);
       } else {
-        this.updateJobProgress(jobId, 'failed', `Apply failed: ${result.errors.join('; ')}`, 100);
+        const isCancelled = job.abortController.signal.aborted;
+        this.updateJobProgress(jobId, isCancelled ? 'cancelled' : 'failed', `Apply failed: ${result.errors.join('; ')}`, 100);
       }
 
       return result;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const isCancelled = err instanceof Error && err.name === 'CancelledError';
+      const isCancelled = (err instanceof Error && err.name === 'CancelledError') || job.abortController.signal.aborted;
 
       this.updateJobProgress(jobId, isCancelled ? 'cancelled' : 'failed', msg, 0);
 
@@ -182,58 +216,24 @@ export class MetadataJobManager extends EventEmitter {
         failedCount: job.preview?.matches.length ?? 0,
         errors: [msg]
       };
-    } finally {
-      job.isExecuting = false;
-      this.cleanCompletedJobs();
     }
   }
 
-  public cancelJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId);
-    if (!job || job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
-      return false;
-    }
-
-    job.abortController.abort();
-    this.updateJobProgress(jobId, 'cancelled', `Job '${jobId}' cancelled by user.`, 0);
-    return true;
-  }
-
-  public cleanCompletedJobs(maxAgeMs = 1000 * 60 * 30, maxRetainedJobs = 50): void {
+  /**
+   * Clean completed/cancelled jobs keeping only recent maxRetainedJobs (LRU eviction).
+   */
+  public cleanCompletedJobs(maxAgeMs = 24 * 60 * 60 * 1000, maxRetainedJobs = 50): void {
     const now = Date.now();
     const finished = Array.from(this.jobs.values())
       .filter((j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled')
-      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)); // Sort newest first
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
 
-    for (let i = 0; i < finished.length; i++) {
-      const job = finished[i];
-      const isExpired = job.completedAt && now - job.completedAt > maxAgeMs;
-      const exceedsCapacity = i >= maxRetainedJobs;
-
-      if (isExpired || exceedsCapacity) {
-        this.jobs.delete(job.jobId);
+    // Keep top maxRetainedJobs recent jobs, delete older or expired ones
+    finished.forEach((job, index) => {
+      const age = now - (job.completedAt ?? job.createdAt);
+      if (index >= maxRetainedJobs || age > maxAgeMs) {
+        this.jobs.delete(job.id);
       }
-    }
-  }
-
-  private processQueue(): void {
-    while (this.activeJobs.size < this.maxConcurrentJobs && this.queue.length > 0) {
-      const jobId = this.queue.shift()!;
-      const job = this.jobs.get(jobId);
-
-      if (job && job.status === 'queued') {
-        this.activeJobs.add(jobId);
-        job.status = 'running';
-        this.updateJobProgress(jobId, 'running', `Processing job ${jobId}...`, 10);
-
-        if (job.preview) {
-          // Autonomous Queue Execution with error event emission visibility
-          this.executeApplyJob(jobId).catch((err: unknown) => {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            this.emit('job:error', { jobId, error: errorMsg });
-          });
-        }
-      }
-    }
+    });
   }
 }

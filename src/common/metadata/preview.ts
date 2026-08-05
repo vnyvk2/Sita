@@ -42,6 +42,12 @@ export interface TrackMatchPreview {
   warningCount: number;
 }
 
+export interface ApplyPreviewOptions {
+  replaceArtwork?: boolean;
+  artworkUrl?: string;
+  operationId?: string;
+}
+
 export interface AlbumTagPreview {
   album: AlbumMetadata;
   matches: TrackMatchPreview[];

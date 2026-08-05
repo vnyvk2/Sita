@@ -1,4 +1,4 @@
-import type { AlbumTagPreview, TrackMatchPreview } from '../../../common/metadata/types';
+import type { AlbumTagPreview, ApplyPreviewOptions, TrackMatchPreview } from '../../../common/metadata/types';
 import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { TagWriterService, type TagWritePayload } from './TagWriterService';
@@ -40,7 +40,15 @@ export class RollbackError extends MetadataError {
 
 export type SongDbUpdater = (
   songId: number,
-  data: { title?: string; year?: number; trackNumber?: number }
+  data: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    genre?: string;
+    year?: number;
+    trackNumber?: number;
+    discNumber?: number;
+  }
 ) => Promise<unknown>;
 
 export interface ApplyResult {
@@ -78,7 +86,11 @@ export class MetadataApplyService {
    * Applies metadata changes from AlbumTagPreview using chunked batched transactions with AbortSignal cancellation support:
    * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction & ReParse -> Revert Disk on Error
    */
-  public async applyPreview(preview: AlbumTagPreview, signal?: AbortSignal): Promise<ApplyResult> {
+  public async applyPreview(
+    preview: AlbumTagPreview,
+    options?: ApplyPreviewOptions,
+    signal?: AbortSignal
+  ): Promise<ApplyResult> {
     if (!preview || !preview.matches || preview.matches.length === 0) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
@@ -86,6 +98,15 @@ export class MetadataApplyService {
     const selectedMatches = preview.matches.filter((m) => m.applyTrack);
     if (selectedMatches.length === 0) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
+    }
+
+    // Step 0: Download and validate artwork buffer ONCE if replaceArtwork is requested
+    let artworkBuffer: Buffer | undefined;
+    if (options?.replaceArtwork) {
+      const artUrl = options.artworkUrl || preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0];
+      if (artUrl) {
+        artworkBuffer = await this.fetchAndValidateArtwork(artUrl, signal);
+      }
     }
 
     let totalUpdated = 0;
@@ -99,7 +120,7 @@ export class MetadataApplyService {
       }
 
       const chunkMatches = selectedMatches.slice(i, i + this.batchChunkSize);
-      const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title, signal);
+      const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title, artworkBuffer, signal);
 
       totalUpdated += chunkResult.updatedCount;
       totalFailed += chunkResult.failedCount;
@@ -107,6 +128,17 @@ export class MetadataApplyService {
 
       if (!chunkResult.success) {
         break; // Stop remaining chunks if a batch transaction fails
+      }
+    }
+
+    if (totalFailed === 0 && totalUpdated > 0) {
+      // Target invalidation for song and album artwork caches
+      try {
+        const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
+        resetArtworkCache('songArtworks');
+        resetArtworkCache('albumArtworks');
+      } catch {
+        // Ignored in isolated testing environments
       }
     }
 
@@ -118,7 +150,46 @@ export class MetadataApplyService {
     };
   }
 
-  private async applyMatchChunk(chunkMatches: TrackMatchPreview[], albumTitle: string, signal?: AbortSignal): Promise<ApplyResult> {
+  private async fetchAndValidateArtwork(urlOrPath: string, signal?: AbortSignal): Promise<Buffer | undefined> {
+    try {
+      if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        if (signal) {
+          if (signal.aborted) controller.abort();
+          else signal.addEventListener('abort', () => controller.abort(), { once: true });
+        }
+
+        const res = await fetch(urlOrPath, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        const contentType = res.headers?.get ? (res.headers.get('content-type') || '') : '';
+        if (res.ok && (!contentType || contentType.includes('image/'))) {
+          const arr = await res.arrayBuffer();
+          const buf = Buffer.from(arr);
+          // 8MB limit for cover art download
+          if (buf.length > 0 && buf.length <= 8 * 1024 * 1024) {
+            return buf;
+          }
+        }
+      } else {
+        const { readFile } = await import('fs/promises');
+        const buf = await readFile(urlOrPath);
+        if (buf.length > 0 && buf.length <= 8 * 1024 * 1024) return buf;
+      }
+    } catch (err) {
+      console.warn(`[MetadataApplyService] Failed to download artwork from ${urlOrPath}:`, err);
+    }
+    return undefined;
+  }
+
+  private async applyMatchChunk(
+    chunkMatches: TrackMatchPreview[],
+    albumTitle: string,
+    artworkBuffer?: Buffer,
+    signal?: AbortSignal
+  ): Promise<ApplyResult> {
     const previousSongs: SongMetadataSnapshot[] = [];
     const updatedSongs: SongMetadataSnapshot[] = [];
     const tagWritePayloads: TagWritePayload[] = [];
@@ -143,7 +214,8 @@ export class MetadataApplyService {
 
       const payloadTags: Partial<TagWritePayload> = {
         filePath: match.songPath,
-        album: albumTitle
+        album: albumTitle,
+        artworkBuffer
       };
 
       const updatedSnapshot: SongMetadataSnapshot = {
@@ -238,8 +310,12 @@ export class MetadataApplyService {
         for (const snap of updatedSongs) {
           await this.dbUpdater(snap.songId, {
             title: snap.title,
+            artist: snap.artist,
+            album: snap.album,
+            genre: snap.genre,
             year: snap.year,
-            trackNumber: snap.trackNumber
+            trackNumber: snap.trackNumber,
+            discNumber: snap.discNumber
           });
         }
       } else {
@@ -266,8 +342,12 @@ export class MetadataApplyService {
                 .where('songId', snap.songId)
                 .update({
                   title: snap.title,
+                  artists: snap.artist ? JSON.stringify([snap.artist]) : undefined,
+                  album: snap.album,
+                  genres: snap.genre ? JSON.stringify([snap.genre]) : undefined,
                   year: snap.year,
                   trackNumber: snap.trackNumber,
+                  discNumber: snap.discNumber,
                   updatedAt: new Date()
                 });
             }
@@ -281,6 +361,8 @@ export class MetadataApplyService {
         id: `snap_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         timestamp: Date.now(),
         description: `AutoTag applied for ${albumTitle}`,
+        albumTitle,
+        songIds: updatedSongs.map((s) => s.songId),
         previousSongs,
         updatedSongs
       };

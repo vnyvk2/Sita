@@ -1,3 +1,7 @@
+import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
+import sharp from 'sharp';
+import { withFileHandle } from '../../utils/withFileHandle';
+
 export interface TagWritePayload {
   filePath: string;
   title?: string;
@@ -9,6 +13,7 @@ export interface TagWritePayload {
   genre?: string;
   isrc?: string;
   musicBrainzRecordingId?: string;
+  artworkBuffer?: Buffer;
 }
 
 export interface TagWriteResult {
@@ -27,7 +32,6 @@ export class TagWriterService {
         return { filePath: payload.filePath, success: false, error: 'Empty file path' };
       }
 
-      const { withFileHandle } = await import('../../utils/withFileHandle');
       await withFileHandle(payload.filePath, async (file) => {
         if (payload.title) file.tag.title = payload.title;
         if (payload.artist) file.tag.performers = [payload.artist];
@@ -35,6 +39,26 @@ export class TagWriterService {
         if (payload.genre) file.tag.genres = [payload.genre];
         if (payload.trackNumber !== undefined) file.tag.track = payload.trackNumber;
         if (payload.year !== undefined) file.tag.year = payload.year;
+
+        if (payload.artworkBuffer && payload.artworkBuffer.length > 0) {
+          try {
+            const jpegBuffer = await sharp(payload.artworkBuffer)
+              .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 85 })
+              .toBuffer();
+
+            if (jpegBuffer) {
+              const picture = Picture.fromData(ByteVector.fromByteArray(new Uint8Array(jpegBuffer)));
+              picture.mimeType = 'image/jpeg';
+              picture.type = PictureType.FrontCover;
+              picture.description = 'artwork';
+              file.tag.pictures = [picture];
+            }
+          } catch (artErr: unknown) {
+            console.warn(`[TagWriterService] Failed to embed artwork for ${payload.filePath}:`, artErr);
+          }
+        }
+
         file.save();
       });
 

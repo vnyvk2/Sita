@@ -1,7 +1,7 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
 import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
-import type { AlbumTagPreview, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
+import type { AlbumTagPreview, ApplyPreviewOptions, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
 
 const activeProgressListeners = new WeakSet<AlbumAutoTagService>();
@@ -36,9 +36,9 @@ export function registerMetadataHandlers(autoTagService: AlbumAutoTagService, ma
   );
 
   // 3. Apply Preview Updates
-  ipcMain.handle('metadata/applyPreview', async (_, preview: AlbumTagPreview, operationId = 'default') => {
+  ipcMain.handle('metadata/applyPreview', async (_, preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId = 'default') => {
     const signal = autoTagService.createAbortSignal(operationId);
-    return autoTagService.applyPreview(preview, signal, operationId);
+    return autoTagService.applyPreview(preview, options, signal, operationId);
   });
 
   // 4. Undo Last AutoTag Operation
