@@ -1,6 +1,6 @@
 import type { MatchCriterion, MetadataCandidate, RecordingMetadata } from '../models/RecordingMetadata';
 import type { TrackMatchPair, ScoreBreakdown } from '../services/AlbumMetadataService';
-import { MetadataNormalizer } from './MetadataNormalizer';
+import { MetadataNormalizer, type RecordingVariant } from './MetadataNormalizer';
 
 export interface LocalSongInput {
   songId: number;
@@ -34,10 +34,26 @@ export interface ReleaseContext {
 export const MIN_MATCH_SCORE = 50;
 
 export class TrackMatcher {
+  private static readonly VARIANT_PENALTY_TABLE: Record<RecordingVariant, number> = {
+    live: 30,
+    acoustic: 25,
+    remix: 40,
+    demo: 35,
+    instrumental: 45,
+    mono: 10,
+    stereo: 10,
+    'radio edit': 15,
+    'extended mix': 20,
+    unplugged: 25,
+    session: 20,
+    orchestral: 25,
+    'piano version': 25
+  };
+
   /**
    * Matches an array of local songs against official release tracks.
    * Enforces strict ONE-TO-ONE candidate assignment with MIN_MATCH_SCORE threshold (50 pts).
-   * Incorporates variant detection mismatch penalties, gradual duration decay, ISRC matching,
+   * Incorporates symmetric variant mismatch penalties, gradual duration decay, ISRC priority (100 pts),
    * deterministic tie-breaking, and MetadataNormalizer.
    */
   public matchTracks(
@@ -123,6 +139,13 @@ export class TrackMatcher {
       });
     }
 
+    // Sort assigned pairs sequentially by official track number for album sequence ordering
+    assignedPairs.sort((a, b) => {
+      const trackA = a.remoteTrack.recording.trackNumber ?? 0;
+      const trackB = b.remoteTrack.recording.trackNumber ?? 0;
+      return trackA - trackB;
+    });
+
     return assignedPairs;
   }
 
@@ -151,28 +174,40 @@ export class TrackMatcher {
       };
     }
 
-    // Priority 2: ISRC exact match (90 points)
+    // Priority 2: ISRC exact match (100 points - official recording identifier)
     if (song.isrc && track.isrc && song.isrc.trim().toUpperCase() === track.isrc.trim().toUpperCase()) {
       return {
-        score: 90,
-        breakdown: { title: 0, artist: 0, duration: 0, mbid: 90, total: 90 },
+        score: 100,
+        breakdown: { title: 0, artist: 0, duration: 0, mbid: 100, total: 100 },
         matchedBy: ['title', 'artist'],
         reasons: ['isrc_exact_match']
       };
     }
 
-    const normSongTitle = MetadataNormalizer.normalizeTitle(song.title);
+    const normSongTitle = song.title ? MetadataNormalizer.normalizeTitle(song.title) : MetadataNormalizer.normalizeFilename(song.path);
     const normTrackTitle = MetadataNormalizer.normalizeTitle(track.title);
 
-    // Variant detection & penalty calculation
+    // Symmetric Variant Penalty Calculation
     const songVariants = MetadataNormalizer.extractVariants(song.title);
     const trackVariants = MetadataNormalizer.extractVariants(track.title);
+
     let variantPenalty = 0;
 
+    // Check variants in song but not in track
     for (const sv of songVariants) {
       if (!trackVariants.has(sv)) {
-        variantPenalty += 30; // -30 penalty for variant mismatch (Live vs Studio, Acoustic, etc.)
+        const penalty = TrackMatcher.VARIANT_PENALTY_TABLE[sv] ?? 25;
+        variantPenalty += penalty;
         reasons.push(`variant_mismatch_${sv}`);
+      }
+    }
+
+    // Check variants in track but not in song
+    for (const tv of trackVariants) {
+      if (!songVariants.has(tv)) {
+        const penalty = TrackMatcher.VARIANT_PENALTY_TABLE[tv] ?? 25;
+        variantPenalty += penalty;
+        reasons.push(`variant_mismatch_${tv}`);
       }
     }
 

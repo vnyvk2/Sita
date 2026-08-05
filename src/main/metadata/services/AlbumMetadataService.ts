@@ -8,6 +8,7 @@ export interface LocalSongInput {
   album?: string;
   path: string;
   duration?: number;
+  isrc?: string;
   musicBrainzRecordingId?: string;
 }
 
@@ -69,6 +70,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
   /**
    * Stage 4 & 5 — Match Songs & Detect Ambiguities -> Stage 6 — Preview
+   * Incorporates Album Sequence Continuity Assistance (MusicBee Feature).
    */
   public async buildAlbumMatch(
     localSongs: LocalSongInput[],
@@ -85,12 +87,34 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     }>
   ): Promise<AlbumPreview> {
     // Run 1-to-1 TrackMatcher assignment
-    const trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {
+    let trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {
       albumTitle: album.title,
       discCount: album.discCount,
       trackCount: album.trackCount,
       releaseType: album.releaseType
     });
+
+    // Album Sequence Continuity Assistance (MusicBee Feature)
+    const highConfidenceCount = trackList.filter((t) => t.confidence >= 0.90).length;
+    const isHighAlbumAgreement = trackList.length > 0 && highConfidenceCount / trackList.length >= 0.65;
+
+    if (isHighAlbumAgreement && trackList.length >= 3) {
+      trackList = trackList.map((pair, idx) => {
+        if (pair.confidence < 0.90 && idx > 0 && idx < trackList.length - 1) {
+          const prevPair = trackList[idx - 1];
+          const nextPair = trackList[idx + 1];
+          if (prevPair.confidence >= 0.90 && nextPair.confidence >= 0.90) {
+            const boostedConfidence = Math.min(0.95, pair.confidence + 0.15);
+            return {
+              ...pair,
+              confidence: boostedConfidence,
+              reasons: [...pair.reasons, 'album_sequence_continuity_boost']
+            };
+          }
+        }
+        return pair;
+      });
+    }
 
     const warnings: string[] = [];
     let totalConfidence = 0;
