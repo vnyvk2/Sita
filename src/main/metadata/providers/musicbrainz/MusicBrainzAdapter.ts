@@ -13,9 +13,12 @@ import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzRelease
 export interface MusicBrainzAdapterOptions {
   matcher?: MetadataMatcher;
   cache?: IdentityResolutionCache;
+  priority?: number;
 }
 
 export class MusicBrainzAdapter implements IMetadataProviderAdapter {
+  public readonly priority: number;
+
   public readonly identity: ProviderIdentity = {
     id: 'musicbrainz',
     name: 'MusicBrainz Provider',
@@ -42,6 +45,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
 
   constructor(apiClient: MusicBrainzApiClient, options?: MusicBrainzAdapterOptions) {
     this.apiClient = apiClient;
+    this.priority = options?.priority ?? 100;
     this.matcher = options?.matcher ?? new MetadataMatcher(0.35);
     this.cache = options?.cache;
   }

@@ -9,7 +9,7 @@ import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
-import type { AlbumMetadata } from '../../models/RecordingMetadata';
+import { ProviderState } from '../../contracts/ProviderStatus';
 
 describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider Runtime Suite', () => {
   it('maps confidence scores to confidence levels cleanly via getConfidenceLevel helper', () => {
@@ -54,24 +54,26 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
     expect(albums).toEqual([]);
   });
 
-  it('tolerates provider failures: when Provider 1 throws, Provider 2 succeeds cleanly', async () => {
+  it('tracks health status per provider independently in getProviderStatus', async () => {
     const failingAdapter: IMetadataProviderAdapter = {
+      priority: 200,
       identity: { id: 'discogs', name: 'Discogs Provider', version: '1.0.0', providerType: 'online' },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
       search: vi.fn(),
-      searchAlbums: vi.fn().mockRejectedValue(new Error('Network Timeout'))
+      searchAlbums: vi.fn().mockRejectedValue(new Error('Rate limit exceeded'))
     };
 
     const successfulAdapter: IMetadataProviderAdapter = {
+      priority: 100,
       identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
       search: vi.fn(),
       searchAlbums: vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', releaseId: 'mb-sour', provider: 'musicbrainz' }
+        { title: 'SOUR', artist: 'Olivia Rodrigo', releaseId: 'mb-sour', provider: 'musicbrainz', year: 2021 }
       ])
     };
 
@@ -81,7 +83,50 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
 
     const albums = await service.search('SOUR', 'Olivia Rodrigo');
     expect(albums).toHaveLength(1);
-    expect(albums[0].releaseId).toBe('mb-sour');
+
+    const mbStatus = runtime.getProviderStatus('musicbrainz');
+    const discogsStatus = runtime.getProviderStatus('discogs');
+
+    expect(mbStatus?.state).toBe(ProviderState.Healthy);
+    expect(discogsStatus?.consecutiveFailures).toBe(1);
+  });
+
+  it('prevents accidental duplicate provider registrations unless overwrite=true', () => {
+    const adapter: IMetadataProviderAdapter = {
+      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      capabilities: new ProviderCapabilities([ProviderCapability.Search]),
+      supports: () => true,
+      lookup: vi.fn(),
+      search: vi.fn()
+    };
+
+    const runtime = new MetadataProviderRuntime(adapter);
+    expect(() => runtime.registerProvider(adapter)).toThrowError(/already registered/);
+    expect(() => runtime.registerProvider(adapter, true)).not.toThrow();
+  });
+
+  it('preserves distinct release years during deduplication (title::artist::year)', async () => {
+    const adapter: IMetadataProviderAdapter = {
+      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      capabilities: new ProviderCapabilities([ProviderCapability.Search]),
+      supports: () => true,
+      lookup: vi.fn(),
+      search: vi.fn(),
+      searchAlbums: vi.fn().mockResolvedValue([
+        { title: 'Greatest Hits', artist: 'Artist', year: 1995, releaseId: 'rel-1995' },
+        { title: 'Greatest Hits', artist: 'Artist', year: 2005, releaseId: 'rel-2005' },
+        { title: 'Greatest Hits', artist: 'Artist', year: 1995, releaseId: 'rel-dup' }
+      ])
+    };
+
+    const runtime = new MetadataProviderRuntime(adapter);
+    await runtime.initialize();
+    const service = new AlbumMetadataService(runtime);
+
+    const albums = await service.search('Greatest Hits', 'Artist');
+    // Keeps 1995 and 2005 distinct, deduplicates duplicate 1995
+    expect(albums).toHaveLength(2);
+    expect(albums.map((a) => a.year)).toEqual([1995, 2005]);
   });
 
   it('executes full end-to-end provider pipeline: search -> resolve -> cache hit -> build match', async () => {

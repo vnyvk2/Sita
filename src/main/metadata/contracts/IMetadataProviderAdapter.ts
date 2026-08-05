@@ -13,6 +13,7 @@ export interface IProviderLifecycle {
 export interface IMetadataProviderAdapter {
   readonly identity: ProviderIdentity;
   readonly capabilities: ProviderCapabilities;
+  readonly priority?: number;
 
   supports(capability: ProviderCapability): boolean;
 
