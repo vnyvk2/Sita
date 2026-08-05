@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAlbumAutoTag } from '../../hooks/useAlbumAutoTag';
 import { ReleaseSearchPanel } from './ReleaseSearchPanel';
 import { AutoTagPreviewTable } from './AutoTagPreviewTable';
@@ -19,39 +20,32 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
   localSongs,
   initialAlbumName = '',
   initialArtistName = '',
-  operationId: sessionOperationId,
+  operationId,
   onClose
 }) => {
-  // Session-owned operationId generated on open/session change
-  const [operationId, setOperationId] = useState(() => sessionOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`));
   const { state, actions } = useAlbumAutoTag(operationId);
-
   const [showErrorDetails, setShowErrorDetails] = useState(false);
   const previousFocusRef = useRef<Element | null>(null);
 
-  // Focus preservation & restoration
+  // Focus preservation
   useEffect(() => {
     if (isOpen) {
       previousFocusRef.current = document.activeElement;
-      // Generate a fresh session operationId on open
-      const newOpId = sessionOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`);
-      setOperationId(newOpId);
       setShowErrorDetails(false);
     }
-  }, [isOpen, sessionOperationId]);
+  }, [isOpen]);
 
-  // Unified Close Handler with focus restoration
+  // Unified Close Handler with requestAnimationFrame focus restoration
   const handleClose = () => {
     actions.reset();
     onClose();
 
-    // Focus restoration safety check
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const prev = previousFocusRef.current;
       if (prev instanceof HTMLElement && document.contains(prev)) {
         prev.focus();
       }
-    }, 50);
+    });
   };
 
   // Keyboard Accessibility (ESC key close)
@@ -78,7 +72,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={handleClose}
       style={{
@@ -262,6 +256,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -5,6 +5,7 @@ import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
 // ? MAIN APP COMPONENTS
 import ErrorBoundary from './components/ErrorBoundary';
+import { AlbumAutoTagDialog } from './components/autotag/AlbumAutoTagDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';
@@ -357,9 +358,33 @@ export default function App() {
     updateEqualizerOptions
   ]);
 
+  const [autoTagState, setAutoTagState] = useState<{
+    isOpen: boolean;
+    songs: any[];
+    albumName?: string;
+    artistName?: string;
+  }>({ isOpen: false, songs: [] });
+
+  const openAutoTagDialog = useCallback((songs: any[], albumName?: string, artistName?: string) => {
+    setAutoTagState({ isOpen: true, songs, albumName, artistName });
+  }, []);
+
+  const closeAutoTagDialog = useCallback(() => {
+    setAutoTagState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const extendedAppUpdateContextValues = useMemo(
+    () => ({
+      ...appUpdateContextValues,
+      openAutoTagDialog,
+      closeAutoTagDialog
+    }),
+    [appUpdateContextValues, openAutoTagDialog, closeAutoTagDialog]
+  );
+
   return (
     <ErrorBoundary>
-      <AppUpdateContext.Provider value={appUpdateContextValues}>
+      <AppUpdateContext.Provider value={extendedAppUpdateContextValues}>
         <div
           className="main-app bg-background-color-1 dark:bg-dark-background-color-1 relative h-screen! min-h-screen w-full overflow-hidden"
           ref={AppRef}
@@ -372,6 +397,13 @@ export default function App() {
           onDrop={windowManagement.onSongDrop}
         >
           <Outlet />
+          <AlbumAutoTagDialog
+            isOpen={autoTagState.isOpen}
+            localSongs={autoTagState.songs}
+            initialAlbumName={autoTagState.albumName}
+            initialArtistName={autoTagState.artistName}
+            onClose={closeAutoTagDialog}
+          />
         </div>
       </AppUpdateContext.Provider>
       {/* <TanStackRouterDevtools position="bottom-right" /> */}

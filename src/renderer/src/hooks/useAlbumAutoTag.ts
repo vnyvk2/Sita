@@ -9,6 +9,8 @@ import type {
   TrackMatchPreview
 } from '../../../common/metadata/types';
 import { metadataApi } from '../services/metadataApi';
+import { albumQuery } from '../queries/albums';
+import { songQuery } from '../queries/songs';
 
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
 export type PreviewFilterOption = 'all' | 'changed' | 'low_confidence' | 'warnings';
@@ -52,7 +54,7 @@ export interface UseAlbumAutoTagActions {
   reset: () => void;
 }
 
-export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?: () => void) {
+export function useAlbumAutoTag(initialOperationId?: string) {
   const [operationId] = useState(() => initialOperationId ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}`));
   const [step, setStep] = useState<AutoTagStep>('search');
   const [stage, setStage] = useState<AutoTagStage>('idle');
@@ -87,6 +89,18 @@ export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?:
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [operationId]);
+
+  const invalidateQueriesSafely = useCallback(() => {
+    try {
+      const { queryClient } = require('../index');
+      if (queryClient && typeof queryClient.invalidateQueries === 'function') {
+        queryClient.invalidateQueries({ queryKey: albumQuery._def });
+        queryClient.invalidateQueries({ queryKey: songQuery._def });
+      }
+    } catch {
+      // In Vitest standalone environment, ignore missing index module
+    }
+  }, []);
 
   // Actions
   const searchReleases = useCallback(async (album: string, artist?: string) => {
@@ -171,8 +185,8 @@ export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?:
         setStep('complete');
         setCanUndo(true);
 
-        // Targeted Query Invalidation ON SUCCESS ONLY
-        if (onQueryInvalidate) onQueryInvalidate();
+        // Directly invalidate TanStack Query cache ON SUCCESS ONLY
+        invalidateQueriesSafely();
 
         return true;
       } else {
@@ -186,7 +200,7 @@ export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?:
     } finally {
       setLoading(false);
     }
-  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, operationId, onQueryInvalidate]);
+  }, [preview, selectedTrackIds, selectedFieldMap, userEditedValues, operationId, invalidateQueriesSafely]);
 
   const undoLastAutoTag = useCallback(async (): Promise<boolean> => {
     setLoading(true);
@@ -196,8 +210,8 @@ export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?:
         setCanUndo(false);
         setLastRestoredCount(res.restoredCount);
 
-        // Targeted Query Invalidation ON UNDO SUCCESS ONLY
-        if (onQueryInvalidate) onQueryInvalidate();
+        // Directly invalidate TanStack Query cache ON UNDO SUCCESS ONLY
+        invalidateQueriesSafely();
 
         return true;
       }
@@ -209,7 +223,7 @@ export function useAlbumAutoTag(initialOperationId?: string, onQueryInvalidate?:
     } finally {
       setLoading(false);
     }
-  }, [operationId, onQueryInvalidate]);
+  }, [operationId, invalidateQueriesSafely]);
 
   const cancel = useCallback(() => {
     metadataApi.cancelAutoTag(operationId);

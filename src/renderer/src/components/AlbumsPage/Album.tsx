@@ -31,7 +31,8 @@ export const Album = (props: AlbumProp) => {
     updateQueueData,
     addNewNotifications,
     updateMultipleSelections,
-    toggleMultipleSelections
+    toggleMultipleSelections,
+    openAutoTagDialog
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -257,15 +258,9 @@ export const Album = (props: AlbumProp) => {
         label: 'Auto Tag Album',
         iconName: 'auto_awesome',
         handlerFunction: () => {
-          window.dispatchEvent(
-            new CustomEvent('nora:open-autotag', {
-              detail: {
-                songs: props.songs,
-                albumName: props.title,
-                artistName: props.artists?.[0]?.name
-              }
-            })
-          );
+          if (openAutoTagDialog) {
+            openAutoTagDialog(props.songs, props.title, props.artists?.[0]?.name);
+          }
         }
       },
       {

@@ -83,7 +83,8 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
     toggleIsFavorite,
     toggleMultipleSelections,
     updateMultipleSelections,
-    createQueue
+    createQueue,
+    openAutoTagDialog
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -414,15 +415,13 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
         class: 'auto-tag',
         iconName: 'auto_awesome',
         handlerFunction: () => {
-          window.dispatchEvent(
-            new CustomEvent('nora:open-autotag', {
-              detail: {
-                songs: [{ songId, title, artist: artists?.[0]?.name, album: album?.title, path }],
-                albumName: album?.title ?? title,
-                artistName: artists?.[0]?.name
-              }
-            })
-          );
+          if (openAutoTagDialog) {
+            openAutoTagDialog(
+              [{ songId, title, artist: artists?.[0]?.name, album: album?.title, path }],
+              album?.title ?? title,
+              artists?.[0]?.name
+            );
+          }
         }
       },
       {

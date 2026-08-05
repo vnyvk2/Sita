@@ -37,6 +37,8 @@ export interface AppUpdateContextType {
   updateVolume: (volume: number) => void;
   updateSongPosition: (position: number) => void;
   updateEqualizerOptions: (options: Equalizer) => void;
+  openAutoTagDialog?: (songs: any[], albumName?: string, artistName?: string) => void;
+  closeAutoTagDialog?: () => void;
   createQueue: (
     songIds: number[],
     queueType: QueueTypes,

@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import Img from '../Img';
@@ -11,6 +12,8 @@ const AlbumImgAndInfoContainer = (props: Props) => {
   const { t } = useTranslation();
 
   const { albumData, songsData } = props;
+
+  const { openAutoTagDialog } = useContext(AppUpdateContext);
 
   const albumDuration = useMemo(
     () =>
@@ -75,15 +78,9 @@ const AlbumImgAndInfoContainer = (props: Props) => {
               {albumData.year && <div className="album-year">{albumData.year}</div>}
               <button
                 onClick={() => {
-                  window.dispatchEvent(
-                    new CustomEvent('nora:open-autotag', {
-                      detail: {
-                        songs: songsData,
-                        albumName: albumData.title,
-                        artistName: albumData.artists?.[0]?.name
-                      }
-                    })
-                  );
+                  if (openAutoTagDialog) {
+                    openAutoTagDialog(songsData, albumData.title, albumData.artists?.[0]?.name);
+                  }
                 }}
                 className="mt-3 flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-blue-500 hover:to-indigo-500 cursor-pointer"
               >
