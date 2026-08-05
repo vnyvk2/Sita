@@ -1,5 +1,5 @@
 // ? BASE IMPORTS
-import { lazy, useCallback, useEffect, useMemo, useRef } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
