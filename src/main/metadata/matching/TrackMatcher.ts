@@ -37,7 +37,18 @@ export interface ReleaseContext {
 
 export const MIN_MATCH_SCORE = 50;
 
+export const DURATION_THRESHOLDS = [
+  { maxDiff: 0.5, score: 30 },
+  { maxDiff: 1.0, score: 29 },
+  { maxDiff: 2.0, score: 27 },
+  { maxDiff: 5.0, score: 20 },
+  { maxDiff: 10.0, score: 10 },
+  { maxDiff: 20.0, score: 5 }
+];
+
 export class TrackMatcher {
+  private static readonly MAX_VARIANT_PENALTY = 50; // Capped maximum total variant penalty
+
   private static readonly VARIANT_PENALTY_TABLE: Record<RecordingVariant, number> = {
     live: 30,
     acoustic: 25,
@@ -56,9 +67,8 @@ export class TrackMatcher {
 
   /**
    * Matches an array of local songs against official release tracks.
+   * Keyed duplicate candidate tracking on title + artist.
    * Enforces strict ONE-TO-ONE candidate assignment with MIN_MATCH_SCORE threshold (50 pts).
-   * Incorporates album scoring (+15), year bonus (+5), curved duration decay, ISRC=100pts priority,
-   * duplicate local candidate warnings, and why explanations.
    */
   public matchTracks(
     localSongs: LocalSongInput[],
@@ -66,11 +76,11 @@ export class TrackMatcher {
     officialTracks: OfficialTrackInput[],
     releaseContext?: ReleaseContext
   ): TrackMatchPair[] {
-    // Detect duplicate local titles
-    const titleCounts = new Map<string, number>();
+    // Detect duplicate local candidates keyed on normalized title + artist
+    const titleArtistCounts = new Map<string, number>();
     for (const song of localSongs) {
-      const norm = MetadataNormalizer.normalizeTitle(song.title);
-      titleCounts.set(norm, (titleCounts.get(norm) ?? 0) + 1);
+      const key = `${MetadataNormalizer.normalizeTitle(song.title)}::${MetadataNormalizer.normalizeArtist(song.artist ?? '')}`;
+      titleArtistCounts.set(key, (titleArtistCounts.get(key) ?? 0) + 1);
     }
 
     interface PairScore {
@@ -85,7 +95,8 @@ export class TrackMatcher {
     const allPairs: PairScore[] = [];
 
     for (const song of localSongs) {
-      const isDuplicateTitle = (titleCounts.get(MetadataNormalizer.normalizeTitle(song.title)) ?? 0) > 1;
+      const key = `${MetadataNormalizer.normalizeTitle(song.title)}::${MetadataNormalizer.normalizeArtist(song.artist ?? '')}`;
+      const isDuplicateTitle = (titleArtistCounts.get(key) ?? 0) > 1;
 
       for (const track of officialTracks) {
         const { score, breakdown, matchedBy, reasons } = this.scorePair(song, track, releaseContext);
@@ -103,7 +114,7 @@ export class TrackMatcher {
       if (b.score !== a.score) return b.score - a.score;
       if (b.breakdown.title !== a.breakdown.title) return b.breakdown.title - a.breakdown.title;
       if (b.breakdown.artist !== a.breakdown.artist) return b.breakdown.artist - a.breakdown.artist;
-      if (b.breakdown.album !== a.breakdown.album) return b.breakdown.album - a.breakdown.album;
+      if ((b.breakdown.album ?? 0) !== (a.breakdown.album ?? 0)) return (b.breakdown.album ?? 0) - (a.breakdown.album ?? 0);
       if (b.breakdown.duration !== a.breakdown.duration) return b.breakdown.duration - a.breakdown.duration;
       return a.track.trackNumber - b.track.trackNumber;
     });
@@ -148,20 +159,38 @@ export class TrackMatcher {
         }
       };
 
-      // Construct human-readable "why" match explanation
+      // Construct rich human-readable "why" match explanation from reasons
       const whyParts: string[] = [];
-      if (pair.breakdown.mbid > 0) whyParts.push('MBID/ISRC Match');
-      if (pair.breakdown.title > 0) whyParts.push('Title');
-      if (pair.breakdown.artist > 0) whyParts.push('Artist');
-      if (pair.breakdown.album > 0) whyParts.push('Album');
-      if (pair.breakdown.duration > 0) whyParts.push('Duration');
-      if (pair.breakdown.year > 0) whyParts.push('Year');
-      const why = whyParts.length > 0 ? whyParts.join(', ') : 'Matched Criteria';
+      if (pair.reasons.includes('mbid_exact_match')) whyParts.push('✓ Exact MBID Match');
+      else if (pair.reasons.includes('isrc_exact_match')) whyParts.push('✓ Exact ISRC Match');
+      else {
+        if (pair.breakdown.title > 0) whyParts.push('✓ Title Match');
+        if (pair.breakdown.artist > 0) whyParts.push('✓ Artist Match');
+        if (pair.breakdown.album && pair.breakdown.album > 0) whyParts.push('✓ Album Match');
+        if (pair.breakdown.duration > 0) whyParts.push('✓ Duration Match');
+        if (pair.breakdown.year && pair.breakdown.year > 0) whyParts.push('✓ Year Match');
+      }
+
+      if (pair.reasons.some((r) => r.startsWith('variant_mismatch'))) {
+        whyParts.push('⚠ Variant Mismatch');
+      }
+      if (pair.reasons.includes('duplicate_local_candidate')) {
+        whyParts.push('⚠ Duplicate Candidate');
+      }
+
+      const why = whyParts.length > 0 ? whyParts.join(' | ') : 'Matched Criteria';
+
+      let confidenceLevel: TrackMatchPair['confidenceLevel'] = 'Poor';
+      if (normalizedScore >= 0.95) confidenceLevel = 'Excellent';
+      else if (normalizedScore >= 0.90) confidenceLevel = 'Very Good';
+      else if (normalizedScore >= 0.80) confidenceLevel = 'Good';
+      else if (normalizedScore >= 0.70) confidenceLevel = 'Review';
 
       assignedPairs.push({
         localSong: pair.localSong,
         remoteTrack: candidate,
         confidence: normalizedScore,
+        confidenceLevel,
         scoreBreakdown: pair.breakdown,
         why,
         matchedBy: pair.matchedBy,
@@ -193,7 +222,7 @@ export class TrackMatcher {
     const matchedBy: MatchCriterion[] = [];
     const reasons: string[] = [];
 
-    // Priority 1: MBID exact match (100 points - perfect)
+    // MBID/ISRC are authoritative. Never combine with heuristic scoring.
     if (
       song.musicBrainzRecordingId &&
       track.musicBrainzRecordingId &&
@@ -207,7 +236,7 @@ export class TrackMatcher {
       };
     }
 
-    // Priority 2: ISRC exact match (100 points - official recording identifier)
+    // MBID/ISRC are authoritative. Never combine with heuristic scoring.
     if (song.isrc && track.isrc && song.isrc.trim().toUpperCase() === track.isrc.trim().toUpperCase()) {
       return {
         score: 100,
@@ -225,25 +254,27 @@ export class TrackMatcher {
     const normSongTitle = MetadataNormalizer.normalizeTitle(effectiveSongTitle);
     const normTrackTitle = MetadataNormalizer.normalizeTitle(track.title);
 
-    // Symmetric Variant Penalty Calculation
+    // Symmetric Variant Penalty Calculation (Capped at MAX_VARIANT_PENALTY = 50)
     const songVariants = MetadataNormalizer.extractVariants(effectiveSongTitle);
     const trackVariants = MetadataNormalizer.extractVariants(track.title);
 
-    let variantPenalty = 0;
+    let rawVariantPenalty = 0;
     for (const sv of songVariants) {
       if (!trackVariants.has(sv)) {
         const penalty = TrackMatcher.VARIANT_PENALTY_TABLE[sv] ?? 25;
-        variantPenalty += penalty;
+        rawVariantPenalty += penalty;
         reasons.push(`variant_mismatch_${sv}`);
       }
     }
     for (const tv of trackVariants) {
       if (!songVariants.has(tv)) {
         const penalty = TrackMatcher.VARIANT_PENALTY_TABLE[tv] ?? 25;
-        variantPenalty += penalty;
+        rawVariantPenalty += penalty;
         reasons.push(`variant_mismatch_${tv}`);
       }
     }
+
+    const variantPenalty = Math.min(TrackMatcher.MAX_VARIANT_PENALTY, rawVariantPenalty);
 
     // Title match (up to 50 points)
     if (normSongTitle === normTrackTitle) {
@@ -267,18 +298,18 @@ export class TrackMatcher {
       }
     }
 
-    // Album match (+15 points exact / +10 points partial)
+    // Album match (+10 points exact / +5 points partial — safer balance)
     const effectiveAlbum = song.album ?? releaseContext?.albumTitle;
     const targetAlbum = track.album ?? releaseContext?.albumTitle;
     if (effectiveAlbum && targetAlbum) {
       const normSongAlbum = MetadataNormalizer.normalizeAlbum(effectiveAlbum);
       const normTargetAlbum = MetadataNormalizer.normalizeAlbum(targetAlbum);
       if (normSongAlbum === normTargetAlbum) {
-        albumScore = 15;
+        albumScore = 10;
         matchedBy.push('album');
         reasons.push('exact_album_match');
       } else if (normSongAlbum.includes(normTargetAlbum) || normTargetAlbum.includes(normSongAlbum)) {
-        albumScore = 10;
+        albumScore = 5;
         matchedBy.push('album');
         reasons.push('partial_album_match');
       }
@@ -300,33 +331,21 @@ export class TrackMatcher {
       }
     }
 
-    // Curved duration decay scoring (up to 30 points)
+    // Configurable curved duration decay scoring (up to 30 points)
     if (song.duration && track.duration) {
       const diffSecs = Math.abs(song.duration - track.duration);
-      if (diffSecs <= 0.5) {
-        durationScore = 30;
-        matchedBy.push('duration');
-        reasons.push('exact_duration_match');
-      } else if (diffSecs <= 1.0) {
-        durationScore = 29;
-        matchedBy.push('duration');
-        reasons.push('close_duration_match');
-      } else if (diffSecs <= 2.0) {
-        durationScore = 27;
-        matchedBy.push('duration');
-        reasons.push('close_duration_match');
-      } else if (diffSecs <= 5.0) {
-        durationScore = 20;
-        matchedBy.push('duration_close');
-        reasons.push('close_duration_match');
-      } else if (diffSecs <= 10.0) {
-        durationScore = 10;
-        matchedBy.push('duration_close');
-        reasons.push('close_duration_match');
-      } else if (diffSecs <= 20.0) {
-        durationScore = 5;
-        matchedBy.push('duration_close');
-        reasons.push('close_duration_match');
+      for (const threshold of DURATION_THRESHOLDS) {
+        if (diffSecs <= threshold.maxDiff) {
+          durationScore = threshold.score;
+          if (threshold.maxDiff <= 2.0) {
+            matchedBy.push('duration');
+            reasons.push('exact_duration_match');
+          } else {
+            matchedBy.push('duration_close');
+            reasons.push('close_duration_match');
+          }
+          break;
+        }
       }
     }
 

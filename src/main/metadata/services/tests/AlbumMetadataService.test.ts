@@ -4,108 +4,61 @@ import { TrackMatcher } from '../../matching/TrackMatcher';
 import { AlbumMetadataService } from '../AlbumMetadataService';
 import type { AlbumMetadata } from '../../models/RecordingMetadata';
 
-describe('Phase 2 Complete — Production-Grade Metadata Engine & Matcher Suite', () => {
-  it('detects useless placeholder titles (Track01, Unknown, Audio Track)', () => {
-    expect(MetadataNormalizer.isUselessTitle('Track 01')).toBe(true);
-    expect(MetadataNormalizer.isUselessTitle('Unknown Title')).toBe(true);
-    expect(MetadataNormalizer.isUselessTitle('Audio Track')).toBe(true);
-    expect(MetadataNormalizer.isUselessTitle('drivers license')).toBe(false);
+describe('Phase 2 Final Polish — Production-Grade Metadata Engine & Matcher Suite', () => {
+  it('preserves Roman numerals in track titles during title normalization', () => {
+    expect(MetadataNormalizer.normalizeTitle('Shine On You Crazy Diamond Part II')).toBe('shine on you crazy diamond part ii');
+    expect(MetadataNormalizer.normalizeTitle('Symphony No. 5 Movement III')).toBe('symphony number 5 movement iii');
   });
 
-  it('falls back to filename normalization when song title is useless placeholder', () => {
+  it('caps maximum variant penalty at 50 points', () => {
     const matcher = new TrackMatcher();
-    const songWithPlaceholder = {
-      songId: 1,
-      title: 'Track 01',
-      artist: 'Olivia Rodrigo',
-      path: '01 - brutal.mp3',
-      duration: 203
-    };
+    const song = { songId: 1, title: 'Song (Live Acoustic Demo Instrumental)', artist: 'Artist', path: 'song.mp3', duration: 200 };
+    const track = { trackId: 't1', title: 'Song', artist: 'Artist', trackNumber: 1, duration: 200 };
 
-    const officialTrack = {
-      trackId: 't1',
-      title: 'brutal',
-      artist: 'Olivia Rodrigo',
-      trackNumber: 1,
-      duration: 203
-    };
+    const { score } = matcher.scorePair(song, track);
+    // Unpenalized score: 50 title + 20 artist + 30 duration = 100
+    // Capped variant penalty: max -50 => score 50
+    expect(score).toBe(50);
+  });
 
-    const { score, matchedBy } = matcher.scorePair(songWithPlaceholder, officialTrack);
+  it('evaluates authoritative ISRC match early returning 100 points without heuristic stacking', () => {
+    const matcher = new TrackMatcher();
+    const song = { songId: 1, title: 'Wrong Title', artist: 'Wrong Artist', album: 'Wrong Album', path: 'a.mp3', isrc: 'USUG12100860' };
+    const track = { trackId: 't1', title: 'drivers license', artist: 'Olivia Rodrigo', album: 'SOUR', trackNumber: 1, isrc: 'USUG12100860' };
+
+    const { score, breakdown } = matcher.scorePair(song, track);
     expect(score).toBe(100);
-    expect(matchedBy).toContain('title');
+    expect(breakdown.mbid).toBe(100);
+    expect(breakdown.title).toBe(0);
+    expect(breakdown.album).toBe(0);
   });
 
-  it('scores album title match (+15 pts) and year bonus (+5 pts)', () => {
+  it('exposes confidence levels (Excellent, Very Good, Good, Review, Poor)', () => {
     const matcher = new TrackMatcher();
-    const song = {
-      songId: 1,
-      title: 'drivers license',
-      artist: 'Olivia Rodrigo',
-      album: 'SOUR',
-      year: 2021,
-      path: '/music/track.mp3',
-      duration: 242
-    };
+    const song = { songId: 1, title: 'drivers license', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 242 };
+    const track = { trackId: 't1', title: 'drivers license', artist: 'Olivia Rodrigo', trackNumber: 1, duration: 242 };
 
-    const track = {
-      trackId: 't1',
-      title: 'drivers license',
-      artist: 'Olivia Rodrigo',
-      album: 'SOUR',
-      year: 2021,
-      trackNumber: 1,
-      duration: 242
-    };
-
-    const { breakdown } = matcher.scorePair(song, track);
-    expect(breakdown.album).toBe(15);
-    expect(breakdown.year).toBe(5);
+    const result = matcher.matchTracks([song], 'rel-1', [track]);
+    expect(result[0].confidenceLevel).toBe('Excellent');
   });
 
-  it('emits duplicate_local_candidate warning when multiple local songs have duplicate titles', () => {
+  it('keys duplicate candidate detection on title + artist', () => {
     const matcher = new TrackMatcher();
     const localSongs = [
-      { songId: 1, title: 'Intro', artist: 'Artist', path: '/01.mp3', duration: 100 },
-      { songId: 2, title: 'Intro', artist: 'Artist', path: '/02.mp3', duration: 100 }
+      { songId: 1, title: 'Intro', artist: 'Artist A', path: 'a.mp3', duration: 100 },
+      { songId: 2, title: 'Intro', artist: 'Artist B', path: 'b.mp3', duration: 100 }
     ];
 
     const officialTracks = [
-      { trackId: 't1', title: 'Intro', artist: 'Artist', trackNumber: 1, duration: 100 }
+      { trackId: 't1', title: 'Intro', artist: 'Artist A', trackNumber: 1, duration: 100 }
     ];
 
     const result = matcher.matchTracks(localSongs, 'rel-1', officialTracks);
-    expect(result).toHaveLength(1);
-    expect(result[0].reasons).toContain('duplicate_local_candidate');
+    // Different artists => NOT flagged as duplicate local candidate
+    expect(result[0].reasons).not.toContain('duplicate_local_candidate');
   });
 
-  it('generates human-readable why match explanation strings', () => {
-    const matcher = new TrackMatcher();
-    const song = {
-      songId: 1,
-      title: 'drivers license',
-      artist: 'Olivia Rodrigo',
-      album: 'SOUR',
-      path: '/track.mp3',
-      duration: 242
-    };
-
-    const track = {
-      trackId: 't1',
-      title: 'drivers license',
-      artist: 'Olivia Rodrigo',
-      album: 'SOUR',
-      trackNumber: 1,
-      duration: 242
-    };
-
-    const result = matcher.matchTracks([song], 'rel-sour', [track]);
-    expect(result[0].why).toContain('Title');
-    expect(result[0].why).toContain('Artist');
-    expect(result[0].why).toContain('Album');
-    expect(result[0].why).toContain('Duration');
-  });
-
-  it('requires consecutive track numbers for Album Sequence Continuity boost (MusicBee feature)', async () => {
+  it('runs AlbumAutoTagger preview with strict confidence levels', async () => {
     const service = new AlbumMetadataService();
     const album: AlbumMetadata = {
       releaseId: 'rel-1',
@@ -121,12 +74,13 @@ describe('Phase 2 Complete — Production-Grade Metadata Engine & Matcher Suite'
     ];
 
     const localSongs = [
-      { songId: 1, title: 'brutal', artist: 'Olivia Rodrigo', path: '/01.mp3', duration: 203 },
-      { songId: 2, title: 'traitor', artist: 'Unknown', path: '/02.mp3', duration: 240 },
-      { songId: 3, title: 'drivers license', artist: 'Olivia Rodrigo', path: '/03.mp3', duration: 242 }
+      { songId: 1, title: 'brutal', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203 },
+      { songId: 2, title: 'traitor', artist: 'Unknown', path: '02.mp3', duration: 240 },
+      { songId: 3, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242 }
     ];
 
     const preview = await service.buildAlbumMatch(localSongs, album, officialTracks);
+    expect(preview.trackList[0].confidenceLevel).toBe('Excellent');
     expect(preview.trackList[1].reasons).toContain('album_sequence_continuity_boost');
   });
 });

@@ -23,10 +23,13 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+export type ConfidenceLevel = 'Excellent' | 'Very Good' | 'Good' | 'Review' | 'Poor';
+
 export interface TrackMatchPair {
   localSong: LocalSongInput;
   remoteTrack: MetadataCandidate;
   confidence: number; // 0.0 to 1.0
+  confidenceLevel?: ConfidenceLevel;
   scoreBreakdown?: ScoreBreakdown;
   why?: string;
   matchedBy: MatchCriterion[];
@@ -74,7 +77,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
   /**
    * Stage 4 & 5 — Match Songs & Detect Ambiguities -> Stage 6 — Preview
-   * Incorporates Album Sequence Continuity Assistance (MusicBee Feature).
+   * Incorporates Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers).
    */
   public async buildAlbumMatch(
     localSongs: LocalSongInput[],
@@ -101,7 +104,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
       year: album.year
     });
 
-    // Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers)
+    // Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers and track matching)
     const highConfidenceCount = trackList.filter((t) => t.confidence >= 0.90).length;
     const isHighAlbumAgreement = trackList.length > 0 && highConfidenceCount / trackList.length >= 0.65;
 
@@ -122,9 +125,15 @@ export class AlbumMetadataService implements IAlbumMetadataService {
             currentTrackNo + 1 === nextTrackNo
           ) {
             const boostedConfidence = Math.min(0.95, pair.confidence + 0.15);
+            let confidenceLevel: ConfidenceLevel = 'Review';
+            if (boostedConfidence >= 0.95) confidenceLevel = 'Excellent';
+            else if (boostedConfidence >= 0.90) confidenceLevel = 'Very Good';
+            else if (boostedConfidence >= 0.80) confidenceLevel = 'Good';
+
             return {
               ...pair,
               confidence: boostedConfidence,
+              confidenceLevel,
               reasons: [...pair.reasons, 'album_sequence_continuity_boost']
             };
           }
@@ -139,7 +148,7 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     for (const pair of trackList) {
       totalConfidence += pair.confidence;
       if (pair.reasons.includes('duplicate_local_candidate')) {
-        warnings.push(`Duplicate local track title detected for "${pair.localSong.title}". Manual verification recommended.`);
+        warnings.push(`Duplicate local track title/artist detected for "${pair.localSong.title}". Manual verification recommended.`);
       }
       if (pair.confidence < 0.75) {
         warnings.push(`Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Manual review required.`);
