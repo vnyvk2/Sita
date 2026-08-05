@@ -110,18 +110,19 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   const pathExt = useMemo(() => window.api.utils.getExtension(songPath), [songPath]);
 
   const isMetadataEditingSupported = useMemo(() => {
+    // Local metadata overrides (Phase 10) support all audio formats (m4a, mp3, flac, wav, etc.) for library songs
+    if (songId) return true;
     const isASupportedFormat = metadataEditingSupportedExtensions.includes(pathExt);
 
     return isASupportedFormat;
-  }, [pathExt]);
+  }, [songId, pathExt]);
 
   const getSongId3Tags = useCallback(() => {
-    if (songId)
+    if (songId) {
       window.api.songUpdates
         .getSongId3Tags(isKnownSource ? String(songId) : songPath, isKnownSource)
         .then((res) => {
           if (res) {
-            console.log(res);
             const data = {
               ...res,
               title: res.title
@@ -130,31 +131,51 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
             setDefaultValues(data);
             setSongInfo(data);
             setIsMetadataUpdatesPending(!!data.isMetadataSavePending);
-
-            if (songId) {
-              window.api.metadata
-                .load({ entityKind: 'song', entityId: songId })
-                .then((merged) => {
-                  if (merged?.fields) {
-                    setSongInfo((prev) => ({
-                      ...prev,
-                      title: (merged.fields.title?.value as string) ?? prev.title,
-                      composer: (merged.fields.composer?.value as string) ?? prev.composer,
-                      comment: (merged.fields.comment?.value as string) ?? prev.comment,
-                      language: (merged.fields.language?.value as string) ?? prev.language,
-                      discNumber: (merged.fields.discNumber?.value as number) ?? prev.discNumber,
-                      rating: (merged.fields.rating?.value as number) ?? prev.rating,
-                      tags: (merged.fields.tags?.value as string[]) ?? prev.tags
-                    }));
-                  }
-                  return undefined;
-                })
-                .catch((err) => console.error('[SongTagsEditingPage] Metadata override load error:', err));
-            }
           }
           return undefined;
         })
-        .catch((err) => console.error(err));
+        .catch((err) => {
+          console.warn('[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:', err);
+          return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
+            if (songs?.[0]) {
+              const song = songs[0];
+              const fallbackData: SongInfo = {
+                title: song.title,
+                artists: song.artists,
+                album: song.album,
+                genres: song.genres,
+                trackNumber: song.trackNumber,
+                year: song.year,
+                artworkPath: song.artworkPaths?.artworkPath
+              };
+              setDefaultValues(fallbackData);
+              setSongInfo(fallbackData);
+            }
+          });
+        })
+        .finally(() => {
+          if (songId) {
+            window.api.metadata
+              .load({ entityKind: 'song', entityId: songId })
+              .then((merged) => {
+                if (merged?.fields) {
+                  setSongInfo((prev) => ({
+                    ...prev,
+                    title: (merged.fields.title?.value as string) ?? prev.title,
+                    composer: (merged.fields.composer?.value as string) ?? prev.composer,
+                    comment: (merged.fields.comment?.value as string) ?? prev.comment,
+                    language: (merged.fields.language?.value as string) ?? prev.language,
+                    discNumber: (merged.fields.discNumber?.value as number) ?? prev.discNumber,
+                    rating: (merged.fields.rating?.value as number) ?? prev.rating,
+                    tags: (merged.fields.tags?.value as string[]) ?? prev.tags
+                  }));
+                }
+                return undefined;
+              })
+              .catch((err) => console.error('[SongTagsEditingPage] Metadata override load error:', err));
+          }
+        });
+    }
   }, [isKnownSource, songId, songPath]);
 
   const handleResetField = useCallback(

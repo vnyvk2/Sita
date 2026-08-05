@@ -32,8 +32,9 @@ import { Route as MainPlayerGenresGenreIdRouteImport } from './routes/main-playe
 import { Route as MainPlayerFoldersFolderPathRouteImport } from './routes/main-player/folders/$folderPath'
 import { Route as MainPlayerArtistsArtistIdRouteImport } from './routes/main-player/artists/$artistId'
 import { Route as MainPlayerAlbumsAlbumIdRouteImport } from './routes/main-player/albums/$albumId'
+import { Route as MainPlayerSongsSongIdIndexRouteImport } from './routes/main-player/songs/$songId/index'
 import { Route as MainPlayerSearchAllIndexRouteImport } from './routes/main-player/search/all/index'
-import { Route as MainPlayerSongsSongIdEditRouteImport } from './routes/main-player/songs/$songId.edit'
+import { Route as MainPlayerSongsSongIdEditRouteImport } from './routes/main-player/songs/$songId/edit'
 import { Route as MainPlayerLyricsEditorSongIdRouteImport } from './routes/main-player/lyrics/editor/$songId'
 
 const MainPlayerRouteRoute = MainPlayerRouteRouteImport.update({
@@ -157,6 +158,12 @@ const MainPlayerAlbumsAlbumIdRoute = MainPlayerAlbumsAlbumIdRouteImport.update({
   path: '/albums/$albumId',
   getParentRoute: () => MainPlayerRouteRoute,
 } as any)
+const MainPlayerSongsSongIdIndexRoute =
+  MainPlayerSongsSongIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => MainPlayerSongsSongIdRoute,
+  } as any)
 const MainPlayerSearchAllIndexRoute =
   MainPlayerSearchAllIndexRouteImport.update({
     id: '/search/all/',
@@ -203,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/main-player/lyrics/editor/$songId': typeof MainPlayerLyricsEditorSongIdRoute
   '/main-player/songs/$songId/edit': typeof MainPlayerSongsSongIdEditRoute
   '/main-player/search/all/': typeof MainPlayerSearchAllIndexRoute
+  '/main-player/songs/$songId/': typeof MainPlayerSongsSongIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -216,7 +224,6 @@ export interface FileRoutesByTo {
   '/main-player/playlists/$playlistId': typeof MainPlayerPlaylistsPlaylistIdRoute
   '/main-player/playlists/favorites': typeof MainPlayerPlaylistsFavoritesRoute
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
-  '/main-player/songs/$songId': typeof MainPlayerSongsSongIdRouteWithChildren
   '/main-player/albums': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists': typeof MainPlayerArtistsIndexRoute
   '/main-player/folders': typeof MainPlayerFoldersIndexRoute
@@ -231,6 +238,7 @@ export interface FileRoutesByTo {
   '/main-player/lyrics/editor/$songId': typeof MainPlayerLyricsEditorSongIdRoute
   '/main-player/songs/$songId/edit': typeof MainPlayerSongsSongIdEditRoute
   '/main-player/search/all': typeof MainPlayerSearchAllIndexRoute
+  '/main-player/songs/$songId': typeof MainPlayerSongsSongIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/main-player/lyrics/editor/$songId': typeof MainPlayerLyricsEditorSongIdRoute
   '/main-player/songs/$songId/edit': typeof MainPlayerSongsSongIdEditRoute
   '/main-player/search/all/': typeof MainPlayerSearchAllIndexRoute
+  '/main-player/songs/$songId/': typeof MainPlayerSongsSongIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -290,6 +299,7 @@ export interface FileRouteTypes {
     | '/main-player/lyrics/editor/$songId'
     | '/main-player/songs/$songId/edit'
     | '/main-player/search/all/'
+    | '/main-player/songs/$songId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -303,7 +313,6 @@ export interface FileRouteTypes {
     | '/main-player/playlists/$playlistId'
     | '/main-player/playlists/favorites'
     | '/main-player/playlists/history'
-    | '/main-player/songs/$songId'
     | '/main-player/albums'
     | '/main-player/artists'
     | '/main-player/folders'
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/main-player/lyrics/editor/$songId'
     | '/main-player/songs/$songId/edit'
     | '/main-player/search/all'
+    | '/main-player/songs/$songId'
   id:
     | '__root__'
     | '/'
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | '/main-player/lyrics/editor/$songId'
     | '/main-player/songs/$songId/edit'
     | '/main-player/search/all/'
+    | '/main-player/songs/$songId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -518,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainPlayerAlbumsAlbumIdRouteImport
       parentRoute: typeof MainPlayerRouteRoute
     }
+    '/main-player/songs/$songId/': {
+      id: '/main-player/songs/$songId/'
+      path: '/'
+      fullPath: '/main-player/songs/$songId/'
+      preLoaderRoute: typeof MainPlayerSongsSongIdIndexRouteImport
+      parentRoute: typeof MainPlayerSongsSongIdRoute
+    }
     '/main-player/search/all/': {
       id: '/main-player/search/all/'
       path: '/search/all'
@@ -544,10 +562,12 @@ declare module '@tanstack/react-router' {
 
 interface MainPlayerSongsSongIdRouteChildren {
   MainPlayerSongsSongIdEditRoute: typeof MainPlayerSongsSongIdEditRoute
+  MainPlayerSongsSongIdIndexRoute: typeof MainPlayerSongsSongIdIndexRoute
 }
 
 const MainPlayerSongsSongIdRouteChildren: MainPlayerSongsSongIdRouteChildren = {
   MainPlayerSongsSongIdEditRoute: MainPlayerSongsSongIdEditRoute,
+  MainPlayerSongsSongIdIndexRoute: MainPlayerSongsSongIdIndexRoute,
 }
 
 const MainPlayerSongsSongIdRouteWithChildren =
