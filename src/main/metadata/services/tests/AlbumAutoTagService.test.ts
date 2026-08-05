@@ -233,4 +233,134 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     vi.unstubAllGlobals();
   });
+
+  it('[C-CRIT-1 regression] undo restores all 7 metadata fields via dbUpdater, not just title/year/trackNumber', async () => {
+    const tagWriter = new TagWriterService();
+    vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    const preview: any = {
+      album: { title: 'SOUR' },
+      matches: [
+        {
+          localSongId: 42,
+          songPath: 'song.mp3',
+          oldTitle: 'Old Title',
+          oldArtist: 'Old Artist',
+          oldAlbum: 'Old Album',
+          oldYear: 2020,
+          oldTrackNumber: 5,
+          oldDiscNumber: 2,
+          oldGenre: 'Rock',
+          applyTrack: true,
+          fieldDiffs: [
+            { fieldId: 'title', applyField: true, suggestedValue: 'New Title' },
+            { fieldId: 'artist', applyField: true, suggestedValue: 'New Artist' },
+            { fieldId: 'album', applyField: true, suggestedValue: 'SOUR' },
+            { fieldId: 'genre', applyField: true, suggestedValue: 'Pop' },
+            { fieldId: 'year', applyField: true, suggestedValue: 2021 },
+            { fieldId: 'trackNumber', applyField: true, suggestedValue: 1 },
+            { fieldId: 'discNumber', applyField: true, suggestedValue: 1 }
+          ]
+        }
+      ]
+    };
+
+    // Apply first
+    const applyResult = await applyService.applyPreview(preview, { replaceArtwork: false });
+    expect(applyResult.success).toBe(true);
+
+    // Now undo
+    const undoResult = await applyService.undoLastAutoTag();
+    expect(undoResult.success).toBe(true);
+    expect(undoResult.restoredCount).toBe(1);
+
+    // dbUpdater should have been called twice: once for apply, once for undo
+    expect(dbUpdater).toHaveBeenCalledTimes(2);
+
+    // Verify the UNDO call restores ALL 7 fields
+    const undoCall = dbUpdater.mock.calls[1];
+    expect(undoCall[0]).toBe(42); // songId
+    expect(undoCall[1]).toEqual({
+      title: 'Old Title',
+      artist: 'Old Artist',
+      album: 'Old Album',
+      genre: 'Rock',
+      year: 2020,
+      trackNumber: 5,
+      discNumber: 2
+    });
+  });
+
+  it('[C-CRIT-2 regression] partial batch write failure rolls back successfully-written files before the failure', async () => {
+    const tagWriter = new TagWriterService();
+
+    // First call: writeBatch for apply — song1 succeeds, song2 succeeds, song3 fails
+    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch')
+      .mockResolvedValueOnce([
+        { filePath: 'song1.mp3', success: true },
+        { filePath: 'song2.mp3', success: true },
+        { filePath: 'song3.mp3', success: false, error: 'Permission denied' }
+      ])
+      // Second call: writeBatch for rollback of song1 + song2
+      .mockResolvedValueOnce([
+        { filePath: 'song1.mp3', success: true },
+        { filePath: 'song2.mp3', success: true }
+      ]);
+
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+    const preview: any = {
+      album: { title: 'Test Album' },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: 'song1.mp3',
+          oldTitle: 'Song 1 Old',
+          oldArtist: 'Artist Old',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'Song 1 New' }]
+        },
+        {
+          localSongId: 2,
+          songPath: 'song2.mp3',
+          oldTitle: 'Song 2 Old',
+          oldArtist: 'Artist Old',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'Song 2 New' }]
+        },
+        {
+          localSongId: 3,
+          songPath: 'song3.mp3',
+          oldTitle: 'Song 3 Old',
+          oldArtist: 'Artist Old',
+          applyTrack: true,
+          fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'Song 3 New' }]
+        }
+      ]
+    };
+
+    const result = await applyService.applyPreview(preview, { replaceArtwork: false });
+
+    expect(result.success).toBe(false);
+    expect(result.errors[0]).toContain('Permission denied');
+
+    // writeBatch should have been called TWICE: once for apply, once for rollback
+    expect(writeBatchSpy).toHaveBeenCalledTimes(2);
+
+    // The rollback call should only include the 2 successfully-written files (not the failed one)
+    const rollbackCall = writeBatchSpy.mock.calls[1][0];
+    expect(rollbackCall).toHaveLength(2);
+    expect(rollbackCall[0].filePath).toBe('song1.mp3');
+    expect(rollbackCall[1].filePath).toBe('song2.mp3');
+
+    // Verify rollback payloads restore OLD metadata
+    expect(rollbackCall[0].title).toBe('Song 1 Old');
+    expect(rollbackCall[1].title).toBe('Song 2 Old');
+
+    // DB updater should NOT have been called (no DB writes should happen on batch failure)
+    expect(dbUpdater).not.toHaveBeenCalled();
+  });
 });

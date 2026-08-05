@@ -284,14 +284,33 @@ export class MetadataApplyService {
 
     // Step 1: Write Physical Disk Tags
     const tagWriteResults = await this.tagWriter.writeBatch(tagWritePayloads);
-    const failedWrite = tagWriteResults.find((r) => !r.success);
+    const failedWriteIndex = tagWriteResults.findIndex((r) => !r.success);
 
-    if (failedWrite) {
+    if (failedWriteIndex !== -1) {
+      // Roll back any files that were successfully written before the failure
+      if (failedWriteIndex > 0) {
+        const successfulRollbacks = rollbackPayloads.slice(0, failedWriteIndex);
+        const rollbackResults = await this.tagWriter.writeBatch(successfulRollbacks);
+        const failedRollbacks = rollbackResults.filter((r) => !r.success);
+        const rollbackErrors = failedRollbacks.map((f) => `Rollback failed for ${f.filePath}: ${f.error}`);
+        if (rollbackErrors.length > 0) {
+          return {
+            success: false,
+            updatedCount: 0,
+            failedCount: chunkMatches.length,
+            errors: [
+              `Physical file tag write failed for ${tagWriteResults[failedWriteIndex].filePath}: ${tagWriteResults[failedWriteIndex].error}`,
+              ...rollbackErrors
+            ]
+          };
+        }
+      }
+
       return {
         success: false,
         updatedCount: 0,
         failedCount: chunkMatches.length,
-        errors: [`Physical file tag write failed for ${failedWrite.filePath}: ${failedWrite.error}`]
+        errors: [`Physical file tag write failed for ${tagWriteResults[failedWriteIndex].filePath}: ${tagWriteResults[failedWriteIndex].error}`]
       };
     }
 
@@ -425,8 +444,12 @@ export class MetadataApplyService {
         for (const snap of snapshot.previousSongs) {
           await this.dbUpdater(snap.songId, {
             title: snap.title,
+            artist: snap.artist,
+            album: snap.album,
+            genre: snap.genre,
             year: snap.year,
-            trackNumber: snap.trackNumber
+            trackNumber: snap.trackNumber,
+            discNumber: snap.discNumber
           });
         }
       } else {
@@ -451,8 +474,12 @@ export class MetadataApplyService {
                 .where('songId', snap.songId)
                 .update({
                   title: snap.title,
+                  artists: snap.artist ? JSON.stringify([snap.artist]) : undefined,
+                  album: snap.album,
+                  genres: snap.genre ? JSON.stringify([snap.genre]) : undefined,
                   year: snap.year,
                   trackNumber: snap.trackNumber,
+                  discNumber: snap.discNumber,
                   updatedAt: new Date()
                 });
             }
