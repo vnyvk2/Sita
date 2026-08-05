@@ -98,15 +98,11 @@ export function useAlbumAutoTag(initialOperationId?: string) {
     };
   }, [operationId]);
 
-  // Targeted Query Cache Invalidation
+  // Query Cache Invalidation
   const invalidateQueryCache = useCallback(() => {
-    if (preview?.album?.releaseId && !isNaN(Number(preview.album.releaseId))) {
-      const albumId = Number(preview.album.releaseId);
-      queryClient.invalidateQueries({ queryKey: albumQuery.single({ albumId }).queryKey });
-    }
     queryClient.invalidateQueries({ queryKey: albumQuery._def });
     queryClient.invalidateQueries({ queryKey: songQuery._def });
-  }, [preview, queryClient]);
+  }, [queryClient]);
 
   // Actions
   const searchReleases = useCallback(async (album: string, artist?: string) => {
@@ -191,7 +187,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setStep('complete');
         setCanUndo(true);
 
-        // Targeted Query Invalidation ON SUCCESS ONLY
+        // Invalidate TanStack Query cache ON SUCCESS ONLY
         invalidateQueryCache();
 
         return true;
@@ -216,7 +212,7 @@ export function useAlbumAutoTag(initialOperationId?: string) {
         setCanUndo(false);
         setLastRestoredCount(res.restoredCount);
 
-        // Targeted Query Invalidation ON UNDO SUCCESS ONLY
+        // Invalidate TanStack Query cache ON UNDO SUCCESS ONLY
         invalidateQueryCache();
 
         return true;
