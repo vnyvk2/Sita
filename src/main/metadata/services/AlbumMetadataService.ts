@@ -11,10 +11,19 @@ export interface LocalSongInput {
   musicBrainzRecordingId?: string;
 }
 
+export interface ScoreBreakdown {
+  title: number;
+  artist: number;
+  duration: number;
+  mbid: number;
+  total: number;
+}
+
 export interface TrackMatchPair {
   localSong: LocalSongInput;
   remoteTrack: MetadataCandidate;
   confidence: number; // 0.0 to 1.0
+  scoreBreakdown?: ScoreBreakdown;
   matchedBy: MatchCriterion[];
   reasons: string[];
 }
@@ -76,7 +85,12 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     }>
   ): Promise<AlbumPreview> {
     // Run 1-to-1 TrackMatcher assignment
-    const trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks);
+    const trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {
+      albumTitle: album.title,
+      discCount: album.discCount,
+      trackCount: album.trackCount,
+      releaseType: album.releaseType
+    });
 
     const warnings: string[] = [];
     let totalConfidence = 0;
