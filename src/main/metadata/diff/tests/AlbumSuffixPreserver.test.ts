@@ -7,6 +7,11 @@ describe('AlbumSuffixPreserver Unit Test Suite', () => {
     expect(res).toBe('SOUR (Deluxe)');
   });
 
+  it('preserves "(Gracie\'s Version)" when base album titles match', () => {
+    const res = AlbumSuffixPreserver.preserveAlbumSuffix("The Secret (Gracie's Version)", 'The Secret');
+    expect(res).toBe("The Secret (Gracie's Version)");
+  });
+
   it('preserves "(Taylor\'s Version)" when base album titles match', () => {
     const res = AlbumSuffixPreserver.preserveAlbumSuffix("1989 (Taylor's Version)", '1989');
     expect(res).toBe("1989 (Taylor's Version)");

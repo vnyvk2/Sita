@@ -1,9 +1,9 @@
 const KNOWN_SUFFIX_REGEX =
-  /\s*(\((?:deluxe|deluxe edition|expanded edition|remastered(?:\s+\d{4})?|\d{4}\s+remaster|anniversary edition|collector's edition|bonus track version|explicit|clean|mono|stereo|live|acoustic|taylor's version)\)|\[explicit\])\s*$/i;
+  /\s*(\((?:deluxe|deluxe edition|expanded edition|remastered(?:\s+\d{4})?|\d{4}\s+remaster|anniversary edition|collector's edition|bonus track version|explicit|clean|mono|stereo|live|acoustic|.*?\bversion|.*?\bedition|.*?\bmix|.*?\bedit)\)|\[explicit\])\s*$/i;
 
 export class AlbumSuffixPreserver {
   /**
-   * Intelligently preserves local album title suffixes (e.g. "(Deluxe)", "(Taylor's Version)", "[Explicit]")
+   * Intelligently preserves local album title suffixes (e.g. "(Deluxe)", "(Gracie's Version)", "(Taylor's Version)", "[Explicit]")
    * when the base album title matches the provider's canonical album title.
    */
   public static preserveAlbumSuffix(localAlbum?: string, remoteAlbum?: string): string | undefined {
