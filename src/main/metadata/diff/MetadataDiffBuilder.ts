@@ -2,12 +2,13 @@ import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../.
 import type { TrackMatchPair } from '../services/AlbumMetadataService';
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 import { ProviderRegistry } from '../resolution/ProviderRegistry';
+import type { ProviderAttribution } from '../domain/ProviderAttribution';
 
 const globalProviderRegistry = new ProviderRegistry();
 
 export class MetadataDiffBuilder {
   /**
-   * Constructs presentation-friendly TrackMatchPreview with per-field diffs and provider attribution from a TrackMatchPair.
+   * Constructs presentation-friendly TrackMatchPreview with per-field diffs and ProviderAttribution domain models from a TrackMatchPair.
    */
   public static buildTrackPreview(pair: TrackMatchPair, registry?: ProviderRegistry): TrackMatchPreview {
     const song = pair.localSong;
@@ -17,18 +18,25 @@ export class MetadataDiffBuilder {
     const activeRegistry = registry ?? globalProviderRegistry;
     const providerName = activeRegistry.getDisplayName(providerId);
 
+    const makeAttribution = (fieldId: string): ProviderAttribution => ({
+      fieldId,
+      providerId,
+      providerName,
+      confidenceScore: pair.confidence
+    });
+
     const suggestedAlbum = AlbumSuffixPreserver.preserveAlbumSuffix(song.album, recording.album);
 
     const fieldDiffs: MetadataFieldDiff[] = [
-      this.compareField('title', 'Title', song.title, recording.title, providerId, providerName),
-      this.compareField('artist', 'Artist', song.artist, recording.artist, providerId, providerName),
-      this.compareField('album', 'Album', song.album, suggestedAlbum, providerId, providerName),
-      this.compareField('year', 'Year', song.year, recording.year, providerId, providerName),
-      this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, providerId, providerName),
-      this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, providerId, providerName),
-      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0], providerId, providerName),
-      this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, providerId, providerName),
-      this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, providerId, providerName)
+      this.compareField('title', 'Title', song.title, recording.title, makeAttribution('title')),
+      this.compareField('artist', 'Artist', song.artist, recording.artist, makeAttribution('artist')),
+      this.compareField('album', 'Album', song.album, suggestedAlbum, makeAttribution('album')),
+      this.compareField('year', 'Year', song.year, recording.year, makeAttribution('year')),
+      this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, makeAttribution('trackNumber')),
+      this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, makeAttribution('discNumber')),
+      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0], makeAttribution('genre')),
+      this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, makeAttribution('isrc')),
+      this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, makeAttribution('musicBrainzRecordingId'))
     ];
 
     const applyTrack = pair.confidence >= 0.75; // Default apply for Good+ matches
@@ -65,8 +73,7 @@ export class MetadataDiffBuilder {
     fieldName: string,
     oldVal?: string | number,
     newVal?: string | number,
-    providerId?: string,
-    providerName?: string
+    attribution?: ProviderAttribution
   ): MetadataFieldDiff {
     const strOld = oldVal !== undefined && oldVal !== null ? String(oldVal).trim() : '';
     const strNew = newVal !== undefined && newVal !== null ? String(newVal).trim() : '';
@@ -100,8 +107,8 @@ export class MetadataDiffBuilder {
       userValue: newVal, // Default to suggested value, editable by user in UI
       status,
       applyField,
-      providerId,
-      providerName
+      providerId: attribution?.providerId,
+      providerName: attribution?.providerName
     };
   }
 }

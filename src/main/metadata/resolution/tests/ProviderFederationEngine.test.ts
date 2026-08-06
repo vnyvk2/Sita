@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProviderRegistry } from '../ProviderRegistry';
-import { MetadataMergeEngine } from '../MetadataMergeEngine';
+import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
 import type { ProviderCandidate } from '../../domain/MetadataResolution';
 
 describe('Provider Federation & Merge Engine Test Suite', () => {
@@ -54,6 +54,28 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
 
     // Verify field attributions
     expect(merged.fieldAttributions.title.providerName).toBe('MusicBrainz');
+    expect(merged.fieldAttributions.genre.providerName).toBe('Discogs');
+    expect(merged.fieldAttributions.artworkUrl.providerName).toBe('Cover Art Archive');
+  });
+
+  it('merges independent field contributions across standalone providers directly', () => {
+    const registry = new ProviderRegistry();
+    const mergeEngine = new MetadataMergeEngine(registry);
+
+    const rawContributions: FieldContribution[] = [
+      { fieldId: 'title', providerId: 'musicbrainz', value: 'drivers license', confidenceScore: 0.98 },
+      { fieldId: 'artist', providerId: 'musicbrainz', value: 'Olivia Rodrigo', confidenceScore: 0.98 },
+      { fieldId: 'genre', providerId: 'discogs', value: 'Bedroom Pop', confidenceScore: 0.92 },
+      { fieldId: 'artworkUrl', providerId: 'coverartarchive', value: 'https://coverartarchive.org/dl.jpg', confidenceScore: 0.99 }
+    ];
+
+    const merged = mergeEngine.mergeFieldContributions(rawContributions);
+
+    expect(merged.title).toBe('drivers license');
+    expect(merged.artist).toBe('Olivia Rodrigo');
+    expect(merged.genre).toBe('Bedroom Pop');
+    expect(merged.artworkUrl).toBe('https://coverartarchive.org/dl.jpg');
+
     expect(merged.fieldAttributions.genre.providerName).toBe('Discogs');
     expect(merged.fieldAttributions.artworkUrl.providerName).toBe('Cover Art Archive');
   });

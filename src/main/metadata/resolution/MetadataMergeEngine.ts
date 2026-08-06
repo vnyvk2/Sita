@@ -28,22 +28,43 @@ export class MetadataMergeEngine {
   }
 
   /**
-   * Merges field-level contributions across multiple provider candidates according to declarative MergePolicy priorities.
+   * Merges candidate objects by extracting field contributions and evaluating MergePolicy priorities.
    */
   public mergeCandidates(
     candidates: ProviderCandidate[],
     policy?: MetadataPolicy
   ): MergedCandidateResult {
-    const defaultResult: MergedCandidateResult = {
-      title: candidates[0]?.title ?? '',
-      artist: candidates[0]?.artist ?? '',
-      fieldAttributions: {}
-    };
+    const rawContributions: FieldContribution[] = [];
 
-    if (!candidates || candidates.length === 0) {
-      return defaultResult;
+    for (const cand of candidates) {
+      const add = (fieldId: string, val?: string | number) => {
+        if (val !== undefined && val !== null && String(val).trim().length > 0) {
+          rawContributions.push({
+            fieldId,
+            providerId: cand.providerId,
+            value: val,
+            confidenceScore: cand.score
+          });
+        }
+      };
+
+      add('title', cand.title);
+      add('artist', cand.artist);
+      add('album', cand.matchedAttributes.album);
+      add('genre', cand.matchedAttributes.genre);
+      add('artworkUrl', cand.matchedAttributes.artworkUrl);
     }
 
+    return this.mergeFieldContributions(rawContributions, policy);
+  }
+
+  /**
+   * Directly merges independent field contributions across multiple providers according to MergePolicy priorities.
+   */
+  public mergeFieldContributions(
+    contributions: FieldContribution[],
+    policy?: MetadataPolicy
+  ): MergedCandidateResult {
     const priorities: Record<string, number> = policy?.merge?.providerPriorities ?? {
       user: 1000,
       musicbrainz: 900,
@@ -55,27 +76,11 @@ export class MetadataMergeEngine {
 
     const contributionsByField: Record<string, FieldContribution[]> = {};
 
-    for (const cand of candidates) {
-      const pid = cand.providerId.toLowerCase();
-      const score = cand.score;
-
-      const addContrib = (fieldId: string, val?: string | number) => {
-        if (val !== undefined && val !== null && String(val).trim().length > 0) {
-          if (!contributionsByField[fieldId]) contributionsByField[fieldId] = [];
-          contributionsByField[fieldId].push({
-            fieldId,
-            providerId: cand.providerId,
-            value: val,
-            confidenceScore: score
-          });
-        }
-      };
-
-      addContrib('title', cand.title);
-      addContrib('artist', cand.artist);
-      addContrib('album', cand.matchedAttributes.album);
-      addContrib('genre', cand.matchedAttributes.genre);
-      addContrib('artworkUrl', cand.matchedAttributes.artworkUrl);
+    for (const c of contributions) {
+      if (!contributionsByField[c.fieldId]) {
+        contributionsByField[c.fieldId] = [];
+      }
+      contributionsByField[c.fieldId].push(c);
     }
 
     const winningResult: Partial<MergedCandidateResult> = {};
@@ -84,7 +89,6 @@ export class MetadataMergeEngine {
     for (const [fieldId, contribs] of Object.entries(contributionsByField)) {
       if (contribs.length === 0) continue;
 
-      // Check field-specific policy overrides
       const fieldPolicy = policy?.merge?.fieldPolicies?.[fieldId];
       let winning: FieldContribution | undefined;
 
@@ -93,11 +97,10 @@ export class MetadataMergeEngine {
       }
 
       if (!winning) {
-        // Sort contributions by provider priority high-to-low then confidence score
         contribs.sort((a, b) => {
           const prioA = priorities[a.providerId.toLowerCase()] ?? 500;
-          const priob = priorities[b.providerId.toLowerCase()] ?? 500;
-          if (prioA !== priob) return priob - prioA;
+          const prioB = priorities[b.providerId.toLowerCase()] ?? 500;
+          if (prioA !== prioB) return prioB - prioA;
           return b.confidenceScore - a.confidenceScore;
         });
         winning = contribs[0];
@@ -116,8 +119,8 @@ export class MetadataMergeEngine {
     }
 
     return {
-      title: winningResult.title ?? candidates[0]?.title ?? '',
-      artist: winningResult.artist ?? candidates[0]?.artist ?? '',
+      title: winningResult.title ?? '',
+      artist: winningResult.artist ?? '',
       album: winningResult.album,
       year: winningResult.year,
       genre: winningResult.genre,
