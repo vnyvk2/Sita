@@ -1,12 +1,50 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
-import type { TrackMatchPair } from '../services/AlbumMetadataService';
+import type { TrackMatchPair, LocalSongInput } from '../services/AlbumMetadataService';
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 import { ProviderRegistry } from '../resolution/ProviderRegistry';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 
 const globalProviderRegistry = new ProviderRegistry();
 
 export class MetadataDiffBuilder {
+  /**
+   * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with field-level ProviderAttributions.
+   */
+  public static buildTrackPreviewFromMergedResult(
+    song: LocalSongInput,
+    merged: MergedCandidateResult
+  ): TrackMatchPreview {
+    const suggestedAlbum = song.album && merged.album
+      ? AlbumSuffixPreserver.preserveAlbumSuffix(song.album, merged.album)
+      : merged.album;
+
+    const fieldDiffs: MetadataFieldDiff[] = [
+      this.compareField('title', 'Title', song.title, merged.title, merged.fieldAttributions.title),
+      this.compareField('artist', 'Artist', song.artist, merged.artist, merged.fieldAttributions.artist),
+      this.compareField('album', 'Album', song.album, suggestedAlbum, merged.fieldAttributions.album),
+      this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year),
+      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre)
+    ];
+
+    return {
+      localSongId: song.songId,
+      songPath: song.path,
+      oldTitle: song.title,
+      oldArtist: song.artist,
+      oldAlbum: song.album,
+      oldYear: song.year,
+      confidence: 0.95,
+      confidenceLevel: 'Excellent',
+      why: 'Multi-Provider Merged Resolution',
+      reasons: ['Merged across active provider federation'],
+      fieldDiffs,
+      applyTrack: true,
+      hasWarnings: false,
+      warningCount: 0
+    };
+  }
+
   /**
    * Constructs presentation-friendly TrackMatchPreview with per-field diffs and ProviderAttribution domain models from a TrackMatchPair.
    */
@@ -39,7 +77,7 @@ export class MetadataDiffBuilder {
       this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, makeAttribution('musicBrainzRecordingId'))
     ];
 
-    const applyTrack = pair.confidence >= 0.75; // Default apply for Good+ matches
+    const applyTrack = pair.confidence >= 0.75;
 
     const warnings = pair.reasons.filter(
       (r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch') || r.toLowerCase().includes('duplicate')
@@ -104,7 +142,7 @@ export class MetadataDiffBuilder {
       fieldName,
       oldValue: oldVal,
       suggestedValue: newVal,
-      userValue: newVal, // Default to suggested value, editable by user in UI
+      userValue: newVal,
       status,
       applyField,
       providerId: attribution?.providerId,

@@ -1,4 +1,5 @@
 import type { ProviderAttribution } from './ProviderAttribution';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 
 export type ProviderId = string;
 
@@ -26,6 +27,7 @@ export interface MetadataResolution {
   operationId: string;
   resourceId: string | number;
   candidates: ProviderCandidate[];
+  mergedResult?: MergedCandidateResult;
   resolvedResource?: ResolvedResource;
   resolvedAt: number;
 }

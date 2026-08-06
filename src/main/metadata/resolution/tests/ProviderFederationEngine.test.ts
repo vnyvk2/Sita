@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ProviderRegistry } from '../ProviderRegistry';
 import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
+import { MetadataResolutionManager } from '../MetadataResolutionManager';
+import type { MetadataLookupGateway } from '../MetadataLookupGateway';
 import type { ProviderCandidate } from '../../domain/MetadataResolution';
+import type { MetadataContext } from '../../domain/MetadataContext';
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 describe('Provider Federation & Merge Engine Test Suite', () => {
   it('resolves provider descriptors and display names via ProviderRegistry', () => {
@@ -78,5 +82,55 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
 
     expect(merged.fieldAttributions.genre.providerName).toBe('Discogs');
     expect(merged.fieldAttributions.artworkUrl.providerName).toBe('Cover Art Archive');
+  });
+
+  it('executes end-to-end multi-provider resolution via MetadataResolutionManager and builds diffs via MetadataDiffBuilder', async () => {
+    const mockGateway: MetadataLookupGateway = {
+      searchCandidates: vi.fn().mockResolvedValue([
+        {
+          providerId: 'musicbrainz',
+          providerName: 'MusicBrainz',
+          externalId: 'mb-101',
+          title: 'deja vu',
+          artist: 'Olivia Rodrigo',
+          score: 0.98,
+          matchedAttributes: { album: 'SOUR' }
+        },
+        {
+          providerId: 'discogs',
+          providerName: 'Discogs',
+          externalId: 'dis-101',
+          title: 'deja vu',
+          artist: 'Olivia Rodrigo',
+          score: 0.92,
+          matchedAttributes: { genre: 'Indie Pop' }
+        }
+      ])
+    };
+
+    const manager = new MetadataResolutionManager({ lookupGateway: mockGateway });
+
+    const context: MetadataContext = {
+      resources: { primaryType: 'track', targetResources: [{ id: 42, type: 'track', attributes: {} }] },
+      execution: { mode: 'Interactive' }
+    };
+
+    const resolution = await manager.resolve('op-dejavu', context);
+
+    expect(resolution.candidates).toHaveLength(2);
+    expect(resolution.mergedResult).toBeDefined();
+    expect(resolution.mergedResult?.title).toBe('deja vu');
+    expect(resolution.mergedResult?.genre).toBe('Indie Pop');
+    expect(resolution.mergedResult?.fieldAttributions.title.providerName).toBe('MusicBrainz');
+    expect(resolution.mergedResult?.fieldAttributions.genre.providerName).toBe('Discogs');
+
+    // Build presentation diffs consuming MergedCandidateResult directly
+    const preview = MetadataDiffBuilder.buildTrackPreviewFromMergedResult(
+      { songId: 42, path: 'dejavu.mp3', title: 'deja vu (old)', artist: 'Olivia Rodrigo' },
+      resolution.mergedResult!
+    );
+
+    expect(preview.fieldDiffs.find((f) => f.fieldId === 'title')?.providerName).toBe('MusicBrainz');
+    expect(preview.fieldDiffs.find((f) => f.fieldId === 'genre')?.providerName).toBe('Discogs');
   });
 });
