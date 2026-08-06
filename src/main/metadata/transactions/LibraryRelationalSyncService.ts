@@ -1,3 +1,5 @@
+import { removeDefaultAppProtocolFromFilePath } from '../../fs/resolveFilePaths';
+
 export type SongDbUpdater = (
   songId: number,
   data: {
@@ -52,7 +54,8 @@ export class LibraryRelationalSyncService {
 
     try {
       const { default: reParseSong } = await import('../../parseSong/reParseSong');
-      await reParseSong(filePath);
+      const cleanPath = removeDefaultAppProtocolFromFilePath(filePath);
+      await reParseSong(cleanPath);
       return { success: true, fallbackUsed: true };
     } catch (parseErr: unknown) {
       const parseMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);

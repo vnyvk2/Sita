@@ -183,7 +183,24 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         await providerRuntime.initialize();
 
         const albumMetadataService = new AlbumMetadataService(providerRuntime);
-        const autoTagService = new AlbumAutoTagService({ albumMetadataService });
+        const applyService = new MetadataApplyService({
+          dbUpdater: async (songId, data) => {
+            await updateSongId3Tags(
+              songId,
+              {
+                title: data.title,
+                artists: data.artist ? [{ name: data.artist }] : undefined,
+                albums: data.album ? [{ title: data.album }] : undefined,
+                genres: data.genre ? [{ name: data.genre }] : undefined,
+                releasedYear: data.year,
+                trackNumber: data.trackNumber
+              },
+              true,
+              true
+            );
+          }
+        });
+        const autoTagService = new AlbumAutoTagService({ albumMetadataService, applyService });
 
         registerMetadataHandlers(autoTagService, mainWindow);
         logger.info('AutoTag IPC handlers initialized successfully');

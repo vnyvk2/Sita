@@ -1,6 +1,7 @@
 import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
 import sharp from 'sharp';
 import { withFileHandle } from '../../utils/withFileHandle';
+import { removeDefaultAppProtocolFromFilePath } from '../../fs/resolveFilePaths';
 
 export interface TagWritePayload {
   filePath: string;
@@ -32,7 +33,9 @@ export class TagWriterService {
         return { filePath: payload.filePath, success: false, error: 'Empty file path' };
       }
 
-      await withFileHandle(payload.filePath, async (file) => {
+      const realPath = removeDefaultAppProtocolFromFilePath(payload.filePath);
+
+      await withFileHandle(realPath, async (file) => {
         if (payload.title) file.tag.title = payload.title;
         if (payload.artist) file.tag.performers = [payload.artist];
         if (payload.album) file.tag.album = payload.album;
