@@ -2,9 +2,12 @@ import type { MetadataProviderExecutor } from '../engine/MetadataProviderExecuto
 import type { ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataContext, AlbumLookupQuery, TrackLookupQuery } from '../domain/MetadataContext';
 import { ProviderRegistry } from './ProviderRegistry';
+import type { FieldContribution } from './MetadataMergeEngine';
+import type { IMetadataProviderAdapter } from '../contracts/IMetadataProviderAdapter';
 
 export interface MetadataLookupGateway {
   searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]>;
+  searchContributions?(context: MetadataContext): Promise<FieldContribution[]>;
 }
 
 export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
@@ -14,6 +17,48 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
   constructor(executor?: MetadataProviderExecutor, providerRegistry?: ProviderRegistry) {
     this.executor = executor;
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();
+  }
+
+  /**
+   * Directly fetches specialized FieldContribution[] across registered active providers, bypassing intermediate full candidate objects.
+   */
+  public async searchContributions(context: MetadataContext): Promise<FieldContribution[]> {
+    const requestQuery = context.request?.query;
+    if (!requestQuery) return [];
+
+    let title: string | undefined;
+    let artist: string | undefined;
+
+    if ('albumTitle' in requestQuery) {
+      const q = requestQuery as AlbumLookupQuery;
+      title = q.albumTitle;
+      artist = q.artistName;
+    } else if ('trackTitle' in requestQuery) {
+      const q = requestQuery as TrackLookupQuery;
+      title = q.trackTitle;
+      artist = q.artistName;
+    }
+
+    if (!title) return [];
+
+    const fieldContributions: FieldContribution[] = [];
+    const activeInstances = this.providerRegistry.getActiveInstances();
+
+    for (const [providerId, instance] of activeInstances.entries()) {
+      const adapter = instance as unknown as IMetadataProviderAdapter;
+      if (adapter && typeof adapter.fetchContribution === 'function') {
+        try {
+          const contrib = await adapter.fetchContribution({ title, artist });
+          if (contrib && contrib.contributions) {
+            fieldContributions.push(...contrib.contributions);
+          }
+        } catch (_err) {
+          // Ignore individual provider lookup errors gracefully
+        }
+      }
+    }
+
+    return fieldContributions;
   }
 
   public async searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]> {
@@ -41,6 +86,38 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
     const activeInstances = this.providerRegistry.getActiveInstances();
     if (activeInstances.size > 0) {
       for (const [providerId, provider] of activeInstances.entries()) {
+        const adapter = provider as unknown as IMetadataProviderAdapter;
+        // Direct specialized contribution check
+        if (adapter && typeof adapter.fetchContribution === 'function') {
+          try {
+            const contrib = await adapter.fetchContribution({ title, artist });
+            if (contrib && contrib.contributions.length > 0) {
+              const titleContrib = contrib.contributions.find((c) => c.fieldId === 'title')?.value;
+              const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;
+              const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
+              const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
+
+              candidates.push({
+                providerId,
+                providerName: this.providerRegistry.getDisplayName(providerId),
+                externalId: providerId,
+                title: String(titleContrib ?? title),
+                artist: String(artistContrib ?? artist ?? ''),
+                score: contrib.confidenceScore,
+                matchedAttributes: {
+                  title: String(titleContrib ?? ''),
+                  artist: String(artistContrib ?? ''),
+                  album: String(albumContrib ?? ''),
+                  genre: String(genreContrib ?? '')
+                }
+              });
+              continue;
+            }
+          } catch (_err) {
+            // Fall back to legacy fetchMetadata if contribution lookup fails
+          }
+        }
+
         try {
           const result = await provider.fetchMetadata({ title, artist });
           if (result) {
