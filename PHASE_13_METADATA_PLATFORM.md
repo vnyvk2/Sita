@@ -49,19 +49,20 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 * **`MetadataPolicy.ts`**: Declarative policy suite (`SelectionPolicy`, `MergePolicy`, `FallbackPolicy`, `ValidationPolicy`).
 * **`MetadataHealth.ts`**: Generic quality assessment contract (`score`, `rating`, `issues`).
 
-#### Application Layer (`src/main/metadata/resolution/` & `src/main/metadata/operations/`)
+#### Application Layer (`src/main/metadata/resolution/`, `src/main/metadata/operations/`, `src/main/metadata/transactions/`)
 * **`MetadataLookupGateway.ts`**: Interface and default implementation wrapping candidate lookups directly.
 * **`MetadataResolutionManager.ts`**: Candidate resolution manager consuming `MetadataLookupGateway` and `MetadataContext`. Throws explicit `ResolutionUnavailableError` if infrastructure is missing.
 * **`MetadataOperationManager.ts`**: Application service managing operation lifecycles, state transitions, and event subscriptions without Node `EventEmitter` coupling.
+* **`MetadataTransactionManager.ts`**: Application service orchestrating atomic mutations across physical disk files, database syncing, artwork downloading, cache invalidation, and `UndoToken` snapshot generation.
+
+#### Infrastructure Layer (`src/main/metadata/transactions/`)
+* **`LibraryRelationalSyncService.ts`**: Encapsulates relational DB table updates and `reParseSong`.
+* **`ArtworkDownloaderService.ts`**: Encapsulates HTTP/HTTPS cover art downloading and magic header validation.
+* **`ArtworkCacheInvalidator.ts`**: Encapsulates UI cover art cache invalidation.
 
 ---
 
-### 3.2 Planned Work (Phases 13C – 13E)
-
-* **Phase 13C — Unified Transaction Manager & Apply Pipeline**:
-  - Build `MetadataTransactionManager` to coordinate chunked disk writes, DB re-indexing, cache flushing, and rollback snapshotting.
-  - Decompose apply steps into specialized infrastructure services: `TagWriterService` (Disk I/O), `LibraryRelationalSyncService` (DB Sync), `ArtworkDownloaderService` (Network I/O), and `ArtworkCacheInvalidator` (Cache flushing).
-  - Re-wire Manual Tag Editor and Album Resolution to execute through `MetadataTransactionManager`.
+### 3.2 Planned Work (Phases 13D – 13E)
 
 * **Phase 13D — Provider Federation Architecture**:
   - Connect `MetadataLookupGateway` to container-managed `ProviderFederation` (`ProviderRegistry`, `ProviderDiscovery`, `HealthManager`, `CircuitBreakerRegistry`, `DefaultProviderSelectionStrategy`, `MetadataMergeEngine`).
@@ -75,6 +76,6 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 
 ## 4. Automated Verification & Metrics
 
-- **Vitest Suite**: `50 / 50 tests passed` (100% pass rate across all 13 test suites).
-- **Architecture Tests**: Verified domain models and application managers via `Phase13DomainSpecification.test.ts` and `Phase13BEngineIntegration.test.ts`.
-- **Zero Architectural Drift**: Zero legacy AutoTag service leaks in `MetadataOperationManager` or `MetadataResolutionManager`.
+- **Vitest Suite**: `52 / 52 tests passed` (100% pass rate across all 14 test suites).
+- **Architecture Tests**: Verified domain models, application managers, and transaction engine via `Phase13DomainSpecification.test.ts`, `Phase13BEngineIntegration.test.ts`, and `Phase13CTransactionEngine.test.ts`.
+- **Zero Architectural Drift**: Zero legacy AutoTag service leaks in `MetadataOperationManager`, `MetadataResolutionManager`, or `MetadataTransactionManager`. Adheres strictly to Invariants 11 and 12.
