@@ -41,8 +41,8 @@ export class ProviderRegistry {
         title: 0.95,
         artist: 0.95,
         album: 0.9,
-        trackNumber: 0.9,
-        discNumber: 0.9,
+        trackNumber: 0.3,
+        discNumber: 0.3,
         isrc: 1.0,
         mbid: 1.0
       },
