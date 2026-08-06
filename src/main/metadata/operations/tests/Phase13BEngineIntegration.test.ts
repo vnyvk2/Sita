@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MetadataOperationManager } from '../MetadataOperationManager';
 import { MetadataResolutionManager } from '../../resolution/MetadataResolutionManager';
 import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGateway';
+import type { MetadataContext } from '../../domain/MetadataContext';
 
 describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Suite', () => {
   it('manages operation lifecycles via MetadataOperationManager', () => {
@@ -20,7 +21,7 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     expect(completed?.completedAt).toBeDefined();
   });
 
-  it('executes candidate resolution via MetadataLookupGateway without leaking AlbumMetadataService', async () => {
+  it('executes candidate resolution via MetadataLookupGateway with MetadataContext', async () => {
     const mockLookupGateway: MetadataLookupGateway = {
       searchCandidates: vi.fn().mockResolvedValue([
         {
@@ -39,8 +40,15 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     const resolutionManager = new MetadataResolutionManager(mockLookupGateway);
     const opManager = new MetadataOperationManager(resolutionManager);
 
+    const context: MetadataContext = {
+      resourceType: 'album',
+      targetResources: [{ resourceId: 201, resourceType: 'album' }],
+      query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' },
+      executionMode: 'Interactive'
+    };
+
     opManager.createOperation('op-sour', 'AlbumResolution', [201], 'Interactive');
-    const resolution = await opManager.executeResolution('op-sour', { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' });
+    const resolution = await opManager.executeResolution('op-sour', context);
 
     expect(resolution).toBeDefined();
     expect(resolution?.candidates).toHaveLength(1);
@@ -54,8 +62,15 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
   it('handles resolution failures gracefully without returning fake empty candidate objects', async () => {
     const opManager = new MetadataOperationManager(); // No resolution manager configured
 
+    const context: MetadataContext = {
+      resourceType: 'album',
+      targetResources: [{ resourceId: 301, resourceType: 'album' }],
+      query: { albumTitle: 'Unknown' },
+      executionMode: 'Interactive'
+    };
+
     opManager.createOperation('op-fail', 'AlbumResolution', [301], 'Interactive');
-    const res = await opManager.executeResolution('op-fail', { albumTitle: 'Unknown' });
+    const res = await opManager.executeResolution('op-fail', context);
 
     expect(res).toBeUndefined();
     const failedOp = opManager.getOperation('op-fail');

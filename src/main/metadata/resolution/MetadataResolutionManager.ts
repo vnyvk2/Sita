@@ -1,5 +1,6 @@
-import type { MetadataLookupGateway, LookupQueryOptions } from './MetadataLookupGateway';
+import type { MetadataLookupGateway } from './MetadataLookupGateway';
 import type { MetadataResolution } from '../domain/MetadataResolution';
+import type { MetadataContext } from '../domain/MetadataContext';
 
 export class ResolutionUnavailableError extends Error {
   constructor(message: string) {
@@ -16,22 +17,21 @@ export class MetadataResolutionManager {
   }
 
   /**
-   * Performs candidate resolution across registered providers via MetadataLookupGateway.
+   * Performs candidate resolution across registered providers via MetadataLookupGateway using MetadataContext.
    */
   public async resolveCandidates(
     operationId: string,
-    resourceId: string | number,
-    options: LookupQueryOptions
+    context: MetadataContext
   ): Promise<MetadataResolution> {
     if (!this.lookupGateway) {
       throw new ResolutionUnavailableError(`No MetadataLookupGateway configured for operation ${operationId}`);
     }
 
-    const candidates = await this.lookupGateway.searchCandidates(options);
+    const candidates = await this.lookupGateway.searchCandidates(context);
 
     return {
       operationId,
-      resourceId,
+      resourceId: context.targetResources[0]?.resourceId ?? 0,
       candidates,
       resolvedAt: Date.now()
     };

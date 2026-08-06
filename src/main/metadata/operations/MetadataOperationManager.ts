@@ -1,7 +1,7 @@
 import type { MetadataOperation, OperationType, ExecutionMode, OperationState } from '../domain/MetadataOperation';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
-import type { LookupQueryOptions } from '../resolution/MetadataLookupGateway';
+import type { MetadataContext } from '../domain/MetadataContext';
 import type { MetadataResolution } from '../domain/MetadataResolution';
 
 export type OperationEventListener = (event: string, payload: unknown) => void;
@@ -82,7 +82,7 @@ export class MetadataOperationManager {
 
   public async executeResolution(
     id: string,
-    options: LookupQueryOptions
+    context: MetadataContext
   ): Promise<MetadataResolution | undefined> {
     const op = this.operations.get(id);
     if (!op) return undefined;
@@ -95,11 +95,7 @@ export class MetadataOperationManager {
     }
 
     try {
-      const resolution = await this.resolutionManager.resolveCandidates(
-        id,
-        op.targetResourceIds[0] ?? 0,
-        options
-      );
+      const resolution = await this.resolutionManager.resolveCandidates(id, context);
 
       this.updateState(id, 'Resolving', `Resolved ${resolution.candidates.length} candidates`, 60);
       this.updateState(id, 'PreviewReady', 'Preview ready for review', 80);

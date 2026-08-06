@@ -1,14 +1,9 @@
 import type { MetadataProviderExecutor } from '../engine/MetadataProviderExecutor';
 import type { ProviderCandidate } from '../domain/MetadataResolution';
-
-export interface LookupQueryOptions {
-  albumTitle?: string;
-  artistName?: string;
-  trackTitle?: string;
-}
+import type { MetadataContext } from '../domain/MetadataContext';
 
 export interface MetadataLookupGateway {
-  searchCandidates(options: LookupQueryOptions): Promise<ProviderCandidate[]>;
+  searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]>;
 }
 
 export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
@@ -18,17 +13,17 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
     this.executor = executor;
   }
 
-  public async searchCandidates(options: LookupQueryOptions): Promise<ProviderCandidate[]> {
-    if (!options.albumTitle && !options.trackTitle) {
+  public async searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]> {
+    const title = (context.query?.albumTitle ?? context.query?.trackTitle ?? context.query?.title) as string | undefined;
+    const artist = (context.query?.artistName ?? context.query?.artist) as string | undefined;
+
+    if (!title) {
       return [];
     }
 
     if (this.executor) {
       try {
-        const results = await this.executor.executeAll({
-          title: options.albumTitle ?? options.trackTitle,
-          artist: options.artistName
-        });
+        const results = await this.executor.executeAll({ title, artist });
 
         const candidates: ProviderCandidate[] = [];
         for (const res of results) {
@@ -37,8 +32,8 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
               providerId: res.providerId,
               providerName: res.providerId === 'musicbrainz' ? 'MusicBrainz' : res.providerId,
               externalId: res.data.mbid ?? res.providerId,
-              title: res.data.title ?? options.albumTitle ?? '',
-              artist: res.data.artist ?? options.artistName ?? '',
+              title: res.data.title ?? title,
+              artist: res.data.artist ?? artist ?? '',
               score: 0.9,
               matchedAttributes: {
                 title: res.data.title ?? '',
