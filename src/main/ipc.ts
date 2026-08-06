@@ -5,6 +5,12 @@ import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import { MetadataBootstrap } from './metadata/setup';
+import { MusicBrainzAdapter, MusicBrainzApiClient } from './metadata/providers/musicbrainz';
+import { MetadataProviderRuntime } from './metadata/runtime/MetadataProviderRuntime';
+import { AlbumMetadataService } from './metadata/services/AlbumMetadataService';
+import { AlbumAutoTagService } from './metadata/services/AlbumAutoTagService';
+import { PlatformBootstrap } from './platform/PlatformBootstrap';
+import { RateLimiter, RetryPolicy } from './platform/networking';
 
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
@@ -160,31 +166,34 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   setupPlaylistExportIpc(playlistRepository);
   registerMembershipIPCHandlers();
   
-  MetadataBootstrap.getInstance().then((metadataContainer) => {
-    registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
+  MetadataBootstrap.getInstance()
+    .then(async (metadataContainer) => {
+      registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
 
-    // Auto-Tag Service: create runtime from the same MusicBrainz infrastructure
-    const { MusicBrainzAdapter, MusicBrainzApiClient } = require('./metadata/providers/musicbrainz');
-    const { MetadataProviderRuntime } = require('./metadata/runtime/MetadataProviderRuntime');
-    const { AlbumMetadataService } = require('./metadata/services/AlbumMetadataService');
-    const { AlbumAutoTagService } = require('./metadata/services/AlbumAutoTagService');
-    const { PlatformBootstrap } = require('./platform/PlatformBootstrap');
-    const { RateLimiter, RetryPolicy } = require('./platform/networking');
+      try {
+        const platform = PlatformBootstrap.getInstance();
+        const requestPipeline = platform.createRequestPipeline({
+          rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
+          retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
+        });
+        const mbApiClient = new MusicBrainzApiClient(requestPipeline);
+        const mbAdapter = new MusicBrainzAdapter(mbApiClient, { cache: metadataContainer.identityCache });
+        const providerRuntime = new MetadataProviderRuntime(mbAdapter);
 
-    const platform = PlatformBootstrap.getInstance();
-    const requestPipeline = platform.createRequestPipeline({
-      rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
-      retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
+        await providerRuntime.initialize();
+
+        const albumMetadataService = new AlbumMetadataService(providerRuntime);
+        const autoTagService = new AlbumAutoTagService({ albumMetadataService });
+
+        registerMetadataHandlers(autoTagService, mainWindow);
+        logger.info('AutoTag IPC handlers initialized successfully');
+      } catch (autoTagErr) {
+        logger.error('Failed to initialize AutoTag IPC handlers', { error: autoTagErr });
+      }
+    })
+    .catch((err) => {
+      logger.error('Failed to initialize MetadataBootstrap', { error: err });
     });
-    const mbApiClient = new MusicBrainzApiClient(requestPipeline);
-    const mbAdapter = new MusicBrainzAdapter(mbApiClient, { cache: metadataContainer.identityCache });
-    const providerRuntime = new MetadataProviderRuntime(mbAdapter);
-    providerRuntime.initialize().then(() => {
-      const albumMetadataService = new AlbumMetadataService(providerRuntime);
-      const autoTagService = new AlbumAutoTagService({ albumMetadataService });
-      registerMetadataHandlers(autoTagService, mainWindow);
-    });
-  });
 
   if (mainWindow) {
     ipcMain.on('app/close', () => app.quit());

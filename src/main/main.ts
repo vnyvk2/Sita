@@ -1,3 +1,4 @@
+import fs from 'fs';
 import os from 'os';
 import path, { join } from 'path';
 
@@ -229,6 +230,19 @@ const restoreWindowZoomOnFocus = () => {
   applyWindowZoomFactor(currentWindowZoomFactor, 'window-focus');
 };
 
+const getPreloadPath = (): string => {
+  const candidates = [
+    path.resolve(import.meta.dirname, '../preload/index.cjs'),
+    path.resolve(import.meta.dirname, '../../preload/index.cjs')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[0];
+};
+
 const createWindow = async () => {
   if (IS_DEVELOPMENT) await installExtensions();
 
@@ -240,7 +254,7 @@ const createWindow = async () => {
     title: 'Nora',
     webPreferences: {
       zoomFactor: currentWindowZoomFactor,
-      preload: path.resolve(import.meta.dirname, '../preload/index.cjs')
+      preload: getPreloadPath()
     },
     visualEffectState: 'followWindow',
     roundedCorners: true,

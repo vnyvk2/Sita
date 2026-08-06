@@ -15,9 +15,9 @@ const manageArtistsOfParsedSong = async (
   const { songId, songArtists, artworkId } = data;
 
   if (songArtists && songArtists.length > 0) {
-    for (const songArtist of songArtists) {
-      const newArtistName = songArtist.trim();
+    const uniqueArtists = Array.from(new Set(songArtists.map((a) => a.trim()))).filter(Boolean);
 
+    for (const newArtistName of uniqueArtists) {
       const availableArtist = await getArtistWithName(newArtistName, trx);
 
       if (availableArtist) {
