@@ -18,6 +18,7 @@ export interface ProviderDescriptor {
   priority: number;
   capabilities: ProviderCapabilities;
   specializedFields: string[];
+  fieldConfidences?: Record<string, number>;
 }
 
 export class ProviderRegistry {
@@ -36,6 +37,15 @@ export class ProviderRegistry {
       website: 'https://musicbrainz.org',
       priority: 900,
       specializedFields: ['title', 'artist', 'album', 'trackNumber', 'discNumber', 'isrc', 'mbid'],
+      fieldConfidences: {
+        title: 0.95,
+        artist: 0.95,
+        album: 0.9,
+        trackNumber: 0.9,
+        discNumber: 0.9,
+        isrc: 1.0,
+        mbid: 1.0
+      },
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,
@@ -54,6 +64,12 @@ export class ProviderRegistry {
       website: 'https://discogs.com',
       priority: 800,
       specializedFields: ['genre', 'style', 'catalogNumber', 'masterRelease'],
+      fieldConfidences: {
+        genre: 0.85,
+        style: 0.85,
+        catalogNumber: 0.9,
+        masterRelease: 0.95
+      },
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,

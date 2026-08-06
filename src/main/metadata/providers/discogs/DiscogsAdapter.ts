@@ -66,36 +66,36 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     if (data.genre) {
       contributions.push({
         fieldId: 'genre',
+        providerId: this.identity.id,
         value: data.genre,
-        confidenceScore: 0.85,
-        sourceProviderId: this.identity.id
+        confidenceScore: 0.85
       });
     }
 
     if (data.style) {
       contributions.push({
         fieldId: 'style',
+        providerId: this.identity.id,
         value: data.style,
-        confidenceScore: 0.85,
-        sourceProviderId: this.identity.id
+        confidenceScore: 0.85
       });
     }
 
     if (data.catalogNumber) {
       contributions.push({
         fieldId: 'catalogNumber',
+        providerId: this.identity.id,
         value: data.catalogNumber,
-        confidenceScore: 0.9,
-        sourceProviderId: this.identity.id
+        confidenceScore: 0.9
       });
     }
 
     if (data.masterRelease) {
       contributions.push({
         fieldId: 'masterRelease',
+        providerId: this.identity.id,
         value: data.masterRelease,
-        confidenceScore: 0.95,
-        sourceProviderId: this.identity.id
+        confidenceScore: 0.95
       });
     }
 
