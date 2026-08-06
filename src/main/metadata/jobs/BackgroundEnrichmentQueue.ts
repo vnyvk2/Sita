@@ -40,12 +40,26 @@ export interface LibraryHealthReport {
   assessedAt: number;
 }
 
+export type WorkerStepResult =
+  | { status: 'processed'; jobId: string }
+  | { status: 'retry_scheduled'; jobId: string; attempts: number }
+  | { status: 'failed'; jobId: string }
+  | { status: 'queue_empty' }
+  | { status: 'paused' };
+
+export interface JobPersister {
+  saveJob(job: BackgroundEnrichmentJob): Promise<void>;
+  deleteJob(jobId: string): Promise<void>;
+  loadPendingJobs(): Promise<BackgroundEnrichmentJob[]>;
+}
+
 export type JobWorkerHandler = (job: BackgroundEnrichmentJob) => Promise<boolean>;
 
 export class BackgroundEnrichmentQueue {
   private readonly operationManager?: MetadataOperationManager;
   private readonly resolutionManager?: MetadataResolutionManager;
   private readonly transactionManager?: MetadataTransactionManager;
+  private readonly persister?: JobPersister;
   private readonly pendingJobs: Map<string, BackgroundEnrichmentJob> = new Map();
   private isRunning = false;
   private isPausedState = false;
@@ -58,14 +72,33 @@ export class BackgroundEnrichmentQueue {
     operationManager?: MetadataOperationManager;
     resolutionManager?: MetadataResolutionManager;
     transactionManager?: MetadataTransactionManager;
+    persister?: JobPersister;
     workerHandler?: JobWorkerHandler;
     maxRetries?: number;
   }) {
     this.operationManager = options?.operationManager;
     this.resolutionManager = options?.resolutionManager;
     this.transactionManager = options?.transactionManager;
+    this.persister = options?.persister;
     this.customHandler = options?.workerHandler;
     this.maxRetries = options?.maxRetries ?? 3;
+  }
+
+  public async restorePersistedJobs(): Promise<number> {
+    if (!this.persister) return 0;
+    try {
+      const jobs = await this.persister.loadPendingJobs();
+      let restored = 0;
+      for (const j of jobs) {
+        if (!this.pendingJobs.has(j.id)) {
+          this.pendingJobs.set(j.id, j);
+          restored++;
+        }
+      }
+      return restored;
+    } catch (_err) {
+      return 0;
+    }
   }
 
   public enqueueEnrichment(songId: number, filePath?: string, songMeta?: Partial<SongMetadataInput>): string {
@@ -84,6 +117,10 @@ export class BackgroundEnrichmentQueue {
     };
 
     this.pendingJobs.set(jobId, job);
+
+    if (this.persister) {
+      void this.persister.saveJob(job);
+    }
 
     if (this.operationManager) {
       this.operationManager.createOperation(jobId, 'BackgroundEnrichment', [songId], 'Background');
@@ -132,21 +169,26 @@ export class BackgroundEnrichmentQueue {
 
   private async processWorkerQueue(): Promise<void> {
     while (this.isRunning && !this.isPausedState && this.pendingJobs.size > 0) {
-      const success = await this.processNextJob();
-      if (!success) {
-        // Break out of tight loop if no job was runnable
+      const step = await this.processNextStep();
+      if (step.status === 'queue_empty' || step.status === 'paused') {
         break;
       }
     }
   }
 
-  public async processNextJob(): Promise<boolean> {
-    if (this.isPausedState || this.pendingJobs.size === 0) {
-      return false;
+  public async processNextStep(): Promise<WorkerStepResult> {
+    if (this.isPausedState) {
+      return { status: 'paused' };
+    }
+
+    if (this.pendingJobs.size === 0) {
+      return { status: 'queue_empty' };
     }
 
     const nextEntry = Array.from(this.pendingJobs.entries()).find(([, j]) => j.status === 'pending');
-    if (!nextEntry) return false;
+    if (!nextEntry) {
+      return { status: 'queue_empty' };
+    }
 
     const [jobId, job] = nextEntry;
     job.status = 'processing';
@@ -172,26 +214,34 @@ export class BackgroundEnrichmentQueue {
       job.status = 'completed';
       this.processedCounter++;
       this.pendingJobs.delete(jobId);
+      if (this.persister) {
+        void this.persister.deleteJob(jobId);
+      }
       if (this.operationManager) {
         this.operationManager.updateState(jobId, 'Completed', `Background enrichment completed for song ${job.songId}`, 100);
       }
-      return true;
+      return { status: 'processed', jobId };
     } else {
       if (job.attempts < job.maxRetries) {
-        // Reset status to pending for retry
         job.status = 'pending';
+        if (this.persister) {
+          void this.persister.saveJob(job);
+        }
         if (this.operationManager) {
           this.operationManager.updateState(jobId, 'Created', `Retrying background enrichment for song ${job.songId} (${job.attempts}/${job.maxRetries})`, 0);
         }
-        return false;
+        return { status: 'retry_scheduled', jobId, attempts: job.attempts };
       } else {
         job.status = 'failed';
         this.failedCounter++;
         this.pendingJobs.delete(jobId);
+        if (this.persister) {
+          void this.persister.deleteJob(jobId);
+        }
         if (this.operationManager) {
           this.operationManager.updateState(jobId, 'Failed', `Background enrichment failed after ${job.attempts} attempts for song ${job.songId}`, 0);
         }
-        return false;
+        return { status: 'failed', jobId };
       }
     }
   }
@@ -225,7 +275,7 @@ export class BackgroundEnrichmentQueue {
         return false;
       }
     }
-    return true; // Return default true for simulated queues without infrastructure
+    return true;
   }
 
   public evaluateSongHealth(song: SongMetadataInput): MetadataHealth {

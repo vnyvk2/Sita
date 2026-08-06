@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BackgroundEnrichmentQueue, type SongMetadataInput } from '../BackgroundEnrichmentQueue';
+import { BackgroundEnrichmentQueue, type SongMetadataInput, type JobPersister, type BackgroundEnrichmentJob } from '../BackgroundEnrichmentQueue';
 import { MetadataOperationManager } from '../../operations/MetadataOperationManager';
 
 describe('Background Enrichment & Library Health Assessment Test Suite', () => {
@@ -70,7 +70,7 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
     expect(queue.pendingCount).toBe(2);
   });
 
-  it('executes background worker loop with retries for failed attempts', async () => {
+  it('executes background worker step with retries for failed attempts returning WorkerStepResult', async () => {
     let callCount = 0;
     const mockHandler = vi.fn().mockImplementation(async () => {
       callCount++;
@@ -81,18 +81,44 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
     const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler, maxRetries: 3 });
 
     queue.enqueueEnrichment(201, 'song201.mp3', { title: 'drivers license', artist: 'Olivia Rodrigo' });
-    queue.startWorkerLoop();
 
-    // Process attempt 1 (fails, stays in pending for retry)
-    await queue.processNextJob();
+    // Step 1: Attempt 1 fails, returns retry_scheduled
+    const step1 = await queue.processNextStep();
+    expect(step1.status).toBe('retry_scheduled');
     expect(callCount).toBe(1);
     expect(queue.pendingCount).toBe(1);
 
-    // Process attempt 2 (succeeds)
-    await queue.processNextJob();
+    // Step 2: Attempt 2 succeeds, returns processed
+    const step2 = await queue.processNextStep();
+    expect(step2.status).toBe('processed');
     expect(callCount).toBe(2);
     expect(queue.processedCount).toBe(1);
     expect(queue.pendingCount).toBe(0);
+  });
+
+  it('persists and restores background jobs across app restarts via JobPersister', async () => {
+    const persistedStorage: BackgroundEnrichmentJob[] = [];
+    const mockPersister: JobPersister = {
+      saveJob: vi.fn().mockImplementation(async (j: BackgroundEnrichmentJob) => {
+        persistedStorage.push(j);
+      }),
+      deleteJob: vi.fn().mockImplementation(async (id: string) => {
+        const idx = persistedStorage.findIndex((j) => j.id === id);
+        if (idx !== -1) persistedStorage.splice(idx, 1);
+      }),
+      loadPendingJobs: vi.fn().mockResolvedValue([
+        { id: 'job-p1', songId: 501, filePath: 'song501.mp3', enqueuedAt: Date.now(), attempts: 0, maxRetries: 3, status: 'pending' }
+      ])
+    };
+
+    const queue = new BackgroundEnrichmentQueue({ persister: mockPersister });
+    const restored = await queue.restorePersistedJobs();
+
+    expect(restored).toBe(1);
+    expect(queue.pendingCount).toBe(1);
+
+    queue.enqueueEnrichment(502, 'song502.mp3');
+    expect(mockPersister.saveJob).toHaveBeenCalled();
   });
 
   it('supports pausing and resuming worker processing', async () => {
@@ -100,11 +126,10 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
     const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler });
 
     queue.enqueueEnrichment(301, 'song301.mp3');
-    queue.startWorkerLoop();
     queue.pause();
 
-    const result = await queue.processNextJob();
-    expect(result).toBe(false);
+    const result = await queue.processNextStep();
+    expect(result.status).toBe('paused');
     expect(queue.isPaused).toBe(true);
 
     queue.resume();
