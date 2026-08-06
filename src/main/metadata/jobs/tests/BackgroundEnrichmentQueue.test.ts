@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BackgroundEnrichmentQueue, type SongMetadataInput } from '../BackgroundEnrichmentQueue';
 import { MetadataOperationManager } from '../../operations/MetadataOperationManager';
 
@@ -49,11 +49,58 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
 
   it('enqueues background operations via MetadataOperationManager', () => {
     const opManager = new MetadataOperationManager();
-    const queue = new BackgroundEnrichmentQueue(opManager);
+    const queue = new BackgroundEnrichmentQueue({ operationManager: opManager });
 
     queue.enqueueEnrichment(42);
     expect(queue.pendingCount).toBe(1);
     expect(opManager.listOperations()).toHaveLength(1);
     expect(opManager.listOperations()[0].mode).toBe('Background');
+  });
+
+  it('automatically enqueues unhealthy songs from health assessment scan', () => {
+    const queue = new BackgroundEnrichmentQueue();
+    const songs: SongMetadataInput[] = [
+      { songId: 101, title: 'Good Song', artist: 'Artist A', album: 'Album A', hasArtwork: true, genre: 'Pop' },
+      { songId: 102, artist: 'Unknown Artist' }, // Poor
+      { songId: 103, title: 'Fair Song', artist: 'Artist B' } // Fair
+    ];
+
+    const count = queue.autoEnqueueUnhealthySongs(songs);
+    expect(count).toBe(2);
+    expect(queue.pendingCount).toBe(2);
+  });
+
+  it('executes background worker loop, processing enqueued jobs via workerHandler', async () => {
+    const mockHandler = vi.fn().mockResolvedValue(true);
+    const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler });
+
+    queue.enqueueEnrichment(201, 'song201.mp3');
+    queue.enqueueEnrichment(202, 'song202.mp3');
+
+    queue.startWorkerLoop();
+
+    // Process both jobs
+    await queue.processNextJob();
+    await queue.processNextJob();
+
+    expect(mockHandler).toHaveBeenCalledTimes(2);
+    expect(queue.processedCount).toBe(2);
+    expect(queue.pendingCount).toBe(0);
+  });
+
+  it('supports pausing and resuming worker processing', async () => {
+    const mockHandler = vi.fn().mockResolvedValue(true);
+    const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler });
+
+    queue.enqueueEnrichment(301, 'song301.mp3');
+    queue.startWorkerLoop();
+    queue.pause();
+
+    const result = await queue.processNextJob();
+    expect(result).toBe(false);
+    expect(queue.isPaused).toBe(true);
+
+    queue.resume();
+    expect(queue.isPaused).toBe(false);
   });
 });
