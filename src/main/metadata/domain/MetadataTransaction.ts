@@ -1,11 +1,20 @@
 import type { UndoToken } from './UndoToken';
+import type { ProviderId } from './MetadataResolution';
 
 export type TransactionState = 'created' | 'executing' | 'committed' | 'rolledBack' | 'failed';
+
+export interface FieldMutation {
+  fieldId: string;
+  oldValue?: string | number;
+  newValue?: string | number;
+  providerId?: ProviderId;
+  confidenceScore?: number;
+}
 
 export interface ResourceMutationPayload {
   resourceId: string | number;
   filePath?: string;
-  fieldChanges: Record<string, string | number>;
+  fieldMutations: FieldMutation[];
   artworkBuffer?: Buffer;
 }
 

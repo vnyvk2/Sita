@@ -30,6 +30,7 @@ export interface MetadataOperation {
   readonly id: string;
   readonly type: OperationType;
   readonly mode: ExecutionMode;
+  readonly targetResourceIds: (string | number)[];
   readonly policy?: MetadataPolicy;
   readonly state: OperationState;
   readonly progressMessage: string;

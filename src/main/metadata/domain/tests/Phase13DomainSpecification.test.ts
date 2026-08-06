@@ -6,13 +6,15 @@ import type { MetadataTransaction } from '../MetadataTransaction';
 import type { UndoToken } from '../UndoToken';
 import type { ProviderAttribution } from '../ProviderAttribution';
 import type { MetadataHealth } from '../MetadataHealth';
+import type { MetadataResolution } from '../MetadataResolution';
 
 describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () => {
-  it('instantiates pure MetadataOperation domain entity contracts', () => {
+  it('instantiates pure MetadataOperation domain entity contracts with targetResourceIds', () => {
     const op: MetadataOperation = {
       id: 'op-101',
       type: 'AlbumResolution',
       mode: 'Interactive',
+      targetResourceIds: [42, 43, 44],
       state: 'Created',
       progressMessage: 'Initialized',
       progressPercent: 0,
@@ -21,6 +23,7 @@ describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () =
 
     expect(op.id).toBe('op-101');
     expect(op.type).toBe('AlbumResolution');
+    expect(op.targetResourceIds).toHaveLength(3);
     expect(op.state).toBe('Created');
   });
 
@@ -40,6 +43,28 @@ describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () =
 
     expect(policy.selection.enabledProviderIds).toContain('discogs');
     expect(policy.merge.fieldPolicies?.genre.preferredProviderId).toBe('discogs');
+  });
+
+  it('instantiates pure MetadataResolution contracts', () => {
+    const resolution: MetadataResolution = {
+      operationId: 'op-101',
+      resourceId: 42,
+      candidates: [
+        {
+          providerId: 'musicbrainz',
+          providerName: 'MusicBrainz',
+          externalId: 'mb-rec-1',
+          title: 'brutal',
+          artist: 'Olivia Rodrigo',
+          score: 0.98,
+          matchedAttributes: { title: 'brutal' }
+        }
+      ],
+      resolvedAt: Date.now()
+    };
+
+    expect(resolution.candidates).toHaveLength(1);
+    expect(resolution.candidates[0].score).toBe(0.98);
   });
 
   it('instantiates pure MetadataPreview contracts with ProviderAttribution', () => {
@@ -76,7 +101,7 @@ describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () =
     expect(preview.fieldChanges[0].attribution?.providerName).toBe('MusicBrainz');
   });
 
-  it('instantiates MetadataTransaction and UndoToken contracts', () => {
+  it('instantiates MetadataTransaction and UndoToken contracts with FieldMutation', () => {
     const undoToken: UndoToken = {
       id: 'undo-1',
       operationId: 'op-101',
@@ -94,14 +119,22 @@ describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () =
         {
           resourceId: 42,
           filePath: 'song.mp3',
-          fieldChanges: { title: 'brutal' }
+          fieldMutations: [
+            {
+              fieldId: 'title',
+              oldValue: 'brutal (audio)',
+              newValue: 'brutal',
+              providerId: 'musicbrainz',
+              confidenceScore: 0.98
+            }
+          ]
         }
       ],
       undoToken
     };
 
     expect(transaction.undoToken?.id).toBe('undo-1');
-    expect(transaction.mutations[0].fieldChanges.title).toBe('brutal');
+    expect(transaction.mutations[0].fieldMutations[0].newValue).toBe('brutal');
   });
 
   it('instantiates generic MetadataHealth quality score contracts', () => {
