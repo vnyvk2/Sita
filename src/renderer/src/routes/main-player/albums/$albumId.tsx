@@ -77,9 +77,10 @@ function AlbumInfoPage() {
     }
   }, [albumData, navigate]);
 
-  if (!albumData) return null;
-
-  const { data: onlineAlbumInfo } = useQuery(albumQuery.fetchOnlineInfo({ albumId }));
+  const { data: onlineAlbumInfo } = useQuery({
+    ...albumQuery.fetchOnlineInfo({ albumId }),
+    enabled: !!albumData
+  });
 
   const { data: albumSongs = [] } = useQuery({
     ...songQuery.allSongInfo({
@@ -94,14 +95,17 @@ function AlbumInfoPage() {
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
+      if (!albumData) return;
       const queueSongIds = albumSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(queueSongIds, 'album', false, albumData.albumId, false, albumData.title);
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [albumData.albumId, createQueue, updateQueueData, albumSongs, albumData.title]
+    [albumData, createQueue, updateQueueData, albumSongs]
   );
+
+  if (!albumData) return null;
 
   return (
     <MainContainer
