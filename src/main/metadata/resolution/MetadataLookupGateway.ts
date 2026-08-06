@@ -1,29 +1,19 @@
 import type { MetadataProviderExecutor } from '../engine/MetadataProviderExecutor';
 import type { ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataContext, AlbumLookupQuery, TrackLookupQuery } from '../domain/MetadataContext';
+import { ProviderRegistry } from './ProviderRegistry';
 
 export interface MetadataLookupGateway {
   searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]>;
 }
 
-export function formatProviderName(providerId: string): string {
-  const map: Record<string, string> = {
-    musicbrainz: 'MusicBrainz',
-    discogs: 'Discogs',
-    coverartarchive: 'Cover Art Archive',
-    spotify: 'Spotify',
-    apple: 'Apple Music',
-    local: 'Local File',
-    user: 'User Override'
-  };
-  return map[providerId.toLowerCase()] ?? providerId;
-}
-
 export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
   private readonly executor?: MetadataProviderExecutor;
+  private readonly providerRegistry: ProviderRegistry;
 
-  constructor(executor?: MetadataProviderExecutor) {
+  constructor(executor?: MetadataProviderExecutor, providerRegistry?: ProviderRegistry) {
     this.executor = executor;
+    this.providerRegistry = providerRegistry ?? new ProviderRegistry();
   }
 
   public async searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]> {
@@ -54,7 +44,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
           if (res.success && res.data) {
             candidates.push({
               providerId: res.providerId,
-              providerName: formatProviderName(res.providerId),
+              providerName: this.providerRegistry.getDisplayName(res.providerId),
               externalId: res.data.mbid ?? res.providerId,
               title: res.data.title ?? title,
               artist: res.data.artist ?? artist ?? '',
@@ -73,5 +63,9 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
     }
 
     return [];
+  }
+
+  public get registry(): ProviderRegistry {
+    return this.providerRegistry;
   }
 }

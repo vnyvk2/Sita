@@ -1,18 +1,21 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import type { TrackMatchPair } from '../services/AlbumMetadataService';
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
-import { formatProviderName } from '../resolution/MetadataLookupGateway';
+import { ProviderRegistry } from '../resolution/ProviderRegistry';
+
+const globalProviderRegistry = new ProviderRegistry();
 
 export class MetadataDiffBuilder {
   /**
    * Constructs presentation-friendly TrackMatchPreview with per-field diffs and provider attribution from a TrackMatchPair.
    */
-  public static buildTrackPreview(pair: TrackMatchPair): TrackMatchPreview {
+  public static buildTrackPreview(pair: TrackMatchPair, registry?: ProviderRegistry): TrackMatchPreview {
     const song = pair.localSong;
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
     const providerId = provider.providerId || 'musicbrainz';
-    const providerName = formatProviderName(providerId);
+    const activeRegistry = registry ?? globalProviderRegistry;
+    const providerName = activeRegistry.getDisplayName(providerId);
 
     const suggestedAlbum = AlbumSuffixPreserver.preserveAlbumSuffix(song.album, recording.album);
 

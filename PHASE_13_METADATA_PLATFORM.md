@@ -44,8 +44,10 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 * **`MetadataPolicy.ts`**: Declarative policy suite (`SelectionPolicy`, `MergePolicy`, `FallbackPolicy`, `ValidationPolicy`).
 * **`MetadataHealth.ts`**: Generic quality assessment contract (`score`, `rating`, `issues`).
 
-#### Application Layer (`src/main/metadata/resolution/`, `src/main/metadata/operations/`, `src/main/metadata/transactions/`)
-* **`MetadataLookupGateway.ts`**: Interface and default implementation mapping provider attribution badges (`MusicBrainz`, `Discogs`, `Cover Art Archive`, `Spotify`, `Apple Music`).
+#### Application & Resolution Layer (`src/main/metadata/resolution/`, `src/main/metadata/operations/`, `src/main/metadata/transactions/`)
+* **`ProviderRegistry.ts`**: Container-managed provider registry storing descriptors (`id`, `displayName`, `icon`, `website`, `capabilities`, `priority`) for `MusicBrainz`, `Discogs`, `Cover Art Archive`, `Spotify`, `Apple Music`.
+* **`MetadataMergeEngine.ts`**: True multi-provider field merge engine resolving field-level contributions across providers according to `MergePolicy` priorities.
+* **`MetadataLookupGateway.ts`**: Gateway interface and implementation consuming `ProviderRegistry`.
 * **`MetadataResolutionManager.ts`**: Candidate resolution manager consuming `MetadataLookupGateway` and `MetadataContext`.
 * **`MetadataOperationManager.ts`**: Application service managing operation lifecycles, state transitions, and event subscriptions.
 * **`MetadataTransactionManager.ts`**: Application service orchestrating atomic mutations across physical disk files, database syncing, artwork downloading, cache invalidation, and `UndoToken` snapshot generation.
@@ -53,7 +55,7 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 * **`SnapshotBuilder.ts`**: Constructs immutable `MetadataHistorySnapshot` objects.
 
 #### Infrastructure & Services Layer (`src/main/metadata/transactions/`, `src/main/metadata/services/`)
-* **`AlbumAutoTagService.ts`**: Production service routed through `MetadataOperationManager` and `MetadataTransactionManager` end-to-end.
+* **`AlbumAutoTagService.ts`**: Thin façade service routed through `MetadataOperationManager` and `MetadataTransactionManager` end-to-end.
 * **`LibraryRelationalSyncService.ts`**: Encapsulates relational DB updates returning structured `SyncResult`.
 * **`ArtworkDownloaderService.ts`**: Encapsulates HTTP/HTTPS cover art downloading and magic header validation using `RequestPipeline`.
 * **`ArtworkCacheInvalidator.ts`**: Encapsulates UI cover art cache invalidation.
@@ -70,6 +72,6 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 
 ## 4. Automated Verification & Metrics
 
-- **Vitest Suite**: `52 / 52 tests passed` (100% pass rate across all 14 test suites).
-- **Architecture Tests**: Verified domain models, application managers, and transaction engine via `Phase13DomainSpecification.test.ts`, `Phase13BEngineIntegration.test.ts`, and `Phase13CTransactionEngine.test.ts`.
+- **Vitest Suite**: `54 / 54 tests passed` (100% pass rate across all 15 test suites).
+- **Architecture Tests**: Verified domain models, application managers, provider federation, and transaction engine via `Phase13DomainSpecification.test.ts`, `Phase13BEngineIntegration.test.ts`, `Phase13CTransactionEngine.test.ts`, and `Phase13DProviderFederation.test.ts`.
 - **Zero Architectural Drift**: Zero legacy AutoTag service leaks in `MetadataOperationManager`, `MetadataResolutionManager`, or `MetadataTransactionManager`. Adheres strictly to Invariants 11 and 12.

@@ -33,6 +33,8 @@ Application Layer ────► MetadataEngine
                          ├── MetadataResolutionManager
                          ├── MetadataTransactionManager
                          └── ProviderFederation
+                               ├── ProviderRegistry
+                               └── MetadataMergeEngine
                                     │
                                     ▼
 Infrastructure Layer ─► TagWriter │ ArtworkDownloader │ DatabaseSync │ ProviderAdapters │ Filesystem
@@ -50,7 +52,9 @@ MetadataOperation (Created)
        │
        ▼
 Searching ─────────────► MetadataResolutionManager (Candidate Resolution via Provider Federation)
-       │
+       │                        │
+       │                        ├──► ProviderRegistry (Descriptor & Capability Lookup)
+       │                        └──► MetadataMergeEngine (Field-Level Policy Conflict Resolution)
        ▼
 PreviewReady ──────────► MetadataPreview (Universal UI DTO with Provider Attribution)
        │
@@ -72,7 +76,7 @@ Completed ─────────────► Publish Event Signals (Meta
 
 ## 4. Provider Federation & Attribution Badges
 
-Every resolved field diff carries structured provider attribution:
+Every resolved field diff carries structured provider attribution resolved by `MetadataMergeEngine` using container descriptors in `ProviderRegistry`:
 * **MusicBrainz**: `MusicBrainz` badge attached to title, artist, album, track number, MBID.
 * **Discogs**: `Discogs` badge attached to master releases, genres, styles, catalog numbers.
 * **Cover Art Archive**: `Cover Art Archive` badge attached to high-resolution front/back artwork.
