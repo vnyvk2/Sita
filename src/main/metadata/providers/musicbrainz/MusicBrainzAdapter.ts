@@ -9,6 +9,7 @@ import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/
 import type { MusicBrainzRecordingDto } from './dto';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
+import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
 
 export interface MusicBrainzAdapterOptions {
   matcher?: MetadataMatcher;
@@ -52,6 +53,29 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
 
   public supports(capability: ProviderCapability): boolean {
     return this.capabilities.has(capability);
+  }
+
+  public async fetchContribution(query: { title?: string; artist?: string }): Promise<MetadataContribution | null> {
+    if (!query.title) return null;
+    const qStr = query.artist ? `recording:"${query.title}" AND artist:"${query.artist}"` : `recording:"${query.title}"`;
+    const recordings = await this.apiClient.searchRecordings(qStr, 1);
+    if (recordings.length === 0) return null;
+
+    const rec = recordings[0];
+    const artistName = rec['artist-credit']?.[0]?.name ?? rec['artist-credit']?.[0]?.artist?.name ?? query.artist ?? '';
+    const albumName = rec.releases?.[0]?.title ?? '';
+
+    return {
+      providerId: 'musicbrainz',
+      providerName: 'MusicBrainz',
+      confidenceScore: 0.95,
+      contributions: [
+        { fieldId: 'title', providerId: 'musicbrainz', value: rec.title, confidenceScore: 0.95 },
+        { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: 0.95 },
+        { fieldId: 'album', providerId: 'musicbrainz', value: albumName, confidenceScore: 0.90 },
+        { fieldId: 'mbid', providerId: 'musicbrainz', value: rec.id, confidenceScore: 0.99 }
+      ]
+    };
   }
 
   public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {

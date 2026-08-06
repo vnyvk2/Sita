@@ -4,6 +4,7 @@ import type { ProviderResult } from '../models/ProviderResult';
 import type { ProviderCapabilities, ProviderCapability } from './ProviderCapabilities';
 import type { ProviderConfiguration } from './ProviderConfiguration';
 import type { ProviderIdentity } from './ProviderIdentity';
+import type { MetadataContribution } from '../domain/MetadataContribution';
 
 export interface IProviderLifecycle {
   initialize?(config?: ProviderConfiguration): Promise<void>;
@@ -29,4 +30,9 @@ export interface IMetadataProviderAdapter {
    * Resolves release details and official track listing into ResolvedAlbumRelease domain model.
    */
   resolveRelease?(providerReleaseId: string): Promise<ResolvedAlbumRelease | null>;
+
+  /**
+   * Directly fetches specialized field contributions for provider federation.
+   */
+  fetchContribution?(query: { title?: string; artist?: string }): Promise<MetadataContribution | null>;
 }
