@@ -1,16 +1,33 @@
-import { EventEmitter } from 'events';
 import type { MetadataOperation, OperationType, ExecutionMode, OperationState } from '../domain/MetadataOperation';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
-import type { MetadataResolutionManager, ResolutionOptions } from '../resolution/MetadataResolutionManager';
+import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
+import type { LookupQueryOptions } from '../resolution/MetadataLookupGateway';
 import type { MetadataResolution } from '../domain/MetadataResolution';
 
-export class MetadataOperationManager extends EventEmitter {
+export type OperationEventListener = (event: string, payload: unknown) => void;
+
+export class MetadataOperationManager {
   private readonly operations: Map<string, MetadataOperation> = new Map();
   private readonly resolutionManager?: MetadataResolutionManager;
+  private readonly listeners: Set<OperationEventListener> = new Set();
 
   constructor(resolutionManager?: MetadataResolutionManager) {
-    super();
     this.resolutionManager = resolutionManager;
+  }
+
+  public subscribe(listener: OperationEventListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify(event: string, payload: unknown): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener(event, payload);
+      } catch (_err) {
+        // Ignore listener errors
+      }
+    });
   }
 
   public createOperation(
@@ -33,7 +50,7 @@ export class MetadataOperationManager extends EventEmitter {
     };
 
     this.operations.set(id, operation);
-    this.emit('operation:created', operation);
+    this.notify('operation:created', operation);
     return operation;
   }
 
@@ -59,13 +76,13 @@ export class MetadataOperationManager extends EventEmitter {
     };
 
     this.operations.set(id, updated);
-    this.emit('operation:state', updated);
+    this.notify('operation:state', updated);
     return updated;
   }
 
   public async executeResolution(
     id: string,
-    options: ResolutionOptions
+    options: LookupQueryOptions
   ): Promise<MetadataResolution | undefined> {
     const op = this.operations.get(id);
     if (!op) return undefined;
@@ -73,25 +90,25 @@ export class MetadataOperationManager extends EventEmitter {
     this.updateState(id, 'Searching', 'Searching candidates across providers...', 20);
 
     if (!this.resolutionManager) {
-      this.updateState(id, 'Resolving', 'Candidate resolution complete', 50);
-      return {
-        operationId: id,
-        resourceId: op.targetResourceIds[0] ?? 0,
-        candidates: [],
-        resolvedAt: Date.now()
-      };
+      this.updateState(id, 'Failed', 'Resolution manager unavailable', 0);
+      return undefined;
     }
 
-    const resolution = await this.resolutionManager.resolveCandidates(
-      id,
-      op.targetResourceIds[0] ?? 0,
-      options
-    );
+    try {
+      const resolution = await this.resolutionManager.resolveCandidates(
+        id,
+        op.targetResourceIds[0] ?? 0,
+        options
+      );
 
-    this.updateState(id, 'Resolving', `Resolved ${resolution.candidates.length} candidates`, 60);
-    this.updateState(id, 'PreviewReady', 'Preview ready for review', 80);
-
-    return resolution;
+      this.updateState(id, 'Resolving', `Resolved ${resolution.candidates.length} candidates`, 60);
+      this.updateState(id, 'PreviewReady', 'Preview ready for review', 80);
+      return resolution;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.updateState(id, 'Failed', `Resolution failed: ${msg}`, 0);
+      return undefined;
+    }
   }
 
   public getOperation(id: string): MetadataOperation | undefined {

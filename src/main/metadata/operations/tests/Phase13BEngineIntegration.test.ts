@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MetadataOperationManager } from '../MetadataOperationManager';
 import { MetadataResolutionManager } from '../../resolution/MetadataResolutionManager';
-import type { AlbumMetadataService } from '../../services/AlbumMetadataService';
+import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGateway';
 
 describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Suite', () => {
   it('manages operation lifecycles via MetadataOperationManager', () => {
@@ -20,16 +20,23 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     expect(completed?.completedAt).toBeDefined();
   });
 
-  it('executes candidate resolution via MetadataResolutionManager', async () => {
-    const mockAlbumMetadataService = {
-      searchAlbums: vi.fn().mockResolvedValue([
-        { id: 'mb-sour', title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, provider: 'musicbrainz', score: 0.98 }
+  it('executes candidate resolution via MetadataLookupGateway without leaking AlbumMetadataService', async () => {
+    const mockLookupGateway: MetadataLookupGateway = {
+      searchCandidates: vi.fn().mockResolvedValue([
+        {
+          providerId: 'musicbrainz',
+          providerName: 'MusicBrainz',
+          externalId: 'mb-sour',
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          score: 0.98,
+          matchedAttributes: { title: 'SOUR' }
+        }
       ])
-    } as unknown as AlbumMetadataService;
+    };
 
-    const resolutionManager = new MetadataResolutionManager({
-      albumMetadataService: mockAlbumMetadataService
-    });
+    const resolutionManager = new MetadataResolutionManager(mockLookupGateway);
     const opManager = new MetadataOperationManager(resolutionManager);
 
     opManager.createOperation('op-sour', 'AlbumResolution', [201], 'Interactive');
@@ -42,5 +49,17 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
 
     const finalOp = opManager.getOperation('op-sour');
     expect(finalOp?.state).toBe('PreviewReady');
+  });
+
+  it('handles resolution failures gracefully without returning fake empty candidate objects', async () => {
+    const opManager = new MetadataOperationManager(); // No resolution manager configured
+
+    opManager.createOperation('op-fail', 'AlbumResolution', [301], 'Interactive');
+    const res = await opManager.executeResolution('op-fail', { albumTitle: 'Unknown' });
+
+    expect(res).toBeUndefined();
+    const failedOp = opManager.getOperation('op-fail');
+    expect(failedOp?.state).toBe('Failed');
+    expect(failedOp?.progressMessage).toContain('Resolution manager unavailable');
   });
 });
