@@ -209,6 +209,7 @@ export class MetadataProviderRuntime {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         this.recordFailure(targetProviderId, msg);
+        throw err;
       }
     }
 

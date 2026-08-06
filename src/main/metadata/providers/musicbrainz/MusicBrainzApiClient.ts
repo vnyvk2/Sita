@@ -110,7 +110,7 @@ export class MusicBrainzApiClient {
           Accept: 'application/json'
         },
         params: {
-          inc: 'artists recordings record-level-relations release-groups media discids tags genres',
+          inc: 'artists recordings release-groups media discids tags genres',
           fmt: 'json'
         }
       });

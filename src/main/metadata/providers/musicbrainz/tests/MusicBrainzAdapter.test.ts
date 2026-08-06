@@ -6,9 +6,10 @@ import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 import { MusicBrainzAdapter } from '../MusicBrainzAdapter';
 import { MusicBrainzApiClient } from '../MusicBrainzApiClient';
-import type { MusicBrainzRecordingDto } from '../dto';
+import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from '../dto';
 
 class MockRequestPipeline {
+  public lastParams?: any;
   public mockRecordings: MusicBrainzRecordingDto[] = [
     {
       id: 'b10bbbfc-cf9e-42e0-be17-e2c3e1d52000',
@@ -21,7 +22,29 @@ class MockRequestPipeline {
     }
   ];
 
+  public mockRelease: MusicBrainzReleaseDto = {
+    id: '2b271a72-55fa-4861-9bfc-83142b97035d',
+    title: 'SOUR',
+    status: 'Official',
+    date: '2021-05-21',
+    'artist-credit': [{ name: 'Olivia Rodrigo' }],
+    media: [
+      {
+        position: 1,
+        'track-count': 2,
+        tracks: [
+          { id: 't1', position: 1, number: '1', title: 'brutal', length: 143000 },
+          { id: 't2', position: 2, number: '2', title: 'traitor', length: 229000 }
+        ]
+      }
+    ]
+  };
+
   public async execute<T>(options: any): Promise<{ data: T }> {
+    this.lastParams = options.params;
+    if (options.url.includes('/release/2b271a72-55fa-4861-9bfc-83142b97035d')) {
+      return { data: this.mockRelease as unknown as T };
+    }
     if (options.url.includes('/recording/b10bbbfc-cf9e-42e0-be17-e2c3e1d52000')) {
       return { data: this.mockRecordings[0] as unknown as T };
     }
@@ -97,5 +120,19 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     const payload = result.payload as any;
     expect(payload.mbid).toBe('b10bbbfc-cf9e-42e0-be17-e2c3e1d52000');
     expect(payload.title).toBe('Bohemian Rhapsody');
+  });
+
+  it('resolves release details without invalid inc parameters', async () => {
+    const mockPipeline = new MockRequestPipeline();
+    const apiClient = new MusicBrainzApiClient(mockPipeline as unknown as RequestPipeline);
+    const adapter = new MusicBrainzAdapter(apiClient);
+
+    const resolved = await adapter.resolveRelease('2b271a72-55fa-4861-9bfc-83142b97035d');
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.album.title).toBe('SOUR');
+    expect(resolved?.tracks).toHaveLength(2);
+    expect(mockPipeline.lastParams?.inc).not.toContain('record-level-relations');
+    expect(mockPipeline.lastParams?.inc).toContain('artists recordings release-groups media discids tags genres');
   });
 });
