@@ -1,10 +1,12 @@
-import type { MetadataTransaction, ResourceMutationPayload, TransactionState } from '../domain/MetadataTransaction';
+import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { UndoToken } from '../domain/UndoToken';
 import { TagWriterService } from '../services/TagWriterService';
 import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
 import { ArtworkDownloaderService } from './ArtworkDownloaderService';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
-import { MetadataHistoryService, type MetadataHistorySnapshot, type SongMetadataSnapshot } from '../history/MetadataHistoryService';
+import { MetadataHistoryService } from '../history/MetadataHistoryService';
+import { MutationExecutor } from './MutationExecutor';
+import { SnapshotBuilder, type DraftSnapshot } from './SnapshotBuilder';
 
 export interface TransactionExecutionOptions {
   replaceArtwork?: boolean;
@@ -27,6 +29,7 @@ export class MetadataTransactionManager {
   private readonly artworkDownloader: ArtworkDownloaderService;
   private readonly cacheInvalidator: ArtworkCacheInvalidator;
   private readonly historyService: MetadataHistoryService;
+  private readonly mutationExecutor: MutationExecutor;
 
   constructor(options?: {
     tagWriter?: TagWriterService;
@@ -38,6 +41,7 @@ export class MetadataTransactionManager {
     this.artworkDownloader = new ArtworkDownloaderService();
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
+    this.mutationExecutor = new MutationExecutor(this.tagWriter, this.relationalSync);
   }
 
   public async executeTransaction(
@@ -68,8 +72,7 @@ export class MetadataTransactionManager {
     let updatedCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
-    const previousSnapshots: SongMetadataSnapshot[] = [];
-    const updatedSnapshots: SongMetadataSnapshot[] = [];
+    const draftSnapshots: DraftSnapshot[] = [];
 
     for (const mut of mutations) {
       if (!mut.filePath) {
@@ -94,45 +97,24 @@ export class MetadataTransactionManager {
         tagPayload.artworkBuffer = artworkBuffer;
       }
 
-      try {
-        const writeResults = await this.tagWriter.writeBatch([
-          { filePath: mut.filePath, tags: tagPayload }
-        ]);
+      const res = await this.mutationExecutor.executeSingleMutation({
+        songId: Number(mut.resourceId),
+        filePath: mut.filePath,
+        tagPayload,
+        fieldMap
+      });
 
-        if (writeResults[0]?.success) {
-          await this.relationalSync.syncRelationalDatabase(
-            Number(mut.resourceId),
-            mut.filePath,
-            fieldMap
-          );
-
-          previousSnapshots.push({
-            songId: Number(mut.resourceId),
-            path: mut.filePath,
-            title: (previousState.title as string) ?? '',
-            artist: previousState.artist as string | undefined,
-            album: previousState.album as string | undefined,
-            year: previousState.year as number | undefined
-          });
-
-          updatedSnapshots.push({
-            songId: Number(mut.resourceId),
-            path: mut.filePath,
-            title: (fieldMap.title as string) ?? '',
-            artist: fieldMap.artist as string | undefined,
-            album: fieldMap.album as string | undefined,
-            year: fieldMap.year as number | undefined
-          });
-
-          updatedCount++;
-        } else {
-          failedCount++;
-          errors.push(writeResults[0]?.error ?? `Failed to write tags to ${mut.filePath}`);
-        }
-      } catch (err: unknown) {
+      if (res.success) {
+        draftSnapshots.push({
+          songId: Number(mut.resourceId),
+          filePath: mut.filePath,
+          previousTags: previousState,
+          appliedTags: fieldMap
+        });
+        updatedCount++;
+      } else {
         failedCount++;
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(msg);
+        errors.push(res.error ?? `Mutation failed for ${mut.filePath}`);
       }
     }
 
@@ -143,16 +125,8 @@ export class MetadataTransactionManager {
       );
     }
 
-    // Push transaction history snapshot if at least one track succeeded
-    if (previousSnapshots.length > 0) {
-      const historySnapshot: MetadataHistorySnapshot = {
-        id: undoToken.id,
-        timestamp: undoToken.timestamp,
-        description: undoToken.description,
-        songIds: previousSnapshots.map((s) => s.songId),
-        previousSongs: previousSnapshots,
-        updatedSongs: updatedSnapshots
-      };
+    if (draftSnapshots.length > 0) {
+      const historySnapshot = SnapshotBuilder.buildHistorySnapshot(operationId, undoToken, draftSnapshots);
       this.historyService.pushSnapshot(historySnapshot);
     }
 
@@ -161,7 +135,7 @@ export class MetadataTransactionManager {
       updatedCount,
       failedCount,
       errors,
-      undoToken: previousSnapshots.length > 0 ? undoToken : undefined
+      undoToken: draftSnapshots.length > 0 ? undoToken : undefined
     };
   }
 
@@ -184,20 +158,17 @@ export class MetadataTransactionManager {
       if (song.album !== undefined) revertTags.album = song.album;
       if (song.year !== undefined) revertTags.year = song.year;
 
-      try {
-        const results = await this.tagWriter.writeBatch([
-          { filePath: song.path, tags: revertTags }
-        ]);
+      const res = await this.mutationExecutor.executeSingleMutation({
+        songId: song.songId,
+        filePath: song.path,
+        tagPayload: revertTags,
+        fieldMap: revertTags
+      });
 
-        if (results[0]?.success) {
-          await this.relationalSync.syncRelationalDatabase(song.songId, song.path, revertTags);
-          revertedCount++;
-        } else {
-          errors.push(results[0]?.error ?? `Failed to revert tags for ${song.path}`);
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(msg);
+      if (res.success) {
+        revertedCount++;
+      } else {
+        errors.push(res.error ?? `Failed to revert tags for ${song.path}`);
       }
     }
 

@@ -11,6 +11,12 @@ export type SongDbUpdater = (
   }
 ) => Promise<unknown>;
 
+export interface SyncResult {
+  success: boolean;
+  warning?: string;
+  fallbackUsed: boolean;
+}
+
 export class LibraryRelationalSyncService {
   private readonly dbUpdater?: SongDbUpdater;
 
@@ -25,7 +31,7 @@ export class LibraryRelationalSyncService {
     songId: number,
     filePath: string,
     fieldMutations: Record<string, string | number>
-  ): Promise<boolean> {
+  ): Promise<SyncResult> {
     if (this.dbUpdater) {
       try {
         await this.dbUpdater(songId, {
@@ -37,20 +43,20 @@ export class LibraryRelationalSyncService {
           trackNumber: fieldMutations.trackNumber as number | undefined,
           discNumber: fieldMutations.discNumber as number | undefined
         });
-        return true;
-      } catch (_err) {
-        // Fallback to reParseSong
+        return { success: true, fallbackUsed: false };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, warning: `DbUpdater failed (${msg})`, fallbackUsed: false };
       }
     }
 
     try {
-      const reParse = await import('../../parseSong/reParseSong');
-      if (reParse && typeof reParse.default === 'function') {
-        await reParse.default(filePath);
-      }
-      return true;
-    } catch (_parseErr) {
-      return true; // Graceful safety fallback in unit testing environments
+      const { default: reParseSong } = await import('../../parseSong/reParseSong');
+      await reParseSong(filePath);
+      return { success: true, fallbackUsed: true };
+    } catch (parseErr: unknown) {
+      const parseMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      return { success: false, warning: `reParseSong failed (${parseMsg})`, fallbackUsed: true };
     }
   }
 }

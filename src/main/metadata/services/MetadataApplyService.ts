@@ -82,6 +82,14 @@ export class MetadataApplyService {
     return this.historyService;
   }
 
+  public get writer(): TagWriterService {
+    return this.tagWriter;
+  }
+
+  public get updater(): SongDbUpdater | undefined {
+    return this.dbUpdater;
+  }
+
   /**
    * Applies metadata changes from AlbumTagPreview using chunked batched transactions with AbortSignal cancellation support:
    * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction & ReParse -> Revert Disk on Error

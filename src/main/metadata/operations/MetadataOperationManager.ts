@@ -33,14 +33,24 @@ export class MetadataOperationManager {
   public createOperation(
     id: string,
     type: OperationType,
-    context: MetadataContext,
+    contextOrResourceIds: MetadataContext | (string | number)[],
     mode: ExecutionMode = 'Interactive',
     policy?: MetadataPolicy
   ): MetadataOperation {
+    const context: MetadataContext = Array.isArray(contextOrResourceIds)
+      ? {
+          resources: {
+            primaryType: 'album',
+            targetResources: contextOrResourceIds.map((rid) => ({ id: rid, type: 'album', attributes: {} }))
+          },
+          execution: { mode }
+        }
+      : contextOrResourceIds;
+
     const operation: MetadataOperation = {
       id,
       type,
-      mode,
+      mode: context.execution.mode,
       targetResourceIds: context.resources.targetResources.map((r) => r.id),
       context,
       policy,

@@ -5,6 +5,9 @@ import type { LocalSongInput } from './AlbumMetadataService';
 import { AlbumMetadataService, getConfidenceLevel } from './AlbumMetadataService';
 import { MetadataDiffBuilder } from '../diff/MetadataDiffBuilder';
 import { MetadataApplyService, type ApplyResult } from './MetadataApplyService';
+import { MetadataOperationManager } from '../operations/MetadataOperationManager';
+import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
+import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 
 export interface AlbumAutoTagServiceOptions {
   albumMetadataService: AlbumMetadataService;
@@ -14,6 +17,8 @@ export interface AlbumAutoTagServiceOptions {
 export class AlbumAutoTagService extends EventEmitter {
   private readonly metadataService: AlbumMetadataService;
   private readonly applyService: MetadataApplyService;
+  private readonly operationManager: MetadataOperationManager;
+  private readonly transactionManager: MetadataTransactionManager;
   private readonly activeOperations: Map<string, AbortController> = new Map();
   private readonly operationStages: Map<string, AutoTagStage> = new Map();
 
@@ -21,6 +26,12 @@ export class AlbumAutoTagService extends EventEmitter {
     super();
     this.metadataService = options.albumMetadataService;
     this.applyService = options.applyService ?? new MetadataApplyService();
+    this.operationManager = new MetadataOperationManager();
+    this.transactionManager = new MetadataTransactionManager({
+      tagWriter: this.applyService.writer,
+      dbUpdater: this.applyService.updater,
+      historyService: this.applyService.history
+    });
   }
 
   public getStage(operationId = 'default'): AutoTagStage {
@@ -31,8 +42,16 @@ export class AlbumAutoTagService extends EventEmitter {
     return this.applyService;
   }
 
+  public get operations(): MetadataOperationManager {
+    return this.operationManager;
+  }
+
+  public get transactions(): MetadataTransactionManager {
+    return this.transactionManager;
+  }
+
   /**
-   * Search album releases with progress reporting and cancellation support.
+   * Search album releases with progress reporting and cancellation support via MetadataOperation.
    */
   public async searchReleases(
     albumName: string,
@@ -42,18 +61,23 @@ export class AlbumAutoTagService extends EventEmitter {
     operationId = 'default'
   ): Promise<AlbumMetadata[]> {
     this.checkCancelled(signal);
+    this.operationManager.createOperation(operationId, 'AlbumResolution', [], 'Interactive');
+    this.operationManager.updateState(operationId, 'Searching', `Searching album releases for "${albumName}"...`, 10);
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
       const results = await this.metadataService.search(albumName, artistName, limit);
       this.checkCancelled(signal);
+      this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);
       this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);
       return results;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
+        this.operationManager.updateState(operationId, 'Cancelled', 'Search cancelled.', 0);
         this.emitProgress('cancelled', 'Search cancelled.', 0, operationId);
         return [];
       }
+      this.operationManager.updateState(operationId, 'Failed', `Search failed: ${err instanceof Error ? err.message : String(err)}`, 0);
       this.emitProgress('failed', `Search failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
     } finally {
@@ -73,6 +97,9 @@ export class AlbumAutoTagService extends EventEmitter {
     operationId = 'default'
   ): Promise<AlbumTagPreview> {
     this.checkCancelled(signal);
+    const targetResourceIds = localSongs.map((s) => s.songId);
+    this.operationManager.createOperation(operationId, 'AlbumResolution', targetResourceIds, 'Interactive');
+    this.operationManager.updateState(operationId, 'Resolving', `Resolving release details for ${releaseId}...`, 30);
     this.emitProgress('resolving', `Resolving release details for ${releaseId}...`, 30, operationId);
 
     try {
@@ -87,6 +114,7 @@ export class AlbumAutoTagService extends EventEmitter {
       const albumPreview = await this.metadataService.buildAlbumMatch(localSongs, resolved.album, resolved.tracks);
       this.checkCancelled(signal);
 
+      this.operationManager.updateState(operationId, 'Merging', 'Building presentation-friendly metadata diffs...', 85);
       this.emitProgress('diffing', 'Building presentation-friendly metadata diffs...', 85, operationId);
       const trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
 
@@ -103,13 +131,16 @@ export class AlbumAutoTagService extends EventEmitter {
         resolvedRelease: resolved
       };
 
+      this.operationManager.updateState(operationId, 'PreviewReady', 'Preview ready for review.', 100);
       this.emitProgress('completed', 'Preview ready for review.', 100, operationId);
       return preview;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
+        this.operationManager.updateState(operationId, 'Cancelled', 'Preview building cancelled.', 0);
         this.emitProgress('cancelled', 'Preview building cancelled.', 0, operationId);
         throw err;
       }
+      this.operationManager.updateState(operationId, 'Failed', `Preview build failed: ${err instanceof Error ? err.message : String(err)}`, 0);
       this.emitProgress('failed', `Preview build failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
     } finally {
@@ -119,7 +150,7 @@ export class AlbumAutoTagService extends EventEmitter {
   }
 
   /**
-   * Apply preview changes to disk and database.
+   * Apply preview changes via MetadataTransactionManager.
    */
   public async applyPreview(
     preview: AlbumTagPreview,
@@ -128,24 +159,52 @@ export class AlbumAutoTagService extends EventEmitter {
     operationId = 'default'
   ): Promise<ApplyResult> {
     this.checkCancelled(signal);
+    this.operationManager.updateState(operationId, 'Applying', `Applying metadata updates for ${preview.album.title}...`, 20);
     this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
 
     try {
-      const result = await this.applyService.applyPreview(preview, options, signal);
+      // Build domain transaction mutations
+      const selectedMatches = preview.matches.filter((m) => m.applyTrack);
+      const mutations: ResourceMutationPayload[] = selectedMatches.map((m) => ({
+        resourceId: m.localSongId,
+        filePath: m.songPath,
+        fieldMutations: m.fieldDiffs
+          .filter((d) => d.applyField && d.status !== 'unchanged')
+          .map((d) => ({
+            fieldId: d.fieldId,
+            oldValue: d.oldValue,
+            newValue: d.userValue ?? d.suggestedValue,
+            providerId: preview.provider,
+            confidenceScore: m.confidence
+          }))
+      }));
+
+      const txResult = await this.transactionManager.executeTransaction(operationId, mutations, options);
       this.checkCancelled(signal);
 
+      const result: ApplyResult = {
+        success: txResult.success,
+        updatedCount: txResult.updatedCount,
+        failedCount: txResult.failedCount,
+        errors: txResult.errors
+      };
+
       if (result.success) {
+        this.operationManager.updateState(operationId, 'Completed', `Successfully updated ${result.updatedCount} songs.`, 100);
         this.emitProgress('completed', `Successfully updated ${result.updatedCount} songs.`, 100, operationId);
       } else {
+        this.operationManager.updateState(operationId, 'Failed', `Applied with errors: ${result.errors.join('; ')}`, 100);
         this.emitProgress('failed', `Applied with errors: ${result.errors.join('; ')}`, 100, operationId);
       }
 
       return result;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
+        this.operationManager.updateState(operationId, 'Cancelled', 'Apply cancelled.', 0);
         this.emitProgress('cancelled', 'Apply cancelled.', 0, operationId);
         throw err;
       }
+      this.operationManager.updateState(operationId, 'Failed', `Apply failed: ${err instanceof Error ? err.message : String(err)}`, 0);
       this.emitProgress('failed', `Apply failed: ${err instanceof Error ? err.message : String(err)}`, 0, operationId);
       throw err;
     } finally {
@@ -155,18 +214,21 @@ export class AlbumAutoTagService extends EventEmitter {
   }
 
   /**
-   * Undoes the last AutoTag transaction.
+   * Undoes the last AutoTag transaction via MetadataTransactionManager.
    */
   public async undoLastAutoTag(operationId = 'default'): Promise<{ success: boolean; restoredCount: number }> {
     this.emitProgress('applying', 'Undoing last AutoTag operation...', 50, operationId);
     try {
-      const res = await this.applyService.undoLastAutoTag();
-      if (res.success) {
-        this.emitProgress('completed', `Restored original metadata for ${res.restoredCount} songs.`, 100, operationId);
+      const res = await this.transactionManager.rollbackLastTransaction();
+      if (res.success && res.revertedCount > 0) {
+        this.operationManager.updateState(operationId, 'Undone', `Restored original metadata for ${res.revertedCount} songs.`, 100);
+        this.emitProgress('completed', `Restored original metadata for ${res.revertedCount} songs.`, 100, operationId);
+        return { success: true, restoredCount: res.revertedCount };
       } else {
+        this.operationManager.updateState(operationId, 'Failed', 'No AutoTag operations available to undo.', 0);
         this.emitProgress('failed', 'No AutoTag operations available to undo.', 0, operationId);
+        return { success: false, restoredCount: 0 };
       }
-      return res;
     } finally {
       this.activeOperations.delete(operationId);
       this.operationStages.delete(operationId);
@@ -180,6 +242,7 @@ export class AlbumAutoTagService extends EventEmitter {
     const controller = this.activeOperations.get(operationId);
     if (controller) {
       controller.abort();
+      this.operationManager.updateState(operationId, 'Cancelled', `Operation '${operationId}' cancelled by user.`, 0);
       this.emitProgress('cancelled', `Operation '${operationId}' cancelled by user.`, 0, operationId);
       this.activeOperations.delete(operationId);
       this.operationStages.delete(operationId);
