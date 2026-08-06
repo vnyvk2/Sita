@@ -37,6 +37,17 @@ export interface ReleaseContext {
 
 export const MIN_MATCH_SCORE = 50;
 
+export function extractStringValue(val: unknown): string | undefined {
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object' && val !== null) {
+    const obj = val as Record<string, unknown>;
+    if (typeof obj.name === 'string') return obj.name;
+    if (typeof obj.title === 'string') return obj.title;
+    if (typeof obj.albumTitle === 'string') return obj.albumTitle;
+  }
+  return undefined;
+}
+
 export const DURATION_THRESHOLDS = [
   { maxDiff: 0.5, score: 30 },
   { maxDiff: 1.0, score: 29 },
@@ -282,9 +293,11 @@ export class TrackMatcher {
     }
 
     // Artist match (up to 20 points)
-    if (song.artist && track.artist) {
-      const normSongArtist = MetadataNormalizer.normalizeArtist(song.artist);
-      const normTrackArtist = MetadataNormalizer.normalizeArtist(track.artist);
+    const rawSongArtist = extractStringValue(song.artist);
+    const rawTrackArtist = extractStringValue(track.artist);
+    if (rawSongArtist && rawTrackArtist) {
+      const normSongArtist = MetadataNormalizer.normalizeArtist(rawSongArtist);
+      const normTrackArtist = MetadataNormalizer.normalizeArtist(rawTrackArtist);
       if (normSongArtist === normTrackArtist || normSongArtist.includes(normTrackArtist)) {
         artistScore = 20;
         matchedBy.push('artist');
@@ -293,8 +306,10 @@ export class TrackMatcher {
     }
 
     // Album match (+10 points exact / +5 points partial — safer balance)
-    const effectiveAlbum = song.album ?? releaseContext?.albumTitle;
-    const targetAlbum = track.album ?? releaseContext?.albumTitle;
+    const rawSongAlbum = extractStringValue(song.album);
+    const rawTrackAlbum = extractStringValue(track.album);
+    const effectiveAlbum = rawSongAlbum ?? releaseContext?.albumTitle;
+    const targetAlbum = rawTrackAlbum ?? releaseContext?.albumTitle;
     if (effectiveAlbum && targetAlbum) {
       const normSongAlbum = MetadataNormalizer.normalizeAlbum(effectiveAlbum);
       const normTargetAlbum = MetadataNormalizer.normalizeAlbum(targetAlbum);
