@@ -4,7 +4,7 @@ import { TagWriterService } from '../services/TagWriterService';
 import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
 import { ArtworkDownloaderService } from './ArtworkDownloaderService';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
-import { MetadataHistoryService } from '../history/MetadataHistoryService';
+import { MetadataHistoryService, type MetadataHistorySnapshot, type SongMetadataSnapshot } from '../history/MetadataHistoryService';
 
 export interface TransactionExecutionOptions {
   replaceArtwork?: boolean;
@@ -65,18 +65,11 @@ export class MetadataTransactionManager {
       affectedResourceIds: mutations.map((m) => m.resourceId)
     };
 
-    const transaction: MetadataTransaction = {
-      id: `tx-${Date.now()}`,
-      operationId,
-      createdAt: Date.now(),
-      state: 'executing',
-      mutations,
-      undoToken
-    };
-
     let updatedCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
+    const previousSnapshots: SongMetadataSnapshot[] = [];
+    const updatedSnapshots: SongMetadataSnapshot[] = [];
 
     for (const mut of mutations) {
       if (!mut.filePath) {
@@ -87,11 +80,13 @@ export class MetadataTransactionManager {
 
       const tagPayload: Record<string, string | number | Buffer> = {};
       const fieldMap: Record<string, string | number> = {};
+      const previousState: Record<string, string | number | undefined> = {};
 
       for (const fm of mut.fieldMutations) {
         if (fm.newValue !== undefined) {
           tagPayload[fm.fieldId] = fm.newValue;
           fieldMap[fm.fieldId] = fm.newValue;
+          previousState[fm.fieldId] = fm.oldValue;
         }
       }
 
@@ -110,6 +105,25 @@ export class MetadataTransactionManager {
             mut.filePath,
             fieldMap
           );
+
+          previousSnapshots.push({
+            songId: Number(mut.resourceId),
+            path: mut.filePath,
+            title: (previousState.title as string) ?? '',
+            artist: previousState.artist as string | undefined,
+            album: previousState.album as string | undefined,
+            year: previousState.year as number | undefined
+          });
+
+          updatedSnapshots.push({
+            songId: Number(mut.resourceId),
+            path: mut.filePath,
+            title: (fieldMap.title as string) ?? '',
+            artist: fieldMap.artist as string | undefined,
+            album: fieldMap.album as string | undefined,
+            year: fieldMap.year as number | undefined
+          });
+
           updatedCount++;
         } else {
           failedCount++;
@@ -129,14 +143,68 @@ export class MetadataTransactionManager {
       );
     }
 
-    transaction.state = errors.length === 0 ? 'committed' : 'failed';
+    // Push transaction history snapshot if at least one track succeeded
+    if (previousSnapshots.length > 0) {
+      const historySnapshot: MetadataHistorySnapshot = {
+        id: undoToken.id,
+        timestamp: undoToken.timestamp,
+        description: undoToken.description,
+        songIds: previousSnapshots.map((s) => s.songId),
+        previousSongs: previousSnapshots,
+        updatedSongs: updatedSnapshots
+      };
+      this.historyService.pushSnapshot(historySnapshot);
+    }
 
     return {
       success: errors.length === 0,
       updatedCount,
       failedCount,
       errors,
-      undoToken
+      undoToken: previousSnapshots.length > 0 ? undoToken : undefined
+    };
+  }
+
+  /**
+   * Executes a rollback operation using the history snapshot stack.
+   */
+  public async rollbackLastTransaction(targetSongId?: number): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
+    const lastSnapshot = this.historyService.popUndo(targetSongId);
+    if (!lastSnapshot) {
+      return { success: true, revertedCount: 0, errors: [] };
+    }
+
+    let revertedCount = 0;
+    const errors: string[] = [];
+
+    for (const song of lastSnapshot.previousSongs) {
+      const revertTags: Record<string, string | number> = {};
+      if (song.title !== undefined) revertTags.title = song.title;
+      if (song.artist !== undefined) revertTags.artist = song.artist;
+      if (song.album !== undefined) revertTags.album = song.album;
+      if (song.year !== undefined) revertTags.year = song.year;
+
+      try {
+        const results = await this.tagWriter.writeBatch([
+          { filePath: song.path, tags: revertTags }
+        ]);
+
+        if (results[0]?.success) {
+          await this.relationalSync.syncRelationalDatabase(song.songId, song.path, revertTags);
+          revertedCount++;
+        } else {
+          errors.push(results[0]?.error ?? `Failed to revert tags for ${song.path}`);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(msg);
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      revertedCount,
+      errors
     };
   }
 

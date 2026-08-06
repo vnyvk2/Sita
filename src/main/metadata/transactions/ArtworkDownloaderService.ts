@@ -1,10 +1,33 @@
 import http from 'http';
 import https from 'https';
+import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 
 export class ArtworkDownloaderService {
+  private readonly requestPipeline?: RequestPipeline;
+
+  constructor(requestPipeline?: RequestPipeline) {
+    this.requestPipeline = requestPipeline;
+  }
+
   public async fetchAndValidateArtwork(url: string, timeoutMs = 15000): Promise<Buffer | null> {
     if (!url || typeof url !== 'string' || !url.startsWith('http')) {
       return null;
+    }
+
+    if (this.requestPipeline) {
+      try {
+        const res = await this.requestPipeline.execute<Buffer>({
+          url,
+          method: 'GET',
+          responseType: 'buffer',
+          timeoutMs
+        });
+        if (res.data && this.validateMagicBytes(res.data)) {
+          return res.data;
+        }
+      } catch (_err) {
+        // Fallback to node http/https
+      }
     }
 
     return new Promise((resolve) => {
@@ -19,20 +42,7 @@ export class ArtworkDownloaderService {
         res.on('data', (chunk: Buffer) => chunks.push(chunk));
         res.on('end', () => {
           const buffer = Buffer.concat(chunks);
-          if (buffer.length < 16) {
-            resolve(null);
-            return;
-          }
-
-          // Validate magic bytes (JPEG or PNG)
-          const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-          const isPng =
-            buffer[0] === 0x89 &&
-            buffer[1] === 0x50 &&
-            buffer[2] === 0x4e &&
-            buffer[3] === 0x47;
-
-          if (isJpeg || isPng) {
+          if (this.validateMagicBytes(buffer)) {
             resolve(buffer);
           } else {
             resolve(null);
@@ -46,5 +56,16 @@ export class ArtworkDownloaderService {
         resolve(null);
       });
     });
+  }
+
+  private validateMagicBytes(buffer: Buffer): boolean {
+    if (buffer.length < 16) return false;
+    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const isPng =
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47;
+    return isJpeg || isPng;
   }
 }

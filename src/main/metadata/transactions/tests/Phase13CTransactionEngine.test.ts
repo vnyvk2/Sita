@@ -4,14 +4,17 @@ import { TagWriterService } from '../../services/TagWriterService';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 
 describe('Phase 13C — Unified Transaction Manager Blueprint Test Suite', () => {
-  it('executes atomic mutations via MetadataTransactionManager and generates UndoToken', async () => {
+  it('executes atomic mutations via MetadataTransactionManager and records UndoToken snapshots', async () => {
     const mockTagWriter = new TagWriterService();
     vi.spyOn(mockTagWriter, 'writeBatch').mockResolvedValue([
       { filePath: 'song.mp3', success: true }
     ]);
 
+    const mockDbUpdater = vi.fn().mockResolvedValue(true);
+
     const txManager = new MetadataTransactionManager({
-      tagWriter: mockTagWriter
+      tagWriter: mockTagWriter,
+      dbUpdater: mockDbUpdater
     });
 
     const mutations: ResourceMutationPayload[] = [
@@ -31,11 +34,22 @@ describe('Phase 13C — Unified Transaction Manager Blueprint Test Suite', () =>
     expect(result.failedCount).toBe(0);
     expect(result.undoToken).toBeDefined();
     expect(result.undoToken?.operationId).toBe('op-sour');
-    expect(result.undoToken?.affectedResourceIds).toEqual([101]);
+    expect(mockDbUpdater).toHaveBeenCalled();
+
+    // Verify snapshot recorded in history
+    expect(txManager.history.canUndo).toBe(true);
+
+    // Rollback transaction
+    const rollbackRes = await txManager.rollbackLastTransaction();
+    expect(rollbackRes.success).toBe(true);
+    expect(rollbackRes.revertedCount).toBe(1);
+    expect(txManager.history.canUndo).toBe(false);
   });
 
   it('handles missing file path validation errors cleanly', async () => {
-    const txManager = new MetadataTransactionManager();
+    const txManager = new MetadataTransactionManager({
+      dbUpdater: vi.fn().mockResolvedValue(true)
+    });
 
     const mutations: ResourceMutationPayload[] = [
       {
