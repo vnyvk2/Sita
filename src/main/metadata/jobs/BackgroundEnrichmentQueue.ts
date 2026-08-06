@@ -19,8 +19,12 @@ export interface BackgroundEnrichmentJob {
   id: string;
   songId: number;
   filePath?: string;
+  title?: string;
+  artist?: string;
+  album?: string;
   enqueuedAt: number;
   attempts: number;
+  maxRetries: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
 }
 
@@ -48,27 +52,34 @@ export class BackgroundEnrichmentQueue {
   private processedCounter = 0;
   private failedCounter = 0;
   private customHandler?: JobWorkerHandler;
+  private readonly maxRetries: number;
 
   constructor(options?: {
     operationManager?: MetadataOperationManager;
     resolutionManager?: MetadataResolutionManager;
     transactionManager?: MetadataTransactionManager;
     workerHandler?: JobWorkerHandler;
+    maxRetries?: number;
   }) {
     this.operationManager = options?.operationManager;
     this.resolutionManager = options?.resolutionManager;
     this.transactionManager = options?.transactionManager;
     this.customHandler = options?.workerHandler;
+    this.maxRetries = options?.maxRetries ?? 3;
   }
 
-  public enqueueEnrichment(songId: number, filePath?: string): string {
+  public enqueueEnrichment(songId: number, filePath?: string, songMeta?: Partial<SongMetadataInput>): string {
     const jobId = `enrich-${songId}-${Date.now()}`;
     const job: BackgroundEnrichmentJob = {
       id: jobId,
       songId,
       filePath,
+      title: songMeta?.title,
+      artist: songMeta?.artist,
+      album: songMeta?.album,
       enqueuedAt: Date.now(),
       attempts: 0,
+      maxRetries: this.maxRetries,
       status: 'pending'
     };
 
@@ -79,7 +90,7 @@ export class BackgroundEnrichmentQueue {
     }
 
     if (this.isRunning && !this.isPausedState) {
-      void this.processNextJob();
+      void this.processWorkerQueue();
     }
 
     return jobId;
@@ -90,7 +101,7 @@ export class BackgroundEnrichmentQueue {
     for (const song of songs) {
       const health = this.evaluateSongHealth(song);
       if (health.rating === 'Fair' || health.rating === 'Poor') {
-        this.enqueueEnrichment(song.songId, song.filePath);
+        this.enqueueEnrichment(song.songId, song.filePath, song);
         enqueued++;
       }
     }
@@ -101,7 +112,7 @@ export class BackgroundEnrichmentQueue {
     if (handler) this.customHandler = handler;
     this.isRunning = true;
     this.isPausedState = false;
-    void this.processNextJob();
+    void this.processWorkerQueue();
   }
 
   public pause(): void {
@@ -111,7 +122,7 @@ export class BackgroundEnrichmentQueue {
   public resume(): void {
     this.isPausedState = false;
     if (this.isRunning) {
-      void this.processNextJob();
+      void this.processWorkerQueue();
     }
   }
 
@@ -119,8 +130,18 @@ export class BackgroundEnrichmentQueue {
     this.isRunning = false;
   }
 
+  private async processWorkerQueue(): Promise<void> {
+    while (this.isRunning && !this.isPausedState && this.pendingJobs.size > 0) {
+      const success = await this.processNextJob();
+      if (!success) {
+        // Break out of tight loop if no job was runnable
+        break;
+      }
+    }
+  }
+
   public async processNextJob(): Promise<boolean> {
-    if (!this.isRunning || this.isPausedState || this.pendingJobs.size === 0) {
+    if (this.isPausedState || this.pendingJobs.size === 0) {
       return false;
     }
 
@@ -132,7 +153,7 @@ export class BackgroundEnrichmentQueue {
     job.attempts++;
 
     if (this.operationManager) {
-      this.operationManager.updateState(jobId, 'Searching', `Background processing for song ${job.songId}`, 25);
+      this.operationManager.updateState(jobId, 'Searching', `Background processing for song ${job.songId} (Attempt ${job.attempts}/${job.maxRetries})`, 25);
     }
 
     let success = false;
@@ -154,29 +175,36 @@ export class BackgroundEnrichmentQueue {
       if (this.operationManager) {
         this.operationManager.updateState(jobId, 'Completed', `Background enrichment completed for song ${job.songId}`, 100);
       }
+      return true;
     } else {
-      job.status = 'failed';
-      this.failedCounter++;
-      if (this.operationManager) {
-        this.operationManager.updateState(jobId, 'Failed', `Background enrichment failed for song ${job.songId}`, 0);
+      if (job.attempts < job.maxRetries) {
+        // Reset status to pending for retry
+        job.status = 'pending';
+        if (this.operationManager) {
+          this.operationManager.updateState(jobId, 'Created', `Retrying background enrichment for song ${job.songId} (${job.attempts}/${job.maxRetries})`, 0);
+        }
+        return false;
+      } else {
+        job.status = 'failed';
+        this.failedCounter++;
+        this.pendingJobs.delete(jobId);
+        if (this.operationManager) {
+          this.operationManager.updateState(jobId, 'Failed', `Background enrichment failed after ${job.attempts} attempts for song ${job.songId}`, 0);
+        }
+        return false;
       }
     }
-
-    // Continue worker loop if active
-    if (this.isRunning && !this.isPausedState && this.pendingJobs.size > 0) {
-      void this.processNextJob();
-    }
-
-    return success;
   }
 
   private async defaultProcessJob(job: BackgroundEnrichmentJob): Promise<boolean> {
     if (this.resolutionManager && this.transactionManager && job.filePath) {
       try {
+        const queryTitle = job.title || `Song-${job.songId}`;
+        const queryArtist = job.artist;
         const resolution = await this.resolutionManager.resolve(job.id, {
           resources: { primaryType: 'track', targetResources: [{ id: job.songId, type: 'track', attributes: {} }] },
           execution: { mode: 'Background' },
-          request: { query: { trackTitle: `Song-${job.songId}` } }
+          request: { query: { trackTitle: queryTitle, artistName: queryArtist } }
         });
 
         if (resolution && resolution.candidates.length > 0) {

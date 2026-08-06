@@ -70,21 +70,28 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
     expect(queue.pendingCount).toBe(2);
   });
 
-  it('executes background worker loop, processing enqueued jobs via workerHandler', async () => {
-    const mockHandler = vi.fn().mockResolvedValue(true);
-    const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler });
+  it('executes background worker loop with retries for failed attempts', async () => {
+    let callCount = 0;
+    const mockHandler = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount < 2) return false; // Fail attempt 1, succeed attempt 2
+      return true;
+    });
 
-    queue.enqueueEnrichment(201, 'song201.mp3');
-    queue.enqueueEnrichment(202, 'song202.mp3');
+    const queue = new BackgroundEnrichmentQueue({ workerHandler: mockHandler, maxRetries: 3 });
 
+    queue.enqueueEnrichment(201, 'song201.mp3', { title: 'drivers license', artist: 'Olivia Rodrigo' });
     queue.startWorkerLoop();
 
-    // Process both jobs
+    // Process attempt 1 (fails, stays in pending for retry)
     await queue.processNextJob();
-    await queue.processNextJob();
+    expect(callCount).toBe(1);
+    expect(queue.pendingCount).toBe(1);
 
-    expect(mockHandler).toHaveBeenCalledTimes(2);
-    expect(queue.processedCount).toBe(2);
+    // Process attempt 2 (succeeds)
+    await queue.processNextJob();
+    expect(callCount).toBe(2);
+    expect(queue.processedCount).toBe(1);
     expect(queue.pendingCount).toBe(0);
   });
 
