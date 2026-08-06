@@ -133,4 +133,25 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     expect(preview.fieldDiffs.find((f) => f.fieldId === 'title')?.providerName).toBe('MusicBrainz');
     expect(preview.fieldDiffs.find((f) => f.fieldId === 'genre')?.providerName).toBe('Discogs');
   });
+
+  it('recomputes merged candidate result instantly when user selects alternate field provider', () => {
+    const registry = new ProviderRegistry();
+    const mergeEngine = new MetadataMergeEngine(registry);
+
+    const rawContributions: FieldContribution[] = [
+      { fieldId: 'genre', providerId: 'discogs', value: 'Pop Rock', confidenceScore: 0.95 },
+      { fieldId: 'genre', providerId: 'spotify', value: 'Synth-Pop', confidenceScore: 0.88 },
+      { fieldId: 'genre', providerId: 'musicbrainz', value: 'Pop', confidenceScore: 0.85 }
+    ];
+
+    const initialMerged = mergeEngine.mergeFieldContributions(rawContributions);
+    expect(initialMerged.genre).toBe('Pop');
+    expect(initialMerged.fieldAttributions.genre.providerName).toBe('MusicBrainz');
+    expect(initialMerged.fieldAlternatives.genre).toHaveLength(3);
+
+    // User selects Spotify as genre provider
+    const updated = mergeEngine.selectFieldProvider(initialMerged, 'genre', 'spotify');
+    expect(updated.genre).toBe('Synth-Pop');
+    expect(updated.fieldAttributions.genre.providerName).toBe('Spotify');
+  });
 });

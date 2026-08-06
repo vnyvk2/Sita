@@ -18,6 +18,7 @@ export interface MergedCandidateResult {
   genre?: string;
   artworkUrl?: string;
   fieldAttributions: Record<string, ProviderAttribution>;
+  fieldAlternatives: Record<string, FieldContribution[]>;
 }
 
 export class MetadataMergeEngine {
@@ -85,9 +86,12 @@ export class MetadataMergeEngine {
 
     const winningResult: Partial<MergedCandidateResult> = {};
     const fieldAttributions: Record<string, ProviderAttribution> = {};
+    const fieldAlternatives: Record<string, FieldContribution[]> = {};
 
     for (const [fieldId, contribs] of Object.entries(contributionsByField)) {
       if (contribs.length === 0) continue;
+
+      fieldAlternatives[fieldId] = [...contribs];
 
       const fieldPolicy = policy?.merge?.fieldPolicies?.[fieldId];
       let winning: FieldContribution | undefined;
@@ -125,7 +129,37 @@ export class MetadataMergeEngine {
       year: winningResult.year,
       genre: winningResult.genre,
       artworkUrl: winningResult.artworkUrl,
-      fieldAttributions
+      fieldAttributions,
+      fieldAlternatives
+    };
+  }
+
+  /**
+   * Recomputes a merged result when the user explicitly selects an alternate provider for a specific field.
+   */
+  public selectFieldProvider(
+    merged: MergedCandidateResult,
+    fieldId: string,
+    providerId: string
+  ): MergedCandidateResult {
+    const alts = merged.fieldAlternatives[fieldId];
+    if (!alts || alts.length === 0) return merged;
+
+    const chosen = alts.find((a) => a.providerId.toLowerCase() === providerId.toLowerCase());
+    if (!chosen) return merged;
+
+    const updatedAttributions = { ...merged.fieldAttributions };
+    updatedAttributions[fieldId] = {
+      fieldId,
+      providerId: chosen.providerId,
+      providerName: this.providerRegistry.getDisplayName(chosen.providerId),
+      confidenceScore: chosen.confidenceScore
+    };
+
+    return {
+      ...merged,
+      [fieldId]: chosen.value,
+      fieldAttributions: updatedAttributions
     };
   }
 }

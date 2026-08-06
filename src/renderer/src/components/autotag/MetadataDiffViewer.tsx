@@ -5,6 +5,7 @@ export interface MetadataDiffViewerProps {
   track: TrackMatchPreview;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
+  fieldAlternativesMap?: Map<string, Array<{ providerId: string; providerName: string; value: string | number }>>;
   onFieldChanged: (fieldId: MetadataFieldId, value: string | number) => void;
   onToggleField: (fieldId: MetadataFieldId) => void;
   onResetField: (fieldId: MetadataFieldId) => void;
@@ -15,6 +16,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   track,
   selectedFieldMap,
   userEditedValues,
+  fieldAlternativesMap,
   onFieldChanged,
   onToggleField,
   onResetField,
@@ -61,13 +63,14 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
           const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
           const badge = getBadgeStyle(diff.status);
           const provStyle = getProviderColor(diff.providerId);
+          const alternatives = fieldAlternativesMap?.get(diff.fieldId);
 
           return (
             <div
               key={diff.fieldId}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '30px 120px 1fr 1fr 110px 100px 50px',
+                gridTemplateColumns: '30px 120px 1fr 1fr 120px 100px 50px',
                 alignItems: 'center',
                 gap: '10px',
                 padding: '8px 12px',
@@ -104,27 +107,49 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                 }}
               />
 
-              {/* Provider Badge */}
-              <div
-                title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
-                style={{
-                  fontSize: '0.70rem',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  textAlign: 'center',
-                  fontWeight: 600,
-                  backgroundColor: provStyle.bg,
-                  border: `1px solid ${provStyle.border}`,
-                  color: provStyle.text,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  cursor: onSelectProviderForField ? 'pointer' : 'default'
-                }}
-                onClick={() => onSelectProviderForField && onSelectProviderForField(diff.fieldId, diff.providerId ?? 'musicbrainz')}
-              >
-                {diff.providerName ?? 'MusicBrainz'}
-              </div>
+              {/* Provider Selector / Badge */}
+              {alternatives && alternatives.length > 1 && onSelectProviderForField ? (
+                <select
+                  value={diff.providerId ?? 'musicbrainz'}
+                  onChange={(e) => onSelectProviderForField(diff.fieldId, e.target.value)}
+                  style={{
+                    fontSize: '0.72rem',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    backgroundColor: provStyle.bg,
+                    border: `1px solid ${provStyle.border}`,
+                    color: provStyle.text,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  {alternatives.map((alt) => (
+                    <option key={alt.providerId} value={alt.providerId} style={{ background: '#1e1e2e', color: '#ffffff' }}>
+                      {alt.providerName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
+                  style={{
+                    fontSize: '0.70rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    textAlign: 'center',
+                    fontWeight: 600,
+                    backgroundColor: provStyle.bg,
+                    border: `1px solid ${provStyle.border}`,
+                    color: provStyle.text,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {diff.providerName ?? 'MusicBrainz'}
+                </div>
+              )}
 
               <span
                 style={{
