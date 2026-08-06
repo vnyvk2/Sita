@@ -53,6 +53,7 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 * **`MetadataTransactionManager.ts`**: Application service orchestrating atomic mutations across physical disk files, database syncing, artwork downloading, cache invalidation, and `UndoToken` snapshot generation.
 * **`MutationExecutor.ts`**: Reusable execution unit unifying forward write and rollback execution.
 * **`SnapshotBuilder.ts`**: Constructs immutable `MetadataHistorySnapshot` objects.
+* **`BackgroundEnrichmentQueue.ts`**: Job queue managing background enrichment tasks (`ExecutionMode.Background`) and library health evaluation.
 
 #### Infrastructure & Services Layer (`src/main/metadata/transactions/`, `src/main/metadata/services/`)
 * **`AlbumAutoTagService.ts`**: Thin façade service routed through `MetadataOperationManager` and `MetadataTransactionManager` end-to-end.
@@ -62,16 +63,8 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 
 ---
 
-### 3.2 Planned Work (Phase 13E)
-
-* **Phase 13E — Background Enrichment Platform & Health Dashboard**:
-  - Build background enrichment job queues using `ExecutionMode.Background`.
-  - Implement library metadata health scoring dashboard (`LibraryHealth`, `AlbumHealth`, `SongHealth`).
-
----
-
 ## 4. Automated Verification & Metrics
 
-- **Vitest Suite**: `54 / 54 tests passed` (100% pass rate across all 15 test suites).
-- **Architecture Tests**: Verified domain models, application managers, provider federation, and transaction engine via `Phase13DomainSpecification.test.ts`, `Phase13BEngineIntegration.test.ts`, `Phase13CTransactionEngine.test.ts`, and `Phase13DProviderFederation.test.ts`.
+- **Vitest Suite**: `58 / 58 tests passed` (100% pass rate across all 16 test suites).
+- **Architecture Tests**: Verified domain models, application managers, provider federation, background jobs, and transaction engine via `MetadataDomainSpecification.test.ts`, `MetadataEngineIntegration.test.ts`, `MetadataTransactionEngine.test.ts`, `ProviderFederationEngine.test.ts`, and `BackgroundEnrichmentQueue.test.ts`.
 - **Zero Architectural Drift**: Zero legacy AutoTag service leaks in `MetadataOperationManager`, `MetadataResolutionManager`, or `MetadataTransactionManager`. Adheres strictly to Invariants 11 and 12.

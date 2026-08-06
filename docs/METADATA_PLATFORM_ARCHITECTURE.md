@@ -32,6 +32,7 @@ Application Layer ────► MetadataEngine
                          ├── MetadataOperationManager
                          ├── MetadataResolutionManager
                          ├── MetadataTransactionManager
+                         ├── BackgroundEnrichmentQueue
                          └── ProviderFederation
                                ├── ProviderRegistry
                                └── MetadataMergeEngine
@@ -81,3 +82,11 @@ Every resolved field diff carries structured provider attribution resolved by `M
 * **Discogs**: `Discogs` badge attached to master releases, genres, styles, catalog numbers.
 * **Cover Art Archive**: `Cover Art Archive` badge attached to high-resolution front/back artwork.
 * **Spotify / Apple Music**: `Spotify` / `Apple Music` badges attached to popular genre tags & release dates.
+
+---
+
+## 5. Background Enrichment Platform & Health Assessment
+
+Background tasks execute asynchronously without blocking the UI main loop:
+* **Background Enqueuing**: `BackgroundEnrichmentQueue` enqueues background jobs with `ExecutionMode.Background`.
+* **Library Quality Health Scoring**: Evaluates individual song health and library-wide health reports (`totalSongs`, `overallScore`, `rating`, `missingTitles`, `missingArtists`, `missingAlbums`, `missingArtworks`, `missingGenres`).
