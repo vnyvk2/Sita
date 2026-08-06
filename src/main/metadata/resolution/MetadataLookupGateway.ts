@@ -35,11 +35,44 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
 
     if (!title) return [];
 
+    const candidates: ProviderCandidate[] = [];
+
+    // 1. Check registry-driven active provider instances first
+    const activeInstances = this.providerRegistry.getActiveInstances();
+    if (activeInstances.size > 0) {
+      for (const [providerId, provider] of activeInstances.entries()) {
+        try {
+          const result = await provider.fetchMetadata({ title, artist });
+          if (result) {
+            candidates.push({
+              providerId,
+              providerName: this.providerRegistry.getDisplayName(providerId),
+              externalId: result.mbid ?? providerId,
+              title: result.title ?? title,
+              artist: result.artist ?? artist ?? '',
+              score: 0.95,
+              matchedAttributes: {
+                title: result.title ?? '',
+                artist: result.artist ?? '',
+                album: result.album ?? '',
+                genre: result.genres?.[0] ?? ''
+              }
+            });
+          }
+        } catch (_err) {
+          // Ignore individual provider lookup errors gracefully
+        }
+      }
+      if (candidates.length > 0) {
+        return candidates;
+      }
+    }
+
+    // 2. Fall back to executor if set
     if (this.executor) {
       try {
         const results = await this.executor.executeAll({ title, artist });
 
-        const candidates: ProviderCandidate[] = [];
         for (const res of results) {
           if (res.success && res.data) {
             candidates.push({

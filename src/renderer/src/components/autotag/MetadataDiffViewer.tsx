@@ -8,6 +8,7 @@ export interface MetadataDiffViewerProps {
   onFieldChanged: (fieldId: MetadataFieldId, value: string | number) => void;
   onToggleField: (fieldId: MetadataFieldId) => void;
   onResetField: (fieldId: MetadataFieldId) => void;
+  onSelectProviderForField?: (fieldId: MetadataFieldId, providerId: string) => void;
 }
 
 export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
@@ -16,7 +17,8 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   userEditedValues,
   onFieldChanged,
   onToggleField,
-  onResetField
+  onResetField,
+  onSelectProviderForField
 }) => {
   const getBadgeStyle = (status: string) => {
     switch (status) {
@@ -28,6 +30,21 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
         return { bg: 'rgba(156, 163, 175, 0.2)', border: 'rgba(156, 163, 175, 0.4)', text: '#9ca3af', label: 'Missing' };
       default:
         return { bg: 'transparent', border: 'transparent', text: 'rgba(255,255,255,0.4)', label: 'Unchanged' };
+    }
+  };
+
+  const getProviderColor = (providerId?: string) => {
+    switch (providerId?.toLowerCase()) {
+      case 'musicbrainz':
+        return { bg: 'rgba(186, 85, 211, 0.2)', text: '#e9d5ff', border: 'rgba(186, 85, 211, 0.4)' };
+      case 'discogs':
+        return { bg: 'rgba(234, 88, 12, 0.2)', text: '#ffedd5', border: 'rgba(234, 88, 12, 0.4)' };
+      case 'coverartarchive':
+        return { bg: 'rgba(14, 165, 233, 0.2)', text: '#e0f2fe', border: 'rgba(14, 165, 233, 0.4)' };
+      case 'spotify':
+        return { bg: 'rgba(34, 197, 94, 0.2)', text: '#dcfce7', border: 'rgba(34, 197, 94, 0.4)' };
+      default:
+        return { bg: 'rgba(59, 130, 246, 0.2)', text: '#dbeafe', border: 'rgba(59, 130, 246, 0.4)' };
     }
   };
 
@@ -43,13 +60,14 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
           const isSelected = selectedFieldMap.get(key) ?? diff.applyField;
           const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
           const badge = getBadgeStyle(diff.status);
+          const provStyle = getProviderColor(diff.providerId);
 
           return (
             <div
               key={diff.fieldId}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '30px 120px 1fr 1fr 120px 60px',
+                gridTemplateColumns: '30px 120px 1fr 1fr 110px 100px 50px',
                 alignItems: 'center',
                 gap: '10px',
                 padding: '8px 12px',
@@ -85,6 +103,28 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   outline: 'none'
                 }}
               />
+
+              {/* Provider Badge */}
+              <div
+                title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
+                style={{
+                  fontSize: '0.70rem',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                  backgroundColor: provStyle.bg,
+                  border: `1px solid ${provStyle.border}`,
+                  color: provStyle.text,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  cursor: onSelectProviderForField ? 'pointer' : 'default'
+                }}
+                onClick={() => onSelectProviderForField && onSelectProviderForField(diff.fieldId, diff.providerId ?? 'musicbrainz')}
+              >
+                {diff.providerName ?? 'MusicBrainz'}
+              </div>
 
               <span
                 style={{
