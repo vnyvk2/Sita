@@ -71,11 +71,19 @@ function AlbumInfoPage() {
     select: (data) => data.data[0]
   });
 
+  useEffect(() => {
+    if (!albumData) {
+      navigate({ to: '/main-player/albums', replace: true });
+    }
+  }, [albumData, navigate]);
+
+  if (!albumData) return null;
+
   const { data: onlineAlbumInfo } = useQuery(albumQuery.fetchOnlineInfo({ albumId }));
 
   const { data: albumSongs = [] } = useQuery({
     ...songQuery.allSongInfo({
-      songIds: albumData.songs.map((song) => song.songId) || [],
+      songIds: albumData?.songs?.map((song) => song.songId) ?? [],
       sortType: sortingOrder,
       filterType: 'notSelected'
     }),
