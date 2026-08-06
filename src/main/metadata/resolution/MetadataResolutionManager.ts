@@ -17,9 +17,9 @@ export class MetadataResolutionManager {
   }
 
   /**
-   * Performs candidate resolution across registered providers via MetadataLookupGateway using MetadataContext.
+   * Performs resolution (lookup, candidate normalization, and merge evaluation) via MetadataLookupGateway.
    */
-  public async resolveCandidates(
+  public async resolve(
     operationId: string,
     context: MetadataContext
   ): Promise<MetadataResolution> {
@@ -31,7 +31,7 @@ export class MetadataResolutionManager {
 
     return {
       operationId,
-      resourceId: context.targetResources[0]?.resourceId ?? 0,
+      resourceId: context.resources.targetResources[0]?.id ?? 0,
       candidates,
       resolvedAt: Date.now()
     };

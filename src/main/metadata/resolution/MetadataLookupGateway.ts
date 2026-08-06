@@ -1,6 +1,6 @@
 import type { MetadataProviderExecutor } from '../engine/MetadataProviderExecutor';
 import type { ProviderCandidate } from '../domain/MetadataResolution';
-import type { MetadataContext } from '../domain/MetadataContext';
+import type { MetadataContext, AlbumLookupQuery, TrackLookupQuery } from '../domain/MetadataContext';
 
 export interface MetadataLookupGateway {
   searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]>;
@@ -14,12 +14,23 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
   }
 
   public async searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]> {
-    const title = (context.query?.albumTitle ?? context.query?.trackTitle ?? context.query?.title) as string | undefined;
-    const artist = (context.query?.artistName ?? context.query?.artist) as string | undefined;
+    const requestQuery = context.request?.query;
+    if (!requestQuery) return [];
 
-    if (!title) {
-      return [];
+    let title: string | undefined;
+    let artist: string | undefined;
+
+    if ('albumTitle' in requestQuery) {
+      const q = requestQuery as AlbumLookupQuery;
+      title = q.albumTitle;
+      artist = q.artistName;
+    } else if ('trackTitle' in requestQuery) {
+      const q = requestQuery as TrackLookupQuery;
+      title = q.trackTitle;
+      artist = q.artistName;
     }
+
+    if (!title) return [];
 
     if (this.executor) {
       try {

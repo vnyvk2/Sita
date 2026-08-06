@@ -1,4 +1,5 @@
 import type { MetadataPolicy } from './MetadataPolicy';
+import type { MetadataContext } from './MetadataContext';
 
 export type OperationType =
   | 'ManualEdit'
@@ -31,6 +32,7 @@ export interface MetadataOperation {
   readonly type: OperationType;
   readonly mode: ExecutionMode;
   readonly targetResourceIds: (string | number)[];
+  readonly context: MetadataContext;
   readonly policy?: MetadataPolicy;
   readonly state: OperationState;
   readonly progressMessage: string;

@@ -33,7 +33,7 @@ export class MetadataOperationManager {
   public createOperation(
     id: string,
     type: OperationType,
-    targetResourceIds: (string | number)[],
+    context: MetadataContext,
     mode: ExecutionMode = 'Interactive',
     policy?: MetadataPolicy
   ): MetadataOperation {
@@ -41,7 +41,8 @@ export class MetadataOperationManager {
       id,
       type,
       mode,
-      targetResourceIds,
+      targetResourceIds: context.resources.targetResources.map((r) => r.id),
+      context,
       policy,
       state: 'Created',
       progressMessage: 'Operation created',
@@ -80,10 +81,7 @@ export class MetadataOperationManager {
     return updated;
   }
 
-  public async executeResolution(
-    id: string,
-    context: MetadataContext
-  ): Promise<MetadataResolution | undefined> {
+  public async executeResolution(id: string): Promise<MetadataResolution | undefined> {
     const op = this.operations.get(id);
     if (!op) return undefined;
 
@@ -95,7 +93,7 @@ export class MetadataOperationManager {
     }
 
     try {
-      const resolution = await this.resolutionManager.resolveCandidates(id, context);
+      const resolution = await this.resolutionManager.resolve(id, op.context);
 
       this.updateState(id, 'Resolving', `Resolved ${resolution.candidates.length} candidates`, 60);
       this.updateState(id, 'PreviewReady', 'Preview ready for review', 80);

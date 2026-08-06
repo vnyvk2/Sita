@@ -5,12 +5,21 @@ import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGatew
 import type { MetadataContext } from '../../domain/MetadataContext';
 
 describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Suite', () => {
+  const dummyContext: MetadataContext = {
+    resources: {
+      primaryType: 'album',
+      targetResources: [{ id: 101, type: 'album', attributes: {} }]
+    },
+    execution: { mode: 'Interactive' }
+  };
+
   it('manages operation lifecycles via MetadataOperationManager', () => {
     const manager = new MetadataOperationManager();
-    const op = manager.createOperation('op-1', 'AlbumResolution', [101, 102], 'Interactive');
+    const op = manager.createOperation('op-1', 'AlbumResolution', dummyContext, 'Interactive');
 
     expect(op.state).toBe('Created');
-    expect(op.targetResourceIds).toEqual([101, 102]);
+    expect(op.targetResourceIds).toEqual([101]);
+    expect(op.context.resources.primaryType).toBe('album');
 
     const updated = manager.updateState('op-1', 'Searching', 'Searching MusicBrainz...', 20);
     expect(updated?.state).toBe('Searching');
@@ -21,7 +30,7 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     expect(completed?.completedAt).toBeDefined();
   });
 
-  it('executes candidate resolution via MetadataLookupGateway with MetadataContext', async () => {
+  it('executes candidate resolution via MetadataLookupGateway with embedded MetadataContext', async () => {
     const mockLookupGateway: MetadataLookupGateway = {
       searchCandidates: vi.fn().mockResolvedValue([
         {
@@ -41,14 +50,20 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     const opManager = new MetadataOperationManager(resolutionManager);
 
     const context: MetadataContext = {
-      resourceType: 'album',
-      targetResources: [{ resourceId: 201, resourceType: 'album' }],
-      query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' },
-      executionMode: 'Interactive'
+      resources: {
+        primaryType: 'album',
+        targetResources: [{ id: 201, type: 'album', attributes: {} }]
+      },
+      execution: { mode: 'Interactive' },
+      request: {
+        id: 'req-1',
+        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' },
+        requestedAt: Date.now()
+      }
     };
 
-    opManager.createOperation('op-sour', 'AlbumResolution', [201], 'Interactive');
-    const resolution = await opManager.executeResolution('op-sour', context);
+    opManager.createOperation('op-sour', 'AlbumResolution', context, 'Interactive');
+    const resolution = await opManager.executeResolution('op-sour');
 
     expect(resolution).toBeDefined();
     expect(resolution?.candidates).toHaveLength(1);
@@ -63,14 +78,15 @@ describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Su
     const opManager = new MetadataOperationManager(); // No resolution manager configured
 
     const context: MetadataContext = {
-      resourceType: 'album',
-      targetResources: [{ resourceId: 301, resourceType: 'album' }],
-      query: { albumTitle: 'Unknown' },
-      executionMode: 'Interactive'
+      resources: {
+        primaryType: 'album',
+        targetResources: [{ id: 301, type: 'album', attributes: {} }]
+      },
+      execution: { mode: 'Interactive' }
     };
 
-    opManager.createOperation('op-fail', 'AlbumResolution', [301], 'Interactive');
-    const res = await opManager.executeResolution('op-fail', context);
+    opManager.createOperation('op-fail', 'AlbumResolution', context, 'Interactive');
+    const res = await opManager.executeResolution('op-fail');
 
     expect(res).toBeUndefined();
     const failedOp = opManager.getOperation('op-fail');
