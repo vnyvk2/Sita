@@ -37,36 +37,30 @@ Phase 13 establishes the **Metadata Platform** where every metadata change—man
 #### Domain Layer (`src/main/metadata/domain/`)
 * **`MetadataResource.ts`**: Immutable domain resource entities (`TrackResource`, `AlbumResource`, `ArtistResource`).
 * **`MetadataOperation.ts`**: Domain model capturing operation identity, type, execution mode, target resource IDs, state machine (`Created` $\rightarrow$ `Searching` $\rightarrow$ `Resolving` $\rightarrow$ `PreviewReady` $\rightarrow$ `Applying` $\rightarrow$ `Completed`), and embedded `MetadataContext`.
-* **`MetadataContext.ts`**: Immutable domain context structured into sub-contexts:
-  * `ResourceContext` (Primary resource type & target resources).
-  * `ExecutionContext` (Execution mode, timeout, locale).
-  * `SelectionContext` (Provider preferences & user selection overrides).
-  * `QueryContext` (Strongly typed `AlbumLookupQuery`, `TrackLookupQuery`, `ArtistLookupQuery`, `ArtworkLookupQuery`).
-  * `MetadataRequest` (Lookup query parameter encapsulation).
+* **`MetadataContext.ts`**: Immutable domain context structured into sub-contexts (`ResourceContext`, `ExecutionContext`, `SelectionContext`, `QueryContext`, `MetadataRequest`).
 * **`MetadataPreview.ts`**: Universal metadata preview model containing `FieldChange`, `ProviderAttribution`, `OperationWarning`, `OperationConflict`, and resource selection.
-* **`MetadataTransaction.ts` & `UndoToken.ts`**: Transaction execution contract and immutable snapshot reference models with structured `FieldMutation[]` (`fieldId`, `oldValue`, `newValue`, `providerId`, `confidenceScore`).
+* **`MetadataTransaction.ts` & `UndoToken.ts`**: Transaction execution contract and immutable snapshot reference models with structured `FieldMutation[]`.
 * **`ProviderAttribution.ts`**: Field-level provider source attribution contract (`providerId`, `providerName`, `confidenceScore`, `sourceUrl`).
 * **`MetadataPolicy.ts`**: Declarative policy suite (`SelectionPolicy`, `MergePolicy`, `FallbackPolicy`, `ValidationPolicy`).
 * **`MetadataHealth.ts`**: Generic quality assessment contract (`score`, `rating`, `issues`).
 
 #### Application Layer (`src/main/metadata/resolution/`, `src/main/metadata/operations/`, `src/main/metadata/transactions/`)
-* **`MetadataLookupGateway.ts`**: Interface and default implementation wrapping candidate lookups directly.
-* **`MetadataResolutionManager.ts`**: Candidate resolution manager consuming `MetadataLookupGateway` and `MetadataContext`. Throws explicit `ResolutionUnavailableError` if infrastructure is missing.
-* **`MetadataOperationManager.ts`**: Application service managing operation lifecycles, state transitions, and event subscriptions without Node `EventEmitter` coupling.
+* **`MetadataLookupGateway.ts`**: Interface and default implementation mapping provider attribution badges (`MusicBrainz`, `Discogs`, `Cover Art Archive`, `Spotify`, `Apple Music`).
+* **`MetadataResolutionManager.ts`**: Candidate resolution manager consuming `MetadataLookupGateway` and `MetadataContext`.
+* **`MetadataOperationManager.ts`**: Application service managing operation lifecycles, state transitions, and event subscriptions.
 * **`MetadataTransactionManager.ts`**: Application service orchestrating atomic mutations across physical disk files, database syncing, artwork downloading, cache invalidation, and `UndoToken` snapshot generation.
+* **`MutationExecutor.ts`**: Reusable execution unit unifying forward write and rollback execution.
+* **`SnapshotBuilder.ts`**: Constructs immutable `MetadataHistorySnapshot` objects.
 
-#### Infrastructure Layer (`src/main/metadata/transactions/`)
-* **`LibraryRelationalSyncService.ts`**: Encapsulates relational DB table updates and `reParseSong`.
-* **`ArtworkDownloaderService.ts`**: Encapsulates HTTP/HTTPS cover art downloading and magic header validation.
+#### Infrastructure & Services Layer (`src/main/metadata/transactions/`, `src/main/metadata/services/`)
+* **`AlbumAutoTagService.ts`**: Production service routed through `MetadataOperationManager` and `MetadataTransactionManager` end-to-end.
+* **`LibraryRelationalSyncService.ts`**: Encapsulates relational DB updates returning structured `SyncResult`.
+* **`ArtworkDownloaderService.ts`**: Encapsulates HTTP/HTTPS cover art downloading and magic header validation using `RequestPipeline`.
 * **`ArtworkCacheInvalidator.ts`**: Encapsulates UI cover art cache invalidation.
 
 ---
 
-### 3.2 Planned Work (Phases 13D – 13E)
-
-* **Phase 13D — Provider Federation Architecture**:
-  - Connect `MetadataLookupGateway` to container-managed `ProviderFederation` (`ProviderRegistry`, `ProviderDiscovery`, `HealthManager`, `CircuitBreakerRegistry`, `DefaultProviderSelectionStrategy`, `MetadataMergeEngine`).
-  - Expose provider attribution badges (`MusicBrainz`, `Discogs`, `Cover Art Archive`) in renderer preview components.
+### 3.2 Planned Work (Phase 13E)
 
 * **Phase 13E — Background Enrichment Platform & Health Dashboard**:
   - Build background enrichment job queues using `ExecutionMode.Background`.

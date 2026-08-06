@@ -1,28 +1,31 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import type { TrackMatchPair } from '../services/AlbumMetadataService';
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
+import { formatProviderName } from '../resolution/MetadataLookupGateway';
 
 export class MetadataDiffBuilder {
   /**
-   * Constructs presentation-friendly TrackMatchPreview with per-field diffs from a TrackMatchPair.
+   * Constructs presentation-friendly TrackMatchPreview with per-field diffs and provider attribution from a TrackMatchPair.
    */
   public static buildTrackPreview(pair: TrackMatchPair): TrackMatchPreview {
     const song = pair.localSong;
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
+    const providerId = provider.providerId || 'musicbrainz';
+    const providerName = formatProviderName(providerId);
 
     const suggestedAlbum = AlbumSuffixPreserver.preserveAlbumSuffix(song.album, recording.album);
 
     const fieldDiffs: MetadataFieldDiff[] = [
-      this.compareField('title', 'Title', song.title, recording.title),
-      this.compareField('artist', 'Artist', song.artist, recording.artist),
-      this.compareField('album', 'Album', song.album, suggestedAlbum),
-      this.compareField('year', 'Year', song.year, recording.year),
-      this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber),
-      this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber),
-      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0]),
-      this.compareField('isrc', 'ISRC', song.isrc, provider.isrc),
-      this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId)
+      this.compareField('title', 'Title', song.title, recording.title, providerId, providerName),
+      this.compareField('artist', 'Artist', song.artist, recording.artist, providerId, providerName),
+      this.compareField('album', 'Album', song.album, suggestedAlbum, providerId, providerName),
+      this.compareField('year', 'Year', song.year, recording.year, providerId, providerName),
+      this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, providerId, providerName),
+      this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, providerId, providerName),
+      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0], providerId, providerName),
+      this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, providerId, providerName),
+      this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, providerId, providerName)
     ];
 
     const applyTrack = pair.confidence >= 0.75; // Default apply for Good+ matches
@@ -58,7 +61,9 @@ export class MetadataDiffBuilder {
     fieldId: MetadataFieldId,
     fieldName: string,
     oldVal?: string | number,
-    newVal?: string | number
+    newVal?: string | number,
+    providerId?: string,
+    providerName?: string
   ): MetadataFieldDiff {
     const strOld = oldVal !== undefined && oldVal !== null ? String(oldVal).trim() : '';
     const strNew = newVal !== undefined && newVal !== null ? String(newVal).trim() : '';
@@ -91,7 +96,9 @@ export class MetadataDiffBuilder {
       suggestedValue: newVal,
       userValue: newVal, // Default to suggested value, editable by user in UI
       status,
-      applyField
+      applyField,
+      providerId,
+      providerName
     };
   }
 }

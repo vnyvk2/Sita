@@ -57,12 +57,23 @@ PreviewReady ──────────► MetadataPreview (Universal UI DTO
        ▼
 Applying ──────────────► MetadataTransactionManager
                                │
-                               ├──► ArtworkDownloaderService (Network I/O)
-                               ├──► TagWriterService (Physical Disk File Write)
-                               ├──► LibraryRelationalSyncService (Relational DB & reParseSong)
+                               ├──► ArtworkDownloaderService (Network I/O via RequestPipeline)
+                               ├──► MutationExecutor (Unified Write & Rollback Execution)
+                               │      ├──► TagWriterService (Physical Disk File Write)
+                               │      └──► LibraryRelationalSyncService (Relational DB Sync & reParseSong)
                                ├──► ArtworkCacheInvalidator (UI Image Cache Cleanup)
                                └──► MetadataHistoryService (UndoToken & Snapshot Recording)
        │
        ▼
 Completed ─────────────► Publish Event Signals (MetadataTransactionCompleted)
 ```
+
+---
+
+## 4. Provider Federation & Attribution Badges
+
+Every resolved field diff carries structured provider attribution:
+* **MusicBrainz**: `MusicBrainz` badge attached to title, artist, album, track number, MBID.
+* **Discogs**: `Discogs` badge attached to master releases, genres, styles, catalog numbers.
+* **Cover Art Archive**: `Cover Art Archive` badge attached to high-resolution front/back artwork.
+* **Spotify / Apple Music**: `Spotify` / `Apple Music` badges attached to popular genre tags & release dates.

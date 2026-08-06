@@ -19,4 +19,6 @@ export interface MetadataFieldDiff {
   userValue?: string | number;
   status: DiffStatus;
   applyField: boolean;
+  providerId?: string;
+  providerName?: string;
 }
