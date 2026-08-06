@@ -7,7 +7,10 @@ import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/Recording
 import type { MetadataContribution, FieldContribution } from '../../domain/MetadataContribution';
 import type { DiscogsApiClient } from './DiscogsApiClient';
 
+import type { ProviderRegistry } from '../../resolution/ProviderRegistry';
+
 export interface DiscogsAdapterOptions {
+  registry?: ProviderRegistry;
   cache?: {
     get<T>(providerId: string, key: string): T | null;
     set<T>(providerId: string, key: string, val: T, ttlMs?: number): void;
@@ -34,15 +37,21 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
   public readonly priority = 800;
 
   private readonly apiClient: DiscogsApiClient;
+  private readonly registry?: ProviderRegistry;
   private readonly cache?: DiscogsAdapterOptions['cache'];
 
   constructor(apiClient: DiscogsApiClient, options?: DiscogsAdapterOptions) {
     this.apiClient = apiClient;
+    this.registry = options?.registry;
     this.cache = options?.cache;
   }
 
   public supports(capability: keyof ProviderCapabilities): boolean {
     return Boolean(this.capabilities[capability]);
+  }
+
+  private getConfidence(fieldId: string, fallback: number): number {
+    return this.registry?.getFieldConfidence(this.identity.id, fieldId, fallback) ?? fallback;
   }
 
   /**
@@ -68,7 +77,7 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
         fieldId: 'genre',
         providerId: this.identity.id,
         value: data.genre,
-        confidenceScore: 0.85
+        confidenceScore: this.getConfidence('genre', 0.85)
       });
     }
 
@@ -77,7 +86,7 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
         fieldId: 'style',
         providerId: this.identity.id,
         value: data.style,
-        confidenceScore: 0.85
+        confidenceScore: this.getConfidence('style', 0.85)
       });
     }
 
@@ -86,7 +95,7 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
         fieldId: 'catalogNumber',
         providerId: this.identity.id,
         value: data.catalogNumber,
-        confidenceScore: 0.9
+        confidenceScore: this.getConfidence('catalogNumber', 0.9)
       });
     }
 
@@ -95,7 +104,7 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
         fieldId: 'masterRelease',
         providerId: this.identity.id,
         value: data.masterRelease,
-        confidenceScore: 0.95
+        confidenceScore: this.getConfidence('masterRelease', 0.95)
       });
     }
 

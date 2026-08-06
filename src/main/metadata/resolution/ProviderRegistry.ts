@@ -160,4 +160,9 @@ export class ProviderRegistry {
   public getActiveInstances(): Map<string, MetadataProvider> {
     return this.activeInstances;
   }
+
+  public getFieldConfidence(providerId: string, fieldId: string, fallback = 0.8): number {
+    const desc = this.getDescriptor(providerId);
+    return desc?.fieldConfidences?.[fieldId] ?? fallback;
+  }
 }

@@ -11,9 +11,12 @@ import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
 import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
 
+import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
+
 export interface MusicBrainzAdapterOptions {
   matcher?: MetadataMatcher;
   cache?: IdentityResolutionCache;
+  registry?: ProviderRegistry;
   priority?: number;
 }
 
@@ -40,6 +43,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   private readonly apiClient: MusicBrainzApiClient;
   private readonly matcher: MetadataMatcher;
   private readonly cache?: IdentityResolutionCache;
+  private readonly registry?: ProviderRegistry;
   private readonly recordingMapper = new MusicBrainzRecordingMapper();
   private readonly releaseMapper = new MusicBrainzReleaseMapper();
   private readonly artistMapper = new MusicBrainzArtistMapper();
@@ -49,10 +53,15 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     this.priority = options?.priority ?? 100;
     this.matcher = options?.matcher ?? new MetadataMatcher(0.35);
     this.cache = options?.cache;
+    this.registry = options?.registry;
   }
 
   public supports(capability: ProviderCapability): boolean {
     return this.capabilities.has(capability);
+  }
+
+  private getConfidence(fieldId: string, fallback: number): number {
+    return this.registry?.getFieldConfidence(this.identity.id, fieldId, fallback) ?? fallback;
   }
 
   public async fetchContribution(query: { title?: string; artist?: string }): Promise<MetadataContribution | null> {
@@ -70,10 +79,10 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       providerName: 'MusicBrainz',
       confidenceScore: 0.95,
       contributions: [
-        { fieldId: 'title', providerId: 'musicbrainz', value: rec.title, confidenceScore: 0.95 },
-        { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: 0.95 },
-        { fieldId: 'album', providerId: 'musicbrainz', value: albumName, confidenceScore: 0.90 },
-        { fieldId: 'mbid', providerId: 'musicbrainz', value: rec.id, confidenceScore: 0.99 }
+        { fieldId: 'title', providerId: 'musicbrainz', value: rec.title, confidenceScore: this.getConfidence('title', 0.95) },
+        { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
+        { fieldId: 'album', providerId: 'musicbrainz', value: albumName, confidenceScore: this.getConfidence('album', 0.90) },
+        { fieldId: 'mbid', providerId: 'musicbrainz', value: rec.id, confidenceScore: this.getConfidence('mbid', 0.99) }
       ]
     };
   }
