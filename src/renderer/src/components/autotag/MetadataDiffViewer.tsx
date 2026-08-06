@@ -5,7 +5,6 @@ export interface MetadataDiffViewerProps {
   track: TrackMatchPreview;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
-  fieldAlternativesMap?: Map<string, Array<{ providerId: string; providerName: string; value: string | number }>>;
   onFieldChanged: (fieldId: MetadataFieldId, value: string | number) => void;
   onToggleField: (fieldId: MetadataFieldId) => void;
   onResetField: (fieldId: MetadataFieldId) => void;
@@ -16,7 +15,6 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   track,
   selectedFieldMap,
   userEditedValues,
-  fieldAlternativesMap,
   onFieldChanged,
   onToggleField,
   onResetField,
@@ -63,7 +61,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
           const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
           const badge = getBadgeStyle(diff.status);
           const provStyle = getProviderColor(diff.providerId);
-          const alternatives = fieldAlternativesMap?.get(diff.fieldId);
+          const alternatives = diff.alternatives;
 
           return (
             <div

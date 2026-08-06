@@ -3,28 +3,41 @@ import type { TrackMatchPair, LocalSongInput } from '../services/AlbumMetadataSe
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 import { ProviderRegistry } from '../resolution/ProviderRegistry';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
-import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
+import type { MergedCandidateResult, FieldContribution } from '../resolution/MetadataMergeEngine';
 
 const globalProviderRegistry = new ProviderRegistry();
 
 export class MetadataDiffBuilder {
   /**
-   * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with field-level ProviderAttributions.
+   * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with self-contained field-level alternatives.
    */
   public static buildTrackPreviewFromMergedResult(
     song: LocalSongInput,
-    merged: MergedCandidateResult
+    merged: MergedCandidateResult,
+    registry?: ProviderRegistry
   ): TrackMatchPreview {
+    const activeRegistry = registry ?? globalProviderRegistry;
     const suggestedAlbum = song.album && merged.album
       ? AlbumSuffixPreserver.preserveAlbumSuffix(song.album, merged.album)
       : merged.album;
 
+    const mapAlternatives = (fieldId: string): Array<{ providerId: string; providerName: string; value: string | number }> | undefined => {
+      const contribs = merged.fieldAlternatives?.[fieldId];
+      if (!contribs || contribs.length === 0) return undefined;
+      return contribs.map((c) => ({
+        providerId: c.providerId,
+        providerName: activeRegistry.getDisplayName(c.providerId),
+        value: c.value,
+        confidenceScore: c.confidenceScore
+      }));
+    };
+
     const fieldDiffs: MetadataFieldDiff[] = [
-      this.compareField('title', 'Title', song.title, merged.title, merged.fieldAttributions.title),
-      this.compareField('artist', 'Artist', song.artist, merged.artist, merged.fieldAttributions.artist),
-      this.compareField('album', 'Album', song.album, suggestedAlbum, merged.fieldAttributions.album),
-      this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year),
-      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre)
+      this.compareField('title', 'Title', song.title, merged.title, merged.fieldAttributions.title, mapAlternatives('title')),
+      this.compareField('artist', 'Artist', song.artist, merged.artist, merged.fieldAttributions.artist, mapAlternatives('artist')),
+      this.compareField('album', 'Album', song.album, suggestedAlbum, merged.fieldAttributions.album, mapAlternatives('album')),
+      this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
+      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre'))
     ];
 
     return {
@@ -111,7 +124,8 @@ export class MetadataDiffBuilder {
     fieldName: string,
     oldVal?: string | number,
     newVal?: string | number,
-    attribution?: ProviderAttribution
+    attribution?: ProviderAttribution,
+    alternatives?: Array<{ providerId: string; providerName: string; value: string | number }>
   ): MetadataFieldDiff {
     const strOld = oldVal !== undefined && oldVal !== null ? String(oldVal).trim() : '';
     const strNew = newVal !== undefined && newVal !== null ? String(newVal).trim() : '';
@@ -146,7 +160,8 @@ export class MetadataDiffBuilder {
       status,
       applyField,
       providerId: attribution?.providerId,
-      providerName: attribution?.providerName
+      providerName: attribution?.providerName,
+      alternatives
     };
   }
 }

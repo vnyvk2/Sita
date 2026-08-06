@@ -6,6 +6,7 @@ export interface DraftSnapshot {
   filePath: string;
   previousTags: Record<string, string | number | undefined>;
   appliedTags: Record<string, string | number | undefined>;
+  providerAttributions?: Record<string, { providerId: string; confidenceScore?: number }>;
 }
 
 export class SnapshotBuilder {

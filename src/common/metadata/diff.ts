@@ -11,6 +11,13 @@ export type MetadataFieldId =
 
 export type DiffStatus = 'changed' | 'unchanged' | 'missing' | 'new';
 
+export interface MetadataFieldDiffAlternative {
+  providerId: string;
+  providerName: string;
+  value: string | number;
+  confidenceScore?: number;
+}
+
 export interface MetadataFieldDiff {
   fieldId: MetadataFieldId;
   fieldName: string;
@@ -21,4 +28,5 @@ export interface MetadataFieldDiff {
   applyField: boolean;
   providerId?: string;
   providerName?: string;
+  alternatives?: MetadataFieldDiffAlternative[];
 }

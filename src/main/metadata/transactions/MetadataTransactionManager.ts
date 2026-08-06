@@ -84,12 +84,19 @@ export class MetadataTransactionManager {
       const tagPayload: Record<string, string | number | Buffer> = {};
       const fieldMap: Record<string, string | number> = {};
       const previousState: Record<string, string | number | undefined> = {};
+      const providerAttributions: Record<string, { providerId: string; confidenceScore?: number }> = {};
 
       for (const fm of mut.fieldMutations) {
         if (fm.newValue !== undefined) {
           tagPayload[fm.fieldId] = fm.newValue;
           fieldMap[fm.fieldId] = fm.newValue;
           previousState[fm.fieldId] = fm.oldValue;
+          if (fm.providerId) {
+            providerAttributions[fm.fieldId] = {
+              providerId: fm.providerId,
+              confidenceScore: fm.confidenceScore
+            };
+          }
         }
       }
 
@@ -109,7 +116,8 @@ export class MetadataTransactionManager {
           songId: Number(mut.resourceId),
           filePath: mut.filePath,
           previousTags: previousState,
-          appliedTags: fieldMap
+          appliedTags: fieldMap,
+          providerAttributions
         });
         updatedCount++;
       } else {
