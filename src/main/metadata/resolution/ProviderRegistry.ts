@@ -17,6 +17,7 @@ export interface ProviderDescriptor {
   website: string;
   priority: number;
   capabilities: ProviderCapabilities;
+  specializedFields: string[];
 }
 
 export class ProviderRegistry {
@@ -34,6 +35,7 @@ export class ProviderRegistry {
       icon: 'musicbrainz-icon',
       website: 'https://musicbrainz.org',
       priority: 900,
+      specializedFields: ['title', 'artist', 'album', 'trackNumber', 'discNumber', 'isrc', 'mbid'],
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,
@@ -51,6 +53,7 @@ export class ProviderRegistry {
       icon: 'discogs-icon',
       website: 'https://discogs.com',
       priority: 800,
+      specializedFields: ['genre', 'style', 'catalogNumber', 'masterRelease'],
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,
@@ -68,6 +71,7 @@ export class ProviderRegistry {
       icon: 'caa-icon',
       website: 'https://coverartarchive.org',
       priority: 850,
+      specializedFields: ['artworkUrl'],
       capabilities: {
         supportsAlbumSearch: false,
         supportsTrackSearch: false,
@@ -85,6 +89,7 @@ export class ProviderRegistry {
       icon: 'spotify-icon',
       website: 'https://spotify.com',
       priority: 700,
+      specializedFields: ['popularity', 'releaseDate', 'genre'],
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,
@@ -102,6 +107,7 @@ export class ProviderRegistry {
       icon: 'apple-icon',
       website: 'https://music.apple.com',
       priority: 650,
+      specializedFields: ['editorialNotes', 'releaseDate'],
       capabilities: {
         supportsAlbumSearch: true,
         supportsTrackSearch: true,

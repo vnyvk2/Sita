@@ -4,7 +4,7 @@ import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEng
 import { MergeSession } from '../MergeSession';
 
 describe('Interactive MergeSession Test Suite', () => {
-  it('initializes MergeSession and recomputes preview when selecting alternate provider', () => {
+  it('initializes MergeSession and recomputes preview via policy updating when selecting alternate provider', () => {
     const registry = new ProviderRegistry();
     const mergeEngine = new MetadataMergeEngine(registry);
 
@@ -23,6 +23,7 @@ describe('Interactive MergeSession Test Suite', () => {
     const session2 = session1.selectProvider('genre', 'spotify');
     expect(session2.result.genre).toBe('Synth-Pop');
     expect(session2.getAttribution('genre')?.providerName).toBe('Spotify');
+    expect(session2.policy.merge?.fieldPolicies?.genre.preferredProviderId).toBe('spotify');
 
     // Original session remains immutable
     expect(session1.result.genre).toBe('Pop');
