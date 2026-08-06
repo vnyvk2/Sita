@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { ProviderRegistry } from '../ProviderRegistry';
+import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
+import { MergeSession } from '../MergeSession';
+
+describe('Interactive MergeSession Test Suite', () => {
+  it('initializes MergeSession and recomputes preview when selecting alternate provider', () => {
+    const registry = new ProviderRegistry();
+    const mergeEngine = new MetadataMergeEngine(registry);
+
+    const rawContributions: FieldContribution[] = [
+      { fieldId: 'genre', providerId: 'discogs', value: 'Pop Rock', confidenceScore: 0.95 },
+      { fieldId: 'genre', providerId: 'spotify', value: 'Synth-Pop', confidenceScore: 0.88 },
+      { fieldId: 'genre', providerId: 'musicbrainz', value: 'Pop', confidenceScore: 0.85 }
+    ];
+
+    const session1 = new MergeSession(mergeEngine, rawContributions);
+    expect(session1.result.genre).toBe('Pop');
+    expect(session1.getAttribution('genre')?.providerName).toBe('MusicBrainz');
+    expect(session1.getAlternatives('genre')).toHaveLength(3);
+
+    // User switches genre provider to Spotify
+    const session2 = session1.selectProvider('genre', 'spotify');
+    expect(session2.result.genre).toBe('Synth-Pop');
+    expect(session2.getAttribution('genre')?.providerName).toBe('Spotify');
+
+    // Original session remains immutable
+    expect(session1.result.genre).toBe('Pop');
+  });
+});
