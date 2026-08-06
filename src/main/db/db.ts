@@ -17,11 +17,14 @@ import { app } from 'electron';
 import { seedDatabase } from './seed';
 
 const DB_NAME = 'nora.pglite.db';
-export const DB_PATH = app.getPath('userData') + '/' + DB_NAME;
+const isTest = typeof process.env.VITEST !== 'undefined' || process.env.NODE_ENV === 'test';
+export const DB_PATH = isTest ? 'memory://' : app.getPath('userData') + '/' + DB_NAME;
 const migrationsFolder = path.join(app.getAppPath(), 'resources', 'drizzle');
 logger.debug(`Migrations folder: ${migrationsFolder}`);
 
-mkdirSync(DB_PATH, { recursive: true });
+if (!isTest) {
+  mkdirSync(DB_PATH, { recursive: true });
+}
 
 ShutdownLogger.logBootMilestone('PGlite.create() start', { DB_PATH });
 const pgliteInstance = await PGlite.create(DB_PATH, { debug: 1, extensions: { pg_trgm, citext } });
