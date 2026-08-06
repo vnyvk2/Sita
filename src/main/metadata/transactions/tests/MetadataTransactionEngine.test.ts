@@ -3,7 +3,7 @@ import { MetadataTransactionManager } from '../MetadataTransactionManager';
 import { TagWriterService } from '../../services/TagWriterService';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 
-describe('Phase 13C — Unified Transaction Manager Blueprint Test Suite', () => {
+describe('Metadata Transaction Manager Blueprint Test Suite', () => {
   it('executes atomic mutations via MetadataTransactionManager and records UndoToken snapshots', async () => {
     const mockTagWriter = new TagWriterService();
     vi.spyOn(mockTagWriter, 'writeBatch').mockResolvedValue([

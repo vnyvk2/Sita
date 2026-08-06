@@ -3,7 +3,7 @@ import { ProviderRegistry } from '../ProviderRegistry';
 import { MetadataMergeEngine } from '../MetadataMergeEngine';
 import type { ProviderCandidate } from '../../domain/MetadataResolution';
 
-describe('Phase 13D — Provider Federation & Merge Engine Test Suite', () => {
+describe('Provider Federation & Merge Engine Test Suite', () => {
   it('resolves provider descriptors and display names via ProviderRegistry', () => {
     const registry = new ProviderRegistry();
     expect(registry.getDisplayName('musicbrainz')).toBe('MusicBrainz');

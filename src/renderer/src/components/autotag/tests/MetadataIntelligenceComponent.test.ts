@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AlbumTagPreview, TrackMatchPreview } from '../../../../../common/metadata/types';
 
-describe('Phase 8 — Metadata Intelligence & Final UX Review Suite', () => {
+describe('Metadata Intelligence & Final UX Review Suite', () => {
   const mockMatches: TrackMatchPreview[] = [
     {
       localSongId: 101,

@@ -8,7 +8,7 @@ import type { ProviderAttribution } from '../ProviderAttribution';
 import type { MetadataHealth } from '../MetadataHealth';
 import type { MetadataResolution } from '../MetadataResolution';
 
-describe('Phase 13A — Domain Model & Specification Blueprint Test Suite', () => {
+describe('Metadata Domain Model Specification Blueprint Test Suite', () => {
   it('instantiates pure MetadataOperation domain entity contracts with targetResourceIds', () => {
     const op: MetadataOperation = {
       id: 'op-101',

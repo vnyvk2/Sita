@@ -4,7 +4,7 @@ import { MetadataResolutionManager } from '../../resolution/MetadataResolutionMa
 import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGateway';
 import type { MetadataContext } from '../../domain/MetadataContext';
 
-describe('Phase 13B — Engine Refactor & Operation Resolution Blueprint Test Suite', () => {
+describe('Metadata Engine & Operation Resolution Blueprint Test Suite', () => {
   const dummyContext: MetadataContext = {
     resources: {
       primaryType: 'album',
