@@ -110,7 +110,6 @@ export class MetadataTransactionManager {
     const chunkSize = options?.chunkSize ?? 50;
     for (let i = 0; i < mutations.length; i += chunkSize) {
       if (signal?.aborted) {
-        failedCount++;
         isCancelled = true;
         errors.push('Transaction operation cancelled by user');
         await this.rollbackDraftSnapshots(draftSnapshots);
