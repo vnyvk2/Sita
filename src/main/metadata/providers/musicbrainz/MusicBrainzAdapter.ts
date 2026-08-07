@@ -64,27 +64,54 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     return this.registry?.getFieldConfidence(this.identity.id, fieldId, fallback) ?? fallback;
   }
 
-  public async fetchContribution(query: { title?: string; artist?: string }): Promise<MetadataContribution | null> {
-    if (!query.title) return null;
-    const qStr = query.artist ? `recording:"${query.title}" AND artist:"${query.artist}"` : `recording:"${query.title}"`;
-    const recordings = await this.apiClient.searchRecordings(qStr, 1);
-    if (recordings.length === 0) return null;
+  public async fetchContribution(query: { title?: string; artist?: string; mbid?: string; releaseId?: string }): Promise<MetadataContribution | null> {
+    console.log('[MusicBrainzAdapter] fetchContribution input query:', query);
+    const targetMbid = query.mbid ?? query.releaseId;
 
-    const rec = recordings[0];
-    const artistName = rec['artist-credit']?.[0]?.name ?? rec['artist-credit']?.[0]?.artist?.name ?? query.artist ?? '';
-    const releaseDto = rec.releases?.[0];
-    const albumName = releaseDto?.title ?? '';
-    const releaseMbid = releaseDto?.id ?? rec.id;
+    if (query.title) {
+      // Direct canonical contribution when title/artist are supplied from the resolved release
+      const contributions: FieldContribution[] = [
+        { fieldId: 'title', providerId: 'musicbrainz', value: query.title, confidenceScore: this.getConfidence('title', 0.95) }
+      ];
+
+      if (query.artist) {
+        contributions.push({ fieldId: 'artist', providerId: 'musicbrainz', value: query.artist, confidenceScore: this.getConfidence('artist', 0.95) });
+      }
+
+      if (targetMbid) {
+        contributions.push({ fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) });
+      }
+
+      return {
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95,
+        contributions
+      };
+    }
+
+    if (!targetMbid) {
+      console.log('[MusicBrainzAdapter] fetchContribution returning null: No title or mbid provided in query');
+      return null;
+    }
+
+    const mbRelease = await this.apiClient.getReleaseById(targetMbid);
+    if (!mbRelease) {
+      console.log('[MusicBrainzAdapter] fetchContribution returning null: getReleaseById returned null for MBID', targetMbid);
+      return null;
+    }
+
+    const artistName = mbRelease['artist-credit']?.[0]?.name ?? query.artist ?? '';
 
     return {
       providerId: 'musicbrainz',
       providerName: 'MusicBrainz',
       confidenceScore: 0.95,
       contributions: [
-        { fieldId: 'title', providerId: 'musicbrainz', value: rec.title, confidenceScore: this.getConfidence('title', 0.95) },
+        { fieldId: 'title', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('title', 0.95) },
         { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
-        { fieldId: 'album', providerId: 'musicbrainz', value: albumName, confidenceScore: this.getConfidence('album', 0.90) },
-        { fieldId: 'mbid', providerId: 'musicbrainz', value: releaseMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
+        { fieldId: 'album', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('album', 0.90) },
+        { fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
       ]
     };
   }

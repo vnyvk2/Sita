@@ -58,8 +58,12 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
    * Phase 14F — Discogs Contribution Adapter
    * Directly returns specialized field contributions: genre, style, catalogNumber, masterRelease.
    */
-  public async fetchContribution(query: { title?: string; artist?: string }): Promise<MetadataContribution | null> {
-    if (!query.title && !query.artist) return null;
+  public async fetchContribution(query: { title?: string; artist?: string; mbid?: string; releaseId?: string }): Promise<MetadataContribution | null> {
+    console.log('[DiscogsAdapter] fetchContribution input query:', query);
+    if (!query.title && !query.artist) {
+      console.log('[DiscogsAdapter] fetchContribution returning null: Neither title nor artist provided');
+      return null;
+    }
 
     const cacheKey = `contribution:${query.title ?? ''}:${query.artist ?? ''}`;
     if (this.cache) {
@@ -68,7 +72,10 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     }
 
     const data = await this.apiClient.fetchContributionData(query);
-    if (!data) return null;
+    if (!data) {
+      console.log('[DiscogsAdapter] fetchContribution returning null: fetchContributionData returned null for query', query);
+      return null;
+    }
 
     const contributions: FieldContribution[] = [];
 

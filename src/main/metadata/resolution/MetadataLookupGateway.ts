@@ -50,16 +50,22 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
     const fieldContributions: FieldContribution[] = [];
     const activeInstances = this.providerRegistry.getActiveInstances();
 
+    console.log('[MetadataLookupGateway] Incoming requestQuery:', requestQuery);
+    console.log('[MetadataLookupGateway] Extracted query for adapters:', { title, artist, mbid, releaseId });
+    console.log('[MetadataLookupGateway] Active Registered Provider Instances:', Array.from(activeInstances.keys()));
+
     for (const [providerId, instance] of activeInstances.entries()) {
       const adapter = instance as unknown as IMetadataProviderAdapter;
       if (adapter && typeof adapter.fetchContribution === 'function') {
         try {
+          console.log(`[MetadataLookupGateway] Calling fetchContribution on '${providerId}' with:`, { title, artist, mbid, releaseId });
           const contrib = await adapter.fetchContribution({ title, artist, mbid, releaseId });
+          console.log(`[MetadataLookupGateway] fetchContribution result from '${providerId}':`, contrib);
           if (contrib && contrib.contributions) {
             fieldContributions.push(...contrib.contributions);
           }
-        } catch (_err) {
-          // Ignore individual provider lookup errors gracefully
+        } catch (err: unknown) {
+          console.warn(`[MetadataLookupGateway] fetchContribution error from '${providerId}':`, err);
         }
       }
     }
@@ -73,18 +79,24 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
 
     let title: string | undefined;
     let artist: string | undefined;
+    let mbid: string | undefined;
+    let releaseId: string | undefined;
 
     if ('albumTitle' in requestQuery) {
-      const q = requestQuery as AlbumLookupQuery;
+      const q = requestQuery as AlbumLookupQuery & { mbid?: string; releaseId?: string };
       title = q.albumTitle;
       artist = q.artistName;
+      mbid = q.mbid;
+      releaseId = q.releaseId;
     } else if ('trackTitle' in requestQuery) {
-      const q = requestQuery as TrackLookupQuery;
+      const q = requestQuery as TrackLookupQuery & { mbid?: string; releaseId?: string };
       title = q.trackTitle;
       artist = q.artistName;
+      mbid = q.mbid;
+      releaseId = q.releaseId;
     }
 
-    if (!title) return [];
+    if (!title && !mbid && !releaseId) return [];
 
     const candidates: ProviderCandidate[] = [];
 
@@ -96,7 +108,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
         // Direct specialized contribution check
         if (adapter && typeof adapter.fetchContribution === 'function') {
           try {
-            const contrib = await adapter.fetchContribution({ title, artist });
+            const contrib = await adapter.fetchContribution({ title, artist, mbid, releaseId });
             if (contrib && contrib.contributions.length > 0) {
               const titleContrib = contrib.contributions.find((c) => c.fieldId === 'title')?.value;
               const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;

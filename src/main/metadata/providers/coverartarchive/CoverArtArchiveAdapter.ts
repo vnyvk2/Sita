@@ -58,8 +58,12 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
    * Directly returns specialized field contributions: artworkUrl, front, back, thumbnail.
    */
   public async fetchContribution(query: { mbid?: string; releaseId?: string; title?: string; artist?: string }): Promise<MetadataContribution | null> {
+    console.log('[CoverArtArchiveAdapter] fetchContribution input query:', query);
     const targetMbid = query.mbid ?? query.releaseId;
-    if (!targetMbid) return null;
+    if (!targetMbid) {
+      console.log('[CoverArtArchiveAdapter] fetchContribution returning null: Neither mbid nor releaseId provided in query');
+      return null;
+    }
 
     const cacheKey = `contribution:${targetMbid}`;
     if (this.cache) {
@@ -68,7 +72,10 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
     }
 
     const data = await this.apiClient.fetchContributionData({ mbid: targetMbid });
-    if (!data) return null;
+    if (!data) {
+      console.log(`[CoverArtArchiveAdapter] fetchContribution returning null: fetchContributionData returned null for MBID '${targetMbid}' (likely no cover art uploaded on CAA)`);
+      return null;
+    }
 
     const contributions: FieldContribution[] = [];
 
