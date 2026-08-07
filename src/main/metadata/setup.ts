@@ -43,12 +43,17 @@ import { LoaderRegistry } from './repository/LoaderRegistry';
 import { UserMetadataRepository } from './repository/UserMetadataRepository';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 import { PlatformBootstrap } from '../platform/PlatformBootstrap';
-import { RateLimiter, RetryPolicy } from '../platform/networking';
+import { RateLimiter, RetryPolicy, RequestPipeline } from '../platform/networking';
+import updateSongId3Tags from '../updateSong/updateSongId3Tags';
+import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter';
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
 import { MusicBrainzAdapter, MusicBrainzApiClient } from './providers/musicbrainz';
-import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
+import { MetadataProviderRuntime } from './runtime/MetadataProviderRuntime';
+import { AlbumAutoTagService } from './services/AlbumAutoTagService';
+import { AlbumMetadataService } from './services/AlbumMetadataService';
+import { MetadataApplyService } from './services/MetadataApplyService';
 import { UserMetadataService } from './services/UserMetadataService';
 
 export interface MetadataContainer {
@@ -88,6 +93,15 @@ export interface MetadataContainer {
     priority: DefaultProviderPriorityPolicy;
   };
   context: MetadataContext;
+  application: {
+    userService: UserMetadataService;
+    albumMetadataService: AlbumMetadataService;
+    autoTagService: AlbumAutoTagService;
+    applyService: MetadataApplyService;
+  };
+  infrastructure: {
+    requestPipeline: RequestPipeline;
+  };
 }
 
 export class MetadataBootstrap {
@@ -111,6 +125,16 @@ export class MetadataBootstrap {
 
     const identityCache = new IdentityResolutionCache();
     const providerDiscovery = new MetadataProviderDiscovery(providerRegistry);
+
+    // Single shared networking pipeline for remote providers
+    const platform = PlatformBootstrap.getInstance();
+    const requestPipeline = platform.createRequestPipeline({
+      rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
+      retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
+    });
+
+    const mbApiClient = new MusicBrainzApiClient(requestPipeline);
+    const musicBrainzAdapter = new MusicBrainzAdapter(mbApiClient, { cache: identityCache });
 
     // Register default entity mappers
     mapperRegistry.register(new SongMapper());
@@ -140,15 +164,7 @@ export class MetadataBootstrap {
 
     providerDiscovery.registerFactory('local-file-provider', () => new LocalMetadataAdapter(localProvider));
     providerDiscovery.registerFactory('user-override-provider', () => new UserMetadataAdapter(userProvider));
-    providerDiscovery.registerFactory('musicbrainz', () => {
-      const platform = PlatformBootstrap.getInstance();
-      const pipeline = platform.createRequestPipeline({
-        rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
-        retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
-      });
-      const client = new MusicBrainzApiClient(pipeline);
-      return new MusicBrainzAdapter(client, { cache: identityCache });
-    });
+    providerDiscovery.registerFactory('musicbrainz', () => musicBrainzAdapter);
 
     await providerDiscovery.discoverAll({
       'local-file-provider': { enabled: true, priority: 100 },
@@ -157,6 +173,30 @@ export class MetadataBootstrap {
     });
 
     const userService = new UserMetadataService(userRepository, eventBus);
+
+    // AutoTag Application Services construction inside MetadataBootstrap composition root
+    const providerRuntime = new MetadataProviderRuntime(musicBrainzAdapter);
+    await providerRuntime.initialize();
+
+    const albumMetadataService = new AlbumMetadataService(providerRuntime);
+    const applyService = new MetadataApplyService({
+      dbUpdater: async (songId, data) => {
+        await updateSongId3Tags(
+          songId,
+          {
+            title: data.title,
+            artists: data.artist ? [{ name: data.artist }] : undefined,
+            albums: data.album ? [{ title: data.album }] : undefined,
+            genres: data.genre ? [{ name: data.genre }] : undefined,
+            releasedYear: data.year,
+            trackNumber: data.trackNumber
+          },
+          true,
+          true
+        );
+      }
+    });
+    const autoTagService = new AlbumAutoTagService({ albumMetadataService, applyService });
 
     const healthManager = new ProviderHealthManager(eventBus);
     const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
@@ -264,7 +304,16 @@ export class MetadataBootstrap {
       cache,
       eventBus,
       policies,
-      context
+      context,
+      application: {
+        userService,
+        albumMetadataService,
+        autoTagService,
+        applyService
+      },
+      infrastructure: {
+        requestPipeline
+      }
     };
   }
 }

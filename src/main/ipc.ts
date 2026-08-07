@@ -5,12 +5,6 @@ import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import { MetadataBootstrap } from './metadata/setup';
-import { MusicBrainzAdapter, MusicBrainzApiClient } from './metadata/providers/musicbrainz';
-import { MetadataProviderRuntime } from './metadata/runtime/MetadataProviderRuntime';
-import { AlbumMetadataService } from './metadata/services/AlbumMetadataService';
-import { AlbumAutoTagService } from './metadata/services/AlbumAutoTagService';
-import { PlatformBootstrap } from './platform/PlatformBootstrap';
-import { RateLimiter, RetryPolicy } from './platform/networking';
 
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
@@ -169,44 +163,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   MetadataBootstrap.getInstance()
     .then(async (metadataContainer) => {
       registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
-
-      try {
-        const platform = PlatformBootstrap.getInstance();
-        const requestPipeline = platform.createRequestPipeline({
-          rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
-          retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
-        });
-        const mbApiClient = new MusicBrainzApiClient(requestPipeline);
-        const mbAdapter = new MusicBrainzAdapter(mbApiClient, { cache: metadataContainer.identityCache });
-        const providerRuntime = new MetadataProviderRuntime(mbAdapter);
-
-        await providerRuntime.initialize();
-
-        const albumMetadataService = new AlbumMetadataService(providerRuntime);
-        const applyService = new MetadataApplyService({
-          dbUpdater: async (songId, data) => {
-            await updateSongId3Tags(
-              songId,
-              {
-                title: data.title,
-                artists: data.artist ? [{ name: data.artist }] : undefined,
-                albums: data.album ? [{ title: data.album }] : undefined,
-                genres: data.genre ? [{ name: data.genre }] : undefined,
-                releasedYear: data.year,
-                trackNumber: data.trackNumber
-              },
-              true,
-              true
-            );
-          }
-        });
-        const autoTagService = new AlbumAutoTagService({ albumMetadataService, applyService });
-
-        registerMetadataHandlers(autoTagService, mainWindow);
-        logger.info('AutoTag IPC handlers initialized successfully');
-      } catch (autoTagErr) {
-        logger.error('Failed to initialize AutoTag IPC handlers', { error: autoTagErr });
-      }
+      registerMetadataHandlers(metadataContainer.application.autoTagService, mainWindow);
+      logger.info('AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root');
     })
     .catch((err) => {
       logger.error('Failed to initialize MetadataBootstrap', { error: err });
