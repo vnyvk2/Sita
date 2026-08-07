@@ -13,6 +13,7 @@ export interface TransactionExecutionOptions {
   artworkUrl?: string;
   songArtworksPath?: string;
   albumArtworksPath?: string;
+  chunkSize?: number;
 }
 
 export interface TransactionResult {
@@ -44,6 +45,15 @@ export class MetadataTransactionManager {
     this.mutationExecutor = new MutationExecutor(this.tagWriter, this.relationalSync);
   }
 
+  /**
+   * Executes a batch of metadata mutations as a single atomic transaction (Option A — Entire Transaction Atomic).
+   *
+   * Transaction Semantics:
+   * - Mutations are processed in chunks (default 50 files per chunk).
+   * - If ANY mutation fails or an AbortSignal cancellation occurs mid-transaction,
+   *   all previously applied mutations in the transaction are automatically reverted
+   *   back to their pre-transaction disk and database states.
+   */
   public async executeTransaction(
     operationId: string,
     mutations: ResourceMutationPayload[],
@@ -75,10 +85,27 @@ export class MetadataTransactionManager {
     const errors: string[] = [];
     const draftSnapshots: DraftSnapshot[] = [];
 
-    const chunkSize = 50;
+    const chunkSize = options?.chunkSize ?? 50;
     for (let i = 0; i < mutations.length; i += chunkSize) {
       if (signal?.aborted) {
+        failedCount++;
         errors.push('Transaction operation cancelled by user');
+        if (draftSnapshots.length > 0) {
+          for (const draft of [...draftSnapshots].reverse()) {
+            try {
+              await this.mutationExecutor.executeSingleMutation({
+                songId: draft.songId,
+                filePath: draft.filePath,
+                tagPayload: draft.previousTags as Record<string, string | number>,
+                fieldMap: draft.previousTags as Record<string, string | number>
+              });
+            } catch {
+              // Ignore single item revert failure during cancellation rollback
+            }
+          }
+          draftSnapshots.length = 0;
+          updatedCount = 0;
+        }
         break;
       }
 
