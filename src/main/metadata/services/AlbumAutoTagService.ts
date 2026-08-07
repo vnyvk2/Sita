@@ -71,32 +71,6 @@ export class AlbumAutoTagService extends EventEmitter {
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
-      if (this.resolutionManager) {
-        const resolutionContext: MetadataContext = {
-          resources: { targetResources: [] },
-          execution: { executionMode: 'Interactive', stage: 'Searching' },
-          request: {
-            query: { albumTitle: albumName, artistName },
-            targetFieldIds: ['title', 'artist', 'album', 'genre', 'artworkUrl']
-          }
-        };
-        const resolution = await this.resolutionManager.resolve(operationId, resolutionContext);
-        if (resolution && resolution.candidates && resolution.candidates.length > 0) {
-          const mappedResults: AlbumMetadata[] = resolution.candidates.map((cand) => ({
-            releaseId: cand.externalId,
-            title: cand.title,
-            artist: cand.artist,
-            year: typeof cand.matchedAttributes.year === 'number' ? cand.matchedAttributes.year : undefined,
-            coverArtUrl: cand.matchedAttributes.artworkUrl,
-            tracks: []
-          }));
-          this.checkCancelled(signal);
-          this.operationManager.updateState(operationId, 'Completed', `Found ${mappedResults.length} release candidates.`, 100);
-          this.emitProgress('completed', `Found ${mappedResults.length} release candidates.`, 100, operationId);
-          return mappedResults;
-        }
-      }
-
       const results = await this.metadataService.search(albumName, artistName, limit);
       this.checkCancelled(signal);
       this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);

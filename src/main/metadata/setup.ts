@@ -208,7 +208,9 @@ export class MetadataBootstrap {
           {
             title: data.title,
             artists: data.artist ? [{ name: data.artist }] : undefined,
-            albums: data.album ? [{ title: data.album }] : undefined,
+            albums: data.album
+              ? [{ title: data.album, artists: data.artist ? [{ name: data.artist }] : undefined }]
+              : undefined,
             genres: data.genre ? [{ name: data.genre }] : undefined,
             releasedYear: data.year,
             trackNumber: data.trackNumber

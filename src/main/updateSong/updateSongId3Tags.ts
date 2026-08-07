@@ -898,8 +898,8 @@ const updateSongId3Tags = async (
       : undefined;
 
     let processedArtwork: { existing?: any, payloads?: any } | undefined;
-    if (newArtworkPath) {
-      const buffer = await generateArtworkBuffer(newArtworkPath);
+    if (newArtworkPath || tags.artworkBuffer) {
+      const buffer = (tags.artworkBuffer as Buffer | undefined) || (newArtworkPath ? await generateArtworkBuffer(newArtworkPath) : undefined);
       artworkBuffer = buffer || undefined;
 
       if (artworkBuffer) {

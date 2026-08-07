@@ -72,7 +72,9 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
 
     const rec = recordings[0];
     const artistName = rec['artist-credit']?.[0]?.name ?? rec['artist-credit']?.[0]?.artist?.name ?? query.artist ?? '';
-    const albumName = rec.releases?.[0]?.title ?? '';
+    const releaseDto = rec.releases?.[0];
+    const albumName = releaseDto?.title ?? '';
+    const releaseMbid = releaseDto?.id ?? rec.id;
 
     return {
       providerId: 'musicbrainz',
@@ -82,7 +84,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
         { fieldId: 'title', providerId: 'musicbrainz', value: rec.title, confidenceScore: this.getConfidence('title', 0.95) },
         { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
         { fieldId: 'album', providerId: 'musicbrainz', value: albumName, confidenceScore: this.getConfidence('album', 0.90) },
-        { fieldId: 'mbid', providerId: 'musicbrainz', value: rec.id, confidenceScore: this.getConfidence('mbid', 0.99) }
+        { fieldId: 'mbid', providerId: 'musicbrainz', value: releaseMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
       ]
     };
   }
