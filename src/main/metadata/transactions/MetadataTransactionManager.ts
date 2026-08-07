@@ -18,6 +18,7 @@ export interface TransactionExecutionOptions {
 
 export interface TransactionResult {
   success: boolean;
+  cancelled?: boolean;
   updatedCount: number;
   failedCount: number;
   errors: string[];
@@ -43,6 +44,26 @@ export class MetadataTransactionManager {
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.mutationExecutor = new MutationExecutor(this.tagWriter, this.relationalSync);
+  }
+
+  /**
+   * Reverts all applied draft snapshots in reverse chronological order.
+   */
+  private async rollbackDraftSnapshots(draftSnapshots: DraftSnapshot[]): Promise<void> {
+    if (draftSnapshots.length === 0) return;
+    for (const draft of [...draftSnapshots].reverse()) {
+      try {
+        await this.mutationExecutor.executeSingleMutation({
+          songId: draft.songId,
+          filePath: draft.filePath,
+          tagPayload: draft.previousTags as Record<string, string | number>,
+          fieldMap: draft.previousTags as Record<string, string | number>
+        });
+      } catch {
+        // Ignore single item revert failure during atomic rollback
+      }
+    }
+    draftSnapshots.length = 0;
   }
 
   /**
@@ -82,6 +103,7 @@ export class MetadataTransactionManager {
 
     let updatedCount = 0;
     let failedCount = 0;
+    let isCancelled = false;
     const errors: string[] = [];
     const draftSnapshots: DraftSnapshot[] = [];
 
@@ -89,23 +111,10 @@ export class MetadataTransactionManager {
     for (let i = 0; i < mutations.length; i += chunkSize) {
       if (signal?.aborted) {
         failedCount++;
+        isCancelled = true;
         errors.push('Transaction operation cancelled by user');
-        if (draftSnapshots.length > 0) {
-          for (const draft of [...draftSnapshots].reverse()) {
-            try {
-              await this.mutationExecutor.executeSingleMutation({
-                songId: draft.songId,
-                filePath: draft.filePath,
-                tagPayload: draft.previousTags as Record<string, string | number>,
-                fieldMap: draft.previousTags as Record<string, string | number>
-              });
-            } catch {
-              // Ignore single item revert failure during cancellation rollback
-            }
-          }
-          draftSnapshots.length = 0;
-          updatedCount = 0;
-        }
+        await this.rollbackDraftSnapshots(draftSnapshots);
+        updatedCount = 0;
         break;
       }
 
@@ -168,23 +177,8 @@ export class MetadataTransactionManager {
       }
 
       if (chunkFailed) {
-        // Atomic Partial Batch Rollback: Revert any mutations already applied in this transaction
-        if (draftSnapshots.length > 0) {
-          for (const draft of [...draftSnapshots].reverse()) {
-            try {
-              await this.mutationExecutor.executeSingleMutation({
-                songId: draft.songId,
-                filePath: draft.filePath,
-                tagPayload: draft.previousTags as Record<string, string | number>,
-                fieldMap: draft.previousTags as Record<string, string | number>
-              });
-            } catch {
-              // Ignore single item revert failure during atomic rollback
-            }
-          }
-          draftSnapshots.length = 0;
-          updatedCount = 0;
-        }
+        await this.rollbackDraftSnapshots(draftSnapshots);
+        updatedCount = 0;
         break;
       }
     }
@@ -203,6 +197,7 @@ export class MetadataTransactionManager {
 
     return {
       success: errors.length === 0,
+      cancelled: isCancelled || undefined,
       updatedCount,
       failedCount,
       errors,
