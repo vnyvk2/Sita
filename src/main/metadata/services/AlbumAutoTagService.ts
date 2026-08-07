@@ -147,7 +147,37 @@ export class AlbumAutoTagService extends EventEmitter {
 
       this.operationManager.updateState(operationId, 'Merging', 'Building presentation-friendly metadata diffs...', 85);
       this.emitProgress('diffing', 'Building presentation-friendly metadata diffs...', 85, operationId);
-      const trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
+
+      let trackPreviews: TrackMatchPreview[] = [];
+
+      if (this.resolutionManager) {
+        const resolution = await this.resolutionManager.resolve({
+          operationId,
+          targetResourceIds,
+          albumTitle: resolved.album.title,
+          artistName: resolved.album.artist,
+          mbid: resolved.providerReleaseId,
+          releaseId: resolved.providerReleaseId
+        });
+
+        if (resolution.mergedResult) {
+          const merged = resolution.mergedResult;
+          if (merged.artworkUrl) {
+            resolved.album.artwork = {
+              primaryPath: merged.artworkUrl,
+              onlineUrls: [merged.artworkUrl]
+            };
+          }
+
+          trackPreviews = albumPreview.trackList.map((pair) =>
+            MetadataDiffBuilder.buildTrackPreviewFromMergedResult(pair, merged, this.resolutionManager?.registry)
+          );
+        } else {
+          trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
+        }
+      } else {
+        trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
+      }
 
       const overallConfidenceLevel = getConfidenceLevel(albumPreview.confidence);
 

@@ -1,8 +1,20 @@
 import type { MetadataLookupGateway } from './MetadataLookupGateway';
-import type { MetadataResolution } from '../domain/MetadataResolution';
+import type { MetadataResolution, ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataContext } from '../domain/MetadataContext';
-import { MetadataMergeEngine } from './MetadataMergeEngine';
+import type { MetadataPolicy } from '../domain/MetadataPolicy';
+import { MetadataMergeEngine, type FieldContribution, type MergedCandidateResult } from './MetadataMergeEngine';
+import { MergeSession } from './MergeSession';
 import { ProviderRegistry } from './ProviderRegistry';
+
+export interface ResolutionRequest {
+  operationId: string;
+  targetResourceIds: (string | number)[];
+  albumTitle: string;
+  artistName?: string;
+  mbid?: string;
+  releaseId?: string;
+  policy?: MetadataPolicy;
+}
 
 export class ResolutionUnavailableError extends Error {
   constructor(message: string) {
@@ -14,6 +26,7 @@ export class ResolutionUnavailableError extends Error {
 export class MetadataResolutionManager {
   private readonly lookupGateway?: MetadataLookupGateway;
   private readonly mergeEngine: MetadataMergeEngine;
+  private readonly providerRegistry: ProviderRegistry;
 
   constructor(options?: MetadataLookupGateway | {
     lookupGateway?: MetadataLookupGateway;
@@ -22,39 +35,93 @@ export class MetadataResolutionManager {
   }) {
     if (options && 'searchCandidates' in options) {
       this.lookupGateway = options;
-      const reg = new ProviderRegistry();
-      this.mergeEngine = new MetadataMergeEngine(reg);
+      this.providerRegistry = new ProviderRegistry();
+      this.mergeEngine = new MetadataMergeEngine(this.providerRegistry);
     } else {
       this.lookupGateway = options?.lookupGateway;
-      const reg = options?.providerRegistry ?? new ProviderRegistry();
-      this.mergeEngine = options?.mergeEngine ?? new MetadataMergeEngine(reg);
+      this.providerRegistry = options?.providerRegistry ?? new ProviderRegistry();
+      this.mergeEngine = options?.mergeEngine ?? new MetadataMergeEngine(this.providerRegistry);
     }
   }
 
   /**
-   * Performs resolution (lookup, candidate normalization, and multi-provider field merge evaluation) via MetadataLookupGateway and MetadataMergeEngine.
+   * Performs multi-provider resolution (lookup, candidate normalization, contribution harvesting, and field merge evaluation)
+   * driven by clean ResolutionRequest DTO. Constructing internal MetadataContext transparently.
    */
   public async resolve(
-    operationId: string,
-    context: MetadataContext
+    request: ResolutionRequest | string,
+    legacyContext?: MetadataContext
   ): Promise<MetadataResolution> {
     if (!this.lookupGateway) {
-      throw new ResolutionUnavailableError(`No MetadataLookupGateway configured for operation ${operationId}`);
+      const opId = typeof request === 'string' ? request : request.operationId;
+      throw new ResolutionUnavailableError(`No MetadataLookupGateway configured for operation ${opId}`);
     }
 
-    const candidates = await this.lookupGateway.searchCandidates(context);
-    const mergedResult = this.mergeEngine.mergeCandidates(candidates, context.policy);
+    // Support legacy signature (operationId: string, context: MetadataContext)
+    if (typeof request === 'string') {
+      const context = legacyContext!;
+      const candidates = await this.lookupGateway.searchCandidates(context);
+      const mergedResult = this.mergeEngine.mergeCandidates(candidates, context.policy);
+      return {
+        operationId: request,
+        resourceId: context.resources.targetResources[0]?.id ?? 0,
+        candidates,
+        mergedResult,
+        resolvedAt: Date.now()
+      };
+    }
+
+    // Phase 13D Adopt Resolution Pipeline: Request DTO pattern
+    const context: MetadataContext = {
+      resources: {
+        primaryType: 'album',
+        targetResources: request.targetResourceIds.map((id) => ({ id, type: 'album', attributes: {} }))
+      },
+      execution: { mode: 'Interactive' },
+      request: {
+        id: request.operationId,
+        query: {
+          albumTitle: request.albumTitle,
+          artistName: request.artistName,
+          mbid: request.mbid ?? request.releaseId,
+          releaseId: request.releaseId ?? request.mbid
+        } as any,
+        policy: request.policy,
+        requestedAt: Date.now()
+      },
+      policy: request.policy
+    };
+
+    let fieldContributions: FieldContribution[] = [];
+    let candidates: ProviderCandidate[] = [];
+
+    if (this.lookupGateway.searchContributions) {
+      fieldContributions = await this.lookupGateway.searchContributions(context);
+    }
+
+    candidates = await this.lookupGateway.searchCandidates(context);
+
+    const mergedResult: MergedCandidateResult = fieldContributions.length > 0
+      ? this.mergeEngine.mergeFieldContributions(fieldContributions, request.policy)
+      : this.mergeEngine.mergeCandidates(candidates, request.policy);
+
+    const session = new MergeSession(this.mergeEngine, fieldContributions, request.policy, mergedResult);
 
     return {
-      operationId,
-      resourceId: context.resources.targetResources[0]?.id ?? 0,
+      operationId: request.operationId,
+      resourceId: request.targetResourceIds[0] ?? 0,
       candidates,
       mergedResult,
-      resolvedAt: Date.now()
-    };
+      resolvedAt: Date.now(),
+      session
+    } as MetadataResolution & { session?: MergeSession };
   }
 
   public get merger(): MetadataMergeEngine {
     return this.mergeEngine;
+  }
+
+  public get registry(): ProviderRegistry {
+    return this.providerRegistry;
   }
 }

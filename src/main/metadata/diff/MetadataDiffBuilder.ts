@@ -13,11 +13,14 @@ export class MetadataDiffBuilder {
    * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with self-contained field-level alternatives.
    */
   public static buildTrackPreviewFromMergedResult(
-    song: LocalSongInput,
+    songOrPair: LocalSongInput | TrackMatchPair,
     merged: MergedCandidateResult,
     registry?: ProviderRegistry
   ): TrackMatchPreview {
     const activeRegistry = registry ?? globalProviderRegistry;
+    const pair = 'localSong' in songOrPair ? songOrPair : undefined;
+    const song = pair ? pair.localSong : (songOrPair as LocalSongInput);
+
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
 
@@ -36,13 +39,24 @@ export class MetadataDiffBuilder {
       }));
     };
 
+    const recTrackNo = pair?.remoteTrack?.recording?.trackNumber;
+    const recDiscNo = pair?.remoteTrack?.recording?.discNumber;
+
     const fieldDiffs: MetadataFieldDiff[] = [
       this.compareField('title', 'Title', song.title, merged.title, merged.fieldAttributions.title, mapAlternatives('title')),
       this.compareField('artist', 'Artist', rawSongArtist, merged.artist, merged.fieldAttributions.artist, mapAlternatives('artist')),
       this.compareField('album', 'Album', rawSongAlbum, suggestedAlbum, merged.fieldAttributions.album, mapAlternatives('album')),
       this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
+      this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
+      this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
       this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre'))
     ];
+
+    const conf = pair?.confidence ?? 0.95;
+    const applyTrack = conf >= 0.75;
+    const warnings = pair?.reasons.filter(
+      (r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch') || r.toLowerCase().includes('duplicate')
+    ) ?? [];
 
     return {
       localSongId: song.songId,
@@ -51,14 +65,17 @@ export class MetadataDiffBuilder {
       oldArtist: rawSongArtist,
       oldAlbum: rawSongAlbum,
       oldYear: song.year,
-      confidence: 0.95,
-      confidenceLevel: 'Excellent',
-      why: 'Multi-Provider Merged Resolution',
-      reasons: ['Merged across active provider federation'],
+      oldTrackNumber: song.trackNumber,
+      oldDiscNumber: song.discNumber,
+      oldGenre: song.genre,
+      confidence: conf,
+      confidenceLevel: pair?.confidenceLevel ?? 'Excellent',
+      why: pair?.why ?? 'Multi-Provider Merged Resolution',
+      reasons: pair?.reasons ?? ['Merged across active provider federation'],
       fieldDiffs,
-      applyTrack: true,
-      hasWarnings: false,
-      warningCount: 0
+      applyTrack,
+      hasWarnings: warnings.length > 0,
+      warningCount: warnings.length
     };
   }
 

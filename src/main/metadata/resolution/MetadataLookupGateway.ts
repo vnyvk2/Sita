@@ -28,18 +28,24 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
 
     let title: string | undefined;
     let artist: string | undefined;
+    let mbid: string | undefined;
+    let releaseId: string | undefined;
 
     if ('albumTitle' in requestQuery) {
-      const q = requestQuery as AlbumLookupQuery;
+      const q = requestQuery as AlbumLookupQuery & { mbid?: string; releaseId?: string };
       title = q.albumTitle;
       artist = q.artistName;
+      mbid = q.mbid;
+      releaseId = q.releaseId;
     } else if ('trackTitle' in requestQuery) {
-      const q = requestQuery as TrackLookupQuery;
+      const q = requestQuery as TrackLookupQuery & { mbid?: string; releaseId?: string };
       title = q.trackTitle;
       artist = q.artistName;
+      mbid = q.mbid;
+      releaseId = q.releaseId;
     }
 
-    if (!title) return [];
+    if (!title && !mbid && !releaseId) return [];
 
     const fieldContributions: FieldContribution[] = [];
     const activeInstances = this.providerRegistry.getActiveInstances();
@@ -48,7 +54,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
       const adapter = instance as unknown as IMetadataProviderAdapter;
       if (adapter && typeof adapter.fetchContribution === 'function') {
         try {
-          const contrib = await adapter.fetchContribution({ title, artist });
+          const contrib = await adapter.fetchContribution({ title, artist, mbid, releaseId });
           if (contrib && contrib.contributions) {
             fieldContributions.push(...contrib.contributions);
           }

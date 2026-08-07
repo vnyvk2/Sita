@@ -1,0 +1,731 @@
+# Metadata Platform — Deep Architectural Audit
+
+> Scope: All code from commit `feb7ca19` to `HEAD` (`91cf76a5`), ~11,500 lines across 129 files.
+> Focus: Architecture, execution flow, ownership, coherence. Not code style.
+
+---
+
+## 1. The Architecture As It Actually Exists Today
+
+Your metadata platform has evolved into **two co-existing architectural generations** that do not share a control plane.
+
+### Generation 1: "The Engine" (pre-feb7ca19)
+
+```
+MetadataBootstrap.bootstrap()
+        │
+        ├── MetadataProviderRegistry   (registries/)
+        ├── MetadataProviderExecutor
+        ├── MetadataMergeEngine         (engine/)
+        ├── MetadataEngine
+        ├── MetadataPipeline
+        ├── MetadataQueryPlanner
+        ├── MetadataCache
+        ├── MetadataEventBus
+        └── MetadataContext             (models/)
+```
+
+This is a fully wired dependency graph. `MetadataBootstrap.bootstrap()` constructs every component, wires them together, and returns a `MetadataContainer`. This system has providers, execution strategies, circuit breakers, retry policies, health managers, diagnostics trackers, and a selection/execution strategy pattern.
+
+It is registered at [`ipc.ts:171`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/ipc.ts#L171):
+
+```ts
+registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
+```
+
+This handles `metadata.load`, `metadata.override.*` — read and user-override operations.
+
+### Generation 2: "The AutoTag Pipeline" (post-feb7ca19)
+
+```
+ipc.ts:173-205  (manually constructed, not via MetadataBootstrap)
+        │
+        ├── MusicBrainzApiClient        (NEW instance, separate from Gen1)
+        ├── MusicBrainzAdapter          (NEW instance, separate from Gen1)
+        ├── MetadataProviderRuntime     (NOT the Gen1 runtime)
+        ├── AlbumMetadataService
+        ├── MetadataApplyService
+        │       ├── TagWriterService
+        │       └── MetadataHistoryService
+        ├── AlbumAutoTagService
+        │       ├── MetadataOperationManager
+        │       └── MetadataTransactionManager
+        │               ├── MutationExecutor
+        │               ├── SnapshotBuilder
+        │               ├── TagWriterService     (SECOND instance)
+        │               ├── LibraryRelationalSyncService
+        │               ├── ArtworkDownloaderService
+        │               ├── ArtworkCacheInvalidator
+        │               └── MetadataHistoryService  (SECOND instance)
+        └── registerMetadataHandlers(autoTagService, mainWindow)
+```
+
+This is **manually assembled** in [`ipc.ts:173-205`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/ipc.ts#L173-L205) — completely outside `MetadataBootstrap`. It creates its own `MusicBrainzApiClient`, its own `MusicBrainzAdapter`, its own `MetadataProviderRuntime`, and its own service instances.
+
+**This is the system that actually runs AutoTag.**
+
+### The Disconnect
+
+These two systems do not share:
+
+| Concern | Gen1 (Engine) | Gen2 (AutoTag) |
+|---|---|---|
+| Provider instances | `MetadataBootstrap` creates `MusicBrainzAdapter` | `ipc.ts` creates a separate `MusicBrainzAdapter` |
+| Rate limiters | Shared via `PlatformBootstrap` | Creates its own `RateLimiter` |
+| Provider registry | `MetadataProviderRegistry` (registries/) | `MetadataProviderRuntime` (runtime/) |
+| Merge engine | `MetadataMergeEngine` (engine/) | None used in primary flow |
+| History | Not connected | `MetadataHistoryService` (two separate instances) |
+| IPC handlers | `metadata.load`, `metadata.override.*` | `metadata/searchAlbums`, `metadata/buildPreview`, etc. |
+
+---
+
+## 2. The Real Execution Pipeline
+
+Starting from the UI (`useAlbumAutoTag` → IPC → main process), here is the **actual** path metadata takes:
+
+### 2.1 Search
+
+```
+Renderer: useAlbumAutoTag.searchReleases()
+    │
+    ▼  IPC: metadata/searchAlbums
+MetadataHandlers.ts
+    │
+    ▼
+AlbumAutoTagService.searchReleases()
+    │  creates MetadataOperation via MetadataOperationManager
+    │
+    ▼
+AlbumMetadataService.search()
+    │
+    ▼
+MetadataProviderRuntime.searchAlbums()
+    │  iterates getSortedAdapters(), calls adapter.searchAlbums()
+    │  Promise.allSettled across all registered adapters
+    │  deduplicates and ranks results
+    │
+    ▼
+MusicBrainzAdapter.searchAlbums()
+    │
+    ▼
+MusicBrainzApiClient.searchReleases()
+    │  HTTP via RequestPipeline (RateLimiter + RetryPolicy)
+    │
+    ▼
+Results flow back to renderer as AlbumMetadata[]
+```
+
+### 2.2 Preview Build
+
+```
+Renderer: useAlbumAutoTag.buildPreview()
+    │
+    ▼  IPC: metadata/buildPreview
+AlbumAutoTagService.buildPreview()
+    │
+    ├── AlbumMetadataService.resolveRelease()
+    │       │
+    │       ▼
+    │   MetadataProviderRuntime.resolveRelease()
+    │       │
+    │       ▼
+    │   MusicBrainzAdapter.resolveRelease()
+    │       │  fetches full release + track listing from MB API
+    │       ▼
+    │   Returns ResolvedAlbumRelease
+    │
+    ├── AlbumMetadataService.buildAlbumMatch()
+    │       │
+    │       ▼
+    │   TrackMatcher.matchTracks()
+    │       │  Hungarian-algorithm-style 1:1 assignment
+    │       │  score breakdown: title + artist + duration + ISRC + MBID
+    │       ▼
+    │   Album Sequence Continuity Assistance (confidence boost for consecutive tracks)
+    │       ▼
+    │   Returns AlbumPreview with TrackMatchPair[]
+    │
+    └── MetadataDiffBuilder.buildTrackPreview()
+            │  per-field diff: title, artist, album, year, trackNumber, etc.
+            │  AlbumSuffixPreserver for "(Deluxe Edition)" style suffixes
+            ▼
+        Returns AlbumTagPreview
+```
+
+### 2.3 Apply
+
+```
+Renderer: useAlbumAutoTag.applyPreview()
+    │
+    ▼  IPC: metadata/applyPreview
+AlbumAutoTagService.applyPreview()
+    │
+    │  ▲ HERE IS A CRITICAL FORK ▲
+    │
+    │  AlbumAutoTagService builds ResourceMutationPayload[]
+    │  from preview.matches and passes them to:
+    │
+    ▼
+MetadataTransactionManager.executeTransaction()
+    │
+    ├── ArtworkDownloaderService.fetchAndValidateArtwork()
+    │
+    ├── FOR EACH mutation:
+    │       │
+    │       ▼
+    │   MutationExecutor.executeSingleMutation()
+    │       │
+    │       ├── TagWriterService.writeBatch()
+    │       │       │  node-taglib-sharp → writes to physical file
+    │       │       ▼
+    │       │   file.tag.title = ...; file.save()
+    │       │
+    │       └── LibraryRelationalSyncService.syncRelationalDatabase()
+    │               │
+    │               ├── dbUpdater() if provided (from ipc.ts → updateSongId3Tags)
+    │               │       OR
+    │               └── reParseSong() as fallback
+    │
+    ├── ArtworkCacheInvalidator.invalidateArtworkCache()
+    │
+    └── SnapshotBuilder.buildHistorySnapshot() → MetadataHistoryService.pushSnapshot()
+```
+
+### 2.4 Undo
+
+```
+AlbumAutoTagService.undoLastAutoTag()
+    │
+    ▼
+MetadataTransactionManager.rollbackLastTransaction()
+    │
+    ├── MetadataHistoryService.popUndo()
+    │       returns MetadataHistorySnapshot with previousSongs
+    │
+    └── FOR EACH previousSong:
+            MutationExecutor.executeSingleMutation()
+                writes old tags back to disk + syncs DB
+```
+
+> [!IMPORTANT]
+> **`MetadataApplyService` also exists with its own `applyPreview()` and `undoLastAutoTag()`**. It has its own `TagWriterService`, its own `MetadataHistoryService`, its own chunk batching logic, and its own rollback logic. It is **not used** in the primary `AlbumAutoTagService.applyPreview()` flow — which goes through `MetadataTransactionManager` instead.
+
+---
+
+## 3. Architecture vs. Implementation: Where They Match
+
+### ✅ Provider Adapter Contract
+
+The [`IMetadataProviderAdapter`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/contracts/IMetadataProviderAdapter.ts) interface is well-designed:
+
+```ts
+identity: ProviderIdentity
+capabilities: ProviderCapabilities
+supports(capability): boolean
+lookup<T>(identity): Promise<ProviderResult<T>>
+search<T>(query): Promise<ProviderResult<T>[]>
+searchAlbums?(album, artist, limit): Promise<AlbumMetadata[]>
+resolveRelease?(releaseId): Promise<ResolvedAlbumRelease | null>
+fetchContribution?(query): Promise<MetadataContribution | null>
+```
+
+This contract cleanly separates generic operations (`lookup`, `search`) from domain-specific ones (`searchAlbums`, `resolveRelease`) and contribution-federation (`fetchContribution`). MusicBrainz, Discogs, and CAA all implement this uniformly.
+
+### ✅ Provider Specialization Model
+
+Each adapter contributes what it's best at:
+- MusicBrainz: `title`, `artist`, `album`, `isrc`, `mbid`
+- Discogs: `genre`, `style`, `catalogNumber`, `masterRelease`
+- Cover Art Archive: `artworkUrl`, `front`, `back`, `thumbnail`
+
+This matches the vision of provider-agnostic specialization.
+
+### ✅ MetadataMergeEngine (resolution/)
+
+The [`MetadataMergeEngine`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataMergeEngine.ts) field-level merge with policy-driven priorities is architecturally sound:
+
+```ts
+mergeFieldContributions(contributions, policy) → MergedCandidateResult
+```
+
+Priority-ordered merge with per-field policy overrides, field alternatives preservation, and provider attribution tracking. This is the correct architecture.
+
+### ✅ MergeSession Immutability
+
+[`MergeSession`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MergeSession.ts) returns a new instance on `selectProvider()` — proper immutable state management for preview recomputation.
+
+### ✅ Domain Model Layer
+
+The domain layer ([`domain/`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/domain)) defines the right abstractions:
+- `MetadataOperation` with lifecycle states
+- `MetadataContext` with sub-contexts (resources, execution, request, policy)
+- `MetadataTransaction` with `FieldMutation[]`
+- `UndoToken`
+- `MetadataPolicy` with merge priorities and field-level overrides
+- `ProviderAttribution`
+
+These are clean domain objects that describe the problem space well.
+
+### ✅ TrackMatcher Algorithm
+
+[`TrackMatcher`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/matching/TrackMatcher.ts) implements proper 1:1 assignment with weighted scoring (title, artist, duration, ISRC, MBID) and the Album Sequence Continuity boost. This is thoughtful and correct.
+
+---
+
+## 4. Architecture vs. Implementation: Where They've Drifted
+
+### ❌ CRITICAL: Two Parallel Architectures That Don't Talk
+
+This is the single biggest problem. You have:
+
+| | Gen1 Engine | Gen2 AutoTag |
+|---|---|---|
+| Bootstrap | `MetadataBootstrap` | Manual wiring in `ipc.ts` |
+| Container | `MetadataContainer` | None |
+| Provider Registry | `MetadataProviderRegistry` (registries/) | `MetadataProviderRuntime` (runtime/) |
+| Merge Engine | `MetadataMergeEngine` (engine/) | `MetadataMergeEngine` (resolution/) |
+| Context | `MetadataContext` (models/) — a class | `MetadataContext` (domain/) — an interface |
+| History | Not used | `MetadataHistoryService` |
+| Providers | `LocalMetadataProvider`, `UserMetadataProvider` | `MusicBrainzAdapter` (separate instance) |
+
+The Gen1 system at [`setup.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/setup.ts) creates a `MusicBrainzAdapter` via `providerDiscovery` and registers it with `MetadataProviderRegistry`. But the AutoTag pipeline at [`ipc.ts:179-181`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/ipc.ts#L179-L181) creates a **completely separate** `MusicBrainzAdapter` with its own `RequestPipeline` and passes it directly to a standalone `MetadataProviderRuntime`.
+
+**These two MusicBrainz instances do not share rate limiters.** Under concurrent load, they could double the API request rate.
+
+### ❌ CRITICAL: MetadataApplyService Is a Dead Parallel Pipeline
+
+[`MetadataApplyService`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/services/MetadataApplyService.ts) (509 lines) implements:
+- Chunk-batched tag writing
+- Artwork download and validation
+- DB update via `dbUpdater` or `reParseSong` fallback
+- Complete rollback on failure
+- History snapshot recording
+- Undo capability
+
+[`MetadataTransactionManager`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/transactions/MetadataTransactionManager.ts) (194 lines) implements:
+- Per-mutation tag writing via `MutationExecutor`
+- Artwork download via `ArtworkDownloaderService`
+- DB sync via `LibraryRelationalSyncService`
+- Cache invalidation via `ArtworkCacheInvalidator`
+- History snapshot recording
+- Undo capability
+
+**These are the same pipeline implemented twice.** The actual execution path is:
+
+```
+AlbumAutoTagService.applyPreview()
+    │
+    ▼ builds ResourceMutationPayload[]
+    │
+    ▼ calls MetadataTransactionManager.executeTransaction()
+```
+
+`MetadataApplyService.applyPreview()` is never called in production. But `AlbumAutoTagService` still holds a reference to it (`this.applyService`) and exposes it as a public getter (`applyManager`). And `MetadataJobManager` references `MetadataApplyService` directly:
+
+```ts
+// MetadataJobManager.ts:169
+const result = await this.applyService.applyPreview(job.preview, undefined, job.abortController.signal);
+```
+
+So `MetadataJobManager` uses the **old** apply pipeline, while `AlbumAutoTagService` uses the **new** one. If a job is executed through `MetadataJobManager`, it will bypass the `MetadataTransactionManager` entirely.
+
+### ❌ Two MetadataHistoryService Instances
+
+`AlbumAutoTagService` creates a `MetadataTransactionManager` with its own `MetadataHistoryService`, and `MetadataApplyService` creates another `MetadataHistoryService`. These are independent in-memory stacks. An undo through one doesn't know about the other.
+
+### ❌ Two MetadataMergeEngine Classes
+
+- [`engine/MetadataMergeEngine.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/engine/MetadataMergeEngine.ts) — the Gen1 version, operates on `ProviderResult[]` using `IMetadataMergePolicy`
+- [`resolution/MetadataMergeEngine.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataMergeEngine.ts) — the Gen2 version, operates on `FieldContribution[]` using `MetadataPolicy`
+
+Same name, completely different semantics. The Gen2 version is the correct architecture. The Gen1 version still exists and is wired into `MetadataEngine`.
+
+### ❌ Two MetadataContext Types
+
+- [`models/MetadataContext.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/models/MetadataContext.ts) — a **class** with `clock`, `logger`, `locale`, `cancellationToken`, `traceId`
+- [`domain/MetadataContext.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/domain/MetadataContext.ts) — an **interface** with `resources`, `execution`, `request`, `policy`
+
+These represent fundamentally different concepts under the same name. The Gen1 version is an infrastructure context (logging, cancellation). The Gen2 version is a domain request context. `MetadataBootstrap` uses the Gen1 class; `MetadataOperationManager` uses the Gen2 interface.
+
+### ❌ Three ProviderRegistry Concepts
+
+1. [`registries/MetadataProviderRegistry.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/registries/MetadataProviderRegistry.ts) — stores `IMetadataProvider` (Gen1)
+2. [`runtime/MetadataProviderRegistry.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/runtime/MetadataProviderRegistry.ts) — stores `MetadataProviderRuntime` (Gen2 runtime wrapper)
+3. [`resolution/ProviderRegistry.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/ProviderRegistry.ts) — stores `ProviderDescriptor` + `MetadataProvider` instances with hardcoded defaults (Gen2 resolution)
+
+Three different classes, three different models, three different directories. The one in `resolution/` is the most evolved (field confidences, specialization, capabilities). But the one in `registries/` is what `MetadataBootstrap` actually uses. And the one in `runtime/` is what `MetadataProviderDiscovery` registers into.
+
+---
+
+## 5. Incomplete Integrations
+
+### Components That Exist But Are Not Used
+
+| Component | Status | Evidence |
+|---|---|---|
+| [`MetadataApplyService.applyPreview()`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/services/MetadataApplyService.ts#L97) | **Dead in primary flow** | `AlbumAutoTagService` calls `MetadataTransactionManager` instead |
+| [`MetadataResolutionManager`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataResolutionManager.ts) | **Never called from production code** | Only used in `BackgroundEnrichmentQueue.defaultProcessJob()` and tests |
+| [`MetadataLookupGateway`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataLookupGateway.ts) | **Never called from production code** | Only reachable through `MetadataResolutionManager.resolve()` |
+| [`MetadataOperationManager.executeResolution()`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/operations/MetadataOperationManager.ts#L94) | **Never called** | Uses `MetadataResolutionManager` internally, but no caller exists |
+| [`MergeSession`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MergeSession.ts) | **Only in tests** | No production code creates a `MergeSession` |
+| [`MetadataDiffBuilder.buildTrackPreviewFromMergedResult()`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/diff/MetadataDiffBuilder.ts#L15) | **Only in tests** | Primary flow uses `buildTrackPreview()` (the single-provider version) |
+| [`BackgroundEnrichmentQueue`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/jobs/BackgroundEnrichmentQueue.ts) | **Never wired or started** | No code in `ipc.ts` or `setup.ts` creates or starts it |
+| [`MetadataJobManager`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/jobs/MetadataJobManager.ts) | **Never wired** | No IPC handler creates jobs via `MetadataJobManager` |
+| `DiscogsAdapter` | **Never registered** | Has full implementation + tests, but no factory in `setup.ts` or `ipc.ts` |
+| `CoverArtArchiveAdapter` | **Never registered** | Same — exists but isn't wired anywhere |
+| Gen1 `MetadataMergeEngine` (engine/) | **Architecturally obsolete** | Superseded by the `resolution/MetadataMergeEngine` |
+| [`MetadataProviderDiscovery`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/runtime/MetadataProviderDiscovery.ts) | **Gen1 only** | Registered in `setup.ts` but not used by the AutoTag pipeline |
+
+### The Federation Gap
+
+The intended flow should be:
+
+```
+User triggers AutoTag
+    │
+    ▼
+MetadataLookupGateway.searchContributions()
+    │  queries ALL registered providers (MB, Discogs, CAA)
+    │
+    ▼
+MetadataMergeEngine.mergeFieldContributions()
+    │  field-level merge with policy priorities
+    │
+    ▼
+MergeSession for interactive selection
+    │
+    ▼
+MetadataTransactionManager.executeTransaction()
+```
+
+The **actual** flow is:
+
+```
+User triggers AutoTag
+    │
+    ▼
+AlbumMetadataService.search()
+    │
+    ▼
+MetadataProviderRuntime.searchAlbums()
+    │  only queries MusicBrainz (the only registered adapter)
+    │
+    ▼
+MetadataDiffBuilder.buildTrackPreview()
+    │  single-provider, no merge
+    │
+    ▼
+MetadataTransactionManager.executeTransaction()
+```
+
+**Provider federation exists in code but is not wired into the execution path.** The entire `MetadataLookupGateway` → `MetadataResolutionManager` → `MetadataMergeEngine` → `MergeSession` pipeline is implemented but sits unused.
+
+---
+
+## 6. Ownership Evaluation
+
+### AlbumAutoTagService — Owns Too Much
+
+[`AlbumAutoTagService`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/services/AlbumAutoTagService.ts) is a 277-line orchestrator that:
+1. Creates `MetadataOperationManager` internally
+2. Creates `MetadataTransactionManager` internally
+3. Holds a reference to `MetadataApplyService` (even though it doesn't use its `applyPreview`)
+4. Manages `AbortController` lifecycle
+5. Manages operation stage tracking
+6. Emits progress events
+7. Orchestrates search → resolve → match → diff → apply → undo
+
+It is both the **application service** and the **operation lifecycle manager**. The `MetadataOperationManager` it creates is used only for state tracking (calling `updateState`) — it never delegates resolution to it. The `operationManager.createOperation()` calls are purely for bookkeeping.
+
+**Should be**: `AlbumAutoTagService` should delegate to `MetadataOperationManager` for lifecycle, and `MetadataOperationManager` should own the state machine. Currently, `AlbumAutoTagService` runs the state machine manually while also telling `MetadataOperationManager` about it.
+
+### MetadataResolutionManager — Good Design, Dead Code
+
+[`MetadataResolutionManager`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataResolutionManager.ts) has the right shape: takes a `MetadataLookupGateway` and a `MetadataMergeEngine`, produces a `MetadataResolution`. This is exactly what a resolution coordinator should do.
+
+**The problem**: Nobody calls it in production. `AlbumAutoTagService` bypasses it completely by talking directly to `AlbumMetadataService` → `MetadataProviderRuntime`.
+
+### MetadataLookupGateway — Correct But Orphaned
+
+[`DefaultMetadataLookupGateway`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/MetadataLookupGateway.ts) implements both `searchCandidates()` and `searchContributions()`. The `searchContributions()` method iterates `ProviderRegistry.getActiveInstances()` and calls `fetchContribution()` on each — this is the federation primitive.
+
+**The problem**: No production code constructs a `DefaultMetadataLookupGateway` or calls it. The `ProviderRegistry.activeInstances` map is never populated (no code calls `registerInstance()`).
+
+### ProviderRegistry (resolution/) — Knows Too Much
+
+[`ProviderRegistry`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/resolution/ProviderRegistry.ts) hardcodes descriptors for MusicBrainz, Discogs, CAA, Spotify, and Apple Music in its constructor. This is configuration masquerading as code. Provider descriptors should be registered by the providers themselves or by bootstrap configuration.
+
+### BackgroundEnrichmentQueue — Correct Architecture, No Integration
+
+[`BackgroundEnrichmentQueue`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/jobs/BackgroundEnrichmentQueue.ts) has good bones: job queue, worker loop, retry strategy, health assessment, persistence interface. But:
+- Never constructed in production code
+- Its `defaultProcessJob()` uses `MetadataResolutionManager` (also not wired)
+- The library health scan (`assessLibraryHealth`) is never called
+
+### MetadataTransactionManager — Should Own More
+
+[`MetadataTransactionManager`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/transactions/MetadataTransactionManager.ts) correctly decomposes into `MutationExecutor`, `SnapshotBuilder`, `ArtworkDownloaderService`, etc. But it doesn't enforce transaction semantics. If `MutationExecutor` succeeds for items 1-3 and fails on item 4, items 1-3 are **already committed to disk**. There is no atomic rollback of the partial batch — unlike `MetadataApplyService` which does roll back successful writes on failure.
+
+---
+
+## 7. Provider Federation Assessment
+
+### Is Federation Truly Implemented?
+
+**In code: Yes.** The `MetadataMergeEngine.mergeFieldContributions()` correctly:
+- Groups contributions by field
+- Applies policy priorities
+- Selects winners
+- Preserves alternatives
+- Tracks attributions
+
+The `MergeSession` correctly recomputes previews immutably when the user selects an alternative provider.
+
+**In production: No.** The federation pipeline is never executed because:
+
+1. `ProviderRegistry.activeInstances` is always empty (no `registerInstance()` calls)
+2. `MetadataLookupGateway` is never constructed
+3. `MetadataResolutionManager` is never called from `AlbumAutoTagService`
+4. `MetadataDiffBuilder.buildTrackPreviewFromMergedResult()` (the multi-provider variant) is never called
+5. `DiscogsAdapter` and `CoverArtArchiveAdapter` are never registered anywhere
+
+The live system is **single-provider MusicBrainz only**.
+
+### Does the MergeEngine Sit at the Center?
+
+**No.** The center of the actual architecture is `AlbumMetadataService` → `MetadataProviderRuntime` → single adapter. The MergeEngine sits to the side, architecturally correct but structurally disconnected.
+
+---
+
+## 8. Long-Term Extensibility
+
+### Adding Spotify, Apple Music, Last.fm, AcousticBrainz, Plugins
+
+**The adapter contract is ready.** Any provider can implement:
+```ts
+implements IMetadataProviderAdapter {
+    identity, capabilities, priority
+    fetchContribution(query) → MetadataContribution
+    searchAlbums(), resolveRelease()
+}
+```
+
+This is good.
+
+**But the wiring is not ready.** To add Spotify today, you would need to:
+
+1. Implement `SpotifyAdapter` ✅ (straightforward)
+2. Register it in... where?
+   - Not in `MetadataBootstrap` — the AutoTag pipeline ignores that
+   - Not in `MetadataProviderRuntime` — it's manually constructed in `ipc.ts` with a single adapter
+   - You'd have to modify `ipc.ts` to manually construct and register it
+3. Change `AlbumAutoTagService` to use `MetadataLookupGateway` instead of `AlbumMetadataService`
+4. Wire the `ProviderRegistry` to actually contain active instances
+5. Switch `MetadataDiffBuilder` from `buildTrackPreview` to `buildTrackPreviewFromMergedResult`
+
+**Estimated effort to add one more provider: Significant refactoring of the wiring, not the adapters.**
+
+The adapter layer scales. The orchestration layer does not.
+
+---
+
+## 9. Architectural Smells
+
+### Hidden Coupling: Global ProviderRegistry in MetadataDiffBuilder
+
+```ts
+// MetadataDiffBuilder.ts:9
+const globalProviderRegistry = new ProviderRegistry();
+```
+
+A module-level singleton that every static call falls back to. This is infrastructure coupling inside a domain-adjacent class.
+
+### Circular Knowledge: AlbumAutoTagService ↔ MetadataApplyService
+
+`AlbumAutoTagService` receives `MetadataApplyService` in its constructor, extracts its internals (`applyService.writer`, `applyService.updater`, `applyService.history`), and passes them to `MetadataTransactionManager`. The child reaches into the parent's guts. `MetadataTransactionManager` should receive its dependencies directly.
+
+### Duplicated SongDbUpdater Type
+
+`SongDbUpdater` is defined in both:
+- [`MetadataApplyService.ts:41`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/services/MetadataApplyService.ts#L41)
+- [`LibraryRelationalSyncService.ts:3`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/metadata/transactions/LibraryRelationalSyncService.ts#L3)
+
+Same interface, defined twice.
+
+### Leaking Abstractions: require() in MetadataJobManager
+
+```ts
+// MetadataJobManager.ts:37-38
+this.applyService = applyService ?? (new (require('../services/MetadataApplyService').MetadataApplyService)());
+this.diagnosticsService = diagnosticsService ?? (new (require('./MetadataDiagnosticsService').MetadataDiagnosticsService)());
+```
+
+Runtime `require()` to avoid circular imports. This is a dependency graph smell — these should be injected.
+
+### Incorrect Dependency Direction: TagWriterService Dual Ownership
+
+Both `MetadataApplyService` and `MetadataTransactionManager` independently create `TagWriterService` instances. The actual writing to disk happens through whichever path executes first. In the current code, both could theoretically write to the same file concurrently if both pipelines were active.
+
+### Missing Domain Object: No "AutoTagSession"
+
+The concept of "I'm auto-tagging an album right now" doesn't have a first-class domain object. Instead, state is scattered across:
+- `AlbumAutoTagService.activeOperations` (Map of AbortControllers)
+- `AlbumAutoTagService.operationStages` (Map of stages)
+- `MetadataOperationManager.operations` (Map of MetadataOperations)
+- `useAlbumAutoTag` state (React hooks)
+
+An `AutoTagSession` domain entity that owns the lifecycle from search to commit would eliminate this scatter.
+
+---
+
+## 10. What You No Longer Understand
+
+### What the Architecture Has Become
+
+You designed a layered metadata platform:
+
+```
+Domain → Operations → Resolution → Merge → Transaction → History
+```
+
+That architecture still exists in your domain models and in some of the newer classes. But the **live execution path** is a flatter pipeline:
+
+```
+IPC → AlbumAutoTagService → AlbumMetadataService → MetadataProviderRuntime → Single Adapter
+                         └→ MetadataTransactionManager → MutationExecutor → Disk + DB
+```
+
+The Resolution and Merge layers are implemented but not wired in. The Operations layer is used for bookkeeping only. The domain models describe a richer system than what actually executes.
+
+### How the Pieces Fit Together Today
+
+```mermaid
+graph TD
+    subgraph "Live Production Path"
+        IPC[IPC Handlers] --> AATS[AlbumAutoTagService]
+        AATS --> AMS[AlbumMetadataService]
+        AMS --> MPR[MetadataProviderRuntime]
+        MPR --> MBA[MusicBrainzAdapter]
+        MBA --> MBAPI[MusicBrainzApiClient]
+        AMS --> TM[TrackMatcher]
+        AATS --> MDB[MetadataDiffBuilder]
+        AATS --> MTM[MetadataTransactionManager]
+        MTM --> ME[MutationExecutor]
+        ME --> TW[TagWriterService]
+        ME --> LRS[LibraryRelationalSyncService]
+        MTM --> MHS[MetadataHistoryService]
+    end
+
+    subgraph "Implemented But Not Wired"
+        MLG[MetadataLookupGateway]
+        MRM[MetadataResolutionManager]
+        MME[MetadataMergeEngine]
+        MS[MergeSession]
+        BEQ[BackgroundEnrichmentQueue]
+        MJM[MetadataJobManager]
+        DA[DiscogsAdapter]
+        CAA[CoverArtArchiveAdapter]
+        MOM[MetadataOperationManager.executeResolution]
+    end
+
+    subgraph "Gen1 - Separate System"
+        MBoot[MetadataBootstrap]
+        MEngine[MetadataEngine]
+        OldMerge[MetadataMergeEngine engine/]
+        MPEX[MetadataProviderExecutor]
+    end
+
+    style MLG fill:#ff9
+    style MRM fill:#ff9
+    style MME fill:#ff9
+    style MS fill:#ff9
+    style BEQ fill:#ff9
+    style MJM fill:#ff9
+    style DA fill:#ff9
+    style CAA fill:#ff9
+    style MOM fill:#ff9
+    style MBoot fill:#f99
+    style MEngine fill:#f99
+    style OldMerge fill:#f99
+    style MPEX fill:#f99
+```
+
+### Is It Still Coherent?
+
+**At the contract level: Yes.** The interfaces and domain models tell a coherent story.
+
+**At the wiring level: No.** Two architectural generations coexist. The newer generation has the right design but isn't fully integrated. The older generation is wired but architecturally obsolete.
+
+### Is It Too Complicated?
+
+The complexity in the domain models and contracts is **justified** — a metadata platform needs operations, policies, resolutions, and merge engines.
+
+The complexity in having two parallel apply pipelines, three registries, two merge engines, and two context types is **not justified** — this is accidental complexity from incremental development.
+
+---
+
+## 11. Honest Overall Verdict
+
+### Is This Becoming a Real Metadata Platform?
+
+**Yes, but it's at a critical inflection point.**
+
+The domain model is genuinely well-designed. The provider adapter contract is clean. The merge engine is correct. The separation of concerns in the newer code (MutationExecutor, SnapshotBuilder, LibraryRelationalSyncService, ArtworkDownloaderService, ArtworkCacheInvalidator) shows good decomposition instincts.
+
+**But the system cannot be called a "platform" yet because it only runs one provider through one path.** The platform capabilities exist in code but aren't exercised.
+
+### What Are the Biggest Architectural Weaknesses?
+
+1. **The Gen1/Gen2 split.** Two systems that don't share providers, rate limiters, registries, or history. This is the #1 priority to resolve.
+
+2. **MetadataApplyService vs MetadataTransactionManager.** Two complete apply pipelines. One is used; one is dead. But `MetadataJobManager` uses the dead one, creating a latent inconsistency.
+
+3. **Federation exists in components but not in execution.** `MetadataLookupGateway`, `MetadataResolutionManager`, and `MergeSession` are architecturally correct but have zero callers in the live path.
+
+4. **No single composition root.** `MetadataBootstrap` should be the one place where everything is wired. Currently, `ipc.ts` manually constructs a parallel universe.
+
+### What Is Missing Before Production-Grade?
+
+| Gap | Impact |
+|---|---|
+| **Single composition root** that wires both Gen1 and Gen2 | Without this, adding providers requires modifying `ipc.ts` |
+| **Wire the federation pipeline** (LookupGateway → MergeEngine → MergeSession) | Without this, only MusicBrainz contributes |
+| **Register Discogs + CAA adapters** in the runtime | They're implemented but disconnected |
+| **Retire `MetadataApplyService`** and consolidate on `MetadataTransactionManager` | Eliminates the dead parallel pipeline |
+| **Atomic transaction rollback** | `MetadataTransactionManager` doesn't roll back partial successes |
+| **Wire `BackgroundEnrichmentQueue`** with a startup trigger | Library health scanning is implemented but never runs |
+| **Persistent history** | `MetadataHistoryService` is in-memory only; lost on restart |
+
+### If I Inherited This Project, What Would Concern Me Most?
+
+1. **I would not know which apply pipeline to fix.** `MetadataApplyService` or `MetadataTransactionManager`? Both look legitimate. The answer is non-obvious without reading `AlbumAutoTagService` line by line.
+
+2. **I would try to register Discogs and not understand why it doesn't work.** There's no error — the `ProviderRegistry` has descriptors, the adapter exists, but nothing connects them to the execution path.
+
+3. **I would not know which `MetadataContext` to use.** Two types, same name, different semantics. Import autocomplete would randomly pick one.
+
+4. **I would be confused by the TODO comments in `MetadataEngine`**: `"TODO Phase 10: Remove executor+mergePolicy path once MergeEngine fully replaces legacy flow"`. Phase 10 came and went. The TODO is still there. The migration never happened.
+
+---
+
+## 12. What I'd Prioritize (Architecture Only)
+
+If the goal is to make this a real metadata platform:
+
+### Step 1: Unify the composition root
+Move the AutoTag pipeline construction from `ipc.ts` into `MetadataBootstrap`. Share provider instances, rate limiters, and registries. One `MetadataContainer` that owns everything.
+
+### Step 2: Wire the federation pipeline
+`AlbumAutoTagService` should call through `MetadataResolutionManager` → `MetadataLookupGateway` → registered adapters → `MetadataMergeEngine`. This replaces the direct `AlbumMetadataService` → `MetadataProviderRuntime` path.
+
+### Step 3: Delete `MetadataApplyService`
+Consolidate on `MetadataTransactionManager`. Move chunk-batching and atomic rollback from `MetadataApplyService` into `MetadataTransactionManager` if needed. Update `MetadataJobManager` to use the transaction manager.
+
+### Step 4: Delete Gen1 `MetadataMergeEngine` (engine/)
+The `resolution/MetadataMergeEngine` supersedes it. Update `MetadataEngine` to use the new one or deprecate it.
+
+### Step 5: Resolve the naming collisions
+- Rename `models/MetadataContext` to `InfrastructureContext` or `RuntimeContext`
+- Consolidate the three provider registries into one
+
+These five changes would transform the codebase from "two parallel architectures" into "one metadata platform."
