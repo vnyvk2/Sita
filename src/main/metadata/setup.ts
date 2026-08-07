@@ -49,6 +49,13 @@ import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter';
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
 import { MusicBrainzAdapter, MusicBrainzApiClient } from './providers/musicbrainz';
+import { DiscogsAdapter } from './providers/discogs/DiscogsAdapter';
+import { DiscogsApiClient } from './providers/discogs/DiscogsApiClient';
+import { CoverArtArchiveAdapter } from './providers/coverartarchive/CoverArtArchiveAdapter';
+import { CaaApiClient } from './providers/coverartarchive/CaaApiClient';
+import { DefaultMetadataLookupGateway } from './resolution/MetadataLookupGateway';
+import { MetadataResolutionManager } from './resolution/MetadataResolutionManager';
+import { ProviderRegistry as ResolutionProviderRegistry } from './resolution/ProviderRegistry';
 import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
 import { MetadataProviderRuntime } from './runtime/MetadataProviderRuntime';
 import { AlbumAutoTagService } from './services/AlbumAutoTagService';
@@ -99,6 +106,10 @@ export interface MetadataContainer {
     autoTagService: AlbumAutoTagService;
     applyService: MetadataApplyService;
   };
+  resolution: {
+    resolutionManager: MetadataResolutionManager;
+    lookupGateway: DefaultMetadataLookupGateway;
+  };
   infrastructure: {
     requestPipeline: RequestPipeline;
   };
@@ -135,6 +146,17 @@ export class MetadataBootstrap {
 
     const mbApiClient = new MusicBrainzApiClient(requestPipeline);
     const musicBrainzAdapter = new MusicBrainzAdapter(mbApiClient, { cache: identityCache });
+
+    const discogsApiClient = new DiscogsApiClient(requestPipeline);
+    const discogsAdapter = new DiscogsAdapter(discogsApiClient, { cache: identityCache });
+
+    const caaApiClient = new CaaApiClient(requestPipeline);
+    const coverArtArchiveAdapter = new CoverArtArchiveAdapter(caaApiClient, { cache: identityCache });
+
+    const resolutionProviderRegistry = new ResolutionProviderRegistry();
+    resolutionProviderRegistry.registerInstance('musicbrainz', musicBrainzAdapter as any);
+    resolutionProviderRegistry.registerInstance('discogs', discogsAdapter as any);
+    resolutionProviderRegistry.registerInstance('coverartarchive', coverArtArchiveAdapter as any);
 
     // Register default entity mappers
     mapperRegistry.register(new SongMapper());
@@ -174,7 +196,7 @@ export class MetadataBootstrap {
 
     const userService = new UserMetadataService(userRepository, eventBus);
 
-    // AutoTag Application Services construction inside MetadataBootstrap composition root
+    // AutoTag Application & Resolution Services construction inside MetadataBootstrap composition root
     const providerRuntime = new MetadataProviderRuntime(musicBrainzAdapter);
     await providerRuntime.initialize();
 
@@ -196,7 +218,6 @@ export class MetadataBootstrap {
         );
       }
     });
-    const autoTagService = new AlbumAutoTagService({ albumMetadataService, applyService });
 
     const healthManager = new ProviderHealthManager(eventBus);
     const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
@@ -219,6 +240,18 @@ export class MetadataBootstrap {
       eventBus,
       selectionStrategy,
       executionStrategy
+    });
+
+    const lookupGateway = new DefaultMetadataLookupGateway(executor, resolutionProviderRegistry);
+    const resolutionManager = new MetadataResolutionManager({
+      lookupGateway,
+      providerRegistry: resolutionProviderRegistry
+    });
+
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService,
+      applyService,
+      resolutionManager
     });
 
     const providerMergePolicy = new DefaultMetadataMergePolicy();
@@ -310,6 +343,10 @@ export class MetadataBootstrap {
         albumMetadataService,
         autoTagService,
         applyService
+      },
+      resolution: {
+        resolutionManager,
+        lookupGateway
       },
       infrastructure: {
         requestPipeline

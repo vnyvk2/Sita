@@ -96,6 +96,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
               const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;
               const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
               const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
+              const artworkUrlContrib = contrib.contributions.find((c) => c.fieldId === 'artworkUrl')?.value;
 
               candidates.push({
                 providerId,
@@ -108,7 +109,8 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
                   title: String(titleContrib ?? ''),
                   artist: String(artistContrib ?? ''),
                   album: String(albumContrib ?? ''),
-                  genre: String(genreContrib ?? '')
+                  genre: String(genreContrib ?? ''),
+                  artworkUrl: String(artworkUrlContrib ?? '')
                 }
               });
               continue;

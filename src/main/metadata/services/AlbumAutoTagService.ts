@@ -8,15 +8,18 @@ import { MetadataApplyService, type ApplyResult } from './MetadataApplyService';
 import { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
+import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 
 export interface AlbumAutoTagServiceOptions {
   albumMetadataService: AlbumMetadataService;
   applyService?: MetadataApplyService;
+  resolutionManager?: MetadataResolutionManager;
 }
 
 export class AlbumAutoTagService extends EventEmitter {
   private readonly metadataService: AlbumMetadataService;
   private readonly applyService: MetadataApplyService;
+  private readonly resolutionManager?: MetadataResolutionManager;
   private readonly operationManager: MetadataOperationManager;
   private readonly transactionManager: MetadataTransactionManager;
   private readonly activeOperations: Map<string, AbortController> = new Map();
@@ -26,6 +29,7 @@ export class AlbumAutoTagService extends EventEmitter {
     super();
     this.metadataService = options.albumMetadataService;
     this.applyService = options.applyService ?? new MetadataApplyService();
+    this.resolutionManager = options.resolutionManager;
     this.operationManager = new MetadataOperationManager();
     this.transactionManager = new MetadataTransactionManager({
       tagWriter: this.applyService.writer,
