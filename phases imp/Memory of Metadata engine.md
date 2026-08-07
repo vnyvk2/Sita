@@ -3397,3 +3397,1715 @@ It should only know:
 > "Given this song identity, how do I translate a MusicBrainz response into Nora's metadata model?"
 
 That's an even stronger separation of concerns than we've used so far, and I think it fits perfectly with the architecture we've been building since Phase 5.
+
+
+
+This actually changes my recommendation quite a bit.
+
+Looking through your roadmap and the architectural rules, I can see the evolution of your thinking. 
+
+Then looking at the MusicBee Auto-Tag screenshot, I also understand **why you don't feel satisfied with the current implementation.**
+
+The problem isn't that it's missing features.
+
+The problem is that **we accidentally implemented the feature before implementing the platform that the feature was supposed to sit on.**
+
+---
+
+# I think there are actually three different things
+
+MusicBee makes them look like one screen.
+
+They aren't.
+
+```
+Search
+    ↓
+Resolution
+    ↓
+Preview
+    ↓
+User Decisions
+    ↓
+Apply
+```
+
+Each is a separate responsibility.
+
+---
+
+# MusicBee's screen hides a huge architecture
+
+That screen is doing all of this:
+
+```
+Provider Search
+      │
+      ▼
+Album Candidates
+      │
+      ▼
+Release Resolution
+      │
+      ▼
+Metadata Merge
+      │
+      ▼
+Preview Model
+      │
+      ▼
+Diff Engine
+      │
+      ▼
+Selection Engine
+      │
+      ▼
+Apply Transaction
+```
+
+Your implementation currently has these pieces, but they're coupled differently.
+
+---
+
+# The biggest realization
+
+When I read your original philosophy again:
+
+> MetadataEngine remains the only metadata authority. 
+
+Everything suddenly clicks.
+
+AutoTag should **never have existed as its own domain.**
+
+Instead...
+
+```
+Metadata Engine
+
+├── Search
+├── Resolve
+├── Preview
+├── Compare
+├── Merge
+├── Apply
+├── Undo
+└── History
+```
+
+AutoTag is simply
+
+```
+Metadata Engine
+
+↓
+
+Album Metadata Workflow
+```
+
+not
+
+```
+AlbumAutoTagService
+
+↓
+
+Metadata Engine
+```
+
+---
+
+# That's exactly why you have that uneasy feeling
+
+Right now the architecture says
+
+```
+Metadata Engine
+
+AutoTag Engine
+```
+
+Two domains.
+
+But your memory always envisioned
+
+```
+Metadata Engine
+
+↓
+
+Capabilities
+
+↓
+
+Manual Edit
+
+Album Lookup
+
+Batch Edit
+
+Artwork
+
+Language
+
+Tags
+
+Future AI
+```
+
+One domain.
+
+---
+
+# Something else I noticed
+
+Your roadmap was always platform-first.
+
+```
+Phase 5
+
+Metadata Engine
+
+↓
+
+Phase 9
+
+Merge Platform
+
+↓
+
+Phase 10
+
+Overrides
+
+↓
+
+Phase 11
+
+External Provider Platform
+
+↓
+
+Phase 12
+
+MusicBrainz
+```
+
+Notice something?
+
+**MusicBrainz itself wasn't supposed to be the architecture.**
+
+It was only supposed to be
+
+> the first provider.
+
+Exactly like Search Engine isn't SQLite.
+
+Membership isn't Playlists.
+
+The engine comes first.
+
+The implementation comes second.
+
+---
+
+# Where we accidentally drifted
+
+Instead of
+
+```
+Metadata Engine
+
+↓
+
+Provider Platform
+
+↓
+
+MusicBrainz Adapter
+```
+
+we ended up with
+
+```
+AlbumMetadataService
+
+↓
+
+MusicBrainz Runtime
+
+↓
+
+MusicBrainz Adapter
+```
+
+That means MusicBrainz became the center.
+
+It shouldn't.
+
+---
+
+# The MusicBee screenshot actually reinforces this
+
+Look carefully.
+
+The provider dropdown...
+
+```
+MusicBrainz
+
+Discogs
+
+...
+```
+
+isn't really an AutoTag feature.
+
+It's a
+
+```
+Metadata Source Selection
+```
+
+feature.
+
+Exactly what your provider architecture already wanted.
+
+---
+
+Likewise
+
+The checkboxes
+
+```
+✓ Album
+
+✓ Genre
+
+✓ Artwork
+
+✓ Year
+```
+
+aren't AutoTag.
+
+They're
+
+```
+Metadata Transaction Options
+```
+
+Again...
+
+Metadata Engine.
+
+Not AutoTag.
+
+---
+
+# Even Preview isn't AutoTag
+
+Preview is universal.
+
+Imagine later
+
+```
+Manual Edit
+
+↓
+
+Preview
+
+↓
+
+Apply
+```
+
+or
+
+```
+Language Detection
+
+↓
+
+Preview
+
+↓
+
+Apply
+```
+
+or
+
+```
+Discogs
+
+↓
+
+Preview
+
+↓
+
+Apply
+```
+
+Same Preview model.
+
+---
+
+# I think Phase 13 should NOT be "Fix AutoTag"
+
+It should be something much bigger.
+
+I would rename it.
+
+---
+
+# Phase 13
+
+## Metadata Operations Platform
+
+Everything becomes an operation.
+
+```
+Metadata Engine
+
+↓
+
+Metadata Operations
+
+├── Search
+├── Resolve
+├── Preview
+├── Compare
+├── Apply
+├── Undo
+├── History
+├── Batch
+├── Diagnostics
+└── Transactions
+```
+
+Then...
+
+```
+Album AutoTag
+
+↓
+
+Metadata Operation
+```
+
+---
+
+```
+Manual Metadata Editor
+
+↓
+
+Metadata Operation
+```
+
+---
+
+```
+Artwork Downloader
+
+↓
+
+Metadata Operation
+```
+
+---
+
+```
+Language Detection
+
+↓
+
+Metadata Operation
+```
+
+---
+
+```
+Future AI
+
+↓
+
+Metadata Operation
+```
+
+Everything becomes one abstraction.
+
+---
+
+# The migration becomes surprisingly clean
+
+Instead of deleting work:
+
+```
+AlbumAutoTagService
+```
+
+shrinks until it becomes
+
+```
+AlbumMetadataOperation
+```
+
+inside the Metadata Engine.
+
+---
+
+```
+AlbumMetadataService
+```
+
+becomes
+
+```
+MetadataResolutionService
+```
+
+---
+
+```
+MetadataApplyService
+```
+
+becomes
+
+```
+MetadataTransactionCoordinator
+```
+
+which orchestrates specialized collaborators instead of owning everything.
+
+---
+
+```
+MetadataJobManager
+```
+
+becomes
+
+```
+MetadataOperationManager
+```
+
+---
+
+```
+MetadataHistoryService
+```
+
+becomes engine-wide history.
+
+---
+
+```
+MetadataDiagnosticsService
+```
+
+becomes engine diagnostics.
+
+---
+
+# This also fixes extensibility
+
+Now adding Discogs isn't
+
+```
+Discogs
+
+↓
+
+AutoTag changes
+```
+
+It's simply
+
+```
+DiscogsProvider
+
+↓
+
+Metadata Engine
+
+↓
+
+Existing Operations
+```
+
+No new architecture.
+
+Just another provider.
+
+---
+
+## I think this is the architecture your notes were always pointing toward
+
+Reading your memory from the beginning to the end, there's a consistent pattern:
+
+- Every major capability is introduced as a **platform** before features consume it.
+- The **Metadata Engine** is explicitly defined as the only metadata authority. 
+- Providers are meant to be isolated data sources/adapters, with merging centralized. 
+- Future capabilities (language, AI, rule engine, filters) are all intended to build **on** that metadata platform, not around it. 
+
+The current Auto-Tag implementation proves the user workflow and many of the underlying services, which is valuable. But the next architectural step shouldn't be incremental cleanup—it should be **absorbing those capabilities back into the Metadata Engine as first-class metadata operations**. That preserves your original design philosophy while reusing most of the code you've already written.  
+
+Excellent. Those answers actually solidify the direction.
+
+I would lock these in as **Phase 13 design principles**.
+
+---
+
+# Phase 13 Vision
+
+## Product Vision
+
+**C. Both equally.**
+
+Not:
+
+> "Music player with metadata"
+
+Not:
+
+> "Metadata editor with playback"
+
+Instead:
+
+> **A modern desktop music platform where metadata is a first-class capability.**
+
+That means metadata is not an accessory.
+
+It is one of Nora's core pillars.
+
+```
+Nora
+
+├── Playback
+├── Library
+├── Metadata
+├── Playlists
+├── Discovery
+└── Sync (future)
+```
+
+Metadata deserves equal architectural weight to playback.
+
+---
+
+# MusicBee is the baseline, not the goal
+
+This answer is even more important.
+
+You said
+
+> **not interested in AI right now**
+>
+> **should be more than MusicBee**
+>
+> **multi-source**
+>
+> **background enrichment**
+
+That is exactly the right scope.
+
+We don't need AI.
+
+We need an **extensible metadata platform**.
+
+---
+
+MusicBee today looks like
+
+```
+User
+
+↓
+
+Search Album
+
+↓
+
+MusicBrainz
+
+↓
+
+Apply
+```
+
+Nora should become
+
+```
+User
+
+↓
+
+Metadata Operation
+
+↓
+
+Metadata Engine
+
+↓
+
+Multiple Providers
+
+↓
+
+Merge
+
+↓
+
+Preview
+
+↓
+
+Apply
+
+↓
+
+Background Enrichment
+```
+
+Huge difference.
+
+---
+
+# Background enrichment changes everything
+
+This is actually the biggest requirement.
+
+Instead of
+
+```
+User clicks
+
+↓
+
+Search
+```
+
+eventually Nora should also support
+
+```
+Library Scan
+
+↓
+
+Background Metadata Jobs
+
+↓
+
+Better artwork found
+
+↓
+
+Genre improved
+
+↓
+
+Release date found
+
+↓
+
+Notify user
+
+↓
+
+Apply later
+```
+
+That's not AutoTag anymore.
+
+That's Metadata Operations.
+
+---
+
+# Providers become plugins
+
+Instead of
+
+```
+AlbumAutoTagService
+
+↓
+
+MusicBrainz
+```
+
+we want
+
+```
+Metadata Engine
+
+↓
+
+Provider Registry
+
+├── MusicBrainz
+├── Discogs
+├── Fanart.tv
+├── Last.fm
+├── Local Scanner
+├── AcousticBrainz
+└── Future...
+```
+
+Every provider looks identical.
+
+---
+
+# AutoTag becomes only ONE operation
+
+Instead of
+
+```
+AutoTag
+
+↓
+
+Apply
+```
+
+we have
+
+```
+Metadata Operations
+
+├── Album Lookup
+├── Manual Edit
+├── Artwork Replace
+├── Batch Rename
+├── Genre Cleanup
+├── Language Fix
+├── Background Enrichment
+├── Metadata Validation
+└── Future...
+```
+
+Notice something.
+
+Nothing here says MusicBrainz.
+
+Nothing says AutoTag.
+
+Those are just operations.
+
+---
+
+# Background jobs become first-class
+
+This is another thing I would change.
+
+Today JobManager feels bolted on.
+
+Instead
+
+```
+Metadata Engine
+
+↓
+
+Operation Manager
+
+↓
+
+Job Queue
+
+↓
+
+History
+
+↓
+
+Diagnostics
+
+↓
+
+Transactions
+```
+
+Everything goes through it.
+
+Foreground.
+
+Background.
+
+Batch.
+
+Scheduled.
+
+Future plugins.
+
+---
+
+# Merge becomes much smarter
+
+Imagine this.
+
+```
+Title
+
+MusicBrainz
+★★★★★
+
+Discogs
+★★★★☆
+
+Local
+★★★☆☆
+
+↓
+
+Choose MB
+```
+
+Artwork
+
+```
+Fanart.tv
+★★★★★
+
+MusicBrainz
+★★☆☆☆
+
+↓
+
+Choose Fanart
+```
+
+Genre
+
+```
+Discogs
+★★★★★
+
+MusicBrainz
+★★☆☆☆
+
+↓
+
+Choose Discogs
+```
+
+Now imagine the Preview.
+
+Every field has
+
+```
+Current
+
+↓
+
+Candidates
+
+↓
+
+Chosen Source
+
+↓
+
+Confidence
+
+↓
+
+Reason
+```
+
+That's already beyond MusicBee.
+
+---
+
+# User decisions become reusable
+
+Suppose user always prefers
+
+```
+Artwork
+
+↓
+
+Fanart.tv
+```
+
+Genre
+
+```
+↓
+
+Discogs
+```
+
+Release
+
+```
+↓
+
+MusicBrainz
+```
+
+That becomes a Metadata Policy.
+
+Not hardcoded.
+
+Configurable.
+
+---
+
+# One thing I would add that MusicBee doesn't have
+
+Metadata Health.
+
+Every album could have
+
+```
+Metadata Score
+
+96%
+
+Issues
+
+• artwork low resolution
+
+• missing publisher
+
+• genre confidence low
+
+• release mismatch
+
+• duplicate artist
+
+• inconsistent disc numbers
+```
+
+Now Background Enrichment knows what to improve.
+
+---
+
+# Even library scanning changes
+
+Instead of
+
+```
+Scanner
+
+↓
+
+Read tags
+
+↓
+
+Done
+```
+
+we eventually have
+
+```
+Scanner
+
+↓
+
+Read Tags
+
+↓
+
+Metadata Analysis
+
+↓
+
+Quality Score
+
+↓
+
+Background Queue
+
+↓
+
+Optional Improvements
+```
+
+Completely different architecture.
+
+---
+
+# This also explains why AutoTag felt disconnected
+
+Because it is trying to solve
+
+```
+Album Search
+```
+
+inside itself.
+
+Instead it should simply ask
+
+```
+Metadata Engine
+
+↓
+
+Resolve Album
+```
+
+The Engine shouldn't know whether the request came from:
+
+- Album AutoTag
+- Background enrichment
+- Manual lookup
+- Batch tagging
+- Future plugin
+
+Same operation.
+
+Different caller.
+
+---
+
+# My proposed Phase 13 mission
+
+I would literally title it:
+
+> **Phase 13 — Metadata Operations Platform**
+
+Not
+
+> AutoTag Refactor
+
+Not
+
+> Metadata Cleanup
+
+Because what we're really building is the **platform that every metadata-related feature will stand on**.
+
+## I also want to add one guiding principle
+
+I think this should be the first paragraph of the Phase 13 specification:
+
+> **Metadata is a platform, not a feature.**
+>
+> The Metadata Engine is the sole authority for metadata retrieval, enrichment, preview, mutation, history, transactions, diagnostics, and provider orchestration. Every metadata capability—manual editing, album lookup, artwork replacement, batch editing, background enrichment, and future providers—must be expressed as Metadata Operations executed through the same engine. No subsystem may introduce an independent metadata pipeline.
+
+If we hold ourselves to that principle, every design decision in Phase 13 becomes much easier: if a new feature can't fit naturally into the Metadata Operations Platform, it's a signal that the architecture—not the feature—needs to evolve.
+Yes. In fact, I think **that should be one of Nora's defining features.**
+
+Not just "choose a provider."
+
+Choose **the provider per metadata field**.
+
+For example:
+
+| Field | Preferred Provider | Automatic? | User Override? |
+|--------|--------------------|------------|----------------|
+| Album Title | MusicBrainz | ✅ | ✅ |
+| Artist | MusicBrainz | ✅ | ✅ |
+| Artwork | Fanart.tv | ✅ | ✅ |
+| Genre | Discogs | ✅ | ✅ |
+| Publisher | MusicBrainz | ✅ | ✅ |
+| Mood | Last.fm (future) | ✅ | ✅ |
+| Lyrics | Lyrics provider | ✅ | ✅ |
+
+Then a user can also say:
+
+> "For THIS album use Discogs artwork instead."
+
+or
+
+> "Always prefer Discogs genres."
+
+or
+
+> "Never replace my artwork automatically."
+
+That is far beyond MusicBee.
+
+---
+
+# I think there are actually 3 levels of provider selection
+
+## Level 1 — Global Policy
+
+Applies to the entire library.
+
+```
+Artwork  -> Fanart.tv
+
+Genre    -> Discogs
+
+Title    -> MusicBrainz
+
+Year     -> MusicBrainz
+```
+
+Most users never change anything else.
+
+---
+
+## Level 2 — Operation Policy
+
+For THIS operation.
+
+```
+Album AutoTag
+
+↓
+
+Use
+
+Artwork -> MusicBrainz
+
+Genre -> Discogs
+
+Release -> MusicBrainz
+```
+
+Temporary.
+
+---
+
+## Level 3 — Field Override
+
+During preview.
+
+Imagine Preview like this:
+
+```
+Album
+
+Current
+--------------------------------
+
+Genre
+
+Rock
+
+↓
+
+Suggestions
+
+○ MusicBrainz
+Alternative Rock
+
+● Discogs
+Pop Rock
+
+○ Keep Current
+Rock
+```
+
+The user literally chooses.
+
+---
+
+Even cooler...
+
+```
+Artwork
+
+MusicBrainz
+
+Discogs
+
+Fanart.tv
+
+Keep Current
+
+Browse Local File
+```
+
+Everything becomes a metadata source.
+
+---
+
+# Background enrichment also follows the same policy
+
+Suppose Background Enrichment finds
+
+```
+Artwork
+
+Better artwork found
+
+1024x1024
+
+Provider
+
+Fanart.tv
+
+Confidence
+
+98%
+```
+
+Instead of applying immediately
+
+Metadata Engine creates
+
+```
+Pending Metadata Operation
+```
+
+User reviews later.
+
+Exactly the same Preview UI.
+
+---
+
+# This means Preview becomes universal
+
+Not AutoTag Preview.
+
+Metadata Preview.
+
+Every operation produces
+
+```
+Metadata Preview
+```
+
+Manual Edit
+
+↓
+
+Preview
+
+Apply
+
+---
+
+Album Lookup
+
+↓
+
+Preview
+
+Apply
+
+---
+
+Background Enrichment
+
+↓
+
+Preview
+
+Apply
+
+---
+
+Artwork Replace
+
+↓
+
+Preview
+
+Apply
+```
+
+One UI.
+
+---
+
+# I think Phase 13 should have one major goal
+
+When Phase 13 finishes, I want this sentence to be true:
+
+> **Every metadata change in Nora is represented as a Metadata Operation executed by the Metadata Engine, regardless of where it originated.**
+
+If that's true:
+
+- Manual editing works.
+- AutoTag works.
+- Background enrichment works.
+- Future providers work.
+- Batch editing works.
+- Undo works.
+- Diagnostics work.
+- Jobs work.
+
+No special cases.
+
+---
+
+# Here's how I'd structure Phase 13
+
+## Phase 13A — Architecture & Domain Model
+- Define the Metadata Operations Platform.
+- Specify the engine as the sole metadata authority.
+- Design operation lifecycle (search → resolve → preview → apply → undo).
+- Define provider, transaction, history, job, and event models.
+
+## Phase 13B — Engine Refactor
+- Move Auto-Tag into the Metadata Engine.
+- Replace the separate provider runtime with the engine's provider infrastructure.
+- Introduce a `MetadataOperationCoordinator` and `MetadataTransactionCoordinator`.
+
+## Phase 13C — Unified Apply Pipeline
+- Make manual edits, Auto-Tag, artwork replacement, and batch edits all use the same transaction pipeline.
+- Unify history, undo, diagnostics, and cache invalidation.
+
+## Phase 13D — Provider Federation
+- Route all metadata retrieval through the provider registry and merge engine.
+- Support global provider policies, per-operation policies, and per-field overrides.
+- Add provider attribution to preview data.
+
+## Phase 13E — Background Metadata Platform
+- Background enrichment jobs.
+- Metadata health scoring.
+- Pending metadata suggestions.
+- Operation queue and diagnostics.
+
+---
+
+## One thing I want to insist on
+
+I would **not** write a single line of implementation until we finish the Phase 13 architecture document.
+
+That document should be on the same level as your original Metadata Engine memory—around 80–150 pages if needed, with:
+
+- Core principles.
+- Domain model.
+- Folder structure.
+- Service responsibilities.
+- Sequence diagrams.
+- Class diagrams.
+- Dependency rules.
+- Provider model.
+- Operation model.
+- Transaction model.
+- History model.
+- UI flow.
+- Migration plan from the current implementation.
+
+Once that blueprint exists, implementing Phase 13 becomes a series of well-defined migrations instead of continuous architectural decisions. Given how foundational this will be for Nora, investing in that design first will pay off for every metadata feature you build afterward.
+
+My recommendation for Phase 13
+I would implement it in this order:
+13A – Domain & Architecture (no production behavior changes)
+Finalize the specification, define the domain models, and lock the architecture.
+
+13B – Engine integration
+Remove the separate Auto-Tag pipeline and make MetadataEngine the only entry point.
+
+13C – Resolution layer
+Introduce MetadataResolutionService and route all provider interactions through it.
+
+13D – Transaction refactor
+Break apart MetadataApplyService into focused infrastructure services coordinated by a transaction manager.
+
+13E – Universal preview model
+Make the preview model the shared foundation for manual edits, album lookup, batch operations, artwork replacement, and future metadata workflows.
+
+13F – Provider federation & policies
+Enable field-level provider selection, provider attribution, and configurable merge policies.
+
+13G – Background platform
+Integrate background enrichment, health scoring, diagnostics, scheduling, and jobs using the same operation pipeline.
+
+I think this is the right next milestone.
+
+Up until now, you've mostly been proving that the **architecture** works. Now it's time to make it actually useful by having multiple providers participate in a single merge.
+
+## I'd do them in this order
+
+### Phase 14F — Discogs Contribution Adapter ⭐
+
+This gives you the biggest improvement for the least work.
+
+Discogs is strongest for:
+
+- Genre
+- Style
+- Catalog number
+- Master release
+
+Implement:
+
+```ts
+fetchContribution(query)
+```
+
+returning something like:
+
+```ts
+{
+  providerId: "discogs",
+  contributions: [
+    {
+      fieldId: "genre",
+      value: "Pop Rock"
+    },
+    {
+      fieldId: "style",
+      value: "Alternative Rock"
+    },
+    {
+      fieldId: "catalogNumber",
+      value: "ABC-123"
+    }
+  ]
+}
+```
+
+---
+
+Then your MergeEngine already knows
+
+```
+title
+↓
+
+MusicBrainz
+
+genre
+↓
+
+Discogs
+```
+
+without changing anything else.
+
+---
+
+## Phase 14G — Cover Art Archive
+
+Probably the simplest adapter.
+
+Return
+
+```ts
+artworkUrl
+```
+
+and maybe
+
+```ts
+front
+back
+thumbnail
+```
+
+Later.
+
+Then
+
+```
+Artwork
+
+↓
+
+CAA
+```
+
+becomes automatic.
+
+---
+
+## Phase 14H — Spotify
+
+Spotify contributes things MusicBrainz doesn't.
+
+Examples
+
+```
+releaseDate
+
+popularity
+
+genres
+```
+
+Maybe
+
+```
+previewUrl
+```
+
+later.
+
+---
+
+## Phase 14I — Apple Music
+
+Mainly
+
+```
+editorialNotes
+
+releaseDate
+
+genre
+```
+
+---
+
+# Then something magical happens
+
+Your merge engine starts receiving
+
+```
+MusicBrainz
+
+↓
+
+title
+
+artist
+
+album
+
+ISRC
+```
+
++
+
+```
+Discogs
+
+↓
+
+genre
+
+style
+```
+
++
+
+```
+CAA
+
+↓
+
+artwork
+```
+
++
+
+```
+Spotify
+
+↓
+
+releaseDate
+
+popularity
+```
+
+Instead of
+
+```
+ProviderCandidate[]
+```
+
+you'll have
+
+```
+FieldContribution[]
+
+title
+
+↓
+
+MusicBrainz
+
+genre
+
+↓
+
+Discogs
+
+artwork
+
+↓
+
+CAA
+
+releaseDate
+
+↓
+
+Spotify
+```
+
+That's the architecture you were aiming for from the beginning.
+
+---
+
+# I'd avoid one thing
+
+I would **not** implement all providers at once.
+
+Do them one by one.
+
+```
+MusicBrainz
+      ↓
+Pass tests
+```
+
+↓
+
+```
+Discogs
+      ↓
+Pass tests
+```
+
+↓
+
+```
+CAA
+      ↓
+Pass tests
+```
+
+↓
+
+```
+Spotify
+      ↓
+Pass tests
+```
+
+↓
+
+```
+Apple
+      ↓
+Pass tests
+```
+
+Each provider becomes an independent milestone, and if one has API quirks, the rest of the platform remains stable.
+
+---
+
+## What Phase 14F should look like
+
+```text
+DiscogsAdapter
+        │
+fetchContribution()
+        │
+        ▼
+MetadataContribution
+        │
+        ▼
+searchContributions()
+        │
+        ▼
+MergeEngine
+        │
+        ▼
+MergeSession
+        │
+        ▼
+Preview
+```
+
+No architectural changes should be needed—you're now exercising the extension points you've already built.
+
+At this stage, you're no longer designing the metadata platform; you're populating it with providers. That's a good sign that the core architecture has stabilized.

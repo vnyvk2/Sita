@@ -162,7 +162,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   
   MetadataBootstrap.getInstance()
     .then(async (metadataContainer) => {
-      registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.userService);
+      registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.application.userService);
       registerMetadataHandlers(metadataContainer.application.autoTagService, mainWindow);
       logger.info('AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root');
     })
