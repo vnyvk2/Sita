@@ -47,7 +47,8 @@ export class MetadataTransactionManager {
   public async executeTransaction(
     operationId: string,
     mutations: ResourceMutationPayload[],
-    options?: TransactionExecutionOptions
+    options?: TransactionExecutionOptions,
+    signal?: AbortSignal
   ): Promise<TransactionResult> {
     if (!mutations || mutations.length === 0) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
@@ -74,55 +75,90 @@ export class MetadataTransactionManager {
     const errors: string[] = [];
     const draftSnapshots: DraftSnapshot[] = [];
 
-    for (const mut of mutations) {
-      if (!mut.filePath) {
-        failedCount++;
-        errors.push(`Resource ${mut.resourceId} missing file path`);
-        continue;
+    const chunkSize = 50;
+    for (let i = 0; i < mutations.length; i += chunkSize) {
+      if (signal?.aborted) {
+        errors.push('Transaction operation cancelled by user');
+        break;
       }
 
-      const tagPayload: Record<string, string | number | Buffer> = {};
-      const fieldMap: Record<string, string | number> = {};
-      const previousState: Record<string, string | number | undefined> = {};
-      const providerAttributions: Record<string, { providerId: string; confidenceScore?: number }> = {};
+      const chunk = mutations.slice(i, i + chunkSize);
+      let chunkFailed = false;
 
-      for (const fm of mut.fieldMutations) {
-        if (fm.newValue !== undefined) {
-          tagPayload[fm.fieldId] = fm.newValue;
-          fieldMap[fm.fieldId] = fm.newValue;
-          previousState[fm.fieldId] = fm.oldValue;
-          if (fm.providerId) {
-            providerAttributions[fm.fieldId] = {
-              providerId: fm.providerId,
-              confidenceScore: fm.confidenceScore
-            };
+      for (const mut of chunk) {
+        if (!mut.filePath) {
+          failedCount++;
+          errors.push(`Resource ${mut.resourceId} missing file path`);
+          chunkFailed = true;
+          break;
+        }
+
+        const tagPayload: Record<string, string | number | Buffer> = {};
+        const fieldMap: Record<string, string | number> = {};
+        const previousState: Record<string, string | number | undefined> = {};
+        const providerAttributions: Record<string, { providerId: string; confidenceScore?: number }> = {};
+
+        for (const fm of mut.fieldMutations) {
+          if (fm.newValue !== undefined) {
+            tagPayload[fm.fieldId] = fm.newValue;
+            fieldMap[fm.fieldId] = fm.newValue;
+            previousState[fm.fieldId] = fm.oldValue;
+            if (fm.providerId) {
+              providerAttributions[fm.fieldId] = {
+                providerId: fm.providerId,
+                confidenceScore: fm.confidenceScore
+              };
+            }
           }
+        }
+
+        if (artworkBuffer) {
+          tagPayload.artworkBuffer = artworkBuffer;
+        }
+
+        const res = await this.mutationExecutor.executeSingleMutation({
+          songId: Number(mut.resourceId),
+          filePath: mut.filePath,
+          tagPayload,
+          fieldMap
+        });
+
+        if (res.success) {
+          draftSnapshots.push({
+            songId: Number(mut.resourceId),
+            filePath: mut.filePath,
+            previousTags: previousState,
+            appliedTags: fieldMap,
+            providerAttributions
+          });
+          updatedCount++;
+        } else {
+          failedCount++;
+          errors.push(res.error ?? `Mutation failed for ${mut.filePath}`);
+          chunkFailed = true;
+          break;
         }
       }
 
-      if (artworkBuffer) {
-        tagPayload.artworkBuffer = artworkBuffer;
-      }
-
-      const res = await this.mutationExecutor.executeSingleMutation({
-        songId: Number(mut.resourceId),
-        filePath: mut.filePath,
-        tagPayload,
-        fieldMap
-      });
-
-      if (res.success) {
-        draftSnapshots.push({
-          songId: Number(mut.resourceId),
-          filePath: mut.filePath,
-          previousTags: previousState,
-          appliedTags: fieldMap,
-          providerAttributions
-        });
-        updatedCount++;
-      } else {
-        failedCount++;
-        errors.push(res.error ?? `Mutation failed for ${mut.filePath}`);
+      if (chunkFailed) {
+        // Atomic Partial Batch Rollback: Revert any mutations already applied in this transaction
+        if (draftSnapshots.length > 0) {
+          for (const draft of [...draftSnapshots].reverse()) {
+            try {
+              await this.mutationExecutor.executeSingleMutation({
+                songId: draft.songId,
+                filePath: draft.filePath,
+                tagPayload: draft.previousTags as Record<string, string | number>,
+                fieldMap: draft.previousTags as Record<string, string | number>
+              });
+            } catch {
+              // Ignore single item revert failure during atomic rollback
+            }
+          }
+          draftSnapshots.length = 0;
+          updatedCount = 0;
+        }
+        break;
       }
     }
 

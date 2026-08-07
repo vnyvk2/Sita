@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import type { AlbumTagPreview, AutoTagStage, ProgressEventPayload } from '../../../common/metadata/types';
-import type { MetadataApplyService, ApplyResult } from '../services/MetadataApplyService';
-import type { MetadataDiagnosticsService } from './MetadataDiagnosticsService';
+import { MetadataApplyService, type ApplyResult } from '../services/MetadataApplyService';
+import { MetadataDiagnosticsService } from './MetadataDiagnosticsService';
 
 export interface MetadataJob {
   id: string;
@@ -34,8 +34,8 @@ export class MetadataJobManager extends EventEmitter {
   ) {
     super();
     this.maxConcurrentJobs = maxConcurrentJobs;
-    this.applyService = applyService ?? (new (require('../services/MetadataApplyService').MetadataApplyService)());
-    this.diagnosticsService = diagnosticsService ?? (new (require('./MetadataDiagnosticsService').MetadataDiagnosticsService)());
+    this.applyService = applyService ?? new MetadataApplyService();
+    this.diagnosticsService = diagnosticsService ?? new MetadataDiagnosticsService();
   }
 
   /**
