@@ -39,8 +39,16 @@ export class RequestPipeline {
     this.authenticator = new Authenticator(options?.authCredentials);
   }
 
-  public async execute<T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>> {
-    const authenticatedOptions = this.authenticator.applyAuthentication(options);
+  public async execute<T = unknown>(
+    urlOrOptions: string | HttpRequestOptions,
+    options?: Omit<HttpRequestOptions, 'url'>
+  ): Promise<HttpResponse<T>> {
+    const opts: HttpRequestOptions =
+      typeof urlOrOptions === 'string'
+        ? { url: urlOrOptions, ...options }
+        : urlOrOptions;
+
+    const authenticatedOptions = this.authenticator.applyAuthentication(opts);
 
     return this.retryPolicy.execute(async () => {
       if (this.rateLimiter) {

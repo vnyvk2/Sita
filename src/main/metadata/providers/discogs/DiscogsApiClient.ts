@@ -51,11 +51,21 @@ export class DiscogsApiClient {
     const url = `${this.baseUrl}/database/search?q=${encodeURIComponent(query)}&type=release&per_page=${limit}`;
 
     try {
+      console.log(`[DiscogsApiClient] GET ${url}`);
       const response = await this.pipeline.execute<{ results?: DiscogsSearchReleaseDto[] }>(url, {
         headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
       });
-      return response.data?.results ?? [];
-    } catch {
+      const results = response.data?.results ?? [];
+      console.log(`[DiscogsApiClient] GET ${url} SUCCESS - Status: ${response.status}, Results count: ${results.length}`);
+      return results;
+    } catch (err: any) {
+      console.error(`[DiscogsApiClient] GET ${url} FAILED - Error:`, {
+        name: err?.name,
+        message: err?.message,
+        status: err?.status ?? err?.response?.status,
+        code: err?.code,
+        data: err?.response?.data
+      });
       return [];
     }
   }
@@ -66,11 +76,20 @@ export class DiscogsApiClient {
     const url = `${this.baseUrl}/releases/${id}`;
 
     try {
+      console.log(`[DiscogsApiClient] GET ${url}`);
       const response = await this.pipeline.execute<DiscogsReleaseDetailsDto>(url, {
         headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
       });
+      console.log(`[DiscogsApiClient] GET ${url} SUCCESS - Status: ${response.status}`);
       return response.data ?? null;
-    } catch {
+    } catch (err: any) {
+      console.error(`[DiscogsApiClient] GET ${url} FAILED - Error:`, {
+        name: err?.name,
+        message: err?.message,
+        status: err?.status ?? err?.response?.status,
+        code: err?.code,
+        data: err?.response?.data
+      });
       return null;
     }
   }
