@@ -103,11 +103,12 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
               const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
               const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
               const artworkUrlContrib = contrib.contributions.find((c) => c.fieldId === 'artworkUrl')?.value;
+              const mbidContrib = contrib.contributions.find((c) => c.fieldId === 'mbid')?.value;
 
               candidates.push({
                 providerId,
                 providerName: this.providerRegistry.getDisplayName(providerId),
-                externalId: providerId,
+                externalId: mbidContrib ? String(mbidContrib) : providerId,
                 title: String(titleContrib ?? title),
                 artist: String(artistContrib ?? artist ?? ''),
                 score: contrib.confidenceScore,
@@ -116,7 +117,8 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
                   artist: String(artistContrib ?? ''),
                   album: String(albumContrib ?? ''),
                   genre: String(genreContrib ?? ''),
-                  artworkUrl: String(artworkUrlContrib ?? '')
+                  artworkUrl: String(artworkUrlContrib ?? ''),
+                  mbid: String(mbidContrib ?? '')
                 }
               });
               continue;
