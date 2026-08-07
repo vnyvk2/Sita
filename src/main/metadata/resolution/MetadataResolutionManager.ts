@@ -1,4 +1,4 @@
-import type { MetadataLookupGateway } from './MetadataLookupGateway';
+import type { MetadataLookupGateway, DefaultMetadataLookupGateway } from './MetadataLookupGateway';
 import type { MetadataResolution, ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataContext } from '../domain/MetadataContext';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
@@ -35,11 +35,12 @@ export class MetadataResolutionManager {
   }) {
     if (options && 'searchCandidates' in options) {
       this.lookupGateway = options;
-      this.providerRegistry = new ProviderRegistry();
+      this.providerRegistry = (options as DefaultMetadataLookupGateway).registry ?? new ProviderRegistry();
       this.mergeEngine = new MetadataMergeEngine(this.providerRegistry);
     } else {
       this.lookupGateway = options?.lookupGateway;
-      this.providerRegistry = options?.providerRegistry ?? new ProviderRegistry();
+      const gwRegistry = (options?.lookupGateway as DefaultMetadataLookupGateway)?.registry;
+      this.providerRegistry = options?.providerRegistry ?? gwRegistry ?? new ProviderRegistry();
       this.mergeEngine = options?.mergeEngine ?? new MetadataMergeEngine(this.providerRegistry);
     }
   }
@@ -72,6 +73,7 @@ export class MetadataResolutionManager {
     }
 
     // Phase 13D Adopt Resolution Pipeline: Request DTO pattern
+    const targetMbid = request.mbid ?? request.releaseId;
     const context: MetadataContext = {
       resources: {
         primaryType: 'album',
@@ -83,8 +85,8 @@ export class MetadataResolutionManager {
         query: {
           albumTitle: request.albumTitle,
           artistName: request.artistName,
-          mbid: request.mbid ?? request.releaseId,
-          releaseId: request.releaseId ?? request.mbid
+          mbid: targetMbid,
+          releaseId: targetMbid
         } as any,
         policy: request.policy,
         requestedAt: Date.now()
@@ -114,7 +116,7 @@ export class MetadataResolutionManager {
       mergedResult,
       resolvedAt: Date.now(),
       session
-    } as MetadataResolution & { session?: MergeSession };
+    };
   }
 
   public get merger(): MetadataMergeEngine {

@@ -1,5 +1,6 @@
 import type { ProviderAttribution } from './ProviderAttribution';
 import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
+import type { MergeSession } from '../resolution/MergeSession';
 
 export type ProviderId = string;
 
@@ -29,5 +30,6 @@ export interface MetadataResolution {
   candidates: ProviderCandidate[];
   mergedResult?: MergedCandidateResult;
   resolvedResource?: ResolvedResource;
+  session?: MergeSession;
   resolvedAt: number;
 }
