@@ -123,6 +123,7 @@ export class AlbumAutoTagService extends EventEmitter {
       this.emitProgress('diffing', 'Building presentation-friendly metadata diffs...', 85, operationId);
 
       let trackPreviews: TrackMatchPreview[] = [];
+      let contributingProviders: MetadataProviderId[] | undefined;
 
       if (this.resolutionManager) {
         const resolution = await this.resolutionManager.resolve({
@@ -140,6 +141,12 @@ export class AlbumAutoTagService extends EventEmitter {
               primaryPath: merged.artworkUrl,
               onlineUrls: [merged.artworkUrl]
             };
+          }
+
+          if (merged.fieldAttributions) {
+            contributingProviders = Array.from(
+              new Set(Object.values(merged.fieldAttributions).map((attr) => attr.providerId as MetadataProviderId))
+            );
           }
 
           trackPreviews = albumPreview.trackList.map((pair) =>
@@ -162,6 +169,7 @@ export class AlbumAutoTagService extends EventEmitter {
         confidenceLevel: overallConfidenceLevel,
         provider: resolved.provider,
         providerReleaseId: resolved.providerReleaseId,
+        contributingProviders,
         resolvedRelease: resolved
       };
 

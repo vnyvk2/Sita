@@ -49,8 +49,40 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
           <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>Pre-Apply Summary</span>
           <ConfidenceBadge level={preview.confidenceLevel} confidence={preview.overallConfidence} />
         </div>
-        <div style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
-          {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {preview.contributingProviders && preview.contributingProviders.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
+              <span style={{ color: '#9ca3af' }}>Federated:</span>
+              {preview.contributingProviders.map((pId) => (
+                <span
+                  key={pId}
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background:
+                      pId === 'discogs'
+                        ? 'rgba(234, 88, 12, 0.25)'
+                        : pId === 'coverartarchive'
+                          ? 'rgba(14, 165, 233, 0.25)'
+                          : 'rgba(186, 85, 211, 0.25)',
+                    color:
+                      pId === 'discogs'
+                        ? '#ffedd5'
+                        : pId === 'coverartarchive'
+                          ? '#e0f2fe'
+                          : '#e9d5ff',
+                    fontSize: '0.75rem',
+                    fontWeight: 600
+                  }}
+                >
+                  {pId === 'musicbrainz' ? 'MusicBrainz' : pId === 'discogs' ? 'Discogs' : pId === 'coverartarchive' ? 'Cover Art Archive' : pId}
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
+            {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
+          </div>
         </div>
       </div>
 
