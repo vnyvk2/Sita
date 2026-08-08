@@ -363,11 +363,15 @@ export default function App() {
     songs: any[];
     albumName?: string;
     artistName?: string;
+    workflow?: import('./hooks/useMetadataWorkflow').WorkflowType;
   }>({ isOpen: false, songs: [] });
 
-  const openAutoTagDialog = useCallback((songs: any[], albumName?: string, artistName?: string) => {
-    setAutoTagState({ isOpen: true, songs, albumName, artistName });
-  }, []);
+  const openAutoTagDialog = useCallback(
+    (songs: any[], albumName?: string, artistName?: string, workflow: import('./hooks/useMetadataWorkflow').WorkflowType = 'album') => {
+      setAutoTagState({ isOpen: true, songs, albumName, artistName, workflow });
+    },
+    []
+  );
 
   const closeAutoTagDialog = useCallback(() => {
     setAutoTagState((prev) => ({ ...prev, isOpen: false }));
@@ -402,6 +406,7 @@ export default function App() {
             localSongs={autoTagState.songs}
             initialAlbumName={autoTagState.albumName}
             initialArtistName={autoTagState.artistName}
+            initialWorkflow={autoTagState.workflow ?? 'album'}
             onClose={closeAutoTagDialog}
           />
         </div>

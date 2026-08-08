@@ -411,15 +411,31 @@ const Song = forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => 
         isDisabled: isMultipleSelectionsEnabled
       },
       {
-        label: 'Auto Tag Album',
-        class: 'auto-tag',
-        iconName: 'auto_awesome',
+        label: 'Auto Tag Track',
+        class: 'auto-tag-track',
+        iconName: 'audiotrack',
         handlerFunction: () => {
           if (openAutoTagDialog) {
             openAutoTagDialog(
-              [{ songId, title, artist: artists?.[0]?.name, album: album?.title, path }],
-              album?.title ?? title,
-              artists?.[0]?.name
+              [{ songId, title, artist: artists?.[0]?.name, album: album?.name, path }],
+              title,
+              artists?.[0]?.name,
+              'track'
+            );
+          }
+        }
+      },
+      {
+        label: 'Auto Tag Album',
+        class: 'auto-tag-album',
+        iconName: 'album',
+        handlerFunction: () => {
+          if (openAutoTagDialog) {
+            openAutoTagDialog(
+              [{ songId, title, artist: artists?.[0]?.name, album: album?.name, path }],
+              album?.name ?? title,
+              artists?.[0]?.name,
+              'album'
             );
           }
         }

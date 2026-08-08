@@ -5109,3 +5109,514 @@ Preview
 No architectural changes should be needed—you're now exercising the extension points you've already built.
 
 At this stage, you're no longer designing the metadata platform; you're populating it with providers. That's a good sign that the core architecture has stabilized.
+
+this is inside autotag lets say similar to ui{Here's the updated architecture I'd put into memory. It reflects where the Metadata system has evolved to now, not just the original Album Auto Tag.
+
+---
+
+# Nora Metadata Center Architecture (Current)
+
+## Goal
+
+A unified **Metadata Center** that handles every metadata operation through a single workflow instead of separate dialogs.
+
+Current workflows:
+
+```
+Metadata Center
+├── Album
+├── Track
+├── Genre & Style
+└── Artwork
+```
+
+Each workflow shares the same pipeline.
+
+---
+
+# High-Level Flow
+
+```
+Context Menu
+        │
+        ▼
+MetadataCenterDialog
+        │
+        ▼
+useMetadataWorkflow
+        │
+        ▼
+metadataApi
+        │
+        ▼
+IPC
+        │
+        ▼
+Metadata Workflow Service
+        │
+        ▼
+Providers
+(MusicBrainz / Discogs / Future)
+```
+
+---
+
+# UI Architecture
+
+```
+MetadataCenterDialog
+│
+├── Header
+│
+├── Workflow Tabs
+│     ├── Album
+│     ├── Track
+│     ├── Genre
+│     └── Artwork
+│
+├── Search & Provider Panel
+│
+├── Progress Overlay
+│
+├── Candidate List
+│
+├── Preview Workspace
+│     │
+│     ├── LEFT
+│     │     ├── Album Summary
+│     │     └── Metadata Diff Panel
+│     │
+│     └── RIGHT
+│           └── Track Table
+│
+└── Sticky Footer
+```
+
+---
+
+# Workflow Hook
+
+Everything is coordinated by
+
+```
+useMetadataWorkflow
+```
+
+It owns the complete UI state.
+
+State includes
+
+```
+workflowType
+
+query
+
+candidates
+
+selectedCandidateId
+
+preview
+
+selectedFieldIds
+
+selectedTrackIds
+
+loading
+
+progress
+
+error
+
+undo state
+```
+
+Actions
+
+```
+search()
+
+buildPreview()
+
+apply()
+
+undo()
+
+toggleField()
+
+toggleTrack()
+
+setWorkflowType()
+
+setQuery()
+```
+
+---
+
+# Search Phase
+
+```
+User
+     │
+Search
+     │
+metadataApi.workflowSearch()
+     │
+IPC
+     │
+Metadata Workflow
+     │
+Providers
+```
+
+Returns
+
+```
+WorkflowCandidate[]
+```
+
+Each candidate contains
+
+```
+id
+
+title
+
+artist
+
+album
+
+year
+
+genre
+
+style
+
+coverArtUrl
+
+provider
+
+confidenceScore
+```
+
+---
+
+# Candidate Selection
+
+Selecting a candidate immediately triggers
+
+```
+buildPreview()
+```
+
+Pipeline
+
+```
+Candidate
+
+↓
+
+Metadata Workflow
+
+↓
+
+Metadata Preview
+
+↓
+
+UI
+```
+
+---
+
+# Preview Model
+
+```
+MetadataPreview
+```
+
+contains
+
+```
+primaryCandidate
+
+all candidates
+
+matches
+
+supportedFields
+
+provider
+
+workflowType
+```
+
+---
+
+# Track Matching
+
+Preview produces
+
+```
+WorkflowMatch[]
+```
+
+Each match contains
+
+```
+localSongId
+
+songPath
+
+confidence
+
+suggestedMetadata
+
+fieldDiffs
+```
+
+---
+
+# Metadata Diffs
+
+Every field becomes a diff
+
+```
+Title
+
+Album
+
+Album Artist
+
+Artist
+
+Genre
+
+Year
+
+Track #
+
+Disc #
+
+Artwork
+
+Lyrics
+
+Comment
+
+...
+```
+
+Each diff has
+
+```
+fieldId
+
+fieldName
+
+oldValue
+
+suggestedValue
+
+status
+```
+
+Status
+
+```
+unchanged
+
+changed
+
+new
+
+missing
+
+conflict
+```
+
+---
+
+# Selective Apply
+
+User chooses
+
+```
+Tracks
+
++
+
+Fields
+```
+
+Only selected items are applied.
+
+```
+Selected Tracks
+
+×
+
+Selected Fields
+
+↓
+
+Apply
+```
+
+---
+
+# Provider Layer
+
+Current providers
+
+```
+Auto
+
+MusicBrainz
+
+Discogs
+```
+
+Provider switching reuses
+
+```
+buildPreview()
+```
+
+without restarting the workflow.
+
+---
+
+# Progress Reporting
+
+Background work emits
+
+```
+Searching
+
+Matching
+
+Diffing
+
+Applying
+
+Completed
+```
+
+with
+
+```
+message
+
+progress %
+
+operationId
+```
+
+through IPC.
+
+---
+
+# Apply Pipeline
+
+```
+Preview
+
+↓
+
+Selected Tracks
+
+↓
+
+Selected Fields
+
+↓
+
+workflowApplyPreview()
+
+↓
+
+Database
+
+↓
+
+React Query Invalidation
+
+↓
+
+UI Refresh
+```
+
+---
+
+# Undo
+
+Every operation owns
+
+```
+operationId
+```
+
+Undo
+
+```
+workflowUndo(operationId)
+```
+
+reverts the last applied metadata operation.
+
+---
+
+# Component Tree
+
+```
+MetadataCenterDialog
+│
+├── WorkflowTabs
+├── SearchAndProviderPanel
+├── ProgressOverlay
+├── CandidateList
+├── AlbumSummaryCard
+├── MetadataDiffPanel
+├── TrackTable
+└── StickyFooter
+```
+
+---
+
+# Current Entry Points
+
+Implemented:
+
+```
+Album Auto Tag
+    ↓
+Metadata Center
+```
+
+Next planned:
+
+```
+Song Context Menu
+      ↓
+Auto Tag
+      ↓
+Track
+      ↓
+Metadata Center
+      (workflow = "track")
+```
+
+Future entry points:
+
+```
+Album Page
+Artist Page
+Genre Page
+Artwork Manager
+Bulk Metadata Editor
+Library Scan Suggestions
+```
+
+---
+
+This is the current architecture I'd consider the foundation. From now on, new metadata capabilities (composer, BPM, replay gain, lyrics, mood, etc.) should plug into this unified workflow rather than creating separate dialogs or pipelines.}
