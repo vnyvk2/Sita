@@ -57,3 +57,14 @@ export interface ResolvedAlbumRelease {
   provider: MetadataProviderId;
   providerReleaseId: string;
 }
+
+export interface CanonicalReleaseContext {
+  mbid?: string;
+  releaseId?: string;
+  title: string;
+  artist?: string;
+  year?: number;
+  trackCount?: number;
+  trackTitles?: string[];
+  externalIds?: Record<string, string>;
+}

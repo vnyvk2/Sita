@@ -997,20 +997,18 @@ const updateSongId3Tags = async (
         // Get current album
         const currentAlbum = song.albums?.[0]?.album;
 
+        let targetAlbumId: number | undefined;
+
         if (tags.albums[0].albumId) {
           // Link to existing album
           const albumId = Number(tags.albums[0].albumId);
+          targetAlbumId = albumId;
 
           if (currentAlbum && currentAlbum.id !== albumId) {
             // Unlink from old album
             await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
 
             // Check if old album should be deleted (no more songs)
-            // Safe cascade pattern: Check for remaining songs before deletion
-            // When album is deleted, database CASCADE will automatically clean up:
-            // - albumsSongs entries (already cleaned up above)
-            // - albumsArtists entries
-            // - albumsArtworks entries
             const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
             if (albumSongIds.length === 0) {
               await deleteAlbum(currentAlbum.id, trx);
@@ -1021,13 +1019,15 @@ const updateSongId3Tags = async (
             await linkSongToAlbum(albumId, songId, trx);
           }
         } else {
-          // Create new album
+          // Create new album or link by title
           const existingAlbum = await getAlbumWithTitle(tags.albums[0].title, trx);
 
           if (existingAlbum) {
+            targetAlbumId = existingAlbum.id;
             await linkSongToAlbum(existingAlbum.id, songId, trx);
           } else {
             const newAlbum = await createAlbum({ title: tags.albums[0].title }, trx);
+            targetAlbumId = newAlbum.id;
             await linkSongToAlbum(newAlbum.id, songId, trx);
           }
 
@@ -1040,6 +1040,15 @@ const updateSongId3Tags = async (
             if (albumSongIds.length === 0) {
               await deleteAlbum(currentAlbum.id, trx);
             }
+          }
+        }
+
+        // Relational Sync: Ensure all song artists are linked to the target album
+        if (targetAlbumId) {
+          const updatedSongState = await getSongById(songId, trx);
+          const songArtistIds = updatedSongState?.artists?.map((a) => a.artist.id) ?? [];
+          for (const artistId of songArtistIds) {
+            await linkArtistToAlbum(targetAlbumId, artistId, trx);
           }
         }
       } else if (song.albums && song.albums.length > 0) {

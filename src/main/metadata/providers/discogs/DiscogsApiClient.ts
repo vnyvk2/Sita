@@ -94,20 +94,46 @@ export class DiscogsApiClient {
     }
   }
 
+  private isCandidateMatching(discogsTitle: string, queryTitle?: string, queryArtist?: string): boolean {
+    if (!discogsTitle) return false;
+    const normTop = discogsTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (queryTitle) {
+      const normTitle = queryTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normTitle.length > 2 && !normTop.includes(normTitle)) return false;
+    }
+
+    if (queryArtist) {
+      const normArtist = queryArtist.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normArtist.length > 2 && !normTop.includes(normArtist)) return false;
+    }
+
+    return true;
+  }
+
   public async fetchContributionData(query: { title?: string; artist?: string }): Promise<DiscogsContributionData | null> {
-    const qStr = [query.title, query.artist].filter(Boolean).join(' ');
+    const qStr = [query.artist, query.title].filter(Boolean).join(' ');
     if (!qStr) return null;
 
-    const results = await this.searchReleases(qStr, 1);
+    const results = await this.searchReleases(qStr, 5);
     if (results.length === 0) return null;
 
-    const top = results[0];
-    const details = await this.getReleaseById(top.id);
+    // Find first candidate that satisfies title and artist matching criteria
+    const matchedCandidate = results.find((candidate) =>
+      this.isCandidateMatching(candidate.title, query.title, query.artist)
+    );
 
-    const genres = details?.genres ?? top.genre ?? [];
-    const styles = details?.styles ?? top.style ?? [];
-    const catNo = details?.labels?.[0]?.catno ?? top.catno;
-    const masterId = details?.master_id ?? top.master_id;
+    if (!matchedCandidate) {
+      console.log(`[DiscogsApiClient] Rejected ${results.length} Discogs search candidate(s) due to low title/artist similarity for "${qStr}"`);
+      return null;
+    }
+
+    const details = await this.getReleaseById(matchedCandidate.id);
+
+    const genres = details?.genres ?? matchedCandidate.genre ?? [];
+    const styles = details?.styles ?? matchedCandidate.style ?? [];
+    const catNo = details?.labels?.[0]?.catno ?? matchedCandidate.catno;
+    const masterId = details?.master_id ?? matchedCandidate.master_id;
 
     return {
       genre: genres.length > 0 ? genres.join(', ') : undefined,

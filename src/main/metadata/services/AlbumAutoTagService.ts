@@ -131,7 +131,15 @@ export class AlbumAutoTagService extends EventEmitter {
           targetResourceIds,
           albumTitle: resolved.album.title,
           artistName: resolved.album.artist,
-          mbid: resolved.providerReleaseId
+          mbid: resolved.providerReleaseId,
+          canonicalContext: {
+            mbid: resolved.providerReleaseId,
+            title: resolved.album.title,
+            artist: resolved.album.artist,
+            year: resolved.album.year,
+            trackCount: resolved.tracks.length,
+            trackTitles: resolved.tracks.map((t) => t.title)
+          }
         });
 
         if (resolution.mergedResult) {
