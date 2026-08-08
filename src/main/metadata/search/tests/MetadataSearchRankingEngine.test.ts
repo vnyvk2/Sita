@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { MetadataQueryNormalizer } from '../MetadataQueryNormalizer';
-import { MetadataSearchRankingEngine } from '../MetadataSearchRankingEngine';
-import type { MusicBrainzReleaseDto } from '../../providers/musicbrainz/dto';
+import { MetadataSearchRankingEngine, type SearchCandidate } from '../MetadataSearchRankingEngine';
 
 describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
-  it('normalizes query strings by stripping noise suffixes like Deluxe Edition and Remastered', () => {
-    const norm = MetadataQueryNormalizer.normalize('SOUR (Deluxe Edition) [Explicit]', 'Olivia Rodrigo (feat. Guest)');
-    expect(norm.cleanTitle).toBe('SOUR');
-    expect(norm.cleanArtist).toBe('Olivia Rodrigo');
-    expect(norm.isDeluxeRequested).toBe(true);
+  it('normalizes query strings by stripping noise suffixes like Remastered while preserving raw title', () => {
+    const norm = MetadataQueryNormalizer.normalize('1989 (Taylor\'s Version) [Explicit]', 'Taylor Swift (feat. Guest)');
+    expect(norm.rawTitle).toBe('1989 (Taylor\'s Version) [Explicit]');
+    expect(norm.cleanTitle).toBe('1989 (Taylor\'s Version)');
+    expect(norm.cleanArtist).toBe('Taylor Swift');
   });
 
-  it('calculates string similarity using bigram Dice coefficient', () => {
+  it('calculates string similarity using Jaro-Winkler distance', () => {
     const simExact = MetadataQueryNormalizer.compareStringSimilarity('Abbey Road', 'Abbey Road');
     expect(simExact).toBe(1.0);
 
@@ -19,33 +18,35 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
     expect(simClose).toBeGreaterThanOrEqual(0.85);
   });
 
-  it('scores and ranks official studio releases above compilations and bootlegs', () => {
+  it('scores and ranks generic SearchCandidate objects prioritizing official studio releases over bootlegs & compilations', () => {
     const normQuery = MetadataQueryNormalizer.normalize('SOUR', 'Olivia Rodrigo');
 
-    const candidates: MusicBrainzReleaseDto[] = [
+    const candidates: SearchCandidate[] = [
       {
         id: 'comp-1',
         title: 'SOUR Greatest Hits Compilation',
+        artist: 'Olivia Rodrigo',
         status: 'Official',
-        score: 95,
-        'artist-credit': [{ name: 'Olivia Rodrigo' }],
-        'release-group': { id: 'rg-1', 'primary-type': 'Album', 'secondary-types': ['Compilation'] }
+        primaryType: 'Album',
+        secondaryTypes: ['Compilation'],
+        baseScore: 95
       },
       {
         id: 'studio-1',
         title: 'SOUR',
+        artist: 'Olivia Rodrigo',
         status: 'Official',
-        score: 90,
-        'artist-credit': [{ name: 'Olivia Rodrigo' }],
-        'release-group': { id: 'rg-2', 'primary-type': 'Album' }
+        primaryType: 'Album',
+        baseScore: 90
       },
       {
         id: 'bootleg-1',
         title: 'SOUR Live Bootleg',
+        artist: 'Olivia Rodrigo',
         status: 'Bootleg',
-        score: 85,
-        'artist-credit': [{ name: 'Olivia Rodrigo' }],
-        'release-group': { id: 'rg-3', 'primary-type': 'Album', 'secondary-types': ['Live'] }
+        primaryType: 'Album',
+        secondaryTypes: ['Live'],
+        baseScore: 85
       }
     ];
 
@@ -53,8 +54,8 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
 
     expect(ranked.length).toBe(3);
     // Official Studio Album should be ranked #1
-    expect(ranked[0].release.id).toBe('studio-1');
+    expect(ranked[0].candidate.id).toBe('studio-1');
     expect(ranked[0].totalScore).toBeGreaterThan(ranked[1].totalScore);
-    expect(ranked[1].release.id).toBe('comp-1');
+    expect(ranked[1].candidate.id).toBe('comp-1');
   });
 });

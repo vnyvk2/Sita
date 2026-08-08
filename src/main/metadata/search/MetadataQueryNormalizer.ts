@@ -11,7 +11,6 @@ export interface NormalizedQuery {
 
 export class MetadataQueryNormalizer {
   private static readonly NOISE_PATTERNS = [
-    /\s*[\(\[]\s*(?:deluxe|bonus|expanded|special|super deluxe|anniversary)\s+(?:edition|version|release)?\s*[\)\]]/gi,
     /\s*[\(\[]\s*(?:remastered|remaster|re-mastered|20\d\d remaster|19\d\d remaster)\s*[\)\]]/gi,
     /\s*[\(\[]\s*(?:explicit|clean)\s*[\)\]]/gi,
     /\s*[\(\[]\s*feat\.\s+[^\)\]]+[\)\]]/gi,
@@ -23,7 +22,7 @@ export class MetadataQueryNormalizer {
     const rawArtist = artist ?? '';
 
     const lowerTitle = rawTitle.toLowerCase();
-    const isDeluxeRequested = lowerTitle.includes('deluxe') || lowerTitle.includes('expanded') || lowerTitle.includes('bonus');
+    const isDeluxeRequested = lowerTitle.includes('deluxe') || lowerTitle.includes('expanded') || lowerTitle.includes('bonus') || lowerTitle.includes('platinum');
     const isRemasterRequested = lowerTitle.includes('remaster');
     const isLiveRequested = lowerTitle.includes('live') || lowerTitle.includes('concert');
     const isCompilationRequested = lowerTitle.includes('greatest hits') || lowerTitle.includes('best of') || lowerTitle.includes('anthology');
@@ -55,30 +54,62 @@ export class MetadataQueryNormalizer {
 
   public static compareStringSimilarity(strA?: string, strB?: string): number {
     if (!strA || !strB) return 0;
-    const a = strA.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const b = strB.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const a = strA.toLowerCase().trim();
+    const b = strB.toLowerCase().trim();
 
     if (a === b) return 1.0;
-    if (a.includes(b) || b.includes(a)) return 0.85;
 
-    // Dice coefficient for bigrams
-    const bigramsA = this.getBigrams(a);
-    const bigramsB = this.getBigrams(b);
-    if (bigramsA.size === 0 || bigramsB.size === 0) return 0;
+    const cleanA = a.replace(/[^a-z0-9]/g, '');
+    const cleanB = b.replace(/[^a-z0-9]/g, '');
+    if (cleanA === cleanB) return 0.98;
 
-    let intersection = 0;
-    for (const bg of bigramsA) {
-      if (bigramsB.has(bg)) intersection++;
-    }
-
-    return (2.0 * intersection) / (bigramsA.size + bigramsB.size);
+    return this.jaroWinklerDistance(cleanA, cleanB);
   }
 
-  private static getBigrams(str: string): Set<string> {
-    const bigrams = new Set<string>();
-    for (let i = 0; i < str.length - 1; i++) {
-      bigrams.add(str.substring(i, i + 2));
+  public static jaroWinklerDistance(s1: string, s2: string): number {
+    if (s1.length === 0 || s2.length === 0) return 0;
+    if (s1 === s2) return 1.0;
+
+    const range = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;
+    const s1Matches = new Array(s1.length).fill(false);
+    const s2Matches = new Array(s2.length).fill(false);
+
+    let m = 0;
+    for (let i = 0; i < s1.length; i++) {
+      const low = Math.max(0, i - range);
+      const high = Math.min(i + range + 1, s2.length);
+
+      for (let j = low; j < high; j++) {
+        if (!s2Matches[j] && s1[i] === s2[j]) {
+          s1Matches[i] = true;
+          s2Matches[j] = true;
+          m++;
+          break;
+        }
+      }
     }
-    return bigrams;
+
+    if (m === 0) return 0;
+
+    let k = 0;
+    let numTranspositions = 0;
+    for (let i = 0; i < s1.length; i++) {
+      if (s1Matches[i]) {
+        while (!s2Matches[k]) k++;
+        if (s1[i] !== s2[k]) numTranspositions++;
+        k++;
+      }
+    }
+
+    const weight = (m / s1.length + m / s2.length + (m - numTranspositions / 2) / m) / 3;
+    let prefix = 0;
+    const p = 0.1;
+
+    for (let i = 0; i < Math.min(4, Math.min(s1.length, s2.length)); i++) {
+      if (s1[i] === s2[i]) prefix++;
+      else break;
+    }
+
+    return weight + prefix * p * (1 - weight);
   }
 }

@@ -1,8 +1,44 @@
-import type { MusicBrainzReleaseDto } from '../providers/musicbrainz/dto';
 import { MetadataQueryNormalizer, type NormalizedQuery } from './MetadataQueryNormalizer';
 
-export interface ScoredReleaseCandidate {
-  release: MusicBrainzReleaseDto;
+export interface SearchCandidate {
+  id: string;
+  title: string;
+  artist?: string;
+  year?: number;
+  status?: string;
+  primaryType?: string;
+  secondaryTypes?: string[];
+  trackCount?: number;
+  baseScore: number;
+  rawItem?: unknown;
+}
+
+export interface SearchRankingWeights {
+  artistMatch: number;
+  titleMatch: number;
+  officialStatus: number;
+  bootlegPenalty: number;
+  primaryTypeAlbum: number;
+  primaryTypeEP: number;
+  compilationPenalty: number;
+  livePenalty: number;
+  trackCountMatch: number;
+}
+
+export const DEFAULT_RANKING_WEIGHTS: SearchRankingWeights = {
+  artistMatch: 30,
+  titleMatch: 30,
+  officialStatus: 20,
+  bootlegPenalty: -25,
+  primaryTypeAlbum: 15,
+  primaryTypeEP: 10,
+  compilationPenalty: -15,
+  livePenalty: -15,
+  trackCountMatch: 10
+};
+
+export interface ScoredSearchCandidate {
+  candidate: SearchCandidate;
   totalScore: number;
   breakdown: {
     baseScore: number;
@@ -11,85 +47,83 @@ export interface ScoredReleaseCandidate {
     statusScore: number;
     primaryTypeScore: number;
     secondaryTypePenalty: number;
+    trackCountBonus: number;
   };
 }
 
 export class MetadataSearchRankingEngine {
   public static rankCandidates(
-    candidates: MusicBrainzReleaseDto[],
+    candidates: SearchCandidate[],
     query: NormalizedQuery,
-    targetTrackCount?: number
-  ): ScoredReleaseCandidate[] {
+    targetTrackCount?: number,
+    weights: SearchRankingWeights = DEFAULT_RANKING_WEIGHTS
+  ): ScoredSearchCandidate[] {
     if (!candidates || candidates.length === 0) return [];
 
-    const scored = candidates.map((rel) => this.scoreCandidate(rel, query, targetTrackCount));
+    const scored = candidates.map((cand) => this.scoreCandidate(cand, query, targetTrackCount, weights));
 
     // Sort descending by totalScore
     return scored.sort((a, b) => b.totalScore - a.totalScore);
   }
 
   public static scoreCandidate(
-    rel: MusicBrainzReleaseDto,
+    cand: SearchCandidate,
     query: NormalizedQuery,
-    targetTrackCount?: number
-  ): ScoredReleaseCandidate {
-    // 1. Base Score from MusicBrainz Lucene (0 - 100)
-    const baseScore = typeof rel.score === 'number' ? rel.score : Number(rel.score ?? 50);
+    targetTrackCount?: number,
+    weights: SearchRankingWeights = DEFAULT_RANKING_WEIGHTS
+  ): ScoredSearchCandidate {
+    // 1. Base Score from Provider Lucene / Search API (0 - 100)
+    const baseScore = typeof cand.baseScore === 'number' ? cand.baseScore : 50;
 
-    // 2. Artist Similarity Score
-    const candidateArtist = rel['artist-credit']?.[0]?.name ?? rel['artist-credit']?.[0]?.artist?.name ?? '';
-    const artistSim = MetadataQueryNormalizer.compareStringSimilarity(candidateArtist, query.cleanArtist ?? query.rawArtist);
-    const artistScore = Math.round(artistSim * 30);
+    // 2. Artist Similarity Score (Jaro-Winkler)
+    const artistSim = MetadataQueryNormalizer.compareStringSimilarity(cand.artist, query.cleanArtist ?? query.rawArtist);
+    const artistScore = Math.round(artistSim * weights.artistMatch);
 
-    // 3. Title Similarity Score
-    const candidateTitle = rel.title ?? '';
-    const titleSim = MetadataQueryNormalizer.compareStringSimilarity(candidateTitle, query.cleanTitle);
-    const titleScore = Math.round(titleSim * 30);
+    // 3. Title Similarity Score (Jaro-Winkler against rawTitle and cleanTitle)
+    const rawTitleSim = MetadataQueryNormalizer.compareStringSimilarity(cand.title, query.rawTitle);
+    const cleanTitleSim = MetadataQueryNormalizer.compareStringSimilarity(cand.title, query.cleanTitle);
+    const bestTitleSim = Math.max(rawTitleSim, cleanTitleSim);
+    const titleScore = Math.round(bestTitleSim * weights.titleMatch);
 
     // 4. Release Status Score (+20 Official, -25 Bootleg/Pseudo-Release)
     let statusScore = 0;
-    const status = rel.status?.toLowerCase();
+    const status = cand.status?.toLowerCase();
     if (status === 'official') {
-      statusScore = 20;
+      statusScore = weights.officialStatus;
     } else if (status === 'bootleg' || status === 'pseudo-release') {
-      statusScore = -25;
+      statusScore = weights.bootlegPenalty;
     }
 
     // 5. Primary Type Score (+15 for Album, +10 for EP)
     let primaryTypeScore = 0;
-    const primaryType = rel['release-group']?.['primary-type']?.toLowerCase();
+    const primaryType = cand.primaryType?.toLowerCase();
     if (primaryType === 'album') {
-      primaryTypeScore = 15;
+      primaryTypeScore = weights.primaryTypeAlbum;
     } else if (primaryType === 'ep') {
-      primaryTypeScore = 10;
-    } else if (primaryType === 'single') {
-      primaryTypeScore = 5;
+      primaryTypeScore = weights.primaryTypeEP;
     }
 
     // 6. Secondary Type Penalties (Compilation, Live, Remix)
     let secondaryTypePenalty = 0;
-    const secondaryTypes = rel['release-group']?.['secondary-types']?.map((t) => t.toLowerCase()) ?? [];
+    const secondaryTypes = cand.secondaryTypes?.map((t) => t.toLowerCase()) ?? [];
 
     if (secondaryTypes.includes('compilation') && !query.isCompilationRequested) {
-      secondaryTypePenalty -= 15;
+      secondaryTypePenalty += weights.compilationPenalty;
     }
     if (secondaryTypes.includes('live') && !query.isLiveRequested) {
-      secondaryTypePenalty -= 15;
-    }
-    if (secondaryTypes.includes('remix') && !query.isRemasterRequested) {
-      secondaryTypePenalty -= 10;
+      secondaryTypePenalty += weights.livePenalty;
     }
 
-    // Track count bonus
+    // 7. Track Count Match Bonus
     let trackCountBonus = 0;
-    if (targetTrackCount && rel.media?.[0]?.['track-count'] === targetTrackCount) {
-      trackCountBonus = 10;
+    if (targetTrackCount && cand.trackCount && cand.trackCount === targetTrackCount) {
+      trackCountBonus = weights.trackCountMatch;
     }
 
     const totalScore = baseScore + artistScore + titleScore + statusScore + primaryTypeScore + secondaryTypePenalty + trackCountBonus;
 
     return {
-      release: rel,
+      candidate: cand,
       totalScore,
       breakdown: {
         baseScore,
@@ -97,7 +131,8 @@ export class MetadataSearchRankingEngine {
         titleScore,
         statusScore,
         primaryTypeScore,
-        secondaryTypePenalty
+        secondaryTypePenalty,
+        trackCountBonus
       }
     };
   }

@@ -118,10 +118,15 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     };
   }
 
-  public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {
+  public async searchAlbums(
+    album: string,
+    artist?: string,
+    limit = 10,
+    targetTrackCount?: number
+  ): Promise<AlbumMetadata[]> {
     if (!album) return [];
 
-    const cacheKey = `album_search:${album}:${artist ?? ''}:${limit}`;
+    const cacheKey = `album_search:${album}:${artist ?? ''}:${limit}:${targetTrackCount ?? 0}`;
     if (this.cache) {
       const cached = this.cache.get<AlbumMetadata[]>(this.identity.id, cacheKey);
       if (cached) return cached;
@@ -130,15 +135,28 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     const SEARCH_BUFFER = 25;
     const normQuery = MetadataQueryNormalizer.normalize(album, artist);
 
-    const queryParts: string[] = [`release:"${normQuery.cleanTitle}"`];
+    const queryParts: string[] = [`release:"${album}"`];
     if (normQuery.cleanArtist) {
       queryParts.push(`artist:"${normQuery.cleanArtist}"`);
     }
-    queryParts.push('(status:official OR status:*)');
 
     const rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER);
-    const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(rawReleases, normQuery);
-    const topReleases = rankedCandidates.slice(0, limit).map((c) => c.release);
+
+    const searchCandidates = rawReleases.map((rel) => ({
+      id: rel.id,
+      title: rel.title,
+      artist: rel['artist-credit']?.[0]?.name ?? rel['artist-credit']?.[0]?.artist?.name,
+      year: rel.date ? Number(rel.date.substring(0, 4)) : undefined,
+      status: rel.status,
+      primaryType: rel['release-group']?.['primary-type'],
+      secondaryTypes: rel['release-group']?.['secondary-types'],
+      trackCount: rel.media?.[0]?.['track-count'],
+      baseScore: typeof rel.score === 'number' ? rel.score : Number(rel.score ?? 50),
+      rawItem: rel
+    }));
+
+    const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(searchCandidates, normQuery, targetTrackCount);
+    const topReleases = rankedCandidates.slice(0, limit).map((c) => c.candidate.rawItem as MusicBrainzReleaseDto);
 
     const results: AlbumMetadata[] = topReleases.map((rel) => this.releaseMapper.toAlbumMetadata(rel, artist));
 
