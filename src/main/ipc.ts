@@ -63,6 +63,7 @@ import {
 } from './db/queries/ignoredItems';
 import { getDatabaseMetrics } from './db/queries/other';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
+import { getSongById } from './db/queries/songs';
 import {
   getUserKeyboardShortcuts,
   saveUserKeyboardShortcuts,

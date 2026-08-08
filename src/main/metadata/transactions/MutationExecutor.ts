@@ -25,17 +25,9 @@ export class MutationExecutor {
 
   public async executeSingleMutation(options: ExecuteMutationOptions): Promise<MutationExecutionResult> {
     try {
-      const writeResults = await this.tagWriter.writeBatch([
-        { filePath: options.filePath, tags: options.tagPayload }
-      ]);
-
-      if (!writeResults[0]?.success) {
-        return {
-          success: false,
-          error: writeResults[0]?.error ?? `Failed to write tags to ${options.filePath}`
-        };
-      }
-
+      // Single persistence owner: updateSongId3Tags (called via relationalSync.dbUpdater)
+      // handles BOTH disk writes (ID3 tags) and database relational sync.
+      // TagWriterService is intentionally NOT used here to avoid double disk writes.
       const syncResult = await this.relationalSync.syncRelationalDatabase(
         options.songId,
         options.filePath,

@@ -358,8 +358,7 @@ export class MetadataApplyService {
           }
         } else {
           // Direct DB query fallback ONLY if module cannot be resolved (e.g. isolated test runner)
-          const { getDb } = await import('../../db');
-          const db = getDb();
+          const { db } = await import('../../db/db');
 
           await db.transaction(async (trx) => {
             for (const snap of updatedSongs) {
@@ -471,8 +470,7 @@ export class MetadataApplyService {
             await reParseSongModule(snap.path);
           }
         } else {
-          const { getDb } = await import('../../db');
-          const db = getDb();
+          const { db } = await import('../../db/db');
 
           await db.transaction(async (trx) => {
             for (const snap of snapshot.previousSongs) {

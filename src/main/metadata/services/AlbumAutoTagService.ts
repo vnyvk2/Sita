@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import type { AlbumMetadata, MetadataProviderId } from '../models/RecordingMetadata';
-import type { AlbumTagPreview, ApplyPreviewOptions, AutoTagStage, ProgressEventPayload } from '../models/AlbumTagPreview';
+import type { AlbumTagPreview, ApplyPreviewOptions, AutoTagStage, ProgressEventPayload, TrackMatchPreview } from '../models/AlbumTagPreview';
 import type { LocalSongInput } from './AlbumMetadataService';
 import { AlbumMetadataService, getConfidenceLevel } from './AlbumMetadataService';
 import { MetadataDiffBuilder } from '../diff/MetadataDiffBuilder';

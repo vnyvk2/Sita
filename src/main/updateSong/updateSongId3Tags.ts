@@ -14,6 +14,7 @@ import { db } from '../db/db';
 import {
   createAlbum,
   getAlbumWithTitle,
+  linkArtistToAlbum,
   linkSongToAlbum,
   unlinkSongFromAlbum,
   getAlbumSongIds,

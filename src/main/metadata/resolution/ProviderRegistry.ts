@@ -1,4 +1,4 @@
-import type { MetadataProvider } from '../engine/MetadataProvider';
+import type { IMetadataProviderAdapter } from '../contracts/IMetadataProviderAdapter';
 
 export interface ProviderCapabilities {
   supportsAlbumSearch: boolean;
@@ -23,7 +23,7 @@ export interface ProviderDescriptor {
 
 export class ProviderRegistry {
   private readonly providers: Map<string, ProviderDescriptor> = new Map();
-  private readonly activeInstances: Map<string, MetadataProvider> = new Map();
+  private readonly activeInstances: Map<string, IMetadataProviderAdapter> = new Map();
 
   constructor() {
     this.registerDefaultDescriptors();
@@ -140,7 +140,7 @@ export class ProviderRegistry {
     this.providers.set(descriptor.id.toLowerCase(), descriptor);
   }
 
-  public registerInstance(id: string, instance: MetadataProvider): void {
+  public registerInstance(id: string, instance: IMetadataProviderAdapter): void {
     this.activeInstances.set(id.toLowerCase(), instance);
   }
 
@@ -157,7 +157,7 @@ export class ProviderRegistry {
     return Array.from(this.providers.values()).sort((a, b) => b.priority - a.priority);
   }
 
-  public getActiveInstances(): Map<string, MetadataProvider> {
+  public getActiveInstances(): Map<string, IMetadataProviderAdapter> {
     return this.activeInstances;
   }
 

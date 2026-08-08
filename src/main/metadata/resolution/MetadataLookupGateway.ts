@@ -1,4 +1,4 @@
-import type { MetadataProviderExecutor } from '../engine/MetadataProviderExecutor';
+import type { MetadataProviderExecutor } from '../providers/MetadataProviderExecutor';
 import type { ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataContext, AlbumLookupQuery, TrackLookupQuery } from '../domain/MetadataContext';
 import { ProviderRegistry } from './ProviderRegistry';

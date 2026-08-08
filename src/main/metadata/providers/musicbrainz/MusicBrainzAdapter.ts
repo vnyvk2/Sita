@@ -6,12 +6,13 @@ import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
 import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
-import type { MusicBrainzRecordingDto } from './dto';
+import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from './dto';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
 import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
 
 import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
+import type { FieldContribution } from '../../resolution/MetadataMergeEngine';
 import { MetadataQueryNormalizer } from '../../search/MetadataQueryNormalizer';
 import { MetadataSearchRankingEngine } from '../../search/MetadataSearchRankingEngine';
 

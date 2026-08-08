@@ -6,7 +6,7 @@ import { MetadataMergeEngine, type FieldContribution, type MergedCandidateResult
 import { MergeSession } from './MergeSession';
 import { ProviderRegistry } from './ProviderRegistry';
 
-import type { CanonicalReleaseContext } from '../../common/metadata/release';
+import type { CanonicalReleaseContext } from '@common/metadata/release';
 
 export interface ResolutionRequest {
   operationId: string;
