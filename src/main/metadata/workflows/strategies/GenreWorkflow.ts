@@ -1,18 +1,17 @@
 import type {
-  MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
   MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
+import { BaseMetadataWorkflow } from '../MetadataWorkflow';
 import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
-import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
-export class GenreWorkflow implements MetadataWorkflow {
+export class GenreWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'genre';
   public readonly displayName = 'Genre & Style Auto Tag';
 
@@ -24,8 +23,10 @@ export class GenreWorkflow implements MetadataWorkflow {
   public readonly preferredProviders: MetadataProviderId[] = ['discogs'];
 
   private readonly discogsAdapter: DiscogsAdapter;
+  private readonly searchCache: Map<string, { genre?: string; style?: string; title?: string; artist?: string }> = new Map();
 
   constructor(discogsAdapter: DiscogsAdapter) {
+    super();
     this.discogsAdapter = discogsAdapter;
   }
 
@@ -49,8 +50,11 @@ export class GenreWorkflow implements MetadataWorkflow {
       const genreVal = contrib?.contributions.find((c) => c.fieldId === 'genre')?.value as string | undefined;
       const styleVal = contrib?.contributions.find((c) => c.fieldId === 'style')?.value as string | undefined;
 
+      const candidateId = alb.releaseId || alb.title;
+      this.searchCache.set(candidateId, { genre: genreVal, style: styleVal, title: alb.title, artist: alb.artist });
+
       candidates.push({
-        id: alb.releaseId || alb.title,
+        id: candidateId,
         title: alb.title,
         artist: alb.artist,
         album: alb.title,
@@ -73,21 +77,34 @@ export class GenreWorkflow implements MetadataWorkflow {
     providerId: MetadataProviderId = 'discogs',
     _signal?: AbortSignal
   ): Promise<MetadataPreview> {
-    const release = await this.discogsAdapter.resolveRelease(candidateId);
+    // 1. First check searchCache to eliminate duplicate network calls to Discogs!
     let genreVal: string | undefined;
     let styleVal: string | undefined;
+    let candidateTitle = 'Unknown Release';
+    let candidateArtist = 'Unknown Artist';
 
-    if (release) {
-      const contrib = await this.discogsAdapter.fetchContribution({
-        title: release.album.title,
-        artist: release.album.artist
-      });
+    const cached = this.searchCache.get(candidateId);
+    if (cached) {
+      genreVal = cached.genre;
+      styleVal = cached.style;
+      candidateTitle = cached.title ?? candidateTitle;
+      candidateArtist = cached.artist ?? candidateArtist;
+    } else {
+      // Fallback: resolve release if search cache expired/missed
+      const release = await this.discogsAdapter.resolveRelease(candidateId);
+      if (release) {
+        candidateTitle = release.album.title;
+        candidateArtist = release.album.artist;
 
-      if (contrib) {
-        const g = contrib.contributions.find((c) => c.fieldId === 'genre')?.value as string;
-        const s = contrib.contributions.find((c) => c.fieldId === 'style')?.value as string;
-        if (g) genreVal = g;
-        if (s) styleVal = s;
+        const contrib = await this.discogsAdapter.fetchContribution({
+          title: release.album.title,
+          artist: release.album.artist
+        });
+
+        if (contrib) {
+          genreVal = contrib.contributions.find((c) => c.fieldId === 'genre')?.value as string | undefined;
+          styleVal = contrib.contributions.find((c) => c.fieldId === 'style')?.value as string | undefined;
+        }
       }
     }
 
@@ -108,16 +125,16 @@ export class GenreWorkflow implements MetadataWorkflow {
         },
         confidence: 0.85,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff('genre', 'Genre', local.genre, suggestedGenre, providerId),
-          MetadataDiffBuilder.createFieldDiff('style', 'Style', undefined, suggestedStyle, providerId)
+          MetadataDiffBuilder.createFieldDiff('genre', local.genre, suggestedGenre, providerId, 0.85),
+          MetadataDiffBuilder.createFieldDiff('style', undefined, suggestedStyle, providerId, 0.85)
         ]
       };
     });
 
     const primaryCandidate: WorkflowCandidate = {
       id: candidateId,
-      title: release?.album.title ?? 'Unknown Release',
-      artist: release?.album.artist ?? 'Unknown Artist',
+      title: candidateTitle,
+      artist: candidateArtist,
       genre: genreVal,
       style: styleVal,
       provider: providerId
@@ -131,26 +148,5 @@ export class GenreWorkflow implements MetadataWorkflow {
       supportedFields: this.supportedFields,
       provider: providerId
     };
-  }
-
-  public buildMutations(
-    preview: MetadataPreview,
-    selectedFieldIds?: string[]
-  ): ResourceMutationPayload[] {
-    const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
-
-    return preview.matches.map((m) => ({
-      resourceId: m.localSongId,
-      filePath: m.songPath,
-      fieldMutations: m.fieldDiffs
-        .filter((d) => fieldsToApply.has(d.fieldId) && d.applyField && d.status !== 'unchanged')
-        .map((d) => ({
-          fieldId: d.fieldId,
-          oldValue: d.oldValue,
-          newValue: d.userValue ?? d.suggestedValue,
-          providerId: preview.provider,
-          confidenceScore: m.confidence
-        }))
-    }));
   }
 }

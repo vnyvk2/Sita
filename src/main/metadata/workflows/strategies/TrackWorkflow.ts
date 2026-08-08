@@ -1,18 +1,17 @@
 import type {
-  MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
   MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
+import { BaseMetadataWorkflow } from '../MetadataWorkflow';
 import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
-import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
-export class TrackWorkflow implements MetadataWorkflow {
+export class TrackWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'track';
   public readonly displayName = 'Track Auto Tag';
 
@@ -27,6 +26,7 @@ export class TrackWorkflow implements MetadataWorkflow {
   private readonly mbAdapter: MusicBrainzAdapter;
 
   constructor(mbAdapter: MusicBrainzAdapter) {
+    super();
     this.mbAdapter = mbAdapter;
   }
 
@@ -74,8 +74,8 @@ export class TrackWorkflow implements MetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff('title', 'Title', local.title, suggestedTitle, providerId),
-          MetadataDiffBuilder.createFieldDiff('artist', 'Artist', local.artist, suggestedArtist, providerId)
+          MetadataDiffBuilder.createFieldDiff('title', local.title, suggestedTitle, providerId, 0.9),
+          MetadataDiffBuilder.createFieldDiff('artist', local.artist, suggestedArtist, providerId, 0.9)
         ]
       };
     });
@@ -95,26 +95,5 @@ export class TrackWorkflow implements MetadataWorkflow {
       supportedFields: this.supportedFields,
       provider: providerId
     };
-  }
-
-  public buildMutations(
-    preview: MetadataPreview,
-    selectedFieldIds?: string[]
-  ): ResourceMutationPayload[] {
-    const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
-
-    return preview.matches.map((m) => ({
-      resourceId: m.localSongId,
-      filePath: m.songPath,
-      fieldMutations: m.fieldDiffs
-        .filter((d) => fieldsToApply.has(d.fieldId) && d.applyField && d.status !== 'unchanged')
-        .map((d) => ({
-          fieldId: d.fieldId,
-          oldValue: d.oldValue,
-          newValue: d.userValue ?? d.suggestedValue,
-          providerId: preview.provider,
-          confidenceScore: m.confidence
-        }))
-    }));
   }
 }

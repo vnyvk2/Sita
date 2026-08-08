@@ -1,18 +1,17 @@
 import type {
-  MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
   MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
+import { BaseMetadataWorkflow } from '../MetadataWorkflow';
 import type { AlbumMetadataService } from '../../services/AlbumMetadataService';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { AlbumMetadata, MetadataProviderId } from '../../models/RecordingMetadata';
-import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
-export class AlbumWorkflow implements MetadataWorkflow {
+export class AlbumWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'album';
   public readonly displayName = 'Album Auto Tag';
 
@@ -30,6 +29,7 @@ export class AlbumWorkflow implements MetadataWorkflow {
   private readonly albumMetadataService: AlbumMetadataService;
 
   constructor(albumMetadataService: AlbumMetadataService) {
+    super();
     this.albumMetadataService = albumMetadataService;
   }
 
@@ -90,10 +90,10 @@ export class AlbumWorkflow implements MetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff('title', 'Title', local.title, suggestedTitle, providerId),
-          MetadataDiffBuilder.createFieldDiff('artist', 'Artist', local.artist, suggestedArtist, providerId),
-          MetadataDiffBuilder.createFieldDiff('album', 'Album', local.album, suggestedAlbum, providerId),
-          MetadataDiffBuilder.createFieldDiff('year', 'Year', local.year, suggestedYear, providerId)
+          MetadataDiffBuilder.createFieldDiff('title', local.title, suggestedTitle, providerId),
+          MetadataDiffBuilder.createFieldDiff('artist', local.artist, suggestedArtist, providerId),
+          MetadataDiffBuilder.createFieldDiff('album', local.album, suggestedAlbum, providerId),
+          MetadataDiffBuilder.createFieldDiff('year', local.year, suggestedYear, providerId)
         ]
       };
     });
@@ -115,26 +115,5 @@ export class AlbumWorkflow implements MetadataWorkflow {
       supportedFields: this.supportedFields,
       provider: providerId
     };
-  }
-
-  public buildMutations(
-    preview: MetadataPreview,
-    selectedFieldIds?: string[]
-  ): ResourceMutationPayload[] {
-    const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
-
-    return preview.matches.map((m) => ({
-      resourceId: m.localSongId,
-      filePath: m.songPath,
-      fieldMutations: m.fieldDiffs
-        .filter((d) => fieldsToApply.has(d.fieldId) && d.applyField && d.status !== 'unchanged')
-        .map((d) => ({
-          fieldId: d.fieldId,
-          oldValue: d.oldValue,
-          newValue: d.userValue ?? d.suggestedValue,
-          providerId: preview.provider,
-          confidenceScore: m.confidence
-        }))
-    }));
   }
 }

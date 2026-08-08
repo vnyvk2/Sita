@@ -143,18 +143,36 @@ export class MetadataDiffBuilder {
     };
   }
 
+const FIELD_NAME_MAP: Record<string, string> = {
+  title: 'Title',
+  artist: 'Artist',
+  album: 'Album',
+  year: 'Year',
+  trackNumber: 'Track Number',
+  discNumber: 'Disc Number',
+  genre: 'Genre',
+  style: 'Style',
+  artworkUrl: 'Cover Art',
+  isrc: 'ISRC',
+  musicBrainzRecordingId: 'MusicBrainz ID'
+};
+
   /**
    * Public helper to build a consistent MetadataFieldDiff between old and new values.
    */
   public static createFieldDiff(
     fieldId: MetadataFieldId,
-    fieldName: string,
     oldVal?: string | number,
     newVal?: string | number,
-    providerId?: string
+    providerId?: string,
+    confidenceScore?: number,
+    fieldName?: string
   ): MetadataFieldDiff {
-    const attribution = providerId ? { fieldId, providerId, confidenceScore: 0.9 } : undefined;
-    return this.compareField(fieldId, fieldName, oldVal, newVal, attribution);
+    const resolvedName = fieldName ?? FIELD_NAME_MAP[fieldId] ?? String(fieldId);
+    const attribution = providerId
+      ? { fieldId, providerId, confidenceScore: confidenceScore ?? 0.9 }
+      : undefined;
+    return this.compareField(fieldId, resolvedName, oldVal, newVal, attribution);
   }
 
   private static compareField(

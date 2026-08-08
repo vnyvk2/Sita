@@ -81,3 +81,43 @@ export interface MetadataWorkflow {
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[];
 }
+
+export abstract class BaseMetadataWorkflow implements MetadataWorkflow {
+  public abstract readonly type: WorkflowType;
+  public abstract readonly displayName: string;
+  public abstract readonly supportedFields: WorkflowSupportedField[];
+  public abstract readonly preferredProviders: MetadataProviderId[];
+
+  public abstract search(
+    query: { title?: string; artist?: string; album?: string; limit?: number },
+    signal?: AbortSignal
+  ): Promise<WorkflowCandidate[]>;
+
+  public abstract buildPreview(
+    localSongs: LocalSongInput[],
+    candidateId: string,
+    providerId?: MetadataProviderId,
+    signal?: AbortSignal
+  ): Promise<MetadataPreview>;
+
+  public buildMutations(
+    preview: MetadataPreview,
+    selectedFieldIds?: string[]
+  ): ResourceMutationPayload[] {
+    const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
+
+    return preview.matches.map((m) => ({
+      resourceId: m.localSongId,
+      filePath: m.songPath,
+      fieldMutations: m.fieldDiffs
+        .filter((d) => fieldsToApply.has(d.fieldId) && d.applyField && d.status !== 'unchanged')
+        .map((d) => ({
+          fieldId: d.fieldId,
+          oldValue: d.oldValue,
+          newValue: d.userValue ?? d.suggestedValue,
+          providerId: preview.provider,
+          confidenceScore: m.confidence
+        }))
+    }));
+  }
+}
