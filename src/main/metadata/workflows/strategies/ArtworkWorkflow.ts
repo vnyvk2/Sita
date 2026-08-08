@@ -88,7 +88,13 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
       },
       confidence: 0.9,
       fieldDiffs: [
-        MetadataDiffBuilder.createFieldDiff('artworkUrl', undefined, coverArtUrl, providerId, 0.9)
+        MetadataDiffBuilder.createFieldDiff({
+          fieldId: 'artworkUrl',
+          oldVal: undefined,
+          newVal: coverArtUrl,
+          providerId,
+          confidenceScore: 0.9
+        })
       ]
     }));
 

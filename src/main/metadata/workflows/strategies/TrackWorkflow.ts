@@ -74,8 +74,8 @@ export class TrackWorkflow extends BaseMetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff('title', local.title, suggestedTitle, providerId, 0.9),
-          MetadataDiffBuilder.createFieldDiff('artist', local.artist, suggestedArtist, providerId, 0.9)
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'title', oldVal: local.title, newVal: suggestedTitle, providerId, confidenceScore: 0.9 }),
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'artist', oldVal: local.artist, newVal: suggestedArtist, providerId, confidenceScore: 0.9 })
         ]
       };
     });

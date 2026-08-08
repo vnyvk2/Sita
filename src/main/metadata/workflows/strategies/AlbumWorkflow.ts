@@ -90,10 +90,10 @@ export class AlbumWorkflow extends BaseMetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff('title', local.title, suggestedTitle, providerId),
-          MetadataDiffBuilder.createFieldDiff('artist', local.artist, suggestedArtist, providerId),
-          MetadataDiffBuilder.createFieldDiff('album', local.album, suggestedAlbum, providerId),
-          MetadataDiffBuilder.createFieldDiff('year', local.year, suggestedYear, providerId)
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'title', oldVal: local.title, newVal: suggestedTitle, providerId, confidenceScore: 0.9 }),
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'artist', oldVal: local.artist, newVal: suggestedArtist, providerId, confidenceScore: 0.9 }),
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'album', oldVal: local.album, newVal: suggestedAlbum, providerId, confidenceScore: 0.9 }),
+          MetadataDiffBuilder.createFieldDiff({ fieldId: 'year', oldVal: local.year, newVal: suggestedYear, providerId, confidenceScore: 0.9 })
         ]
       };
     });

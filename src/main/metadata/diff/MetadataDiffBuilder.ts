@@ -5,8 +5,18 @@ import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 import { ProviderRegistry } from '../resolution/ProviderRegistry';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
 import type { MergedCandidateResult, FieldContribution } from '../resolution/MetadataMergeEngine';
+import { getMetadataFieldDisplayName } from '../../../common/metadata/displayNames';
 
 const globalProviderRegistry = new ProviderRegistry();
+
+export interface CreateFieldDiffOptions {
+  fieldId: MetadataFieldId;
+  oldVal?: string | number;
+  newVal?: string | number;
+  providerId?: string;
+  confidenceScore?: number;
+  fieldName?: string;
+}
 
 export class MetadataDiffBuilder {
   /**
@@ -143,36 +153,37 @@ export class MetadataDiffBuilder {
     };
   }
 
-const FIELD_NAME_MAP: Record<string, string> = {
-  title: 'Title',
-  artist: 'Artist',
-  album: 'Album',
-  year: 'Year',
-  trackNumber: 'Track Number',
-  discNumber: 'Disc Number',
-  genre: 'Genre',
-  style: 'Style',
-  artworkUrl: 'Cover Art',
-  isrc: 'ISRC',
-  musicBrainzRecordingId: 'MusicBrainz ID'
-};
-
   /**
    * Public helper to build a consistent MetadataFieldDiff between old and new values.
+   * Supports both object-style options parameter and legacy positional arguments.
    */
   public static createFieldDiff(
-    fieldId: MetadataFieldId,
+    optionsOrFieldId: MetadataFieldId | CreateFieldDiffOptions,
     oldVal?: string | number,
     newVal?: string | number,
     providerId?: string,
     confidenceScore?: number,
     fieldName?: string
   ): MetadataFieldDiff {
-    const resolvedName = fieldName ?? FIELD_NAME_MAP[fieldId] ?? String(fieldId);
-    const attribution = providerId
-      ? { fieldId, providerId, confidenceScore: confidenceScore ?? 0.9 }
+    let opts: CreateFieldDiffOptions;
+    if (typeof optionsOrFieldId === 'object') {
+      opts = optionsOrFieldId;
+    } else {
+      opts = {
+        fieldId: optionsOrFieldId,
+        oldVal,
+        newVal,
+        providerId,
+        confidenceScore,
+        fieldName
+      };
+    }
+
+    const resolvedName = opts.fieldName ?? getMetadataFieldDisplayName(opts.fieldId);
+    const attribution = opts.providerId
+      ? { fieldId: opts.fieldId, providerId: opts.providerId, providerName: opts.providerId, confidenceScore: opts.confidenceScore ?? 0.9 }
       : undefined;
-    return this.compareField(fieldId, resolvedName, oldVal, newVal, attribution);
+    return this.compareField(opts.fieldId, resolvedName, opts.oldVal, opts.newVal, attribution);
   }
 
   private static compareField(
