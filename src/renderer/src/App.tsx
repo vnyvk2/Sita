@@ -5,7 +5,7 @@ import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
 // ? MAIN APP COMPONENTS
 import ErrorBoundary from './components/ErrorBoundary';
-import { AlbumAutoTagDialog } from './components/autotag/AlbumAutoTagDialog';
+import { MetadataCenterDialog } from './components/metadatacenter/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';
@@ -397,7 +397,7 @@ export default function App() {
           onDrop={windowManagement.onSongDrop}
         >
           <Outlet />
-          <AlbumAutoTagDialog
+          <MetadataCenterDialog
             isOpen={autoTagState.isOpen}
             localSongs={autoTagState.songs}
             initialAlbumName={autoTagState.albumName}
