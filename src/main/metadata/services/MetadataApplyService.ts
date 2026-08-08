@@ -222,19 +222,17 @@ export class MetadataApplyService {
 
       const payloadTags: Partial<TagWritePayload> = {
         filePath: match.songPath,
-        album: albumTitle,
         artworkBuffer
       };
 
       const updatedSnapshot: SongMetadataSnapshot = {
-        ...previousSnapshot,
-        album: albumTitle
+        ...previousSnapshot
       };
 
       for (const diff of match.fieldDiffs) {
         if (!diff.applyField) continue;
         const val = diff.userValue !== undefined ? diff.userValue : diff.suggestedValue;
-        if (val === undefined || val === null) continue;
+        if (val === undefined || val === null || String(val).trim() === '') continue;
 
         switch (diff.fieldId) {
           case 'title':
