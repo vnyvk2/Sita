@@ -95,12 +95,29 @@ export const songQuery = createQueryKeys('songs', {
         })
     };
   },
-  history: (data: { sortType: SongSortTypes; start?: number; end?: number; limit?: number }) => {
-    const { sortType = 'addedOrder', start = 0, end = 0, limit } = data;
+  history: (data: {
+    sortType: SongSortTypes;
+    period?: HistoryPeriod;
+    limit?: number;
+    start?: number;
+    end?: number;
+  }) => {
+    const { sortType = 'addedOrder', period = 'all', limit, start = 0, end = 0 } = data;
 
     return {
-      queryKey: [`sortType=${sortType}`, `start=${start}`, `end=${end}`, `limit=${limit}`],
-      queryFn: () => window.api.audioLibraryControls.getAllHistorySongs(sortType, { start, end })
+      queryKey: [
+        `sortType=${sortType}`,
+        `period=${period}`,
+        `limit=${limit}`,
+        `start=${start}`,
+        `end=${end}`
+      ],
+      queryFn: () =>
+        window.api.audioLibraryControls.getAllHistorySongs(
+          sortType,
+          { start, end },
+          { period, limit }
+        )
     };
   }
 });
