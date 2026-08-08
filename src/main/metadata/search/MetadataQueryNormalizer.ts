@@ -11,10 +11,17 @@ export interface NormalizedQuery {
 
 export class MetadataQueryNormalizer {
   private static readonly NOISE_PATTERNS = [
+    // Remaster tags
     /\s*[\(\[]\s*(?:remastered|remaster|re-mastered|20\d\d remaster|19\d\d remaster)\s*[\)\]]/gi,
+    // Explicit/Clean indicators
     /\s*[\(\[]\s*(?:explicit|clean)\s*[\)\]]/gi,
+    // Featured artists
     /\s*[\(\[]\s*feat\.\s+[^\)\]]+[\)\]]/gi,
-    /\s*[\(\[]\s*ft\.\s+[^\)\]]+[\)\]]/gi
+    /\s*[\(\[]\s*ft\.\s+[^\)\]]+[\)\]]/gi,
+    // Edition suffixes — deluxe, expanded, anniversary, special, bonus, platinum, super deluxe
+    /\s*[\(\[]\s*(?:deluxe|deluxe\s+edition|super\s+deluxe|expanded\s+edition|special\s+edition|anniversary\s+edition|platinum\s+edition|bonus\s+track(?:s)?(?:\s+edition)?|collector'?s?\s+edition|limited\s+edition)\s*[\)\]]/gi,
+    // Standalone " - Deluxe Edition" or " - Remastered" without brackets
+    /\s+-\s+(?:deluxe|deluxe\s+edition|remastered|expanded\s+edition|special\s+edition|anniversary\s+edition)\s*$/gi
   ];
 
   public static normalize(title: string, artist?: string): NormalizedQuery {

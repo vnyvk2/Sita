@@ -45,7 +45,7 @@ import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 import { PlatformBootstrap } from '../platform/PlatformBootstrap';
 import { RateLimiter, RetryPolicy, RequestPipeline } from '../platform/networking';
 import updateSongId3Tags from '../updateSong/updateSongId3Tags';
-import { getSongById } from '../db/queries/songs';
+import { SongMetadataBuilder } from './transactions/SongMetadataBuilder';
 import { IdentityResolutionCache } from './cache/IdentityResolutionCache';
 import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter';
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
@@ -204,52 +204,7 @@ export class MetadataBootstrap {
     const albumMetadataService = new AlbumMetadataService(providerRuntime);
     const applyService = new MetadataApplyService({
       dbUpdater: async (songId, data) => {
-        // Read current complete song state from database
-        const currentSong = await getSongById(songId);
-        if (!currentSong) {
-          throw new Error(`[dbUpdater] Song with id ${songId} not found in database`);
-        }
-
-        // Build COMPLETE SongTags by merging changed fields onto current state.
-        // This prevents the "undefined = remove" bug where partial field maps
-        // caused albums/artists/genres to be unlinked and deleted.
-        const currentArtists: SongTagsArtistData[] =
-          currentSong.artists?.map((a) => ({
-            artistId: a.artist.id,
-            name: a.artist.name
-          })) ?? [];
-
-        const currentAlbums: SongTagsAlbumData[] =
-          currentSong.albums?.map((a) => ({
-            albumId: a.album.id,
-            title: a.album.title
-          })) ?? [];
-
-        const currentGenres: SongTagsGenreData[] =
-          currentSong.genres?.map((g) => ({
-            genreId: g.genre.id,
-            name: g.genre.name
-          })) ?? [];
-
-        const completeTags: SongTags = {
-          title: data.title ?? currentSong.title,
-          duration: parseFloat(String(currentSong.duration ?? 0)),
-          artists:
-            data.artist !== undefined
-              ? [{ name: data.artist }]
-              : currentArtists,
-          albums:
-            data.album !== undefined
-              ? [{ title: data.album }]
-              : currentAlbums,
-          genres:
-            data.genre !== undefined
-              ? [{ name: data.genre }]
-              : currentGenres,
-          releasedYear: data.year ?? currentSong.year ?? undefined,
-          trackNumber: data.trackNumber ?? currentSong.trackNumber ?? undefined
-        };
-
+        const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
         await updateSongId3Tags(songId, completeTags, true, true);
       }
     });

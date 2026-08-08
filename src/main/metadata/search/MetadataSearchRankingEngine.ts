@@ -23,6 +23,8 @@ export interface SearchRankingWeights {
   compilationPenalty: number;
   livePenalty: number;
   trackCountMatch: number;
+  editionBoost: number;
+  remasterBoost: number;
 }
 
 export const DEFAULT_RANKING_WEIGHTS: SearchRankingWeights = {
@@ -34,7 +36,9 @@ export const DEFAULT_RANKING_WEIGHTS: SearchRankingWeights = {
   primaryTypeEP: 10,
   compilationPenalty: -15,
   livePenalty: -15,
-  trackCountMatch: 10
+  trackCountMatch: 10,
+  editionBoost: 12,
+  remasterBoost: 10
 };
 
 export interface ScoredSearchCandidate {
@@ -48,6 +52,7 @@ export interface ScoredSearchCandidate {
     primaryTypeScore: number;
     secondaryTypePenalty: number;
     trackCountBonus: number;
+    editionBoost: number;
   };
 }
 
@@ -120,7 +125,32 @@ export class MetadataSearchRankingEngine {
       trackCountBonus = weights.trackCountMatch;
     }
 
-    const totalScore = baseScore + artistScore + titleScore + statusScore + primaryTypeScore + secondaryTypePenalty + trackCountBonus;
+    // 8. Edition-Aware Scoring
+    // When the user explicitly searched for an edition (deluxe, remastered, etc.),
+    // boost candidates whose titles match that edition intent.
+    let editionBoost = 0;
+    const candTitleLower = cand.title?.toLowerCase() ?? '';
+
+    if (query.isDeluxeRequested) {
+      const hasDeluxeKeyword =
+        candTitleLower.includes('deluxe') ||
+        candTitleLower.includes('expanded') ||
+        candTitleLower.includes('bonus') ||
+        candTitleLower.includes('platinum') ||
+        candTitleLower.includes('anniversary') ||
+        candTitleLower.includes('special edition');
+      if (hasDeluxeKeyword) {
+        editionBoost += weights.editionBoost;
+      }
+    }
+
+    if (query.isRemasterRequested) {
+      if (candTitleLower.includes('remaster') || candTitleLower.includes('re-master')) {
+        editionBoost += weights.remasterBoost;
+      }
+    }
+
+    const totalScore = baseScore + artistScore + titleScore + statusScore + primaryTypeScore + secondaryTypePenalty + trackCountBonus + editionBoost;
 
     return {
       candidate: cand,
@@ -132,7 +162,8 @@ export class MetadataSearchRankingEngine {
         statusScore,
         primaryTypeScore,
         secondaryTypePenalty,
-        trackCountBonus
+        trackCountBonus,
+        editionBoost
       }
     };
   }

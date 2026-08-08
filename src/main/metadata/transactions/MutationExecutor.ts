@@ -1,4 +1,3 @@
-import type { TagWriterService } from '../services/TagWriterService';
 import type { LibraryRelationalSyncService } from './LibraryRelationalSyncService';
 
 export interface ExecuteMutationOptions {
@@ -14,20 +13,24 @@ export interface MutationExecutionResult {
   warning?: string;
 }
 
+/**
+ * MutationExecutor — executes a single metadata mutation for one song.
+ *
+ * Persistence owner: updateSongId3Tags (called via LibraryRelationalSyncService.dbUpdater)
+ * handles BOTH disk writes (ID3 tags) and database relational sync.
+ *
+ * TagWriterService was intentionally removed from this path to establish
+ * a single persistence owner and avoid double disk writes.
+ */
 export class MutationExecutor {
-  private readonly tagWriter: TagWriterService;
   private readonly relationalSync: LibraryRelationalSyncService;
 
-  constructor(tagWriter: TagWriterService, relationalSync: LibraryRelationalSyncService) {
-    this.tagWriter = tagWriter;
+  constructor(relationalSync: LibraryRelationalSyncService) {
     this.relationalSync = relationalSync;
   }
 
   public async executeSingleMutation(options: ExecuteMutationOptions): Promise<MutationExecutionResult> {
     try {
-      // Single persistence owner: updateSongId3Tags (called via relationalSync.dbUpdater)
-      // handles BOTH disk writes (ID3 tags) and database relational sync.
-      // TagWriterService is intentionally NOT used here to avoid double disk writes.
       const syncResult = await this.relationalSync.syncRelationalDatabase(
         options.songId,
         options.filePath,

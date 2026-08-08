@@ -136,12 +136,26 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     const SEARCH_BUFFER = 25;
     const normQuery = MetadataQueryNormalizer.normalize(album, artist);
 
-    const queryParts: string[] = [`release:"${album}"`];
+    // Use cleanTitle for Lucene query to handle editions like "Deluxe", "Remastered", etc.
+    // MusicBrainz indexes the base release title, so searching with edition suffixes
+    // often produces poor or no results.
+    const searchTitle = normQuery.cleanTitle || album;
+    const queryParts: string[] = [`release:"${searchTitle}"`];
     if (normQuery.cleanArtist) {
       queryParts.push(`artist:"${normQuery.cleanArtist}"`);
     }
 
-    const rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER);
+    let rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER);
+
+    // Fallback: if clean title search returned nothing and we stripped edition info,
+    // retry with the original raw title
+    if (rawReleases.length === 0 && searchTitle !== album) {
+      const fallbackParts: string[] = [`release:"${album}"`];
+      if (normQuery.cleanArtist) {
+        fallbackParts.push(`artist:"${normQuery.cleanArtist}"`);
+      }
+      rawReleases = await this.apiClient.searchReleases(fallbackParts.join(' AND '), SEARCH_BUFFER);
+    }
 
     const searchCandidates = rawReleases.map((rel) => ({
       id: rel.id,

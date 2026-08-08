@@ -1,6 +1,5 @@
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { UndoToken } from '../domain/UndoToken';
-import { TagWriterService } from '../services/TagWriterService';
 import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
 import { ArtworkDownloaderService } from './ArtworkDownloaderService';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
@@ -26,7 +25,6 @@ export interface TransactionResult {
 }
 
 export class MetadataTransactionManager {
-  private readonly tagWriter: TagWriterService;
   private readonly relationalSync: LibraryRelationalSyncService;
   private readonly artworkDownloader: ArtworkDownloaderService;
   private readonly cacheInvalidator: ArtworkCacheInvalidator;
@@ -34,16 +32,14 @@ export class MetadataTransactionManager {
   private readonly mutationExecutor: MutationExecutor;
 
   constructor(options?: {
-    tagWriter?: TagWriterService;
     dbUpdater?: SongDbUpdater;
     historyService?: MetadataHistoryService;
   }) {
-    this.tagWriter = options?.tagWriter ?? new TagWriterService();
     this.relationalSync = new LibraryRelationalSyncService(options?.dbUpdater);
     this.artworkDownloader = new ArtworkDownloaderService();
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
-    this.mutationExecutor = new MutationExecutor(this.tagWriter, this.relationalSync);
+    this.mutationExecutor = new MutationExecutor(this.relationalSync);
   }
 
   /**
