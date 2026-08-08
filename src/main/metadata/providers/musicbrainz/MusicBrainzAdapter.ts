@@ -12,6 +12,8 @@ import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzRelease
 import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
 
 import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
+import { MetadataQueryNormalizer } from '../../search/MetadataQueryNormalizer';
+import { MetadataSearchRankingEngine } from '../../search/MetadataSearchRankingEngine';
 
 export interface MusicBrainzAdapterOptions {
   matcher?: MetadataMatcher;
@@ -125,13 +127,20 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       if (cached) return cached;
     }
 
-    const queryParts: string[] = [`release:"${album}"`];
-    if (artist) {
-      queryParts.push(`artist:"${artist}"`);
-    }
+    const SEARCH_BUFFER = 25;
+    const normQuery = MetadataQueryNormalizer.normalize(album, artist);
 
-    const releases = await this.apiClient.searchReleases(queryParts.join(' AND '), limit);
-    const results: AlbumMetadata[] = releases.map((rel) => this.releaseMapper.toAlbumMetadata(rel, artist));
+    const queryParts: string[] = [`release:"${normQuery.cleanTitle}"`];
+    if (normQuery.cleanArtist) {
+      queryParts.push(`artist:"${normQuery.cleanArtist}"`);
+    }
+    queryParts.push('(status:official OR status:*)');
+
+    const rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER);
+    const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(rawReleases, normQuery);
+    const topReleases = rankedCandidates.slice(0, limit).map((c) => c.release);
+
+    const results: AlbumMetadata[] = topReleases.map((rel) => this.releaseMapper.toAlbumMetadata(rel, artist));
 
     if (this.cache && results.length > 0) {
       this.cache.set(this.identity.id, cacheKey, results);
