@@ -513,7 +513,14 @@ declare global {
     subFolders: SavedMusicFolder[];
   }
 
-  // ? LocalStorage related types
+  type ThemePreset = 'default' | 'nord' | 'emerald' | 'dracula';
+
+  interface VisibleSideTabs {
+    genres: boolean;
+    folders: boolean;
+    artists: boolean;
+    albums: boolean;
+  }
 
   interface Preferences {
     seekbarScrollInterval: number;
@@ -537,6 +544,8 @@ declare global {
     enableImageBasedDynamicThemes: boolean;
     autoTranslateLyrics: boolean;
     autoConvertLyrics: boolean;
+    visibleSideTabs?: VisibleSideTabs;
+    themePreset?: ThemePreset;
   }
 
   interface CurrentSong {
