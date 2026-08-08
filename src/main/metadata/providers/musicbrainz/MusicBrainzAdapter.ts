@@ -277,6 +277,32 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     return this.recordingMapper.toProviderResult(recordingToMap, confidenceScore) as ProviderResult<TDTO>;
   }
 
+  public async searchRecordings(title: string, artist?: string, limit = 10): Promise<Array<{ id: string; title: string; artist?: string; album?: string; year?: number; confidenceScore?: number }>> {
+    const query = artist ? `recording:"${title}" AND artist:"${artist}"` : `recording:"${title}"`;
+    const recordings = await this.apiClient.searchRecordings(query, limit);
+
+    return recordings.map((r) => ({
+      id: r.id,
+      title: r.title,
+      artist: r['artist-credit']?.[0]?.name ?? r['artist-credit']?.[0]?.artist?.name,
+      album: r.releases?.[0]?.title,
+      year: r.releases?.[0]?.date ? parseInt(r.releases[0].date.substring(0, 4), 10) : undefined,
+      confidenceScore: typeof r.score === 'number' ? r.score / 100 : 0.8
+    }));
+  }
+
+  public async resolveRecording(recordingId: string): Promise<{ id: string; title: string; artist?: string; trackNumber?: number } | null> {
+    if (!recordingId) return null;
+    const details = await this.apiClient.getRecordingById(recordingId);
+    if (!details) return null;
+
+    return {
+      id: details.id,
+      title: details.title,
+      artist: details['artist-credit']?.[0]?.name ?? details['artist-credit']?.[0]?.artist?.name
+    };
+  }
+
   public async search<TDTO = unknown>(query: string, options?: Record<string, unknown>): Promise<ProviderResult<TDTO>[]> {
     const limit = (options?.limit as number) ?? 10;
     const candidates = await this.apiClient.searchRecordings(query, limit);

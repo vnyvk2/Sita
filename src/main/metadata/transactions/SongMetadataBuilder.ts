@@ -20,9 +20,11 @@ export interface MetadataFieldChanges {
   artist?: string;
   album?: string;
   genre?: string;
+  style?: string;
   year?: number;
   trackNumber?: number;
   discNumber?: number;
+  artworkPath?: string;
 }
 
 export class SongMetadataBuilder {
@@ -75,14 +77,15 @@ export class SongMetadataBuilder {
           ? SongMetadataBuilder.mergeAlbum(changes.album, currentAlbums)
           : currentAlbums,
 
-      // Genres: preserve existing IDs when name hasn't changed
+      // Genres & Styles: preserve existing IDs when names haven't changed
       genres:
-        changes.genre !== undefined
-          ? SongMetadataBuilder.mergeGenre(changes.genre, currentGenres)
+        changes.genre !== undefined || changes.style !== undefined
+          ? SongMetadataBuilder.mergeGenresAndStyles(changes.genre, changes.style, currentGenres)
           : currentGenres,
 
       releasedYear: changes.year ?? currentSong.year ?? undefined,
-      trackNumber: changes.trackNumber ?? currentSong.trackNumber ?? undefined
+      trackNumber: changes.trackNumber ?? currentSong.trackNumber ?? undefined,
+      artworkPath: changes.artworkPath ?? undefined
     };
   }
 
@@ -121,19 +124,34 @@ export class SongMetadataBuilder {
   }
 
   /**
-   * Merge genre change: if the name matches an existing genre, preserve the ID.
-   * Otherwise return a new entry that will trigger find-or-create.
+   * Merge genre & style changes: preserves existing IDs when names match,
+   * combining both genre and style strings into the SongTagsGenreData array.
    */
-  private static mergeGenre(
-    newName: string,
+  private static mergeGenresAndStyles(
+    genreStr: string | undefined,
+    styleStr: string | undefined,
     currentGenres: SongTagsGenreData[]
   ): SongTagsGenreData[] {
-    const existing = currentGenres.find(
-      (g) => g.name.toLowerCase() === newName.toLowerCase()
-    );
-    if (existing) {
-      return [existing];
+    const rawNames: string[] = [];
+
+    if (genreStr) {
+      rawNames.push(...genreStr.split(',').map((s) => s.trim()).filter(Boolean));
     }
-    return [{ name: newName }];
+    if (styleStr) {
+      rawNames.push(...styleStr.split(',').map((s) => s.trim()).filter(Boolean));
+    }
+
+    const uniqueNames = Array.from(new Set(rawNames));
+    if (uniqueNames.length === 0) return currentGenres;
+
+    return uniqueNames.map((name) => {
+      const existing = currentGenres.find(
+        (g) => g.name.toLowerCase() === name.toLowerCase()
+      );
+      if (existing) {
+        return existing;
+      }
+      return { name };
+    });
   }
 }

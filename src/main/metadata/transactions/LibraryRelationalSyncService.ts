@@ -7,9 +7,11 @@ export type SongDbUpdater = (
     artist?: string;
     album?: string;
     genre?: string;
+    style?: string;
     year?: number;
     trackNumber?: number;
     discNumber?: number;
+    artworkPath?: string;
   }
 ) => Promise<unknown>;
 
@@ -41,9 +43,11 @@ export class LibraryRelationalSyncService {
           artist: fieldMutations.artist as string | undefined,
           album: fieldMutations.album as string | undefined,
           genre: fieldMutations.genre as string | undefined,
+          style: fieldMutations.style as string | undefined,
           year: fieldMutations.year as number | undefined,
           trackNumber: fieldMutations.trackNumber as number | undefined,
-          discNumber: fieldMutations.discNumber as number | undefined
+          discNumber: fieldMutations.discNumber as number | undefined,
+          artworkPath: fieldMutations.artworkPath as string | undefined
         });
         return { success: true, fallbackUsed: false };
       } catch (err: unknown) {

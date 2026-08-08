@@ -704,6 +704,18 @@ export const api = {
         ipcRenderer.removeListener('metadata/progress', listener);
       };
     }
+  },
+  metadataWorkflow: {
+    search: (workflowType: string, query: { title?: string; artist?: string; album?: string; limit?: number }, operationId?: string) =>
+      ipcRenderer.invoke('metadata/workflow/search', workflowType, query, operationId),
+    buildPreview: (workflowType: string, localSongs: unknown[], candidateId: string, providerId?: string, operationId?: string) =>
+      ipcRenderer.invoke('metadata/workflow/buildPreview', workflowType, localSongs, candidateId, providerId, operationId),
+    applyPreview: (workflowType: string, preview: unknown, selectedFieldIds?: string[], options?: unknown, operationId?: string) =>
+      ipcRenderer.invoke('metadata/workflow/applyPreview', workflowType, preview, selectedFieldIds, options, operationId),
+    undo: (operationId?: string) =>
+      ipcRenderer.invoke('metadata/workflow/undo', operationId),
+    cancel: (operationId?: string) =>
+      ipcRenderer.invoke('metadata/workflow/cancel', operationId)
   }
 };
 

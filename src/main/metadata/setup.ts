@@ -63,6 +63,12 @@ import { AlbumAutoTagService } from './services/AlbumAutoTagService';
 import { AlbumMetadataService } from './services/AlbumMetadataService';
 import { MetadataApplyService } from './services/MetadataApplyService';
 import { UserMetadataService } from './services/UserMetadataService';
+import { MetadataWorkflowService } from './services/MetadataWorkflowService';
+import { AlbumWorkflow } from './workflows/strategies/AlbumWorkflow';
+import { GenreWorkflow } from './workflows/strategies/GenreWorkflow';
+import { ArtworkWorkflow } from './workflows/strategies/ArtworkWorkflow';
+import { TrackWorkflow } from './workflows/strategies/TrackWorkflow';
+import { MetadataTransactionManager } from './transactions/MetadataTransactionManager';
 
 export interface MetadataContainer {
   engine: MetadataEngine;
@@ -105,6 +111,7 @@ export interface MetadataContainer {
     userService: UserMetadataService;
     albumMetadataService: AlbumMetadataService;
     autoTagService: AlbumAutoTagService;
+    workflowService: MetadataWorkflowService;
     applyService: MetadataApplyService;
   };
   resolution: {
@@ -244,6 +251,22 @@ export class MetadataBootstrap {
       resolutionManager
     });
 
+    const transactionManager = new MetadataTransactionManager({
+      dbUpdater: async (songId, data) => {
+        const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
+        await updateSongId3Tags(songId, completeTags, true, true);
+      }
+    });
+
+    const workflowService = new MetadataWorkflowService({
+      transactionManager
+    });
+
+    workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
+    workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
+    workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter));
+    workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter));
+
     const providerMergePolicy = new DefaultMetadataMergePolicy();
     const planner = new MetadataQueryPlanner(repository);
 
@@ -332,6 +355,7 @@ export class MetadataBootstrap {
         userService,
         albumMetadataService,
         autoTagService,
+        workflowService,
         applyService
       },
       resolution: {

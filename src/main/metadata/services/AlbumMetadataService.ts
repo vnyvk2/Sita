@@ -12,6 +12,8 @@ export interface LocalSongInput {
   duration?: number;
   isrc?: string;
   musicBrainzRecordingId?: string;
+  genre?: string;
+  trackNumber?: number;
 }
 
 export interface ScoreBreakdown {
@@ -84,6 +86,10 @@ export class AlbumMetadataService implements IAlbumMetadataService {
       throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime instance.');
     }
     return this.runtime.searchAlbums(albumName, artistName, limit);
+  }
+
+  public async searchAlbums(albumName: string, artistName?: string, limit = 10): Promise<AlbumMetadata[]> {
+    return this.search(albumName, artistName, limit);
   }
 
   /**
