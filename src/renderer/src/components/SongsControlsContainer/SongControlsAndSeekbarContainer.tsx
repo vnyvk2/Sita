@@ -3,10 +3,10 @@ import { useStore } from '@tanstack/react-store';
 import { useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
+import LyricsIcon from '../Icons/LyricsIcon';
 import NavLink from '../NavLink';
 import SeekBarContainer from './SeekBarContainer';
 
@@ -121,11 +121,7 @@ const SongControlsAndSeekbarContainer = () => {
           className={`lyrics-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent [&.active]:after:opacity-100`}
           title={t('player.lyrics')}
         >
-          <img
-            src={CustomLyricsIcon}
-            className="h-6 w-6 opacity-60 transition-opacity group-[.active]:opacity-100 hover:opacity-80"
-            alt="Lyrics"
-          />
+          <LyricsIcon className="h-6 w-6 opacity-60 transition-opacity group-[.active]:text-font-color-highlight group-[.active]:opacity-100 dark:group-[.active]:text-dark-font-color-highlight hover:opacity-80" />
         </NavLink>
       </div>
       <SeekBarContainer />

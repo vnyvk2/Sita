@@ -27,16 +27,18 @@ const ContextMenuItem = (props: ContextMenuItem) => {
           }
         }}
       >
-        <div className="flex items-center">
+        <div className="flex min-w-0 flex-1 items-center">
           {props.iconName && (
-            <span className={`material-icons-round icon mr-4 text-lg ${props.iconClassName}`}>
+            <span
+              className={`material-icons-round icon mr-3 text-lg shrink-0 ${props.iconClassName || ''}`}
+            >
               {props.iconName}
             </span>
-          )}{' '}
-          {props.label}
+          )}
+          <span className="flex-1 leading-snug break-words">{props.label}</span>
         </div>
         {hasInnerMenus && (
-          <span className="material-icons-round ml-4 text-lg opacity-50">
+          <span className="material-icons-round ml-2 text-lg shrink-0 opacity-50">
             {isExpanded ? 'expand_less' : 'expand_more'}
           </span>
         )}
