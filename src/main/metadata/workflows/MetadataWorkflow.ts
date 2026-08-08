@@ -1,6 +1,7 @@
 import type { MetadataProviderId } from '../models/RecordingMetadata';
 import type { LocalSongInput } from '../services/AlbumMetadataService';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
+import type { MetadataFieldDiff } from '@common/metadata/types';
 
 export type WorkflowType = 'album' | 'track' | 'genre' | 'artwork';
 
@@ -22,17 +23,8 @@ export interface WorkflowCandidate {
   coverArtUrl?: string;
   provider: MetadataProviderId;
   confidenceScore?: number;
+  metadata?: Record<string, unknown>;
   rawItem?: unknown;
-}
-
-export interface WorkflowFieldDiff {
-  fieldId: string;
-  oldValue?: string | number;
-  suggestedValue?: string | number;
-  userValue?: string | number;
-  status: 'unchanged' | 'changed' | 'added' | 'removed';
-  applyField: boolean;
-  providerId?: MetadataProviderId;
 }
 
 export interface WorkflowMatch {
@@ -50,17 +42,21 @@ export interface WorkflowMatch {
     trackNumber?: number;
   };
   confidence: number;
-  fieldDiffs: WorkflowFieldDiff[];
+  fieldDiffs: MetadataFieldDiff[];
 }
 
-export interface WorkflowPreview {
+export interface MetadataPreview {
   workflowType: WorkflowType;
   primaryCandidate?: WorkflowCandidate;
   candidates: WorkflowCandidate[];
   matches: WorkflowMatch[];
   supportedFields: WorkflowSupportedField[];
   provider: MetadataProviderId;
+  warnings?: string[];
+  overallConfidence?: number;
 }
+
+export type WorkflowPreview = MetadataPreview;
 
 export interface MetadataWorkflow {
   readonly type: WorkflowType;
@@ -78,10 +74,10 @@ export interface MetadataWorkflow {
     candidateId: string,
     providerId?: MetadataProviderId,
     signal?: AbortSignal
-  ): Promise<WorkflowPreview>;
+  ): Promise<MetadataPreview>;
 
   buildMutations(
-    preview: WorkflowPreview,
+    preview: MetadataPreview,
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[];
 }

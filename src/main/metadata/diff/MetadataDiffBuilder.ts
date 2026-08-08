@@ -143,6 +143,20 @@ export class MetadataDiffBuilder {
     };
   }
 
+  /**
+   * Public helper to build a consistent MetadataFieldDiff between old and new values.
+   */
+  public static createFieldDiff(
+    fieldId: MetadataFieldId,
+    fieldName: string,
+    oldVal?: string | number,
+    newVal?: string | number,
+    providerId?: string
+  ): MetadataFieldDiff {
+    const attribution = providerId ? { fieldId, providerId, confidenceScore: 0.9 } : undefined;
+    return this.compareField(fieldId, fieldName, oldVal, newVal, attribution);
+  }
+
   private static compareField(
     fieldId: MetadataFieldId,
     fieldName: string,

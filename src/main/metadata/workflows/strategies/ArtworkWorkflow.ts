@@ -2,7 +2,7 @@ import type {
   MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
-  WorkflowPreview,
+  MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
@@ -11,6 +11,7 @@ import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class ArtworkWorkflow implements MetadataWorkflow {
   public readonly type: WorkflowType = 'artwork';
@@ -64,7 +65,7 @@ export class ArtworkWorkflow implements MetadataWorkflow {
     candidateId: string,
     providerId: MetadataProviderId = 'discogs',
     _signal?: AbortSignal
-  ): Promise<WorkflowPreview> {
+  ): Promise<MetadataPreview> {
     let coverArtUrl: string | undefined;
 
     if (providerId === 'coverartarchive') {
@@ -87,14 +88,7 @@ export class ArtworkWorkflow implements MetadataWorkflow {
       },
       confidence: 0.9,
       fieldDiffs: [
-        {
-          fieldId: 'artworkUrl',
-          oldValue: undefined,
-          suggestedValue: coverArtUrl,
-          status: coverArtUrl ? 'added' : 'unchanged',
-          applyField: Boolean(coverArtUrl),
-          providerId
-        }
+        MetadataDiffBuilder.createFieldDiff('artworkUrl', 'Cover Art', undefined, coverArtUrl, providerId)
       ]
     }));
 
@@ -116,7 +110,7 @@ export class ArtworkWorkflow implements MetadataWorkflow {
   }
 
   public buildMutations(
-    preview: WorkflowPreview,
+    preview: MetadataPreview,
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[] {
     const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));

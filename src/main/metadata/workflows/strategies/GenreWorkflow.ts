@@ -2,7 +2,7 @@ import type {
   MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
-  WorkflowPreview,
+  MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
@@ -10,6 +10,7 @@ import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class GenreWorkflow implements MetadataWorkflow {
   public readonly type: WorkflowType = 'genre';
@@ -58,7 +59,8 @@ export class GenreWorkflow implements MetadataWorkflow {
         style: styleVal,
         coverArtUrl: alb.artwork?.primaryPath || alb.artwork?.onlineUrls?.[0],
         provider: 'discogs',
-        confidenceScore: 0.85
+        confidenceScore: 0.85,
+        rawItem: { album: alb, contrib }
       });
     }
 
@@ -70,7 +72,7 @@ export class GenreWorkflow implements MetadataWorkflow {
     candidateId: string,
     providerId: MetadataProviderId = 'discogs',
     _signal?: AbortSignal
-  ): Promise<WorkflowPreview> {
+  ): Promise<MetadataPreview> {
     const release = await this.discogsAdapter.resolveRelease(candidateId);
     let genreVal: string | undefined;
     let styleVal: string | undefined;
@@ -90,8 +92,8 @@ export class GenreWorkflow implements MetadataWorkflow {
     }
 
     const matches: WorkflowMatch[] = localSongs.map((local) => {
-      const genreDiffers = local.genre !== genreVal;
-      const styleDiffers = Boolean(styleVal);
+      const suggestedGenre = genreVal ?? local.genre;
+      const suggestedStyle = styleVal;
 
       return {
         localSongId: Number(local.songId),
@@ -101,27 +103,13 @@ export class GenreWorkflow implements MetadataWorkflow {
           title: local.title,
           artist: local.artist,
           album: local.album,
-          genre: genreVal ?? local.genre,
-          style: styleVal
+          genre: suggestedGenre,
+          style: suggestedStyle
         },
         confidence: 0.85,
         fieldDiffs: [
-          {
-            fieldId: 'genre',
-            oldValue: local.genre,
-            suggestedValue: genreVal ?? local.genre,
-            status: genreDiffers ? 'changed' : 'unchanged',
-            applyField: genreDiffers,
-            providerId
-          },
-          {
-            fieldId: 'style',
-            oldValue: undefined,
-            suggestedValue: styleVal,
-            status: styleDiffers ? 'added' : 'unchanged',
-            applyField: styleDiffers,
-            providerId
-          }
+          MetadataDiffBuilder.createFieldDiff('genre', 'Genre', local.genre, suggestedGenre, providerId),
+          MetadataDiffBuilder.createFieldDiff('style', 'Style', undefined, suggestedStyle, providerId)
         ]
       };
     });
@@ -146,7 +134,7 @@ export class GenreWorkflow implements MetadataWorkflow {
   }
 
   public buildMutations(
-    preview: WorkflowPreview,
+    preview: MetadataPreview,
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[] {
     const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));

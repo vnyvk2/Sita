@@ -6,6 +6,8 @@ export type MetadataFieldId =
   | 'trackNumber'
   | 'discNumber'
   | 'genre'
+  | 'style'
+  | 'artworkUrl'
   | 'isrc'
   | 'musicBrainzRecordingId';
 

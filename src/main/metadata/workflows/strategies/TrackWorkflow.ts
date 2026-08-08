@@ -2,7 +2,7 @@ import type {
   MetadataWorkflow,
   WorkflowCandidate,
   WorkflowMatch,
-  WorkflowPreview,
+  MetadataPreview,
   WorkflowSupportedField,
   WorkflowType
 } from '../MetadataWorkflow';
@@ -10,6 +10,7 @@ import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainz
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class TrackWorkflow implements MetadataWorkflow {
   public readonly type: WorkflowType = 'track';
@@ -54,41 +55,27 @@ export class TrackWorkflow implements MetadataWorkflow {
     candidateId: string,
     providerId: MetadataProviderId = 'musicbrainz',
     _signal?: AbortSignal
-  ): Promise<WorkflowPreview> {
+  ): Promise<MetadataPreview> {
     const recording = await this.mbAdapter.resolveRecording(candidateId);
 
     const matches: WorkflowMatch[] = localSongs.map((local) => {
-      const titleDiffers = local.title !== recording?.title;
-      const artistDiffers = local.artist !== recording?.artist;
+      const suggestedTitle = recording?.title ?? local.title;
+      const suggestedArtist = recording?.artist ?? local.artist;
 
       return {
         localSongId: Number(local.songId),
         songPath: local.path || '',
         matchedCandidateId: candidateId,
         suggestedMetadata: {
-          title: recording?.title ?? local.title,
-          artist: recording?.artist ?? local.artist,
+          title: suggestedTitle,
+          artist: suggestedArtist,
           album: local.album,
           trackNumber: recording?.trackNumber ?? local.trackNumber
         },
         confidence: 0.9,
         fieldDiffs: [
-          {
-            fieldId: 'title',
-            oldValue: local.title,
-            suggestedValue: recording?.title ?? local.title,
-            status: titleDiffers ? 'changed' : 'unchanged',
-            applyField: titleDiffers,
-            providerId
-          },
-          {
-            fieldId: 'artist',
-            oldValue: local.artist,
-            suggestedValue: recording?.artist ?? local.artist,
-            status: artistDiffers ? 'changed' : 'unchanged',
-            applyField: artistDiffers,
-            providerId
-          }
+          MetadataDiffBuilder.createFieldDiff('title', 'Title', local.title, suggestedTitle, providerId),
+          MetadataDiffBuilder.createFieldDiff('artist', 'Artist', local.artist, suggestedArtist, providerId)
         ]
       };
     });
@@ -111,7 +98,7 @@ export class TrackWorkflow implements MetadataWorkflow {
   }
 
   public buildMutations(
-    preview: WorkflowPreview,
+    preview: MetadataPreview,
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[] {
     const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
