@@ -21,27 +21,32 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
   onApply,
   onUndo
 }) => {
+  const dynamicApplyLabel =
+    selectedTrackCount > 0
+      ? `Update ${selectedTrackCount} Song${selectedTrackCount > 1 ? 's' : ''}`
+      : 'Apply Metadata';
+
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '14px 24px',
+        padding: '16px 24px',
         background: 'rgba(15, 23, 42, 0.95)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(12px)',
-        borderBottomLeftRadius: '12px',
-        borderBottomRightRadius: '12px'
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(16px)',
+        borderBottomLeftRadius: '16px',
+        borderBottomRightRadius: '16px'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#94A3B8' }}>
         <span>
-          <strong style={{ color: '#FFF' }}>{selectedTrackCount}</strong> / {matchCount} tracks selected
+          <strong style={{ color: '#F8FAFC' }}>{selectedTrackCount}</strong> / {matchCount} tracks selected
         </span>
         <span>•</span>
         <span>
-          <strong style={{ color: '#60A5FA' }}>{selectedFieldCount}</strong> fields active
+          <strong style={{ color: '#38BDF8' }}>{selectedFieldCount}</strong> fields active
         </span>
 
         {canUndo && (
@@ -54,14 +59,20 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
                 background: 'rgba(239, 68, 68, 0.15)',
                 color: '#F87171',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
-                padding: '4px 10px',
-                borderRadius: '6px',
+                padding: '5px 12px',
+                borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
-                fontWeight: 600
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
-              ↺ Undo Available
+              <span className="material-symbols-rounded" style={{ fontSize: '14px' }}>
+                undo
+              </span>
+              <span>Undo Available</span>
             </button>
           </>
         )}
@@ -72,13 +83,13 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
           onClick={onCancel}
           disabled={loading}
           style={{
-            padding: '8px 18px',
+            padding: '9px 20px',
             fontSize: '13px',
             fontWeight: 500,
-            color: 'rgba(255, 255, 255, 0.7)',
+            color: '#94A3B8',
             background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '8px',
             cursor: 'pointer'
           }}
         >
@@ -89,18 +100,24 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
           onClick={onApply}
           disabled={loading || matchCount === 0}
           style={{
-            padding: '8px 22px',
+            padding: '9px 24px',
             fontSize: '13px',
             fontWeight: 600,
-            color: '#FFF',
-            background: loading ? 'rgba(96, 165, 250, 0.4)' : '#3B82F6',
+            color: '#FFFFFF',
+            background: loading ? 'rgba(59, 130, 246, 0.4)' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
           }}
         >
-          {loading ? 'Applying...' : 'Apply Changes'}
+          <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>
+            {loading ? 'sync' : 'check'}
+          </span>
+          <span>{loading ? 'Applying...' : dynamicApplyLabel}</span>
         </button>
       </div>
     </div>

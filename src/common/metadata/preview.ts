@@ -59,3 +59,44 @@ export interface AlbumTagPreview {
   contributingProviders?: MetadataProviderId[];
   resolvedRelease?: ResolvedAlbumRelease;
 }
+
+// --- Unified Workflow DTOs ---
+
+export interface WorkflowCandidate {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  year?: number;
+  genre?: string;
+  style?: string;
+  coverArtUrl?: string;
+  provider: MetadataProviderId;
+  confidenceScore?: number;
+  rawItem?: any;
+}
+
+export interface WorkflowMatch {
+  localSongId: number;
+  songPath: string;
+  matchedCandidateId?: string;
+  suggestedMetadata: Record<string, any>;
+  confidence: number;
+  fieldDiffs: MetadataFieldDiff[];
+}
+
+export interface WorkflowSupportedField {
+  fieldId: string;
+  displayName: string;
+  category: string;
+  defaultEnabled: boolean;
+}
+
+export interface MetadataPreview {
+  workflowType: string;
+  primaryCandidate: WorkflowCandidate;
+  candidates: WorkflowCandidate[];
+  matches: WorkflowMatch[];
+  supportedFields: WorkflowSupportedField[];
+  provider: MetadataProviderId;
+}

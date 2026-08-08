@@ -1,11 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMetadataWorkflow, type WorkflowType } from '../../hooks/useMetadataWorkflow';
 import { WorkflowTabs } from './WorkflowTabs';
+import { SearchAndProviderPanel } from './SearchAndProviderPanel';
 import { CandidateList } from './CandidateList';
+import { AlbumSummaryCard } from './AlbumSummaryCard';
 import { MetadataDiffPanel } from './MetadataDiffPanel';
 import { TrackTable } from './TrackTable';
+import { ProgressOverlay } from './ProgressOverlay';
 import { StickyFooter } from './StickyFooter';
+import styles from './MetadataCenter.module.css';
 
 export interface MetadataCenterDialogProps {
   isOpen: boolean;
@@ -27,6 +31,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
   onClose
 }) => {
   const previousFocusRef = useRef<Element | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string>('auto');
 
   const { state, actions } = useMetadataWorkflow({
     initialWorkflow,
@@ -35,7 +40,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     operationId
   });
 
-  // Preserve focus
+  // Preserve focus on open
   useEffect(() => {
     if (isOpen) {
       previousFocusRef.current = document.activeElement;
@@ -76,76 +81,47 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     }
   }, [isOpen, initialAlbumName, initialArtistName]);
 
-  // When candidate selection changes, build preview
+  // Handle candidate selection & re-diffing
   const handleSelectCandidate = (candidateId: string, providerId: string) => {
     actions.setSelectedCandidateId(candidateId);
     actions.buildPreview(localSongs, candidateId, providerId);
   };
 
+  // Handle provider pill click
+  const handleProviderChange = (providerId: string) => {
+    setSelectedProvider(providerId);
+    if (state.selectedCandidateId) {
+      actions.buildPreview(localSongs, state.selectedCandidateId, providerId === 'auto' ? undefined : providerId);
+    }
+  };
+
   if (!isOpen) return null;
 
+  const activeCandidate = state.candidates.find((c) => c.id === state.selectedCandidateId) || state.preview?.primaryCandidate;
+  const sampleMatch = state.preview?.matches?.[0];
+  const fieldDiffs = sampleMatch?.fieldDiffs || [];
+
   return createPortal(
-    <div
-      onClick={handleClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(12px)'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '900px',
-          maxWidth: '92vw',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Modal Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#FFF' }}>
-              Metadata Center
+    <div className={styles.overlay} onClick={handleClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.titleGroup}>
+            <h2>
+              <span className="material-symbols-rounded" style={{ color: '#38BDF8', fontSize: '24px' }}>
+                auto_fix_high
+              </span>
+              <span>Metadata Center</span>
             </h2>
-            <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
-              MusicBee-Inspired Granular Metadata Management
-            </span>
+            <div className={styles.titleSubtitle}>
+              MusicBee-Redesigned Granular Metadata Workspace
+            </div>
           </div>
 
-          <button
-            onClick={handleClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: '20px',
-              cursor: 'pointer'
-            }}
-          >
-            ✕
+          <button onClick={handleClose} className={styles.closeButton}>
+            <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>
+              close
+            </span>
           </button>
         </div>
 
@@ -158,83 +134,59 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           }}
         />
 
-        {/* Modal Content Scroll Area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Search Inputs */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Album / Title..."
-              value={state.query.title}
-              onChange={(e) => actions.setQuery({ ...state.query, title: e.target.value, album: e.target.value })}
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                borderRadius: '6px',
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#FFF',
-                fontSize: '13px'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Artist..."
-              value={state.query.artist}
-              onChange={(e) => actions.setQuery({ ...state.query, artist: e.target.value })}
-              style={{
-                width: '200px',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#FFF',
-                fontSize: '13px'
-              }}
-            />
-            <button
-              onClick={() => actions.search(state.query)}
-              disabled={state.loading}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '6px',
-                background: '#3B82F6',
-                color: '#FFF',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer'
-              }}
-            >
-              {state.loading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
+        {/* Scrollable Content Body */}
+        <div className={styles.bodyContent}>
+          {/* Section 1: Unified Search & Provider Selection Panel */}
+          <SearchAndProviderPanel
+            title={state.query.title}
+            artist={state.query.artist}
+            selectedProvider={selectedProvider}
+            loading={state.loading}
+            onTitleChange={(val) => actions.setQuery({ ...state.query, title: val, album: val })}
+            onArtistChange={(val) => actions.setQuery({ ...state.query, artist: val })}
+            onProviderChange={handleProviderChange}
+            onSearch={() => actions.search(state.query)}
+          />
+
+          {/* Real-time Progress Overlay */}
+          <ProgressOverlay
+            stage={state.stage}
+            message={state.progressMessage}
+            progressPercent={state.progressPercent}
+          />
 
           {/* Error Banner */}
           {state.error && (
-            <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.2)', color: '#F87171', fontSize: '13px' }}>
+            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#F87171', fontSize: '13px' }}>
               {state.error}
             </div>
           )}
 
-          {/* Section 1: Search Results Candidates */}
+          {/* Section 2: Search Candidates List */}
           <CandidateList
             candidates={state.candidates}
             selectedId={state.selectedCandidateId}
             onSelect={handleSelectCandidate}
           />
 
-          {/* Section 2: Selective Metadata Diffs */}
-          {state.preview && (
-            <MetadataDiffPanel
-              supportedFields={state.preview.supportedFields || []}
-              selectedFieldIds={state.selectedFieldIds}
-              onToggleField={actions.toggleField}
-              matches={state.preview.matches || []}
+          {/* Section 3: Selected Release Overview Card */}
+          {activeCandidate && (
+            <AlbumSummaryCard
+              candidate={activeCandidate}
+              trackCount={state.preview?.matches?.length ?? 0}
             />
           )}
 
-          {/* Section 3: Track Preview Table */}
+          {/* Section 4: Selective Field Diffs */}
+          {state.preview && (
+            <MetadataDiffPanel
+              fieldDiffs={fieldDiffs}
+              selectedFieldIds={state.selectedFieldIds}
+              onToggleField={actions.toggleField}
+            />
+          )}
+
+          {/* Section 5: Color-Coded Track Table */}
           {state.preview && (
             <TrackTable
               matches={state.preview.matches || []}

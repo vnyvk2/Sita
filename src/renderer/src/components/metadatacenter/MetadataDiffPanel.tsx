@@ -1,31 +1,31 @@
 import React from 'react';
+import type { MetadataFieldDiff } from '../../../../common/metadata/types';
+import styles from './MetadataCenter.module.css';
 
 export interface MetadataDiffPanelProps {
-  supportedFields?: any[];
+  fieldDiffs: MetadataFieldDiff[];
   selectedFieldIds: Set<string>;
   onToggleField: (fieldId: string) => void;
-  matches: any[];
 }
 
 export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
-  supportedFields: _supportedFields,
+  fieldDiffs,
   selectedFieldIds,
-  onToggleField,
-  matches
+  onToggleField
 }) => {
-  if (!matches || matches.length === 0) return null;
-
-  // Aggregate field diffs across matches
-  const sampleMatch = matches[0];
-  const fieldDiffs = sampleMatch?.fieldDiffs || [];
+  if (!fieldDiffs || fieldDiffs.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', marginBottom: '4px' }}>
-        Selective Metadata Changes
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span className="material-symbols-rounded" style={{ fontSize: '16px', color: '#38BDF8' }}>
+          tune
+        </span>
+        <span>Selective Field Changes ({fieldDiffs.filter((d) => selectedFieldIds.has(d.fieldId)).length} Selected)</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-        {fieldDiffs.map((diff: any) => {
+
+      <div className={styles.diffGrid}>
+        {fieldDiffs.map((diff) => {
           const isSelected = selectedFieldIds.has(diff.fieldId);
           const isChanged = diff.status === 'changed' || diff.status === 'new';
 
@@ -33,50 +33,43 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
             <div
               key={diff.fieldId}
               onClick={() => onToggleField(diff.fieldId)}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                padding: '12px',
-                borderRadius: '8px',
-                background: isSelected ? 'rgba(96, 165, 250, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                border: isSelected ? '1px solid rgba(96, 165, 250, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
+              className={`${styles.diffCard} ${isSelected ? styles.selectedDiffCard : ''}`}
             >
               <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => {}} // handled by parent onClick
-                style={{ marginTop: '3px', cursor: 'pointer' }}
+                style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#10B981' }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                     {diff.fieldName}
                   </span>
                   <span
                     style={{
                       fontSize: '10px',
                       fontWeight: 600,
-                      padding: '1px 6px',
+                      padding: '2px 7px',
                       borderRadius: '4px',
-                      background: isChanged ? 'rgba(59, 130, 246, 0.2)' : 'rgba(156, 163, 175, 0.15)',
-                      color: isChanged ? '#60A5FA' : '#9CA3AF'
+                      background: isChanged ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
+                      color: isChanged ? '#34D399' : '#94A3B8'
                     }}
                   >
                     {diff.status}
                   </span>
                 </div>
 
-                <div style={{ marginTop: '6px', fontSize: '13px' }}>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.5)', textDecoration: isChanged ? 'line-through' : 'none' }}>
-                    Current: {diff.oldValue || 'None'}
+                <div style={{ marginTop: '8px', fontSize: '13px' }}>
+                  <div style={{ color: '#64748B', textDecoration: isChanged ? 'line-through' : 'none' }}>
+                    Current: {diff.oldValue !== undefined && diff.oldValue !== '' ? String(diff.oldValue) : 'None'}
                   </div>
                   {isChanged && (
-                    <div style={{ color: '#34D399', fontWeight: 600, marginTop: '2px' }}>
-                      Suggested: {diff.suggestedValue || 'None'}
+                    <div style={{ color: '#34D399', fontWeight: 600, marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="material-symbols-rounded" style={{ fontSize: '14px' }}>
+                        arrow_forward
+                      </span>
+                      <span>{diff.suggestedValue !== undefined && diff.suggestedValue !== '' ? String(diff.suggestedValue) : 'None'}</span>
                     </div>
                   )}
                 </div>
