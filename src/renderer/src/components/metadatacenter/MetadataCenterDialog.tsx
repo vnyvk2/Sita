@@ -87,7 +87,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     actions.buildPreview(localSongs, candidateId, providerId);
   };
 
-  // Handle provider pill click
+  // Handle provider pill click (instant re-diff using active candidate)
   const handleProviderChange = (providerId: string) => {
     setSelectedProvider(providerId);
     if (state.selectedCandidateId) {
@@ -104,7 +104,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
   return createPortal(
     <div className={styles.overlay} onClick={handleClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        {/* Header Workspace */}
         <div className={styles.header}>
           <div className={styles.titleGroup}>
             <h2>
@@ -136,7 +136,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
         {/* Scrollable Content Body */}
         <div className={styles.bodyContent}>
-          {/* Section 1: Unified Search & Provider Selection Panel */}
+          {/* Section 1: Unified Search & Provider Control Bar */}
           <SearchAndProviderPanel
             title={state.query.title}
             artist={state.query.artist}
@@ -148,7 +148,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             onSearch={() => actions.search(state.query)}
           />
 
-          {/* Real-time Progress Overlay */}
+          {/* Live Real-time Progress Overlay */}
           <ProgressOverlay
             stage={state.stage}
             message={state.progressMessage}
@@ -162,41 +162,45 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             </div>
           )}
 
-          {/* Section 2: Search Candidates List */}
+          {/* Section 2: Release Candidates List */}
           <CandidateList
             candidates={state.candidates}
             selectedId={state.selectedCandidateId}
             onSelect={handleSelectCandidate}
           />
 
-          {/* Section 3: Selected Release Overview Card */}
-          {activeCandidate && (
-            <AlbumSummaryCard
-              candidate={activeCandidate}
-              trackCount={state.preview?.matches?.length ?? 0}
-            />
-          )}
-
-          {/* Section 4: Selective Field Diffs */}
+          {/* Section 3: Split Workspace Grid (LEFT: Overview + Diffs | RIGHT: Track Table) */}
           {state.preview && (
-            <MetadataDiffPanel
-              fieldDiffs={fieldDiffs}
-              selectedFieldIds={state.selectedFieldIds}
-              onToggleField={actions.toggleField}
-            />
-          )}
+            <div className={styles.previewWorkspaceGrid}>
+              {/* LEFT COLUMN: Overview & Category Field Diffs */}
+              <div className={styles.leftWorkspace}>
+                {activeCandidate && (
+                  <AlbumSummaryCard
+                    candidate={activeCandidate}
+                    trackCount={state.preview?.matches?.length ?? 0}
+                  />
+                )}
 
-          {/* Section 5: Color-Coded Track Table */}
-          {state.preview && (
-            <TrackTable
-              matches={state.preview.matches || []}
-              selectedTrackIds={state.selectedTrackIds}
-              onToggleTrack={actions.toggleTrack}
-            />
+                <MetadataDiffPanel
+                  fieldDiffs={fieldDiffs}
+                  selectedFieldIds={state.selectedFieldIds}
+                  onToggleField={actions.toggleField}
+                />
+              </div>
+
+              {/* RIGHT COLUMN: Filterable Git-Diff Track Table */}
+              <div className={styles.rightWorkspace}>
+                <TrackTable
+                  matches={state.preview.matches || []}
+                  selectedTrackIds={state.selectedTrackIds}
+                  onToggleTrack={actions.toggleTrack}
+                />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Sticky Footer */}
+        {/* Footer Workspace */}
         <StickyFooter
           matchCount={state.preview?.matches?.length ?? 0}
           selectedFieldCount={state.selectedFieldIds.size}

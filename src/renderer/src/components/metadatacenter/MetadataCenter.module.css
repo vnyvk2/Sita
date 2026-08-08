@@ -326,9 +326,54 @@
   border-left: 3px solid #10B981 !important;
 }
 
-.rowWarning {
-  background: rgba(239, 68, 68, 0.08) !important;
-  border-left: 3px solid #EF4444 !important;
+/* Split Preview Workspace Grid (Left: Diffs, Right: Tracks) */
+.previewWorkspaceGrid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.leftWorkspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rightWorkspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Filter Pills */
+.filterPillGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.4);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.filterPill {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #94A3B8;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.activeFilterPill {
+  background: #3B82F6;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
 /* Keyframes */
