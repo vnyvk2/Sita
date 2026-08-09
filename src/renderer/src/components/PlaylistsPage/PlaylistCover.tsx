@@ -1,4 +1,4 @@
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';

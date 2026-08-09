@@ -21,7 +21,9 @@ export type OperationType =
   | 'playlist.snapshot'
   | 'playlist.setArtwork'
   | 'playlist.updateSidebarPositions'
-  | 'playlist.restoreSidebarPositions';
+  | 'playlist.restoreSidebarPositions'
+  | 'playlist.pin'
+  | 'playlist.unpin';
 
 export interface OperationContext {
   trx: DBTransaction;

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AutoTagStage } from '../../../common/metadata/types';
+import type { AutoTagStage } from '../../../../common/metadata/types';
 
 export interface AutoTagProgressOverlayProps {
   stage: AutoTagStage;

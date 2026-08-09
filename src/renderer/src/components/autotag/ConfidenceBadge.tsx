@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ConfidenceLevel } from '../../../common/metadata/types';
+import type { ConfidenceLevel } from '../../../../common/metadata/types';
 
 export interface ConfidenceBadgeProps {
   level: ConfidenceLevel;

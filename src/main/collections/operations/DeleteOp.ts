@@ -4,9 +4,7 @@ import { createCollectionId } from '../../../common/collections/id';
 
 import logger from '../../logger';
 
-export interface DeleteInput {
-  playlistId: number;
-}
+import type { DeleteInput } from '../../../common/collections/operationInputs';
 
 export class DeleteOp implements CollectionOperation<DeleteInput, void> {
   private readonly repository: PlaylistRepository;

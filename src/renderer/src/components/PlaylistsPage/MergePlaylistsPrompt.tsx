@@ -1,4 +1,4 @@
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';

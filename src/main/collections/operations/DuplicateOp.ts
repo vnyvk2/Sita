@@ -5,9 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { DuplicatePlanner } from './DuplicatePlanner';
 import { DuplicateExecutor } from './DuplicateExecutor';
 
-export interface DuplicateInput {
-  playlistId: number;
-}
+import type { DuplicateInput } from '../../../common/collections/operationInputs';
 
 const MAX_DEPTH = 50;
 

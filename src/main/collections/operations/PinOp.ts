@@ -3,9 +3,7 @@ import { createCollectionId } from '../../../common/collections/id';
 import { playlists } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
-export interface PinInput {
-  playlistId: number;
-}
+import type { PinInput, UnpinInput } from '../../../common/collections/operationInputs';
 
 export class PinOp implements CollectionOperation<PinInput, void> {
   public async execute(
@@ -35,9 +33,7 @@ export class PinOp implements CollectionOperation<PinInput, void> {
   }
 }
 
-export interface UnpinInput {
-  playlistId: number;
-}
+
 
 export class UnpinOp implements CollectionOperation<UnpinInput, void> {
   public async execute(

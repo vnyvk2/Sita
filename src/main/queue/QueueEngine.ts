@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { QueueEntry, QueueEntrySource, QueueState } from './types';
+import type { QueueEntry, QueueEntrySource, QueueState } from './types';
 
 export class QueueEngine {
   private state: QueueState;
@@ -40,7 +40,7 @@ export class QueueEngine {
    * Replace the entire queue with new songs.
    */
   public replaceQueue(songIds: number[], source: QueueEntrySource, startingIndex = 0): void {
-    const newEntries = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map(songId => ({
       id: uuidv4(),
       songId,
       source,
@@ -66,7 +66,7 @@ export class QueueEngine {
   public addNext(songIds: number[], source: QueueEntrySource): void {
     if (songIds.length === 0) return;
 
-    const newEntries = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map(songId => ({
       id: uuidv4(),
       songId,
       source,
@@ -111,7 +111,7 @@ export class QueueEngine {
     }
 
     const startNaturalIdx = this.state.entries.length;
-    const newEntries = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map(songId => ({
       id: uuidv4(),
       songId,
       source,
@@ -227,7 +227,7 @@ export class QueueEngine {
     const currentNatural = this.state.currentEntryId ? this.getNaturalIndex(this.state.currentEntryId) : -1;
     let nextPlayback = 0;
 
-    if (currentNatural !== -1) {
+    if (currentNatural !== -1 && this.state.currentEntryId) {
       this.state.history.push(this.state.currentEntryId);
       const currentPlayback = this.getPlaybackIndex(currentNatural);
       nextPlayback = currentPlayback + 1;

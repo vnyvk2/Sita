@@ -11,7 +11,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';
 import PlaylistCoverSettingsPrompt from '../PlaylistsPage/PlaylistCoverSettingsPrompt';
 
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 
 type Props = {
   playlist: PlaylistDto;

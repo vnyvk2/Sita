@@ -1,5 +1,5 @@
 import type { PlaylistViewMode } from '@common/collections/types';
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';

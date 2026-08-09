@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';
-import type { CollectionEvent } from '../../api/CollectionTypes';
+import type { CollectionEvent } from '@common/collections/operationInputs';
 
 export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();

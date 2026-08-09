@@ -87,6 +87,10 @@ function PlaylistInfoPage() {
     collectionDetailOptions(playlistId)
   );
 
+  if (!playlistData) {
+    throw new Error('Playlist not found');
+  }
+
   const { data: collectionEntries = [] } = useQuery({
     ...collectionEntriesOptions(playlistId, undefined, undefined, sortingOrder),
     enabled: !!playlistId

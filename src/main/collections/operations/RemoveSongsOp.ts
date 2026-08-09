@@ -3,10 +3,7 @@ import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 
-export interface RemoveSongsInput {
-  playlistId: number;
-  entryIds: readonly number[];
-}
+import type { RemoveSongsInput } from '../../../common/collections/operationInputs';
 
 export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { removedCount: number; deltaCount: number; deltaDuration: number }> {
   private readonly repository: PlaylistRepository;

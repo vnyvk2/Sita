@@ -13,6 +13,7 @@ export type CollectionType =
 export type CollectionSource = 'local' | 'remote' | 'search' | 'queue' | 'generated';
 
 export type PlaylistViewMode =
+  | 'addedOrder'
   | 'customOrder'
   | 'originalOrder'
   | 'aToZ'

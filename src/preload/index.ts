@@ -4,20 +4,24 @@ import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 
-import type { PlaylistDto as CollectionDto, CollectionHierarchyNodeDto as BreadcrumbDto, PlaylistEntryDto } from '../main/collections/ipc/dtos';
-import type { CreateFolderInput } from '../main/collections/operations/CreateFolderOp';
-import type { CreatePlaylistInput } from '../main/collections/operations/CreatePlaylistOp';
-import type { AddSongsInput } from '../main/collections/operations/AddSongsOp';
-import type { RemoveSongsInput } from '../main/collections/operations/RemoveSongsOp';
-import type { ReorderInput as ReorderSongsInput } from '../main/collections/operations/ReorderOp';
-import type { RenameInput } from '../main/collections/operations/RenameOp';
-import type { MoveCollectionInput } from '../main/collections/operations/MoveCollectionOp';
-import type { DeleteInput } from '../main/collections/operations/DeleteOp';
-import type { DuplicateInput } from '../main/collections/operations/DuplicateOp';
-import type { MergePlaylistsInput } from '../main/collections/operations/MergePlaylistsOp';
-import type { BulkDeleteInput, BulkRestoreInput } from '../main/collections/operations/BulkDeleteOp';
-import type { PinInput, UnpinInput } from '../main/collections/operations/PinOp';
-import type { CollectionEvent } from '../main/collections/events/CollectionEventBus';
+import type { PlaylistDto as CollectionDto, CollectionHierarchyNodeDto as BreadcrumbDto, PlaylistEntryDto } from '../common/collections/dtos';
+import type { 
+  CreateFolderInput, 
+  CreatePlaylistInput, 
+  AddSongsInput, 
+  RemoveSongsInput, 
+  ReorderInput as ReorderSongsInput, 
+  RenameInput, 
+  MoveCollectionInput, 
+  DeleteInput, 
+  DuplicateInput, 
+  MergePlaylistsInput, 
+  BulkDeleteInput, 
+  BulkRestoreInput, 
+  PinInput, 
+  UnpinInput, 
+  CollectionEvent 
+} from '../common/collections/operationInputs';
 import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '../common/collections/types';
 
 // const { contextBridge, ipcRenderer } = require('electron');

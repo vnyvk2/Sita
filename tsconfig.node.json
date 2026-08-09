@@ -21,6 +21,6 @@
     "noImplicitAny": true,
     "useUnknownInCatchVariables": true,
     "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": false
   }
 }

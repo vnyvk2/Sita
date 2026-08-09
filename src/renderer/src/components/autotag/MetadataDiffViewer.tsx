@@ -1,5 +1,5 @@
 import React from 'react';
-import type { MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
+import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
 
 export interface MetadataDiffViewerProps {
   track: TrackMatchPreview;

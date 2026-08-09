@@ -4,10 +4,7 @@ import { playlists, playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { eq, inArray } from 'drizzle-orm';
 
-export interface MergePlaylistsInput {
-  sourcePlaylistIds: number[];
-  targetPlaylistId: number;
-}
+import type { MergePlaylistsInput } from '../../../common/collections/operationInputs';
 
 export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput, { deltaCount: number; deltaDuration: number }> {
   private repository: PlaylistRepository;

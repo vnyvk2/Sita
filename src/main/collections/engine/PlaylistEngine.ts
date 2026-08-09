@@ -6,25 +6,40 @@ import type { OperationContext } from '../operations/types';
 
 import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
 import { processArtworkFiles } from '../../other/artworks';
-import { AddSongsOp, type AddSongsInput } from '../operations/AddSongsOp';
-import { RemoveSongsOp, type RemoveSongsInput } from '../operations/RemoveSongsOp';
-import { RenameOp, type RenameInput } from '../operations/RenameOp';
-import { ReorderOp, type ReorderInput } from '../operations/ReorderOp';
-import { DeleteOp, type DeleteInput } from '../operations/DeleteOp';
-import { PinOp, type PinInput } from '../operations/PinOp';
-import { UnpinOp, type UnpinInput } from '../operations/PinOp';
-import { CreateFolderOp, type CreateFolderInput } from '../operations/CreateFolderOp';
-import { CreatePlaylistOp, type CreatePlaylistInput } from '../operations/CreatePlaylistOp';
-import { DuplicateOp, type DuplicateInput } from '../operations/DuplicateOp';
+import { AddSongsOp } from '../operations/AddSongsOp';
+import { RemoveSongsOp } from '../operations/RemoveSongsOp';
+import { RenameOp } from '../operations/RenameOp';
+import { ReorderOp } from '../operations/ReorderOp';
+import { DeleteOp } from '../operations/DeleteOp';
+import { PinOp } from '../operations/PinOp';
+import { UnpinOp } from '../operations/PinOp';
+import { CreateFolderOp } from '../operations/CreateFolderOp';
+import { CreatePlaylistOp } from '../operations/CreatePlaylistOp';
+import { DuplicateOp } from '../operations/DuplicateOp';
 import { DuplicatePlanner } from '../operations/DuplicatePlanner';
 import { DuplicateExecutor } from '../operations/DuplicateExecutor';
-import { MergePlaylistsOp, type MergePlaylistsInput } from '../operations/MergePlaylistsOp';
-import { MoveCollectionOp, type MoveCollectionInput } from '../operations/MoveCollectionOp';
-import { BulkDeleteOp, BulkRestoreOp, type BulkDeleteInput, type BulkRestoreInput } from '../operations/BulkDeleteOp';
+import { MergePlaylistsOp } from '../operations/MergePlaylistsOp';
+import { MoveCollectionOp } from '../operations/MoveCollectionOp';
+import { BulkDeleteOp, BulkRestoreOp, type BulkRestoreInput } from '../operations/BulkDeleteOp';
 import { SetArtworkOp, type SetArtworkInput } from '../operations/SetArtworkOp';
 import { FolderStatisticsService } from './FolderStatisticsService';
 import { HierarchyService } from './HierarchyService';
 import { collectionEventBus } from '../events/CollectionEventBus';
+import type {
+  AddSongsInput,
+  BulkDeleteInput,
+  CreateFolderInput,
+  CreatePlaylistInput,
+  DeleteInput,
+  DuplicateInput,
+  MergePlaylistsInput,
+  MoveCollectionInput,
+  PinInput,
+  RemoveSongsInput,
+  RenameInput,
+  ReorderInput,
+  UnpinInput
+} from '../../../common/collections/operationInputs';
 
 export class PlaylistEngine {
   private readonly repository: PlaylistRepository;

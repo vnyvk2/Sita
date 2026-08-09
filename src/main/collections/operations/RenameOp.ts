@@ -2,10 +2,7 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 
-export interface RenameInput {
-  playlistId: number;
-  newName: string;
-}
+import type { RenameInput } from '../../../common/collections/operationInputs';
 
 export class RenameOp implements CollectionOperation<RenameInput, void> {
   private readonly repository: PlaylistRepository;

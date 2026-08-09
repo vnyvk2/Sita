@@ -14,7 +14,7 @@ import type {
   BulkRestoreInput,
   PinInput,
   UnpinInput
-} from '../../api/CollectionTypes';
+} from '@common/collections/operationInputs';
 
 export const useCreateFolder = () => {
   const queryClient = useQueryClient();

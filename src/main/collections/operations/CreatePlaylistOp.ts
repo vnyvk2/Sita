@@ -3,10 +3,7 @@ import { db } from '../../db/db';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 
-export interface CreatePlaylistInput {
-  name: string;
-  parentId?: number | null;
-}
+import type { CreatePlaylistInput } from '../../../common/collections/operationInputs';
 
 export class CreatePlaylistOp implements CollectionOperation<CreatePlaylistInput, number> {
   private repository: PlaylistRepository;

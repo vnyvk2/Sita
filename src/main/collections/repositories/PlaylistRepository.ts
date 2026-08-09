@@ -8,6 +8,8 @@ import logger from '../../logger';
 
 export type NewPlaylist = typeof playlists.$inferInsert;
 export type NewPlaylistEntry = typeof playlistEntries.$inferInsert;
+export type PlaylistRow = typeof playlists.$inferSelect;
+export type PlaylistEntryRow = typeof playlistEntries.$inferSelect;
 
 export class PlaylistRepository {
   public async getById(playlistId: number, trx: DB | DBTransaction = db) {
@@ -205,7 +207,7 @@ export class PlaylistRepository {
     return inserted;
   }
 
-  public async restorePlaylistWithId(data: typeof playlists.$inferSelect, trx: DB | DBTransaction = db) {
+  public async restorePlaylistWithId(data: PlaylistRow, trx: DB | DBTransaction = db) {
     const [inserted] = await trx
       .insert(playlists)
       .values(data)
@@ -238,6 +240,18 @@ export class PlaylistRepository {
   public async insertEntries(entries: NewPlaylistEntry[], trx: DB | DBTransaction = db) {
     if (entries.length === 0) return [];
     
+    return await trx
+      .insert(playlistEntries)
+      .values(entries)
+      .returning();
+  }
+
+  public async restoreEntriesWithIds(
+    entries: PlaylistEntryRow[],
+    trx: DB | DBTransaction = db
+  ): Promise<PlaylistEntryRow[]> {
+    if (entries.length === 0) return [];
+
     return await trx
       .insert(playlistEntries)
       .values(entries)

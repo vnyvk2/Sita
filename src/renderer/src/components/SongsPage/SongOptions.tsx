@@ -2,6 +2,7 @@ import i18n from '../../i18n';
 import { type DropdownOption } from '../Dropdown';
 
 export const songSortTypes = [
+  'addedOrder',
   'customOrder',
   'originalOrder',
   'aToZ',

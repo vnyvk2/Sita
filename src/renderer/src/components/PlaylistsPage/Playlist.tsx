@@ -5,7 +5,7 @@ import { useStore } from '@tanstack/react-store';
 import { Suspense, lazy, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollectionClient } from '@renderer/api/CollectionClient';
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';

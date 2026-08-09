@@ -4,10 +4,7 @@ import { playlists } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { HierarchyService } from '../engine/HierarchyService';
 
-export interface MoveCollectionInput {
-  playlistIds: number[];
-  targetParentId: number | null;
-}
+import type { MoveCollectionInput } from '../../../common/collections/operationInputs';
 
 export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput, void> {
   private resolver: HierarchyService;

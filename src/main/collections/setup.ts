@@ -34,8 +34,8 @@ export const executor = new OperationExecutor(operationJournalWriter);
 export const membershipCache = new MembershipCache();
 export const playlistMembershipSource = new PlaylistMembershipSource(playlistRepository);
 export const membershipService = new MembershipService(membershipCache, [playlistMembershipSource]);
-export const playlistEngine = new PlaylistEngine(playlistRepository, membershipService, executor);
 export const hierarchyService = new HierarchyService();
+export const playlistEngine = new PlaylistEngine(playlistRepository, membershipService, executor, hierarchyService);
 export function registerDefaultOperations(
   reg: OperationRegistry,
   repo: PlaylistRepository,

@@ -1,3 +1,30 @@
+export interface RestoreSongsInput {
+  playlistId: number;
+  entries: {
+    playlistId: number;
+    songId: number;
+    position: number;
+    source: string;
+    createdAt?: Date;
+  }[];
+}
+
+export interface RestorePlaylistInput {
+  playlist: {
+    id: number;
+    name: string;
+    description?: string | null;
+    parentId?: number | null;
+    playlistType: string;
+    itemCount: number;
+    totalDuration: string;
+    sidebarPosition?: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  entries: RestoreSongsInput['entries'];
+}
+
 export interface CreateFolderInput {
   name: string;
   parentId?: number | null;
@@ -19,50 +46,50 @@ export interface RemoveSongsInput {
   entryIds: readonly number[];
 }
 
-export interface ReorderSongsInput {
+export interface ReorderInput {
   playlistId: number;
   entryId: number;
   newPosition: number;
 }
 
 export interface RenameInput {
-  collectionId: number;
-  name: string;
+  playlistId: number;
+  newName: string;
 }
 
 export interface MoveCollectionInput {
-  collectionId: number;
+  playlistIds: number[];
   targetParentId: number | null;
-  sidebarPosition?: number;
+  sidebarPosition?: number; // Preserved for renderer
 }
 
 export interface DeleteInput {
-  collectionId: number;
+  playlistId: number;
 }
 
 export interface DuplicateInput {
-  collectionId: number;
+  playlistId: number;
 }
 
 export interface MergePlaylistsInput {
-  sourceIds: number[];
-  targetId: number;
+  sourcePlaylistIds: number[];
+  targetPlaylistId: number;
 }
 
 export interface BulkDeleteInput {
-  collectionIds: number[];
+  playlistIds: number[];
 }
 
 export interface BulkRestoreInput {
-  collectionIds: number[];
+  restores: RestorePlaylistInput[];
 }
 
 export interface PinInput {
-  collectionId: number;
+  playlistId: number;
 }
 
 export interface UnpinInput {
-  collectionId: number;
+  playlistId: number;
 }
 
 export type CollectionEvent =

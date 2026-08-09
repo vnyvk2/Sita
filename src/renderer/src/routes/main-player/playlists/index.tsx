@@ -139,7 +139,6 @@ function PlaylistsPage() {
           e.pageY
         )
       }
-      focusable
       onKeyDown={(e) => {
         if (e.ctrlKey && e.key === 'a') {
           e.stopPropagation();

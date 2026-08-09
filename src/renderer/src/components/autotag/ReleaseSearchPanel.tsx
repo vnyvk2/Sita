@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AlbumMetadata } from '../../../common/metadata/types';
+import type { AlbumMetadata } from '../../../../common/metadata/types';
 
 export interface ReleaseSearchPanelProps {
   initialAlbumName?: string;

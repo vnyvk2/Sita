@@ -1,21 +1,15 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import { PlaylistRepository, type PlaylistRow } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 import type { RestoreSongsInput } from './RestoreSongsOp';
 
+type RestorablePlaylist = Omit<PlaylistRow, 'createdAt' | 'updatedAt'> & {
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
 export interface RestorePlaylistInput {
-  playlist: {
-    id: number;
-    name: string;
-    description?: string | null;
-    parentId?: number | null;
-    playlistType: string;
-    itemCount: number;
-    totalDuration: string;
-    sidebarPosition?: number | null;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+  playlist: RestorablePlaylist;
   entries: RestoreSongsInput['entries'];
 }
 
@@ -38,7 +32,7 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
       updatedAt: typeof playlist.updatedAt === 'string' ? new Date(playlist.updatedAt) : playlist.updatedAt,
     };
 
-    await this.repository.restorePlaylistWithId(playlistToInsert as any, ctx.trx);
+    await this.repository.restorePlaylistWithId(playlistToInsert, ctx.trx);
 
     if (entries.length > 0) {
       const entriesToInsert = entries.map(e => {
@@ -49,7 +43,7 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
           updatedAt: typeof e.updatedAt === 'string' ? new Date(e.updatedAt) : e.updatedAt,
         };
       });
-      await this.repository.insertEntries(entriesToInsert as any, ctx.trx);
+      await this.repository.restoreEntriesWithIds(entriesToInsert, ctx.trx);
     }
 
     const affectedSongIds = Array.from(new Set(entries.map(e => e.songId)));

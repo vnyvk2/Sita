@@ -7,8 +7,10 @@ import { HierarchyService } from '../engine/HierarchyService';
 
 import logger from '../../logger';
 
-export interface BulkDeleteInput {
-  playlistIds: number[];
+import type { BulkDeleteInput } from '../../../common/collections/operationInputs';
+
+export interface BulkRestoreInput {
+  restores: RestorePlaylistInput[];
 }
 
 export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> {
@@ -77,9 +79,6 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
   }
 }
 
-export interface BulkRestoreInput {
-  restores: RestorePlaylistInput[];
-}
 
 export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void> {
   private repository: PlaylistRepository;
@@ -103,7 +102,7 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
     // 1. Use HierarchyService to determine topological order
     const nodes = input.restores.map(r => ({
       id: r.playlist.id,
-      parentId: r.playlist.parentId,
+      parentId: r.playlist.parentId ?? null,
       name: r.playlist.name,
       playlistType: r.playlist.playlistType
     }));

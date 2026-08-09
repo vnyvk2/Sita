@@ -2,11 +2,7 @@ import type { CollectionOperation, OperationContext, OperationResult } from './t
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 
-export interface ReorderInput {
-  playlistId: number;
-  entryId: number;
-  newPosition: number;
-}
+import type { ReorderInput } from '../../../common/collections/operationInputs';
 
 export class ReorderOp implements CollectionOperation<ReorderInput, void> {
   private readonly repository: PlaylistRepository;

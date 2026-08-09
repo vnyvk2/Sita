@@ -3,11 +3,7 @@ import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 
-export interface AddSongsInput {
-  playlistId: number;
-  songIds: readonly number[];
-  insertAt?: number;
-}
+import type { AddSongsInput } from '../../../common/collections/operationInputs';
 
 export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCount: number; deltaCount: number; deltaDuration: number }> {
   private readonly repository: PlaylistRepository;

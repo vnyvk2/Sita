@@ -1,5 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
-import type { PlaylistDto as CollectionDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto as CollectionDto } from '@common/collections/dtos';
 import { CollectionClient } from '../../api/CollectionClient';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';

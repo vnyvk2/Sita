@@ -29,6 +29,6 @@
     },
     "types": [ "vite/client" ],
     "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": false
   }
 }

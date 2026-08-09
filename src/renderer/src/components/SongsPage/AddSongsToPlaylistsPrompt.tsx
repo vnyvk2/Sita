@@ -2,7 +2,7 @@
 
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
-import type { PlaylistDto } from '@main/collections/ipc/dtos';
+import type { PlaylistDto } from '@common/collections/dtos';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
