@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { useAlbumAutoTag } from '../useAlbumAutoTag';
+// import { useAlbumAutoTag } from '../useAlbumAutoTag';
 
 const mockInvalidateQueries = vi.fn();
 
@@ -11,14 +11,13 @@ vi.mock('@tanstack/react-query', () => ({
 
 describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', () => {
   let mockUnsubscribe: ReturnType<typeof vi.fn>;
-  let mockProgressCallback: ((payload: any) => void) | null = null;
   let listenerCount = 0;
 
   beforeEach(() => {
     mockUnsubscribe = vi.fn(() => {
       listenerCount--;
     });
-    mockProgressCallback = null;
+
     listenerCount = 0;
     mockInvalidateQueries.mockClear();
 
@@ -53,7 +52,7 @@ describe('Phase 6 — Comprehensive Integration Test Suite (useAlbumAutoTag)', (
           cancelAutoTag: vi.fn(),
           onProgress: vi.fn((cb) => {
             listenerCount++;
-            mockProgressCallback = cb;
+            void cb;
             return mockUnsubscribe;
           })
         }

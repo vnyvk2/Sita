@@ -132,8 +132,8 @@ export function useMetadataWorkflow(options: UseMetadataWorkflowOptions = {}) {
         setCanUndo(true);
         setStage('completed');
         // Invalidate react-query caches
-        queryClient.invalidateQueries({ queryKey: albumQuery.allKeys() });
-        queryClient.invalidateQueries({ queryKey: songQuery.allKeys() });
+        queryClient.invalidateQueries({ queryKey: albumQuery._def });
+        queryClient.invalidateQueries({ queryKey: songQuery._def });
         return true;
       } else {
         setError(res.errors?.join('; ') ?? 'Apply failed');
@@ -155,8 +155,8 @@ export function useMetadataWorkflow(options: UseMetadataWorkflowOptions = {}) {
       const res = await metadataApi.workflowUndo(operationId);
       if (res.success) {
         setCanUndo(false);
-        queryClient.invalidateQueries({ queryKey: albumQuery.allKeys() });
-        queryClient.invalidateQueries({ queryKey: songQuery.allKeys() });
+        queryClient.invalidateQueries({ queryKey: albumQuery._def });
+        queryClient.invalidateQueries({ queryKey: songQuery._def });
         return true;
       }
       return false;

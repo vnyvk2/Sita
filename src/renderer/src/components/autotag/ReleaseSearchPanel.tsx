@@ -93,7 +93,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
             key={cand.releaseId ?? cand.title}
             style={{
               display: 'flex',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
               padding: '14px 18px',
               borderRadius: '10px',

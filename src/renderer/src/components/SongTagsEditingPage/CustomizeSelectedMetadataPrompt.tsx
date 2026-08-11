@@ -3,6 +3,7 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import isLyricsSynced from '../../../../common/isLyricsSynced';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { mergeSongMetadata } from '../../utils/manageMetadataResults';
 import Button from '../Button';
@@ -76,7 +77,6 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
       changePromptMenuData(false, undefined, '');
 
       const {
-        isTitleSelected,
         isAlbumSelected,
         isArtistsSelected,
         isGenresSelected

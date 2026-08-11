@@ -72,11 +72,13 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   const { isOnline } = useNetworkConnectivity();
 
   const [songInfo, setSongInfo] = useState<EditableSongTags>({
-    title: ''
-  });
+    title: '',
+    duration: 0
+  } as EditableSongTags);
   const [defaultValues, setDefaultValues] = useState<EditableSongTags>({
-    title: ''
-  });
+    title: '',
+    duration: 0
+  } as EditableSongTags);
 
   const [artistKeyword, setArtistKeyword] = useState('');
   const [artistResults, setArtistResults] = useState<ArtistResult[]>([]);
@@ -136,18 +138,14 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
         })
         .catch((err) => {
           console.warn('[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:', err);
-          return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
+           return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
             if (songs?.[0]) {
               const song = songs[0];
               const fallbackData: EditableSongTags = {
                 title: song.title,
                 artists: song.artists,
-                albumArtists: song.albumArtists,
-                albums: song.album ? [{ title: song.album.name, albumId: song.album.albumId }] : undefined,
-                genres: song.genres,
-                trackNumber: song.trackNo,
-                releasedYear: song.year,
-                artworkPath: song.artworkPaths?.artworkPath
+                artworkPath: song.artworkPaths?.artworkPath,
+                duration: song.duration
               };
               setDefaultValues(fallbackData);
               setSongInfo(fallbackData);
@@ -469,7 +467,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
 
     if (songId) {
       window.api.metadata
-        .clearOverrides({ identity: { entityKind: 'song', entityId: songId } })
+        .clearOverrides({ entityKind: 'song', entityId: songId })
         .then(fetchTagsFromFile)
         .catch((err) => {
           console.error('[SongTagsEditingPage] Failed to clear overrides:', err);
