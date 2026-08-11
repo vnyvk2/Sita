@@ -1,14 +1,14 @@
 import type { db } from '@main/db/db';
 import type { GetAllSongListeningDataReturnType } from '@main/db/queries/listens';
-import { ReactElement, ReactNode } from 'react';
-import { resources } from 'src/renderer/src/i18n';
+import type { ReactElement, ReactNode } from 'react';
+import type { resources } from 'src/renderer/src/i18n';
 
-import { api } from '../preload';
-import { ButtonProps } from '../renderer/src/components/Button';
-import { DropdownOption } from '../renderer/src/components/Dropdown';
-import { songSortTypes } from '../renderer/src/components/SongsPage/SongOptions';
-import { LastFMSessionData } from './last_fm_api';
-import { SimilarArtist, Tag } from './last_fm_artist_info_api';
+import type { api } from '../preload';
+import type { ButtonProps } from '../renderer/src/components/Button';
+import type { DropdownOption } from '../renderer/src/components/Dropdown';
+import type { songSortTypes } from '../renderer/src/components/SongsPage/SongOptions';
+import type { LastFMSessionData } from './last_fm_api';
+import type { SimilarArtist, Tag } from './last_fm_artist_info_api';
 
 declare global {
   interface Window {

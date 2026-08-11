@@ -1,4 +1,4 @@
-import { SaveDialogOptions, shell } from 'electron';
+import { shell, type SaveDialogOptions } from 'electron';
 import { writeFile, access } from 'fs/promises';
 import { dirname, relative, parse, join } from 'path';
 import type {
