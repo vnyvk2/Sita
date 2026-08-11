@@ -181,7 +181,12 @@ export class MetadataDiffBuilder {
 
     const resolvedName = opts.fieldName ?? getMetadataFieldDisplayName(opts.fieldId);
     const attribution = opts.providerId
-      ? { fieldId: opts.fieldId, providerId: opts.providerId, providerName: opts.providerId, confidenceScore: opts.confidenceScore ?? 0.9 }
+      ? {
+          fieldId: opts.fieldId,
+          providerId: opts.providerId,
+          providerName: globalProviderRegistry.getDisplayName(opts.providerId),
+          confidenceScore: opts.confidenceScore ?? 0.9
+        }
       : undefined;
     return this.compareField(opts.fieldId, resolvedName, opts.oldVal, opts.newVal, attribution);
   }

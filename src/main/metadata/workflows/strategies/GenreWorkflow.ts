@@ -115,6 +115,21 @@ export class GenreWorkflow extends BaseMetadataWorkflow {
           genreVal = contrib.contributions.find((c) => c.fieldId === 'genre')?.value as string | undefined;
           styleVal = contrib.contributions.find((c) => c.fieldId === 'style')?.value as string | undefined;
         }
+
+        const candidate: WorkflowCandidate = {
+          id: candidateId,
+          title: candidateTitle,
+          artist: candidateArtist,
+          album: candidateTitle,
+          year: release.album.year,
+          genre: genreVal,
+          style: styleVal,
+          coverArtUrl: release.album.artwork?.primaryPath || release.album.artwork?.onlineUrls?.[0],
+          provider: 'discogs',
+          confidenceScore: 0.85,
+          rawItem: { album: release.album, contrib }
+        };
+        this.cacheCandidate(candidateId, candidate);
       }
     }
 
