@@ -10,7 +10,6 @@ import type { PlaylistDto } from '@common/collections/dtos';
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
-import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import { usePinCollection, useUnpinCollection } from '../../hooks/collections/useCollectionMutations';
 import NavLink from '../NavLink';
@@ -19,6 +18,7 @@ import PlaylistCover from './PlaylistCover';
 const ConfirmDeletePlaylistsPrompt = lazy(() => import('./ConfirmDeletePlaylistsPrompt'));
 const RenamePlaylistPrompt = lazy(() => import('./RenamePlaylistPrompt'));
 const PlaylistExportSettingsPrompt = lazy(() => import('./PlaylistExportSettingsPrompt'));
+const PlaylistCoverSettingsPrompt = lazy(() => import('./PlaylistCoverSettingsPrompt'));
 
 const getPlaylistSongIds = async (id: number): Promise<number[]> => {
   const entries = await CollectionClient.getEntries(id);
@@ -35,7 +35,6 @@ export const Playlist = (props: PlaylistProp) => {
     store,
     (state) => state.multipleSelectionsData.isEnabled
   );
-  const preferences = useStore(store, (state) => state.localStorage.preferences);
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const queue = useStore(store, (state) => state.localStorage.queue);
 
@@ -138,7 +137,6 @@ export const Playlist = (props: PlaylistProp) => {
           addNewNotifications([
             {
               id: 'newSongsToQueue',
-              delay: 100,
               content: t('notifications.addedToQueue', {
                 count: songData.length
               })
@@ -196,7 +194,6 @@ export const Playlist = (props: PlaylistProp) => {
               addNewNotifications([
                 {
                   id: 'newSongsToQueue',
-                  delay: 100,
                   content: t('notifications.addedToQueue', {
                     count: songIds.length
                   })
@@ -220,7 +217,7 @@ export const Playlist = (props: PlaylistProp) => {
             props.id === SpecialPlaylists.History
       },
       {
-        label: t(`playlist.${props.isArtworkAvailable ? 'changeArtwork' : 'addArtwork'}`),
+        label: t(`playlist.${props.artworkPath ? 'changeArtwork' : 'addArtwork'}`),
         iconName: 'photo_camera',
         handlerFunction: () => {
           window.api.songUpdates
@@ -270,7 +267,7 @@ export const Playlist = (props: PlaylistProp) => {
             .then((entries) => {
               const ids = (entries || []).map((e) => e.songId);
               if (ids.length === 0) return [];
-              return window.api.songs.getSong({ songIds: ids });
+              return window.api.audioLibraryControls.getSongInfo(ids);
             })
             .then((songs) => {
               changePromptMenuData(
@@ -328,7 +325,7 @@ export const Playlist = (props: PlaylistProp) => {
         {
           label: t('playlist.importIntoPlaylist', 'Import M3U into Playlist'),
           iconName: 'publish',
-          handlerFunction: () => CollectionClient.import(props.id),
+          handlerFunction: () => window.api.collections.import({ targetPlaylistId: props.id }),
           isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
         },
       {

@@ -16,7 +16,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CollectionClient } from '@renderer/api/CollectionClient';
+import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 
 import { SpecialPlaylists } from '../../../../../common/playlists.enum';
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -133,8 +133,7 @@ function FavoritesPlaylistInfoPage() {
   );
 
   const importSongsToFavorites = useCallback(() => {
-    CollectionClient
-      .import(SpecialPlaylists.Favorites)
+    window.api.collections.import({ targetPlaylistId: SpecialPlaylists.Favorites })
       .then(() => {
         queryClient.invalidateQueries({
           queryKey: songQuery.favorites({ sortType: sortingOrder }).queryKey
@@ -208,7 +207,7 @@ function FavoritesPlaylistInfoPage() {
         }}
         components={{
           Header: () => (
-            <PlaylistInfoAndImgContainer playlist={playlistData} songs={favoriteSongs} />
+            <PlaylistInfoAndImgContainer playlist={mapLegacyPlaylistToDto(playlistData)} songs={favoriteSongs} />
           )
         }}
         itemContent={(index, item) => {

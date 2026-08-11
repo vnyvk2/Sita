@@ -1,4 +1,4 @@
-import type { PlaylistDto } from '@common/collections/types';
+import type { PlaylistDto } from '@common/collections/dtos';
 import DefaultImgCover from '../assets/images/webp/song_cover_default.webp';
 import type { PlaylistCoverSettings, ResolvedPlaylistCover } from '../types/playlistCover';
 import type { MaterializedCoverDraft } from '../types/playlistCoverDraft';

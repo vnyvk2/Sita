@@ -49,7 +49,7 @@ const SelectablePlaylist = (props: SelectablePlaylistProp) => {
         />
         <div className="playlist-cover-container h-full cursor-pointer overflow-hidden rounded-lg">
           <Img
-            src={artworkPath}
+            src={artworkPath || undefined}
             alt="Playlist Cover"
             loading="lazy"
             className="h-full"

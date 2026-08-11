@@ -86,9 +86,10 @@ const CollageSongPickerPrompt = (props: Props) => {
                 </div>
               </div>
               <Checkbox
+                id={`collage-song-picker-${song.songId}`}
                 isChecked={isChecked}
                 isDisabled={isMaxReached}
-                onChange={() => toggleSongSelection(song.songId)}
+                checkedStateUpdateFunction={() => toggleSongSelection(song.songId)}
               />
             </div>
           );
@@ -98,12 +99,10 @@ const CollageSongPickerPrompt = (props: Props) => {
       <div className="mt-4 flex items-center justify-end gap-3 pt-3 border-t border-font-color-black/10 dark:border-font-color-white/10">
         <Button
           label={t('common.cancel')}
-          type="tertiary"
           clickHandler={onCancel}
         />
         <Button
-          label={t('common.save')}
-          type="primary"
+          label={t('common.save', 'Save')}
           clickHandler={handleSave}
         />
       </div>

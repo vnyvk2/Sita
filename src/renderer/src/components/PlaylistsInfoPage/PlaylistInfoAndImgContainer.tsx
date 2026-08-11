@@ -1,11 +1,7 @@
-import { store } from '@renderer/store/store';
-import { useStore } from '@tanstack/react-store';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
-import Img from '../Img';
 import { useContext } from 'react';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';
@@ -20,7 +16,6 @@ type Props = {
 };
 
 const PlaylistInfoAndImgContainer = (props: Props) => {
-  const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 

@@ -1,7 +1,6 @@
 import Img from '@renderer/components/Img';
 import NavLink from '@renderer/components/NavLink';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import { CollectionClient } from '@renderer/api/CollectionClient';
 import { lazy, Suspense, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

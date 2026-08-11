@@ -28,7 +28,7 @@ const PlaylistCover = (props: Props) => {
     (state) => state.localStorage.preferences.enableArtworkFromSongCovers
   );
 
-  const [settingsVersion, setSettingsVersion] = useState(0);
+  const [_settingsVersion, setSettingsVersion] = useState(0);
 
   // Subscribe to cover settings changes for instant real-time UI re-rendering
   useEffect(() => {

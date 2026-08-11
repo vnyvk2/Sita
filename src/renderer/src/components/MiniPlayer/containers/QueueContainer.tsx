@@ -52,7 +52,6 @@ const QueueContainer = (props: Props) => {
   // Auto-scroll to the currently playing song when the queue opens
   useEffect(() => {
     const activeQueue = queue.queues[queue.currentQueueIndex];
-    const activeSongIds = activeQueue?.songIds || [];
 
     if (
       isQueueVisible &&

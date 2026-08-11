@@ -10,12 +10,13 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
 
+import type { PlaylistDto } from '@common/collections/dtos';
+
 interface NewPlaylistPromptProp {
-  updatePlaylists: (_updatedPlaylist: Playlist[]) => void;
-  currentPlaylists: Playlist[];
+  currentPlaylists: PlaylistDto[];
 }
 
-const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
+const NewPlaylistPrompt = (_props: NewPlaylistPromptProp) => {
   const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 

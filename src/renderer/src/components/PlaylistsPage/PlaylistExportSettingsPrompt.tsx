@@ -1,7 +1,7 @@
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import type { PlaylistExportFormat, PlaylistExportOptions } from '@common/collections/types';
+import type { PlaylistExportFormat } from '@common/collections/types';
 import Button from '../Button';
 import Dropdown from '../Dropdown';
 

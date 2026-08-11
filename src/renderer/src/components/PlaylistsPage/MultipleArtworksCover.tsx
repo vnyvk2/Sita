@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useMemo } from 'react';
 
-import type { CoverRendererProps, PlaylistCoverLayout } from '../../types/playlistCover';
+import type { CoverRendererProps, PlaylistCoverLayout, CoverLayoutVariant } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Img from '../Img';
 import GridRenderer from './renderers/GridRenderer';
@@ -74,7 +74,7 @@ const MultipleArtworksCover = (props: Props) => {
       }
       if (idsToFetchArr.length === 0) return [];
       const data = await CollectionClient.getArtworks(idsToFetchArr);
-      return data?.map((x) => x.artworkPaths) || [];
+      return data || [];
     },
     enabled:
       !resolvedArtworks &&

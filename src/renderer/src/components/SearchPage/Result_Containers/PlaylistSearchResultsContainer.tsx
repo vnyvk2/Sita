@@ -8,6 +8,7 @@ import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import useSelectAllHandler from '../../../hooks/useSelectAllHandler';
 import Button from '../../Button';
 import { Playlist } from '../../PlaylistsPage/Playlist';
+import { mapLegacyPlaylistToDto } from '../../../utils/playlistAdapter';
 import SecondaryContainer from '../../SecondaryContainer';
 
 type Props = {
@@ -40,12 +41,7 @@ const PlaylistSearchResultsContainer = (props: Props) => {
                   <Playlist
                     index={index}
                     key={`${playlist.playlistId}-${playlist.name}`}
-                    name={playlist.name}
-                    playlistId={playlist.playlistId}
-                    createdDate={playlist.createdDate}
-                    songs={playlist.songs}
-                    isArtworkAvailable={playlist.isArtworkAvailable}
-                    artworkPaths={playlist.artworkPaths}
+                    {...mapLegacyPlaylistToDto(playlist)}
                     selectAllHandler={selectAllHandler}
                   />
                 );

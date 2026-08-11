@@ -1,6 +1,7 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
+import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
@@ -229,7 +230,7 @@ function HistoryPlaylistInfoPage() {
           });
         }}
         components={{
-          Header: () => <PlaylistInfoAndImgContainer playlist={playlistData} songs={historySongs} />
+          Header: () => <PlaylistInfoAndImgContainer playlist={mapLegacyPlaylistToDto(playlistData)} songs={historySongs} />
         }}
         itemContent={(index, item) => {
           return (

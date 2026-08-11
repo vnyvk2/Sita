@@ -102,7 +102,6 @@ function PlaylistsPage() {
         true,
         <NewPlaylistPrompt
           currentPlaylists={playlists}
-          updatePlaylists={() => {} /* queries are invalidated via CollectionEventProvider */}
         />
       ),
     [changePromptMenuData, playlists, sortingOrder]
@@ -117,6 +116,10 @@ function PlaylistsPage() {
           e.preventDefault();
           e.stopPropagation();
           search.inputRef.current?.focus();
+        }
+        if (e.ctrlKey && e.key === 'a') {
+          e.stopPropagation();
+          selectAllHandler();
         }
       }}
       onContextMenu={(e) =>
@@ -139,12 +142,6 @@ function PlaylistsPage() {
           e.pageY
         )
       }
-      onKeyDown={(e) => {
-        if (e.ctrlKey && e.key === 'a') {
-          e.stopPropagation();
-          selectAllHandler();
-        }
-      }}
     >
       <>
         <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">

@@ -158,7 +158,7 @@ function PlaylistInfoPage() {
       const titleMatch = song.title?.toLowerCase().includes(lowerQ);
       const artistsStr = song.artists?.map((a) => a.name).join(' ').toLowerCase() ?? '';
       const artistMatch = artistsStr.includes(lowerQ);
-      const albumMatch = song.album?.title?.toLowerCase().includes(lowerQ);
+      const albumMatch = song.album?.name?.toLowerCase().includes(lowerQ);
       const genresStr = song.genres?.map((g) => g.name).join(' ').toLowerCase() ?? '';
       const genreMatch = genresStr.includes(lowerQ);
       return titleMatch || artistMatch || albumMatch || genreMatch;
@@ -191,7 +191,7 @@ function PlaylistInfoPage() {
       const previousEntries = queryClient.getQueryData(entriesQuery.queryKey);
 
       if (sourceIndex !== undefined && previousEntries && Array.isArray(previousEntries)) {
-        queryClient.setQueryData(entriesQuery.queryKey, (oldEntries: typeof previousEntries) => {
+        queryClient.setQueryData(entriesQuery.queryKey, (oldEntries) => {
           if (!oldEntries) return oldEntries;
           const next = [...oldEntries];
           const [moved] = next.splice(sourceIndex, 1);
@@ -479,7 +479,7 @@ function PlaylistInfoPage() {
         } else if (canReorder(sortingOrder) && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           e.preventDefault();
           e.stopPropagation();
-          const selectedSongIds = store.getState().multipleSelectionsData.selectedSongIds;
+          const selectedSongIds = store.state.multipleSelectionsData.multipleSelections;
           if (selectedSongIds.length === 1) {
             const targetSongId = selectedSongIds[0];
             const currIdx = filteredSongs.findIndex((s) => s.songId === targetSongId);
@@ -579,7 +579,7 @@ function PlaylistInfoPage() {
             <Droppable
               droppableId="playlist-droppable"
               mode="virtual"
-              renderClone={(provided, snapshot, rubric) => {
+              renderClone={(provided, _snapshot, rubric) => {
                 const item = filteredSongs[rubric.source.index];
                 if (!item) return null;
                 return (
@@ -700,7 +700,7 @@ function PlaylistInfoPage() {
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           <span className="mb-6">{t('playlist.empty')}</span>
-          {!SpecialPlaylists.isSpecialPlaylistId(playlistData.playlistId) && (
+          {!SpecialPlaylists.isSpecialPlaylistId(playlistData.id) && (
             <Button
               label={t('playlist.addSongs', 'Add songs')}
               iconName="playlist_add"

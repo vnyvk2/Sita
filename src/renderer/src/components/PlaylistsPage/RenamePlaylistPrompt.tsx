@@ -6,6 +6,7 @@ import { useRenameCollection } from '../../hooks/collections/useCollectionMutati
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import PlaylistCover from './PlaylistCover';
+import type { PlaylistDto } from '@common/collections/dtos';
 
 interface Props {
   playlistData: PlaylistDto;

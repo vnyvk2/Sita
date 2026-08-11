@@ -45,7 +45,7 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
   const arePlaylistsRemovable = useMemo(() => {
     return (
       numericPlaylistIds.length > 0 &&
-      !playlistIds.some((playlistId) => SpecialPlaylists.isSpecialPlaylistId(playlistId))
+      !playlistIds.some((playlistId) => typeof playlistId === 'number' && SpecialPlaylists.isSpecialPlaylistId(playlistId))
     );
   }, [playlistIds, numericPlaylistIds]);
 

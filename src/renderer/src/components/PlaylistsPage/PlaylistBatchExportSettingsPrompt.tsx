@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import type { PlaylistExportFormat, PlaylistBatchExportOptions, BatchExportResult, BatchExportProgressPayload } from '@common/collections/types';
+import type { PlaylistExportFormat, PlaylistBatchExportOptions, BatchExportResult } from '@common/collections/types';
 import Button from '../Button';
 import Dropdown from '../Dropdown';
 import { CollectionClient } from '@renderer/api/CollectionClient';
@@ -24,20 +24,20 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
   const [progress, setProgress] = useState<{ current: number; total: number; playlistName: string } | null>(null);
 
   useEffect(() => {
-    const handleProgress = (event: any, data: BatchExportProgressPayload) => {
-      setProgress(data);
+    const handleProgress = (_event: any, messageCode: string, data: any) => {
+      if (messageCode === 'PLAYLIST_BATCH_EXPORT_PROGRESS') {
+        setProgress(data);
+      }
     };
 
-    const removeListener = window.api.events?.onEvent
-      ? window.api.events.onEvent((_event: any, payload: any) => {
-          if (payload?.messageCode === 'PLAYLIST_BATCH_EXPORT_PROGRESS') {
-            handleProgress(null, payload.data);
-          }
-        })
-      : undefined;
+    if (window.api.messages?.getMessageFromMain) {
+      window.api.messages.getMessageFromMain(handleProgress);
+    }
 
     return () => {
-      if (removeListener) removeListener();
+      if (window.api.messages?.removeMessageToRendererEventListener) {
+        window.api.messages.removeMessageToRendererEventListener(handleProgress);
+      }
     };
   }, []);
 
