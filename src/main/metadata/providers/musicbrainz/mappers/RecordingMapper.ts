@@ -1,4 +1,6 @@
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
+import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import type { MetadataCandidate, RecordingMetadata, ProviderMetadata } from '@main/metadata/models/RecordingMetadata';
 import type { MusicBrainzRecordingDto } from '../dto/RecordingDto';
 
@@ -45,7 +47,7 @@ export class MusicBrainzRecordingMapper {
       providerArtistId: dto['artist-credit']?.[0]?.artist?.id,
       isrc: dto.isrcs?.[0],
       label: primaryRelease?.['label-info']?.[0]?.label?.name,
-      releaseType: primaryRelease?.['primary-type'],
+      releaseType: primaryRelease?.['release-group']?.['primary-type'],
       confidence,
       matchedBy: ['musicbrainz_recording_search'],
       reasons
@@ -67,12 +69,12 @@ export class MusicBrainzRecordingMapper {
 
     return new ProviderResult({
       payload: fields,
-      confidence,
-      providerInfo: {
+      confidence: new MetadataConfidence(confidence),
+      providerInfo: new MetadataProviderInfo({
         id: 'musicbrainz',
-        name: 'MusicBrainz Provider',
+        displayName: 'MusicBrainz Provider',
         version: '1.0.0'
-      }
+      })
     });
   }
 }

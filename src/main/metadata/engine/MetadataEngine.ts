@@ -14,6 +14,7 @@ import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergeP
 
 import type { MetadataMergeEngine } from './MetadataMergeEngine';
 import { DefaultMetadataMergePolicy } from '../providers/policies/DefaultMetadataMergePolicy';
+import { MetadataCapabilities } from '../common/types';
 
 export interface MetadataEngineOptions {
   executor: IMetadataProviderExecutor;
@@ -69,13 +70,13 @@ export class MetadataEngine implements IMetadataGateway {
     if (this.mergeEngine) {
       mergedPayload = await this.mergeEngine.mergeEntity(
         identity,
-        'ReadDatabase',
+        MetadataCapabilities.Tags,
         execContext
       );
     } else {
       const providerResults = await this.executor.execute(
         identity,
-        'ReadDatabase',
+        MetadataCapabilities.Tags,
         execContext
       );
       mergedPayload = this.mergePolicy.merge(providerResults);
@@ -121,7 +122,7 @@ export class MetadataEngine implements IMetadataGateway {
     if (cacheMisses.length > 0) {
       const batchResultsList = await this.executor.executeMany<unknown>(
         cacheMisses,
-        'ReadDatabase',
+        MetadataCapabilities.Tags,
         execContext
       );
 
@@ -166,13 +167,13 @@ export class MetadataEngine implements IMetadataGateway {
     if (this.mergeEngine) {
       mergedPayload = await this.mergeEngine.refreshAndMergeEntity(
         identity,
-        'ReadDatabase',
+        MetadataCapabilities.Tags,
         execContext
       );
     } else {
       const providerResults = await this.executor.refresh(
         identity,
-        'ReadDatabase',
+        MetadataCapabilities.Tags,
         execContext
       );
       mergedPayload = this.mergePolicy.merge(providerResults);
@@ -227,8 +228,17 @@ export class MetadataEngine implements IMetadataGateway {
   }
 
   public async query(query: MetadataQuery): Promise<MetadataEntity[]> {
-    const plannedIdentities = await this.planner.plan(query);
-    return this.loadMany(plannedIdentities);
+    const planned = await this.planner.executePlan(query);
+    const entities: MetadataEntity[] = [];
+    for (const dto of planned.dtos) {
+      const entity = await this.pipeline.processDTO(query.kind, dto, null);
+      if (entity) {
+        this.cache.set(entity);
+        this.publishEntity(entity, 'MetadataLoaded');
+        entities.push(entity);
+      }
+    }
+    return entities;
   }
 
   private publishEntity(

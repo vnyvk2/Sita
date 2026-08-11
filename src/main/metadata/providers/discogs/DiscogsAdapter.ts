@@ -1,44 +1,43 @@
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
-import type { ProviderCapabilities } from '../../contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '../../contracts/ProviderIdentity';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
-import type { ProviderResult } from '../../models/ProviderResult';
-import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/RecordingMetadata';
-import type { MetadataContribution, FieldContribution } from '../../domain/MetadataContribution';
+import type { AlbumMetadata, ResolvedAlbumRelease, OfficialTrackInput } from '../../models/RecordingMetadata';
+import type { MetadataContribution } from '../../domain/MetadataContribution';
+import type { FieldContribution } from '../../resolution/MetadataMergeEngine';
 import type { DiscogsApiClient } from './DiscogsApiClient';
-
 import type { ProviderRegistry } from '../../resolution/ProviderRegistry';
+import type { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
+
+import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
+import { ProviderResult } from '../../models/ProviderResult';
+import { MetadataConfidence } from '../../models/MetadataConfidence';
+import { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
 
 export interface DiscogsAdapterOptions {
   registry?: ProviderRegistry;
-  cache?: {
-    get<T>(providerId: string, key: string): T | null;
-    set<T>(providerId: string, key: string, val: T, ttlMs?: number): void;
-  };
+  cache?: IdentityResolutionCache;
 }
 
 export class DiscogsAdapter implements IMetadataProviderAdapter {
   public readonly identity: ProviderIdentity = {
     id: 'discogs',
-    displayName: 'Discogs',
-    version: '1.0.0'
+    name: 'Discogs',
+    version: '1.0.0',
+    providerType: 'online'
   };
 
-  public readonly capabilities: ProviderCapabilities = {
-    supportsAlbumSearch: true,
-    supportsTrackSearch: true,
-    supportsArtistSearch: true,
-    supportsCoverArt: true,
-    supportsHighResArtwork: true,
-    supportsGenres: true,
-    supportsISRC: false
-  };
+  public readonly capabilities: ProviderCapabilities = new ProviderCapabilities([
+    ProviderCapability.Search,
+    ProviderCapability.Artwork,
+    ProviderCapability.Tags,
+    ProviderCapability.Lookup
+  ]);
 
   public readonly priority = 800;
 
   private readonly apiClient: DiscogsApiClient;
   private readonly registry?: ProviderRegistry;
-  private readonly cache?: DiscogsAdapterOptions['cache'];
+  private readonly cache?: IdentityResolutionCache;
 
   constructor(apiClient: DiscogsApiClient, options?: DiscogsAdapterOptions) {
     this.apiClient = apiClient;
@@ -46,8 +45,8 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     this.cache = options?.cache;
   }
 
-  public supports(capability: keyof ProviderCapabilities): boolean {
-    return Boolean(this.capabilities[capability]);
+  public supports(capability: ProviderCapability): boolean {
+    return this.capabilities.has(capability);
   }
 
   private getConfidence(fieldId: string, fallback: number): number {
@@ -58,24 +57,17 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
    * Phase 14F — Discogs Contribution Adapter
    * Directly returns specialized field contributions: genre, style, catalogNumber, masterRelease.
    */
-  public async fetchContribution(query: { title?: string; artist?: string; mbid?: string; releaseId?: string }): Promise<MetadataContribution | null> {
-    console.log('[DiscogsAdapter] fetchContribution input query:', query);
-    if (!query.title && !query.artist) {
-      console.log('[DiscogsAdapter] fetchContribution returning null: Neither title nor artist provided');
-      return null;
-    }
+  public async fetchContribution(query: { title?: string; artist?: string }): Promise<MetadataContribution | null> {
+    if (!query.title && !query.artist) return null;
 
-    const cacheKey = `contribution:${query.title ?? ''}:${query.artist ?? ''}`;
+    const cacheKey = `discogs:${query.title ?? ''}:${query.artist ?? ''}`;
     if (this.cache) {
       const cached = this.cache.get<MetadataContribution>(this.identity.id, cacheKey);
       if (cached) return cached;
     }
 
     const data = await this.apiClient.fetchContributionData(query);
-    if (!data) {
-      console.log('[DiscogsAdapter] fetchContribution returning null: fetchContributionData returned null for query', query);
-      return null;
-    }
+    if (!data) return null;
 
     const contributions: FieldContribution[] = [];
 
@@ -119,8 +111,9 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
 
     const result: MetadataContribution = {
       providerId: this.identity.id,
-      contributions,
-      fetchedAt: Date.now()
+      providerName: this.identity.name,
+      confidenceScore: 0.85,
+      contributions
     };
 
     if (this.cache) {
@@ -142,16 +135,12 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
       const relTitle = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rel.title;
 
       return {
-        id: String(rel.id),
         releaseId: String(rel.id),
         title: relTitle,
         artist: relArtist,
-        album: relTitle,
         year: rel.year ? parseInt(rel.year, 10) : undefined,
-        genre: rel.genre?.[0],
-        coverArtUrl: rel.cover_image ?? rel.thumb,
-        provider: this.identity.id,
-        confidenceScore: 0.8
+        provider: 'discogs',
+        artwork: (rel.cover_image ?? rel.thumb) ? { onlineUrls: [rel.cover_image ?? rel.thumb!] } : undefined
       };
     });
   }
@@ -165,24 +154,28 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     const primaryArtist = details.artists?.[0]?.name ?? 'Unknown Artist';
     const coverArt = details.images?.find((img) => img.type === 'primary')?.uri ?? details.images?.[0]?.uri;
 
-    const tracks = (details.tracklist ?? []).map((tr, idx) => ({
-      recordingId: `discogs-tr-${details.id}-${idx + 1}`,
+    const tracks: OfficialTrackInput[] = (details.tracklist ?? []).map((tr, idx) => ({
       title: tr.title,
       trackNumber: idx + 1,
       duration: tr.duration ? this.parseDuration(tr.duration) : undefined,
-      artist: primaryArtist,
-      isrc: undefined
+      artist: primaryArtist
     }));
 
-    return {
-      releaseId: String(details.id),
+    const album: AlbumMetadata = {
       title: details.title,
       artist: primaryArtist,
       year: details.year,
-      genre: details.genres?.[0],
-      coverArtUrl: coverArt,
-      provider: this.identity.id,
-      tracks
+      label: details.labels?.[0]?.name,
+      releaseId: String(details.id),
+      provider: 'discogs',
+      artwork: coverArt ? { onlineUrls: [coverArt] } : undefined
+    };
+
+    return {
+      album,
+      tracks,
+      provider: 'discogs',
+      providerReleaseId: String(details.id)
     };
   }
 
@@ -190,40 +183,52 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     const rawId = String(identity.entityId);
     const details = await this.apiClient.getReleaseById(rawId);
 
+    const info = new MetadataProviderInfo({
+      id: this.identity.id,
+      displayName: this.identity.name,
+      version: this.identity.version
+    });
+
     if (details) {
       const primaryArtist = details.artists?.[0]?.name ?? 'Unknown Artist';
-      return {
-        providerId: this.identity.id,
-        entityId: String(details.id),
-        matchConfidence: 0.9,
-        metadata: {
+      return new ProviderResult<TDTO>({
+        payload: {
           title: details.title,
           artist: primaryArtist,
           album: details.title,
           genre: details.genres?.[0],
           year: details.year
-        } as TDTO
-      };
+        } as TDTO,
+        confidence: new MetadataConfidence(0.9),
+        providerInfo: info,
+        status: 'success'
+      });
     }
 
-    return {
-      providerId: this.identity.id,
-      entityId: rawId,
-      matchConfidence: 0.0,
-      metadata: null as TDTO,
+    return new ProviderResult<TDTO>({
+      payload: null,
+      confidence: MetadataConfidence.low(),
+      providerInfo: info,
+      status: 'failed',
       error: 'Discogs release not found'
-    };
+    });
   }
 
   public async search<TDTO = unknown>(query: string, options?: Record<string, unknown>): Promise<ProviderResult<TDTO>[]> {
     const limit = (options?.limit as number) ?? 10;
     const albums = await this.searchAlbums(query, undefined, limit);
 
-    return albums.map((alb) => ({
-      providerId: this.identity.id,
-      entityId: alb.id,
-      matchConfidence: alb.confidenceScore ?? 0.8,
-      metadata: alb as TDTO
+    const info = new MetadataProviderInfo({
+      id: this.identity.id,
+      displayName: this.identity.name,
+      version: this.identity.version
+    });
+
+    return albums.map((alb) => new ProviderResult<TDTO>({
+      payload: alb as TDTO,
+      confidence: new MetadataConfidence(0.8),
+      providerInfo: info,
+      status: 'success'
     }));
   }
 

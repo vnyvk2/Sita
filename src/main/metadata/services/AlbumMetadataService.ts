@@ -14,6 +14,7 @@ export interface LocalSongInput {
   musicBrainzRecordingId?: string;
   genre?: string;
   trackNumber?: number;
+  discNumber?: number;
 }
 
 export interface ScoreBreakdown {

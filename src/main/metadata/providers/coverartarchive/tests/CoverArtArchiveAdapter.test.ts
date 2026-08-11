@@ -77,7 +77,7 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
     });
 
     const result = await adapter.lookup({ entityId: mbid } as any);
-    expect(result.matchConfidence).toBe(0.95);
-    expect((result.metadata as any).coverArtUrl).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg');
+    expect(result.confidence.score).toBe(0.95);
+    expect((result.payload as any).coverArtUrl).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg');
   });
 });

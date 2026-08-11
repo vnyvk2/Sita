@@ -1,4 +1,6 @@
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
+import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import type { MusicBrainzArtistDto } from '../dto/ArtistDto';
 
 export class MusicBrainzArtistMapper {
@@ -14,12 +16,12 @@ export class MusicBrainzArtistMapper {
 
     return new ProviderResult({
       payload: fields,
-      confidence: 0.9,
-      providerInfo: {
+      confidence: new MetadataConfidence(0.9),
+      providerInfo: new MetadataProviderInfo({
         id: 'musicbrainz',
-        name: 'MusicBrainz Provider',
+        displayName: 'MusicBrainz Provider',
         version: '1.0.0'
-      }
+      })
     });
   }
 }

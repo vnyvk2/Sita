@@ -5,10 +5,12 @@ import type { IdentityResolutionCache } from '@main/metadata/cache/IdentityResol
 import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
 import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
+import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
 import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from './dto';
 import { MusicBrainzApiClient } from './MusicBrainzApiClient';
-import { MusicBrainzArtistMapper, MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
+import { MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
 import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
 
 import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
@@ -49,7 +51,6 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   private readonly registry?: ProviderRegistry;
   private readonly recordingMapper = new MusicBrainzRecordingMapper();
   private readonly releaseMapper = new MusicBrainzReleaseMapper();
-  private readonly artistMapper = new MusicBrainzArtistMapper();
 
   constructor(apiClient: MusicBrainzApiClient, options?: MusicBrainzAdapterOptions) {
     this.apiClient = apiClient;
@@ -231,21 +232,29 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
 
     // 3. Search query lookup
     const searchQuery = this.buildSearchQuery(identity);
+    const info = new MetadataProviderInfo({
+      id: this.identity.id,
+      displayName: this.identity.name,
+      version: this.identity.version
+    });
+
     if (!searchQuery) {
-      return new ProviderResult({
+      return new ProviderResult<TDTO>({
         payload: null,
-        confidence: 0,
-        providerInfo: this.identity
-      }) as ProviderResult<TDTO>;
+        confidence: MetadataConfidence.low(),
+        providerInfo: info,
+        status: 'failed'
+      });
     }
 
     const candidates = await this.apiClient.searchRecordings(searchQuery, 10);
     if (candidates.length === 0) {
-      return new ProviderResult({
+      return new ProviderResult<TDTO>({
         payload: null,
-        confidence: 0,
-        providerInfo: this.identity
-      }) as ProviderResult<TDTO>;
+        confidence: MetadataConfidence.low(),
+        providerInfo: info,
+        status: 'failed'
+      });
     }
 
     // Adapt MusicBrainz DTOs to provider-generic CandidateItems

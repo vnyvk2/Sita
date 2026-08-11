@@ -7,7 +7,15 @@ export interface MusicBrainzReleaseDto {
   date?: string;
   country?: string;
   barcode?: string;
+  score?: number;
+  'media-count'?: number;
   'artist-credit'?: MusicBrainzArtistCreditDto[];
+  'label-info'?: Array<{
+    label?: {
+      id?: string;
+      name?: string;
+    };
+  }>;
   'release-group'?: {
     id: string;
     title: string;
@@ -17,12 +25,27 @@ export interface MusicBrainzReleaseDto {
   media?: Array<{
     format?: string;
     'track-count'?: number;
+    position?: number;
+    track?: Array<{
+      id?: string;
+      position?: number;
+      number?: string;
+      title?: string;
+      length?: number;
+    }>;
     tracks?: Array<{
       id: string;
-      position: number;
-      number: string;
-      title: string;
+      position?: number;
+      number?: string;
+      title?: string;
       length?: number;
+      'artist-credit'?: MusicBrainzArtistCreditDto[];
+      recording?: {
+        id: string;
+        title: string;
+        length?: number;
+        'artist-credit'?: MusicBrainzArtistCreditDto[];
+      };
     }>;
   }>;
 }

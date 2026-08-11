@@ -4,19 +4,13 @@ import type {
   MusicBrainzArtistDto,
   MusicBrainzRecordingDto,
   MusicBrainzRecordingSearchResultDto,
-  MusicBrainzReleaseDto
+  MusicBrainzReleaseDto,
+  MusicBrainzReleaseSearchResultDto
 } from './dto';
 
 export interface MusicBrainzApiClientOptions {
   baseUrl?: string;
   userAgent?: string;
-}
-
-export interface MusicBrainzReleaseSearchResultDto {
-  created?: string;
-  count?: number;
-  offset?: number;
-  releases?: MusicBrainzReleaseDto[];
 }
 
 export class MusicBrainzApiClient {

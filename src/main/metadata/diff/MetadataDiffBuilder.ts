@@ -4,7 +4,7 @@ import { extractStringValue } from '../matching/TrackMatcher';
 import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 import { ProviderRegistry } from '../resolution/ProviderRegistry';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
-import type { MergedCandidateResult, FieldContribution } from '../resolution/MetadataMergeEngine';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 import { getMetadataFieldDisplayName } from '../../../common/metadata/displayNames';
 
 const globalProviderRegistry = new ProviderRegistry();
@@ -99,7 +99,7 @@ export class MetadataDiffBuilder {
 
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
-    const providerId = provider.providerId || 'musicbrainz';
+    const providerId = provider.provider || 'musicbrainz';
     const activeRegistry = registry ?? globalProviderRegistry;
     const providerName = activeRegistry.getDisplayName(providerId);
 

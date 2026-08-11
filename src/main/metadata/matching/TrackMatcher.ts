@@ -12,6 +12,9 @@ export interface LocalSongInput {
   duration?: number;
   isrc?: string;
   musicBrainzRecordingId?: string;
+  genre?: string;
+  trackNumber?: number;
+  discNumber?: number;
 }
 
 export interface OfficialTrackInput {

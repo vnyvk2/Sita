@@ -4,9 +4,9 @@ import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { UserMetadataRepository } from '../repository/UserMetadataRepository';
 
+import { MetadataCapabilities } from '../common/types';
 import { MetadataConfidence } from '../models/MetadataConfidence';
 import { MetadataProviderInfo } from '../models/MetadataProviderInfo';
-import { ProviderBatchResult } from '../models/ProviderBatchResult';
 import { ProviderResult } from '../models/ProviderResult';
 
 export class UserMetadataProvider implements IMetadataProvider {
@@ -29,11 +29,11 @@ export class UserMetadataProvider implements IMetadataProvider {
   }
 
   public supports(capability: MetadataCapability): boolean {
-    return capability === 'ReadDatabase' || capability === 'ReadMemory';
+    return capability === MetadataCapabilities.Tags;
   }
 
   public getCapabilities(): Set<MetadataCapability> {
-    return new Set(['ReadDatabase', 'ReadMemory']);
+    return new Set([MetadataCapabilities.Tags]);
   }
 
   public async fetch<TDTO = unknown>(
@@ -58,10 +58,12 @@ export class UserMetadataProvider implements IMetadataProvider {
       });
     } catch (error) {
       return new ProviderResult<TDTO>({
-        error: error instanceof Error ? error : new Error(String(error)),
+        payload: null,
+        confidence: MetadataConfidence.low(),
+        error: error instanceof Error ? error.message : String(error),
         providerInfo: this.info,
         latencyMs: Date.now() - startMs,
-        status: 'error'
+        status: 'failed'
       });
     }
   }
@@ -69,14 +71,13 @@ export class UserMetadataProvider implements IMetadataProvider {
   public async fetchMany<TDTO = unknown>(
     identities: MetadataIdentity[],
     _context?: ProviderExecutionContext
-  ): Promise<ProviderBatchResult<TDTO>> {
+  ): Promise<ProviderResult<TDTO>[]> {
     const startMs = Date.now();
-    const results = new Map<string, ProviderResult<TDTO>>();
 
     try {
       const overridesMap = await this.repository.getOverridesForMany(identities);
 
-      for (const identity of identities) {
+      return identities.map((identity) => {
         const key = `${identity.entityKind}:${String(identity.entityId)}`;
         const overrides = overridesMap.get(key) ?? [];
         const payload: Record<string, unknown> = {};
@@ -85,38 +86,24 @@ export class UserMetadataProvider implements IMetadataProvider {
           payload[override.fieldId] = override.value;
         }
 
-        results.set(
-          identity.metadataId,
-          new ProviderResult<TDTO>({
-            payload: payload as TDTO,
-            confidence: MetadataConfidence.verified(),
-            providerInfo: this.info,
-            latencyMs: 0,
-            status: 'success'
-          })
-        );
-      }
-
-      return new ProviderBatchResult<TDTO>({
-        results,
-        totalLatencyMs: Date.now() - startMs
+        return new ProviderResult<TDTO>({
+          payload: payload as TDTO,
+          confidence: MetadataConfidence.verified(),
+          providerInfo: this.info,
+          latencyMs: Date.now() - startMs,
+          status: 'success'
+        });
       });
     } catch (error) {
-      for (const identity of identities) {
-        results.set(
-          identity.metadataId,
-          new ProviderResult<TDTO>({
-            error: error instanceof Error ? error : new Error(String(error)),
-            providerInfo: this.info,
-            latencyMs: Date.now() - startMs,
-            status: 'error'
-          })
-        );
-      }
-
-      return new ProviderBatchResult<TDTO>({
-        results,
-        totalLatencyMs: Date.now() - startMs
+      return identities.map(() => {
+        return new ProviderResult<TDTO>({
+          payload: null,
+          confidence: MetadataConfidence.low(),
+          error: error instanceof Error ? error.message : String(error),
+          providerInfo: this.info,
+          latencyMs: Date.now() - startMs,
+          status: 'failed'
+        });
       });
     }
   }
@@ -131,11 +118,11 @@ export class UserMetadataProvider implements IMetadataProvider {
   public async refreshMany<TDTO = unknown>(
     identities: MetadataIdentity[],
     context?: ProviderExecutionContext
-  ): Promise<ProviderBatchResult<TDTO>> {
+  ): Promise<ProviderResult<TDTO>[]> {
     return this.fetchMany<TDTO>(identities, context);
   }
 
   public async shutdown(): Promise<void> {
-    this.info.setDisabled('Shut down');
+    this.info.setDisabled();
   }
 }

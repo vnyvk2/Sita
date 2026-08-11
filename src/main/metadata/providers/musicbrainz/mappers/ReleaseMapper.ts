@@ -1,4 +1,6 @@
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
+import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import type { AlbumMetadata, OfficialTrackInput, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
 import type { MusicBrainzReleaseDto } from '../dto/ReleaseDto';
 
@@ -69,12 +71,12 @@ export class MusicBrainzReleaseMapper {
 
     return new ProviderResult({
       payload: album as unknown as Record<string, unknown>,
-      confidence: 0.9,
-      providerInfo: {
+      confidence: new MetadataConfidence(0.9),
+      providerInfo: new MetadataProviderInfo({
         id: 'musicbrainz',
-        name: 'MusicBrainz Provider',
+        displayName: 'MusicBrainz Provider',
         version: '1.0.0'
-      }
+      })
     });
   }
 }

@@ -99,8 +99,8 @@ describe('Phase 14F — Discogs Contribution Adapter Suite', () => {
 
     const resolved = await adapter.resolveRelease('999');
     expect(resolved).not.toBeNull();
-    expect(resolved?.title).toBe('Nevermind');
-    expect(resolved?.artist).toBe('Nirvana');
+    expect(resolved?.album.title).toBe('Nevermind');
+    expect(resolved?.album.artist).toBe('Nirvana');
     expect(resolved?.tracks).toHaveLength(2);
     expect(resolved?.tracks[0].title).toBe('Smells Like Teen Spirit');
     expect(resolved?.tracks[0].duration).toBe(301);
