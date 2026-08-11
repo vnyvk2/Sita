@@ -1,6 +1,5 @@
 import { type SQL, sql } from 'drizzle-orm';
-import type { SmartPlaylistRuleAST, RuleCondition, SmartPlaylistField, SmartPlaylistOperator, OrderDefinition } from './ast';
-import type { ExecutionPlan } from './QueryPlanner';
+import type { SmartPlaylistRuleAST, RuleCondition, SmartPlaylistField, OrderDefinition } from './ast';
 import { songs, artists, albums, genres } from '../../db/schema';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 

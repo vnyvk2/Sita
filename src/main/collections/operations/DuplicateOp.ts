@@ -1,13 +1,9 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { createCollectionId } from '../../../common/collections/id';
-import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
-import { eq, inArray } from 'drizzle-orm';
 import { DuplicatePlanner } from './DuplicatePlanner';
 import { DuplicateExecutor } from './DuplicateExecutor';
 
 import type { DuplicateInput } from '../../../common/collections/operationInputs';
-
-const MAX_DEPTH = 50;
 
 export class DuplicateOp implements CollectionOperation<DuplicateInput, number> {
   private planner: DuplicatePlanner;

@@ -10,7 +10,7 @@ export interface SnapshotSmartPlaylistInput {
 }
 
 export class SnapshotSmartPlaylistOp implements CollectionOperation<SnapshotSmartPlaylistInput, number> {
-  private repository: PlaylistRepository;
+  public readonly repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository = new PlaylistRepository()) {
     this.repository = repository;

@@ -1,5 +1,5 @@
 import { db } from '@db/db';
-import { albumsSongs, artistsSongs, genresSongs, playlistEntries, songs } from '@db/schema';
+import { albumsSongs, artistsSongs, genresSongs, playlistEntries } from '@db/schema';
 import { asc, eq, inArray, sql, and } from 'drizzle-orm';
 
 import type { MembershipEntry } from '../models/MembershipEntry';

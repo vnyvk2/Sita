@@ -11,7 +11,7 @@ export interface DraftSnapshot {
 
 export class SnapshotBuilder {
   public static buildHistorySnapshot(
-    operationId: string,
+    _operationId: string,
     undoToken: UndoToken,
     drafts: DraftSnapshot[]
   ): MetadataHistorySnapshot {

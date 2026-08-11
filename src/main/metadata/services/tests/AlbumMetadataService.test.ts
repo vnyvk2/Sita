@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MetadataNormalizer } from '../../matching/MetadataNormalizer';
 import { TrackMatcher } from '../../matching/TrackMatcher';
 import { AlbumMetadataService, getConfidenceLevel } from '../AlbumMetadataService';
 import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';

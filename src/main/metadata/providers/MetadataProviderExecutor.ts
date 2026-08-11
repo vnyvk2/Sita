@@ -1,6 +1,5 @@
 import type { MetadataCapability } from '../common/types';
 import type { MetadataEventBus } from '../events/MetadataEventBus';
-import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
 import type { IMetadataProviderExecutor } from '../interfaces/IMetadataProviderExecutor';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';

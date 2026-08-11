@@ -10,7 +10,7 @@ import { dirExistsSync } from '../utils/dirExists';
 import checkFolderForContentModifications from './checkFolderForContentModifications';
 import checkFolderForUnknownModifications from './checkFolderForUnknownContentModifications';
 import checkForFolderModifications from './checkForFolderModifications';
-import { getAbortController, saveAbortController, closeAbortController } from './controlAbortControllers';
+import { getAbortController, saveAbortController } from './controlAbortControllers';
 import { saveFolderStructures, getAllFoldersFromFolderStructures } from './parseFolderStructuresForSongPaths';
 import { generateFolderStructure } from '../core/getFolderStructures';
 

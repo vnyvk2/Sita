@@ -34,7 +34,6 @@ import getSongInfo from './core/getSongInfo';
 import getSongLyrics from './core/getSongLyrics';
 import getStorageUsage from './core/getStorageUsage';
 import importAppData from './core/importAppData';
-import importPlaylist from './core/importPlaylist';
 import removeMusicFolder from './core/removeMusicFolder';
 
 import { resolveArtistDuplicates } from './core/resolveDuplicates';

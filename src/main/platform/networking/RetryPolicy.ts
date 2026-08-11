@@ -66,8 +66,7 @@ export class RetryPolicy {
 
   public calculateDelay(attempt: number, err?: unknown): number {
     if (err instanceof HttpError && err.status === 429) {
-      // Respect Retry-After header if present
-      const retryAfterHeader = err.statusText; // checked in pipeline if needed
+      // Respect Retry-After header in pipeline if needed
     }
 
     const exponentialDelay = this.initialDelayMs * Math.pow(this.backoffFactor, attempt - 1);

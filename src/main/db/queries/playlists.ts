@@ -1,7 +1,7 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { db } from '@db/db';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
 
 import { playlistEntries, playlists, songs, playHistory } from '../schema';
 

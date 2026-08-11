@@ -1,5 +1,4 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { db } from '../../db/db';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
 

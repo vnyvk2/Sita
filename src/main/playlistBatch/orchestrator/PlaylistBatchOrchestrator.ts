@@ -3,7 +3,6 @@ import type { PlaylistSyncWorkflow } from '../../playlistSync/workflow/PlaylistS
 import type { BatchExecutionPlan } from '../models/BatchExecutionPlan';
 import type { BatchSession } from '../models/BatchSession';
 import type { BatchExecutionSummary } from '../models/BatchExecutionSummary';
-import type { BatchItem } from '../models/BatchItem';
 
 export interface BatchOrchestrationOptions {
   concurrency?: number;
@@ -19,7 +18,7 @@ export class PlaylistBatchOrchestrator {
 
   async executeBatchPlan(
     plan: BatchExecutionPlan,
-    options?: BatchOrchestrationOptions
+    _options?: BatchOrchestrationOptions
   ): Promise<BatchExecutionSummary> {
     const startTime = Date.now();
     const sessionId = `batch_session_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;

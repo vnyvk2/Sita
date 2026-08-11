@@ -1,8 +1,7 @@
 import type {
   SmartPlaylistDefinition,
   SmartPlaylistRuleAST,
-  SmartPlaylistField,
-  OrderDefinition
+  SmartPlaylistField
 } from '../query/ast';
 
 export class DependencyAnalyzer {

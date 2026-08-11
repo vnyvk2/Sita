@@ -9,8 +9,6 @@ import { MetadataOperationManager } from '../operations/MetadataOperationManager
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
-import type { MetadataContext } from '../domain/MetadataContext';
-
 export interface AlbumAutoTagServiceOptions {
   albumMetadataService: AlbumMetadataService;
   applyService?: MetadataApplyService;

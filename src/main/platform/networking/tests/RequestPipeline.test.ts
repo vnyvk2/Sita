@@ -1,5 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-import { Authenticator } from '../Authenticator';
+import { describe, expect, it } from 'vitest';
 import { HttpError } from '../FetchHttpClient';
 import type { HttpRequestOptions, HttpResponse, IHttpClient } from '../IHttpClient';
 import { RateLimiter } from '../RateLimiter';
@@ -86,7 +85,6 @@ describe('Platform Networking — RequestPipeline & Utilities', () => {
     const rateLimiter = new RateLimiter({ maxRequests: 2, perIntervalMs: 1000 });
     const pipeline = new RequestPipeline({ client: mockClient, rateLimiter });
 
-    const start = Date.now();
     await pipeline.execute({ url: 'https://api.example.com/1' });
     await pipeline.execute({ url: 'https://api.example.com/2' });
     expect(mockClient.calls.length).toBe(2);

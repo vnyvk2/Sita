@@ -8,7 +8,7 @@ export interface MetadataSearchGatewayOptions {
 }
 
 export class MetadataSearchGateway {
-  private readonly gateway: IMetadataGateway;
+  public readonly gateway: IMetadataGateway;
   private readonly resolver: MetadataSearchResolver;
 
   constructor(options: MetadataSearchGatewayOptions) {

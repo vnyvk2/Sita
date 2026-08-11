@@ -3,7 +3,7 @@ import type { ObservabilityMetrics } from '../models/ObservabilityMetrics';
 import type { PlaylistHealth } from '../models/PlaylistHealth';
 
 export class HealthEvaluator {
-  computeHealth(metrics: ObservabilityMetrics, issues: DiagnosticIssue[]): PlaylistHealth {
+  computeHealth(_metrics: ObservabilityMetrics, issues: DiagnosticIssue[]): PlaylistHealth {
     let score = 100;
 
     for (const issue of issues) {

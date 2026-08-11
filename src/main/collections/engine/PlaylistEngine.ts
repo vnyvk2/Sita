@@ -63,7 +63,7 @@ export class PlaylistEngine {
   private readonly bulkRestoreOp: BulkRestoreOp;
   private readonly setArtworkOp: SetArtworkOp;
   
-  private readonly folderStats: FolderStatisticsService;
+  public readonly folderStats: FolderStatisticsService;
   private readonly hierarchyService: HierarchyService;
 
   constructor(

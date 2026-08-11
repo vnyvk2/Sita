@@ -3,7 +3,7 @@ import type { PlaylistConflict } from '../models/PlaylistConflict';
 import type { ConflictAnalysis } from '../models/ConflictAnalysis';
 
 export class PlaylistConflictAnalyzer {
-  analyzePlan(plan: PlaylistSyncPlan, currentPlaylistSongIds: number[]): ConflictAnalysis {
+  analyzePlan(plan: PlaylistSyncPlan, _currentPlaylistSongIds: number[]): ConflictAnalysis {
     const conflicts: PlaylistConflict[] = [];
 
     const songAddCounts = new Map<number, number>();

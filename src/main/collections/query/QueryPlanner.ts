@@ -1,4 +1,4 @@
-import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, RuleGroup, RuleCondition, OrderDefinition } from './ast';
+import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, RuleCondition, OrderDefinition } from './ast';
 
 export type JoinRelation = 'artist' | 'album' | 'genre';
 

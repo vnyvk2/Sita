@@ -1,8 +1,8 @@
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { createCollectionId } from '../../../common/collections/id';
-import { playlists, playlistEntries } from '../../db/schema';
+import { playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 import type { MergePlaylistsInput } from '../../../common/collections/operationInputs';
 
