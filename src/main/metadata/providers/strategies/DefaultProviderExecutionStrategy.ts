@@ -71,11 +71,7 @@ export class DefaultProviderExecutionStrategy implements IProviderExecutionStrat
         identity,
         execContext,
         eventBus: this.eventBus,
-        action: action as (
-          provider: IMetadataProvider,
-          identity: MetadataIdentity,
-          context?: ProviderExecutionContext
-        ) => Promise<unknown>
+        action
       });
 
       const res = await this.executionPipeline.process<TDTO>(stageContext);
