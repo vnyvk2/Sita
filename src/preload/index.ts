@@ -592,9 +592,10 @@ const libraryMetrics = {
 const collections = {
   read: {
     getCollection: (id: number): Promise<CollectionDto | null> => ipcRenderer.invoke('collections/read/getCollection', id),
-    getChildren: (id: number): Promise<CollectionDto[]> => ipcRenderer.invoke('collections/read/getChildren', id),
+    getChildren: (id: number | null): Promise<CollectionDto[]> => ipcRenderer.invoke('collections/read/getChildren', id),
     getEntries: (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode): Promise<PlaylistEntryDto[]> => ipcRenderer.invoke('collections/read/getEntries', id, offset, limit, sortType),
-    getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> => ipcRenderer.invoke('collections/read/getBreadcrumbs', id)
+    getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> => ipcRenderer.invoke('collections/read/getBreadcrumbs', id),
+    getArtworks: (songIds: number[]): Promise<ArtworkPaths[]> => ipcRenderer.invoke('collections/read/getArtworks', songIds)
   },
   write: {
     createFolder: (input: CreateFolderInput): Promise<number> => ipcRenderer.invoke('collections/write/createFolder', input),

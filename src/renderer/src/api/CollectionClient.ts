@@ -1,4 +1,4 @@
-import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '@common/collections/types';
+import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistBatchExportOptions } from '@common/collections/types';
 import type { 
   CreateFolderInput,
   CreatePlaylistInput,

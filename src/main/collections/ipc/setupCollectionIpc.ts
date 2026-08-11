@@ -26,7 +26,7 @@ export function setupCollectionIpc(
     return playlist ? mapPlaylistToDto(playlist) : null;
   });
 
-  ipcMain.handle('collections/read/getChildren', async (_, id: number) => {
+  ipcMain.handle('collections/read/getChildren', async (_, id: number | null) => {
     const children = await repository.getChildren(id);
     return children.map(mapPlaylistToDto);
   });

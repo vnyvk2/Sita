@@ -25,7 +25,7 @@ export class UndoEngine {
   private readonly membershipService: MembershipService;
 
   // In-memory UI state
-  private readonly sequencePointers = new Map<string, number>();
+  private readonly sequencePointers = new Map<string | number, number>();
 
   public getCurrentPointer(collectionId: CollectionId): number | undefined {
     return this.sequencePointers.get(collectionId.key);
@@ -61,7 +61,7 @@ export class UndoEngine {
       currentSeq = latest.sequenceNumber;
     }
 
-    if (currentSeq <= 0) return false; // Reached beginning of history
+    if (currentSeq === undefined || currentSeq <= 0) return false; // Reached beginning of history
 
     const journalEntry = await this.journalRepo.getCurrentOrPrevious(collectionId.type, numericKey, currentSeq);
     if (!journalEntry) return false;

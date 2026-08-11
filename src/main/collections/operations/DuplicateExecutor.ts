@@ -1,5 +1,5 @@
 import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
-import { inArray, eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import type { PlannedNode } from './DuplicatePlanner';
 
 export class DuplicateExecutor {
@@ -27,7 +27,9 @@ export class DuplicateExecutor {
       .where(inArray(playlists.id, nodeIds));
 
     // Map oldId -> fullNode
-    const fullNodeMap = new Map(fullNodes.map((n: any) => [n.id, n]));
+    const fullNodeMap = new Map<number, (typeof fullNodes)[number]>(
+      fullNodes.map((n: (typeof fullNodes)[number]) => [n.id, n])
+    );
 
     // 2. Insert nodes (since plannedNodes are topologically sorted, parents exist before children)
     const idMap = new Map<number, number>();
