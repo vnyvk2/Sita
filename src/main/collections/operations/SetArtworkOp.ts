@@ -3,20 +3,14 @@ import { artworks, artworksPlaylists } from '../../db/schema';
 import { linkArtworkToPlaylist, saveArtworks } from '../../db/queries/artworks';
 import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
 import logger from '../../logger';
-import { processArtworkFiles } from '../../other/artworks';
+import { processArtworkFiles, type ArtworkPayload } from '../../other/artworks';
 import { createCollectionId } from '../../../common/collections/id';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export interface ProcessedArtworkPayload {
   existing?: (typeof artworks.$inferSelect)[];
-  payloads?: {
-    hash: string;
-    path: string;
-    width: number;
-    height: number;
-    source: 'playlist';
-  }[];
+  payloads?: ArtworkPayload[];
 }
 
 export interface SetArtworkInput {

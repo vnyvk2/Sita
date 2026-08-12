@@ -6,13 +6,16 @@ export class SmartPlaylistJob implements Job {
   public jobClass: JobClass = 'background';
   public retries = 0;
   public readonly maxRetries = 3;
+  public readonly description: string;
   
   private engine = new SmartPlaylistEngine();
 
   constructor(
     public readonly id: string, // Expected to be `smart_playlist_regenerate_${playlistId}`
     private readonly playlistId: number
-  ) {}
+  ) {
+    this.description = `Regenerating smart playlist ${playlistId}`;
+  }
 
   public type = 'SmartPlaylistRegeneration';
 

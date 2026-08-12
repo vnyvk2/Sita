@@ -137,19 +137,19 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
 
   const songs = songRefs
     .map((ref) => hydratedMap.get(`song:${ref.id}`))
-    .filter(Boolean);
+    .filter((s): s is SongData => Boolean(s));
   const artists = artistRefs
     .map((ref) => hydratedMap.get(`artist:${ref.id}`))
-    .filter(Boolean);
+    .filter((a): a is Artist => Boolean(a));
   const albums = albumRefs
     .map((ref) => hydratedMap.get(`album:${ref.id}`))
-    .filter(Boolean);
+    .filter((al): al is Album => Boolean(al));
   const playlists = playlistRefs
     .map((ref) => hydratedMap.get(`playlist:${ref.id}`))
-    .filter(Boolean);
+    .filter((p): p is Playlist => Boolean(p));
   const genres = genreRefs
     .map((ref) => hydratedMap.get(`genre:${ref.id}`))
-    .filter(Boolean);
+    .filter((g): g is Genre => Boolean(g));
 
   // 4. Compute section confidence from match tiers
   const bestTierOf = (refs: SearchMatchReference[]): MatchTierValue =>

@@ -1,5 +1,6 @@
 import { smartPlaylistRules } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
+import { createCollectionId } from '../../../../common/collections/id';
 import type { CollectionOperation, OperationContext, OperationResult } from '../types';
 import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, OrderDefinition } from '../../query/ast';
 import { DependencyAnalyzer } from '../../engine/DependencyAnalyzer';
@@ -50,7 +51,7 @@ export class UpdateSmartPlaylistOp implements CollectionOperation<UpdateSmartPla
 
     return {
       data: undefined,
-      collectionId: { type: 'playlist', id: playlistId },
+      collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.updateSmartRule',
       operationInput: { playlistId, definition },
       inverseInput: {

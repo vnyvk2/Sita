@@ -4,7 +4,6 @@ import { libraryEventBus } from '../../events/LibraryEventBus';
 import { DependencyAnalyzer } from './DependencyAnalyzer';
 import { libraryScheduler } from '../../workers/jobScheduler';
 import { SmartPlaylistJob } from '../../workers/jobs/smartPlaylistJob';
-import type { SmartPlaylistField } from '../query/ast';
 
 export class SmartPlaylistScheduler {
   private dirtyPlaylists = new Set<number>();
@@ -44,7 +43,7 @@ export class SmartPlaylistScheduler {
     );
   }
 
-  private async handleEvent(eventName: string, changedFields: SmartPlaylistField[]) {
+  private async handleEvent(eventName: string, changedFields: readonly string[]) {
     this.metrics.eventsReceived++;
     try {
       const allRules = await db

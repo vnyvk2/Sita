@@ -1,6 +1,7 @@
 import type {
   SmartPlaylistDefinition,
   SmartPlaylistRuleAST,
+  RuleCondition,
   SmartPlaylistField
 } from '../query/ast';
 
@@ -22,7 +23,7 @@ export class DependencyAnalyzer {
     return Array.from(fields);
   }
 
-  private static walkAst(node: SmartPlaylistRuleAST, fields: Set<SmartPlaylistField>): void {
+  private static walkAst(node: SmartPlaylistRuleAST | RuleCondition, fields: Set<SmartPlaylistField>): void {
     if (node.type === 'condition') {
       fields.add(node.field);
     } else if (node.type === 'group') {
@@ -36,8 +37,8 @@ export class DependencyAnalyzer {
    * Checks if a smart playlist should be regenerated based on the changed metadata fields.
    */
   public static isAffectedByMetadataChange(
-    cachedDependencies: SmartPlaylistField[],
-    changedFields: SmartPlaylistField[]
+    cachedDependencies: readonly string[],
+    changedFields: readonly string[]
   ): boolean {
     if (!cachedDependencies) return true; // Default safe fallback if missing
     if (cachedDependencies.length === 0) return false; // Explicitly empty means no dependencies
