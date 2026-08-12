@@ -15,6 +15,10 @@ describe('Metadata Domain Model Specification Blueprint Test Suite', () => {
       type: 'AlbumResolution',
       mode: 'Interactive',
       targetResourceIds: [42, 43, 44],
+      context: {
+        resources: { primaryType: 'album', targetResources: [] },
+        execution: { mode: 'Interactive' }
+      },
       state: 'Created',
       progressMessage: 'Initialized',
       progressPercent: 0,

@@ -28,8 +28,9 @@ describe('Background Enrichment & Library Health Assessment Test Suite', () => {
     const poorHealth = queue.evaluateSongHealth(incompleteSong);
     expect(poorHealth.score).toBeLessThan(50);
     expect(poorHealth.rating).toBe('Poor');
-    expect(poorHealth.issues).toContain('Missing song title');
-    expect(poorHealth.issues).toContain('Missing or generic artist');
+    const descriptions = poorHealth.issues.map((i) => i.description);
+    expect(descriptions).toContain('Missing song title');
+    expect(descriptions).toContain('Missing or generic artist');
   });
 
   it('assesses overall library health score across a batch of songs', () => {

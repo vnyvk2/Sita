@@ -1,19 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MetadataTransactionManager } from '../MetadataTransactionManager';
-import { TagWriterService } from '../../services/TagWriterService';
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
 
 describe('Metadata Transaction Manager Blueprint Test Suite', () => {
   it('executes atomic mutations via MetadataTransactionManager and records UndoToken snapshots', async () => {
-    const mockTagWriter = new TagWriterService();
-    vi.spyOn(mockTagWriter, 'writeBatch').mockResolvedValue([
-      { filePath: 'song.mp3', success: true }
-    ]);
-
     const mockDbUpdater = vi.fn().mockResolvedValue(true);
 
     const txManager = new MetadataTransactionManager({
-      tagWriter: mockTagWriter,
       dbUpdater: mockDbUpdater
     });
 
