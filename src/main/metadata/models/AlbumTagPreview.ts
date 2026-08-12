@@ -54,5 +54,6 @@ export interface AlbumTagPreview {
   confidenceLevel: ConfidenceLevel;
   provider: MetadataProviderId;
   providerReleaseId: string;
+  contributingProviders?: MetadataProviderId[];
   resolvedRelease?: ResolvedAlbumRelease;
 }

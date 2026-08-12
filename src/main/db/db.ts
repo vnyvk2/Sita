@@ -42,6 +42,8 @@ await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
 export const db = drizzle(pgliteInstance, {
   schema
 });
+export type DB = typeof db;
+export type DBTransaction = Parameters<Parameters<DB['transaction']>[0]>[0];
 ShutdownLogger.logBootMilestone('Drizzle ORM initialized');
 
 export const closeDatabaseInstance = async () => {

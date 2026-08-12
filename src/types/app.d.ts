@@ -6,7 +6,7 @@ import type { resources } from 'src/renderer/src/i18n';
 import type { api } from '../preload';
 import type { ButtonProps } from '../renderer/src/components/Button';
 import type { DropdownOption } from '../renderer/src/components/Dropdown';
-import type { songSortTypes } from '../renderer/src/components/SongsPage/SongOptions';
+import type { songSortTypes } from '../common/songSortTypes';
 import type { LastFMSessionData } from './last_fm_api';
 import type { SimilarArtist, Tag } from './last_fm_artist_info_api';
 
@@ -978,6 +978,7 @@ declare global {
     | 'PENDING_METADATA_UPDATES_SAVED'
     | 'FOLDER_PARSED_FOR_DIRECTORIES'
     | 'RESET_SUCCESSFUL'
+    | 'PLAYLIST_BATCH_EXPORT_PROGRESS'
     | 'LYRICS_SAVE_QUEUED'
     | 'LYRICS_SAVED_IN_LRC_FILE'
     | 'PENDING_LYRICS_SAVED'
@@ -1324,6 +1325,7 @@ declare global {
     synchronizedLyrics?: string;
     unsynchronizedLyrics?: string;
     artworkPath?: string;
+    artworkBuffer?: Buffer;
     duration: number;
     isLyricsSavePending?: boolean;
     isMetadataSavePending?: boolean;

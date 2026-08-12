@@ -1,5 +1,5 @@
 import type { Collection, CollectionEntry, CollectionId, PlaylistViewMode } from '../../../common/collections/types';
-import type { SortDefinition } from '../query/ast';
+import type { OrderDefinition } from '../query/ast';
 
 export interface CollectionQueryOptions {
   sortType?: PlaylistViewMode;
@@ -12,7 +12,7 @@ export interface EntryQueryOptions {
   start: number;
   end: number;
   sortType?: PlaylistViewMode;
-  sortDefinition?: SortDefinition[];
+  sortDefinition?: OrderDefinition[];
 }
 
 export interface CollectionProvider {
