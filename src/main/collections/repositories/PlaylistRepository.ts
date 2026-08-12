@@ -210,10 +210,10 @@ export class PlaylistRepository {
   public async restorePlaylistWithId(data: PlaylistRow, trx: DB | DBTransaction = db) {
     const [inserted] = await trx
       .insert(playlists)
-      .values(data)
       .overridingSystemValue()
+      .values(data)
       .returning();
-      
+
     return inserted;
   }
 
@@ -254,6 +254,7 @@ export class PlaylistRepository {
 
     return await trx
       .insert(playlistEntries)
+      .overridingSystemValue()
       .values(entries)
       .returning();
   }
@@ -337,7 +338,7 @@ export class PlaylistRepository {
 
     const uniqueSongIds = Array.from(new Set(songIds));
     const CHUNK_SIZE = 500;
-    const songRows: { id: number; duration: number | null }[] = [];
+    const songRows: { id: number; duration: string | null }[] = [];
 
     for (let i = 0; i < uniqueSongIds.length; i += CHUNK_SIZE) {
       const chunk = uniqueSongIds.slice(i, i + CHUNK_SIZE);

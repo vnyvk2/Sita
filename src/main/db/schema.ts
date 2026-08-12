@@ -19,7 +19,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type { SmartPlaylistRuleAST, OrderDefinition, SmartPlaylistField } from '../collections/query/ast';
-import type { OperationInverseInput } from '../collections/operations/types';
+import type { OperationInverseInput, OperationType } from '../collections/operations/types';
 import type { CollectionContextData } from '../collections/context/types';
 
 // ============================================================================
@@ -1304,7 +1304,7 @@ export const operationJournal = pgTable(
     collectionType: varchar('collection_type', { length: 20 }).notNull(),
     collectionId: integer('collection_id').notNull(),
     /** What operation was performed */
-    operationType: varchar('operation_type', { length: 50 }).notNull(),
+    operationType: varchar('operation_type', { length: 50 }).$type<OperationType>().notNull(),
     /** Direction: 'forward' for original, 'reverse' for undo */
     direction: varchar('direction', { length: 10 }).notNull().default('forward'),
     /** The forward operation input (what was requested) */
