@@ -25,7 +25,11 @@ export class ShutdownLogger {
     return currentBootSessionId;
   }
 
-  public static logShutdownTransition(state: ShutdownState, source?: string): string {
+  public static logShutdownTransition(
+    state: ShutdownState,
+    source?: string,
+    details?: Record<string, unknown>
+  ): string {
     const now = Date.now();
     const timestamp = new Date(now).toISOString();
 
@@ -39,7 +43,7 @@ export class ShutdownLogger {
       // Transition called before Started state session initialization
       logger.warn(
         `[Pre-Shutdown][${timestamp}] State transition to ${state} without active Started session (source: ${source || 'unknown'})`,
-        { category: 'lifecycle' }
+        { category: 'lifecycle', ...(details || {}) }
       );
       return 'uninitialized';
     }
@@ -49,7 +53,7 @@ export class ShutdownLogger {
 
     logger.info(
       `[${currentShutdownSessionId}][${timestamp}] Shutdown State: ${state} (source: ${source || 'unknown'}, elapsed: ${durationMs}ms)`,
-      { category: 'lifecycle' }
+      { category: 'lifecycle', ...(details || {}) }
     );
 
     return currentShutdownSessionId;
