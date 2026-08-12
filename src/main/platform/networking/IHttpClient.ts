@@ -6,6 +6,7 @@ export interface HttpRequestOptions {
   body?: unknown;
   timeoutMs?: number;
   signal?: AbortSignal;
+  responseType?: 'json' | 'text' | 'buffer';
 }
 
 export interface HttpResponse<T = unknown> {

@@ -1,36 +1,10 @@
 import i18n from '../../i18n';
 import { type DropdownOption } from '../Dropdown';
 
-export const songSortTypes = [
-  'addedOrder',
-  'customOrder',
-  'originalOrder',
-  'aToZ',
-  'zToA',
-  'dateAddedAscending',
-  'dateAddedDescending',
-  'dateModifiedAscending',
-  'dateModifiedDescending',
-  'releasedYearAscending',
-  'releasedYearDescending',
-  'trackNoAscending',
-  'trackNoDescending',
-  'artistNameAscending',
-  'artistNameDescending',
-  'allTimeMostListened',
-  'allTimeLeastListened',
-  'monthlyMostListened',
-  'monthlyLeastListened',
-  'albumNameAscending',
-  'albumNameDescending',
-  'mostSkipped',
-  'leastSkipped',
-  'blacklistedSongs',
-  'whitelistedSongs'
-] as const;
-
-export type SongSortTypes = (typeof songSortTypes)[number];
+export { songSortTypes, type SongSortTypes } from '../../../../common/songSortTypes';
+import type { SongSortTypes } from '../../../../common/songSortTypes';
 export type PlaylistViewMode = SongSortTypes;
+
 
 export function canReorder(viewMode?: PlaylistViewMode | string): boolean {
   return viewMode === 'customOrder';

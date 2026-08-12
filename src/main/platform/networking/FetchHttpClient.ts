@@ -73,15 +73,20 @@ export class FetchHttpClient implements IHttpClient {
       });
 
       let responseData: unknown = undefined;
-      const contentType = responseHeaders['content-type'] ?? '';
-      if (contentType.includes('application/json')) {
-        responseData = await response.json();
+      if (options.responseType === 'buffer') {
+        const arrayBuf = await response.arrayBuffer();
+        responseData = Buffer.from(arrayBuf);
       } else {
-        const text = await response.text();
-        try {
-          responseData = JSON.parse(text);
-        } catch {
-          responseData = text;
+        const contentType = responseHeaders['content-type'] ?? '';
+        if (contentType.includes('application/json')) {
+          responseData = await response.json();
+        } else {
+          const text = await response.text();
+          try {
+            responseData = JSON.parse(text);
+          } catch {
+            responseData = text;
+          }
         }
       }
 
