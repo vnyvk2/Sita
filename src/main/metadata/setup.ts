@@ -58,6 +58,7 @@ import { DefaultMetadataLookupGateway } from './resolution/MetadataLookupGateway
 import { MetadataResolutionManager } from './resolution/MetadataResolutionManager';
 import { ProviderRegistry as ResolutionProviderRegistry } from './resolution/ProviderRegistry';
 import { MetadataProviderDiscovery } from './runtime/MetadataProviderDiscovery';
+import { MetadataProviderRegistry as RuntimeMetadataProviderRegistry } from './runtime/MetadataProviderRegistry';
 import { MetadataProviderRuntime } from './runtime/MetadataProviderRuntime';
 import { AlbumAutoTagService } from './services/AlbumAutoTagService';
 import { AlbumMetadataService } from './services/AlbumMetadataService';
@@ -137,13 +138,14 @@ export class MetadataBootstrap {
     const context = new MetadataContext(contextOptions);
     const fieldRegistry = new MetadataFieldRegistry(CORE_FIELD_DEFINITIONS);
     const providerRegistry = new MetadataProviderRegistry();
+    const runtimeProviderRegistry = new RuntimeMetadataProviderRegistry();
     const mapperRegistry = new MapperRegistry();
     const loaderRegistry = new LoaderRegistry();
     const eventBus = new MetadataEventBus();
     const cache = new MetadataCache();
 
     const identityCache = new IdentityResolutionCache();
-    const providerDiscovery = new MetadataProviderDiscovery(providerRegistry);
+    const providerDiscovery = new MetadataProviderDiscovery(runtimeProviderRegistry);
 
     // Single shared networking pipeline for remote providers
     const platform = PlatformBootstrap.getInstance();

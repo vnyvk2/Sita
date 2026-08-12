@@ -1,4 +1,4 @@
-import type { MetadataHealth } from '../domain/MetadataHealth';
+import type { MetadataHealth, HealthIssue } from '../domain/MetadataHealth';
 import type { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 import type { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
@@ -254,7 +254,11 @@ export class BackgroundEnrichmentQueue {
         const resolution = await this.resolutionManager.resolve(job.id, {
           resources: { primaryType: 'track', targetResources: [{ id: job.songId, type: 'track', attributes: {} }] },
           execution: { mode: 'Background' },
-          request: { query: { trackTitle: queryTitle, artistName: queryArtist } }
+          request: {
+            id: job.id,
+            requestedAt: Date.now(),
+            query: { trackTitle: queryTitle, artistName: queryArtist }
+          }
         });
 
         if (resolution && resolution.candidates.length > 0) {
@@ -280,31 +284,56 @@ export class BackgroundEnrichmentQueue {
 
   public evaluateSongHealth(song: SongMetadataInput): MetadataHealth {
     let score = 100;
-    const issues: string[] = [];
+    const issues: HealthIssue[] = [];
 
     if (!song.title || song.title.trim().length === 0) {
       score -= 30;
-      issues.push('Missing song title');
+      issues.push({
+        code: 'MISSING_TITLE',
+        description: 'Missing song title',
+        severity: 'high',
+        fieldId: 'title'
+      });
     }
 
     if (!song.artist || song.artist.trim().length === 0 || song.artist.toLowerCase() === 'unknown artist') {
       score -= 25;
-      issues.push('Missing or generic artist');
+      issues.push({
+        code: 'MISSING_ARTIST',
+        description: 'Missing or generic artist',
+        severity: 'high',
+        fieldId: 'artist'
+      });
     }
 
     if (!song.album || song.album.trim().length === 0 || song.album.toLowerCase() === 'unknown album') {
       score -= 20;
-      issues.push('Missing or generic album');
+      issues.push({
+        code: 'MISSING_ALBUM',
+        description: 'Missing or generic album',
+        severity: 'medium',
+        fieldId: 'album'
+      });
     }
 
     if (!song.hasArtwork && !song.artworkBuffer) {
       score -= 15;
-      issues.push('Missing cover artwork');
+      issues.push({
+        code: 'MISSING_ARTWORK',
+        description: 'Missing cover artwork',
+        severity: 'medium',
+        fieldId: 'artwork'
+      });
     }
 
     if (!song.genre || song.genre.trim().length === 0) {
       score -= 10;
-      issues.push('Missing genre tag');
+      issues.push({
+        code: 'MISSING_GENRE',
+        description: 'Missing genre tag',
+        severity: 'low',
+        fieldId: 'genre'
+      });
     }
 
     const finalScore = Math.max(0, score);

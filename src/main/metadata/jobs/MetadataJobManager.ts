@@ -116,7 +116,7 @@ export class MetadataJobManager extends EventEmitter {
       job.progressPercent = progressPercent;
     }
 
-    if (stage === 'running' && !job.startedAt) {
+    if (job.status === 'running' && !job.startedAt) {
       job.startedAt = Date.now();
     }
     if (stage === 'completed' || stage === 'failed' || stage === 'cancelled') {
