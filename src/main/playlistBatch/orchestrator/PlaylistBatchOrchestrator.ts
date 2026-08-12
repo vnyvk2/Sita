@@ -61,7 +61,7 @@ export class PlaylistBatchOrchestrator {
         if (item.action === 'IMPORT' && this.importWorkflow) {
           const importPlan = await this.importWorkflow.createPlanFromFile(item.sourceFile);
           const result = await this.importWorkflow.executePlan(importPlan);
-          importedSongsCount += result.importedEntriesCount;
+          importedSongsCount += result.importedSongIds.length;
           item.status = 'COMPLETED';
           successfulCount++;
         } else if (item.action === 'SYNC' && this.syncWorkflow && item.playlistId !== undefined) {

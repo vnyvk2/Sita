@@ -44,7 +44,7 @@ describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinemen
         warnings: [],
         entries: []
       })),
-      executePlan: vi.fn(async () => ({ playlistId: 101, importedEntriesCount: 2, skippedEntriesCount: 0, success: true, durationMs: 15 }))
+      executePlan: vi.fn(async () => ({ playlistId: 101, importedSongIds: [1, 2], skippedEntriesCount: 0, success: true, durationMs: 15 }))
     } as unknown as PlaylistImportWorkflow;
 
     const orchestrator = new PlaylistBatchOrchestrator(mockImportWorkflow);
