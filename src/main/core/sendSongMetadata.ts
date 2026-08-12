@@ -66,7 +66,7 @@ const sendSongMetadata = async (
         const songFile = getSongFileObject(song.path);
         songMetadata = songFile.tag;
       } catch (err) {
-        logger.warn(`TagLib read skipped/failed for ${song.path}:`, err);
+        logger.warn(`TagLib read skipped/failed for ${song.path}:`, { error: err });
       }
 
       console.log('[STAGE 4: sendSongMetadata] TagLib File Reader Result:', {

@@ -359,21 +359,62 @@ export class MetadataApplyService {
         } else {
           // Direct DB query fallback ONLY if module cannot be resolved (e.g. isolated test runner)
           const { db } = await import('../../db/db');
+          const { songs } = await import('../../db/schema');
+          const { eq } = await import('drizzle-orm');
+
+          const { getSongById } = await import('../../db/queries/songs');
+          const { convertToSongData } = await import('../../utils/convert');
+          const {
+            removeDeletedArtistDataOfSong,
+            removeDeletedAlbumDataOfSong,
+            removeDeletedGenreDataOfSong
+          } = await import('../../removeSongsFromLibrary');
+
+          const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
+          const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
+          const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
 
           await db.transaction(async (trx) => {
             for (const snap of updatedSongs) {
-              await trx('songs')
-                .where('songId', snap.songId)
-                .update({
+              const prevSongData = await getSongById(snap.songId, trx);
+              if (prevSongData) {
+                const prevSong = convertToSongData(prevSongData);
+                await removeDeletedArtistDataOfSong(prevSong, trx);
+                await removeDeletedAlbumDataOfSong(prevSong, trx);
+                await removeDeletedGenreDataOfSong(prevSong, trx);
+              }
+
+              // 1. Update scalar fields
+              await trx
+                .update(songs)
+                .set({
                   title: snap.title,
-                  artists: snap.artist ? JSON.stringify([snap.artist]) : undefined,
-                  album: snap.album,
-                  genres: snap.genre ? JSON.stringify([snap.genre]) : undefined,
                   year: snap.year,
                   trackNumber: snap.trackNumber,
-                  discNumber: snap.discNumber,
+                  diskNumber: snap.discNumber,
                   updatedAt: new Date()
-                });
+                })
+                .where(eq(songs.id, snap.songId));
+
+              // 2. Update relational metadata
+              if (snap.artist) {
+                await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
+              }
+              if (snap.album) {
+                await manageAlbumsOfParsedSong(
+                  {
+                    songId: snap.songId,
+                    artists: snap.artist ? [snap.artist] : [],
+                    albumArtists: snap.artist ? [snap.artist] : [],
+                    albumName: snap.album,
+                    songYear: snap.year
+                  },
+                  trx
+                );
+              }
+              if (snap.genre) {
+                await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
+              }
             }
           });
         }
@@ -471,21 +512,60 @@ export class MetadataApplyService {
           }
         } else {
           const { db } = await import('../../db/db');
+          const { songs } = await import('../../db/schema');
+          const { eq } = await import('drizzle-orm');
+
+          const { getSongById } = await import('../../db/queries/songs');
+          const { convertToSongData } = await import('../../utils/convert');
+          const {
+            removeDeletedArtistDataOfSong,
+            removeDeletedAlbumDataOfSong,
+            removeDeletedGenreDataOfSong
+          } = await import('../../removeSongsFromLibrary');
+
+          const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
+          const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
+          const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
 
           await db.transaction(async (trx) => {
             for (const snap of snapshot.previousSongs) {
-              await trx('songs')
-                .where('songId', snap.songId)
-                .update({
+              const prevSongData = await getSongById(snap.songId, trx);
+              if (prevSongData) {
+                const prevSong = convertToSongData(prevSongData);
+                await removeDeletedArtistDataOfSong(prevSong, trx);
+                await removeDeletedAlbumDataOfSong(prevSong, trx);
+                await removeDeletedGenreDataOfSong(prevSong, trx);
+              }
+
+              await trx
+                .update(songs)
+                .set({
                   title: snap.title,
-                  artists: snap.artist ? JSON.stringify([snap.artist]) : undefined,
-                  album: snap.album,
-                  genres: snap.genre ? JSON.stringify([snap.genre]) : undefined,
                   year: snap.year,
                   trackNumber: snap.trackNumber,
-                  discNumber: snap.discNumber,
+                  diskNumber: snap.discNumber,
                   updatedAt: new Date()
-                });
+                })
+                .where(eq(songs.id, snap.songId));
+
+              if (snap.artist) {
+                await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
+              }
+              if (snap.album) {
+                await manageAlbumsOfParsedSong(
+                  {
+                    songId: snap.songId,
+                    artists: snap.artist ? [snap.artist] : [],
+                    albumArtists: snap.artist ? [snap.artist] : [],
+                    albumName: snap.album,
+                    songYear: snap.year
+                  },
+                  trx
+                );
+              }
+              if (snap.genre) {
+                await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
+              }
             }
           });
         }

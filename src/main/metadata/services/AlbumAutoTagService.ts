@@ -31,7 +31,6 @@ export class AlbumAutoTagService extends EventEmitter {
     this.resolutionManager = options.resolutionManager;
     this.operationManager = new MetadataOperationManager();
     this.transactionManager = new MetadataTransactionManager({
-      tagWriter: this.applyService.writer,
       dbUpdater: this.applyService.updater,
       historyService: this.applyService.history
     });

@@ -83,7 +83,7 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     expect(preview.resolvedRelease).not.toBeUndefined();
 
     // 3. Apply Preview
-    const applyResult = await autoTagService.applyPreview(preview, undefined, 'op-apply');
+    const applyResult = await autoTagService.applyPreview(preview, undefined, undefined, 'op-apply');
     expect(applyResult.success).toBe(true);
     expect(applyResult.updatedCount).toBe(3);
 

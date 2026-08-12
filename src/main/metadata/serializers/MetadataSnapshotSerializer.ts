@@ -20,8 +20,8 @@ export class MetadataSnapshotSerializer {
     for (const [fieldId, val] of Object.entries(entity.getAllFields())) {
       fieldsRecord[fieldId] = {
         value: val.value,
-        source: val.source,
-        confidence: val.confidence
+        source: val.source ? (typeof val.source === 'string' ? val.source : val.source.type) : undefined,
+        confidence: val.confidence ? (typeof val.confidence === 'number' ? val.confidence : val.confidence.score) : undefined
       };
     }
 
