@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import type { QueueEntry, QueueEntrySource, QueueState } from './types';
 
 export class QueueEngine {
@@ -41,7 +41,7 @@ export class QueueEngine {
    */
   public replaceQueue(songIds: number[], source: QueueEntrySource, startingIndex = 0): void {
     const newEntries: QueueEntry[] = songIds.map(songId => ({
-      id: uuidv4(),
+      id: randomUUID(),
       songId,
       source,
     }));
@@ -67,7 +67,7 @@ export class QueueEngine {
     if (songIds.length === 0) return;
 
     const newEntries: QueueEntry[] = songIds.map(songId => ({
-      id: uuidv4(),
+      id: randomUUID(),
       songId,
       source,
     }));
@@ -112,7 +112,7 @@ export class QueueEngine {
 
     const startNaturalIdx = this.state.entries.length;
     const newEntries: QueueEntry[] = songIds.map(songId => ({
-      id: uuidv4(),
+      id: randomUUID(),
       songId,
       source,
     }));
