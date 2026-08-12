@@ -4,6 +4,7 @@ import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import type { DatabaseMetadataRepository } from '../repository/DatabaseMetadataRepository';
 
+import { MetadataCapabilities } from '../common/types';
 import { MetadataConfidence } from '../models/MetadataConfidence';
 import { MetadataProviderInfo } from '../models/MetadataProviderInfo';
 import { ProviderResult } from '../models/ProviderResult';
@@ -22,8 +23,8 @@ export class LocalMetadataProvider implements IMetadataProvider {
       priority: 100
     });
     this.capabilities = new Set<MetadataCapability>([
-      'ReadDatabase',
-      'QueryLocal'
+      MetadataCapabilities.Tags,
+      MetadataCapabilities.Genre
     ]);
   }
 

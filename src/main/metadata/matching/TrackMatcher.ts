@@ -1,6 +1,8 @@
-import type { MatchCriterion, MetadataCandidate, RecordingMetadata } from '../models/RecordingMetadata';
+import type { MatchCriterion, MetadataCandidate, OfficialTrackInput, RecordingMetadata } from '../models/RecordingMetadata';
 import { getConfidenceLevel, type TrackMatchPair, type ScoreBreakdown } from '../services/AlbumMetadataService';
 import { MetadataNormalizer, type RecordingVariant } from './MetadataNormalizer';
+
+export type { OfficialTrackInput };
 
 export interface LocalSongInput {
   songId: number;
@@ -15,19 +17,6 @@ export interface LocalSongInput {
   genre?: string;
   trackNumber?: number;
   discNumber?: number;
-}
-
-export interface OfficialTrackInput {
-  trackId?: string;
-  title: string;
-  artist?: string;
-  album?: string;
-  year?: number;
-  trackNumber: number;
-  discNumber?: number;
-  duration?: number;
-  isrc?: string;
-  musicBrainzRecordingId?: string;
 }
 
 export interface ReleaseContext {
@@ -130,7 +119,7 @@ export class TrackMatcher {
       if (b.breakdown.artist !== a.breakdown.artist) return b.breakdown.artist - a.breakdown.artist;
       if ((b.breakdown.album ?? 0) !== (a.breakdown.album ?? 0)) return (b.breakdown.album ?? 0) - (a.breakdown.album ?? 0);
       if (b.breakdown.duration !== a.breakdown.duration) return b.breakdown.duration - a.breakdown.duration;
-      return a.track.trackNumber - b.track.trackNumber;
+      return (a.track.trackNumber ?? 0) - (b.track.trackNumber ?? 0);
     });
 
     const claimedSongIds = new Set<number>();
@@ -142,7 +131,7 @@ export class TrackMatcher {
         continue;
       }
 
-      const trackKey = pair.track.trackId ?? pair.track.trackNumber;
+      const trackKey = pair.track.trackId ?? pair.track.trackNumber ?? pair.track.title;
       if (claimedSongIds.has(pair.localSong.songId) || claimedTrackIds.has(trackKey)) {
         continue;
       }
