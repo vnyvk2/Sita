@@ -34,5 +34,5 @@ export interface IMetadataProviderAdapter {
   /**
    * Directly fetches specialized field contributions for provider federation.
    */
-  fetchContribution?(query: { title?: string; artist?: string }): Promise<MetadataContribution | null>;
+  fetchContribution?(query: { title?: string; artist?: string; mbid?: string; releaseId?: string; isrc?: string }): Promise<MetadataContribution | null>;
 }

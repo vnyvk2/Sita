@@ -11,11 +11,9 @@ export interface MetadataLookupGateway {
 }
 
 export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
-  private readonly executor?: MetadataProviderExecutor;
   private readonly providerRegistry: ProviderRegistry;
 
-  constructor(executor?: MetadataProviderExecutor, providerRegistry?: ProviderRegistry) {
-    this.executor = executor;
+  constructor(_executor?: MetadataProviderExecutor, providerRegistry?: ProviderRegistry) {
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();
   }
 
@@ -140,26 +138,28 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
           }
         }
 
-        try {
-          const result = await provider.fetchMetadata({ title, artist });
-          if (result) {
-            candidates.push({
-              providerId,
-              providerName: this.providerRegistry.getDisplayName(providerId),
-              externalId: result.mbid ?? providerId,
-              title: result.title ?? title,
-              artist: result.artist ?? artist ?? '',
-              score: 0.95,
-              matchedAttributes: {
-                title: result.title ?? '',
-                artist: result.artist ?? '',
-                album: result.album ?? '',
-                genre: result.genres?.[0] ?? ''
-              }
-            });
+        if (adapter && typeof adapter.searchAlbums === 'function' && title) {
+          try {
+            const albums = await adapter.searchAlbums(title, artist, 5);
+            for (const alb of albums) {
+              candidates.push({
+                providerId,
+                providerName: this.providerRegistry.getDisplayName(providerId),
+                externalId: alb.releaseId || providerId,
+                title: alb.title,
+                artist: alb.artist,
+                score: 0.85,
+                matchedAttributes: {
+                  title: alb.title,
+                  artist: alb.artist,
+                  album: alb.title,
+                  artworkUrl: alb.artwork?.primaryPath || alb.artwork?.onlineUrls?.[0] || ''
+                }
+              });
+            }
+          } catch (_err) {
+            // Ignore individual provider album search errors gracefully
           }
-        } catch (_err) {
-          // Ignore individual provider lookup errors gracefully
         }
       }
       if (candidates.length > 0) {
@@ -167,34 +167,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
       }
     }
 
-    // 2. Fall back to executor if set
-    if (this.executor) {
-      try {
-        const results = await this.executor.executeAll({ title, artist });
-
-        for (const res of results) {
-          if (res.success && res.data) {
-            candidates.push({
-              providerId: res.providerId,
-              providerName: this.providerRegistry.getDisplayName(res.providerId),
-              externalId: res.data.mbid ?? res.providerId,
-              title: res.data.title ?? title,
-              artist: res.data.artist ?? artist ?? '',
-              score: 0.9,
-              matchedAttributes: {
-                title: res.data.title ?? '',
-                artist: res.data.artist ?? ''
-              }
-            });
-          }
-        }
-        return candidates;
-      } catch (_err) {
-        return [];
-      }
-    }
-
-    return [];
+    return candidates;
   }
 
   public get registry(): ProviderRegistry {

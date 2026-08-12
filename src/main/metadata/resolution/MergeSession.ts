@@ -18,6 +18,11 @@ export class MergeSession {
     this.mergeEngine = mergeEngine;
     this.rawContributions = [...contributions];
     this.currentPolicy = policy ?? {
+      level: 'operation',
+      selection: {
+        enabledProviderIds: ['user', 'musicbrainz', 'coverartarchive', 'discogs', 'spotify', 'apple'],
+        maxCandidates: 10
+      },
       merge: {
         providerPriorities: {
           user: 1000,
@@ -28,6 +33,15 @@ export class MergeSession {
           apple: 650
         },
         fieldPolicies: {}
+      },
+      fallback: {
+        allowLocalFallback: true,
+        allowEmptyFallbacks: true
+      },
+      validation: {
+        strictMode: false,
+        requireTitle: true,
+        requireArtist: false
       }
     };
     this.currentResult = initialResult ?? this.mergeEngine.mergeFieldContributions(this.rawContributions, this.currentPolicy);
@@ -40,7 +54,10 @@ export class MergeSession {
   public selectProvider(fieldId: string, providerId: string): MergeSession {
     const updatedFieldPolicies = {
       ...(this.currentPolicy.merge?.fieldPolicies ?? {}),
-      [fieldId]: { preferredProviderId: providerId }
+      [fieldId]: {
+        fieldId,
+        preferredProviderId: providerId
+      }
     };
 
     const updatedPolicy: MetadataPolicy = {
