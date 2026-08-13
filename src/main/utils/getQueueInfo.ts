@@ -98,6 +98,14 @@ export const getQueueInfo = async (
       };
     }
 
+    case 'recentlyAdded': {
+      const artwork = getPlaylistArtworkPath('Recently Added', false);
+      return {
+        artworkPath: artwork.artworkPath,
+        title: 'Recently Added'
+      };
+    }
+
     default:
       return undefined;
   }

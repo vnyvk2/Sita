@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
+import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
+import {
+  playlistEngine,
+  undoEngine,
+  playlistRepository,
+  hierarchyService
+} from './collections/setup';
 import addSongsFromFolderStructures from './core/addMusicFolder';
-import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
-import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
-import { registerMetadataHandlers } from './ipc/MetadataHandlers';
-import { MetadataBootstrap } from './metadata/setup';
-
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
 import changeAppTheme from './core/changeAppTheme';
@@ -15,16 +17,14 @@ import clearSearchHistoryResults from './core/clearSeachHistoryResults';
 import clearSongHistory from './core/clearSongHistory';
 import deleteSongsFromSystem from './core/deleteSongsFromSystem';
 import exportAppData from './core/exportAppData';
-
 import fetchAlbumData from './core/fetchAlbumData';
 import fetchArtistData from './core/fetchArtistData';
 import fetchSongInfoFromLastFM from './core/fetchSongInfoFromLastFM';
 import { getAllFavoriteSongs } from './core/getAllFavoriteSongs';
 import { getAllHistorySongs } from './core/getAllHistorySongs';
+import { getAllRecentlyAddedSongs } from './core/getAllRecentlyAddedSongs';
 import getAllSongs from './core/getAllSongs';
-import type { HistoryQueryOptions } from './db/queries/history';
 import getArtistInfoFromNet from './core/getArtistInfoFromNet';
-
 import getBlacklistData from './core/getBlacklistData';
 import { getArtistDuplicates } from './core/getDuplicates';
 import { getFolderStructures } from './core/getFolderStructures';
@@ -35,8 +35,8 @@ import getSongInfo from './core/getSongInfo';
 import getSongLyrics from './core/getSongLyrics';
 import getStorageUsage from './core/getStorageUsage';
 import importAppData from './core/importAppData';
+import { recoverLibraryAssets } from './core/recovery';
 import removeMusicFolder from './core/removeMusicFolder';
-
 import { resolveArtistDuplicates } from './core/resolveDuplicates';
 import resolveFeaturingArtists from './core/resolveFeaturingArtists';
 import { resolveSeparateArtists } from './core/resolveSeparateArtists';
@@ -45,13 +45,13 @@ import restoreBlacklistedSongs from './core/restoreBlacklistedSongs';
 import saveArtworkToSystem from './core/saveArtworkToSystem';
 import sendAudioData from './core/sendAudioData';
 import sendAudioDataFromPath from './core/sendAudioDataFromPath';
-
 import sendSongID3Tags from './core/sendSongMetadata';
 import toggleBlacklistFolders from './core/toggleBlacklistFolders';
 import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
+import type { HistoryQueryOptions } from './db/queries/history';
 import {
   addIgnoredArtist,
   addIgnoredDuplicate,
@@ -72,6 +72,8 @@ import {
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
+import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
+import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import logger, { logFilePath } from './logger';
 import {
   allowScreenSleeping,
@@ -92,6 +94,8 @@ import {
   toggleMiniPlayerAlwaysOnTop,
   toggleOnBatteryPower
 } from './main';
+import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
+import { MetadataBootstrap } from './metadata/setup';
 import { setDiscordRpcActivity } from './other/discordRPC';
 import { generatePalettes } from './other/generatePalette';
 import getAlbumInfoFromLastFM from './other/lastFm/getAlbumInfoFromLastFM';
@@ -99,9 +103,12 @@ import getSimilarTracks from './other/lastFm/getSimilarTracks';
 import scrobbleSong from './other/lastFm/scrobbleSong';
 import sendNowPlayingSongDataToLastFM from './other/lastFm/sendNowPlayingSongDataToLastFM';
 import reParseSong from './parseSong/reParseSong';
+import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
+import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
+import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 import saveLyricsToSong from './saveLyricsToSong';
-import updateSongId3Tags, { isMetadataUpdatesPending } from './updateSong/updateSongId3Tags';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
+import updateSongId3Tags, { isMetadataUpdatesPending } from './updateSong/updateSongId3Tags';
 import convertLyricsToPinyin from './utils/convertToPinyin';
 import convertLyricsToRomaja from './utils/convertToRomaja';
 import {
@@ -117,18 +124,12 @@ import { adaptivePolicyEngine } from './workers/adaptivePolicyEngine';
 import { libraryScheduler } from './workers/jobScheduler';
 import { registerLibraryChoreography } from './workers/libraryChoreography';
 import { libraryObservability } from './workers/libraryObservability';
-import { recoverLibraryAssets } from './core/recovery';
-import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
-import { playlistEngine, undoEngine, playlistRepository, hierarchyService } from './collections/setup';
-import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
-import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
-import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
   // Start the Library Builder Scheduler
   libraryScheduler.start();
   adaptivePolicyEngine.start();
-  
+
   // Enqueue Garbage Collection on startup
   libraryScheduler.requestMaintenance();
 
@@ -147,7 +148,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
   // Fire and forget startup recovery sync
   recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
-  
+
   // Setup Collection IPC, Playlist Import IPC, & Playlist Export IPC
   setupCollectionIpc(
     playlistEngine,
@@ -161,16 +162,21 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
   setupPlaylistExportIpc(playlistRepository);
   registerMembershipIPCHandlers();
-  
+
   MetadataBootstrap.getInstance()
     .then(async (metadataContainer) => {
-      registerMetadataIPCHandlers(metadataContainer.engine, metadataContainer.application.userService);
+      registerMetadataIPCHandlers(
+        metadataContainer.engine,
+        metadataContainer.application.userService
+      );
       registerMetadataHandlers(
         metadataContainer.application.autoTagService,
         metadataContainer.application.workflowService,
         mainWindow
       );
-      logger.info('AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root');
+      logger.info(
+        'AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root'
+      );
     })
     .catch((err) => {
       logger.error('Failed to initialize MetadataBootstrap', { error: err });
@@ -274,8 +280,22 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/getAllHistorySongs',
-      (_, sortType?: SongSortTypes, paginatingData?: PaginatingData, options?: HistoryQueryOptions) =>
-        getAllHistorySongs(sortType, paginatingData, options)
+      (
+        _,
+        sortType?: SongSortTypes,
+        paginatingData?: PaginatingData,
+        options?: HistoryQueryOptions
+      ) => getAllHistorySongs(sortType, paginatingData, options)
+    );
+
+    ipcMain.handle(
+      'app/getAllRecentlyAddedSongs',
+      (
+        _,
+        sortType?: SongSortTypes,
+        paginatingData?: PaginatingData,
+        options?: { period?: RecentlyAddedPeriod }
+      ) => getAllRecentlyAddedSongs(sortType, paginatingData, options)
     );
 
     ipcMain.handle(
@@ -356,12 +376,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/getUserData', async () => await getUserSettings());
     ipcMain.handle('app/getUserSettings', async () => await getUserSettings());
 
-    ipcMain.handle(
-      'app/search/query',
-      (
-        _,
-        options: SearchCoordinatorOptions
-      ) => SearchCoordinator.query(options)
+    ipcMain.handle('app/search/query', (_, options: SearchCoordinatorOptions) =>
+      SearchCoordinator.query(options)
     );
 
     ipcMain.handle(
@@ -509,7 +525,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/resyncSongsLibrary', async () => {
       await checkForNewSongs();
       sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
-      
+
       libraryScheduler.requestMaintenance();
     });
 
@@ -523,7 +539,13 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/updateSongId3Tags',
-      (_, songIdOrPath: string, tags: SongTags, sendUpdatedData?: boolean, isKnownSource = true) => {
+      (
+        _,
+        songIdOrPath: string,
+        tags: SongTags,
+        sendUpdatedData?: boolean,
+        isKnownSource = true
+      ) => {
         console.log('[IPC app/updateSongId3Tags] Received payload:', {
           songIdOrPath,
           typeofSongIdOrPath: typeof songIdOrPath,
@@ -552,7 +574,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/reParseSong', (_, songPath: string) => reParseSong(songPath));
 
     ipcMain.handle('app/reloadSongFromFile', async (_, songIdOrPath: number | string) => {
-      const isNumeric = typeof songIdOrPath === 'number' || (!isNaN(Number(songIdOrPath)) && !String(songIdOrPath).includes('/') && !String(songIdOrPath).includes('\\'));
+      const isNumeric =
+        typeof songIdOrPath === 'number' ||
+        (!isNaN(Number(songIdOrPath)) &&
+          !String(songIdOrPath).includes('/') &&
+          !String(songIdOrPath).includes('\\'));
       let songPath = String(songIdOrPath);
       let targetId = isNumeric ? Number(songIdOrPath) : undefined;
 

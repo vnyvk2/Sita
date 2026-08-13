@@ -406,7 +406,9 @@ function RouteComponent() {
               </div>
               <div className="queue-info">
                 <div className="queue-type text-sm font-semibold uppercase opacity-50 dark:font-medium">
-                  {queue.queues[queue.currentQueueIndex].metadata?.queueType}
+                  {queue.queues[queue.currentQueueIndex].metadata?.queueType === 'recentlyAdded'
+                    ? t('common.recentlyAdded', 'Recently Added')
+                    : queue.queues[queue.currentQueueIndex].metadata?.queueType}
                 </div>
                 <div className="queue-title text-3xl">{queueInfo?.title}</div>
                 <div className="other-info flex text-sm font-light">

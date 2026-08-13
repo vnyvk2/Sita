@@ -1,29 +1,38 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
+import type {
+  PlaylistDto as CollectionDto,
+  CollectionHierarchyNodeDto as BreadcrumbDto,
+  PlaylistEntryDto
+} from '../common/collections/dtos';
+import type {
+  CreateFolderInput,
+  CreatePlaylistInput,
+  AddSongsInput,
+  RemoveSongsInput,
+  ReorderInput as ReorderSongsInput,
+  RenameInput,
+  MoveCollectionInput,
+  DeleteInput,
+  DuplicateInput,
+  MergePlaylistsInput,
+  BulkDeleteInput,
+  BulkRestoreInput,
+  PinInput,
+  UnpinInput,
+  CollectionEvent
+} from '../common/collections/operationInputs';
+import type {
+  PlaylistViewMode,
+  PlaylistExportOptions,
+  PlaylistImportIpcOptions,
+  PlaylistImportAnalysis,
+  PlaylistBatchExportOptions,
+  BatchExportResult
+} from '../common/collections/types';
 import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
-
-import type { PlaylistDto as CollectionDto, CollectionHierarchyNodeDto as BreadcrumbDto, PlaylistEntryDto } from '../common/collections/dtos';
-import type { 
-  CreateFolderInput, 
-  CreatePlaylistInput, 
-  AddSongsInput, 
-  RemoveSongsInput, 
-  ReorderInput as ReorderSongsInput, 
-  RenameInput, 
-  MoveCollectionInput, 
-  DeleteInput, 
-  DuplicateInput, 
-  MergePlaylistsInput, 
-  BulkDeleteInput, 
-  BulkRestoreInput, 
-  PinInput, 
-  UnpinInput, 
-  CollectionEvent 
-} from '../common/collections/operationInputs';
-import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '../common/collections/types';
-
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -113,6 +122,12 @@ const audioLibraryControls = {
     options?: HistoryQueryOptions
   ): Promise<PaginatedResult<SongData, SongSortTypes>> =>
     ipcRenderer.invoke('app/getAllHistorySongs', sortType, paginatingData, options),
+  getAllRecentlyAddedSongs: (
+    sortType?: SongSortTypes,
+    paginatingData?: PaginatingData,
+    options?: { period?: RecentlyAddedPeriod }
+  ): Promise<PaginatedResult<SongData, SongSortTypes>> =>
+    ipcRenderer.invoke('app/getAllRecentlyAddedSongs', sortType, paginatingData, options),
   getAllFavoriteSongs: (
     sortType?: SongSortTypes,
     paginatingData?: PaginatingData
@@ -454,8 +469,6 @@ const albumsData = {
     ipcRenderer.invoke('app/getAlbumInfoFromLastFM', albumId)
 };
 
-
-
 const queue = {
   getQueueInfo: (queueType: QueueTypes, id: string): Promise<QueueInfo | undefined> =>
     ipcRenderer.invoke('app/getQueueInfo', queueType, id)
@@ -586,51 +599,85 @@ const utils = {
   removeDefaultAppProtocolFromFilePath: (filePath: string) => {
     return filePath.replace(/nora:[/\\]{1,2}localfiles[/\\]{1,2}|\?[\w+=\w+&?]+$/gm, '');
   },
-  showOpenDialog: (options?: unknown): Promise<string[]> => ipcRenderer.invoke('utils/showOpenDialog', options),
+  showOpenDialog: (options?: unknown): Promise<string[]> =>
+    ipcRenderer.invoke('utils/showOpenDialog', options),
   openPath: (dirPath: string): void => ipcRenderer.send('app/revealFolderInFileExplorer', dirPath)
 };
 
 const libraryMetrics = {
   getSchedulerMetrics: () => ipcRenderer.invoke('app/getSchedulerMetrics'),
-  prioritizeArtworkGeneration: (albumId: number) => ipcRenderer.send('app/prioritizeArtworkGeneration', albumId),
+  prioritizeArtworkGeneration: (albumId: number) =>
+    ipcRenderer.send('app/prioritizeArtworkGeneration', albumId),
   retryRecoverable: () => ipcRenderer.invoke('app/retryRecoverable')
 };
 
 const collections = {
   read: {
-    getCollection: (id: number): Promise<CollectionDto | null> => ipcRenderer.invoke('collections/read/getCollection', id),
-    getChildren: (id: number | null): Promise<CollectionDto[]> => ipcRenderer.invoke('collections/read/getChildren', id),
-    getEntries: (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode): Promise<PlaylistEntryDto[]> => ipcRenderer.invoke('collections/read/getEntries', id, offset, limit, sortType),
-    getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> => ipcRenderer.invoke('collections/read/getBreadcrumbs', id),
-    getArtworks: (songIds: number[]): Promise<ArtworkPaths[]> => ipcRenderer.invoke('collections/read/getArtworks', songIds)
+    getCollection: (id: number): Promise<CollectionDto | null> =>
+      ipcRenderer.invoke('collections/read/getCollection', id),
+    getChildren: (id: number | null): Promise<CollectionDto[]> =>
+      ipcRenderer.invoke('collections/read/getChildren', id),
+    getEntries: (
+      id: number,
+      offset?: number,
+      limit?: number,
+      sortType?: PlaylistViewMode
+    ): Promise<PlaylistEntryDto[]> =>
+      ipcRenderer.invoke('collections/read/getEntries', id, offset, limit, sortType),
+    getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> =>
+      ipcRenderer.invoke('collections/read/getBreadcrumbs', id),
+    getArtworks: (songIds: number[]): Promise<ArtworkPaths[]> =>
+      ipcRenderer.invoke('collections/read/getArtworks', songIds)
   },
   write: {
-    createFolder: (input: CreateFolderInput): Promise<number> => ipcRenderer.invoke('collections/write/createFolder', input),
-    createPlaylist: (input: CreatePlaylistInput): Promise<number> => ipcRenderer.invoke('collections/write/createPlaylist', input),
-    addSongs: (input: AddSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/addSongs', input),
-    removeSongs: (input: RemoveSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/removeSongs', input),
-    reorder: (input: ReorderSongsInput): Promise<void> => ipcRenderer.invoke('collections/write/reorder', input),
-    rename: (input: RenameInput): Promise<void> => ipcRenderer.invoke('collections/write/rename', input),
-    move: (input: MoveCollectionInput): Promise<void> => ipcRenderer.invoke('collections/write/move', input),
-    delete: (input: DeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/delete', input),
-    duplicate: (input: DuplicateInput): Promise<number> => ipcRenderer.invoke('collections/write/duplicate', input),
-    merge: (input: MergePlaylistsInput): Promise<number> => ipcRenderer.invoke('collections/write/merge', input),
-    bulkDelete: (input: BulkDeleteInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkDelete', input),
-    bulkRestore: (input: BulkRestoreInput): Promise<void> => ipcRenderer.invoke('collections/write/bulkRestore', input),
+    createFolder: (input: CreateFolderInput): Promise<number> =>
+      ipcRenderer.invoke('collections/write/createFolder', input),
+    createPlaylist: (input: CreatePlaylistInput): Promise<number> =>
+      ipcRenderer.invoke('collections/write/createPlaylist', input),
+    addSongs: (input: AddSongsInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/addSongs', input),
+    removeSongs: (input: RemoveSongsInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/removeSongs', input),
+    reorder: (input: ReorderSongsInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/reorder', input),
+    rename: (input: RenameInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/rename', input),
+    move: (input: MoveCollectionInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/move', input),
+    delete: (input: DeleteInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/delete', input),
+    duplicate: (input: DuplicateInput): Promise<number> =>
+      ipcRenderer.invoke('collections/write/duplicate', input),
+    merge: (input: MergePlaylistsInput): Promise<number> =>
+      ipcRenderer.invoke('collections/write/merge', input),
+    bulkDelete: (input: BulkDeleteInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/bulkDelete', input),
+    bulkRestore: (input: BulkRestoreInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/bulkRestore', input),
     pin: (input: PinInput): Promise<void> => ipcRenderer.invoke('collections/write/pin', input),
-    unpin: (input: UnpinInput): Promise<void> => ipcRenderer.invoke('collections/write/unpin', input),
-    setArtwork: (playlistId: number, artworkPath: string): Promise<ArtworkPaths | undefined> => ipcRenderer.invoke('collections/write/setArtwork', { playlistId, artworkPath })
+    unpin: (input: UnpinInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/unpin', input),
+    setArtwork: (playlistId: number, artworkPath: string): Promise<ArtworkPaths | undefined> =>
+      ipcRenderer.invoke('collections/write/setArtwork', { playlistId, artworkPath })
   },
   history: {
-    undo: (collectionId: string): Promise<boolean> => ipcRenderer.invoke('collections/history/undo', collectionId),
-    redo: (collectionId: string): Promise<boolean> => ipcRenderer.invoke('collections/history/redo', collectionId)
+    undo: (collectionId: string): Promise<boolean> =>
+      ipcRenderer.invoke('collections/history/undo', collectionId),
+    redo: (collectionId: string): Promise<boolean> =>
+      ipcRenderer.invoke('collections/history/redo', collectionId)
   },
   events: {
-    onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => ipcRenderer.on('collections/event', callback),
-    offEvent: (callback: (...args: any[]) => void) => ipcRenderer.removeListener('collections/event', callback)
+    onEvent: (callback: (e: unknown, event: CollectionEvent) => void) =>
+      ipcRenderer.on('collections/event', callback),
+    offEvent: (callback: (...args: any[]) => void) =>
+      ipcRenderer.removeListener('collections/event', callback)
   },
-  export: (playlistId: number, options?: PlaylistExportOptions): Promise<void> => ipcRenderer.invoke('collections/export', playlistId, options),
-  exportBatch: (playlistIds: number[], options?: PlaylistBatchExportOptions): Promise<BatchExportResult> =>
+  export: (playlistId: number, options?: PlaylistExportOptions): Promise<void> =>
+    ipcRenderer.invoke('collections/export', playlistId, options),
+  exportBatch: (
+    playlistIds: number[],
+    options?: PlaylistBatchExportOptions
+  ): Promise<BatchExportResult> =>
     ipcRenderer.invoke('collections/export-batch', playlistIds, options),
   analyze: (filePath?: string): Promise<PlaylistImportAnalysis | null> =>
     ipcRenderer.invoke('collections/analyze', filePath),
@@ -641,12 +688,18 @@ const collections = {
 const membership = {
   getMembers: (collection: { kind: string; id: string | number }, memberKind: string) =>
     ipcRenderer.invoke('membership:getMembers', collection, memberKind),
-  getCollectionsContaining: (member: { kind: string; id: string | number }, collectionKind: string) =>
-    ipcRenderer.invoke('membership:getCollectionsContaining', member, collectionKind),
-  contains: (collection: { kind: string; id: string | number }, member: { kind: string; id: string | number }) =>
-    ipcRenderer.invoke('membership:contains', collection, member),
-  containsMany: (collection: { kind: string; id: string | number }, members: { kind: string; id: string | number }[]) =>
-    ipcRenderer.invoke('membership:containsMany', collection, members),
+  getCollectionsContaining: (
+    member: { kind: string; id: string | number },
+    collectionKind: string
+  ) => ipcRenderer.invoke('membership:getCollectionsContaining', member, collectionKind),
+  contains: (
+    collection: { kind: string; id: string | number },
+    member: { kind: string; id: string | number }
+  ) => ipcRenderer.invoke('membership:contains', collection, member),
+  containsMany: (
+    collection: { kind: string; id: string | number },
+    members: { kind: string; id: string | number }[]
+  ) => ipcRenderer.invoke('membership:containsMany', collection, members),
   count: (collection: { kind: string; id: string | number }, memberKind: string) =>
     ipcRenderer.invoke('membership:count', collection, memberKind)
 };
@@ -654,10 +707,15 @@ const membership = {
 const metadata = {
   load: (identity: { entityKind: string; entityId: string | number }) =>
     ipcRenderer.invoke('metadata.load', identity),
-  setField: (identity: { entityKind: string; entityId: string | number }, fieldId: string, value: unknown) =>
-    ipcRenderer.invoke('metadata.override.set', { identity, fieldId, value }),
-  setFields: (identity: { entityKind: string; entityId: string | number }, overrides: Record<string, unknown>) =>
-    ipcRenderer.invoke('metadata.override.setBatch', { identity, overrides }),
+  setField: (
+    identity: { entityKind: string; entityId: string | number },
+    fieldId: string,
+    value: unknown
+  ) => ipcRenderer.invoke('metadata.override.set', { identity, fieldId, value }),
+  setFields: (
+    identity: { entityKind: string; entityId: string | number },
+    overrides: Record<string, unknown>
+  ) => ipcRenderer.invoke('metadata.override.setBatch', { identity, overrides }),
   removeField: (identity: { entityKind: string; entityId: string | number }, fieldId: string) =>
     ipcRenderer.invoke('metadata.override.remove', { identity, fieldId }),
   clearOverrides: (identity: { entityKind: string; entityId: string | number }) =>
@@ -701,7 +759,12 @@ export const api = {
   metadataAutoTag: {
     searchAlbums: (albumName: string, artistName?: string, limit?: number, operationId?: string) =>
       ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, operationId),
-    buildPreview: (localSongs: unknown[], releaseId: string, providerId?: string, operationId?: string) =>
+    buildPreview: (
+      localSongs: unknown[],
+      releaseId: string,
+      providerId?: string,
+      operationId?: string
+    ) =>
       ipcRenderer.invoke('metadata/buildPreview', localSongs, releaseId, providerId, operationId),
     applyPreview: (preview: unknown, options?: unknown, operationId?: string) =>
       ipcRenderer.invoke('metadata/applyPreview', preview, options, operationId),
@@ -718,16 +781,43 @@ export const api = {
     }
   },
   metadataWorkflow: {
-    search: (workflowType: string, query: { title?: string; artist?: string; album?: string; limit?: number }, operationId?: string) =>
-      ipcRenderer.invoke('metadata/workflow/search', workflowType, query, operationId),
-    buildPreview: (workflowType: string, localSongs: unknown[], candidateId: string, providerId?: string, operationId?: string) =>
-      ipcRenderer.invoke('metadata/workflow/buildPreview', workflowType, localSongs, candidateId, providerId, operationId),
-    applyPreview: (workflowType: string, preview: unknown, selectedFieldIds?: string[], options?: unknown, operationId?: string) =>
-      ipcRenderer.invoke('metadata/workflow/applyPreview', workflowType, preview, selectedFieldIds, options, operationId),
-    undo: (operationId?: string) =>
-      ipcRenderer.invoke('metadata/workflow/undo', operationId),
-    cancel: (operationId?: string) =>
-      ipcRenderer.invoke('metadata/workflow/cancel', operationId)
+    search: (
+      workflowType: string,
+      query: { title?: string; artist?: string; album?: string; limit?: number },
+      operationId?: string
+    ) => ipcRenderer.invoke('metadata/workflow/search', workflowType, query, operationId),
+    buildPreview: (
+      workflowType: string,
+      localSongs: unknown[],
+      candidateId: string,
+      providerId?: string,
+      operationId?: string
+    ) =>
+      ipcRenderer.invoke(
+        'metadata/workflow/buildPreview',
+        workflowType,
+        localSongs,
+        candidateId,
+        providerId,
+        operationId
+      ),
+    applyPreview: (
+      workflowType: string,
+      preview: unknown,
+      selectedFieldIds?: string[],
+      options?: unknown,
+      operationId?: string
+    ) =>
+      ipcRenderer.invoke(
+        'metadata/workflow/applyPreview',
+        workflowType,
+        preview,
+        selectedFieldIds,
+        options,
+        operationId
+      ),
+    undo: (operationId?: string) => ipcRenderer.invoke('metadata/workflow/undo', operationId),
+    cancel: (operationId?: string) => ipcRenderer.invoke('metadata/workflow/cancel', operationId)
   }
 };
 

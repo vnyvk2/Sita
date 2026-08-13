@@ -303,7 +303,7 @@ export const parseGenreArtworks = (
 };
 
 export const getPlaylistArtworkPath = (
-  playlistId: number | 'History' | 'Favorites',
+  playlistId: number | 'History' | 'Favorites' | 'Recently Added',
   isArtworkAvailable: boolean,
   resetCache = false
 ): ArtworkPaths => {
