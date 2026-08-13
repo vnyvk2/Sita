@@ -5,12 +5,6 @@ import logger from '../../logger';
 import { playHistory } from '../schema';
 import { getAllSongs } from './songs';
 
-export type HistoryPeriod = 'all' | '1' | '7' | '30' | '90' | '365';
-
-export interface HistoryQueryOptions {
-  period?: HistoryPeriod;
-  limit?: number;
-}
 
 export const getCutoffDate = (period?: HistoryPeriod): Date | undefined => {
   if (!period || period === 'all') return undefined;

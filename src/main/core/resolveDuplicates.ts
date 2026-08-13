@@ -33,7 +33,7 @@ export const resolveArtistDuplicates = async (selectedArtistId: number, duplicat
   const albumsRes = await getAllAlbums({});
 
   const artists = artistsRes.data.map(convertToArtist);
-  const songs = songsRes.data.map(convertToSongData);
+  const songs = songsRes.data.map((song) => convertToSongData(song));
   const albums = albumsRes.data.map(convertToAlbum);
 
   const selectedArtist = getSelectedArtist(selectedArtistId, artists)?.artist;

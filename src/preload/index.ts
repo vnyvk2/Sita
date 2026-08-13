@@ -23,7 +23,7 @@ import type {
   CollectionEvent 
 } from '../common/collections/operationInputs';
 import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '../common/collections/types';
-import type { HistoryQueryOptions } from '../main/db/queries/history';
+
 
 // const { contextBridge, ipcRenderer } = require('electron');
 

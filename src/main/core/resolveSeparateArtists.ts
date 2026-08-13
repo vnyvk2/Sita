@@ -30,7 +30,7 @@ export const resolveSeparateArtists = async (
   const albumsRes = await getAllAlbums({});
 
   let artistsData = artistsRes.data.map(convertToArtist);
-  const songsData = songsRes.data.map(convertToSongData);
+  const songsData = songsRes.data.map((song) => convertToSongData(song));
   const albumsData = albumsRes.data.map(convertToAlbum);
 
   const selectedArtistData = getSelectedArtist(separateArtistId, artistsData);

@@ -1,6 +1,3 @@
-import type { db } from '@main/db/db';
-import type { HistoryPeriod, HistoryQueryOptions } from '@main/db/queries/history';
-import type { GetAllSongListeningDataReturnType } from '@main/db/queries/listens';
 import type { ReactElement, ReactNode } from 'react';
 import type { resources } from 'src/renderer/src/i18n';
 
@@ -1161,6 +1158,12 @@ declare global {
     | 'favorites'
     | 'nonFavorites';
 
+  type HistoryPeriod = 'all' | '1' | '7' | '30' | '90' | '365';
+  interface HistoryQueryOptions {
+    period?: HistoryPeriod;
+    limit?: number;
+  }
+
   type SongSortTypes = (typeof songSortTypes)[number];
 
   type ArtistFilterTypes = 'notSelected' | 'favorites';
@@ -1174,6 +1177,8 @@ declare global {
     | 'mostLovedDescending';
 
   type PlaylistSortTypes = 'aToZ' | 'zToA' | 'noOfSongsAscending' | 'noOfSongsDescending';
+
+  type AlbumFilterTypes = 'notSelected' | 'favorites';
 
   type AlbumSortTypes = 'aToZ' | 'zToA' | 'noOfSongsAscending' | 'noOfSongsDescending';
 
@@ -1239,6 +1244,7 @@ declare global {
     | 'artists/deletedArtist'
     | 'artists/artworks'
     | 'albums'
+    | 'albums/likes'
     | 'albums/newAlbum'
     | 'albums/updatedAlbum'
     | 'albums/deletedAlbum'

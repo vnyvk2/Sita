@@ -140,8 +140,8 @@ function SongsPage() {
     if (!songData) return [];
     const genresSet = new Set<string>();
     for (const song of songData) {
-      if (song.genres) {
-        for (const g of song.genres) {
+      if ('genres' in song && song.genres) {
+        for (const g of (song as SongData).genres!) {
           if (g.name && g.name.trim() !== '') {
             genresSet.add(g.name.trim());
           }
@@ -187,9 +187,9 @@ function SongsPage() {
 
       // 2. Genre filter
       if (genre && genre !== 'all') {
-        const hasGenre = song.genres?.some(
+        const hasGenre = ('genres' in song && song.genres) ? (song as SongData).genres!.some(
           (g) => g.name.toLowerCase() === genre.toLowerCase()
-        );
+        ) : false;
         if (!hasGenre) return false;
       }
 

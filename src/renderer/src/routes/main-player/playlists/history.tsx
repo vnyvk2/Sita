@@ -6,6 +6,7 @@ import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
+import type { DropdownProp } from '@renderer/components/Dropdown';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
@@ -188,7 +189,7 @@ function HistoryPlaylistInfoPage() {
     sortingOrder === 'allTimeMostListened' || sortingOrder === 'monthlyMostListened';
 
   const dropdowns = useMemo(() => {
-    const list = [
+    const list: DropdownProp<string>[] = [
       {
         name: 'HistoryPeriodDropdown',
         type: `${t('historyPage.period', 'Period')} :`,

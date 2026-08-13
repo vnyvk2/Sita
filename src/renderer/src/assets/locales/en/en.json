@@ -1,5 +1,7 @@
 {
   "common": {
+    "like": "Like",
+    "dislike": "Dislike",
     "song_one": "song",
     "song_other": "Songs",
     "playlist_one": "playlist",
