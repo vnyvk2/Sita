@@ -1,7 +1,23 @@
 import { db } from '@db/db';
-import { desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, gte, sql } from 'drizzle-orm';
 
+import logger from '../../logger';
 import { playHistory } from '../schema';
+import { getAllSongs } from './songs';
+
+export type HistoryPeriod = 'all' | '1' | '7' | '30' | '90' | '365';
+
+export interface HistoryQueryOptions {
+  period?: HistoryPeriod;
+  limit?: number;
+}
+
+export const getCutoffDate = (period?: HistoryPeriod): Date | undefined => {
+  if (!period || period === 'all') return undefined;
+  const days = parseInt(period, 10);
+  if (isNaN(days) || days <= 0) return undefined;
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+};
 
 export const addSongToPlayHistory = async (songId: number, trx: DB | DBTransaction = db) => {
   const data = await trx.insert(playHistory).values({ songId });
@@ -18,27 +34,73 @@ export const getSongPlayHistory = async (songId: number, trx: DB | DBTransaction
   return data;
 };
 
-import logger from '../../logger';
-import { getAllSongs } from './songs';
-
 export const getAllSongsInHistory = async (
   sortType?: SongSortTypes,
   paginatingData?: PaginatingData,
+  options?: HistoryQueryOptions,
   trx: DB | DBTransaction = db
 ) => {
   const { start = 0, end = 0 } = paginatingData || {};
-  const limit = end - start === 0 ? undefined : end - start;
+  const limit = end - start > 0 ? end - start : undefined;
 
   try {
-    // First, get the ordered song IDs from playHistory with pagination
-    const historyRecords = await trx
-      .select({ songId: playHistory.songId })
-      .from(playHistory)
-      .orderBy(desc(playHistory.createdAt))
-      .limit(limit ?? 1000000)
-      .offset(start);
+    const isMostPlayed =
+      sortType === 'allTimeMostListened' || sortType === 'monthlyMostListened';
 
-    const songIds = historyRecords.map((r) => r.songId);
+    const effectivePeriod =
+      options?.period ?? (sortType === 'monthlyMostListened' ? '30' : 'all');
+    const cutoffDate = getCutoffDate(effectivePeriod);
+    const whereClause = cutoffDate ? gte(playHistory.createdAt, cutoffDate) : undefined;
+
+    let songIds: number[] = [];
+    let preserveOrder = true;
+
+    if (isMostPlayed) {
+      const topNLimit = Math.min(Math.max(1, options?.limit ?? 25), 1000);
+      const historyRecords = await trx
+        .select({
+          songId: playHistory.songId,
+          playCount: sql<number>`count(*)::int`,
+          lastPlayed: sql<Date>`max(${playHistory.createdAt})`
+        })
+        .from(playHistory)
+        .where(whereClause)
+        .groupBy(playHistory.songId)
+        .orderBy(
+          sql`count(*) DESC`,
+          sql`max(${playHistory.createdAt}) DESC`,
+          asc(playHistory.songId)
+        )
+        .limit(topNLimit);
+
+      const allTopSongIds = historyRecords.map((r) => r.songId);
+      songIds = limit ? allTopSongIds.slice(start, start + limit) : allTopSongIds.slice(start);
+      preserveOrder = true;
+    } else if (
+      sortType === 'addedOrder' ||
+      sortType === 'dateAddedDescending' ||
+      !sortType
+    ) {
+      const historyRecords = await trx
+        .select({ songId: playHistory.songId })
+        .from(playHistory)
+        .where(whereClause)
+        .orderBy(desc(playHistory.createdAt))
+        .limit(limit ?? 1000000)
+        .offset(start);
+
+      songIds = historyRecords.map((r) => r.songId);
+      preserveOrder = true;
+    } else {
+      const historyRecords = await trx
+        .select({ songId: playHistory.songId })
+        .from(playHistory)
+        .where(whereClause)
+        .groupBy(playHistory.songId);
+
+      songIds = historyRecords.map((r) => r.songId);
+      preserveOrder = false;
+    }
 
     if (songIds.length === 0) {
       return {
@@ -50,13 +112,13 @@ export const getAllSongsInHistory = async (
       };
     }
 
-    // Then fetch the songs using the existing optimized getAllSongs query
     const songsResult = await getAllSongs(
       {
-        start: 0, // We already paginated the IDs, so we fetch all matching songs
+        start: 0,
         end: 0,
         songIds,
-        preserveIdOrder: true
+        sortType,
+        preserveIdOrder: preserveOrder
       },
       trx
     );
@@ -78,3 +140,4 @@ export const clearFullSongHistory = async (trx: DB | DBTransaction = db) => {
   const data = await trx.delete(playHistory);
   return data;
 };
+

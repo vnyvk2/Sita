@@ -1,14 +1,15 @@
-import { getAllSongsInHistory } from '@main/db/queries/history';
+import { getAllSongsInHistory, type HistoryQueryOptions } from '@main/db/queries/history';
 
 import logger from '../logger';
 import { convertToSongData } from '../utils/convert';
 
 export const getAllHistorySongs = async (
   sortType?: SongSortTypes,
-  paginatingData?: PaginatingData
+  paginatingData?: PaginatingData,
+  options?: HistoryQueryOptions
 ): Promise<PaginatedResult<SongData, SongSortTypes>> => {
   try {
-    const data = await getAllSongsInHistory(sortType, paginatingData);
+    const data = await getAllSongsInHistory(sortType, paginatingData, options);
     const songs = data.data.map((song) => convertToSongData(song));
 
     return {
@@ -23,3 +24,4 @@ export const getAllHistorySongs = async (
     throw error;
   }
 };
+

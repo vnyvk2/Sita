@@ -19,6 +19,7 @@ import type { BulkDeleteInput, BulkRestoreInput } from '../main/collections/oper
 import type { PinInput, UnpinInput } from '../main/collections/operations/PinOp';
 import type { CollectionEvent } from '../main/collections/events/CollectionEventBus';
 import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '../common/collections/types';
+import type { HistoryQueryOptions } from '../main/db/queries/history';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -104,9 +105,10 @@ const audioLibraryControls = {
     ipcRenderer.invoke('app/getSongInfo', songIds, sortType, filterType, limit, preserveIdOrder),
   getAllHistorySongs: (
     sortType?: SongSortTypes,
-    paginatingData?: PaginatingData
+    paginatingData?: PaginatingData,
+    options?: HistoryQueryOptions
   ): Promise<PaginatedResult<SongData, SongSortTypes>> =>
-    ipcRenderer.invoke('app/getAllHistorySongs', sortType, paginatingData),
+    ipcRenderer.invoke('app/getAllHistorySongs', sortType, paginatingData, options),
   getAllFavoriteSongs: (
     sortType?: SongSortTypes,
     paginatingData?: PaginatingData

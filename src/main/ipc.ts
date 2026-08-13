@@ -22,6 +22,7 @@ import fetchSongInfoFromLastFM from './core/fetchSongInfoFromLastFM';
 import { getAllFavoriteSongs } from './core/getAllFavoriteSongs';
 import { getAllHistorySongs } from './core/getAllHistorySongs';
 import getAllSongs from './core/getAllSongs';
+import type { HistoryQueryOptions } from './db/queries/history';
 import getArtistInfoFromNet from './core/getArtistInfoFromNet';
 
 import getBlacklistData from './core/getBlacklistData';
@@ -274,8 +275,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/getAllHistorySongs',
-      (_, sortType?: SongSortTypes, paginatingData?: PaginatingData) =>
-        getAllHistorySongs(sortType, paginatingData)
+      (_, sortType?: SongSortTypes, paginatingData?: PaginatingData, options?: HistoryQueryOptions) =>
+        getAllHistorySongs(sortType, paginatingData, options)
     );
 
     ipcMain.handle(

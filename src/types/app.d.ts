@@ -1,4 +1,5 @@
 import type { db } from '@main/db/db';
+import type { HistoryPeriod, HistoryQueryOptions } from '@main/db/queries/history';
 import type { GetAllSongListeningDataReturnType } from '@main/db/queries/listens';
 import { ReactElement, ReactNode } from 'react';
 import { resources } from 'src/renderer/src/i18n';
@@ -644,6 +645,8 @@ declare global {
     albumDetailPage?: SongSortTypes;
     genreDetailPage?: SongSortTypes;
     artistDetailPage?: SongSortTypes;
+    historyPagePeriod?: HistoryPeriod;
+    historyPageMostPlayedLimit?: number;
   }
 
   interface LyricsEditorSettings {
