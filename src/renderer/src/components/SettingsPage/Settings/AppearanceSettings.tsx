@@ -6,7 +6,7 @@ import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { type KeyboardEvent, useCallback } from 'react';
+import { type KeyboardEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import HomeImgDark from '../../../assets/images/webp/home-skeleton-dark.webp';
@@ -18,8 +18,10 @@ import Dropdown from '../../Dropdown';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
 import ThemePreviewGrid from './ThemePreviewGrid';
-import { useEffectiveAppearance } from '../../hooks/useEffectiveAppearance';
+import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
+import { themeRegistry, type ThemePreset } from '../../../../../common/themeRegistry';
 const ThemeSettings = () => {
+  const [showThemeGrid, setShowThemeGrid] = useState(false);
   const { data: userSettings } = useQuery(settingsQuery.all);
 
   const { mutate: changeAppTheme } = useMutation({
@@ -174,13 +176,27 @@ const ThemeSettings = () => {
         <li className="secondary-container change-theme-preset my-4">
           <div className="description">{t('settingsPage.themePresetDescription')}</div>
           <div className="mt-4 flex w-full flex-col">
-            <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
-              {t('settingsPage.themePreset')}:
-            </span>
-            <ThemePreviewGrid
-              currentTheme={themePreset as ThemePreset}
-              onThemeChange={(theme) => storage.preferences.setPreferences('themePreset', theme)}
-            />
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                {t('settingsPage.themePreset')}: <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-1">{t(themeRegistry[themePreset as ThemePreset]?.nameKey)}</span>
+              </span>
+              <button
+                type="button"
+                className="rounded-md bg-background-color-2 px-4 py-2 text-sm font-medium hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 transition-colors"
+                onClick={() => setShowThemeGrid((prev) => !prev)}
+              >
+                {showThemeGrid ? t('settingsPage.hideThemes', 'Hide Themes') : t('settingsPage.browseThemes', 'Browse Themes')}
+              </button>
+            </div>
+            
+            {showThemeGrid && (
+              <div className="mt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                <ThemePreviewGrid
+                  currentTheme={themePreset as ThemePreset}
+                  onThemeChange={(theme) => storage.preferences.setPreferences('themePreset', theme)}
+                />
+              </div>
+            )}
           </div>
         </li>
 

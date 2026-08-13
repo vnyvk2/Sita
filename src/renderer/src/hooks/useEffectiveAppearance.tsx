@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useStore } from '@tanstack/react-store';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { settingsQuery } from '../components/SettingsPage/Settings/settingsQuery';
-import { store } from '../other/store';
+import { useQuery } from '@tanstack/react-query';
+import { settingsQuery } from '../queries/settings';
+import { store } from '../store/store';
 import { resolveEffectiveAppearance } from '../utils/resolveEffectiveAppearance';
 
 export function useEffectiveAppearance() {
@@ -11,8 +11,8 @@ export function useEffectiveAppearance() {
     (state) => state.localStorage.preferences?.themePreset ?? 'default'
   );
 
-  const { data: userSettings } = useSuspenseQuery(settingsQuery.all);
-  const userAppearance = userSettings.isDarkMode;
+  const { data: userSettings } = useQuery(settingsQuery.all);
+  const userAppearance = userSettings?.isDarkMode ?? false;
 
   return useMemo(() => {
     return resolveEffectiveAppearance({
