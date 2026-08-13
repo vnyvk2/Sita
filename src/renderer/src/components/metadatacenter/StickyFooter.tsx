@@ -40,13 +40,13 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
         borderBottomRightRadius: '16px'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#94A3B8' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: 'var(--text-color-dimmed)' }}>
         <span>
-          <strong style={{ color: '#F8FAFC' }}>{selectedTrackCount}</strong> / {matchCount} tracks selected
+          <strong style={{ color: 'var(--text-color)' }}>{selectedTrackCount}</strong> / {matchCount} tracks selected
         </span>
         <span>•</span>
         <span>
-          <strong style={{ color: '#38BDF8' }}>{selectedFieldCount}</strong> fields active
+          <strong style={{ color: 'var(--text-color-highlight)' }}>{selectedFieldCount}</strong> fields active
         </span>
 
         {canUndo && (
@@ -57,7 +57,7 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
               disabled={loading}
               style={{
                 background: 'rgba(239, 68, 68, 0.15)',
-                color: '#F87171',
+                color: 'var(--text-color-crimson)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
                 padding: '5px 12px',
                 borderRadius: '8px',
@@ -86,7 +86,7 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
             padding: '9px 20px',
             fontSize: '13px',
             fontWeight: 500,
-            color: '#94A3B8',
+            color: 'var(--text-color-dimmed)',
             background: 'transparent',
             border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '8px',
@@ -103,7 +103,7 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
             padding: '9px 24px',
             fontSize: '13px',
             fontWeight: 600,
-            color: '#FFFFFF',
+            color: 'var(--text-color-white)',
             background: loading ? 'rgba(59, 130, 246, 0.4)' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
             border: 'none',
             borderRadius: '8px',

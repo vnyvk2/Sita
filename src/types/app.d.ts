@@ -514,7 +514,7 @@ declare global {
     subFolders: SavedMusicFolder[];
   }
 
-  type ThemePreset = 'default' | 'nord' | 'emerald' | 'dracula';
+  type ThemePreset = import('../common/themeRegistry').ThemePreset;
 
   interface VisibleSideTabs {
     genres: boolean;

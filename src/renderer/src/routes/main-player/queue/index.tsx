@@ -562,7 +562,7 @@ function RouteComponent() {
               )}
           </div>
           {currentQueue.length === 0 && (
-            <div className="no-songs-container flex h-full w-full flex-col items-center justify-center text-center text-2xl text-[#ccc]">
+            <div className="no-songs-container flex h-full w-full flex-col items-center justify-center text-center text-2xl text-font-color-dimmed">
               <Img src={NoSongsImage} className="mb-8 w-60" alt="" /> {t('currentQueuePage.empty')}
               <Button
                 label={t('currentQueuePage.addSongs', 'Add Songs')}

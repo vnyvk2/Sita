@@ -29,7 +29,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: '#f3f4f6' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-color)' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
         <input
           type="text"
@@ -42,7 +42,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
             borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.07)',
             border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#ffffff',
+            color: 'var(--text-color-white)',
             outline: 'none',
             fontSize: '0.9rem'
           }}
@@ -58,7 +58,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
             borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.07)',
             border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#ffffff',
+            color: 'var(--text-color-white)',
             outline: 'none',
             fontSize: '0.9rem'
           }}
@@ -71,7 +71,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
             borderRadius: '8px',
             background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
             border: 'none',
-            color: '#ffffff',
+            color: 'var(--text-color-white)',
             fontWeight: 600,
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.6 : 1
@@ -104,7 +104,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 600, fontSize: '1rem', color: '#ffffff' }}>{cand.title}</span>
+                <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-color-white)' }}>{cand.title}</span>
                 {cand.year && (
                   <span style={{ fontSize: '0.82rem', opacity: 0.7 }}>({cand.year})</span>
                 )}
@@ -138,7 +138,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
                   borderRadius: '6px',
                   background: 'rgba(59, 130, 246, 0.2)',
                   border: '1px solid rgba(59, 130, 246, 0.4)',
-                  color: '#60a5fa',
+                  color: 'var(--text-color-highlight)',
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer'

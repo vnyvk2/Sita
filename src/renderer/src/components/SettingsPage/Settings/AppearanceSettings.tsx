@@ -17,7 +17,8 @@ import Checkbox from '../../Checkbox';
 import Dropdown from '../../Dropdown';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
-
+import ThemePreviewGrid from './ThemePreviewGrid';
+import { useEffectiveAppearance } from '../../hooks/useEffectiveAppearance';
 const ThemeSettings = () => {
   const { data: userSettings } = useQuery(settingsQuery.all);
 
@@ -70,6 +71,8 @@ const ThemeSettings = () => {
     }
   }, []);
 
+  const { isThemeControlled, mode: effectiveMode } = useEffectiveAppearance();
+
   return userSettings ? (
     <li
       className="main-container appearance-settings-container mb-16"
@@ -81,11 +84,18 @@ const ThemeSettings = () => {
       </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
         <li>
-          <div className="description">{t('settingsPage.changeTheme')}</div>
-          <div className="theme-change-radio-btns flex max-w-3xl items-center justify-between pt-4 pl-4">
+          <div className="description">
+            {t('settingsPage.changeTheme')}
+            {isThemeControlled && (
+              <span className="ml-2 font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+                {t('settingsPage.controlledByTheme', { theme: t(themeRegistry[themePreset as ThemePreset]?.nameKey) })}
+              </span>
+            )}
+          </div>
+          <div className={`theme-change-radio-btns flex max-w-3xl items-center justify-between pt-4 pl-4 ${isThemeControlled ? 'opacity-50 pointer-events-none' : ''}`}>
             <label
               htmlFor="lightThemeRadioBtn"
-              tabIndex={0}
+              tabIndex={isThemeControlled ? -1 : 0}
               className={`theme-change-radio-btn bg-background-color-2/75 hover:bg-background-color-2 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 mb-2 flex cursor-pointer flex-col items-center rounded-md p-6 outline-offset-1 focus-within:outline-2 ${
                 !userSettings.useSystemTheme &&
                 !userSettings.isDarkMode &&
@@ -100,6 +110,7 @@ const ThemeSettings = () => {
                 value="lightTheme"
                 id="lightThemeRadioBtn"
                 defaultChecked={!userSettings.useSystemTheme && !userSettings.isDarkMode}
+                disabled={isThemeControlled}
                 onClick={() => changeAppTheme('light')}
               />
               <Img loading="eager" src={HomeImgLight} className="h-24 w-40 shadow-md" />
@@ -110,7 +121,7 @@ const ThemeSettings = () => {
 
             <label
               htmlFor="darkThemeRadioBtn"
-              tabIndex={0}
+              tabIndex={isThemeControlled ? -1 : 0}
               className={`theme-change-radio-btn bg-background-color-2/75 hover:bg-background-color-2 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 mb-2 flex cursor-pointer flex-col items-center rounded-md p-6 outline-offset-1 focus-within:outline-2 ${
                 !userSettings.useSystemTheme &&
                 userSettings.isDarkMode &&
@@ -125,6 +136,7 @@ const ThemeSettings = () => {
                 value="darkTheme"
                 id="darkThemeRadioBtn"
                 defaultChecked={!userSettings.useSystemTheme && userSettings.isDarkMode}
+                disabled={isThemeControlled}
                 onClick={() => changeAppTheme('dark')}
               />
               <Img loading="eager" src={HomeImgDark} className="h-24 w-40 shadow-md" />
@@ -135,7 +147,7 @@ const ThemeSettings = () => {
 
             <label
               htmlFor="systemThemeRadioBtn"
-              tabIndex={0}
+              tabIndex={isThemeControlled ? -1 : 0}
               className={`theme-change-radio-btn hover:bg-background-color bg-background-color-2/75 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 mb-2 flex cursor-pointer flex-col items-center rounded-md p-6 outline-offset-1 focus-within:outline-2 ${
                 userSettings.useSystemTheme &&
                 'bg-background-color-3! dark:bg-dark-background-color-3!'
@@ -149,6 +161,7 @@ const ThemeSettings = () => {
                 value="systemTheme"
                 id="systemThemeRadioBtn"
                 defaultChecked={userSettings.useSystemTheme}
+                disabled={isThemeControlled}
                 onClick={() => changeAppTheme('system')}
               />
               <Img loading="eager" src={HomeImgLightDark} className="h-24 w-40 shadow-md" />
@@ -160,25 +173,13 @@ const ThemeSettings = () => {
         </li>
         <li className="secondary-container change-theme-preset my-4">
           <div className="description">{t('settingsPage.themePresetDescription')}</div>
-          <div className="mt-2 flex items-center">
+          <div className="mt-4 flex w-full flex-col">
             <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
               {t('settingsPage.themePreset')}:
             </span>
-            <Dropdown<ThemePreset>
-              name="themePreset"
-              value={themePreset}
-              onChange={(e) =>
-                storage.preferences.setPreferences(
-                  'themePreset',
-                  e.target.value as ThemePreset
-                )
-              }
-              options={[
-                { label: t('settingsPage.defaultThemePreset'), value: 'default' },
-                { label: t('settingsPage.nordThemePreset'), value: 'nord' },
-                { label: t('settingsPage.emeraldThemePreset'), value: 'emerald' },
-                { label: t('settingsPage.draculaThemePreset'), value: 'dracula' }
-              ]}
+            <ThemePreviewGrid
+              currentTheme={themePreset as ThemePreset}
+              onThemeChange={(theme) => storage.preferences.setPreferences('themePreset', theme)}
             />
           </div>
         </li>

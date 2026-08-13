@@ -21,8 +21,8 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
         return {
           bg: 'rgba(59, 130, 246, 0.15)',
           border: 'rgba(59, 130, 246, 0.4)',
-          text: '#60a5fa',
-          iconColor: '#3b82f6'
+          text: 'var(--text-color-highlight)',
+          iconColor: 'var(--text-color-highlight-2)'
         };
       case 'Review':
         return {
@@ -36,8 +36,8 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
         return {
           bg: 'rgba(239, 68, 68, 0.15)',
           border: 'rgba(239, 68, 68, 0.4)',
-          text: '#f87171',
-          iconColor: '#ef4444'
+          text: 'var(--text-color-crimson)',
+          iconColor: 'var(--text-color-crimson)'
         };
     }
   };

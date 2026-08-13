@@ -48,31 +48,31 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={onSelectAll}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color-white)', fontSize: '0.8rem', cursor: 'pointer' }}
           >
             Select All
           </button>
           <button
             onClick={onSelectChanged}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color-white)', fontSize: '0.8rem', cursor: 'pointer' }}
           >
             Select Changed Only
           </button>
           <button
             onClick={onClearSelections}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#9ca3af', fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ padding: '6px 12px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-color-dimmed)', fontSize: '0.8rem', cursor: 'pointer' }}
           >
             Clear Selections
           </button>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
+              style={{ background: 'var(--background-color-2)', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
@@ -81,12 +81,12 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
             </select>
           </label>
 
-          <label style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
+              style={{ background: 'var(--background-color-2)', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
             >
               <option value="trackNumber">Track Number</option>
               <option value="confidence">Confidence</option>
@@ -134,17 +134,17 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
 
-                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#9ca3af', width: '28px' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-color-dimmed)', width: '28px' }}>
                   {track.oldTrackNumber ? String(track.oldTrackNumber).padStart(2, '0') : '--'}
                 </span>
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>{track.oldTitle}</span>
-                  <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{track.oldArtist}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-color-white)' }}>{track.oldTitle}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)' }}>{track.oldArtist}</span>
                 </div>
 
                 {changedCount > 0 && (
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', fontWeight: 500 }}>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--text-color-highlight)', fontWeight: 500 }}>
                     {changedCount} diff(s)
                   </span>
                 )}
@@ -158,7 +158,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                 <ConfidenceBadge level={track.confidenceLevel} confidence={track.confidence} />
 
                 <button
-                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-color-dimmed)', cursor: 'pointer' }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedTrackId(isExpanded ? null : track.localSongId);
