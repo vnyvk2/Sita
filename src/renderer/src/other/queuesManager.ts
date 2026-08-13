@@ -113,6 +113,10 @@ export class QueuesManager {
   deleteQueue(queueId: string) {
     const index = this.queues.findIndex((q) => q.id === queueId);
     if (index >= 0 && index < this.queues.length) {
+      if (this.queues[index].getMetadata().isLocked) {
+        console.warn(`Attempted to delete locked queue ${queueId}`);
+        return;
+      }
       const [removed] = this.queues.splice(index, 1);
       this.unbindQueueEvents(removed);
 
@@ -142,12 +146,70 @@ export class QueuesManager {
     }
   }
 
+  toggleQueueLock(queueId: string): boolean {
+    const queue = this.queues.find((q) => q.id === queueId);
+    if (queue) {
+      const isCurrentlyLocked = !!queue.getMetadata().isLocked;
+      queue.setMetadata({ isLocked: !isCurrentlyLocked });
+      this.triggerStoreSync();
+      this.emit('queuesChanged');
+      return true;
+    }
+    return false;
+  }
+
+  removeAllQueues(): { deleted: number; kept: number } {
+    let deletedCount = 0;
+    let keptCount = 0;
+
+    // Preserve reference to the currently active queue before filtering
+    const activeQueue = this.queues[this.activeQueueIndex];
+    const activeQueueId = activeQueue?.id;
+
+    const remainingQueues = this.queues.filter((q) => {
+      if (q.getMetadata().isLocked) {
+        keptCount++;
+        return true;
+      }
+      this.unbindQueueEvents(q);
+      deletedCount++;
+      return false;
+    });
+
+    let activeQueueChanged = false;
+
+    if (remainingQueues.length === 0) {
+      const newQueue = new PlayerQueue();
+      this.bindQueueEvents(newQueue);
+      this.queues = [newQueue];
+      this.activeQueueIndex = 0;
+      activeQueueChanged = true;
+    } else {
+      this.queues = remainingQueues;
+      // If the previously active queue survived, maintain its active status; otherwise activate the first surviving queue
+      const newActiveIndex = this.queues.findIndex((q) => q.id === activeQueueId);
+      if (newActiveIndex >= 0) {
+        this.activeQueueIndex = newActiveIndex;
+      } else {
+        this.activeQueueIndex = 0;
+        activeQueueChanged = true;
+      }
+    }
+
+    this.triggerStoreSync();
+    this.emit('queuesChanged');
+
+    if (activeQueueChanged) {
+      this.emit('activeQueueChanged');
+    }
+
+    return { deleted: deletedCount, kept: keptCount };
+  }
+
   renameQueue(queueId: string, newName: string) {
     const queue = this.queues.find((q) => q.id === queueId);
     if (queue) {
-      const metadata = queue.getMetadata();
-      const updatedMetadata = { ...metadata, title: newName };
-      queue.setMetadata(updatedMetadata.queueId, updatedMetadata.queueType, updatedMetadata.title);
+      queue.setMetadata({ title: newName });
     }
   }
 

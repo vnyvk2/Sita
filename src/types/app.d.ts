@@ -348,7 +348,7 @@ declare global {
     currentSongIndex: number | null;
     songIds: number[];
     queueBeforeShuffle?: number[];
-    queueId?: string;
+    queueId?: string | number;
     queueType: QueueTypes;
   }
 
@@ -675,9 +675,10 @@ declare global {
   type ShortcutCategoryList = ShortcutCategory[];
 
   interface PlayerQueueMetadata {
-    queueId?: string;
+    queueId?: string | number;
     queueType?: QueueTypes;
     title?: string;
+    isLocked?: boolean;
   }
 
   type QueueEventType =
@@ -714,7 +715,7 @@ declare global {
       positions: number[];
     };
     restored: { restoredQueue: number[] };
-    metadataChange: { queueId?: string; queueType?: QueueTypes };
+    metadataChange: { queueId?: string | number; queueType?: QueueTypes };
   }
 
   interface PlayerQueueJson {

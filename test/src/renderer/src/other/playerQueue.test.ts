@@ -620,7 +620,7 @@ describe('PlayerQueue', () => {
     describe('setMetadata', () => {
       test('should set queue ID and type', () => {
         const queue = new PlayerQueue(['song1', 'song2']);
-        queue.setMetadata('album-123', 'album');
+        queue.setMetadata({ queueId: 'album-123', queueType: 'album' });
         expect(queue.metadata?.queueId).toBe('album-123');
         expect(queue.metadata?.queueType).toBe('album');
       });
@@ -630,19 +630,36 @@ describe('PlayerQueue', () => {
           queueId: 'old-id',
           queueType: 'songs'
         });
-        queue.setMetadata('new-id', 'playlist');
+        queue.setMetadata({ queueId: 'new-id', queueType: 'playlist' });
         expect(queue.metadata?.queueId).toBe('new-id');
         expect(queue.metadata?.queueType).toBe('playlist');
       });
 
-      test('should handle undefined values', () => {
+      test('should handle partial values without clearing existing fields', () => {
         const queue = new PlayerQueue(['song1'], 0, undefined, {
           queueId: 'id',
           queueType: 'album'
         });
-        queue.setMetadata();
-        expect(queue.metadata?.queueId).toBeUndefined();
-        expect(queue.metadata?.queueType).toBeUndefined();
+        queue.setMetadata({});
+        expect(queue.metadata?.queueId).toBe('id');
+        expect(queue.metadata?.queueType).toBe('album');
+      });
+
+      test('should accept partial metadata object and update isLocked', () => {
+        const queue = new PlayerQueue(['song1'], 0, undefined, {
+          title: 'My Queue',
+          queueId: 'album-1',
+          queueType: 'album'
+        });
+
+        queue.setMetadata({ isLocked: true });
+        expect(queue.metadata?.isLocked).toBe(true);
+        expect(queue.metadata?.title).toBe('My Queue');
+        expect(queue.metadata?.queueId).toBe('album-1');
+        expect(queue.metadata?.queueType).toBe('album');
+
+        queue.setMetadata({ isLocked: false });
+        expect(queue.metadata?.isLocked).toBe(false);
       });
     });
 
@@ -1025,6 +1042,21 @@ describe('PlayerQueue', () => {
         expect(restoredQueue.metadata).toEqual(originalQueue.metadata);
       });
 
+      test('should preserve isLocked state through JSON serialization round-trip', () => {
+        const originalQueue = new PlayerQueue(['song1', 'song2'], 0, undefined, {
+          title: 'Protected Favorites',
+          isLocked: true
+        });
+
+        const json = originalQueue.toJSON();
+        expect(json.metadata?.isLocked).toBe(true);
+
+        const restoredQueue = PlayerQueue.fromJSON(json);
+        expect(restoredQueue.getMetadata().isLocked).toBe(true);
+        expect(restoredQueue.metadata?.isLocked).toBe(true);
+        expect(restoredQueue.metadata?.title).toBe('Protected Favorites');
+      });
+
       test('should work with JSON.stringify and JSON.parse', () => {
         const originalQueue = new PlayerQueue(['song1', 'song2'], 1, undefined, {
           queueId: 'genre-rock',
@@ -1193,7 +1225,7 @@ describe('PlayerQueue', () => {
           const callback = vi.fn();
 
           queue.on('metadataChange', callback);
-          queue.setMetadata('playlist-123', 'playlist');
+          queue.setMetadata({ queueId: 'playlist-123', queueType: 'playlist' });
 
           expect(callback).toHaveBeenCalledTimes(1);
           expect(callback).toHaveBeenCalledWith({
@@ -1432,7 +1464,7 @@ describe('PlayerQueue', () => {
       expect(queue.metadata?.queueId).toBe('album-1');
       expect(queue.metadata?.queueType).toBe('album');
 
-      queue.setMetadata('playlist-1', 'playlist');
+      queue.setMetadata({ queueId: 'playlist-1', queueType: 'playlist' });
       expect(queue.metadata?.queueId).toBe('playlist-1');
       expect(queue.metadata?.queueType).toBe('playlist');
     });

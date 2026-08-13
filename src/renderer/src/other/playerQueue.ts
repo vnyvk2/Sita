@@ -645,14 +645,16 @@ class PlayerQueue {
   }
 
   /**
-   * Sets the queue metadata
+   * Sets or updates the queue metadata
    *
-   * @param queueId - Optional queue identifier
-   * @param queueType - Optional queue type
+   * @param updatedMetadata - Partial metadata object to merge with existing metadata
    */
-  setMetadata(queueId?: string | number, queueType?: QueueTypes, title?: string): void {
-    this.metadata = { queueId: queueId as any, queueType, title };
-    this.emit('metadataChange', { queueId: queueId as any, queueType });
+  setMetadata(updatedMetadata: Partial<PlayerQueueMetadata>): void {
+    this.metadata = { ...(this.metadata || {}), ...updatedMetadata };
+    this.emit('metadataChange', {
+      queueId: this.metadata?.queueId,
+      queueType: this.metadata?.queueType
+    });
   }
 
   /**
