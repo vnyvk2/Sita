@@ -6,7 +6,7 @@ import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import MainContainer from '@renderer/components/MainContainer';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { lyricsQuery } from '@renderer/queries/lyrics';
 import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';

@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Link, RouterProvider, createHashHistory, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
@@ -7,18 +7,9 @@ import { CollectionEventProvider } from './components/providers/CollectionEventP
 import { UndoShortcutProvider } from './components/UndoShortcutProvider';
 
 import './i18n';
+import { queryClient } from './queryClient';
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
-
-// Create a new router instance
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false, // default: true
-      staleTime: 1000 * 60 * 1 // 1 minutes
-    }
-  }
-});
 
 const history = createHashHistory();
 // Create a new router instance

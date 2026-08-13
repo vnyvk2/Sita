@@ -13,7 +13,7 @@ import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { artistQuery } from '@renderer/queries/artists';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';

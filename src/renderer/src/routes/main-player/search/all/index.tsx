@@ -7,7 +7,7 @@ import AllPlaylistResults from '@renderer/components/SearchPage/All_Search_Resul
 import AllSongResults from '@renderer/components/SearchPage/All_Search_Result_Containers/AllSongResults';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { searchQuery } from '@renderer/queries/search';
 import { store } from '@renderer/store/store';
 import { searchPageSchema } from '@renderer/utils/zod/searchPageSchema';

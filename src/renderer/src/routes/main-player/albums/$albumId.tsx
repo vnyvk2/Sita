@@ -7,7 +7,7 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { albumQuery } from '@renderer/queries/albums';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';

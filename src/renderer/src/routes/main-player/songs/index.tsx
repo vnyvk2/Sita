@@ -10,7 +10,7 @@ import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';

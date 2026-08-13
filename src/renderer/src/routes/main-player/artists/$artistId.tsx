@@ -12,7 +12,7 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { albumQuery } from '@renderer/queries/albums';
 import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';

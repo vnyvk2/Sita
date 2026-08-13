@@ -1,8 +1,7 @@
 import Preloader from '@renderer/components/Preloader/Preloader';
 import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { createFileRoute, Navigate } from '@tanstack/react-router';
-
-import { queryClient } from '..';
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,

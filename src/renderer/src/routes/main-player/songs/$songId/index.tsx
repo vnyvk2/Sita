@@ -11,7 +11,7 @@ import SongStat from '@renderer/components/SongInfoPage/SongStat';
 import SongsWithFeaturingArtistsSuggestion from '@renderer/components/SongInfoPage/SongsWithFeaturingArtistSuggestion';
 import SongArtist from '@renderer/components/SongsPage/SongArtist';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { listenQuery } from '@renderer/queries/listens';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';

@@ -1,4 +1,4 @@
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { userPreferencesQuery, userPreferencesMutation } from '@renderer/queries/userPreferences';
 import { useQuery, useMutation } from '@tanstack/react-query';
 

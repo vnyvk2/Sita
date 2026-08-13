@@ -11,7 +11,7 @@ import SecondaryContainer from '@renderer/components/SecondaryContainer';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';

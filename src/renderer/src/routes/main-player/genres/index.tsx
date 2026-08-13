@@ -8,7 +8,7 @@ import MainContainer from '@renderer/components/MainContainer';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { genreQuery } from '@renderer/queries/genres';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';

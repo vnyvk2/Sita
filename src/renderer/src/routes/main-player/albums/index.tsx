@@ -9,7 +9,7 @@ import PageSearchInput from '@renderer/components/PageSearchInput';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { albumQuery } from '@renderer/queries/albums';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { store } from '@renderer/store/store';

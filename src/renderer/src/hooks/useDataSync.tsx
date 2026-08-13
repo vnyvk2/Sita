@@ -1,11 +1,11 @@
+import { collectionKeys } from '@renderer/api/collectionKeys';
 import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { useEffect } from 'react';
 
-import { queryClient } from '..';
 import { albumQuery } from '../queries/albums';
 import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
-import { collectionKeys } from '@renderer/api/collectionKeys';
 import { searchQuery } from '../queries/search';
 import { songQuery } from '../queries/songs';
 

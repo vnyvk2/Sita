@@ -1,4 +1,4 @@
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';

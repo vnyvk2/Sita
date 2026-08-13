@@ -1,5 +1,4 @@
 // import { useEffect } from 'react';
-// import { router } from '@renderer/index';
 
 import AppIcon from '../../assets/images/webp/logo_light_mode.webp';
 import Img from '../Img';

@@ -1,5 +1,5 @@
 import SettingsPage from '@renderer/components/SettingsPage/SettingsPage';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { settingsQuery } from '@renderer/queries/settings';
 import { createFileRoute } from '@tanstack/react-router';
 

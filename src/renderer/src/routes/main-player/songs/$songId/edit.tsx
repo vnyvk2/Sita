@@ -1,5 +1,5 @@
 import SongTagsEditingPage from '@renderer/components/SongTagsEditingPage/SongTagsEditingPage';
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { songQuery } from '@renderer/queries/songs';
 import { createFileRoute } from '@tanstack/react-router';
 

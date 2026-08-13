@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex */
 
-import { queryClient } from '@renderer/index';
+import { queryClient } from '@renderer/queryClient';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useMutation, useQuery } from '@tanstack/react-query';
