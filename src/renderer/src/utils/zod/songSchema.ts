@@ -18,3 +18,28 @@ export const songSearchSchema = baseInfoPageSearchParamsSchema.extend({
 });
 
 export type SongSearchSchema = z.infer<typeof songSearchSchema>;
+
+export const recentlyAddedPeriodValues = [
+  'today',
+  '24h',
+  '7d',
+  '30d',
+  '90d',
+  '365d',
+  'all'
+] as const;
+
+export const recentlyAddedSongSearchSchema = baseInfoPageSearchParamsSchema.extend({
+  sortingOrder: z.enum(songSortTypes).optional(),
+  filteringOrder: z.enum(songFilterTypes).optional(),
+  period: z.enum(recentlyAddedPeriodValues).optional(),
+  action: z.enum(['add-to-queue']).optional(),
+  queueIndex: z.coerce.number().optional(),
+  keyword: z.string().optional(),
+  language: z.string().optional(),
+  genre: z.string().optional(),
+  onlyFavoriteArtists: z.boolean().optional(),
+  onlyFavoriteAlbums: z.boolean().optional()
+});
+
+export type RecentlyAddedSongSearchSchema = z.infer<typeof recentlyAddedSongSearchSchema>;

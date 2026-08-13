@@ -55,7 +55,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-color)' }}>
             Cover Artwork Preview
           </span>
           <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 500 }}>
@@ -71,7 +71,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               borderRadius: '6px',
               border: replaceArtwork ? '1px solid rgba(255,255,255,0.15)' : '1px solid #3b82f6',
               background: replaceArtwork ? 'transparent' : 'rgba(59, 130, 246, 0.2)',
-              color: replaceArtwork ? '#9ca3af' : '#60a5fa',
+              color: replaceArtwork ? 'var(--text-color-dimmed)' : 'var(--text-color-highlight)',
               fontSize: '0.8rem',
               fontWeight: 600,
               cursor: 'pointer'
@@ -86,7 +86,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               borderRadius: '6px',
               border: !replaceArtwork ? '1px solid rgba(255,255,255,0.15)' : '1px solid #10b981',
               background: !replaceArtwork ? 'transparent' : 'rgba(16, 185, 129, 0.2)',
-              color: !replaceArtwork ? '#9ca3af' : '#34d399',
+              color: !replaceArtwork ? 'var(--text-color-dimmed)' : '#34d399',
               fontSize: '0.8rem',
               fontWeight: 600,
               cursor: 'pointer'
@@ -111,14 +111,14 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
             border: !replaceArtwork ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)'
           }}
         >
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', fontWeight: 500 }}>Current Cover</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)', fontWeight: 500 }}>Current Cover</span>
           <div
             style={{
               width: '100px',
               height: '100px',
               borderRadius: '8px',
               overflow: 'hidden',
-              background: '#111827',
+              background: 'var(--background-color-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -135,7 +135,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎵</span>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Local Embedded File</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Local Embedded File</span>
         </div>
 
         {/* Suggested Artwork */}
@@ -158,7 +158,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               height: '100px',
               borderRadius: '8px',
               overflow: 'hidden',
-              background: '#111827',
+              background: 'var(--background-color-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'

@@ -108,7 +108,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
         <div className={styles.header}>
           <div className={styles.titleGroup}>
             <h2>
-              <span className="material-symbols-rounded" style={{ color: '#38BDF8', fontSize: '24px' }}>
+              <span className="material-symbols-rounded" style={{ color: 'var(--text-color-highlight)', fontSize: '24px' }}>
                 auto_fix_high
               </span>
               <span>Metadata Center</span>
@@ -157,7 +157,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Error Banner */}
           {state.error && (
-            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#F87171', fontSize: '13px' }}>
+            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--text-color-crimson)', fontSize: '13px' }}>
               {state.error}
             </div>
           )}

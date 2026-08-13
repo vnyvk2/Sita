@@ -22,13 +22,13 @@ export const ProgressOverlay: React.FC<ProgressOverlayProps> = ({ stage, message
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
-        <span style={{ color: '#38BDF8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ color: 'var(--text-color-highlight)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="material-symbols-rounded" style={{ fontSize: '18px', animation: 'spin 1.5s linear infinite' }}>
             sync
           </span>
           <span>{message || 'Processing metadata...'}</span>
         </span>
-        <span style={{ color: '#38BDF8', fontWeight: 700 }}>{Math.round(progressPercent)}%</span>
+        <span style={{ color: 'var(--text-color-highlight)', fontWeight: 700 }}>{Math.round(progressPercent)}%</span>
       </div>
 
       <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(15, 23, 42, 0.6)', overflow: 'hidden' }}>

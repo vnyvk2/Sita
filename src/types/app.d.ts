@@ -1,10 +1,10 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { resources } from 'src/renderer/src/i18n';
 
+import type { songSortTypes } from '../common/songSortTypes';
 import type { api } from '../preload';
 import type { ButtonProps } from '../renderer/src/components/Button';
 import type { DropdownOption } from '../renderer/src/components/Dropdown';
-import type { songSortTypes } from '../common/songSortTypes';
 import type { LastFMSessionData } from './last_fm_api';
 import type { SimilarArtist, Tag } from './last_fm_artist_info_api';
 
@@ -348,7 +348,7 @@ declare global {
     currentSongIndex: number | null;
     songIds: number[];
     queueBeforeShuffle?: number[];
-    queueId?: string;
+    queueId?: string | number;
     queueType: QueueTypes;
   }
 
@@ -369,7 +369,8 @@ declare global {
     | 'genre'
     | 'folder'
     | 'favorites'
-    | 'history';
+    | 'history'
+    | 'recentlyAdded';
 
   interface QueueInfo {
     artworkPath: string;
@@ -513,7 +514,7 @@ declare global {
     subFolders: SavedMusicFolder[];
   }
 
-  type ThemePreset = 'default' | 'nord' | 'emerald' | 'dracula';
+  type ThemePreset = import('../common/themeRegistry').ThemePreset;
 
   interface VisibleSideTabs {
     genres: boolean;
@@ -652,6 +653,7 @@ declare global {
     genreDetailPage?: SongSortTypes;
     artistDetailPage?: SongSortTypes;
     historyPagePeriod?: HistoryPeriod;
+    recentlyAddedPagePeriod?: RecentlyAddedPeriod;
     historyPageMostPlayedLimit?: number;
   }
 
@@ -673,9 +675,10 @@ declare global {
   type ShortcutCategoryList = ShortcutCategory[];
 
   interface PlayerQueueMetadata {
-    queueId?: string;
+    queueId?: string | number;
     queueType?: QueueTypes;
     title?: string;
+    isLocked?: boolean;
   }
 
   type QueueEventType =
@@ -712,7 +715,7 @@ declare global {
       positions: number[];
     };
     restored: { restoredQueue: number[] };
-    metadataChange: { queueId?: string; queueType?: QueueTypes };
+    metadataChange: { queueId?: string | number; queueType?: QueueTypes };
   }
 
   interface PlayerQueueJson {
@@ -1159,6 +1162,7 @@ declare global {
     | 'nonFavorites';
 
   type HistoryPeriod = 'all' | '1' | '7' | '30' | '90' | '365';
+  type RecentlyAddedPeriod = 'today' | '24h' | '7d' | '30d' | '90d' | '365d' | 'all';
   interface HistoryQueryOptions {
     period?: HistoryPeriod;
     limit?: number;

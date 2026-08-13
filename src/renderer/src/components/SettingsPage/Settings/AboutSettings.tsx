@@ -14,6 +14,7 @@ import GithubDarkIcon from '../../../assets/images/svg/github.svg';
 import AppIcon from '../../../assets/images/webp/logo_light_mode.webp';
 import SLFlag from '../../../assets/images/webp/sl-flag.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
+import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 import calculateElapsedTime from '../../../utils/calculateElapsedTime';
 import storage from '../../../utils/localStorage';
 import { parseChangelog } from '../../../utils/parseChangelog';
@@ -30,12 +31,7 @@ const ClearLocalStoragePrompt = lazy(() => import('../ClearLocalStoragePrompt'))
 const OpenLinkConfirmPrompt = lazy(() => import('../../OpenLinkConfirmPrompt'));
 
 const AboutSettings = () => {
-  const {
-    data: { isDarkMode }
-  } = useSuspenseQuery({
-    ...settingsQuery.all,
-    select: (data) => ({ isDarkMode: data.isDarkMode })
-  });
+  const { isDark: isDarkMode } = useEffectiveAppearance();
   const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 

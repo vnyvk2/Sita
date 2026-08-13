@@ -24,7 +24,7 @@ const SongGenresInput = (props: Props) => {
     <div className="tag-input flex max-w-2xl min-w-40 flex-col">
       <label htmlFor="song-genres-id3-tag">{t('common.genre_other')}</label>
       <div className="border-background-color-2 dark:border-dark-background-color-2 mt-2 w-[90%] rounded-xl border-2 p-2">
-        <div className="genres-container flex flex-wrap p-2 empty:py-2 empty:after:h-full empty:after:w-full empty:after:text-center empty:after:text-[#ccc] empty:after:content-['No_genres_selected_for_this_song.'] dark:empty:after:text-[#ccc]">
+        <div className="genres-container flex flex-wrap p-2 empty:py-2 empty:after:h-full empty:after:w-full empty:after:text-center empty:after:text-font-color-dimmed empty:after:content-['No_genres_selected_for_this_song.']">
           {songGenres &&
             songGenres.map((genre) => (
               <span

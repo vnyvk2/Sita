@@ -27,7 +27,11 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
       }
 
       const playerQueue = manager.createQueue(queueTitle, newQueue);
-      playerQueue.setMetadata(queueId, queueType, queueTitle);
+      playerQueue.setMetadata({
+        queueId,
+        queueType,
+        title: queueTitle
+      });
 
       if (isShuffleQueue) {
         playerQueue.shuffle();
@@ -74,7 +78,7 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
   );
 
   const toggleQueueShuffle = useCallback(
-    (isShuffle?: boolean | any) => {
+    (isShuffle?: boolean | unknown) => {
       const playerQueue = getActiveQueue();
       if (typeof isShuffle === 'boolean') {
         if (isShuffle) {

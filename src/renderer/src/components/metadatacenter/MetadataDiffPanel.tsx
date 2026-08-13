@@ -17,8 +17,8 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ fontSize: '13px', fontWeight: 600, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span className="material-symbols-rounded" style={{ fontSize: '16px', color: '#38BDF8' }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span className="material-symbols-rounded" style={{ fontSize: '16px', color: 'var(--text-color-highlight)' }}>
           tune
         </span>
         <span>Selective Field Changes ({fieldDiffs.filter((d) => selectedFieldIds.has(d.fieldId)).length} Selected)</span>
@@ -43,7 +43,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                     {diff.fieldName}
                   </span>
                   <span
@@ -53,7 +53,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
                       padding: '2px 7px',
                       borderRadius: '4px',
                       background: isChanged ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
-                      color: isChanged ? '#34D399' : '#94A3B8'
+                      color: isChanged ? '#34D399' : 'var(--text-color-dimmed)'
                     }}
                   >
                     {diff.status}
@@ -61,7 +61,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
                 </div>
 
                 <div style={{ marginTop: '8px', fontSize: '13px' }}>
-                  <div style={{ color: '#64748B', textDecoration: isChanged ? 'line-through' : 'none' }}>
+                  <div style={{ color: 'var(--text-color-dimmed)', textDecoration: isChanged ? 'line-through' : 'none' }}>
                     Current: {diff.oldValue !== undefined && diff.oldValue !== '' ? String(diff.oldValue) : 'None'}
                   </div>
                   {isChanged && (

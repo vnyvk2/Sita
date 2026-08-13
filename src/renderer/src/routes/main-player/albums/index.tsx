@@ -208,7 +208,7 @@ function AlbumsPage() {
           )}
         </div>
         {/* {albumsData && albumsData.length === 0 && (
-          <div className="no-songs-container my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-2xl text-[#ccc]">
+          <div className="no-songs-container my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-2xl text-font-color-dimmed">
             <Img
               src={FetchingDataImage}
               alt="No songs available."

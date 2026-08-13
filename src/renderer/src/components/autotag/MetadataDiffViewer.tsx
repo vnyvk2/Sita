@@ -27,7 +27,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
       case 'new':
         return { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.4)', text: '#34d399', label: 'New' };
       case 'missing':
-        return { bg: 'rgba(156, 163, 175, 0.2)', border: 'rgba(156, 163, 175, 0.4)', text: '#9ca3af', label: 'Missing' };
+        return { bg: 'rgba(156, 163, 175, 0.2)', border: 'rgba(156, 163, 175, 0.4)', text: 'var(--text-color-dimmed)', label: 'Missing' };
       default:
         return { bg: 'transparent', border: 'transparent', text: 'rgba(255,255,255,0.4)', label: 'Unchanged' };
     }
@@ -49,9 +49,9 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#f3f4f6' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--text-color)' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.9 }}>
-        Field Differences for: <span style={{ color: '#60a5fa' }}>{track.oldTitle}</span>
+        Field Differences for: <span style={{ color: 'var(--text-color-highlight)' }}>{track.oldTitle}</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -81,12 +81,12 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggleField(diff.fieldId)}
-                style={{ cursor: 'pointer', accentColor: '#3b82f6' }}
+                style={{ cursor: 'pointer', accentColor: 'var(--text-color-highlight-2)' }}
               />
 
               <span style={{ fontWeight: 600, fontSize: '0.82rem', opacity: 0.8 }}>{diff.fieldName}</span>
 
-              <div style={{ fontSize: '0.82rem', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-color-dimmed)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em style={{ opacity: 0.5 }}>None</em>}
               </div>
 
@@ -99,7 +99,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   borderRadius: '6px',
                   background: 'rgba(255, 255, 255, 0.08)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#ffffff',
+                  color: 'var(--text-color-white)',
                   fontSize: '0.82rem',
                   outline: 'none'
                 }}
@@ -123,7 +123,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   }}
                 >
                   {alternatives.map((alt) => (
-                    <option key={alt.providerId} value={alt.providerId} style={{ background: '#1e1e2e', color: '#ffffff' }}>
+                    <option key={alt.providerId} value={alt.providerId} style={{ background: 'var(--background-color-2)', color: 'var(--text-color-white)' }}>
                       {alt.providerName}
                     </option>
                   ))}

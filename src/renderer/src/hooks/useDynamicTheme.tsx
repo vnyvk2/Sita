@@ -1,7 +1,9 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { useEffectiveAppearance } from './useEffectiveAppearance';
 import { settingsQuery } from '../queries/settings';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
@@ -213,16 +215,15 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
   }, [isImageBasedDynamicThemesEnabled, setDynamicThemesFromSongPalette, currentSongPaletteData]);
 
   // Monitor dark mode setting and apply/remove 'dark' class on document.body
-  const { data: userSettings } = useSuspenseQuery(settingsQuery.all);
-  const isDarkMode = userSettings.isDarkMode;
+  const { isDark } = useEffectiveAppearance();
 
   useEffect(() => {
-    if (isDarkMode) {
+    if (isDark) {
       document.body.classList.add('dark');
     } else {
       document.body.classList.remove('dark');
     }
-  }, [isDarkMode]);
+  }, [isDark]);
 
   // Monitor theme preset preference and apply data-theme attribute on document.documentElement
   const themePreset = useStore(

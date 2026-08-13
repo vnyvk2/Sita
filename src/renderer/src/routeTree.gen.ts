@@ -25,6 +25,7 @@ import { Route as MainPlayerFoldersIndexRouteImport } from './routes/main-player
 import { Route as MainPlayerArtistsIndexRouteImport } from './routes/main-player/artists/index'
 import { Route as MainPlayerAlbumsIndexRouteImport } from './routes/main-player/albums/index'
 import { Route as MainPlayerSongsSongIdRouteImport } from './routes/main-player/songs/$songId'
+import { Route as MainPlayerPlaylistsRecentlyAddedRouteImport } from './routes/main-player/playlists/recently-added'
 import { Route as MainPlayerPlaylistsHistoryRouteImport } from './routes/main-player/playlists/history'
 import { Route as MainPlayerPlaylistsFavoritesRouteImport } from './routes/main-player/playlists/favorites'
 import { Route as MainPlayerPlaylistsPlaylistIdRouteImport } from './routes/main-player/playlists/$playlistId'
@@ -118,6 +119,12 @@ const MainPlayerSongsSongIdRoute = MainPlayerSongsSongIdRouteImport.update({
   path: '/songs/$songId',
   getParentRoute: () => MainPlayerRouteRoute,
 } as any)
+const MainPlayerPlaylistsRecentlyAddedRoute =
+  MainPlayerPlaylistsRecentlyAddedRouteImport.update({
+    id: '/playlists/recently-added',
+    path: '/playlists/recently-added',
+    getParentRoute: () => MainPlayerRouteRoute,
+  } as any)
 const MainPlayerPlaylistsHistoryRoute =
   MainPlayerPlaylistsHistoryRouteImport.update({
     id: '/playlists/history',
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/main-player/playlists/$playlistId': typeof MainPlayerPlaylistsPlaylistIdRoute
   '/main-player/playlists/favorites': typeof MainPlayerPlaylistsFavoritesRoute
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
+  '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
   '/main-player/songs/$songId': typeof MainPlayerSongsSongIdRouteWithChildren
   '/main-player/albums/': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists/': typeof MainPlayerArtistsIndexRoute
@@ -224,6 +232,7 @@ export interface FileRoutesByTo {
   '/main-player/playlists/$playlistId': typeof MainPlayerPlaylistsPlaylistIdRoute
   '/main-player/playlists/favorites': typeof MainPlayerPlaylistsFavoritesRoute
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
+  '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
   '/main-player/albums': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists': typeof MainPlayerArtistsIndexRoute
   '/main-player/folders': typeof MainPlayerFoldersIndexRoute
@@ -253,6 +262,7 @@ export interface FileRoutesById {
   '/main-player/playlists/$playlistId': typeof MainPlayerPlaylistsPlaylistIdRoute
   '/main-player/playlists/favorites': typeof MainPlayerPlaylistsFavoritesRoute
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
+  '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
   '/main-player/songs/$songId': typeof MainPlayerSongsSongIdRouteWithChildren
   '/main-player/albums/': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists/': typeof MainPlayerArtistsIndexRoute
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/$playlistId'
     | '/main-player/playlists/favorites'
     | '/main-player/playlists/history'
+    | '/main-player/playlists/recently-added'
     | '/main-player/songs/$songId'
     | '/main-player/albums/'
     | '/main-player/artists/'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/$playlistId'
     | '/main-player/playlists/favorites'
     | '/main-player/playlists/history'
+    | '/main-player/playlists/recently-added'
     | '/main-player/albums'
     | '/main-player/artists'
     | '/main-player/folders'
@@ -341,6 +353,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/$playlistId'
     | '/main-player/playlists/favorites'
     | '/main-player/playlists/history'
+    | '/main-player/playlists/recently-added'
     | '/main-player/songs/$songId'
     | '/main-player/albums/'
     | '/main-player/artists/'
@@ -480,6 +493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainPlayerSongsSongIdRouteImport
       parentRoute: typeof MainPlayerRouteRoute
     }
+    '/main-player/playlists/recently-added': {
+      id: '/main-player/playlists/recently-added'
+      path: '/playlists/recently-added'
+      fullPath: '/main-player/playlists/recently-added'
+      preLoaderRoute: typeof MainPlayerPlaylistsRecentlyAddedRouteImport
+      parentRoute: typeof MainPlayerRouteRoute
+    }
     '/main-player/playlists/history': {
       id: '/main-player/playlists/history'
       path: '/playlists/history'
@@ -583,6 +603,7 @@ interface MainPlayerRouteRouteChildren {
   MainPlayerPlaylistsPlaylistIdRoute: typeof MainPlayerPlaylistsPlaylistIdRoute
   MainPlayerPlaylistsFavoritesRoute: typeof MainPlayerPlaylistsFavoritesRoute
   MainPlayerPlaylistsHistoryRoute: typeof MainPlayerPlaylistsHistoryRoute
+  MainPlayerPlaylistsRecentlyAddedRoute: typeof MainPlayerPlaylistsRecentlyAddedRoute
   MainPlayerSongsSongIdRoute: typeof MainPlayerSongsSongIdRouteWithChildren
   MainPlayerAlbumsIndexRoute: typeof MainPlayerAlbumsIndexRoute
   MainPlayerArtistsIndexRoute: typeof MainPlayerArtistsIndexRoute
@@ -607,6 +628,7 @@ const MainPlayerRouteRouteChildren: MainPlayerRouteRouteChildren = {
   MainPlayerPlaylistsPlaylistIdRoute: MainPlayerPlaylistsPlaylistIdRoute,
   MainPlayerPlaylistsFavoritesRoute: MainPlayerPlaylistsFavoritesRoute,
   MainPlayerPlaylistsHistoryRoute: MainPlayerPlaylistsHistoryRoute,
+  MainPlayerPlaylistsRecentlyAddedRoute: MainPlayerPlaylistsRecentlyAddedRoute,
   MainPlayerSongsSongIdRoute: MainPlayerSongsSongIdRouteWithChildren,
   MainPlayerAlbumsIndexRoute: MainPlayerAlbumsIndexRoute,
   MainPlayerArtistsIndexRoute: MainPlayerArtistsIndexRoute,

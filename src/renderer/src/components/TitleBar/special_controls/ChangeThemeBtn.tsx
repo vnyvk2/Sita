@@ -1,18 +1,13 @@
 import { settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useTranslation } from 'react-i18next';
 
 import Button from '../../Button';
+import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 
 const ChangeThemeBtn = () => {
-  const {
-    data: { isDarkMode }
-  } = useSuspenseQuery({
-    ...settingsQuery.all,
-    select: (data) => ({ isDarkMode: data.isDarkMode })
-  });
+  const { isDark: isDarkMode } = useEffectiveAppearance();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
 
   const { t } = useTranslation();

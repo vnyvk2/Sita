@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
 import historyPlaylistCoverImage from '../../../assets/images/webp/history-playlist-icon.webp';
+import playlistCoverDefaultImage from '../../../assets/images/webp/playlist_cover_default.webp';
 
 export const Route = createFileRoute('/main-player/home/')({
   component: HomePage,
@@ -259,6 +260,12 @@ function HomePage() {
               label="History"
               to="/main-player/playlists/history"
               artworkPath={historyPlaylistCoverImage}
+            />
+            <SpecialPlaylistCard
+              playlistId={SpecialPlaylists.RecentlyAdded}
+              label="Recently Added"
+              to="/main-player/playlists/recently-added"
+              artworkPath={playlistCoverDefaultImage}
             />
           </div>
         </SecondaryContainer>
