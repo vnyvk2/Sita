@@ -14,6 +14,7 @@ import HomeImgLightDark from '../../../assets/images/webp/home-skeleton-light-da
 import HomeImgLight from '../../../assets/images/webp/home-skeleton-light.webp';
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
+import Dropdown from '../../Dropdown';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
 
@@ -53,6 +54,10 @@ const ThemeSettings = () => {
   const enableImageBasedDynamicThemes = useStore(
     store,
     (state) => state.localStorage.preferences?.enableImageBasedDynamicThemes
+  );
+  const themePreset = useStore(
+    store,
+    (state) => state.localStorage.preferences?.themePreset ?? 'default'
   );
 
   const { t } = useTranslation();
@@ -153,6 +158,31 @@ const ThemeSettings = () => {
             </label>
           </div>
         </li>
+        <li className="secondary-container change-theme-preset my-4">
+          <div className="description">{t('settingsPage.themePresetDescription')}</div>
+          <div className="mt-2 flex items-center">
+            <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
+              {t('settingsPage.themePreset')}:
+            </span>
+            <Dropdown<ThemePreset>
+              name="themePreset"
+              value={themePreset}
+              onChange={(e) =>
+                storage.preferences.setPreferences(
+                  'themePreset',
+                  e.target.value as ThemePreset
+                )
+              }
+              options={[
+                { label: t('settingsPage.defaultThemePreset'), value: 'default' },
+                { label: t('settingsPage.nordThemePreset'), value: 'nord' },
+                { label: t('settingsPage.emeraldThemePreset'), value: 'emerald' },
+                { label: t('settingsPage.draculaThemePreset'), value: 'dracula' }
+              ]}
+            />
+          </div>
+        </li>
+
         <li className="secondary-container enable-image-based-dynamic-themes mb-4">
           <div className="description">
             {t('settingsPage.enableImageBasedDynamicThemesDescription')}

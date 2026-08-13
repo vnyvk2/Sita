@@ -13,12 +13,17 @@ import {
   parseSongArtworks
 } from '@main/fs/resolveFilePaths';
 
-export const convertToSongData = (song: GetAllSongsReturnType[number]): SongData => {
+export const convertToSongData = (
+  song: GetAllSongsReturnType[number],
+  languageOverride?: string
+): SongData => {
   const artists = song.artists?.map((a) => ({ artistId: a.artist.id, name: a.artist.name })) ?? [];
 
   // Album (pick first if multiple)
   const albumObj = song.albums?.[0]?.album;
-  const album = albumObj ? { albumId: albumObj.id, name: albumObj.title } : undefined;
+  const album = albumObj
+    ? { albumId: albumObj.id, name: albumObj.title, isAFavorite: albumObj.isFavorite ?? false }
+    : undefined;
 
   // Blacklist
   const isBlacklisted = song.isBlacklisted;
@@ -57,7 +62,8 @@ export const convertToSongData = (song: GetAllSongsReturnType[number]): SongData
     createdDate: song.createdAt ? new Date(song.createdAt).getTime() : 0,
     modifiedDate: song.updatedAt ? new Date(song.updatedAt).getTime() : undefined,
     discNo: song.diskNumber ?? undefined,
-    noOfChannels: song.noOfChannels ?? undefined
+    noOfChannels: song.noOfChannels ?? undefined,
+    language: languageOverride
   } satisfies SongData;
 };
 
@@ -92,6 +98,7 @@ export const convertToAlbum = (album: GetAllAlbumsReturnType[number]) => {
     artworkPaths: parseAlbumArtworks(artworks),
     artists,
     year: album.year ?? undefined,
+    isAFavorite: album.isFavorite ?? false,
     songs: album.songs.map((s) => ({
       title: s.song.title,
       songId: s.song.id

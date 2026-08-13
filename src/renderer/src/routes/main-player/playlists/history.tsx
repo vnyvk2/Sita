@@ -1,5 +1,6 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import MainContainer from '@renderer/components/MainContainer';
+import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 import Song from '@renderer/components/SongsPage/Song';
@@ -15,10 +16,11 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect } from 'react';
+import { type ChangeEvent, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import historyPlaylistCoverImage from '../../../assets/images/webp/history-playlist-icon.webp';
+
 export const Route = createFileRoute('/main-player/playlists/history')({
   validateSearch: songSearchSchema,
   component: HistoryPlaylistInfoPage
@@ -37,36 +39,73 @@ const playlistData: Playlist = {
   isArtworkAvailable: true
 };
 
+const periodOptions = [
+  { label: 'All Time', value: 'all' },
+  { label: 'Last 24 Hours', value: '1' },
+  { label: 'Last 7 Days', value: '7' },
+  { label: 'Last 30 Days', value: '30' },
+  { label: 'Last 90 Days', value: '90' },
+  { label: 'Last 365 Days', value: '365' }
+];
+
+const mostPlayedLimitOptions = [
+  { label: 'Top 10', value: '10' },
+  { label: 'Top 25', value: '25' },
+  { label: 'Top 50', value: '50' },
+  { label: 'Top 100', value: '100' }
+];
+
 /**
  * Render the History playlist details page with controls for playback, queue management, selection,
- * and sorting.
- *
- * The page displays saved history songs, provides actions to play, shuffle, and add songs to the
- * queue, supports select-all, and persists the playlist sorting preference to local storage when it
- * changes.
+ * period filtering, Most Played limits, and playlist creation.
  *
  * @returns A React element representing the History playlist information page.
  */
 function HistoryPlaylistInfoPage() {
-  const { scrollTopOffset } = Route.useSearch();
+  const { scrollTopOffset, period: searchPeriod, mostPlayedLimit: searchLimit } = Route.useSearch();
 
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
   );
+  const storedPeriod = useStore(
+    store,
+    (state) => state.localStorage.sortingStates?.historyPagePeriod || 'all'
+  );
+  const storedLimit = useStore(
+    store,
+    (state) => state.localStorage.sortingStates?.historyPageMostPlayedLimit || 25
+  );
+
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const { updateQueueData, addNewNotifications, createQueue } = useContext(AppUpdateContext);
+  const { updateQueueData, addNewNotifications, createQueue, changePromptMenuData } =
+    useContext(AppUpdateContext);
   const { t } = useTranslation();
   const { sortingOrder = playlistSortingState } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/history' });
+
+  const period = (searchPeriod as HistoryPeriod) || storedPeriod;
+  const mostPlayedLimit = searchLimit || storedLimit;
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
   }, [sortingOrder]);
 
+  useEffect(() => {
+    if (searchPeriod) {
+      storage.sortingStates.setSortingStates('historyPagePeriod', searchPeriod as HistoryPeriod);
+    }
+  }, [searchPeriod]);
+
+  useEffect(() => {
+    if (searchLimit) {
+      storage.sortingStates.setSortingStates('historyPageMostPlayedLimit', searchLimit);
+    }
+  }, [searchLimit]);
+
   const { data: historySongs = [] } = useSuspenseQuery({
-    ...songQuery.history({ sortType: sortingOrder }),
+    ...songQuery.history({ sortType: sortingOrder, period, limit: mostPlayedLimit }),
     select: (data) => data.data
   });
 
@@ -89,34 +128,6 @@ function HistoryPlaylistInfoPage() {
     },
     [createQueue, updateQueueData, t, historySongs]
   );
-
-  // const clearSongHistory = useCallback(() => {
-  //   changePromptMenuData(
-  //     true,
-  //     <SensitiveActionConfirmPrompt
-  //       title={t('settingsPage.confirmSongHistoryDeletion')}
-  //       content={t('settingsPage.songHistoryDeletionDisclaimer')}
-  //       confirmButton={{
-  //         label: t('settingsPage.clearHistory'),
-  //         clickHandler: () =>
-  //           window.api.audioLibraryControls
-  //             .clearSongHistory()
-  //             .then(
-  //               (res) =>
-  //                 res.success &&
-  //                 addNewNotifications([
-  //                   {
-  //                     id: 'queueCleared',
-  //                     duration: 5000,
-  //                     content: t('settingsPage.songHistoryDeletionSuccess')
-  //                   }
-  //                 ])
-  //             )
-  //             .catch((err) => console.error(err))
-  //       }}
-  //     />
-  //   );
-  // }, [addNewNotifications, changePromptMenuData, t]);
 
   const addSongsToQueue = useCallback(() => {
     const validSongIds = historySongs
@@ -164,6 +175,61 @@ function HistoryPlaylistInfoPage() {
     [createQueue, historySongs]
   );
 
+  const createPlaylistFromHistory = useCallback(() => {
+    if (historySongs.length === 0) return;
+    const songIds = historySongs.map((song) => song.songId);
+    changePromptMenuData(
+      true,
+      <NewPlaylistPrompt songIds={songIds} />
+    );
+  }, [changePromptMenuData, historySongs]);
+
+  const isMostPlayedMode =
+    sortingOrder === 'allTimeMostListened' || sortingOrder === 'monthlyMostListened';
+
+  const dropdowns = useMemo(() => {
+    const list = [
+      {
+        name: 'HistoryPeriodDropdown',
+        type: `${t('historyPage.period', 'Period')} :`,
+        value: period,
+        options: periodOptions,
+        onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+          const newPeriod = e.currentTarget.value as HistoryPeriod;
+          storage.sortingStates.setSortingStates('historyPagePeriod', newPeriod);
+          navigate({ search: (prev) => ({ ...prev, period: newPeriod }), replace: true });
+        }
+      },
+      {
+        name: 'PlaylistPageSortDropdown',
+        type: `${t('common.sortBy', 'Sort By')} :`,
+        value: sortingOrder,
+        options: songSortOptions,
+        onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+          const order = e.currentTarget.value as SongSortTypes;
+          storage.sortingStates.setSortingStates('playlistDetailPage', order);
+          navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
+        }
+      }
+    ];
+
+    if (isMostPlayedMode) {
+      list.push({
+        name: 'HistoryMostPlayedLimitDropdown',
+        type: `${t('historyPage.limit', 'Top')} :`,
+        value: String(mostPlayedLimit),
+        options: mostPlayedLimitOptions,
+        onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+          const limitVal = parseInt(e.currentTarget.value, 10);
+          storage.sortingStates.setSortingStates('historyPageMostPlayedLimit', limitVal);
+          navigate({ search: (prev) => ({ ...prev, mostPlayedLimit: limitVal }), replace: true });
+        }
+      });
+    }
+
+    return list;
+  }, [isMostPlayedMode, mostPlayedLimit, navigate, period, sortingOrder, t]);
+
   return (
     <MainContainer
       className="main-container playlist-info-page-container h-full! px-8 pr-0! pb-0!"
@@ -179,13 +245,6 @@ function HistoryPlaylistInfoPage() {
         title={t('playlistsPage.history')}
         className="pr-4"
         buttons={[
-          // {
-          //   label: t('settingsPage.clearHistory'),
-          //   iconName: 'clear',
-          //   clickHandler: clearSongHistory,
-          //   isVisible: playlistData.playlistId === 'History',
-          //   isDisabled: !(playlistData.songs && playlistData.songs.length > 0)
-          // },
           {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
@@ -203,21 +262,15 @@ function HistoryPlaylistInfoPage() {
             iconName: 'add',
             clickHandler: addSongsToQueue,
             isDisabled: !(historySongs.length > 0)
-          }
-        ]}
-        dropdowns={[
+          },
           {
-            name: 'PlaylistPageSortDropdown',
-            type: `${t('common.sortBy')} :`,
-            value: sortingOrder,
-            options: songSortOptions,
-            onChange: (e) => {
-              const order = e.currentTarget.value as SongSortTypes;
-              navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
-            },
+            tooltipLabel: t('historyPage.createPlaylistFromHistory', 'Create Playlist from History'),
+            iconName: 'playlist_add',
+            clickHandler: createPlaylistFromHistory,
             isDisabled: !(historySongs.length > 0)
           }
         ]}
+        dropdowns={dropdowns}
       />
       <VirtualizedList
         data={historySongs}
@@ -255,3 +308,4 @@ function HistoryPlaylistInfoPage() {
     </MainContainer>
   );
 }
+

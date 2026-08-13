@@ -1,22 +1,23 @@
-/* eslint-disable jsx-a11y/no-autofocus */
-
-/* eslint-disable promise/catch-or-return */
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreatePlaylist } from '../../hooks/collections/useCollectionMutations';
 
 import PlaylistDefaultCover from '../../assets/images/webp/playlist_cover_default.webp';
+import { CollectionClient } from '../../api/CollectionClient';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useCreatePlaylist } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
 import Img from '../Img';
 
 import type { PlaylistDto } from '@common/collections/dtos';
 
 interface NewPlaylistPromptProp {
-  currentPlaylists: PlaylistDto[];
+  updatePlaylists?: (_updatedPlaylist: PlaylistDto[]) => void;
+  currentPlaylists?: PlaylistDto[];
+  songIds?: number[];
 }
 
-const NewPlaylistPrompt = (_props: NewPlaylistPromptProp) => {
+const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
+  const { songIds } = props;
   const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
@@ -35,13 +36,19 @@ const NewPlaylistPrompt = (_props: NewPlaylistPromptProp) => {
             if (artworkPath && playlistId) {
               await window.api.collections.write.setArtwork(playlistId, artworkPath).catch(console.error);
             }
+            if (songIds && songIds.length > 0 && playlistId) {
+              await CollectionClient.addSongs({ playlistId, songIds }).catch(console.error);
+            }
             changePromptMenuData(false);
             // Invalidation happens automatically via CollectionEventProvider
             addNewNotifications([
               {
                 id: 'playlistCreated',
                 duration: 5000,
-                content: t('newPlaylistPrompt.addPlaylistSuccess')
+                content:
+                  songIds && songIds.length > 0
+                    ? `${t('newPlaylistPrompt.addPlaylistSuccess')} (${songIds.length} ${t('common.songs', 'songs')})`
+                    : t('newPlaylistPrompt.addPlaylistSuccess')
               }
             ]);
           },

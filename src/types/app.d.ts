@@ -1,4 +1,5 @@
 import type { db } from '@main/db/db';
+import type { HistoryPeriod, HistoryQueryOptions } from '@main/db/queries/history';
 import type { GetAllSongListeningDataReturnType } from '@main/db/queries/listens';
 import type { ReactElement, ReactNode } from 'react';
 import type { resources } from 'src/renderer/src/i18n';
@@ -86,7 +87,7 @@ declare global {
     title: string;
     duration: number;
     artists?: { artistId: number; name: string }[];
-    album?: { albumId: number; name: string };
+    album?: { albumId: number; name: string; isAFavorite?: boolean };
     genres?: { genreId: number; name: string }[];
     albumArtists?: { artistId: number; name: string }[];
     bitrate?: number;
@@ -102,6 +103,7 @@ declare global {
     createdDate?: number;
     modifiedDate?: number;
     addedDate: number;
+    language?: string;
   }
 
   interface ArtworkPaths {
@@ -181,7 +183,7 @@ declare global {
   interface AudioInfo {
     title: string;
     artists?: { artistId: number; name: string }[];
-    album?: { albumId: number; name: string };
+    album?: { albumId: number; name: string; isAFavorite?: boolean };
     duration: number;
     artworkPaths: ArtworkPaths;
     path: string;
@@ -192,6 +194,7 @@ declare global {
     paletteData?: PaletteData;
     isBlacklisted: boolean;
     trackNo?: number;
+    language?: string;
   }
 
   type PaginatingData = { start: number; end: number };
@@ -513,7 +516,14 @@ declare global {
     subFolders: SavedMusicFolder[];
   }
 
-  // ? LocalStorage related types
+  type ThemePreset = 'default' | 'nord' | 'emerald' | 'dracula';
+
+  interface VisibleSideTabs {
+    genres: boolean;
+    folders: boolean;
+    artists: boolean;
+    albums: boolean;
+  }
 
   interface Preferences {
     seekbarScrollInterval: number;
@@ -537,6 +547,8 @@ declare global {
     enableImageBasedDynamicThemes: boolean;
     autoTranslateLyrics: boolean;
     autoConvertLyrics: boolean;
+    visibleSideTabs?: VisibleSideTabs;
+    themePreset?: ThemePreset;
   }
 
   interface CurrentSong {
@@ -642,6 +654,8 @@ declare global {
     albumDetailPage?: SongSortTypes;
     genreDetailPage?: SongSortTypes;
     artistDetailPage?: SongSortTypes;
+    historyPagePeriod?: HistoryPeriod;
+    historyPageMostPlayedLimit?: number;
   }
 
   interface LyricsEditorSettings {
@@ -774,6 +788,7 @@ declare global {
       songId: number;
     }[];
     year?: number;
+    isAFavorite?: boolean;
     artworkName?: string;
   }
 

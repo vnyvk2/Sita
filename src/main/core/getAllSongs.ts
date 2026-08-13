@@ -1,8 +1,10 @@
+import { db } from '@main/db/db';
 import { getAllSongs as getAllSavedSongs } from '@main/db/queries/songs';
+import { metadataOverrides } from '@main/db/schema';
+import { convertToSongData } from '@main/utils/convert';
+import { and, eq, inArray } from 'drizzle-orm';
 
-// import { getListeningData } from '../filesystem';
 import logger from '../logger';
-import { convertToSongData } from '../utils/convert';
 
 type SongArtwork = Awaited<
   ReturnType<typeof getAllSavedSongs>
@@ -71,15 +73,18 @@ export const parsePaletteFromArtworks = (artworks: SongArtwork[]): PaletteData |
 const getAllSongs = async (
   sortType = 'aToZ' as SongSortTypes,
   filterType?: SongFilterTypes,
-  paginatingData?: PaginatingData
+  paginatingData?: PaginatingData,
+  trx: DB | DBTransaction = db
 ) => {
-  const songsData = await getAllSavedSongs({
-    start: paginatingData?.start ?? 0,
-    end: paginatingData?.end ?? 0,
-    filterType,
-    sortType
-  });
-  // const listeningData = getListeningData();
+  const songsData = await getAllSavedSongs(
+    {
+      start: paginatingData?.start ?? 0,
+      end: paginatingData?.end ?? 0,
+      filterType,
+      sortType
+    },
+    trx
+  );
 
   const result: PaginatedResult<AudioInfo, SongSortTypes> = {
     data: [],
@@ -90,16 +95,36 @@ const getAllSongs = async (
   };
 
   if (songsData && songsData.data.length > 0) {
-    // const audioData = sortSongs(
-    //   filterSongs(songsData, filterType),
-    //   sortType,
-    //   undefined
-    //   // listeningData
-    // );
+    const fetchedSongIds = songsData.data.map((s) => String(s.id));
+    const languageMap = new Map<number, string>();
 
-    result.data = songsData.data.map((song) => convertToSongData(song));
+    if (fetchedSongIds.length > 0) {
+      const languageOverrides = await trx
+        .select({
+          entityId: metadataOverrides.entityId,
+          stringValue: metadataOverrides.stringValue
+        })
+        .from(metadataOverrides)
+        .where(
+          and(
+            eq(metadataOverrides.entityKind, 'song'),
+            eq(metadataOverrides.fieldId, 'language'),
+            inArray(metadataOverrides.entityId, fetchedSongIds)
+          )
+        );
 
-    // result = paginateData(parsedData, sortType, paginatingData);
+      for (const override of languageOverrides) {
+        const sId = Number(override.entityId);
+        if (!isNaN(sId) && override.stringValue) {
+          languageMap.set(sId, override.stringValue);
+        }
+      }
+    }
+
+    result.data = songsData.data.map((song) =>
+      convertToSongData(song, languageMap.get(song.id))
+    );
+
     result.total = songsData.data.length;
     result.start = songsData.start;
     result.end = songsData.end;

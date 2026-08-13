@@ -23,6 +23,7 @@ import type {
   CollectionEvent 
 } from '../common/collections/operationInputs';
 import type { PlaylistViewMode, PlaylistExportOptions, PlaylistImportIpcOptions, PlaylistImportAnalysis, PlaylistBatchExportOptions, BatchExportResult } from '../common/collections/types';
+import type { HistoryQueryOptions } from '../main/db/queries/history';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -108,9 +109,10 @@ const audioLibraryControls = {
     ipcRenderer.invoke('app/getSongInfo', songIds, sortType, filterType, limit, preserveIdOrder),
   getAllHistorySongs: (
     sortType?: SongSortTypes,
-    paginatingData?: PaginatingData
+    paginatingData?: PaginatingData,
+    options?: HistoryQueryOptions
   ): Promise<PaginatedResult<SongData, SongSortTypes>> =>
-    ipcRenderer.invoke('app/getAllHistorySongs', sortType, paginatingData),
+    ipcRenderer.invoke('app/getAllHistorySongs', sortType, paginatingData, options),
   getAllFavoriteSongs: (
     sortType?: SongSortTypes,
     paginatingData?: PaginatingData
@@ -443,6 +445,11 @@ const albumsData = {
     const stringIds = albumTitlesOrIds?.map(String);
     return ipcRenderer.invoke('app/getAlbumData', stringIds, sortType, start, end);
   },
+  toggleLikeAlbums: (
+    albumIds: number[],
+    likeAlbum?: boolean
+  ): Promise<ToggleLikeSongReturnValue | undefined> =>
+    ipcRenderer.invoke('app/toggleLikeAlbums', albumIds, likeAlbum),
   getAlbumInfoFromLastFM: (albumId: number): Promise<LastFMAlbumInfo | undefined> =>
     ipcRenderer.invoke('app/getAlbumInfoFromLastFM', albumId)
 };

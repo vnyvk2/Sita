@@ -1,25 +1,26 @@
 import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import Button from '@renderer/components/Button';
-import Dropdown from '@renderer/components/Dropdown';
+import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/index';
 import { getQueuesManager } from '@renderer/other/queuesManager';
+import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';
-import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect } from 'react';
+import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/songs/')({
@@ -38,6 +39,14 @@ export const Route = createFileRoute('/main-player/songs/')({
         start: 0,
         end: 0,
         keyword: deps.keyword ?? ''
+      })
+    );
+    await queryClient.ensureQueryData(
+      artistQuery.all({
+        sortType: 'aToZ',
+        filterType: 'favorites',
+        start: 0,
+        end: 0
       })
     );
   },
@@ -77,7 +86,11 @@ function SongsPage() {
     filteringOrder = 'notSelected',
     action,
     queueIndex,
-    keyword
+    keyword,
+    language = 'all',
+    genre = 'all',
+    onlyFavoriteArtists = false,
+    onlyFavoriteAlbums = false
   } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -86,6 +99,122 @@ function SongsPage() {
   } = useSuspenseQuery(
     songQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' })
   );
+
+  const {
+    data: { data: favoriteArtistsData }
+  } = useSuspenseQuery(
+    artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 })
+  );
+
+  const favoriteArtistIds = useMemo(() => {
+    if (!favoriteArtistsData) return new Set<number>();
+    return new Set(favoriteArtistsData.map((artist) => artist.artistId));
+  }, [favoriteArtistsData]);
+
+  const availableLanguages = useMemo(() => {
+    if (!songData) return [];
+    const langs = new Set<string>();
+    for (const song of songData) {
+      if (song.language && song.language.trim() !== '') {
+        langs.add(song.language.trim());
+      }
+    }
+    return Array.from(langs).sort();
+  }, [songData]);
+
+  const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allLanguages', 'All Languages'), value: 'all' },
+      { label: t('common.unspecifiedLanguage', 'Unspecified'), value: 'unspecified' }
+    ];
+    if (availableLanguages.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const lang of availableLanguages) {
+        options.push({ label: lang, value: lang });
+      }
+    }
+    return options;
+  }, [availableLanguages, t]);
+
+  const availableGenres = useMemo(() => {
+    if (!songData) return [];
+    const genresSet = new Set<string>();
+    for (const song of songData) {
+      if (song.genres) {
+        for (const g of song.genres) {
+          if (g.name && g.name.trim() !== '') {
+            genresSet.add(g.name.trim());
+          }
+        }
+      }
+    }
+    return Array.from(genresSet).sort();
+  }, [songData]);
+
+  const genreDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allGenres', 'All Genres'), value: 'all' }
+    ];
+    if (availableGenres.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const g of availableGenres) {
+        options.push({ label: g, value: g });
+      }
+    }
+    return options;
+  }, [availableGenres, t]);
+
+  const filteredSongs = useMemo(() => {
+    if (!songData) return [];
+
+    const hasSubFilters =
+      (language && language !== 'all') ||
+      (genre && genre !== 'all') ||
+      onlyFavoriteArtists ||
+      onlyFavoriteAlbums;
+
+    if (!hasSubFilters) return songData;
+
+    return songData.filter((song) => {
+      // 1. Language filter
+      if (language && language !== 'all') {
+        if (language === 'unspecified') {
+          if (song.language && song.language.trim() !== '') return false;
+        } else {
+          if (song.language?.toLowerCase() !== language.toLowerCase()) return false;
+        }
+      }
+
+      // 2. Genre filter
+      if (genre && genre !== 'all') {
+        const hasGenre = song.genres?.some(
+          (g) => g.name.toLowerCase() === genre.toLowerCase()
+        );
+        if (!hasGenre) return false;
+      }
+
+      // 3. Favorite Artist filter (song has at least one favorited artist)
+      if (onlyFavoriteArtists) {
+        const hasFavArtist = song.artists?.some((a) => favoriteArtistIds.has(a.artistId));
+        if (!hasFavArtist) return false;
+      }
+
+      // 4. Favorite Album filter (song's album is favorited)
+      if (onlyFavoriteAlbums) {
+        const isFavAlbum = Boolean(song.album?.isAFavorite);
+        if (!isFavAlbum) return false;
+      }
+
+      return true;
+    });
+  }, [
+    songData,
+    language,
+    genre,
+    onlyFavoriteArtists,
+    onlyFavoriteAlbums,
+    favoriteArtistIds
+  ]);
 
   const search = usePageSearch({
     keyword,
@@ -125,19 +254,6 @@ function SongsPage() {
       true,
       <AddMusicFoldersPrompt
         onSuccess={() => {
-          // const relevantSongsData: AudioInfo[] = songs.map((song) => {
-          //   return {
-          //     title: song.title,
-          //     songId: song.songId,
-          //     artists: song.artists,
-          //     duration: song.duration,
-          //     path: song.path,
-          //     artworkPaths: song.artworkPaths,
-          //     addedDate: song.addedDate,
-          //     isAFavorite: song.isAFavorite,
-          //     isBlacklisted: song.isBlacklisted
-          //   };
-          // });
           queryClient.invalidateQueries(
             songQuery.all({
               sortType: sortingOrder,
@@ -147,7 +263,6 @@ function SongsPage() {
             })
           );
         }}
-        // onFailure={() => setSongData([])}
       />
     );
   }, [changePromptMenuData, filteringOrder, sortingOrder]);
@@ -176,11 +291,11 @@ function SongsPage() {
     []
   );
 
-  const selectAllHandler = useSelectAllHandler(songData, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = songData
+      const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(
@@ -193,18 +308,14 @@ function SongsPage() {
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [songData, createQueue, updateQueueData, t]
+    [filteredSongs, createQueue, updateQueueData, t]
   );
 
-  // const parentRef = useRef<HTMLDivElement>(null);
-
-  // const rowVirtualizer = useVirtualizer({
-  //   count: songsData?.length || 0,
-  //   getScrollElement: () => parentRef.current,
-  //   estimateSize: () => 60,
-  //   overscan: 10,
-  //   debug: true
-  // });
+  const hasActiveSubFilters =
+    (language && language !== 'all') ||
+    (genre && genre !== 'all') ||
+    onlyFavoriteArtists ||
+    onlyFavoriteAlbums;
 
   return (
     <MainContainer
@@ -222,7 +333,7 @@ function SongsPage() {
         }
       }}
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
+      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-6 flex items-center pr-4 text-3xl font-medium">
         <div className="container flex">
           {t('common.song_other')}{' '}
           <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
@@ -233,11 +344,11 @@ function SongsPage() {
                 })}
               </div>
             ) : (
-              songData &&
-              songData.length > 0 && (
+              filteredSongs &&
+              filteredSongs.length > 0 && (
                 <span className="no-of-songs">
                   {t('common.songWithCount', {
-                    count: songData.length
+                    count: filteredSongs.length
                   })}
                 </span>
               )
@@ -360,7 +471,7 @@ function SongsPage() {
             iconName="play_arrow"
             clickHandler={() =>
               createQueue(
-                songData.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+                filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
                 'songs',
                 false,
                 undefined,
@@ -375,7 +486,7 @@ function SongsPage() {
             iconName="shuffle"
             clickHandler={() =>
               createQueue(
-                songData.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+                filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
                 'songs',
                 true,
                 undefined,
@@ -413,38 +524,97 @@ function SongsPage() {
           />
         </div>
       </div>
-      <div
-        className="songs-container appear-from-bottom h-full flex-1 delay-100"
-        // ref={songsContainerRef}
-      >
-        {/* <InfiniteLoader
-            // isItemLoaded={isItemLoaded}
-            itemCount={60}
-            // loadMoreItems={loadMoreItems}
-          >
-            {({ onItemsRendered, ref }) => (
-              <List
-                ref={ref}
-                onItemsRendered={onItemsRendered}
-                itemCount={songsData.length}
-                itemSize={60}
-                width={width || '100%'}
-                height={height || 450}
-                overscanCount={10}
-                className="appear-from-bottom delay-100"
-                initialScrollOffset={
-                  currentlyActivePage.data?.scrollTopOffset ?? 0
-                }
-                onScroll={(data) => {
-                }
-              >
-                {songs}
-              </List>
-            )}
-          </InfiniteLoader> */}
-        {songData && songData.length > 0 && (
+
+      <div className="sub-filters-container mb-4 flex flex-wrap items-center gap-2 pr-4 text-xs md:text-sm">
+        <Dropdown
+          name="songsPageLanguageDropdown"
+          type={`${t('common.language', 'Language')} :`}
+          value={language}
+          options={languageDropdownOptions}
+          onChange={(e) => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                language: e.currentTarget.value === 'all' ? undefined : e.currentTarget.value
+              })
+            });
+          }}
+        />
+        <Dropdown
+          name="songsPageGenreDropdown"
+          type={`${t('common.genre', 'Genre')} :`}
+          value={genre}
+          options={genreDropdownOptions}
+          onChange={(e) => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                genre: e.currentTarget.value === 'all' ? undefined : e.currentTarget.value
+              })
+            });
+          }}
+        />
+        <Button
+          key="fav-artists-filter-btn"
+          className={`fav-artists-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            onlyFavoriteArtists
+              ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
+              : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50'
+          }`}
+          iconName={onlyFavoriteArtists ? 'star' : 'star_outline'}
+          label={t('common.favoriteArtists', 'Favorite Artists')}
+          clickHandler={() => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                onlyFavoriteArtists: prev.onlyFavoriteArtists ? undefined : true
+              })
+            });
+          }}
+        />
+        <Button
+          key="fav-albums-filter-btn"
+          className={`fav-albums-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            onlyFavoriteAlbums
+              ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
+              : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50'
+          }`}
+          iconName={onlyFavoriteAlbums ? 'album' : 'album'}
+          label={t('common.favoriteAlbums', 'Favorite Albums')}
+          clickHandler={() => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                onlyFavoriteAlbums: prev.onlyFavoriteAlbums ? undefined : true
+              })
+            });
+          }}
+        />
+        {hasActiveSubFilters && (
+          <Button
+            key="clear-sub-filters-btn"
+            className="clear-sub-filters-btn ml-1 text-xs opacity-75 hover:opacity-100"
+            iconName="filter_alt_off"
+            tooltipLabel={t('common.clearFilters', 'Clear sub-filters')}
+            clickHandler={() => {
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  language: undefined,
+                  genre: undefined,
+                  onlyFavoriteArtists: undefined,
+                  onlyFavoriteAlbums: undefined
+                })
+              });
+            }}
+          />
+        )}
+      </div>
+
+      <div className="songs-container appear-from-bottom h-full flex-1 delay-100">
+        {filteredSongs && filteredSongs.length > 0 && (
           <VirtualizedList
-            data={songData}
+            data={filteredSongs}
             fixedItemHeight={60}
             scrollTopOffset={scrollTopOffset}
             onDebouncedScroll={(range) => {
@@ -473,7 +643,7 @@ function SongsPage() {
           />
         )}
       </div>
-      {songData.length === 0 && (
+      {filteredSongs.length === 0 && (
         <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[8%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
           <Img src={NoSongsImage} alt="" className="mb-8 w-60" />
           <span>{t('songsPage.empty')}</span>

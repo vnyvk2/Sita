@@ -411,7 +411,14 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     enableImageBasedDynamicThemes: false,
     doNotShowHelpPageOnLyricsEditorStartUp: false,
     autoTranslateLyrics: false,
-    autoConvertLyrics: false
+    autoConvertLyrics: false,
+    visibleSideTabs: {
+      genres: true,
+      folders: true,
+      artists: true,
+      albums: true
+    },
+    themePreset: 'default'
   },
   playback: {
     currentSong: {
@@ -440,7 +447,9 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     playlistDetailPage: 'addedOrder',
     albumDetailPage: 'trackNoDescending',
     genreDetailPage: 'aToZ',
-    artistDetailPage: 'aToZ'
+    artistDetailPage: 'aToZ',
+    historyPagePeriod: 'all',
+    historyPageMostPlayedLimit: 25
   },
   equalizerPreset: {
     thirtyTwoHertzFilter: 0,

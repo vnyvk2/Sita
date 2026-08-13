@@ -224,6 +224,20 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
     }
   }, [isDarkMode]);
 
+  // Monitor theme preset preference and apply data-theme attribute on document.documentElement
+  const themePreset = useStore(
+    store,
+    (state) => state.localStorage.preferences?.themePreset
+  );
+
+  useEffect(() => {
+    if (themePreset && themePreset !== 'default') {
+      document.documentElement.setAttribute('data-theme', themePreset);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [themePreset]);
+
   return {
     setDynamicThemesFromSongPalette,
     updateBodyBackgroundImage

@@ -255,6 +255,16 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: showAlbumInfoPage
       },
       {
+        label: t(`common.${props.isAFavorite ? 'dislike' : 'like'}`),
+        iconName: 'favorite',
+        iconClassName: props.isAFavorite
+          ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
+          : 'material-icons-round',
+        handlerFunction: () => {
+          window.api.albumsData.toggleLikeAlbums([props.albumId]);
+        }
+      },
+      {
         label: 'Auto Tag Album',
         iconName: 'auto_awesome',
         handlerFunction: () => {

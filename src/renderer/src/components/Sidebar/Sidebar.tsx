@@ -1,7 +1,7 @@
 import { store } from '@renderer/store/store';
 import { linkOptions } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
@@ -11,7 +11,10 @@ import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 
 const Sidebar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
-  // const currentlyActivePage = useStore(store, (state) => state.currentlyActivePage);
+  const visibleSideTabs = useStore(
+    store,
+    (state) => state.localStorage.preferences?.visibleSideTabs
+  );
 
   const { t } = useTranslation();
 
@@ -94,26 +97,28 @@ const Sidebar = memo(() => {
     [t]
   );
 
-  const [data, setData] = useState<typeof linkData>();
-
-  useEffect(() => {
-    setData(linkData);
-  }, [linkData]);
+  const filteredLinkData = useMemo(() => {
+    return linkData.filter((link) => {
+      if (link.id === 'Folders' && visibleSideTabs?.folders === false) return false;
+      if (link.id === 'Artists' && visibleSideTabs?.artists === false) return false;
+      if (link.id === 'Albums' && visibleSideTabs?.albums === false) return false;
+      if (link.id === 'Genres' && visibleSideTabs?.genres === false) return false;
+      return true;
+    });
+  }, [linkData, visibleSideTabs]);
 
   const sideBarItems = useMemo(
     () =>
-      data
-        ? data.map((link) => (
-            <SideBarItem
-              to={link.to}
-              key={link.id}
-              parentClassName={link.parentClassName}
-              icon={link.icon}
-              content={link.content}
-            />
-          ))
-        : [],
-    [data]
+      filteredLinkData.map((link) => (
+        <SideBarItem
+          to={link.to}
+          key={link.id}
+          parentClassName={link.parentClassName}
+          icon={link.icon}
+          content={link.content}
+        />
+      )),
+    [filteredLinkData]
   );
 
   return (

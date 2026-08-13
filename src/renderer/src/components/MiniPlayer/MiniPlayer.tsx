@@ -6,10 +6,10 @@ import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import CustomLyricsIcon from '../../assets/images/svg/custom-lyrics-icon.png';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
+import LyricsIcon from '../Icons/LyricsIcon';
 import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
@@ -508,11 +508,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }}
               title={t('player.lyrics')}
             >
-              <img
-                src={CustomLyricsIcon}
-                className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100"
-                alt="Lyrics"
-              />
+              <LyricsIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
             </button>
           )}
 

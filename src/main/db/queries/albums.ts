@@ -19,6 +19,7 @@ const defaultGetAllAlbumsOptions = {
   albumIds: [] as number[],
   start: 0,
   end: 0,
+  filterType: 'notSelected' as AlbumFilterTypes,
   sortType: 'aToZ' as AlbumSortTypes
 };
 export type GetAllAlbumsOptions = Partial<typeof defaultGetAllAlbumsOptions>;
@@ -26,7 +27,7 @@ export const getAllAlbums = async (
   options: GetAllAlbumsOptions = defaultGetAllAlbumsOptions,
   trx: DB | DBTransaction = db
 ) => {
-  const { albumIds = [], start = 0, end = 0, sortType = 'aToZ' } = options;
+  const { albumIds = [], start = 0, end = 0, filterType = 'notSelected', sortType = 'aToZ' } = options;
 
   const limit = end - start === 0 ? undefined : end - start;
 
@@ -38,6 +39,8 @@ export const getAllAlbums = async (
       if (albumIds && albumIds.length > 0) {
         filters.push(inArray(s.id, albumIds));
       }
+
+      if (filterType === 'favorites') filters.push(eq(s.isFavorite, true));
 
       return and(...filters);
     },
@@ -197,6 +200,21 @@ export const getAlbumSongIds = async (albumId: number, trx: DB | DBTransaction =
  * @param trx - Database transaction instance (defaults to main db connection)
  * @returns Promise that resolves when the album is deleted
  */
+export const getAlbumFavoriteStatus = (albumIds: number[], trx: DB | DBTransaction = db) => {
+  return trx
+    .select({ id: albums.id, isFavorite: albums.isFavorite })
+    .from(albums)
+    .where(inArray(albums.id, albumIds));
+};
+
+export const updateAlbumFavoriteStatus = async (
+  albumIds: number[],
+  isFavorite: boolean,
+  trx: DB | DBTransaction = db
+) => {
+  return trx.update(albums).set({ isFavorite }).where(inArray(albums.id, albumIds));
+};
+
 export const deleteAlbum = async (albumId: number, trx: DB | DBTransaction = db) => {
   return trx.delete(albums).where(eq(albums.id, albumId));
 };

@@ -159,7 +159,7 @@ export const getAllSongs = async (
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -260,7 +260,7 @@ export const getSongById = async (songId: number, trx: DB | DBTransaction = db) 
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -320,7 +320,7 @@ export const getSongByPath = async (path: string, trx: DB | DBTransaction = db) 
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -389,7 +389,7 @@ export const searchSongs = async (keyword: string, trx: DB | DBTransaction = db)
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -451,7 +451,7 @@ export const getSongsByNames = async (songNames: string[], trx: DB | DBTransacti
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -593,7 +593,7 @@ export const getAllSongsInFavorite = async (
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {
@@ -722,7 +722,7 @@ export const getSongByIdForSongMetadata = async (songId: number, trx: DB | DBTra
       albums: {
         with: {
           album: {
-            columns: { id: true, title: true },
+            columns: { id: true, title: true, isFavorite: true },
             with: {
               artists: {
                 with: {

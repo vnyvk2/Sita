@@ -262,6 +262,13 @@ function ArtistInfoPage() {
     [artistData?.artistId, artistData?.name, createQueue, updateQueueData, songs]
   );
 
+  const handlePlayAllArtistSongs = useCallback(() => {
+    const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
+    if (queueSongIds.length > 0) {
+      createQueue(queueSongIds, 'artist', false, artistData?.artistId, true, artistData?.name);
+    }
+  }, [artistData?.artistId, artistData?.name, createQueue, songs]);
+
   const songComponenets = useMemo(
     () =>
       songs
@@ -384,6 +391,15 @@ function ArtistInfoPage() {
           {songs.length > 0 && (
             <div className="artist-total-songs-duration">{artistSongsDuration}</div>
           )}
+          <div className="artist-actions-container mt-4 flex items-center">
+            <Button
+              className="play-all-btn text-sm font-normal"
+              label={t('common.playAll')}
+              iconName="play_arrow"
+              clickHandler={handlePlayAllArtistSongs}
+              isDisabled={songs.length === 0}
+            />
+          </div>
         </div>
       </div>
 

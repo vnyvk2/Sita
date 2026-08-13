@@ -371,6 +371,12 @@
     "lightTheme": "Light theme",
     "darkTheme": "Dark theme",
     "systemTheme": "System theme",
+    "themePreset": "Theme Preset",
+    "themePresetDescription": "Select a color scheme preset for Nora interface.",
+    "defaultThemePreset": "Default (Nora)",
+    "nordThemePreset": "Nord (Arctic)",
+    "emeraldThemePreset": "Emerald (Mint)",
+    "draculaThemePreset": "Dracula (Purple)",
 
     "enableImageBasedDynamicThemes": "Enable Dynamic Themes",
     "enableImageBasedDynamicThemesDescription": "Change app theme dynamically based on the theme of the current playing song cover image",
@@ -448,6 +454,8 @@
     "playlistArtworksDescription": "Change the behavior of artworks made from song covers.",
     "enablePlaylistArtworks": "Enable artworks made from song covers on playlists",
     "shuffleArtworkFromSongCovers": "Enable shuffling the artwork made from song covers. (The artworks shuffle each time a page refresh happens.)",
+    "sidebarNavigation": "Sidebar Navigation",
+    "sidebarNavigationDescription": "Select which side tabs to display in the navigation bar.",
 
     "accessibility": "Accessibility",
     "reducedMotionDescription": "Removes animation that appears in the app. This will also reduce the smoothness of the app.",
