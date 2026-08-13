@@ -104,6 +104,82 @@ const PreferencesSettings = () => {
             />
           </div>
         </li>
+
+        <li className="checkbox-container">
+          <div className="secondary-container toggle-sidebar-navigation mb-4">
+            <div className="description">{t('settingsPage.sidebarNavigationDescription')}</div>
+            <div className="mt-2 flex flex-col gap-1">
+              <Checkbox
+                id="toggleSidebarTabGenre"
+                isChecked={preferences?.visibleSideTabs?.genres ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    genres: state
+                  });
+                }}
+                labelContent={t('common.genre_other')}
+              />
+              <Checkbox
+                id="toggleSidebarTabFolders"
+                isChecked={preferences?.visibleSideTabs?.folders ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    folders: state
+                  });
+                }}
+                labelContent={t('common.folder_other')}
+              />
+              <Checkbox
+                id="toggleSidebarTabArtists"
+                isChecked={preferences?.visibleSideTabs?.artists ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    artists: state
+                  });
+                }}
+                labelContent={t('common.artist_other')}
+              />
+              <Checkbox
+                id="toggleSidebarTabAlbums"
+                isChecked={preferences?.visibleSideTabs?.albums ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    albums: state
+                  });
+                }}
+                labelContent={t('common.album_other')}
+              />
+            </div>
+          </div>
+        </li>
       </ul>
     </li>
   );

@@ -148,6 +148,91 @@
   --dark-slider-opacity: 0.25;
 }
 
+/* ? THEME PRESETS */
+[data-theme="nord"] {
+  --background-color-1: 220 16% 96%;
+  --background-color-2: 216 28% 90%;
+  --background-color-3: 193 48% 82%;
+  --side-bar-background: 216 28% 90%;
+  --background-color-dimmed: 220 16% 30%;
+  --text-color-highlight: 213 32% 42%;
+  --text-color-highlight-2: 193 43% 50%;
+  --context-menu-background: 220 16% 96%;
+  --context-menu-list-hover: 213 32% 85%;
+  --seekbar-background-color: 213 32% 35%;
+  --seekbar-track-background-color: 216 28% 80%;
+  --foreground-color-1: 193 43% 50%;
+  --scrollbar-thumb-background-color: 216 28% 85%;
+
+  --dark-background-color-1: 220 26% 14%;
+  --dark-background-color-2: 220 16% 22%;
+  --dark-background-color-3: 193 43% 50%;
+  --dark-side-bar-background: 220 16% 22%;
+  --dark-text-color-highlight: 193 43% 67%;
+  --dark-text-color-highlight-2: 193 48% 78%;
+  --dark-context-menu-background: 220 26% 14%;
+  --dark-context-menu-list-hover: 220 16% 28%;
+  --dark-seekbar-background-color: 193 43% 75%;
+  --dark-seekbar-track-background-color: 220 26% 28%;
+  --dark-scrollbar-thumb-background-color: 220 16% 28%;
+}
+
+[data-theme="emerald"] {
+  --background-color-1: 150 20% 97%;
+  --background-color-2: 152 24% 91%;
+  --background-color-3: 158 55% 82%;
+  --side-bar-background: 152 24% 91%;
+  --background-color-dimmed: 165 20% 30%;
+  --text-color-highlight: 160 84% 30%;
+  --text-color-highlight-2: 158 64% 42%;
+  --context-menu-background: 150 20% 97%;
+  --context-menu-list-hover: 152 24% 84%;
+  --seekbar-background-color: 160 84% 25%;
+  --seekbar-track-background-color: 152 24% 80%;
+  --foreground-color-1: 158 64% 42%;
+  --scrollbar-thumb-background-color: 152 24% 84%;
+
+  --dark-background-color-1: 165 25% 10%;
+  --dark-background-color-2: 165 20% 16%;
+  --dark-background-color-3: 158 64% 45%;
+  --dark-side-bar-background: 165 20% 16%;
+  --dark-text-color-highlight: 158 64% 55%;
+  --dark-text-color-highlight-2: 158 70% 70%;
+  --dark-context-menu-background: 165 25% 10%;
+  --dark-context-menu-list-hover: 165 20% 22%;
+  --dark-seekbar-background-color: 158 64% 75%;
+  --dark-seekbar-track-background-color: 165 25% 20%;
+  --dark-scrollbar-thumb-background-color: 165 20% 24%;
+}
+
+[data-theme="dracula"] {
+  --background-color-1: 260 20% 97%;
+  --background-color-2: 260 20% 92%;
+  --background-color-3: 265 60% 86%;
+  --side-bar-background: 260 20% 92%;
+  --background-color-dimmed: 265 20% 30%;
+  --text-color-highlight: 265 60% 45%;
+  --text-color-highlight-2: 265 75% 55%;
+  --context-menu-background: 260 20% 97%;
+  --context-menu-list-hover: 260 20% 86%;
+  --seekbar-background-color: 265 60% 35%;
+  --seekbar-track-background-color: 260 20% 82%;
+  --foreground-color-1: 265 75% 55%;
+  --scrollbar-thumb-background-color: 260 20% 86%;
+
+  --dark-background-color-1: 231 15% 14%;
+  --dark-background-color-2: 232 14% 20%;
+  --dark-background-color-3: 265 75% 65%;
+  --dark-side-bar-background: 232 14% 20%;
+  --dark-text-color-highlight: 265 89% 75%;
+  --dark-text-color-highlight-2: 265 95% 82%;
+  --dark-context-menu-background: 231 15% 14%;
+  --dark-context-menu-list-hover: 232 14% 26%;
+  --dark-seekbar-background-color: 265 89% 82%;
+  --dark-seekbar-track-background-color: 232 14% 28%;
+  --dark-scrollbar-thumb-background-color: 232 14% 26%;
+}
+
 /* ? BASIC STYLING */
 html {
   scroll-behavior: smooth;
