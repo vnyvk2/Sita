@@ -15,7 +15,6 @@ import AppIcon from '../../../assets/images/webp/logo_light_mode.webp';
 import SLFlag from '../../../assets/images/webp/sl-flag.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
-import useAppInfo from '../../../hooks/useAppInfo';
 import calculateElapsedTime from '../../../utils/calculateElapsedTime';
 import storage from '../../../utils/localStorage';
 import { parseChangelog } from '../../../utils/parseChangelog';
