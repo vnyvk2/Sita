@@ -1,10 +1,10 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { resources } from 'src/renderer/src/i18n';
 
+import type { songSortTypes } from '../common/songSortTypes';
 import type { api } from '../preload';
 import type { ButtonProps } from '../renderer/src/components/Button';
 import type { DropdownOption } from '../renderer/src/components/Dropdown';
-import type { songSortTypes } from '../common/songSortTypes';
 import type { LastFMSessionData } from './last_fm_api';
 import type { SimilarArtist, Tag } from './last_fm_artist_info_api';
 
@@ -348,7 +348,7 @@ declare global {
     currentSongIndex: number | null;
     songIds: number[];
     queueBeforeShuffle?: number[];
-    queueId?: string;
+    queueId?: string | number;
     queueType: QueueTypes;
   }
 
@@ -673,9 +673,10 @@ declare global {
   type ShortcutCategoryList = ShortcutCategory[];
 
   interface PlayerQueueMetadata {
-    queueId?: string;
+    queueId?: string | number;
     queueType?: QueueTypes;
     title?: string;
+    isLocked?: boolean;
   }
 
   type QueueEventType =
@@ -712,7 +713,7 @@ declare global {
       positions: number[];
     };
     restored: { restoredQueue: number[] };
-    metadataChange: { queueId?: string; queueType?: QueueTypes };
+    metadataChange: { queueId?: string | number; queueType?: QueueTypes };
   }
 
   interface PlayerQueueJson {
