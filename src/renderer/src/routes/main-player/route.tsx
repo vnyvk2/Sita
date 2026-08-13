@@ -4,12 +4,10 @@ import Img from '@renderer/components/Img';
 import PromptMenu from '@renderer/components/PromptMenu/PromptMenu';
 import SongControlsContainer from '@renderer/components/SongsControlsContainer/SongControlsContainer';
 import TitleBar from '@renderer/components/TitleBar/TitleBar';
-import { settingsQuery } from '@renderer/queries/settings';
+import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 import { store } from '@renderer/store/store';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 
 export const Route = createFileRoute('/main-player')({
   component: RouteComponent

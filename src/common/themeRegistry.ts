@@ -1,8 +1,24 @@
 export type ThemeModePolicy = 'light' | 'dark' | 'adaptive';
 
+export type ThemeNameKey =
+  | 'settingsPage.defaultThemePreset'
+  | 'settingsPage.nordThemePreset'
+  | 'settingsPage.emeraldThemePreset'
+  | 'settingsPage.draculaThemePreset'
+  | 'settingsPage.solarizedThemePreset'
+  | 'settingsPage.monokaiThemePreset'
+  | 'settingsPage.catppuccinThemePreset'
+  | 'settingsPage.tokyonightThemePreset'
+  | 'settingsPage.rosepineThemePreset'
+  | 'settingsPage.gruvboxThemePreset'
+  | 'settingsPage.synthwaveThemePreset'
+  | 'settingsPage.cyberpunkThemePreset'
+  | 'settingsPage.oceanicThemePreset'
+  | 'settingsPage.midnightThemePreset';
+
 export interface ThemeDefinition {
   id: string;
-  nameKey: string;
+  nameKey: ThemeNameKey;
   mode: ThemeModePolicy;
   preview: {
     background: string;
@@ -11,7 +27,23 @@ export interface ThemeDefinition {
   };
 }
 
-export const themeRegistry = {
+export type ThemePreset =
+  | 'default'
+  | 'nord'
+  | 'emerald'
+  | 'dracula'
+  | 'solarized'
+  | 'monokai'
+  | 'catppuccin'
+  | 'tokyonight'
+  | 'rosepine'
+  | 'gruvbox'
+  | 'synthwave'
+  | 'cyberpunk'
+  | 'oceanic'
+  | 'midnight';
+
+export const themeRegistry: Record<ThemePreset, ThemeDefinition> = {
   default: {
     id: 'default',
     nameKey: 'settingsPage.defaultThemePreset',
@@ -96,6 +128,4 @@ export const themeRegistry = {
     mode: 'dark',
     preview: { background: '#000000', foreground: '#0d0d0d', accent: '#4d4dff' }
   }
-} as const satisfies Record<string, ThemeDefinition>;
-
-export type ThemePreset = keyof typeof themeRegistry;
+};

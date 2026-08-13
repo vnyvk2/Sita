@@ -1,10 +1,7 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { useEffectiveAppearance } from './useEffectiveAppearance';
-import { settingsQuery } from '../queries/settings';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
 

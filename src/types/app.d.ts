@@ -1469,7 +1469,4 @@ declare global {
   interface RouteStates {
     'lyrics-editor': LyricsEditorRouteState;
   }
-
-  type DB = typeof db;
-  type DBTransaction = Parameters<Parameters<DB['transaction']>[0]>[0];
 }

@@ -1,5 +1,3 @@
-import { settingsQuery } from '@renderer/queries/settings';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { lazy, useContext, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 

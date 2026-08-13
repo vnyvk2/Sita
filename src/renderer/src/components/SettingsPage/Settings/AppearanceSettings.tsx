@@ -14,12 +14,12 @@ import HomeImgLightDark from '../../../assets/images/webp/home-skeleton-light-da
 import HomeImgLight from '../../../assets/images/webp/home-skeleton-light.webp';
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
-import Dropdown from '../../Dropdown';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
 import ThemePreviewGrid from './ThemePreviewGrid';
 import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 import { themeRegistry, type ThemePreset } from '../../../../../common/themeRegistry';
+
 const ThemeSettings = () => {
   const [showThemeGrid, setShowThemeGrid] = useState(false);
   const { data: userSettings } = useQuery(settingsQuery.all);
@@ -73,7 +73,7 @@ const ThemeSettings = () => {
     }
   }, []);
 
-  const { isThemeControlled, mode: effectiveMode } = useEffectiveAppearance();
+  const { isThemeControlled } = useEffectiveAppearance();
 
   return userSettings ? (
     <li
@@ -90,7 +90,9 @@ const ThemeSettings = () => {
             {t('settingsPage.changeTheme')}
             {isThemeControlled && (
               <span className="ml-2 font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
-                {t('settingsPage.controlledByTheme', { theme: t(themeRegistry[themePreset as ThemePreset]?.nameKey) })}
+                {t('settingsPage.controlledByTheme', 'Controlled by {{theme}}', {
+                  theme: t((themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey)
+                })}
               </span>
             )}
           </div>
@@ -178,7 +180,7 @@ const ThemeSettings = () => {
           <div className="mt-4 flex w-full flex-col">
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
-                {t('settingsPage.themePreset')}: <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-1">{t(themeRegistry[themePreset as ThemePreset]?.nameKey)}</span>
+                {t('settingsPage.themePreset')}: <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-1">{t((themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey)}</span>
               </span>
               <button
                 type="button"
