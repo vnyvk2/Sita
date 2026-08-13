@@ -268,6 +268,7 @@ export const albums = pgTable(
     // Generated column: case-insensitive text for searches (using citext type)
     titleCI: citext('title_ci').generatedAlwaysAs((): SQL => sql`${albums.title}::citext`),
     year: integer('year'),
+    isFavorite: boolean('is_favorite').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
@@ -281,7 +282,8 @@ export const albums = pgTable(
     // Index for year-based filtering and sorting
     index('idx_albums_year').on(t.year.desc()),
     // Composite index for year + title sorting
-    index('idx_albums_year_title').on(t.year.desc(), t.title.asc())
+    index('idx_albums_year_title').on(t.year.desc(), t.title.asc()),
+    index('idx_albums_is_favorite').on(t.isFavorite)
   ]
 );
 

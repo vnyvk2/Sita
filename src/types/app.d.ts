@@ -86,7 +86,7 @@ declare global {
     title: string;
     duration: number;
     artists?: { artistId: number; name: string }[];
-    album?: { albumId: number; name: string };
+    album?: { albumId: number; name: string; isAFavorite?: boolean };
     genres?: { genreId: number; name: string }[];
     albumArtists?: { artistId: number; name: string }[];
     bitrate?: number;
@@ -102,6 +102,7 @@ declare global {
     createdDate?: number;
     modifiedDate?: number;
     addedDate: number;
+    language?: string;
   }
 
   interface ArtworkPaths {
@@ -181,7 +182,7 @@ declare global {
   interface AudioInfo {
     title: string;
     artists?: { artistId: number; name: string }[];
-    album?: { albumId: number; name: string };
+    album?: { albumId: number; name: string; isAFavorite?: boolean };
     duration: number;
     artworkPaths: ArtworkPaths;
     path: string;
@@ -192,6 +193,7 @@ declare global {
     paletteData?: PaletteData;
     isBlacklisted: boolean;
     trackNo?: number;
+    language?: string;
   }
 
   type PaginatingData = { start: number; end: number };
@@ -774,6 +776,7 @@ declare global {
       songId: number;
     }[];
     year?: number;
+    isAFavorite?: boolean;
     artworkName?: string;
   }
 

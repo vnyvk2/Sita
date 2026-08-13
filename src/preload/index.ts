@@ -439,6 +439,11 @@ const albumsData = {
     const stringIds = albumTitlesOrIds?.map(String);
     return ipcRenderer.invoke('app/getAlbumData', stringIds, sortType, start, end);
   },
+  toggleLikeAlbums: (
+    albumIds: number[],
+    likeAlbum?: boolean
+  ): Promise<ToggleLikeSongReturnValue | undefined> =>
+    ipcRenderer.invoke('app/toggleLikeAlbums', albumIds, likeAlbum),
   getAlbumInfoFromLastFM: (albumId: number): Promise<LastFMAlbumInfo | undefined> =>
     ipcRenderer.invoke('app/getAlbumInfoFromLastFM', albumId)
 };

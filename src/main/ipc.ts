@@ -48,6 +48,7 @@ import sendAudioDataFromPath from './core/sendAudioDataFromPath';
 
 import sendSongID3Tags from './core/sendSongMetadata';
 import toggleBlacklistFolders from './core/toggleBlacklistFolders';
+import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
@@ -255,6 +256,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/toggleLikeArtists', (_, artistIds: number[], likeArtist?: boolean) =>
       toggleLikeArtists(artistIds, likeArtist)
+    );
+
+    ipcMain.handle('app/toggleLikeAlbums', (_, albumIds: number[], likeAlbum?: boolean) =>
+      toggleLikeAlbums(albumIds, likeAlbum)
     );
 
     ipcMain.handle(

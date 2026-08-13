@@ -50,3 +50,10 @@ export const albumQuery = createQueryKeys('albums', {
     queryFn: async () => (await window.api.albumsData.getAlbumInfoFromLastFM(data.albumId)) ?? null
   })
 });
+
+export const albumMutations = {
+  toggleLike: (data: { albumIds: number[]; isLikeAlbum?: boolean }) => ({
+    invalidatingQueryKeys: [['albums'], ['songs']],
+    mutationFn: () => window.api.albumsData.toggleLikeAlbums(data.albumIds, data.isLikeAlbum)
+  })
+};
