@@ -449,6 +449,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     genreDetailPage: 'aToZ',
     artistDetailPage: 'aToZ',
     historyPagePeriod: 'all',
+    recentlyAddedPagePeriod: 'today',
     historyPageMostPlayedLimit: 25
   },
   equalizerPreset: {

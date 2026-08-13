@@ -13,7 +13,7 @@ import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
-import { songSearchSchema } from '@renderer/utils/zod/songSchema';
+import { recentlyAddedSongSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 import playlistCoverDefaultImage from '../../../assets/images/webp/playlist_cover_default.webp';
 
 export const Route = createFileRoute('/main-player/playlists/recently-added')({
-  validateSearch: songSearchSchema,
+  validateSearch: recentlyAddedSongSearchSchema,
   component: RecentlyAddedPlaylistInfoPage
 });
 
