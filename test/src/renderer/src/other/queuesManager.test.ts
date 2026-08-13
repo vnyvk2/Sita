@@ -27,7 +27,8 @@ vi.mock('@renderer/store/store', () => ({
         }
       }
     },
-    subscribe: vi.fn(() => vi.fn())
+    subscribe: vi.fn(() => vi.fn()),
+    setState: vi.fn()
   },
   dispatch: vi.fn()
 }));
@@ -98,18 +99,20 @@ describe('QueuesManager', () => {
   });
 
   describe('removeAllQueues', () => {
-    test('Case 1: None locked -> removes all queues and leaves one default empty queue', () => {
-      manager.createQueue('Queue 1', [1]);
+    test('Case 1: None locked -> removes background queues and preserves active queue', () => {
+      const q1 = manager.createQueue('Queue 1', [1]);
       manager.createQueue('Queue 2', [2]);
       manager.createQueue('Queue 3', [3]);
 
+      manager.switchQueue(0); // q1 is active
       const { deleted, kept } = manager.removeAllQueues();
 
-      expect(deleted).toBe(3);
-      expect(kept).toBe(0);
+      expect(deleted).toBe(2);
+      expect(kept).toBe(1);
       expect(manager.queues.length).toBe(1);
+      expect(manager.queues[0].id).toBe(q1.id);
       expect(manager.activeQueueIndex).toBe(0);
-      expect(manager.queues[0].isEmpty).toBe(true);
+      expect(manager.getActiveQueue().id).toBe(q1.id);
     });
 
     test('Case 2: All locked -> removes nothing and keeps all queues', () => {
@@ -125,10 +128,10 @@ describe('QueuesManager', () => {
       expect(manager.queues.length).toBe(2);
     });
 
-    test('Case 3: Active queue is locked -> remains active after removal of unlocked queues', () => {
-      const q1 = manager.createQueue('Queue 1', [1]); // index 0
-      const q2 = manager.createQueue('Queue 2', [2]); // index 1
-      const q3 = manager.createQueue('Queue 3', [3]); // index 2
+    test('Case 3: Active queue is locked -> remains active and preserves locked queues', () => {
+      const q1 = manager.createQueue('Queue 1', [1]); // index 0 (unlocked)
+      const q2 = manager.createQueue('Queue 2', [2]); // index 1 (locked)
+      const q3 = manager.createQueue('Queue 3', [3]); // index 2 (unlocked)
 
       manager.toggleQueueLock(q2.id); // q2 is locked
       manager.switchQueue(1); // q2 is active
@@ -143,29 +146,29 @@ describe('QueuesManager', () => {
       expect(manager.getActiveQueue().id).toBe(q2.id);
     });
 
-    test('Case 4: Active queue is unlocked -> switches active to first surviving locked queue', () => {
+    test('Case 4: Active queue is unlocked -> preserves active queue and all locked queues', () => {
       const q1 = manager.createQueue('Queue 1', [1]); // index 0 (unlocked, active)
       const q2 = manager.createQueue('Queue 2', [2]); // index 1 (locked)
       const q3 = manager.createQueue('Queue 3', [3]); // index 2 (locked)
+      const q4 = manager.createQueue('Queue 4', [4]); // index 3 (unlocked)
 
       manager.toggleQueueLock(q2.id);
       manager.toggleQueueLock(q3.id);
-      manager.switchQueue(0); // q1 is active
+      manager.switchQueue(0); // q1 is active and unlocked
 
       const { deleted, kept } = manager.removeAllQueues();
 
-      expect(deleted).toBe(1);
-      expect(kept).toBe(2);
-      expect(manager.queues.length).toBe(2);
+      expect(deleted).toBe(1); // q4 removed
+      expect(kept).toBe(3); // q1 (active), q2 (locked), q3 (locked)
+      expect(manager.queues.length).toBe(3);
       expect(manager.activeQueueIndex).toBe(0);
-      expect(manager.getActiveQueue().id).toBe(q2.id);
+      expect(manager.getActiveQueue().id).toBe(q1.id);
     });
 
     test('Event emissions: active queue survives -> queuesChanged emitted, activeQueueChanged NOT emitted', () => {
       const q1 = manager.createQueue('Queue 1', [1]);
       manager.createQueue('Queue 2', [2]);
-      manager.toggleQueueLock(q1.id);
-      manager.switchQueue(0); // q1 is active and locked
+      manager.switchQueue(0); // q1 is active
 
       const queuesChangedCb = vi.fn();
       const activeQueueChangedCb = vi.fn();
@@ -176,38 +179,6 @@ describe('QueuesManager', () => {
 
       expect(queuesChangedCb).toHaveBeenCalledTimes(1);
       expect(activeQueueChangedCb).not.toHaveBeenCalled();
-    });
-
-    test('Event emissions: active queue removed -> queuesChanged and activeQueueChanged emitted', () => {
-      const q1 = manager.createQueue('Queue 1', [1]); // unlocked
-      const q2 = manager.createQueue('Queue 2', [2]); // locked
-      manager.toggleQueueLock(q2.id);
-      manager.switchQueue(0); // q1 is active and unlocked
-
-      const queuesChangedCb = vi.fn();
-      const activeQueueChangedCb = vi.fn();
-      manager.on('queuesChanged', queuesChangedCb);
-      manager.on('activeQueueChanged', activeQueueChangedCb);
-
-      manager.removeAllQueues();
-
-      expect(queuesChangedCb).toHaveBeenCalledTimes(1);
-      expect(activeQueueChangedCb).toHaveBeenCalledTimes(1);
-    });
-
-    test('Event emissions: all queues removed -> queuesChanged and activeQueueChanged emitted for fallback queue', () => {
-      manager.createQueue('Queue 1', [1]);
-      manager.createQueue('Queue 2', [2]);
-
-      const queuesChangedCb = vi.fn();
-      const activeQueueChangedCb = vi.fn();
-      manager.on('queuesChanged', queuesChangedCb);
-      manager.on('activeQueueChanged', activeQueueChangedCb);
-
-      manager.removeAllQueues();
-
-      expect(queuesChangedCb).toHaveBeenCalledTimes(1);
-      expect(activeQueueChangedCb).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -11,8 +11,11 @@ const RemoveAllQueuesPrompt = () => {
   const manager = getQueuesManager();
 
   const totalQueues = manager?.queues.length || 0;
-  const lockedQueues = manager?.queues.filter((q) => q.getMetadata().isLocked).length || 0;
-  const unlockedQueues = totalQueues - lockedQueues;
+  const activeQueueIndex = manager?.activeQueueIndex ?? 0;
+  const keptQueues =
+    manager?.queues.filter((q, idx) => q.getMetadata().isLocked || idx === activeQueueIndex)
+      .length || 0;
+  const unlockedQueues = totalQueues - keptQueues;
 
   const removeQueues = useCallback(() => {
     if (manager) {
@@ -23,7 +26,7 @@ const RemoveAllQueuesPrompt = () => {
           content: t('currentQueuePage.removedAllQueues', {
             deleted,
             kept,
-            defaultValue: `Removed ${deleted} queues. Kept ${kept} locked queues.`
+            defaultValue: `Removed ${deleted} queues. Kept ${kept} active & locked queues.`
           }),
           iconName: 'delete'
         }
@@ -45,13 +48,13 @@ const RemoveAllQueuesPrompt = () => {
         <p>
           {t('currentQueuePage.unlockedQueuesRemoved', {
             count: unlockedQueues,
-            defaultValue: `${unlockedQueues} unlocked queues will be removed.`
+            defaultValue: `${unlockedQueues} unlocked background queues will be removed.`
           })}
         </p>
         <p>
           {t('currentQueuePage.lockedQueuesKept', {
-            count: lockedQueues,
-            defaultValue: `${lockedQueues} locked queues will be kept.`
+            count: keptQueues,
+            defaultValue: `${keptQueues} queues will be kept (active & locked).`
           })}
         </p>
       </div>

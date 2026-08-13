@@ -166,8 +166,8 @@ export class QueuesManager {
     const activeQueue = this.queues[this.activeQueueIndex];
     const activeQueueId = activeQueue?.id;
 
-    const remainingQueues = this.queues.filter((q) => {
-      if (q.getMetadata().isLocked) {
+    const remainingQueues = this.queues.filter((q, index) => {
+      if (q.getMetadata().isLocked || index === this.activeQueueIndex) {
         keptCount++;
         return true;
       }
