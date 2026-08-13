@@ -45,7 +45,7 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
         backgroundColor: 'rgba(18, 18, 24, 0.85)',
         backdropFilter: 'blur(12px)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
-        color: '#f3f4f6',
+        color: 'var(--text-color)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
@@ -86,7 +86,7 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
             style={{
               background: 'rgba(239, 68, 68, 0.2)',
               border: '1px solid rgba(239, 68, 68, 0.4)',
-              color: '#f87171',
+              color: 'var(--text-color-crimson)',
               borderRadius: '6px',
               padding: '4px 12px',
               fontSize: '0.78rem',

@@ -109,18 +109,18 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          color: '#f3f4f6'
+          color: 'var(--text-color)'
         }}
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Album Auto-Tagger</span>
+            <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-color-white)' }}>Album Auto-Tagger</span>
             {state.preview && <ConfidenceBadge level={state.preview.confidenceLevel} confidence={state.preview.overallConfidence} />}
           </div>
           <button
             onClick={handleClose}
-            style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '1.2rem', cursor: 'pointer' }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-color-dimmed)', fontSize: '1.2rem', cursor: 'pointer' }}
           >
             ✕
           </button>
@@ -140,19 +140,19 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
 
           {/* Expandable Error UX Drawer */}
           {state.error && (
-            <div style={{ padding: '14px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.88rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ padding: '14px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--text-color-crimson)', fontSize: '0.88rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600 }}>Couldn't update metadata.</span>
                 <button
                   onClick={() => setShowErrorDetails((prev) => !prev)}
-                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-color-highlight)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}
                 >
                   {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
                 </button>
               </div>
 
               {showErrorDetails && (
-                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'rgba(0, 0, 0, 0.4)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: '#fca5a5' }}>
+                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'rgba(0, 0, 0, 0.4)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: 'var(--text-color-crimson)' }}>
                   {state.error}
                 </div>
               )}
@@ -220,14 +220,14 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
                 {state.canUndo && (
                   <button
                     onClick={actions.undoLastAutoTag}
-                    style={{ padding: '10px 20px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ padding: '10px 20px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: 'var(--text-color-crimson)', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Undo Last AutoTag
                   </button>
                 )}
                 <button
                   onClick={handleClose}
-                  style={{ padding: '10px 24px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '10px 24px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', color: 'var(--text-color-white)', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Done
                 </button>
@@ -247,7 +247,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)' }}>
             <button
               onClick={actions.reset}
-              style={{ padding: '8px 16px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', fontSize: '0.85rem', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color-white)', fontSize: '0.85rem', cursor: 'pointer' }}
             >
               ← Back to Search
             </button>
@@ -255,7 +255,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={handleClose}
-                style={{ padding: '8px 16px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', fontSize: '0.85rem', cursor: 'pointer' }}
+                style={{ padding: '8px 16px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-color-white)', fontSize: '0.85rem', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -267,7 +267,7 @@ export const AlbumAutoTagDialog: React.FC<AlbumAutoTagDialogProps> = ({
                   borderRadius: '6px',
                   background: 'linear-gradient(135deg, #10b981, #059669)',
                   border: 'none',
-                  color: '#ffffff',
+                  color: 'var(--text-color-white)',
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: state.selectedTrackIds.size === 0 || state.loading ? 'not-allowed' : 'pointer',

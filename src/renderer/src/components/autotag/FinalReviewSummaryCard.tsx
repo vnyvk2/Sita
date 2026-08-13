@@ -41,7 +41,7 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '14px',
-        color: '#f3f4f6'
+        color: 'var(--text-color)'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -52,7 +52,7 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {preview.contributingProviders && preview.contributingProviders.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-              <span style={{ color: '#9ca3af' }}>Federated:</span>
+              <span style={{ color: 'var(--text-color-dimmed)' }}>Federated:</span>
               {preview.contributingProviders.map((pId) => (
                 <span
                   key={pId}
@@ -80,7 +80,7 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
               ))}
             </div>
           )}
-          <div style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-color-highlight)', fontWeight: 600 }}>
             {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
           </div>
         </div>
@@ -88,23 +88,23 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
         <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Titles Changed</div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#60a5fa' }}>{titlesChanged}</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Titles Changed</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-color-highlight)' }}>{titlesChanged}</div>
         </div>
 
         <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Artists Changed</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Artists Changed</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#a78bfa' }}>{artistsChanged}</div>
         </div>
 
         <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Years Updated</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Years Updated</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fbbf24' }}>{yearsChanged}</div>
         </div>
 
         <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Cover Artwork</div>
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: replaceArtwork ? '#34d399' : '#9ca3af', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Cover Artwork</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: replaceArtwork ? '#34d399' : 'var(--text-color-dimmed)', marginTop: '4px' }}>
             {replaceArtwork ? 'Replace' : 'Keep Current'}
           </div>
         </div>

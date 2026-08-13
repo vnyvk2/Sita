@@ -16,7 +16,7 @@ export const AlbumSummaryCard: React.FC<AlbumSummaryCardProps> = ({ candidate, t
         <img src={candidate.coverArtUrl} alt={candidate.title} className={styles.summaryThumb} />
       ) : (
         <div className={styles.summaryThumb} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.8)' }}>
-          <span className="material-symbols-rounded" style={{ fontSize: '36px', color: '#94A3B8' }}>
+          <span className="material-symbols-rounded" style={{ fontSize: '36px', color: 'var(--text-color-dimmed)' }}>
             album
           </span>
         </div>
@@ -25,12 +25,12 @@ export const AlbumSummaryCard: React.FC<AlbumSummaryCardProps> = ({ candidate, t
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#FFF' }}>{candidate.title}</h3>
-            <div style={{ fontSize: '13px', color: '#38BDF8', fontWeight: 500, marginTop: '2px' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-color-white)' }}>{candidate.title}</h3>
+            <div style={{ fontSize: '13px', color: 'var(--text-color-highlight)', fontWeight: 500, marginTop: '2px' }}>
               {candidate.artist || 'Unknown Artist'}
             </div>
           </div>
-          <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', color: 'var(--text-color-highlight)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
             {candidate.provider}
           </span>
         </div>

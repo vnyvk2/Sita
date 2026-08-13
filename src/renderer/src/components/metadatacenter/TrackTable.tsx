@@ -38,8 +38,8 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Header & Filter Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className="material-symbols-rounded" style={{ fontSize: '16px', color: '#38BDF8' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="material-symbols-rounded" style={{ fontSize: '16px', color: 'var(--text-color-highlight)' }}>
             queue_music
           </span>
           <span>Track Match List ({matches.length} Tracks)</span>
@@ -69,7 +69,7 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
             <button
               onClick={() => setFilter('conflicts')}
               className={`${styles.filterPill} ${filter === 'conflicts' ? styles.activeFilterPill : ''}`}
-              style={{ color: '#F87171' }}
+              style={{ color: 'var(--text-color-crimson)' }}
             >
               Conflicts ({conflictMatches.length})
             </button>
@@ -87,7 +87,7 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
       >
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
           <thead>
-            <tr style={{ background: 'rgba(30, 41, 59, 0.6)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#94A3B8' }}>
+            <tr style={{ background: 'rgba(30, 41, 59, 0.6)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-color-dimmed)' }}>
               <th style={{ padding: '10px 14px', width: '40px' }}>✓</th>
               <th style={{ padding: '10px 14px', width: '40px' }}>#</th>
               <th style={{ padding: '10px 14px' }}>Track Title</th>
@@ -109,7 +109,7 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
 
               if (isConflict) {
                 statusLabel = 'Conflict';
-                statusColor = '#EF4444';
+                statusColor = 'var(--text-color-crimson)';
               } else if (hasDiff) {
                 statusLabel = 'Minor rename';
                 statusColor = '#F59E0B';
@@ -134,8 +134,8 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
                         style={{ cursor: 'pointer', accentColor: '#10B981' }}
                       />
                     </td>
-                    <td style={{ padding: '12px 14px', color: '#64748B' }}>{idx + 1}</td>
-                    <td style={{ padding: '12px 14px', fontWeight: 600, color: '#F8FAFC' }}>
+                    <td style={{ padding: '12px 14px', color: 'var(--text-color-dimmed)' }}>{idx + 1}</td>
+                    <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text-color)' }}>
                       {m.suggestedMetadata?.title || 'Unknown Track'}
                     </td>
                     <td style={{ padding: '12px 14px', color: statusColor, fontWeight: 600 }}>
@@ -165,7 +165,7 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: '#94A3B8',
+                          color: 'var(--text-color-dimmed)',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -185,8 +185,8 @@ export const TrackTable: React.FC<TrackTableProps> = ({ matches, selectedTrackId
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', fontSize: '12px' }}>
                           {m.fieldDiffs?.map((fd) => (
                             <div key={fd.fieldId} style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                              <span style={{ color: '#94A3B8', fontWeight: 600 }}>{fd.fieldName}:</span>{' '}
-                              <span style={{ color: fd.status === 'changed' ? '#34D399' : '#F1F5F9', fontWeight: fd.status === 'changed' ? 600 : 400 }}>
+                              <span style={{ color: 'var(--text-color-dimmed)', fontWeight: 600 }}>{fd.fieldName}:</span>{' '}
+                              <span style={{ color: fd.status === 'changed' ? '#34D399' : 'var(--text-color)', fontWeight: fd.status === 'changed' ? 600 : 400 }}>
                                 {fd.suggestedValue !== undefined ? String(fd.suggestedValue) : String(fd.oldValue ?? '—')}
                               </span>
                             </div>

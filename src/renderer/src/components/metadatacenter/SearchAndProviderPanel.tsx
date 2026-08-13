@@ -30,7 +30,7 @@ export const SearchAndProviderPanel: React.FC<SearchAndProviderPanelProps> = ({
 
   return (
     <div className={styles.searchBar}>
-      <span className="material-symbols-rounded" style={{ color: '#94A3B8', fontSize: '20px' }}>
+      <span className="material-symbols-rounded" style={{ color: 'var(--text-color-dimmed)', fontSize: '20px' }}>
         search
       </span>
       <input

@@ -11,7 +11,7 @@ export interface CandidateListProps {
 export const CandidateList: React.FC<CandidateListProps> = ({ candidates, selectedId, onSelect }) => {
   if (!candidates || candidates.length === 0) {
     return (
-      <div style={{ padding: '28px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+      <div style={{ padding: '28px', textAlign: 'center', color: 'var(--text-color-dimmed)', fontSize: '13px' }}>
         No releases found. Enter query above and click Search.
       </div>
     );
@@ -52,15 +52,15 @@ export const CandidateList: React.FC<CandidateListProps> = ({ candidates, select
                   className={styles.candidateThumb}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <span className="material-symbols-rounded" style={{ color: '#94A3B8', fontSize: '24px' }}>
+                  <span className="material-symbols-rounded" style={{ color: 'var(--text-color-dimmed)', fontSize: '24px' }}>
                     album
                   </span>
                 </div>
               )}
 
               <div>
-                <div style={{ fontWeight: 600, fontSize: '14px', color: '#F8FAFC' }}>{cand.title}</div>
-                <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '3px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-color)' }}>{cand.title}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-color-dimmed)', marginTop: '3px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <span>{cand.artist || 'Unknown Artist'}</span>
                   {cand.year && <span>• {cand.year}</span>}
                   {cand.genre && <span>• {cand.genre}</span>}
@@ -80,7 +80,7 @@ export const CandidateList: React.FC<CandidateListProps> = ({ candidates, select
                   borderRadius: '4px',
                   display: 'inline-block',
                   background: cand.provider === 'musicbrainz' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                  color: cand.provider === 'musicbrainz' ? '#F87171' : '#60A5FA'
+                  color: cand.provider === 'musicbrainz' ? 'var(--text-color-crimson)' : 'var(--text-color-highlight)'
                 }}
               >
                 {cand.provider}

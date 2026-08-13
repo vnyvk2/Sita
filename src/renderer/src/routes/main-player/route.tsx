@@ -9,6 +9,7 @@ import { store } from '@renderer/store/store';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
+import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 
 export const Route = createFileRoute('/main-player')({
   component: RouteComponent
@@ -23,23 +24,18 @@ function RouteComponent() {
       (state.isOnBatteryPower && state.localStorage.preferences.removeAnimationsOnBatteryPower)
     );
   });
-  const {
-    data: { isDarkMode }
-  } = useSuspenseQuery({
-    ...settingsQuery.all,
-    select: (data) => ({ isDarkMode: data.isDarkMode })
-  });
+  const { isDark } = useEffectiveAppearance();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
 
   return (
     <div
       className={`App relative select-none ${
-        isDarkMode ? 'dark bg-dark-background-color-1' : 'bg-background-color-1'
+        isDark ? 'dark bg-dark-background-color-1' : 'bg-background-color-1'
       } ${
         isReducedMotion
           ? 'reduced-motion animate-none transition-none delay-0! duration-0! [&.dialog-menu]:backdrop-blur-none!'
           : 'transition-colors duration-200'
-      } after:text-font-color-white dark:after:text-font-color-white grid !h-screen min-h-screen w-full grid-rows-[auto_1fr_auto] items-center overflow-y-hidden after:invisible after:absolute after:-z-10 after:grid after:h-full after:w-full after:place-items-center after:bg-[rgba(0,0,0,0)] after:text-4xl after:font-medium after:content-["Drop_your_song_here"] dark:after:bg-[rgba(0,0,0,0)] [&.blurred_#title-bar]:opacity-40 [&.fullscreen_#window-controls-container]:hidden [&.song-drop]:after:visible [&.song-drop]:after:z-20 [&.song-drop]:after:border-4 [&.song-drop]:after:border-dashed [&.song-drop]:after:border-[#ccc] [&.song-drop]:after:bg-[rgba(0,0,0,0.7)] [&.song-drop]:after:transition-[background,visibility,color] dark:[&.song-drop]:after:border-[#ccc] dark:[&.song-drop]:after:bg-[rgba(0,0,0,0.7)]`}
+      } after:text-font-color-white dark:after:text-font-color-white grid !h-screen min-h-screen w-full grid-rows-[auto_1fr_auto] items-center overflow-y-hidden after:invisible after:absolute after:-z-10 after:grid after:h-full after:w-full after:place-items-center after:bg-[rgba(0,0,0,0)] after:text-4xl after:font-medium after:content-["Drop_your_song_here"] dark:after:bg-[rgba(0,0,0,0)] [&.blurred_#title-bar]:opacity-40 [&.fullscreen_#window-controls-container]:hidden [&.song-drop]:after:visible [&.song-drop]:after:z-20 [&.song-drop]:after:border-4 [&.song-drop]:after:border-dashed [&.song-drop]:after:border-font-color-dimmed [&.song-drop]:after:bg-[rgba(0,0,0,0.7)] [&.song-drop]:after:transition-[background,visibility,color] dark:[&.song-drop]:after:border-font-color-dimmed dark:[&.song-drop]:after:bg-[rgba(0,0,0,0.7)]`}
     >
       {bodyBackgroundImage && (
         <div
