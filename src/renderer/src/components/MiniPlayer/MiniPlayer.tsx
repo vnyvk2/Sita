@@ -115,8 +115,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     // 3. Top layer intrinsic requirement (pip_exit 24px + minimize 36px + close 36px)
     const topMinWidth = 96;
     const topBaseHeight = topRef.current.offsetHeight || 32;
-    // Top compressed target: ~75% of base height, clamped to safe interaction floor (~24px)
-    const topCompressedHeight = Math.max(Math.round(topBaseHeight * 0.75), 24);
+    // Top compressed target: 60% of base height (~20px) via container queries
+    const topCompressedHeight = Math.max(Math.round(topBaseHeight * 0.60), 20);
 
     // 4. Middle layer intrinsic floor (sacrificial with text ellipsis, floor = 0)
     const middleMinWidth = 0;
@@ -425,7 +425,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
         />
         {/* Persistent top drag region */}
-        <div className="absolute top-0 left-0 z-0 h-10 w-full [-webkit-app-region:drag]"></div>
+        <div className="absolute top-0 left-0 z-0 h-8 max-h-[30%] w-full [-webkit-app-region:drag]"></div>
 
         {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
         <div
@@ -494,7 +494,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {/* Fades in on hover/focus/paused — hidden at rest like the old design.  */}
       <div
         ref={bottomRef}
-        className={`relative z-30 w-full shrink-0 transition-[visibility,opacity] duration-200 ${
+        className={`relative z-30 w-full shrink-0 [-webkit-app-region:no-drag] transition-[visibility,opacity] duration-200 ${
           showControls || isQueueVisible
             ? 'visible opacity-100'
             : 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
@@ -504,7 +504,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <SeekBarSlider
           name="mini-player-seek-slider"
           id="miniPlayerSeekSlider"
-          className="seek-slider bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[width,height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
+          className="seek-slider [-webkit-app-region:no-drag] bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[width,height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}

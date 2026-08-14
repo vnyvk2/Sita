@@ -851,8 +851,28 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 }
 
 /* ? MINI PLAYER STYLES */
+.mini-player {
+  container-type: size;
+  container-name: mini-player-container;
+}
+
 .mini-player .mini-player-title-bar {
   -webkit-app-region: drag;
+  height: clamp(1.25rem, 24cqh, 2rem);
+}
+
+.mini-player .mini-player-title-bar .go-to-main-player-btn {
+  font-size: clamp(0.9rem, 15cqh, 1.125rem);
+  padding: clamp(0.2rem, 3cqh, 0.375rem);
+}
+
+.mini-player .mini-player-title-bar .window-controls-container button {
+  width: clamp(1.5rem, 24cqh, 2.25rem);
+}
+
+.mini-player .mini-player-title-bar .window-controls-container svg {
+  width: clamp(0.5rem, 8cqh, 0.625rem);
+  height: clamp(0.5rem, 8cqh, 0.625rem);
 }
 
 .mini-player .container .seek-slider::-webkit-slider-runnable-track {
