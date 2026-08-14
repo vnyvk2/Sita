@@ -88,6 +88,7 @@ import {
   restartRenderer,
   revealSongInFileExplorer,
   sendMessageToRenderer,
+  setMiniPlayerMinimumBounds,
   stopScreenSleeping,
   toggleAudioPlayingState,
   toggleAutoLaunch,
@@ -654,6 +655,12 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>
       toggleMiniPlayerAlwaysOnTop(isMiniPlayerAlwaysOnTop)
+    );
+
+    ipcMain.handle(
+      'app/setMiniPlayerMinimumBounds',
+      (_, bounds: { minWidth: number; minHeight: number }) =>
+        setMiniPlayerMinimumBounds(bounds.minWidth, bounds.minHeight)
     );
 
     ipcMain.handle('app/showMiniPlayerContextMenu', (event, template: any[]) => {

@@ -64,8 +64,10 @@ const MAIN_WINDOW_DEFAULT_ZOOM_FACTOR = 0.8;
 const MAIN_WINDOW_MIN_ZOOM_FACTOR = 0.5;
 const MAIN_WINDOW_MAX_ZOOM_FACTOR = 3;
 
-const MINI_PLAYER_MIN_SIZE_X = 270;
-const MINI_PLAYER_MIN_SIZE_Y = 220;
+const MINI_PLAYER_MIN_SIZE_X = 240;
+const MINI_PLAYER_MIN_SIZE_Y = 80;
+const MINI_PLAYER_DEFAULT_SIZE_X = 340;
+const MINI_PLAYER_DEFAULT_SIZE_Y = 160;
 const MINI_PLAYER_MAX_SIZE_X = 510;
 const MINI_PLAYER_MAX_SIZE_Y = 400;
 const MINI_PLAYER_ASPECT_RATIO = 0;
@@ -104,6 +106,8 @@ let currentWindowZoomFactor = MAIN_WINDOW_DEFAULT_ZOOM_FACTOR;
 let isQueueExpanded = false;
 let compactHeight: number | null = null;
 let compactY: number | null = null;
+let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
+let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
 
 // / / / / / / INITIALIZATION / / / / / / /
 
@@ -849,6 +853,24 @@ function ensureWindowIsVisible(window: BrowserWindow) {
   }
 }
 
+export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) {
+  logger.debug('Updating mini player dynamic minimum bounds', { minWidth, minHeight });
+  currentMiniPlayerMinWidth = minWidth;
+  currentMiniPlayerMinHeight = minHeight;
+
+  if (mainWindow && playerType === 'mini') {
+    mainWindow.setMinimumSize(minWidth, minHeight);
+
+    // Current-size protection: if the window is currently smaller than the new minimum, expand smoothly
+    const [currentW, currentH] = mainWindow.getSize();
+    if (currentW < minWidth || (!isQueueExpanded && currentH < minHeight)) {
+      const targetW = Math.max(currentW, minWidth);
+      const targetH = isQueueExpanded ? currentH : Math.max(currentH, minHeight);
+      mainWindow.setSize(targetW, targetH, true);
+    }
+  }
+}
+
 export async function changePlayerType(type: PlayerTypes) {
   if (mainWindow) {
     logger.debug(`Changed player type.`, { type });
@@ -870,12 +892,17 @@ export async function changePlayerType(type: PlayerTypes) {
       if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
 
       mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
-      mainWindow.setMinimumSize(MINI_PLAYER_MIN_SIZE_X, MINI_PLAYER_MIN_SIZE_Y);
+      mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
       mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
 
-      if (miniPlayerWidth !== null && miniPlayerHeight !== null) {
-        mainWindow.setSize(miniPlayerWidth, miniPlayerHeight, true);
-      } else mainWindow.setSize(MINI_PLAYER_MIN_SIZE_X, MINI_PLAYER_MIN_SIZE_Y, true);
+      const targetWidth = miniPlayerWidth
+        ? Math.max(miniPlayerWidth, currentMiniPlayerMinWidth)
+        : MINI_PLAYER_DEFAULT_SIZE_X;
+      const targetHeight = miniPlayerHeight
+        ? Math.max(miniPlayerHeight, currentMiniPlayerMinHeight)
+        : MINI_PLAYER_DEFAULT_SIZE_Y;
+
+      mainWindow.setSize(targetWidth, targetHeight, true);
 
       // Reset queue expansion state when switching to mini player
       isQueueExpanded = false;
@@ -886,9 +913,15 @@ export async function changePlayerType(type: PlayerTypes) {
         mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
         ensureWindowIsVisible(mainWindow);
       } else {
-        mainWindow.center();
-        const [x, y] = mainWindow.getPosition();
-        await saveUserSettings({ miniPlayerX: x, miniPlayerY: y });
+        // Smart bottom-right screen anchoring on first launch
+        const display = screen.getDisplayMatching(mainWindow.getBounds());
+        const { workArea } = display;
+        const margin = 24;
+        const targetX = workArea.x + workArea.width - targetWidth - margin;
+        const targetY = workArea.y + workArea.height - targetHeight - margin;
+
+        mainWindow.setPosition(targetX, targetY, true);
+        await saveUserSettings({ miniPlayerX: targetX, miniPlayerY: targetY });
       }
       mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
     } else if (type === 'normal') {
@@ -995,7 +1028,7 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     // Collapse back to compact size
     isQueueExpanded = false;
 
-    const restoreHeight = compactHeight || MINI_PLAYER_MIN_SIZE_Y;
+    const restoreHeight = compactHeight ?? currentMiniPlayerMinHeight;
     const restoreY = compactY;
 
     logger.debug('Collapsing mini player queue', { restoreHeight, restoreY });

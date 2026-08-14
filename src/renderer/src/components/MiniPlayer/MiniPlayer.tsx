@@ -3,7 +3,7 @@ import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
@@ -87,6 +87,90 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const [isQueueVisible, setIsQueueVisible] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [queueDirection, setQueueDirection] = useState<'down' | 'up'>('down');
+
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const metaRef = useRef<HTMLDivElement>(null);
+  const lastBoundsRef = useRef<{ minWidth: number; minHeight: number } | null>(null);
+
+  const measureAndSyncBounds = useCallback(() => {
+    if (!controlsRef.current || !bottomRef.current || !topRef.current) return;
+
+    // 1. Controls deck intrinsic width (rigid playback buttons + pinned actions)
+    const controlsWidth = controlsRef.current.getBoundingClientRect().width;
+
+    // 2. Metadata floor: artwork is rigid (32px), title is 100% sacrificial (collapses to 0)
+    const hasArtwork = pinnedControls.includes('artwork');
+    const hasTitle = pinnedControls.includes('title');
+    const artworkWidth = hasArtwork ? 32 : 0;
+    const titleFloor = 0; // Completely sacrificial: can collapse to 0 at absolute minimum window width
+    const deckGap = hasArtwork ? 8 : 0;
+    const deckPadding = hasArtwork || hasTitle ? 24 : 8; // px-3 vs px-1
+
+    const bottomMinWidth =
+      artworkWidth + titleFloor + deckGap + controlsWidth + deckPadding;
+
+    // 3. Top layer intrinsic requirement
+    // 3. Top layer intrinsic requirement (pip_exit 24px + minimize 36px + close 36px)
+    const topMinWidth = 96;
+    const topBaseHeight = topRef.current.offsetHeight || 32;
+    // Top compressed target: ~75% of base height, clamped to safe interaction floor (~24px)
+    const topCompressedHeight = Math.max(Math.round(topBaseHeight * 0.75), 24);
+
+    // 4. Middle layer intrinsic floor (sacrificial with text ellipsis, floor = 0)
+    const middleMinWidth = 0;
+
+    // 5. Total bottom deck height
+    const bottomHeight = bottomRef.current.offsetHeight || 52;
+
+    // Final Dynamic Sizing Equations:
+    // minWidth = MAX(top, middle, bottom)
+    // minHeight = topCompressed + bottom
+    const calculatedMinWidth = Math.round(Math.max(topMinWidth, middleMinWidth, bottomMinWidth));
+    const calculatedMinHeight = Math.round(topCompressedHeight + bottomHeight);
+
+    // Loop prevention: compare against cached last bounds
+    const prev = lastBoundsRef.current;
+    if (
+      !prev ||
+      Math.abs(prev.minWidth - calculatedMinWidth) >= 1 ||
+      Math.abs(prev.minHeight - calculatedMinHeight) >= 1
+    ) {
+      lastBoundsRef.current = { minWidth: calculatedMinWidth, minHeight: calculatedMinHeight };
+      window.api.miniPlayer.setDynamicMinimumBounds({
+        minWidth: calculatedMinWidth,
+        minHeight: calculatedMinHeight
+      });
+    }
+  }, [pinnedControls]);
+
+  useEffect(() => {
+    let rafId: number;
+
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        measureAndSyncBounds();
+      });
+    };
+
+    scheduleMeasure();
+
+    const observer = new ResizeObserver(() => {
+      scheduleMeasure();
+    });
+
+    if (controlsRef.current) observer.observe(controlsRef.current);
+    if (bottomRef.current) observer.observe(bottomRef.current);
+    if (topRef.current) observer.observe(topRef.current);
+    if (metaRef.current) observer.observe(metaRef.current);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [measureAndSyncBounds]);
 
   const manageKeyboardShortcuts = useCallback(
     (e: KeyboardEvent) => {
@@ -357,7 +441,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
       {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
       {/* Fades in on hover/focus/paused — same as old behavior.                */}
-      <div className="relative z-30 w-full">
+      <div ref={topRef} className="relative z-30 w-full">
         <TitleBarContainer isLyricsVisible={isLyricsVisible} />
       </div>
 
@@ -409,6 +493,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {/* ═══ TIER 3 (BOTTOM): SeekBar + Controls ════════════════════════════ */}
       {/* Fades in on hover/focus/paused — hidden at rest like the old design.  */}
       <div
+        ref={bottomRef}
         className={`relative z-30 w-full shrink-0 transition-[visibility,opacity] duration-200 ${
           showControls || isQueueVisible
             ? 'visible opacity-100'
@@ -432,7 +517,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         >
           {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
           {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
-            <div className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            <div
+              ref={metaRef}
+              className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+            >
               {pinnedControls.includes('artwork') && (
                 <div className="mini-deck-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs">
                   <Img
@@ -445,15 +533,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 </div>
               )}
               {pinnedControls.includes('title') && (
-                <div className="mini-deck-track-info flex min-w-0 flex-1 flex-col justify-center text-left">
+                <div className="mini-deck-track-info flex min-w-0 w-0 max-w-full flex-1 flex-col justify-center overflow-hidden text-left">
                   <div
-                    className="truncate text-xs font-medium text-font-color-white leading-tight"
+                    className="truncate max-w-full text-xs font-medium text-font-color-white leading-tight"
                     title={currentSongData.title}
                   >
                     {currentSongData.title}
                   </div>
                   <div
-                    className="truncate text-[10px] text-font-color-white/70 leading-tight mt-0.5"
+                    className="truncate max-w-full text-[10px] text-font-color-white/70 leading-tight mt-0.5"
                     title={currentSongData.artists?.map((a) => a.name).join(', ')}
                   >
                     {currentSongData.songId && Array.isArray(currentSongData.artists)
@@ -468,7 +556,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           )}
 
           {/* Controls Deck */}
-          <div className="mini-deck-controls flex shrink-0 items-center justify-center">
+          <div ref={controlsRef} className="mini-deck-controls flex shrink-0 items-center justify-center">
             {/* Optional: Favorite */}
           {pinnedControls.includes('love') && (
             <Button

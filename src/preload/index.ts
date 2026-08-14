@@ -507,7 +507,9 @@ const miniPlayer = {
   removeQueueDirectionChangeListener: (callback: (_: unknown, direction: 'up' | 'down') => void) =>
     ipcRenderer.removeListener('app/miniPlayerQueueDirection', callback),
   showContextMenu: (template: any[]): Promise<string | null> =>
-    ipcRenderer.invoke('app/showMiniPlayerContextMenu', template)
+    ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
+  setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>
+    ipcRenderer.invoke('app/setMiniPlayerMinimumBounds', bounds)
 };
 
 // $ APP SETTINGS HELPER FUNCTIONS
