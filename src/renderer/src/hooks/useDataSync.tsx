@@ -48,7 +48,8 @@ export function useDataSync(): void {
           'songs/deletedSong',
           'songs/artworks',
           'songs/palette',
-          'songs/likes'
+          'songs/likes',
+          'albums/likes'
         ];
         if (songEvents.includes(dataEvent.dataType)) {
           queryClient.invalidateQueries({ queryKey: songQuery._def });
@@ -74,7 +75,8 @@ export function useDataSync(): void {
           'albums',
           'albums/updatedAlbum',
           'albums/deletedAlbum',
-          'albums/newAlbum'
+          'albums/newAlbum',
+          'albums/likes'
         ];
         if (albumEvents.includes(dataEvent.dataType)) {
           queryClient.invalidateQueries({ queryKey: albumQuery._def });

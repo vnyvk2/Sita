@@ -1,6 +1,11 @@
 import NoAlbumsImage from '@assets/images/svg/Easter bunny_Monochromatic.svg';
 import { Album } from '@renderer/components/AlbumsPage/Album';
-import { albumSortOptions } from '@renderer/components/AlbumsPage/AlbumOptions';
+import {
+  albumFilterOptions,
+  albumSortOptions,
+  type AlbumFilterTypes,
+  type AlbumSortTypes
+} from '@renderer/components/AlbumsPage/AlbumOptions';
 import Button from '@renderer/components/Button';
 import Dropdown from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
@@ -26,6 +31,7 @@ export const Route = createFileRoute('/main-player/albums/')({
   component: AlbumsPage,
   loaderDeps: ({ search }) => ({
     sortingOrder: search.sortingOrder,
+    filteringOrder: search.filteringOrder,
     keyword: search.keyword
   }),
   loader: async ({ deps }) => {
@@ -33,6 +39,7 @@ export const Route = createFileRoute('/main-player/albums/')({
     await queryClient.ensureQueryData(
       albumQuery.all({
         sortType: deps.sortingOrder || sortingState || 'aToZ',
+        filterType: deps.filteringOrder || 'notSelected',
         start: 0,
         end: 0,
         keyword: deps.keyword ?? ''
@@ -56,7 +63,11 @@ function AlbumsPage() {
   );
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
-  const { sortingOrder = albumsPageSortingState || 'aToZ', keyword } = Route.useSearch();
+  const {
+    sortingOrder = albumsPageSortingState || 'aToZ',
+    filteringOrder = 'notSelected',
+    keyword
+  } = Route.useSearch();
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -65,6 +76,7 @@ function AlbumsPage() {
   } = useSuspenseQuery(
     albumQuery.all({
       sortType: sortingOrder,
+      filterType: filteringOrder,
       start: 0,
       end: 0,
       keyword: keyword ?? ''
@@ -159,6 +171,19 @@ function AlbumsPage() {
                 className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                 iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
                 clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'album')}
+              />
+              <Dropdown
+                name="albumPageFilterDropdown"
+                value={filteringOrder}
+                options={albumFilterOptions}
+                onChange={(e) => {
+                  navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      filteringOrder: e.currentTarget.value as AlbumFilterTypes
+                    })
+                  });
+                }}
               />
               <Dropdown
                 name="albumSortDropdown"

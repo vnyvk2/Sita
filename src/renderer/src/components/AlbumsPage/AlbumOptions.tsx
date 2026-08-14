@@ -1,13 +1,14 @@
 import i18n from '@renderer/i18n';
+import {
+  albumFilterTypes,
+  type AlbumFilterTypes,
+  albumSortTypes,
+  type AlbumSortTypes
+} from '@renderer/utils/albumFilters';
 
 import type { DropdownOption } from '../Dropdown';
 
-export const albumSortTypes = [
-  'aToZ',
-  'zToA',
-  'noOfSongsAscending',
-  'noOfSongsDescending'
-] as const;
+export { albumFilterTypes, type AlbumFilterTypes, albumSortTypes, type AlbumSortTypes };
 
 export const albumSortOptions: DropdownOption<AlbumSortTypes>[] = [
   { label: i18n.t('sortTypes.aToZ'), value: 'aToZ' },
@@ -20,4 +21,9 @@ export const albumSortOptions: DropdownOption<AlbumSortTypes>[] = [
     label: i18n.t('sortTypes.noOfSongsAscending'),
     value: 'noOfSongsAscending'
   }
+];
+
+export const albumFilterOptions: DropdownOption<AlbumFilterTypes>[] = [
+  { label: i18n.t('filterTypes.notSelected'), value: 'notSelected' },
+  { label: i18n.t('filterTypes.favorites'), value: 'favorites' }
 ];

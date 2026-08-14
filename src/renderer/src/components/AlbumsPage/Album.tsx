@@ -1,7 +1,7 @@
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultAlbumCover from '../../assets/images/webp/album_cover_default.webp';
@@ -36,6 +36,12 @@ export const Album = (props: AlbumProp) => {
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const [isFavorite, setIsFavorite] = useState(props.isAFavorite);
+
+  useEffect(() => {
+    setIsFavorite(props.isAFavorite);
+  }, [props.isAFavorite]);
 
   const playAlbumSongs = useCallback(
     (isShuffle = false) => {
@@ -154,6 +160,16 @@ export const Album = (props: AlbumProp) => {
     [navigate, props.albumId]
   );
 
+  const toggleLikeAlbum = useCallback(async () => {
+    const nextValue = !isFavorite;
+    setIsFavorite(nextValue);
+    try {
+      await window.api.albumsData.toggleLikeAlbums([props.albumId], nextValue);
+    } catch {
+      setIsFavorite(!nextValue);
+    }
+  }, [isFavorite, props.albumId]);
+
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;
     if (multipleSelectionsData.selectionType !== 'album') return false;
@@ -255,14 +271,12 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: showAlbumInfoPage
       },
       {
-        label: t(`common.${props.isAFavorite ? 'dislike' : 'like'}`),
+        label: t(`common.${isFavorite ? 'dislike' : 'like'}`),
         iconName: 'favorite',
-        iconClassName: props.isAFavorite
+        iconClassName: isFavorite
           ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
           : 'material-icons-round',
-        handlerFunction: () => {
-          window.api.albumsData.toggleLikeAlbums([props.albumId]);
-        }
+        handlerFunction: toggleLikeAlbum
       },
       {
         label: 'Auto Tag Album',
@@ -299,6 +313,7 @@ export const Album = (props: AlbumProp) => {
     addNewNotifications,
     addToQueueForMultipleSelections,
     isAMultipleSelection,
+    isFavorite,
     isMultipleSelectionEnabled,
     multipleSelectionsData.multipleSelections.length,
     multipleSelectionsData.selectionType,
@@ -309,6 +324,7 @@ export const Album = (props: AlbumProp) => {
     queue.queues[queue.currentQueueIndex].songIds,
     showAlbumInfoPage,
     t,
+    toggleLikeAlbum,
     toggleMultipleSelections,
     updateMultipleSelections,
     updateQueueData
@@ -379,15 +395,35 @@ export const Album = (props: AlbumProp) => {
             className="absolute right-3 bottom-3 z-10"
           />
         ) : (
-          <Button
-            className="text-font-color-white! absolute right-[5%] bottom-[5%] z-1 m-0! rounded-none! border-0! bg-transparent p-0! opacity-0 outline-offset-1 transition-opacity group-focus-within:opacity-75 group-hover:opacity-75 hover:bg-transparent hover:opacity-100! focus-visible:opacity-100! focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
-            iconName="play_circle"
-            iconClassName="text-5xl! leading-none!"
-            clickHandler={(e) => {
-              e.stopPropagation();
-              playAlbumSongs();
-            }}
-          />
+          <>
+            <Button
+              className={`absolute top-[5%] right-[5%] z-2 m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
+                isFavorite
+                  ? 'opacity-100'
+                  : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
+              }`}
+              iconName="favorite"
+              iconClassName={`${
+                isFavorite
+                  ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
+                  : 'material-icons-round material-icons-round-outlined text-font-color-white'
+              } text-xl! leading-none!`}
+              tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}
+              clickHandler={(e) => {
+                e.stopPropagation();
+                toggleLikeAlbum();
+              }}
+            />
+            <Button
+              className="text-font-color-white! absolute right-[5%] bottom-[5%] z-1 m-0! rounded-none! border-0! bg-transparent p-0! opacity-0 outline-offset-1 transition-opacity group-focus-within:opacity-75 group-hover:opacity-75 hover:bg-transparent hover:opacity-100! focus-visible:opacity-100! focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
+              iconName="play_circle"
+              iconClassName="text-5xl! leading-none!"
+              clickHandler={(e) => {
+                e.stopPropagation();
+                playAlbumSongs();
+              }}
+            />
+          </>
         )}
         <div className="album-cover-container relative h-full overflow-hidden rounded-lg before:invisible before:absolute before:h-full before:w-full before:bg-linear-to-b before:from-[hsla(0,0%,0%,0%)] before:to-[hsla(0,0%,0%,50%)] before:opacity-0 before:transition-[visibility,opacity] before:duration-300 before:content-[''] group-focus-within:before:visible group-focus-within:before:opacity-100 group-hover:before:visible group-hover:before:opacity-100">
           <Img

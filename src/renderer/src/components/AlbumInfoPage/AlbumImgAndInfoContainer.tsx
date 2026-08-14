@@ -1,8 +1,9 @@
-import { useContext, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
+import Button from '../Button';
 import Img from '../Img';
 import SongArtist from '../SongsPage/SongArtist';
 
@@ -14,6 +15,23 @@ const AlbumImgAndInfoContainer = (props: Props) => {
   const { albumData, songsData } = props;
 
   const { openAutoTagDialog } = useContext(AppUpdateContext);
+
+  const [isFavorite, setIsFavorite] = useState(albumData?.isAFavorite ?? false);
+
+  useEffect(() => {
+    setIsFavorite(albumData?.isAFavorite ?? false);
+  }, [albumData?.isAFavorite]);
+
+  const toggleLikeAlbum = useCallback(async () => {
+    if (!albumData) return;
+    const nextValue = !isFavorite;
+    setIsFavorite(nextValue);
+    try {
+      await window.api.albumsData.toggleLikeAlbums([albumData.albumId], nextValue);
+    } catch {
+      setIsFavorite(!nextValue);
+    }
+  }, [albumData, isFavorite]);
 
   const albumDuration = useMemo(
     () =>
@@ -48,7 +66,7 @@ const AlbumImgAndInfoContainer = (props: Props) => {
     <>
       {albumData && (
         <div className="album-img-and-info-container flex flex-row items-center pb-6">
-          <div className="album-cover-container mr-8">
+          <div className="album-cover-container relative mr-8">
             {albumData.artworkPaths && (
               <Img
                 src={albumData.artworkPaths.artworkPath}
@@ -56,7 +74,20 @@ const AlbumImgAndInfoContainer = (props: Props) => {
                 loading="eager"
                 alt="Album Cover"
               />
-            )}{' '}
+            )}
+            <Button
+              className="bg-background-color-1 text-font-color-highlight hover:bg-background-color-1 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-2 absolute -bottom-4 right-4 m-0! flex rounded-full border-0! p-2.5! shadow-xl -outline-offset-[6px] focus-visible:outline!"
+              tooltipLabel={t(
+                `common.${isFavorite ? 'dislike' : 'like'}`
+              )}
+              iconName="favorite"
+              iconClassName={`text-3xl! leading-none! ${
+                isFavorite
+                  ? 'material-icons-round'
+                  : 'material-icons-round material-icons-round-outlined'
+              }`}
+              clickHandler={toggleLikeAlbum}
+            />
           </div>
           {albumData.title && albumData.artists && (
             <div className="album-info-container text-font-color-black dark:text-font-color-white max-w-[70%]">

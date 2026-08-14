@@ -6,6 +6,7 @@ import { convertToAlbum } from '../utils/convert';
 const fetchAlbumData = async (
   albumTitlesOrIds: string[] = [],
   sortType?: AlbumSortTypes,
+  filterType?: AlbumFilterTypes,
   start = 0,
   end = 0
 ): Promise<PaginatedResult<Album, AlbumSortTypes>> => {
@@ -19,7 +20,8 @@ const fetchAlbumData = async (
 
   logger.debug(`Requested albums data`, {
     albumTitlesOrIdsCount: albumTitlesOrIds.length,
-    sortType
+    sortType,
+    filterType
   });
 
   const numericIds = albumTitlesOrIds
@@ -33,6 +35,7 @@ const fetchAlbumData = async (
   const albums = await getAllAlbums({
     albumIds: numericIds,
     sortType,
+    filterType,
     start,
     end
   });
