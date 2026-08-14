@@ -1,6 +1,6 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
@@ -22,7 +22,39 @@ const FullScreenPlayer = () => {
 
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const [isLyricsAvailable, setIsLyricsAvailable] = useState(false);
-  const [songPos, setSongPos] = useState(0);
+  const [songSecond, setSongSecond] = useState(0);
+  const currentFloorSecondRef = useRef(0);
+
+  // Subscribe to position change for ~1 Hz whole-second time label updates
+  useEffect(() => {
+    const handlePositionChange = (e: Event) => {
+      if ('detail' in e && typeof e.detail === 'number') {
+        const floorSec = Math.floor(e.detail);
+        if (floorSec !== currentFloorSecondRef.current) {
+          currentFloorSecondRef.current = floorSec;
+          setSongSecond(floorSec);
+        }
+      }
+    };
+
+    document.addEventListener('player/positionChange', handlePositionChange);
+    return () => document.removeEventListener('player/positionChange', handlePositionChange);
+  }, []);
+
+  // Reset when song changes
+  useEffect(() => {
+    currentFloorSecondRef.current = 0;
+    setSongSecond(0);
+  }, [currentSongData.songId]);
+
+  // Handle immediate visual feedback during active user scrubbing
+  const handleSeek = useCallback((currentPosition: number) => {
+    const floorSec = Math.floor(currentPosition);
+    if (floorSec !== currentFloorSecondRef.current) {
+      currentFloorSecondRef.current = floorSec;
+      setSongSecond(floorSec);
+    }
+  }, []);
 
   const fullScreenPlayerContainerRef = useRef<HTMLDivElement>(null);
   const { isMouseActive } = useMouseActiveState(fullScreenPlayerContainerRef, {
@@ -74,7 +106,7 @@ const FullScreenPlayer = () => {
           setIsLyricsAvailable={setIsLyricsAvailable}
         />
         <SongInfoContainer
-          songPos={songPos}
+          songPos={songSecond}
           isLyricsVisible={isLyricsVisible}
           setIsLyricsVisible={setIsLyricsVisible}
           isLyricsAvailable={isLyricsAvailable}
@@ -84,8 +116,8 @@ const FullScreenPlayer = () => {
           name="full-screen-player-seek-slider"
           id="fullScreenPlayerSeekSlider"
           sliderOpacity={0.25}
-          onSeek={(currentPosition) => setSongPos(currentPosition)}
-          className={`full-screen-player-seek-slider bg-background-color-3/25 before:bg-background-color-3 absolute h-fit w-full appearance-none outline-hidden outline-offset-1 transition-[width,height,transform] delay-200 ease-in-out group-hover/fullScreenPlayer:-translate-y-8 group-hover/fullScreenPlayer:scale-x-95 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:max-w-full before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:backdrop-blur-lg before:transition-[width,height,transform] before:delay-200 before:ease-in-out before:content-[''] hover:before:h-3 focus-visible:!outline ${
+          onSeek={handleSeek}
+          className={`full-screen-player-seek-slider bg-background-color-3/25 before:bg-background-color-3 absolute h-fit w-full appearance-none outline-hidden outline-offset-1 transition-[height,transform] delay-200 ease-in-out group-hover/fullScreenPlayer:-translate-y-8 group-hover/fullScreenPlayer:scale-x-95 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:max-w-full before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:backdrop-blur-lg before:transition-[height,transform] before:ease-in-out before:content-[''] hover:before:h-3 focus-visible:!outline ${
             isMouseActive && 'peer-hover/songInfoContainer:before:h-3'
           } ${!isCurrentSongPlaying && isLyricsVisible && '-translate-y-8! scale-x-95!'}`}
         />

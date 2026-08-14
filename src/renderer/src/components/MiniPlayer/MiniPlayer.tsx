@@ -504,7 +504,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <SeekBarSlider
           name="mini-player-seek-slider"
           id="miniPlayerSeekSlider"
-          className="seek-slider [-webkit-app-region:no-drag] bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[width,height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
+          className="seek-slider [-webkit-app-region:no-drag] bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}
