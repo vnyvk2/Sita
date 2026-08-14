@@ -11,7 +11,6 @@ import LyricsMetadata from '../../LyricsPage/LyricsMetadata';
 type Props = { isLyricsVisible: boolean };
 
 const LyricsContainer = (props: Props) => {
-  const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
@@ -142,8 +141,8 @@ const LyricsContainer = (props: Props) => {
   return (
     <div
       className={`mini-player-lyrics-container absolute inset-0 z-20 flex flex-col items-center overflow-x-hidden overflow-y-auto px-4 py-12 transition-all duration-200 select-none ${
-        !isCurrentSongPlaying ? 'blur-xs brightness-50' : ''
-      } ${isLyricsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        isLyricsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+      }`}
       id="miniPlayerLyricsContainer"
     >
       {isLyricsVisible && lyricsComponents.length > 0 && lyrics && lyrics.lyrics.isSynced && (
