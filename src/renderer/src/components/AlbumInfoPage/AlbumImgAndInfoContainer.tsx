@@ -1,4 +1,4 @@
-import { useContext, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
@@ -15,6 +15,23 @@ const AlbumImgAndInfoContainer = (props: Props) => {
   const { albumData, songsData } = props;
 
   const { openAutoTagDialog } = useContext(AppUpdateContext);
+
+  const [isFavorite, setIsFavorite] = useState(albumData?.isAFavorite ?? false);
+
+  useEffect(() => {
+    setIsFavorite(albumData?.isAFavorite ?? false);
+  }, [albumData?.isAFavorite]);
+
+  const toggleLikeAlbum = useCallback(async () => {
+    if (!albumData) return;
+    const nextValue = !isFavorite;
+    setIsFavorite(nextValue);
+    try {
+      await window.api.albumsData.toggleLikeAlbums([albumData.albumId], nextValue);
+    } catch {
+      setIsFavorite(!nextValue);
+    }
+  }, [albumData, isFavorite]);
 
   const albumDuration = useMemo(
     () =>
@@ -61,17 +78,15 @@ const AlbumImgAndInfoContainer = (props: Props) => {
             <Button
               className="bg-background-color-1 text-font-color-highlight hover:bg-background-color-1 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-2 absolute -bottom-4 right-4 m-0! flex rounded-full border-0! p-2.5! shadow-xl -outline-offset-[6px] focus-visible:outline!"
               tooltipLabel={t(
-                `common.${albumData.isAFavorite ? 'dislike' : 'like'}`
+                `common.${isFavorite ? 'dislike' : 'like'}`
               )}
               iconName="favorite"
               iconClassName={`text-3xl! leading-none! ${
-                albumData.isAFavorite
+                isFavorite
                   ? 'material-icons-round'
                   : 'material-icons-round material-icons-round-outlined'
               }`}
-              clickHandler={() => {
-                window.api.albumsData.toggleLikeAlbums([albumData.albumId], !albumData.isAFavorite);
-              }}
+              clickHandler={toggleLikeAlbum}
             />
           </div>
           {albumData.title && albumData.artists && (

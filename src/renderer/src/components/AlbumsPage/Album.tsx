@@ -1,7 +1,7 @@
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultAlbumCover from '../../assets/images/webp/album_cover_default.webp';
@@ -36,6 +36,12 @@ export const Album = (props: AlbumProp) => {
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const [isFavorite, setIsFavorite] = useState(props.isAFavorite);
+
+  useEffect(() => {
+    setIsFavorite(props.isAFavorite);
+  }, [props.isAFavorite]);
 
   const playAlbumSongs = useCallback(
     (isShuffle = false) => {
@@ -99,7 +105,7 @@ export const Album = (props: AlbumProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData]
+    [createQueue, multipleSelectionsData, t]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
@@ -140,7 +146,8 @@ export const Album = (props: AlbumProp) => {
   }, [
     addNewNotifications,
     multipleSelectionsData,
-    queue.queues[queue.currentQueueIndex].songIds,
+    queue.currentQueueIndex,
+    queue.queues,
     t,
     updateQueueData
   ]);
@@ -154,9 +161,15 @@ export const Album = (props: AlbumProp) => {
     [navigate, props.albumId]
   );
 
-  const toggleLikeAlbum = useCallback(() => {
-    window.api.albumsData.toggleLikeAlbums([props.albumId], !props.isAFavorite);
-  }, [props.albumId, props.isAFavorite]);
+  const toggleLikeAlbum = useCallback(async () => {
+    const nextValue = !isFavorite;
+    setIsFavorite(nextValue);
+    try {
+      await window.api.albumsData.toggleLikeAlbums([props.albumId], nextValue);
+    } catch {
+      setIsFavorite(!nextValue);
+    }
+  }, [isFavorite, props.albumId]);
 
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;
@@ -259,9 +272,9 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: showAlbumInfoPage
       },
       {
-        label: t(`common.${props.isAFavorite ? 'dislike' : 'like'}`),
+        label: t(`common.${isFavorite ? 'dislike' : 'like'}`),
         iconName: 'favorite',
-        iconClassName: props.isAFavorite
+        iconClassName: isFavorite
           ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
           : 'material-icons-round',
         handlerFunction: toggleLikeAlbum
@@ -301,6 +314,7 @@ export const Album = (props: AlbumProp) => {
     addNewNotifications,
     addToQueueForMultipleSelections,
     isAMultipleSelection,
+    isFavorite,
     isMultipleSelectionEnabled,
     multipleSelectionsData.multipleSelections.length,
     multipleSelectionsData.selectionType,
@@ -309,7 +323,6 @@ export const Album = (props: AlbumProp) => {
     playAlbumSongsForMultipleSelections,
     props.albumId,
     props.artists,
-    props.isAFavorite,
     props.songs,
     props.title,
     queue.queues[queue.currentQueueIndex].songIds,
@@ -389,17 +402,17 @@ export const Album = (props: AlbumProp) => {
           <>
             <Button
               className={`absolute top-[5%] right-[5%] z-2 m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
-                props.isAFavorite
+                isFavorite
                   ? 'opacity-100'
                   : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
               }`}
               iconName="favorite"
               iconClassName={`${
-                props.isAFavorite
+                isFavorite
                   ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
                   : 'material-icons-round material-icons-round-outlined text-font-color-white'
               } text-xl! leading-none!`}
-              tooltipLabel={t(`common.${props.isAFavorite ? 'dislike' : 'like'}`)}
+              tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}
               clickHandler={(e) => {
                 e.stopPropagation();
                 toggleLikeAlbum();
