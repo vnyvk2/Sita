@@ -144,6 +144,8 @@
   --dark-context-menu-list-hover: 224 8% 28%; /* hsl(224 8% 28%) */
   --dark-seekbar-background-color: 240 1% 83%; /* hsl(240 1% 83%) */
   --dark-seekbar-track-background-color: 0 0% 25%;
+  --dark-foreground-color-1: 244 98% 80%;
+  --dark-background-color-dimmed: 228 7% 20%;
   --dark-scrollbar-thumb-background-color: 212 48% 94%; /* hsl(212, 48%, 94%) */
   --dark-slider-opacity: 0.25;
 }

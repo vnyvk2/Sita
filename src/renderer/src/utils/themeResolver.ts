@@ -6,7 +6,7 @@ import {
   type SemanticDynamicPalette
 } from './semanticPalette';
 
-export type DynamicThemeMode = 'static' | 'dynamic-accent' | 'full-dynamic';
+export type DynamicThemeMode = 'dynamic-accent' | 'full-dynamic';
 
 export const THEME_TOKEN_KEYS = [
   '--background-color-1',
@@ -556,12 +556,12 @@ export interface ResolveThemeOptions {
 export function resolveTheme(options: ResolveThemeOptions): ThemeTokens {
   const presetKey = options.preset ?? 'default';
   const rawPreset = PRESET_RAW_TOKENS[presetKey] ?? PRESET_RAW_TOKENS.default;
-  const mode = options.mode ?? 'static';
+  const mode = options.mode ?? 'dynamic-accent';
   const intensity = options.intensity ?? 100;
   const palette = options.palette;
 
-  // 1. Static Mode or Missing Palette -> Return Preset directly
-  if (mode === 'static' || !palette || intensity <= 0) {
+  // 1. Missing Palette or 0% Intensity -> Return Preset directly
+  if (!palette || intensity <= 0) {
     const result = {} as ThemeTokens;
     for (const key of THEME_TOKEN_KEYS) {
       result[key] = rawPreset[key];

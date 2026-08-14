@@ -49,6 +49,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
         <div className="flex gap-2">
           <button
             type="button"
+            aria-pressed={dynamicThemeMode === 'dynamic-accent'}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
               dynamicThemeMode === 'dynamic-accent'
                 ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
@@ -60,6 +61,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
           </button>
           <button
             type="button"
+            aria-pressed={dynamicThemeMode === 'full-dynamic'}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
               dynamicThemeMode === 'full-dynamic'
                 ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
@@ -111,6 +113,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
             type="range"
             name="dynamic-theme-intensity-slider"
             id="dynamic-theme-intensity-slider"
+            aria-label={t('settingsPage.dynamicThemeIntensity', 'Dynamic Theme Intensity')}
             className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-1 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
             min={0}
             step={5}
@@ -139,7 +142,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.primaryAccent)})` }}
               />
               <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
-                Primary Accent
+                {t('settingsPage.primaryAccent', 'Primary Accent')}
               </span>
             </div>
             <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
@@ -148,7 +151,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.secondaryAccent)})` }}
               />
               <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
-                Secondary Accent
+                {t('settingsPage.secondaryAccent', 'Secondary Accent')}
               </span>
             </div>
             <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
@@ -157,7 +160,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.dark.backgroundBase)})` }}
               />
               <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
-                Dark Canvas
+                {t('settingsPage.darkCanvas', 'Dark Canvas')}
               </span>
             </div>
             <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
@@ -166,7 +169,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.light.backgroundBase)})` }}
               />
               <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
-                Light Canvas
+                {t('settingsPage.lightCanvas', 'Light Canvas')}
               </span>
             </div>
           </div>
