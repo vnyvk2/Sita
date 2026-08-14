@@ -3,7 +3,7 @@ import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
@@ -40,7 +40,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop
     })
   });
-  const pinnedControls = settings?.miniPlayerPinnedControls || ['love', 'lyrics', 'volume'];
+  const pinnedControls = useMemo(
+    () => settings?.miniPlayerPinnedControls || ['love', 'lyrics', 'volume'],
+    [settings?.miniPlayerPinnedControls]
+  );
 
   const { mutate: toggleAlwaysOnTop } = useMutation({
     mutationKey: settingsMutation.toggleMiniPlayerAlwaysOnTop.mutationKey,
@@ -72,7 +75,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     handleSkipForwardClick,
     toggleIsFavorite,
     toggleMutedState,
-    updateContextMenuData,
     toggleRepeat,
     toggleQueueShuffle
   } = useContext(AppUpdateContext);
@@ -147,6 +149,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       e.stopPropagation();
       const template = [
         {
+          id: 'compactMode',
+          label: t('miniPlayer.compactMode', 'Compact Mode')
+        },
+        {
           id: 'toggleQueue',
           label: t('player.currentQueue', 'Queue')
         },
@@ -177,6 +183,18 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         {
           label: t('miniPlayer.panelLayout', 'Panel Layout'),
           submenu: [
+            {
+              id: 'pin_artwork',
+              label: t('miniPlayer.artwork', 'Artwork'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('artwork')
+            },
+            {
+              id: 'pin_title',
+              label: t('miniPlayer.trackInfo', 'Track Info'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('title')
+            },
             {
               id: 'pin_love',
               label: t('player.likeDislike', 'Love'),
@@ -226,6 +244,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const clickedId = await window.api.miniPlayer.showContextMenu(template);
 
       switch (clickedId) {
+        case 'compactMode':
+          // Placeholder for Compact Mode (to be implemented with intrinsic sizing engine in Task 2/3)
+          break;
         case 'toggleQueue':
           setIsQueueVisible((prev) => !prev);
           break;
@@ -249,6 +270,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           break;
         case 'toggleAlwaysOnTop':
           toggleAlwaysOnTop(!settings?.isMiniPlayerAlwaysOnTop);
+          break;
+        case 'pin_artwork':
+          handleTogglePinnedControl('artwork');
+          break;
+        case 'pin_title':
+          handleTogglePinnedControl('title');
           break;
         case 'pin_love':
           handleTogglePinnedControl('love');
@@ -276,7 +303,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     [
       pinnedControls,
       handleTogglePinnedControl,
-      updateContextMenuData,
       t,
       toggleRepeat,
       currentSongData.isKnownSource,
@@ -284,7 +310,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       isAFavorite,
       isCurrentSongPlaying,
       toggleSongPlayback,
-      toggleQueueShuffle
+      toggleQueueShuffle,
+      settings?.isMiniPlayerAlwaysOnTop,
+      toggleAlwaysOnTop
     ]
   );
 
@@ -395,8 +423,53 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         />
 
         {/* ── Controls Row ─────────────────────────────────────── */}
-        <div className="controls-row relative z-20 flex w-full items-center justify-center overflow-hidden pt-1 pb-2">
-          {/* Optional: Favorite */}
+        <div
+          className={`controls-row relative z-20 flex w-full items-center ${
+            pinnedControls.includes('artwork') || pinnedControls.includes('title')
+              ? 'justify-between gap-2 px-3'
+              : 'justify-center px-1'
+          } overflow-hidden pt-1 pb-2`}
+        >
+          {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
+          {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
+            <div className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              {pinnedControls.includes('artwork') && (
+                <div className="mini-deck-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs">
+                  <Img
+                    src={currentSongData.artworkPath}
+                    fallbackSrc={DefaultSongCover}
+                    loading="eager"
+                    alt="Song Cover"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              {pinnedControls.includes('title') && (
+                <div className="mini-deck-track-info flex min-w-0 flex-1 flex-col justify-center text-left">
+                  <div
+                    className="truncate text-xs font-medium text-font-color-white leading-tight"
+                    title={currentSongData.title}
+                  >
+                    {currentSongData.title}
+                  </div>
+                  <div
+                    className="truncate text-[10px] text-font-color-white/70 leading-tight mt-0.5"
+                    title={currentSongData.artists?.map((a) => a.name).join(', ')}
+                  >
+                    {currentSongData.songId && Array.isArray(currentSongData.artists)
+                      ? currentSongData.artists?.length > 0
+                        ? currentSongData.artists.map((artist) => artist.name).join(', ')
+                        : t('common.unknownArtist')
+                      : ''}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Controls Deck */}
+          <div className="mini-deck-controls flex shrink-0 items-center justify-center">
+            {/* Optional: Favorite */}
           {pinnedControls.includes('love') && (
             <Button
               className={`favorite-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
@@ -563,6 +636,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
             </button>
           )}
+          </div>
         </div>
       </div>
 

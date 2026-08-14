@@ -711,7 +711,11 @@
 
   "miniPlayer": {
     "alwaysOnTopEnabled": "Always on top: ON",
-    "alwaysOnTopDisabled": "Always on top: OFF"
+    "alwaysOnTopDisabled": "Always on top: OFF",
+    "compactMode": "Compact Mode",
+    "artwork": "Artwork",
+    "trackInfo": "Track Info",
+    "panelLayout": "Panel Layout"
   },
 
   "time": {
