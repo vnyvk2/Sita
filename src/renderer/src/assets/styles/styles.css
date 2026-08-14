@@ -828,6 +828,11 @@ input[type='range']:active::-webkit-slider-thumb {
   transform: scale(1.2);
 }
 
+input[type='range'][data-scrubbing='true']::before,
+input[type='range'][data-scrubbing='true'] {
+  transition: none !important;
+}
+
 #miniPlayerLyricsContainer::-webkit-scrollbar {
   display: none !important;
 }
