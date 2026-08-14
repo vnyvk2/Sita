@@ -105,7 +105,7 @@ export const Album = (props: AlbumProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData, t]
+    [createQueue, multipleSelectionsData]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
@@ -146,8 +146,7 @@ export const Album = (props: AlbumProp) => {
   }, [
     addNewNotifications,
     multipleSelectionsData,
-    queue.currentQueueIndex,
-    queue.queues,
+    queue.queues[queue.currentQueueIndex].songIds,
     t,
     updateQueueData
   ]);
@@ -209,7 +208,15 @@ export const Album = (props: AlbumProp) => {
         })
         .flat();
     }
-    return <span className="text-xs font-normal">{t('common.unknownArtist')}</span>;
+    return (
+      <span
+        className={`text-xs font-normal ${
+          isAMultipleSelection ? 'text-font-color-black! dark:text-font-color-black!' : ''
+        }`}
+      >
+        {t(`common.unknownArtist`)}
+      </span>
+    );
   }, [isAMultipleSelection, props, t]);
 
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -318,13 +325,10 @@ export const Album = (props: AlbumProp) => {
     isMultipleSelectionEnabled,
     multipleSelectionsData.multipleSelections.length,
     multipleSelectionsData.selectionType,
-    openAutoTagDialog,
     playAlbumSongs,
     playAlbumSongsForMultipleSelections,
     props.albumId,
-    props.artists,
     props.songs,
-    props.title,
     queue.queues[queue.currentQueueIndex].songIds,
     showAlbumInfoPage,
     t,
