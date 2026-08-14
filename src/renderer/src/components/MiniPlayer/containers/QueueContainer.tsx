@@ -190,13 +190,13 @@ const QueueContainer = (props: Props) => {
   if (!isQueueVisible) return null;
 
   return (
-    <div className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md">
+    <div className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]">
       {/* Header */}
-      <div className="shrink-0 px-4 py-3">
+      <div className="shrink-0 px-4 py-3 [-webkit-app-region:no-drag]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev > 0 ? prev - 1 : queue.queues.length - 1))
@@ -204,7 +204,7 @@ const QueueContainer = (props: Props) => {
             >
               <span className="material-icons-round text-sm">chevron_left</span>
             </button>
-            <span className="text-font-color-white text-xs font-semibold tracking-wider uppercase opacity-60">
+            <span className="text-font-color-white text-xs font-semibold tracking-wider uppercase opacity-60 select-none">
               {viewingQueueIndex === queue.currentQueueIndex
                 ? t('currentQueuePage.queue', 'Currently Playing Queue')
                 : queue.queues[viewingQueueIndex]?.metadata?.title ||
@@ -213,7 +213,7 @@ const QueueContainer = (props: Props) => {
                     : `Queue ${viewingQueueIndex + 1}`)}
             </span>
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev < queue.queues.length - 1 ? prev + 1 : 0))
@@ -224,7 +224,7 @@ const QueueContainer = (props: Props) => {
             {viewingQueueIndex !== queue.currentQueueIndex &&
               (queue.queues[viewingQueueIndex]?.songIds?.length ?? 0) > 0 && (
                 <button
-                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 items-center justify-center rounded-full transition-colors focus-visible:outline-none"
+                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 items-center justify-center rounded-full transition-colors focus-visible:outline-none [-webkit-app-region:no-drag] cursor-pointer"
                   title={t('common.play', 'Play')}
                   onClick={() => {
                     if (manager) {

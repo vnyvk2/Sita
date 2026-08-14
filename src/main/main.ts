@@ -106,8 +106,18 @@ let currentWindowZoomFactor = MAIN_WINDOW_DEFAULT_ZOOM_FACTOR;
 let isQueueExpanded = false;
 let compactHeight: number | null = null;
 let compactY: number | null = null;
+let compactX: number | null = null;
+let expandedHeight: number | null = null;
+let expandedDirection: 'up' | 'down' | null = null;
+let programmaticMoveTarget: { x: number; y: number } | null = null;
 let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
 let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
+
+function setMiniPlayerPositionProgrammatically(x: number, y: number) {
+  if (!mainWindow) return;
+  programmaticMoveTarget = { x, y };
+  mainWindow.setPosition(x, y, true);
+}
 
 // / / / / / / INITIALIZATION / / / / / / /
 
@@ -656,8 +666,31 @@ function manageAppMoveEvent() {
   const [x, y] = mainWindow.getPosition();
   logger.debug(`User moved the player`, { playerType, coordinates: { x, y } });
 
-  if (playerType === 'mini') saveUserSettings({ miniPlayerX: x, miniPlayerY: y });
-  else if (playerType === 'normal') saveUserSettings({ mainWindowX: x, mainWindowY: y });
+  if (playerType === 'mini') {
+    if (
+      programmaticMoveTarget &&
+      programmaticMoveTarget.x === x &&
+      programmaticMoveTarget.y === y
+    ) {
+      programmaticMoveTarget = null;
+      return;
+    }
+    programmaticMoveTarget = null;
+
+    if (isQueueExpanded && compactHeight !== null && expandedHeight !== null) {
+      const heightDelta = expandedHeight - compactHeight;
+      const anchorY = expandedDirection === 'up' ? y + heightDelta : y;
+      compactX = x;
+      compactY = anchorY;
+      saveUserSettings({ miniPlayerX: x, miniPlayerY: anchorY });
+    } else {
+      compactX = x;
+      compactY = y;
+      saveUserSettings({ miniPlayerX: x, miniPlayerY: y });
+    }
+  } else if (playerType === 'normal') {
+    saveUserSettings({ mainWindowX: x, mainWindowY: y });
+  }
 }
 
 function manageAppResizeEvent() {
@@ -933,6 +966,10 @@ export async function changePlayerType(type: PlayerTypes) {
       isQueueExpanded = false;
       compactHeight = null;
       compactY = null;
+      compactX = null;
+      expandedHeight = null;
+      expandedDirection = null;
+      programmaticMoveTarget = null;
 
       if (miniPlayerX !== null && miniPlayerY !== null) {
         mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
@@ -988,6 +1025,7 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     if (!isQueueExpanded || compactHeight === null || compactY === null) {
       compactHeight = currentHeight;
       compactY = currentY;
+      compactX = currentX;
       isQueueExpanded = true;
     }
     const baseHeight = compactHeight;
@@ -1006,8 +1044,8 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
     // Decide direction: pick whichever direction can show MORE of the queue.
     // Default to down only when both directions can fully fit.
-    let expandedHeight: number;
-    let expandedY = baseY;
+    let calculatedExpandedHeight: number;
+    let calculatedExpandedY = baseY;
     let direction: 'down' | 'up' = 'down';
 
     const canFitFullDown = spaceBelow >= queuePanelHeight;
@@ -1015,37 +1053,40 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
     if (canFitFullDown) {
       // Full fit downwards — ideal default
-      expandedHeight = totalHeight;
+      calculatedExpandedHeight = totalHeight;
       direction = 'down';
     } else if (canFitFullUp) {
       // Full fit upwards
-      expandedHeight = totalHeight;
+      calculatedExpandedHeight = totalHeight;
       direction = 'up';
     } else {
       // Neither can fully fit — pick whichever direction has MORE room
       direction = spaceBelow >= spaceAbove ? 'down' : 'up';
       const availableSpace = direction === 'down' ? spaceBelow : spaceAbove;
-      expandedHeight = baseHeight + availableSpace;
+      calculatedExpandedHeight = baseHeight + availableSpace;
     }
 
     if (direction === 'up') {
-      expandedY = baseY - (expandedHeight - baseHeight);
+      calculatedExpandedY = baseY - (calculatedExpandedHeight - baseHeight);
     }
+
+    expandedHeight = calculatedExpandedHeight;
+    expandedDirection = direction;
 
     logger.debug('Expanding mini player queue', {
       queueItemCount,
       direction,
       compactHeight: baseHeight,
-      expandedHeight,
+      expandedHeight: calculatedExpandedHeight,
       spaceBelow,
       spaceAbove
     });
 
     // Temporarily allow larger max height for expansion
-    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, expandedHeight);
-    mainWindow.setSize(width, expandedHeight, true);
-    if (expandedY !== currentY) {
-      mainWindow.setPosition(currentX, expandedY, true);
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, calculatedExpandedHeight);
+    mainWindow.setSize(width, calculatedExpandedHeight, true);
+    if (calculatedExpandedY !== currentY) {
+      setMiniPlayerPositionProgrammatically(currentX, calculatedExpandedY);
     }
 
     // Notify renderer of the expansion direction
@@ -1056,17 +1097,21 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
     const restoreHeight = compactHeight ?? currentMiniPlayerMinHeight;
     const restoreY = compactY;
+    const restoreX = compactX ?? currentX;
 
-    logger.debug('Collapsing mini player queue', { restoreHeight, restoreY });
+    logger.debug('Collapsing mini player queue', { restoreHeight, restoreY, restoreX });
 
     mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
     mainWindow.setSize(width, restoreHeight, true);
-    if (restoreY !== null && restoreY !== currentY) {
-      mainWindow.setPosition(currentX, restoreY, true);
+    if (restoreY !== null && (restoreY !== currentY || (compactX !== null && compactX !== currentX))) {
+      setMiniPlayerPositionProgrammatically(restoreX, restoreY);
     }
 
     compactHeight = null;
     compactY = null;
+    compactX = null;
+    expandedHeight = null;
+    expandedDirection = null;
   }
 }
 

@@ -297,9 +297,8 @@ const SeekBarSlider = (props: Props) => {
     }, 250);
   };
 
-  const seekBarCssProperties: CSSProperties = {
-    '--seek-before-width': '0%'
-  };
+  const seekBarCssProperties: CSSProperties = {};
+  seekBarCssProperties['--seek-before-width'] = '0%';
   if (sliderOpacity !== undefined) seekBarCssProperties['--slider-opacity'] = `${sliderOpacity}`;
 
   return (

@@ -263,6 +263,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             settings?.isMiniPlayerAlwaysOnTop ? 'Disable Always on Top' : 'Always on Top'
           )
         },
+        {
+          id: 'resetMiniPlayer',
+          label: t('miniPlayer.resetToDefault', 'Reset to Default Position')
+        },
         { type: 'separator' },
         {
           label: t('miniPlayer.panelLayout', 'Panel Layout'),
@@ -355,6 +359,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         case 'toggleAlwaysOnTop':
           toggleAlwaysOnTop(!settings?.isMiniPlayerAlwaysOnTop);
           break;
+        case 'resetMiniPlayer':
+          window.api.miniPlayer.resetToDefaultPosition();
+          break;
         case 'pin_artwork':
           handleTogglePinnedControl('artwork');
           break;
@@ -408,7 +415,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     // At rest (playing, not hovered): ONLY album art visible.
     // On hover/focus/paused: title bar, song info, controls, seekbar fade in.
     <div
-      className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full ${isQueueVisible && queueDirection === 'up' ? 'flex-col-reverse' : 'flex-col'} overflow-hidden !transition-none select-none ${
+      className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full flex-col overflow-hidden !transition-none select-none ${
         !isCurrentSongPlaying && 'paused'
       } ${preferences?.isReducedMotion ? 'reduced-motion' : ''} ${className}`}
       onContextMenu={handleContextMenu}
@@ -424,8 +431,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
           } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
         />
-        {/* Persistent top drag region */}
-        <div className="absolute top-0 left-0 z-0 h-8 max-h-[30%] w-full [-webkit-app-region:drag]"></div>
 
         {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
         <div
@@ -439,11 +444,22 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         ></div>
       </div>
 
-      {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
-      {/* Fades in on hover/focus/paused — same as old behavior.                */}
-      <div ref={topRef} className="relative z-30 w-full">
-        <TitleBarContainer isLyricsVisible={isLyricsVisible} />
-      </div>
+      {/* ── Spatial Queue Container (Placed above deck when expanding upward) ── */}
+      {isQueueVisible && queueDirection === 'up' && (
+        <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
+
+      {/* ═══ MINI PLAYER DECK (Strict fixed hierarchy: TOP -> MIDDLE -> BOTTOM) ═══ */}
+      <div
+        className={`mini-player-deck relative flex ${
+          isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
+        } flex-col overflow-hidden`}
+      >
+        {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
+        {/* Fades in on hover/focus/paused — same as old behavior.                */}
+        <div ref={topRef} className="relative z-30 w-full">
+          <TitleBarContainer isLyricsVisible={isLyricsVisible} />
+        </div>
 
       {/* ═══ TIER 2 (MIDDLE): Song Info ══════════════════════════════════════ */}
       {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
@@ -727,12 +743,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           </div>
         </div>
       </div>
+    </div>
+
+      {/* ── Spatial Queue Container (Placed below deck when expanding downward) ── */}
+      {isQueueVisible && queueDirection === 'down' && (
+        <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
 
       {/* ── Lyrics overlay (absolute, within the entire window when lyrics on) ── */}
       <LyricsContainer isLyricsVisible={isLyricsVisible} />
-
-      {/* ── Queue container (flex, takes up remaining space when expanded) ── */}
-      <QueueContainer isQueueVisible={isQueueVisible} />
     </div>
   );
 }
