@@ -191,12 +191,22 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
   const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
 
-  useEffect(() => {
-    window.api.miniPlayer.toggleMiniPlayerQueue(isQueueVisible, queueLength);
-    if (!isQueueVisible) setQueueDirection('down');
+  const handleToggleQueue = useCallback(async () => {
+    const nextVisible = !isQueueVisible;
+    if (nextVisible) {
+      const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
+      if (result?.direction) {
+        setQueueDirection(result.direction);
+      }
+      setIsQueueVisible(true);
+    } else {
+      setIsQueueVisible(false);
+      setQueueDirection('down');
+      await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+    }
   }, [isQueueVisible, queueLength]);
 
-  // Listen for queue direction changes from main process
+  // Listen for external queue direction changes from main process if any
   useEffect(() => {
     const handleDirectionChange = (_: unknown, direction: 'up' | 'down') => {
       setQueueDirection(direction);
@@ -336,7 +346,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           // Placeholder for Compact Mode (to be implemented with intrinsic sizing engine in Task 2/3)
           break;
         case 'toggleQueue':
-          setIsQueueVisible((prev) => !prev);
+          handleToggleQueue();
           break;
         case 'togglePlay':
           if (isCurrentSongPlaying) toggleSongPlayback();
@@ -403,7 +413,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       toggleSongPlayback,
       toggleQueueShuffle,
       settings?.isMiniPlayerAlwaysOnTop,
-      toggleAlwaysOnTop
+      toggleAlwaysOnTop,
+      handleToggleQueue
     ]
   );
 
@@ -734,7 +745,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               title={t('player.currentQueue', 'Queue')}
               onClick={(e) => {
                 e.currentTarget.blur();
-                setIsQueueVisible((prev) => !prev);
+                handleToggleQueue();
               }}
             >
               <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />

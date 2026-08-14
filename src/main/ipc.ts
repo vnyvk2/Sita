@@ -650,8 +650,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/changePlayerType', (_, type: PlayerTypes) => changePlayerType(type));
 
-    ipcMain.on('app/toggleMiniPlayerQueue', (_, isExpanded: boolean, queueItemCount?: number) =>
-      expandMiniPlayer(isExpanded, queueItemCount)
+    ipcMain.handle(
+      'app/toggleMiniPlayerQueue',
+      (_, isExpanded: boolean, queueItemCount?: number) =>
+        expandMiniPlayer(isExpanded, queueItemCount)
     );
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>

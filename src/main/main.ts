@@ -113,10 +113,15 @@ let programmaticMoveTarget: { x: number; y: number } | null = null;
 let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
 let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
 
-function setMiniPlayerPositionProgrammatically(x: number, y: number) {
+function setMiniPlayerBoundsProgrammatically(bounds: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
   if (!mainWindow) return;
-  programmaticMoveTarget = { x, y };
-  mainWindow.setPosition(x, y, true);
+  programmaticMoveTarget = { x: bounds.x, y: bounds.y };
+  mainWindow.setBounds(bounds, false);
 }
 
 // / / / / / / INITIALIZATION / / / / / / /
@@ -1015,7 +1020,7 @@ export async function changePlayerType(type: PlayerTypes) {
 }
 
 export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
-  if (!mainWindow || playerType !== 'mini') return;
+  if (!mainWindow || playerType !== 'mini') return { isExpanded: false, direction: 'down' as const };
 
   const [width, currentHeight] = mainWindow.getSize();
   const [currentX, currentY] = mainWindow.getPosition();
@@ -1084,34 +1089,40 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
 
     // Temporarily allow larger max height for expansion
     mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, calculatedExpandedHeight);
-    mainWindow.setSize(width, calculatedExpandedHeight, true);
-    if (calculatedExpandedY !== currentY) {
-      setMiniPlayerPositionProgrammatically(currentX, calculatedExpandedY);
-    }
+    setMiniPlayerBoundsProgrammatically({
+      x: currentX,
+      y: calculatedExpandedY,
+      width,
+      height: calculatedExpandedHeight
+    });
 
     // Notify renderer of the expansion direction
     mainWindow.webContents.send('app/miniPlayerQueueDirection', direction);
+    return { isExpanded: true, direction, height: calculatedExpandedHeight };
   } else {
     // Collapse back to compact size
     isQueueExpanded = false;
 
     const restoreHeight = compactHeight ?? currentMiniPlayerMinHeight;
-    const restoreY = compactY;
+    const restoreY = compactY ?? currentY;
     const restoreX = compactX ?? currentX;
 
     logger.debug('Collapsing mini player queue', { restoreHeight, restoreY, restoreX });
 
     mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
-    mainWindow.setSize(width, restoreHeight, true);
-    if (restoreY !== null && (restoreY !== currentY || (compactX !== null && compactX !== currentX))) {
-      setMiniPlayerPositionProgrammatically(restoreX, restoreY);
-    }
+    setMiniPlayerBoundsProgrammatically({
+      x: restoreX,
+      y: restoreY,
+      width,
+      height: restoreHeight
+    });
 
     compactHeight = null;
     compactY = null;
     compactX = null;
     expandedHeight = null;
     expandedDirection = null;
+    return { isExpanded: false, direction: 'down' as const, height: restoreHeight };
   }
 }
 

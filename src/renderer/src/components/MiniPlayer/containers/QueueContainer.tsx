@@ -26,6 +26,7 @@ const QueueContainer = (props: Props) => {
   const navigate = useNavigate();
 
   const listRef = useRef<HTMLDivElement>(null);
+  const isFirstScrollRef = useRef(true);
 
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
 
@@ -51,6 +52,11 @@ const QueueContainer = (props: Props) => {
 
   // Auto-scroll to the currently playing song when the queue opens
   useEffect(() => {
+    if (!isQueueVisible) {
+      isFirstScrollRef.current = true;
+      return;
+    }
+
     const activeQueue = queue.queues[queue.currentQueueIndex];
 
     if (
@@ -65,8 +71,10 @@ const QueueContainer = (props: Props) => {
         const itemHeight = 52;
         const containerHeight = listRef.current.clientHeight;
         const scrollTarget = activeIndex * itemHeight - containerHeight / 2 + itemHeight / 2;
+        const behavior = isFirstScrollRef.current ? 'instant' : 'smooth';
+        isFirstScrollRef.current = false;
         requestAnimationFrame(() => {
-          listRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+          listRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior });
         });
       }
     }

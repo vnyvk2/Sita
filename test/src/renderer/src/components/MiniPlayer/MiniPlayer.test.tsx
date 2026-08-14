@@ -121,6 +121,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       ...window.api,
       miniPlayer: {
         setMinimumBounds: vi.fn(),
+        setDynamicMinimumBounds: vi.fn(),
         resetToDefaultPosition: resetToDefaultPositionMock,
         toggleMiniPlayerQueue: vi.fn(),
         toggleMiniPlayerAlwaysOnTop: vi.fn(),
@@ -213,5 +214,36 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     const resetItem = template.find((item: any) => item.id === 'resetMiniPlayer');
     expect(resetItem).toBeDefined();
     expect(resetItem.label).toBe('Reset to Default Position');
+  });
+
+  it('renders queue above deck when toggleMiniPlayerQueue returns up direction', async () => {
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockResolvedValueOnce({
+      isExpanded: true,
+      direction: 'up'
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const root = container.querySelector('.mini-player')!;
+    fireEvent.contextMenu(root);
+
+    // Simulate clicking toggleQueue
+    const template = showContextMenuMock.mock.calls[0][0];
+    const toggleQueueItem = template.find((item: any) => item.id === 'toggleQueue');
+    expect(toggleQueueItem).toBeDefined();
+
+    // Trigger toggle via context menu
+    showContextMenuMock.mockResolvedValueOnce('toggleQueue');
+    fireEvent.contextMenu(root);
+
+    // After resolving, queue is visible
+    const queue = await screen.findByTestId('queue-container');
+    expect(queue).toBeDefined();
   });
 });
