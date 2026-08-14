@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TheatreLyricsView from '../../../../../../src/renderer/src/components/LyricsPage/TheatreLyricsView';
 import { AppUpdateContext, type AppUpdateContextType } from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
@@ -26,6 +26,10 @@ describe('TheatreLyricsView', () => {
     updatePlayerType: vi.fn(),
     toggleLyricsDrawer: vi.fn()
   };
+
+  afterEach(() => {
+    cleanup();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,8 +86,8 @@ describe('TheatreLyricsView', () => {
   });
 
   it('should trigger onClose when exit theatre button is clicked', () => {
-    const { container } = renderComponent();
-    const exitBtn = container.querySelector('.exit-theatre-btn') as HTMLButtonElement;
+    renderComponent();
+    const exitBtn = document.body.querySelector('.exit-theatre-btn') as HTMLButtonElement;
     expect(exitBtn).not.toBeNull();
     fireEvent.click(exitBtn);
     expect(mockClose).toHaveBeenCalledTimes(1);

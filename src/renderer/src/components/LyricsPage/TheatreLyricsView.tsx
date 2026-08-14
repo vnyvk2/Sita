@@ -2,6 +2,7 @@ import Button from '@renderer/components/Button';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import LyricsAmbientBackground from './LyricsAmbientBackground';
@@ -49,13 +50,17 @@ const TheatreLyricsView = ({
 
   const isArtworkBackground = preferences?.lyricsBackground === 'artwork';
 
-  return (
-    <div className="theatre-lyrics-view fixed inset-0 z-40 flex h-screen w-screen flex-col overflow-hidden bg-background-color-1 text-font-color-black select-none dark:bg-dark-background-color-1 dark:text-font-color-white">
+  return createPortal(
+    <div className="theatre-lyrics-view fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-background-color-1 text-font-color-black select-none dark:bg-dark-background-color-1 dark:text-font-color-white">
       {/* Ambient Artwork Background */}
       {isArtworkBackground && (
         <LyricsAmbientBackground
           artworkPath={currentSongData.artworkPath}
           paletteData={currentSongData.paletteData}
+          blur={preferences?.lyricsArtworkBlur}
+          darkness={preferences?.lyricsArtworkDarkness}
+          enableAnimation={preferences?.lyricsArtworkAnimation}
+          reducedMotion={preferences?.isReducedMotion}
         />
       )}
 
@@ -131,7 +136,8 @@ const TheatreLyricsView = ({
 
       {/* Floating Bottom Player Bar */}
       <TheatreLyricsPlayerBar />
-    </div>
+    </div>,
+    document.body
   );
 };
 

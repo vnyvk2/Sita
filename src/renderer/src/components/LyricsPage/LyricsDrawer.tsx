@@ -47,7 +47,7 @@ const LyricsDrawer = () => {
   useSkipLyricsLines(lyrics);
 
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, true, 'normal');
+    return renderLyricsLines(lyrics, currentSongData.duration, true, 'drawer');
   }, [currentSongData.duration, lyrics]);
 
   const handleExpandClick = () => {
@@ -69,7 +69,7 @@ const LyricsDrawer = () => {
 
   return (
     <aside
-      className="lyrics-drawer relative z-20 flex h-full w-96 min-w-[320px] max-w-[35vw] flex-col overflow-hidden border-l border-background-color-2 bg-background-color-1/95 backdrop-blur-xl transition-all duration-300 dark:border-dark-background-color-2 dark:bg-dark-background-color-1/95"
+      className="lyrics-drawer relative z-20 order-3 flex h-full w-96 min-w-[320px] max-w-[35vw] shrink-0 flex-col overflow-hidden border-l border-background-color-2 bg-background-color-1/95 backdrop-blur-xl transition-all duration-300 dark:border-dark-background-color-2 dark:bg-dark-background-color-1/95"
       aria-label={t('player.lyrics', 'Lyrics')}
     >
       {/* Ambient Artwork Background */}
@@ -115,7 +115,7 @@ const LyricsDrawer = () => {
       </div>
 
       {/* Lyrics Stream */}
-      <div className="lyrics-lines-container relative z-10 flex min-h-0 flex-1 w-full scrollbar-gutter-stable flex-col items-center overflow-y-auto px-4 py-6 [overflow-anchor:none]!">
+      <div className="lyrics-lines-container relative z-10 flex min-h-0 flex-1 w-full flex-col items-center overflow-y-auto px-6 py-8 [overflow-anchor:none]!">
         {isLoadingLyrics && (
           <div className="flex h-full w-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-font-color-highlight border-t-transparent dark:border-dark-font-color-highlight" />

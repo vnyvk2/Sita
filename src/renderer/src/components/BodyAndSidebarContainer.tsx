@@ -11,7 +11,7 @@ const BodyAndSideBarContainer = () => {
       <ErrorBoundary>
         <NotificationPanel />
         <Sidebar />
-        <div className="body relative order-2 h-full! w-full overflow-hidden rounded-tl-lg *:overflow-x-hidden lg:pl-14">
+        <div className="body relative order-2 flex-1 min-w-0 h-full! overflow-hidden rounded-tl-lg *:overflow-x-hidden lg:pl-14">
           <Outlet />
         </div>
         <LyricsDrawer />
