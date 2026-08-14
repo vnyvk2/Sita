@@ -392,6 +392,17 @@
 
     "enableImageBasedDynamicThemes": "Enable Dynamic Themes",
     "enableImageBasedDynamicThemesDescription": "Change app theme dynamically based on the theme of the current playing song cover image",
+    "dynamicThemeMode": "Dynamic Theme Mode",
+    "dynamicThemeModeAccent": "Dynamic Accent",
+    "dynamicThemeModeAccentDesc": "Preserves the current preset's surfaces and text while adapting accents, highlights, and seekbars to the song artwork.",
+    "dynamicThemeModeFull": "Full Atmosphere",
+    "dynamicThemeModeFullDesc": "Dynamically synthesizes the entire application color scheme from the song artwork.",
+    "dynamicThemeIntensity": "Dynamic Theme Intensity",
+    "dynamicThemeIntensityDesc": "Controls how strongly album artwork influences the theme.",
+    "dynamicThemeIntensityPreset": "Preset (0%)",
+    "dynamicThemeIntensityArtwork": "Artwork (100%)",
+    "resetIntensity": "Reset to 100%",
+    "resolvedTones": "Derived Semantic Tones",
 
     "language": "Language",
     "languageDescription": "Select the language you want Nora to be displayed in.",

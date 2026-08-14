@@ -8,6 +8,7 @@ import { useDynamicTheme } from '../../../../../src/renderer/src/hooks/useDynami
 import { store } from '../../../../../src/renderer/src/store/store';
 import {
   ACCENT_TOKEN_KEYS,
+  PRESET_RAW_TOKENS,
   THEME_TOKEN_KEYS
 } from '../../../../../src/renderer/src/utils/themeResolver';
 
@@ -203,6 +204,71 @@ describe('useDynamicTheme hook', () => {
 
     expect(rootElement.style.getPropertyValue('--background-color-1')).toBe('');
     expect(rootElement.style.getPropertyValue('--seekbar-background-color')).not.toBe('');
+  });
+
+  it('should adjust token values proportionally when dynamicThemeIntensity changes', () => {
+    const { rerender } = renderHook(() => useDynamicTheme(), { wrapper: createWrapper() });
+
+    // 1. Full dynamic at 100% intensity
+    act(() => {
+      store.setState((prev) => ({
+        ...prev,
+        localStorage: {
+          ...prev.localStorage,
+          preferences: {
+            ...prev.localStorage.preferences,
+            enableImageBasedDynamicThemes: true,
+            dynamicThemeMode: 'full-dynamic',
+            dynamicThemeIntensity: 100,
+            themePreset: 'dracula'
+          }
+        },
+        currentSongData: {
+          ...prev.currentSongData,
+          paletteData: mockPalette
+        }
+      }));
+    });
+
+    rerender();
+    const valAt100 = rootElement.style.getPropertyValue('--dark-seekbar-background-color');
+
+    // 2. Full dynamic at 0% intensity (should equal dracula preset raw token)
+    act(() => {
+      store.setState((prev) => ({
+        ...prev,
+        localStorage: {
+          ...prev.localStorage,
+          preferences: {
+            ...prev.localStorage.preferences,
+            dynamicThemeIntensity: 0
+          }
+        }
+      }));
+    });
+
+    rerender();
+    const valAt0 = rootElement.style.getPropertyValue('--dark-seekbar-background-color');
+    expect(valAt0).toBe(PRESET_RAW_TOKENS.dracula['--dark-seekbar-background-color']);
+
+    // 3. Full dynamic at 50% intensity (should differ from both 0% and 100%)
+    act(() => {
+      store.setState((prev) => ({
+        ...prev,
+        localStorage: {
+          ...prev.localStorage,
+          preferences: {
+            ...prev.localStorage.preferences,
+            dynamicThemeIntensity: 50
+          }
+        }
+      }));
+    });
+
+    rerender();
+    const valAt50 = rootElement.style.getPropertyValue('--dark-seekbar-background-color');
+    expect(valAt50).not.toBe(valAt0);
+    expect(valAt50).not.toBe(valAt100);
   });
 
   it('should remove all dynamic tokens when dynamic theming is disabled', () => {
