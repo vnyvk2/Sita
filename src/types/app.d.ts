@@ -543,6 +543,8 @@ declare global {
     showTrackNumberAsSongIndex: boolean;
     allowToPreventScreenSleeping: boolean;
     enableImageBasedDynamicThemes: boolean;
+    dynamicThemeMode?: 'dynamic-accent' | 'full-dynamic';
+    dynamicThemeIntensity?: number;
     autoTranslateLyrics: boolean;
     autoConvertLyrics: boolean;
     visibleSideTabs?: VisibleSideTabs;
