@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -6,7 +7,7 @@ import HighlightedText from '../../../../../src/renderer/src/components/SearchPa
 describe('HighlightedText', () => {
   it('should render the original text when highlight is empty', () => {
     render(<HighlightedText text="Hello World" highlight="" />);
-    expect(screen.getByText('Hello World')).toBeInTheDocument();
+    expect(screen.getByText('Hello World')).toBeDefined();
   });
 
   it('should highlight the exact matching part', () => {
