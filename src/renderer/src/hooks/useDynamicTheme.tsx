@@ -2,175 +2,126 @@ import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect } from 'react';
 
 import { useEffectiveAppearance } from './useEffectiveAppearance';
+import { type ThemePreset } from '../../../common/themeRegistry';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
-
-const manageBrightness = (
-  values: [number, number, number],
-  range?: { min?: number; max?: number }
-): [number, number, number] => {
-  const max = range?.max || 1;
-  const min = range?.min || 0.9;
-
-  const [h, s, l] = values;
-
-  const updatedL = l >= min ? (l <= max ? l : max) : min;
-  return [h, s, updatedL];
-};
-
-const manageSaturation = (
-  values: [number, number, number],
-  range?: { min?: number; max?: number }
-): [number, number, number] => {
-  const max = range?.max || 1;
-  const min = range?.min || 0.9;
-
-  const [h, s, l] = values;
-
-  const updatedS = s >= min ? (s <= max ? s : max) : min;
-  return [h, updatedS, l];
-};
+import { resolveSemanticPalette } from '../utils/semanticPalette';
+import {
+  ACCENT_TOKEN_KEYS,
+  resolveTheme,
+  THEME_TOKEN_KEYS,
+  type DynamicThemeMode
+} from '../utils/themeResolver';
 
 const resetStyles = () => {
   const root = document.getElementById('root');
-
   if (root) {
-    root.style.removeProperty('--side-bar-background');
-    root.style.removeProperty('--background-color-2');
-    root.style.removeProperty('--dark-background-color-2');
-    root.style.removeProperty('--background-color-3');
-    root.style.removeProperty('--dark-background-color-3');
-    root.style.removeProperty('--text-color-highlight');
-    root.style.removeProperty('--dark-text-color-highlight');
-    root.style.removeProperty('--seekbar-background-color');
-    root.style.removeProperty('--dark-seekbar-background-color');
-    root.style.removeProperty('--scrollbar-thumb-background-color');
-    root.style.removeProperty('--dark-scrollbar-thumb-background-color');
-    root.style.removeProperty('--seekbar-track-background-color');
-    root.style.removeProperty('--dark-seekbar-track-background-color');
-    root.style.removeProperty('--text-color-highlight-2');
-    root.style.removeProperty('--dark-text-color-highlight-2');
+    for (const token of THEME_TOKEN_KEYS) {
+      root.style.removeProperty(token);
+    }
     root.style.removeProperty('--slider-opacity');
     root.style.removeProperty('--dark-slider-opacity');
-    root.style.removeProperty('--context-menu-list-hover');
-    root.style.removeProperty('--dark-context-menu-list-hover');
+  }
+};
+
+/**
+ * Efficiently applies resolved dynamic tokens to #root using diff-based writes.
+ * Reads inline custom-property values on #root and writes only when that value differs,
+ * while removing tokens that are no longer active.
+ */
+const applyThemeTokens = (
+  palette?: NodeVibrantPalette,
+  preset: ThemePreset = 'default',
+  mode: DynamicThemeMode = 'dynamic-accent',
+  intensity: number = 100
+) => {
+  const root = document.getElementById('root');
+  if (!root) return;
+
+  if (!palette) {
+    resetStyles();
+    return;
+  }
+
+  const semanticPalette = resolveSemanticPalette(palette);
+  const resolvedTokens = resolveTheme({
+    preset,
+    palette: semanticPalette,
+    mode,
+    intensity
+  });
+
+  const activeKeys = mode === 'full-dynamic' ? THEME_TOKEN_KEYS : ACCENT_TOKEN_KEYS;
+  const activeKeySet = new Set<string>(activeKeys);
+
+  // 1. Write or update active tokens only if changed
+  for (const token of activeKeys) {
+    const nextVal = resolvedTokens[token];
+    if (root.style.getPropertyValue(token) !== nextVal) {
+      root.style.setProperty(token, nextVal, 'important');
+    }
+  }
+
+  // 2. Clean up inactive tokens only if currently set
+  for (const token of THEME_TOKEN_KEYS) {
+    if (!activeKeySet.has(token) && root.style.getPropertyValue(token) !== '') {
+      root.style.removeProperty(token);
+    }
   }
 };
 
 export interface UseDynamicThemeReturn {
-  setDynamicThemesFromSongPalette: (palette?: NodeVibrantPalette) => () => void;
+  setDynamicThemesFromSongPalette: (
+    palette?: NodeVibrantPalette,
+    customMode?: DynamicThemeMode,
+    customIntensity?: number
+  ) => () => void;
   updateBodyBackgroundImage: (isVisible: boolean, src?: string) => void;
 }
 
 /**
  * Hook for managing dynamic themes, background images, and dark mode.
  *
- * Provides functions to apply color palettes from song artwork and manage background images.
- * Automatically applies themes when enabled and when song palette data is available. Also manages
- * dark mode by toggling the 'dark' class on document.body based on user preferences.
- *
- * @example
- *   ```tsx
- *   function ThemeManager() {
- *     const { setDynamicThemesFromSongPalette } = useDynamicTheme();
- *
- *     const applyTheme = (palette) => {
- *       const resetStyles = setDynamicThemesFromSongPalette(palette);
- *       // Later: resetStyles() to remove custom theme
- *     };
- *   }
- *   ```;
- *
- * @returns Theme management functions
+ * Integrates with Dynamic Theme v2 engine (semanticPalette & themeResolver)
+ * with diff-based CSS variable writes to avoid redundant property updates
+ * and eliminate unnecessary remove-and-reapply cycles.
  */
 export function useDynamicTheme(): UseDynamicThemeReturn {
-  const setDynamicThemesFromSongPalette = useCallback((palette?: NodeVibrantPalette) => {
-    const generateColor = (values: [number, number, number]) => {
-      const [lh, ls, ll] = values;
-      const color = `${lh * 360} ${ls * 100}% ${ll * 100}%`;
-      return color;
-    };
+  const themePreset = useStore(
+    store,
+    (state) => state.localStorage.preferences?.themePreset ?? 'default'
+  );
 
-    const root = document.getElementById('root');
-    if (root) {
-      if (palette) {
-        if (
-          palette?.LightVibrant &&
-          palette?.DarkVibrant &&
-          palette?.LightMuted &&
-          palette?.DarkMuted &&
-          palette?.Vibrant &&
-          palette?.Muted
-        ) {
-          const highLightVibrant = generateColor(manageBrightness(palette.LightVibrant.hsl));
-          const mediumLightVibrant = generateColor(
-            manageBrightness(palette.LightVibrant.hsl, { min: 0.75 })
-          );
-          const darkLightVibrant = generateColor(
-            manageSaturation(
-              manageBrightness(palette.LightVibrant.hsl, {
-                max: 0.2,
-                min: 0.2
-              }),
-              { max: 0.05, min: 0.05 }
-            )
-          );
-          const highVibrant = generateColor(manageBrightness(palette.Vibrant.hsl, { min: 0.7 }));
+  const dynamicThemeMode = useStore(
+    store,
+    (state) => (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
+  );
 
-          const lightVibrant = generateColor(palette.LightVibrant.hsl);
-          const darkVibrant = generateColor(palette.DarkVibrant.hsl);
-          // const lightMuted = generateColor(palette.LightMuted.hsl);
-          // const darkMuted = generateColor(palette.DarkMuted.hsl);
-          // const vibrant = generateColor(palette.Vibrant.hsl);
-          // const muted = generateColor(palette.Muted.hsl);
+  const dynamicThemeIntensity = useStore(
+    store,
+    (state) => state.localStorage.preferences?.dynamicThemeIntensity ?? 100
+  );
 
-          root.style.setProperty('--side-bar-background', highLightVibrant, 'important');
-          root.style.setProperty('--background-color-2', highLightVibrant, 'important');
+  const isImageBasedDynamicThemesEnabled = useStore(
+    store,
+    (state) => state.localStorage.preferences?.enableImageBasedDynamicThemes ?? false
+  );
 
-          root.style.setProperty('--context-menu-list-hover', highLightVibrant, 'important');
-          root.style.setProperty('--dark-context-menu-list-hover', highLightVibrant, 'important');
+  const currentSongPaletteData = useStore(store, (state) => state.currentSongData?.paletteData);
 
-          root.style.setProperty('--dark-background-color-2', darkLightVibrant, 'important');
-
-          root.style.setProperty('--background-color-3', highVibrant, 'important');
-          root.style.setProperty('--dark-background-color-3', lightVibrant, 'important');
-
-          root.style.setProperty('--text-color-highlight', darkVibrant, 'important');
-          root.style.setProperty('--dark-text-color-highlight', lightVibrant, 'important');
-
-          root.style.setProperty('--seekbar-background-color', darkVibrant, 'important');
-          root.style.setProperty('--dark-seekbar-background-color', lightVibrant, 'important');
-
-          root.style.setProperty(
-            '--scrollbar-thumb-background-color',
-            mediumLightVibrant,
-            'important'
-          );
-          root.style.setProperty(
-            '--dark-scrollbar-thumb-background-color',
-            mediumLightVibrant,
-            'important'
-          );
-
-          root.style.setProperty('--seekbar-track-background-color', darkVibrant, 'important');
-          root.style.setProperty(
-            '--dark-seekbar-track-background-color',
-            darkLightVibrant,
-            'important'
-          );
-
-          root.style.setProperty('--slider-opacity', '0.25', 'important');
-          root.style.setProperty('--dark-slider-opacity', '1', 'important');
-
-          root.style.setProperty('--text-color-highlight-2', darkVibrant, 'important');
-          root.style.setProperty('--dark-text-color-highlight-2', lightVibrant, 'important');
-        }
-      } else {
-        resetStyles();
-      }
-    }
-    return resetStyles;
-  }, []);
+  const setDynamicThemesFromSongPalette = useCallback(
+    (
+      palette?: NodeVibrantPalette,
+      customMode?: DynamicThemeMode,
+      customIntensity?: number
+    ) => {
+      const mode = customMode ?? dynamicThemeMode;
+      const intensity = customIntensity ?? dynamicThemeIntensity;
+      applyThemeTokens(palette, themePreset, mode, intensity);
+      return resetStyles;
+    },
+    [themePreset, dynamicThemeMode, dynamicThemeIntensity]
+  );
 
   const updateBodyBackgroundImage = useCallback((isVisible: boolean, src?: string) => {
     let image: string | undefined;
@@ -186,30 +137,23 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
     });
   }, []);
 
-  // Monitor preference and song data changes to apply/remove dynamic themes
-  const isImageBasedDynamicThemesEnabled = useStore(
-    store,
-    (state) => state.localStorage.preferences.enableImageBasedDynamicThemes
-  );
-
-  const currentSongPaletteData = useStore(store, (state) => state.currentSongData.paletteData);
-
+  // Reactively apply dynamic theme with diff-based writes
   useEffect(() => {
-    // Reset styles first
-    setDynamicThemesFromSongPalette(undefined);
+    const isDynamicActive = isImageBasedDynamicThemesEnabled && Boolean(currentSongPaletteData);
+    const targetPalette = isDynamicActive ? currentSongPaletteData : undefined;
 
-    // Apply dynamic theme if enabled and palette data is available
-    const isDynamicThemesEnabled = isImageBasedDynamicThemesEnabled && currentSongPaletteData;
+    applyThemeTokens(targetPalette, themePreset, dynamicThemeMode, dynamicThemeIntensity);
 
-    const resetStyles = setDynamicThemesFromSongPalette(
-      isDynamicThemesEnabled ? currentSongPaletteData : undefined
-    );
-
-    // Cleanup on unmount or when dependencies change
     return () => {
-      resetStyles();
+      // If dynamic theming is disabled or unmounted, cleanup is handled by applyThemeTokens
     };
-  }, [isImageBasedDynamicThemesEnabled, setDynamicThemesFromSongPalette, currentSongPaletteData]);
+  }, [
+    isImageBasedDynamicThemesEnabled,
+    currentSongPaletteData,
+    themePreset,
+    dynamicThemeMode,
+    dynamicThemeIntensity
+  ]);
 
   // Monitor dark mode setting and apply/remove 'dark' class on document.body
   const { isDark } = useEffectiveAppearance();
@@ -223,11 +167,6 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
   }, [isDark]);
 
   // Monitor theme preset preference and apply data-theme attribute on document.documentElement
-  const themePreset = useStore(
-    store,
-    (state) => state.localStorage.preferences?.themePreset
-  );
-
   useEffect(() => {
     if (themePreset && themePreset !== 'default') {
       document.documentElement.setAttribute('data-theme', themePreset);

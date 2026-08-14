@@ -1,150 +1,180 @@
-type Props = { palette: PaletteData };
+import { store } from '@renderer/store/store';
+import { useStore } from '@tanstack/react-store';
+import { type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const manageBrightness = (
-  values: [number, number, number],
-  range?: { min?: number; max?: number }
-): [number, number, number] => {
-  const max = range?.max || 1;
-  const min = range?.min || 0.9;
+import storage from '../../../utils/localStorage';
+import { formatHsl, resolveSemanticPalette } from '../../../utils/semanticPalette';
+import { type DynamicThemeMode } from '../../../utils/themeResolver';
+import Button from '../../Button';
 
-  const [h, s, l] = values;
+interface DynamicThemeSettingsProps {
+  palette?: NodeVibrantPalette;
+}
 
-  const updatedL = l >= min ? (l <= max ? l : max) : min;
-  return [h, s, updatedL];
-};
+const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
+  const { t } = useTranslation();
 
-const manageSaturation = (
-  values: [number, number, number],
-  range?: { min?: number; max?: number }
-): [number, number, number] => {
-  const max = range?.max || 1;
-  const min = range?.min || 0.9;
-
-  const [h, s, l] = values;
-
-  const updatedS = s >= min ? (s <= max ? s : max) : min;
-  return [h, updatedS, l];
-};
-
-const generateColor = (values: [number, number, number]) => {
-  const [lh, ls, ll] = values;
-  const color = `${lh * 360} ${ls * 100}% ${ll * 100}%`;
-  return color;
-};
-
-const DynamicThemeSettings = (props: Props) => {
-  const { palette } = props;
-
-  const highLightVibrant = generateColor(manageBrightness(palette.LightVibrant?.hsl || [0, 0, 0]));
-  const mediumLightVibrant = generateColor(
-    manageBrightness(palette.LightVibrant?.hsl || [0, 0, 0], { min: 0.75 })
-  );
-  const darkLightVibrant = generateColor(
-    manageSaturation(
-      manageBrightness(palette.LightVibrant?.hsl || [0, 0, 0], {
-        max: 0.2,
-        min: 0.2
-      }),
-      { max: 0.05, min: 0.05 }
-    )
-  );
-  const highVibrant = generateColor(
-    manageBrightness(palette.Vibrant?.hsl || [0, 0, 0], { min: 0.7 })
+  const dynamicThemeMode = useStore(
+    store,
+    (state) => (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
   );
 
-  const lightVibrant = generateColor(palette.LightVibrant?.hsl || [0, 0, 0]);
-  const darkVibrant = generateColor(palette.DarkVibrant?.hsl || [0, 0, 0]);
+  const dynamicThemeIntensity = useStore(
+    store,
+    (state) => state.localStorage.preferences?.dynamicThemeIntensity ?? 100
+  );
+
+  const semanticPalette = palette ? resolveSemanticPalette(palette) : undefined;
+
+  const intensitySliderStyle: CSSProperties = {
+    ['--seek-before-width' as string]: `${dynamicThemeIntensity}%`
+  };
+
+  const handleModeChange = (mode: 'dynamic-accent' | 'full-dynamic') => {
+    storage.preferences.setPreferences('dynamicThemeMode', mode);
+  };
+
+  const handleIntensityChange = (intensity: number) => {
+    storage.preferences.setPreferences('dynamicThemeIntensity', intensity);
+  };
 
   return (
-    <div className="mt-8 flex flex-col gap-6">
-      <div className="flex gap-6">
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.DarkVibrant?.hex }}
-          />
-          <span className="mt-2">Dark Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.LightVibrant?.hex }}
-          />
-          <span className="mt-2">Light Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.DarkMuted?.hex }}
-          />
-          <span className="mt-2">Dark Muted</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.LightMuted?.hex }}
-          />
-          <span className="mt-2">Light Muted</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.Vibrant?.hex }}
-          />
-          <span className="mt-2">Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: palette?.Muted?.hex }}
-          />
-          <span className="mt-2">Muted</span>
-        </span>
+    <div className="mt-4 flex flex-col gap-6 rounded-lg bg-background-color-2/50 dark:bg-dark-background-color-2/50 p-4 border border-background-color-3/20 dark:border-dark-background-color-3/20">
+      {/* 1. Dynamic Mode Selection */}
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+          {t('settingsPage.dynamicThemeMode', 'Dynamic Theme Mode')}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={dynamicThemeMode === 'dynamic-accent'}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
+              dynamicThemeMode === 'dynamic-accent'
+                ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+            }`}
+            onClick={() => handleModeChange('dynamic-accent')}
+          >
+            {t('settingsPage.dynamicThemeModeAccent', 'Dynamic Accent')}
+          </button>
+          <button
+            type="button"
+            aria-pressed={dynamicThemeMode === 'full-dynamic'}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
+              dynamicThemeMode === 'full-dynamic'
+                ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+            }`}
+            onClick={() => handleModeChange('full-dynamic')}
+          >
+            {t('settingsPage.dynamicThemeModeFull', 'Full Atmosphere')}
+          </button>
+        </div>
+        <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed mt-1">
+          {dynamicThemeMode === 'dynamic-accent'
+            ? t(
+                'settingsPage.dynamicThemeModeAccentDesc',
+                "Preserves active preset backgrounds and surfaces while dynamically coloring accents, highlights, and seekbars from the album artwork."
+              )
+            : t(
+                'settingsPage.dynamicThemeModeFullDesc',
+                'Dynamically synthesizes the entire application color scheme from album artwork.'
+              )}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-6">
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${highLightVibrant})` }}
+
+      {/* 2. Theme Intensity Slider */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+            {t('settingsPage.dynamicThemeIntensity', 'Dynamic Theme Intensity')}: {dynamicThemeIntensity}%
+          </span>
+          <Button
+            label={t('settingsPage.resetIntensity', 'Reset to 100%')}
+            iconName="restart_alt"
+            className="text-xs py-1 px-2.5"
+            isDisabled={dynamicThemeIntensity === 100}
+            clickHandler={() => handleIntensityChange(100)}
           />
-          <span className="mt-2">High Light Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${mediumLightVibrant})` }}
+        </div>
+        <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed">
+          {t(
+            'settingsPage.dynamicThemeIntensityDesc',
+            'Controls how strongly album artwork influences the theme.'
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+          <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+            {t('settingsPage.dynamicThemeIntensityPreset', 'Preset (0%)')}
+          </span>
+          <input
+            type="range"
+            name="dynamic-theme-intensity-slider"
+            id="dynamic-theme-intensity-slider"
+            aria-label={t('settingsPage.dynamicThemeIntensity', 'Dynamic Theme Intensity')}
+            className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-1 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+            min={0}
+            step={5}
+            max={100}
+            value={dynamicThemeIntensity}
+            onChange={(e) => handleIntensityChange(e.currentTarget.valueAsNumber)}
+            style={intensitySliderStyle}
+            title={`${dynamicThemeIntensity}%`}
           />
-          <span className="mt-2">Medium Light Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${highVibrant})` }}
-          />
-          <span className="mt-2">High Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${lightVibrant})` }}
-          />
-          <span className="mt-2">Light Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${darkVibrant})` }}
-          />
-          <span className="mt-2">Dark Vibrant</span>
-        </span>
-        <span className="flex w-24 flex-col items-center text-center text-xs">
-          <span
-            className="h-12 w-full rounded-md"
-            style={{ backgroundColor: `hsl(${darkLightVibrant})` }}
-          />
-          <span className="mt-2">Dark Light Vibrant</span>
-        </span>
+          <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+            {t('settingsPage.dynamicThemeIntensityArtwork', 'Artwork (100%)')}
+          </span>
+        </div>
       </div>
+
+      {/* 3. Live Palette & Semantic Role Preview */}
+      {semanticPalette && (
+        <div className="mt-2 pt-4 border-t border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-3">
+          <div className="text-xs font-semibold text-text-color-dimmed dark:text-dark-text-color-dimmed uppercase tracking-wider">
+            {t('settingsPage.resolvedTones', 'Derived Semantic Tones')}
+          </div>
+          <div className="grid grid-cols-4 gap-2.5">
+            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+              <span
+                className="h-7 w-full rounded-md shadow-2xs"
+                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.primaryAccent)})` }}
+              />
+              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+                {t('settingsPage.primaryAccent', 'Primary Accent')}
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+              <span
+                className="h-7 w-full rounded-md shadow-2xs"
+                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.secondaryAccent)})` }}
+              />
+              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+                {t('settingsPage.secondaryAccent', 'Secondary Accent')}
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+              <span
+                className="h-7 w-full rounded-md shadow-2xs"
+                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.dark.backgroundBase)})` }}
+              />
+              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+                {t('settingsPage.darkCanvas', 'Dark Canvas')}
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+              <span
+                className="h-7 w-full rounded-md shadow-2xs"
+                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.light.backgroundBase)})` }}
+              />
+              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+                {t('settingsPage.lightCanvas', 'Light Canvas')}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

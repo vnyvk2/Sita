@@ -144,6 +144,8 @@
   --dark-context-menu-list-hover: 224 8% 28%; /* hsl(224 8% 28%) */
   --dark-seekbar-background-color: 240 1% 83%; /* hsl(240 1% 83%) */
   --dark-seekbar-track-background-color: 0 0% 25%;
+  --dark-foreground-color-1: 244 98% 80%;
+  --dark-background-color-dimmed: 228 7% 20%;
   --dark-scrollbar-thumb-background-color: 212 48% 94%; /* hsl(212, 48%, 94%) */
   --dark-slider-opacity: 0.25;
 }
@@ -686,24 +688,24 @@ body,
   background-color: var(--background-color-1);
 }
 
-/* body,
-body * {
+/* ? SCOPED THEME TRANSITIONS (Smooth color updates without global thrashing) */
+.App,
+.side-bar,
+.mini-player,
+.full-screen-player {
   transition:
-    color var(--transition-duration-0_2s) linear,
-    background-color var(--transition-duration-0_2s) linear;
-  -webkit-transition:
-    color var(--transition-duration-0_2s) linear,
-    background-color var(--transition-duration-0_2s) linear;
-  -moz-transition:
-    color var(--transition-duration-0_2s) linear,
-    background-color var(--transition-duration-0_2s) linear;
-  -ms-transition:
-    color var(--transition-duration-0_2s) linear,
-    background-color var(--transition-duration-0_2s) linear;
-  -o-transition:
-    color var(--transition-duration-0_2s) linear,
-    background-color var(--transition-duration-0_2s) linear;
-} */
+    background-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .App,
+  .side-bar,
+  .mini-player,
+  .full-screen-player {
+    transition-duration: 0ms !important;
+  }
+}
 
 /* ? APP DARK THEME STYLES */
 .App.dark,

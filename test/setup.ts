@@ -43,3 +43,17 @@ vi.mock('electron-updater', () => {
     autoUpdater: mockAutoUpdater
   };
 });
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { api?: unknown }).api = {
+    log: {
+      sendLogs: vi.fn()
+    },
+    properties: {
+      isInDevelopment: false
+    },
+    settings: {
+      getUserSettings: vi.fn().mockResolvedValue({})
+    }
+  };
+}
