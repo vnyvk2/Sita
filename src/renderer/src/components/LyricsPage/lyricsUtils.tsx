@@ -6,7 +6,7 @@ export function renderLyricsLines(
   lyrics: SongLyrics | null | undefined,
   songDuration: number,
   isAutoScrolling = true,
-  playerType: 'normal' | 'full' | 'mini' = 'normal'
+  playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal'
 ): ReactNode[] {
   if (!lyrics?.lyrics) return [];
   const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;

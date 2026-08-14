@@ -16,7 +16,7 @@ interface LyricProp {
   index: number;
   syncedLyrics?: { start: number; end: number };
   isAutoScrolling?: boolean;
-  playerType?: PlayerTypes;
+  playerType?: PlayerTypes | 'drawer';
 }
 
 // const syncedLyricsRegex = /^\[\d+:\d{1,2}\.\d{1,3}]/gm;
@@ -176,6 +176,9 @@ const LyricLine = (props: LyricProp) => {
             }`
           : 'text-font-color-black! dark:text-font-color-white! scale-100! text-4xl! font-medium blur-none! [&>div>span]:mr-3'
       } ${playerType === 'mini' && 'text-font-color-white/20! mb-2! text-2xl!'} ${
+        playerType === 'drawer' &&
+        'text-font-color-black/30! dark:text-font-color-white/30! mb-3! text-xl! md:text-2xl! leading-snug text-left! items-start! justify-start! w-full!'
+      } ${
         playerType === 'full' &&
         'text-font-color-white/20! mb-6! origin-left items-start! justify-start! text-left! text-7xl!'
       }`}
@@ -211,13 +214,23 @@ const LyricLine = (props: LyricProp) => {
     >
       {lyricStringLineSecondaryUpper && (
         <div
-          className={`flex flex-row flex-wrap ${playerType !== 'full' && 'items-center justify-center'} ${syncedLyrics && isInRange ? 'text-font-color-black/50! dark:text-font-color-white/50! text-xl!' : 'text-xl!'}`}
+          className={`flex flex-row flex-wrap ${
+            playerType !== 'full' && playerType !== 'drawer' && 'items-center justify-center'
+          } ${
+            playerType === 'drawer'
+              ? 'text-xs!'
+              : syncedLyrics && isInRange
+                ? 'text-font-color-black/50! dark:text-font-color-white/50! text-xl!'
+                : 'text-xl!'
+          }`}
         >
           {lyricStringLineSecondaryUpper}
         </div>
       )}
       <div
-        className={`flex flex-row flex-wrap ${playerType !== 'full' && 'items-center justify-center'}`}
+        className={`flex flex-row flex-wrap ${
+          playerType !== 'full' && playerType !== 'drawer' && 'items-center justify-center'
+        }`}
       >
         {lyricStringLinePrimary}
       </div>

@@ -47,7 +47,7 @@ const LyricsDrawer = () => {
   useSkipLyricsLines(lyrics);
 
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, true, 'normal');
+    return renderLyricsLines(lyrics, currentSongData.duration, true, 'drawer');
   }, [currentSongData.duration, lyrics]);
 
   const handleExpandClick = () => {
