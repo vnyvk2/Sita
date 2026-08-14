@@ -28,38 +28,38 @@ const WindowControlsContainer = () => {
 
   return (
     <div
-      className="window-controls-container ml-6 flex h-full items-center justify-between"
+      className="window-controls-container flex h-full items-center justify-end bg-background-color-2/70 dark:bg-dark-background-color-2/80 [-webkit-app-region:no-drag]"
       id="window-controls-container"
     >
       <button
         type="button"
-        className={`minimize-btn !m-0 flex h-full cursor-pointer items-center justify-center !rounded-none !border-0 bg-transparent !px-3 text-font-color-black transition-[background,color] ease-in-out hover:!bg-[hsla(0deg,0%,80%,0.5)] focus-visible:!outline dark:bg-transparent dark:text-font-color-white ${
+        className={`minimize-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-background-color-3/60 hover:text-font-color-black focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white ${
           bodyBackgroundImage && 'text-font-color-white!'
-        } `}
+        }`}
         onClick={minimize}
         title={t('titleBar.minimize')}
       >
-        <MinimizeIcon className="h-3 w-3" />
+        <MinimizeIcon className="h-2.5 w-2.5" />
       </button>
       <button
         type="button"
-        className={`maximize-btn !m-0 flex h-full cursor-pointer items-center justify-center !rounded-none !border-0 bg-transparent !px-3 text-font-color-black transition-[background,color] ease-in-out hover:!bg-[hsla(0deg,0%,80%,0.5)] focus-visible:!outline dark:bg-transparent dark:text-font-color-white ${
+        className={`maximize-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-background-color-3/60 hover:text-font-color-black focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white ${
           bodyBackgroundImage && 'text-font-color-white!'
-        } `}
+        }`}
         onClick={maximize}
         title={t('titleBar.maximize')}
       >
-        <MaximizeIcon className="h-3 w-3" />
+        <MaximizeIcon className="h-2.5 w-2.5" />
       </button>
       <button
         type="button"
-        className={`close-btn hover:!bg-font-color-crimson hover:!text-font-color-white !m-0 flex h-full cursor-pointer items-center justify-center !rounded-none !border-0 bg-transparent !px-3 text-font-color-black transition-[background,color] ease-in-out focus-visible:!outline dark:bg-transparent dark:text-font-color-white ${
+        className={`close-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-[#e81123] hover:text-white focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-[#e81123] dark:hover:text-white ${
           bodyBackgroundImage && 'text-font-color-white!'
-        } `}
+        }`}
         onClick={close}
         title={t('titleBar.close')}
       >
-        <CloseIcon className="h-3.5 w-3.5" />
+        <CloseIcon className="h-2.5 w-2.5" />
       </button>
     </div>
   );

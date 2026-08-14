@@ -52,22 +52,22 @@ const TitleBarContainer = (props: Props) => {
       <div className="window-controls-container flex [-webkit-app-region:no-drag]">
         <button
           type="button"
-          className="minimize-btn m-0! flex h-full cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! px-2.5! text-font-color-white -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
+          className="minimize-btn m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
           onClick={() => window.api.windowControls.minimizeApp()}
           title={t('titleBar.minimize')}
         >
-          <MinimizeIcon className="h-3 w-3" />
+          <MinimizeIcon className="h-2.5 w-2.5" />
         </button>
         <button
           type="button"
-          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! px-2.5! text-font-color-white -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
+          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
           onClick={() => {
             if (hideWindowOnClose) window.api.windowControls.hideApp();
             else window.api.windowControls.closeApp();
           }}
           title={t('titleBar.close')}
         >
-          <CloseIcon className="h-3.5 w-3.5" />
+          <CloseIcon className="h-2.5 w-2.5" />
         </button>
       </div>
     </div>
