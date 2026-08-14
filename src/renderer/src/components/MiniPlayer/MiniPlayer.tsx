@@ -10,6 +10,7 @@ import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import LyricsIcon from '../Icons/LyricsIcon';
+import QueueIcon from '../Icons/QueueIcon';
 import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
@@ -550,14 +551,17 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
           {/* Optional: Queue Toggle */}
           {pinnedControls.includes('queue') && (
-            <Button
-              className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-              tooltipLabel={t('player.currentQueue', 'Queue')}
-              iconClassName="material-icons-round-outlined text-lg!"
-              clickHandler={() => setIsQueueVisible((prev) => !prev)}
-              iconName="queue_music"
-              removeFocusOnClick
-            />
+            <button
+              type="button"
+              className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+              title={t('player.currentQueue', 'Queue')}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                setIsQueueVisible((prev) => !prev);
+              }}
+            >
+              <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
+            </button>
           )}
         </div>
       </div>

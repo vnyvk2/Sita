@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import Button from '../../Button';
+import { CloseIcon, MinimizeIcon } from '../../Icons/WindowIcons';
 
 type Props = { isLyricsVisible: boolean };
 
@@ -49,25 +50,25 @@ const TitleBarContainer = (props: Props) => {
         />
       </div>
       <div className="window-controls-container flex [-webkit-app-region:no-drag]">
-        <Button
-          className="minimize-btn m-0! flex h-full items-center justify-center rounded-none! border-0! bg-transparent! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
-          clickHandler={() => window.api.windowControls.minimizeApp()}
-          tooltipLabel={t('titleBar.minimize')}
-          iconName="minimize"
-          iconClassName="material-icons-round icon flex h-fit cursor-pointer items-center justify-center text-center text-xl font-light! transition-[background] ease-in-out"
-          removeFocusOnClick
-        />
-        <Button
-          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full items-center justify-center rounded-none! border-0! bg-transparent! px-2! text-center text-xl -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
-          clickHandler={() => {
+        <button
+          type="button"
+          className="minimize-btn m-0! flex h-full cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! px-2.5! text-font-color-white -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
+          onClick={() => window.api.windowControls.minimizeApp()}
+          title={t('titleBar.minimize')}
+        >
+          <MinimizeIcon className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! px-2.5! text-font-color-white -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
+          onClick={() => {
             if (hideWindowOnClose) window.api.windowControls.hideApp();
             else window.api.windowControls.closeApp();
           }}
-          tooltipLabel={t('titleBar.close')}
-          iconName="close"
-          iconClassName="material-icons-round icon flex h-fit  cursor-pointer items-center justify-center text-center text-xl font-light! transition-[background] ease-in-out"
-          removeFocusOnClick
-        />
+          title={t('titleBar.close')}
+        >
+          <CloseIcon className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );

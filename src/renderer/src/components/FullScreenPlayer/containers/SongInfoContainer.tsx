@@ -7,6 +7,7 @@ import DefaultSongCover from '../../../assets/images/webp/song_cover_default.web
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import calculateTime from '../../../utils/calculateTime';
 import Button from '../../Button';
+import LyricsIcon from '../../Icons/LyricsIcon';
 import Img from '../../Img';
 import UpNextSongPopup from '../../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../../VolumeSlider';
@@ -136,16 +137,16 @@ const SongInfoContainer = (props: Props) => {
               iconName="skip_next"
               removeFocusOnClick
             />
-            <Button
-              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white h-fit cursor-pointer !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline ${
+            <button
+              type="button"
+              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white h-fit cursor-pointer !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline mr-4 flex items-center justify-center rounded-3xl ${
                 isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
               }`}
-              iconClassName="text-2xl!"
-              clickHandler={() => setIsLyricsVisible((prevState) => !prevState)}
-              iconName="notes"
-              tooltipLabel={t('player.lyrics')}
-              removeFocusOnClick
-            />
+              onClick={() => setIsLyricsVisible((prevState) => !prevState)}
+              title={t('player.lyrics')}
+            >
+              <LyricsIcon className="h-6 w-6" />
+            </button>
             <Button
               className={`volume-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white h-fit cursor-pointer !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline ${
                 isMuted && 'text-dark-background-color-3! after:opacity-100'

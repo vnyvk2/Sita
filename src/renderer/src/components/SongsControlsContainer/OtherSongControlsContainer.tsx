@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
+import QueueIcon from '../Icons/QueueIcon';
 import NavLink from '../NavLink';
 import VolumeSlider from '../VolumeSlider';
 
@@ -59,7 +60,7 @@ const OtherSongControlsContainer = () => {
           { label: '', isContextMenuItemSeperator: true, handlerFunction: () => true },
           {
             label: t('player.showCurrentQueue'),
-            iconName: 'table_rows',
+            iconName: 'queue_music',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () => toggleOverlay('/main-player/queue')
           },
@@ -106,15 +107,7 @@ const OtherSongControlsContainer = () => {
         }`}
         title={t('player.currentQueue')}
       >
-        {({ isActive }) => {
-          return (
-            <span
-              className={`${isActive ? 'material-icons-round' : 'material-icons-round-outlined'} group-[.active]:text-font-color-highlight! dark:group-[.active]:text-dark-font-color-highlight! !text-2xl opacity-60 transition-[color,_opacity] group-[.active]:opacity-100! hover:opacity-80`}
-            >
-              table_rows
-            </span>
-          );
-        }}
+        <QueueIcon className="h-6 w-6 opacity-60 transition-[color,opacity] group-[.active]:text-font-color-highlight group-[.active]:opacity-100 dark:group-[.active]:text-dark-font-color-highlight hover:opacity-80" />
       </NavLink>
 
       <Button
