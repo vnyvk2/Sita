@@ -1,7 +1,9 @@
 import { queryClient } from '@renderer/queryClient';
 import { settingsQuery } from '@renderer/queries/settings';
+import { store } from '@renderer/store/store';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useStore } from '@tanstack/react-store';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import i18n from '../../../i18n';
@@ -24,8 +26,24 @@ const automaticallySaveLyricsOptions: DropdownOption<AutomaticallySaveLyricsType
 
 const LyricsSettings = () => {
   const { data: userSettings } = useQuery(settingsQuery.all);
-
   const { t } = useTranslation();
+
+  const lyricsBackground = useStore(
+    store,
+    (state) => state.localStorage.preferences?.lyricsBackground ?? 'default'
+  );
+  const lyricsArtworkBlur = useStore(
+    store,
+    (state) => state.localStorage.preferences?.lyricsArtworkBlur ?? 40
+  );
+  const lyricsArtworkDarkness = useStore(
+    store,
+    (state) => state.localStorage.preferences?.lyricsArtworkDarkness ?? 50
+  );
+  const lyricsArtworkAnimation = useStore(
+    store,
+    (state) => state.localStorage.preferences?.lyricsArtworkAnimation ?? true
+  );
 
   const [lyricsAutomaticallySaveState, setLyricsAutomaticallySaveState] =
     useState<AutomaticallySaveLyricsTypes>('NONE');
@@ -48,7 +66,6 @@ const LyricsSettings = () => {
 
   useEffect(() => {
     const lyricsSaveState = storage.preferences.getPreferences('lyricsAutomaticallySaveState');
-
     setLyricsAutomaticallySaveState(lyricsSaveState);
   }, []);
 
@@ -56,7 +73,6 @@ const LyricsSettings = () => {
 
   useEffect(() => {
     const autoTranslateLyrics = storage.preferences.getPreferences('autoTranslateLyrics');
-
     setAutoTranslateLyrics(autoTranslateLyrics);
   }, []);
 
@@ -64,9 +80,32 @@ const LyricsSettings = () => {
 
   useEffect(() => {
     const autoConvertLyrics = storage.preferences.getPreferences('autoConvertLyrics');
-
     setAutoConvertLyrics(autoConvertLyrics);
   }, []);
+
+  const handleBackgroundChange = (mode: 'default' | 'artwork') => {
+    storage.preferences.setPreferences('lyricsBackground', mode);
+  };
+
+  const handleBlurChange = (val: number) => {
+    storage.preferences.setPreferences('lyricsArtworkBlur', val);
+  };
+
+  const handleDarknessChange = (val: number) => {
+    storage.preferences.setPreferences('lyricsArtworkDarkness', val);
+  };
+
+  const handleAnimationChange = (val: boolean) => {
+    storage.preferences.setPreferences('lyricsArtworkAnimation', val);
+  };
+
+  const blurSliderStyle: CSSProperties = {
+    ['--seek-before-width' as string]: `${((lyricsArtworkBlur - 20) / 60) * 100}%`
+  };
+
+  const darknessSliderStyle: CSSProperties = {
+    ['--seek-before-width' as string]: `${((lyricsArtworkDarkness - 20) / 60) * 100}%`
+  };
 
   return (
     <li
@@ -78,6 +117,149 @@ const LyricsSettings = () => {
         {t('settingsPage.lyrics')}
       </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
+        {/* 1. Lyrics Appearance (Default vs Artwork background) */}
+        <li className="lyrics-appearance-section mb-6 list-none -ml-6">
+          <div className="flex flex-col gap-4 rounded-lg bg-background-color-2/50 dark:bg-dark-background-color-2/50 p-4 border border-background-color-3/20 dark:border-dark-background-color-3/20">
+            <div className="flex flex-col gap-1">
+              <div className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+                {t('settingsPage.lyricsAppearance', 'Lyrics Appearance')}
+              </div>
+              <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed">
+                {t(
+                  'settingsPage.lyricsAppearanceDescription',
+                  'Choose the background style for the lyrics view.'
+                )}
+              </div>
+            </div>
+
+            {/* Segmented Mode Toggle */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                aria-pressed={lyricsBackground === 'default'}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out cursor-pointer ${
+                  lyricsBackground === 'default'
+                    ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                    : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+                }`}
+                onClick={() => handleBackgroundChange('default')}
+              >
+                {t('settingsPage.lyricsBackgroundDefault', 'Default')}
+              </button>
+              <button
+                type="button"
+                aria-pressed={lyricsBackground === 'artwork'}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out cursor-pointer ${
+                  lyricsBackground === 'artwork'
+                    ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                    : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+                }`}
+                onClick={() => handleBackgroundChange('artwork')}
+              >
+                {t('settingsPage.lyricsBackgroundArtwork', 'Artwork Background')}
+              </button>
+            </div>
+
+            {/* Nested Artwork Background Controls */}
+            {lyricsBackground === 'artwork' && (
+              <div className="mt-2 pt-4 border-t border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-5">
+                {/* Blur Intensity Slider */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+                      {t('settingsPage.blurIntensity', 'Blur Intensity')}: {lyricsArtworkBlur}px
+                    </span>
+                    <Button
+                      label={t('settingsPage.resetBlur', 'Reset to 40px')}
+                      iconName="restart_alt"
+                      className="text-xs py-1 px-2.5"
+                      isDisabled={lyricsArtworkBlur === 40}
+                      clickHandler={() => handleBlurChange(40)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                      20px
+                    </span>
+                    <input
+                      type="range"
+                      name="lyrics-blur-slider"
+                      id="lyrics-blur-slider"
+                      aria-label={t('settingsPage.blurIntensity', 'Blur Intensity')}
+                      className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-1 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                      min={20}
+                      max={80}
+                      step={1}
+                      value={lyricsArtworkBlur}
+                      onChange={(e) => handleBlurChange(e.currentTarget.valueAsNumber)}
+                      style={blurSliderStyle}
+                      title={`${lyricsArtworkBlur}px`}
+                    />
+                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                      80px
+                    </span>
+                  </div>
+                </div>
+
+                {/* Background Darkness Slider */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+                      {t('settingsPage.backgroundDarkness', 'Background Darkness')}: {lyricsArtworkDarkness}%
+                    </span>
+                    <Button
+                      label={t('settingsPage.resetDarkness', 'Reset to 50%')}
+                      iconName="restart_alt"
+                      className="text-xs py-1 px-2.5"
+                      isDisabled={lyricsArtworkDarkness === 50}
+                      clickHandler={() => handleDarknessChange(50)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                      20%
+                    </span>
+                    <input
+                      type="range"
+                      name="lyrics-darkness-slider"
+                      id="lyrics-darkness-slider"
+                      aria-label={t('settingsPage.backgroundDarkness', 'Background Darkness')}
+                      className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-1 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                      min={20}
+                      max={80}
+                      step={1}
+                      value={lyricsArtworkDarkness}
+                      onChange={(e) => handleDarknessChange(e.currentTarget.valueAsNumber)}
+                      style={darknessSliderStyle}
+                      title={`${lyricsArtworkDarkness}%`}
+                    />
+                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                      80%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Subtle Animation Toggle */}
+                <div className="flex flex-col gap-1 mt-1">
+                  <Checkbox
+                    id="lyricsArtworkAnimation"
+                    isChecked={lyricsArtworkAnimation}
+                    checkedStateUpdateFunction={(state) => handleAnimationChange(state)}
+                    labelContent={t('settingsPage.subtleAnimation', 'Subtle animation')}
+                  />
+                  <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed pl-7">
+                    {t(
+                      'settingsPage.subtleAnimationDescription',
+                      'Gentle ambient motion for artwork background.'
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </li>
+
+        {/* Existing lyrics settings */}
         <li className="save-lyrics-automatically mb-4">
           <div className="description">{t('settingsPage.saveLyricsAutomaticallyDescription')}</div>
           <div className="mt-4 flex flex-row items-center">
