@@ -484,8 +484,14 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/getAlbumData',
-      (_, albumTitlesOrIds?: string[], sortType?: AlbumSortTypes, start?: number, end?: number) =>
-        fetchAlbumData(albumTitlesOrIds, sortType, start, end)
+      (
+        _,
+        albumTitlesOrIds?: string[],
+        sortType?: AlbumSortTypes,
+        filterType?: AlbumFilterTypes,
+        start?: number,
+        end?: number
+      ) => fetchAlbumData(albumTitlesOrIds, sortType, filterType, start, end)
     );
 
     ipcMain.handle('app/getArtistDuplicates', (_, artistName: string) =>

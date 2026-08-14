@@ -1,12 +1,33 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import type { AlbumFilterTypes, AlbumSortTypes } from '@renderer/utils/albumFilters';
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const albumQuery = createQueryKeys('albums', {
-  all: (data: { sortType?: AlbumSortTypes; start?: number; end?: number; limit?: number; keyword?: string; }) => {
-    const { sortType = 'aToZ', start = 0, end = 0, keyword = '' } = data;
+  all: (data: {
+    sortType?: AlbumSortTypes;
+    filterType?: AlbumFilterTypes;
+    start?: number;
+    end?: number;
+    limit?: number;
+    keyword?: string;
+  }) => {
+    const {
+      sortType = 'aToZ',
+      filterType = 'notSelected',
+      start = 0,
+      end = 0,
+      keyword = ''
+    } = data;
 
     return {
-      queryKey: [`sortType=${sortType}`, `start=${start}`, `end=${end}`, `limit=${end - start}`, `keyword=${keyword}`],
+      queryKey: [
+        `sortType=${sortType}`,
+        `filterType=${filterType}`,
+        `start=${start}`,
+        `end=${end}`,
+        `limit=${end - start}`,
+        `keyword=${keyword}`
+      ],
       queryFn: async () => {
         if (keyword.trim()) {
           const res = await window.api.search.query({
@@ -15,9 +36,19 @@ export const albumQuery = createQueryKeys('albums', {
             limit: SEARCH_LIMITS.PAGE,
             updateSearchHistory: false
           });
-          return { data: res.albums, unresolvedData: [] };
+          const data =
+            filterType === 'favorites'
+              ? res.albums.filter((album) => album.isAFavorite)
+              : res.albums;
+          return { data, unresolvedData: [] };
         }
-        return window.api.albumsData.getAlbumData([], sortType as AlbumSortTypes, start, end);
+        return window.api.albumsData.getAlbumData(
+          [],
+          sortType as AlbumSortTypes,
+          filterType as AlbumFilterTypes,
+          start,
+          end
+        );
       }
     };
   },
@@ -38,12 +69,12 @@ export const albumQuery = createQueryKeys('albums', {
         `limit=${end - start}`
       ],
       queryFn: () =>
-        window.api.albumsData.getAlbumData(albumIds, sortType as AlbumSortTypes, start, end)
+        window.api.albumsData.getAlbumData(albumIds, sortType as AlbumSortTypes, undefined, start, end)
     };
   },
   single: (data: { albumId: number }) => ({
     queryKey: [data.albumId],
-    queryFn: () => window.api.albumsData.getAlbumData([data.albumId], 'aToZ', 0, 1)
+    queryFn: () => window.api.albumsData.getAlbumData([data.albumId], 'aToZ', undefined, 0, 1)
   }),
   fetchOnlineInfo: (data: { albumId: number }) => ({
     queryKey: [data.albumId],

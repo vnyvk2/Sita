@@ -454,11 +454,12 @@ const albumsData = {
   getAlbumData: (
     albumTitlesOrIds?: (string | number)[],
     sortType?: AlbumSortTypes,
+    filterType?: AlbumFilterTypes,
     start?: number,
     end?: number
   ): Promise<PaginatedResult<Album, AlbumSortTypes>> => {
     const stringIds = albumTitlesOrIds?.map(String);
-    return ipcRenderer.invoke('app/getAlbumData', stringIds, sortType, start, end);
+    return ipcRenderer.invoke('app/getAlbumData', stringIds, sortType, filterType, start, end);
   },
   toggleLikeAlbums: (
     albumIds: number[],
