@@ -65,6 +65,7 @@ export interface AppUpdateContextType {
     addSelections?: number[],
     replaceSelections?: boolean
   ) => void;
+  toggleLyricsDrawer: (state?: boolean) => void;
   updateAppUpdatesState: (state: AppUpdatesState) => void;
 }
 

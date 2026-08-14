@@ -111,6 +111,10 @@ export default function App() {
   // Multi-selection hook handles selecting multiple items for batch operations
   const { updateMultipleSelections, toggleMultipleSelections } = useMultiSelection();
 
+  const toggleLyricsDrawer = useCallback((state?: boolean) => {
+    dispatch({ type: 'TOGGLE_LYRICS_DRAWER', data: state });
+  }, []);
+
   // ? INITIALIZE PROMPT MENU
   // Prompt menu hook handles modal dialogs, error messages, and overlay content
   const { changePromptMenuData, updatePromptMenuHistoryIndex } = usePromptMenu();
@@ -322,6 +326,7 @@ export default function App() {
       updateBodyBackgroundImage,
       updateMultipleSelections,
       toggleMultipleSelections,
+      toggleLyricsDrawer,
       updateAppUpdatesState,
       updateEqualizerOptions
     };
@@ -354,6 +359,7 @@ export default function App() {
     updateBodyBackgroundImage,
     updateMultipleSelections,
     toggleMultipleSelections,
+    toggleLyricsDrawer,
     updateAppUpdatesState,
     updateEqualizerOptions
   ]);

@@ -1,7 +1,7 @@
 import i18n from '@renderer/i18n';
 import { normalizedKeys } from '@renderer/other/appShortcuts';
-import { store } from '@renderer/store/store';
-import { useNavigate } from '@tanstack/react-router';
+import { dispatch, store } from '@renderer/store/store';
+import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { lazy, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -86,6 +86,8 @@ export interface KeyboardShortcutDependencies {
  */
 export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies): void {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { history } = useRouter();
   const { toggleOverlay } = useOverlayNavigation();
   const { t } = useTranslation();
   const player = useAudioPlayer();
@@ -250,7 +252,11 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             navigate({ to: '/main-player/search' });
             break;
           case i18n.t('appShortcutsPrompt.goToLyrics'):
-            toggleOverlay('/main-player/lyrics');
+            if (location.pathname.startsWith('/main-player/lyrics')) {
+              history.back();
+            } else {
+              dispatch({ type: 'TOGGLE_LYRICS_DRAWER' });
+            }
             break;
           case i18n.t('appShortcutsPrompt.goToQueue'):
             toggleOverlay('/main-player/queue');

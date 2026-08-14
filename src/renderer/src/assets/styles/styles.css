@@ -1009,3 +1009,26 @@ input[type='checkbox']:checked ~ .checkmark .icon {
   backdrop-filter: blur(10px); /* apply the blur */
   pointer-events: none; /* make the overlay click-through */
 }
+
+@keyframes ambientDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.12);
+  }
+  50% {
+    transform: translate3d(-1%, -1.5%, 0) scale(1.18);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.12);
+  }
+}
+
+.animate-ambient-drift {
+  animation: ambientDrift 28s ease-in-out infinite;
+  will-change: transform;
+}
+
+.reduced-motion .animate-ambient-drift,
+.paused .animate-ambient-drift {
+  animation-play-state: paused;
+}
+

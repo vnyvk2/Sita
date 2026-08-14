@@ -549,6 +549,10 @@ declare global {
     autoConvertLyrics: boolean;
     visibleSideTabs?: VisibleSideTabs;
     themePreset?: ThemePreset;
+    lyricsBackground?: 'default' | 'artwork';
+    lyricsArtworkBlur?: number;
+    lyricsArtworkDarkness?: number;
+    lyricsArtworkAnimation?: boolean;
   }
 
   interface CurrentSong {
