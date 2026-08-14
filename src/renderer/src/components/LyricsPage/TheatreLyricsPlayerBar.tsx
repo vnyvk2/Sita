@@ -1,17 +1,17 @@
+import Button from '@renderer/components/Button';
+import Img from '@renderer/components/Img';
+import SeekBarSlider from '@renderer/components/SeekBarSlider';
+import VolumeSlider from '@renderer/components/VolumeSlider';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { store } from '@renderer/store/store';
+import calculateTime from '@renderer/utils/calculateTime';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
-import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import calculateTime from '../../utils/calculateTime';
-import Button from '../Button';
-import Img from '../Img';
-import SeekBarSlider from '../SeekBarSlider';
-import VolumeSlider from '../VolumeSlider';
 
-const FocusedLyricsPlayerBar = () => {
+const TheatreLyricsPlayerBar = () => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const isKnownSource = useStore(store, (state) => state.currentSongData.isKnownSource);
@@ -70,7 +70,7 @@ const FocusedLyricsPlayerBar = () => {
   }, [currentSongData.artists]);
 
   return (
-    <div className="focused-lyrics-player-bar-container pointer-events-auto relative z-20 w-full px-6 pb-6 pt-2">
+    <div className="theatre-lyrics-player-bar-container pointer-events-auto relative z-20 w-full px-6 pb-6 pt-2">
       <div className="mx-auto flex w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-black/60 px-6 py-3 shadow-2xl backdrop-blur-xl text-font-color-white">
         {/* Top row: Track info, primary playback controls, volume */}
         <div className="flex w-full items-center justify-between gap-4">
@@ -185,7 +185,7 @@ const FocusedLyricsPlayerBar = () => {
             />
 
             <div className="w-24 max-w-[6rem]">
-              <VolumeSlider name="focused-volume-slider" id="focusedVolumeSlider" />
+              <VolumeSlider name="theatre-volume-slider" id="theatreVolumeSlider" />
             </div>
           </div>
         </div>
@@ -197,8 +197,8 @@ const FocusedLyricsPlayerBar = () => {
           </span>
           <div className="relative flex flex-1 items-center">
             <SeekBarSlider
-              id="focused-seek-bar-slider"
-              name="focused-seek-bar-slider"
+              id="theatre-seek-bar-slider"
+              name="theatre-seek-bar-slider"
               onSeek={(currentPosition) => setSongPos(currentPosition)}
             />
           </div>
@@ -212,4 +212,4 @@ const FocusedLyricsPlayerBar = () => {
   );
 };
 
-export default FocusedLyricsPlayerBar;
+export default TheatreLyricsPlayerBar;

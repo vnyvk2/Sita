@@ -659,6 +659,11 @@
     "showSavedLyrics": "Show saved lyrics",
     "expandLyrics": "Expand lyrics",
     "collapseLyrics": "Collapse lyrics",
+    "theatreMode": "Theatre Mode",
+    "exitTheatreMode": "Exit Theatre Mode",
+    "expandToFullPage": "Expand to full page",
+    "dockToSidePanel": "Dock to side panel",
+    "noSongPlaying": "No song playing",
 
     "lyricsLoading": "Looking for lyrics",
     "lyricsLoadingDescription": "Hang on... We're looking everywhere...",

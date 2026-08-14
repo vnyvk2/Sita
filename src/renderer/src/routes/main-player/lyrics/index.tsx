@@ -1,11 +1,12 @@
 import { isLyricsEnhancedSynced } from '@common/isLyricsSynced';
 import Button from '@renderer/components/Button';
-import FocusedLyricsView from '@renderer/components/LyricsPage/FocusedLyricsView';
-import LyricLine from '@renderer/components/LyricsPage/LyricLine';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import LyricsMetadata from '@renderer/components/LyricsPage/LyricsMetadata';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
+import TheatreLyricsView from '@renderer/components/LyricsPage/TheatreLyricsView';
+import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import MainContainer from '@renderer/components/MainContainer';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
 import { queryClient } from '@renderer/queryClient';
@@ -14,9 +15,9 @@ import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';
 import { lyricsSchema } from '@renderer/utils/zod/lyricsSchema';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { appPreferences } from '../../../../../../package.json';
@@ -33,13 +34,15 @@ function LyricsPage() {
   const currentSongData = useStore(store, (state) => state.currentSongData);
 
   const { t } = useTranslation();
-  const { isAutoScrolling } = Route.useSearch();
+  const { isAutoScrolling, from } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const { history } = useRouter();
+  const { toggleLyricsDrawer } = useContext(AppUpdateContext);
   const { isOnline } = useNetworkConnectivity();
 
   const [lyricsType, setLyricsType] = useState<LyricsTypes>('ANY');
   const [lyricsRequestType, setLyricsRequestType] = useState<LyricsRequestTypes>('ANY');
-  const [isFocused, setIsFocused] = useState(false);
+  const [isTheatreMode, setIsTheatreMode] = useState(false);
 
   const { data: lyrics, isPending: isLoadingLyrics } = useQuery({
     ...lyricsQuery.single({
@@ -144,65 +147,7 @@ function LyricsPage() {
   // ]);
 
   const lyricsComponents = useMemo(() => {
-    if (lyrics && lyrics?.lyrics) {
-      const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
-
-      if (isSynced && parsedLyrics) {
-        const syncedLyricsLines = parsedLyrics.map((lyric, index) => {
-          const { originalText } = lyric;
-          const start = (lyric?.start || 0) + offset;
-          const end =
-            (lyric.end === Number.POSITIVE_INFINITY ? currentSongData.duration : lyric.end || 0) +
-            offset;
-
-          return (
-            <LyricLine
-              playerType="normal"
-              key={index}
-              index={index}
-              lyric={originalText}
-              translatedLyricLines={lyric.translatedTexts}
-              syncedLyrics={{ start, end }}
-              isAutoScrolling={isAutoScrolling}
-              convertedLyric={lyric.romanizedText}
-            />
-          );
-        });
-
-        const firstLine = (
-          <LyricLine
-            playerType="normal"
-            key="..."
-            index={0}
-            lyric="•••"
-            syncedLyrics={{
-              start: 0,
-              end: (parsedLyrics[0]?.start || 0) + offset
-            }}
-            isAutoScrolling={isAutoScrolling}
-          />
-        );
-
-        if ((parsedLyrics[0]?.start || 0) !== 0) syncedLyricsLines.unshift(firstLine);
-        return syncedLyricsLines;
-      }
-
-      if (!isSynced) {
-        return parsedLyrics.map((line, index) => {
-          return (
-            <LyricLine
-              playerType="normal"
-              key={index}
-              index={index}
-              lyric={line.originalText}
-              isAutoScrolling={isAutoScrolling}
-              convertedLyric={line.romanizedText}
-            />
-          );
-        });
-      }
-    }
-    return [];
+    return renderLyricsLines(lyrics, currentSongData.duration, isAutoScrolling, 'normal');
   }, [currentSongData.duration, isAutoScrolling, lyrics]);
 
   // const showOnlineLyrics = useCallback(
@@ -418,8 +363,8 @@ function LyricsPage() {
         />
       )}
 
-      {isFocused && lyrics && lyrics.lyrics.parsedLyrics.length > 0 ? (
-        <FocusedLyricsView
+      {isTheatreMode && lyrics && lyrics.lyrics.parsedLyrics.length > 0 ? (
+        <TheatreLyricsView
           lyrics={lyrics}
           lyricsComponents={lyricsComponents}
           copyright={copyright}
@@ -431,7 +376,7 @@ function LyricsPage() {
           }
           onEditLyrics={goToLyricsEditor}
           onResetLyrics={() => resetLyrics()}
-          onClose={() => setIsFocused(false)}
+          onClose={() => setIsTheatreMode(false)}
         />
       ) : (
         <>
@@ -614,13 +559,29 @@ function LyricsPage() {
                     </>
                   )}
                   {lyrics && lyrics.lyrics.parsedLyrics.length > 0 && (
-                    <Button
-                      key={16}
-                      tooltipLabel={t('lyricsPage.expandLyrics', 'Expand lyrics')}
-                      className="expand-lyrics-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                      iconName="open_in_full"
-                      clickHandler={() => setIsFocused(true)}
-                    />
+                    <>
+                      <Button
+                        key="dock-lyrics-btn"
+                        tooltipLabel={t('lyricsPage.dockToSidePanel', 'Dock to side panel')}
+                        className="dock-lyrics-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                        iconName="close_fullscreen"
+                        clickHandler={() => {
+                          toggleLyricsDrawer(true);
+                          if (from) {
+                            navigate({ to: from as any });
+                          } else {
+                            history.back();
+                          }
+                        }}
+                      />
+                      <Button
+                        key="theatre-lyrics-btn"
+                        tooltipLabel={t('lyricsPage.theatreMode', 'Theatre Mode')}
+                        className="theatre-lyrics-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                        iconName="theaters"
+                        clickHandler={() => setIsTheatreMode(true)}
+                      />
+                    </>
                   )}
                 </div>
               </div>

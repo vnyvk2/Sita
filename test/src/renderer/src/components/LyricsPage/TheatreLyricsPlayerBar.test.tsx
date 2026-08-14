@@ -3,11 +3,11 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import FocusedLyricsPlayerBar from '../../../../../../src/renderer/src/components/LyricsPage/FocusedLyricsPlayerBar';
+import TheatreLyricsPlayerBar from '../../../../../../src/renderer/src/components/LyricsPage/TheatreLyricsPlayerBar';
 import { AppUpdateContext, type AppUpdateContextType } from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
 import { store } from '../../../../../../src/renderer/src/store/store';
 
-describe('FocusedLyricsPlayerBar', () => {
+describe('TheatreLyricsPlayerBar', () => {
   const mockContextValues: Partial<AppUpdateContextType> = {
     toggleSongPlayback: vi.fn(),
     handleSkipBackwardClick: vi.fn(),
@@ -18,7 +18,8 @@ describe('FocusedLyricsPlayerBar', () => {
     toggleMutedState: vi.fn(),
     updateVolume: vi.fn(),
     updateSongPosition: vi.fn(),
-    updatePlayerType: vi.fn()
+    updatePlayerType: vi.fn(),
+    toggleLyricsDrawer: vi.fn()
   };
 
   beforeEach(() => {
@@ -54,7 +55,7 @@ describe('FocusedLyricsPlayerBar', () => {
   const renderComponent = () =>
     render(
       <AppUpdateContext.Provider value={mockContextValues as AppUpdateContextType}>
-        <FocusedLyricsPlayerBar />
+        <TheatreLyricsPlayerBar />
       </AppUpdateContext.Provider>
     );
 
@@ -65,7 +66,6 @@ describe('FocusedLyricsPlayerBar', () => {
   });
 
   it('should initialize song position immediately from active AudioPlayer singleton without 00:00 flash', () => {
-    // Simulate active playback at 90 seconds (01:30)
     window.__NORA_AUDIO_PLAYER__ = {
       currentTime: 90
     } as any;

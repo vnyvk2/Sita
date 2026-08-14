@@ -1,7 +1,7 @@
 import { Outlet } from '@tanstack/react-router';
 
 import ErrorBoundary from './ErrorBoundary';
-// import Body from './Body';
+import LyricsDrawer from './LyricsPage/LyricsDrawer';
 import NotificationPanel from './NotificationPanel/NotificationPanel';
 import Sidebar from './Sidebar/Sidebar';
 
@@ -14,6 +14,7 @@ const BodyAndSideBarContainer = () => {
         <div className="body relative order-2 h-full! w-full overflow-hidden rounded-tl-lg *:overflow-x-hidden lg:pl-14">
           <Outlet />
         </div>
+        <LyricsDrawer />
       </ErrorBoundary>
     </div>
   );

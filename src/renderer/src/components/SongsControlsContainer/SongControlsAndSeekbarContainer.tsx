@@ -1,17 +1,20 @@
 import { store } from '@renderer/store/store';
+import { useLocation, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
 import LyricsIcon from '../Icons/LyricsIcon';
-import NavLink from '../NavLink';
 import SeekBarContainer from './SeekBarContainer';
 
 const SongControlsAndSeekbarContainer = () => {
   const { toggleOverlay } = useOverlayNavigation();
+  const location = useLocation();
+  const { history } = useRouter();
+  const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const isKnownSource = useStore(store, (state) => state.currentSongData.isKnownSource);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
@@ -24,6 +27,7 @@ const SongControlsAndSeekbarContainer = () => {
     toggleIsFavorite,
     toggleRepeat,
     toggleSongPlayback,
+    toggleLyricsDrawer,
     handleSkipForwardClick,
     handleSkipBackwardClick
   } = useContext(AppUpdateContext);
@@ -112,17 +116,29 @@ const SongControlsAndSeekbarContainer = () => {
           clickHandler={() => toggleRepeat()}
         />
 
-        <NavLink
-          to="/main-player/lyrics"
-          onClick={(e) => {
-            e.preventDefault();
-            toggleOverlay('/main-player/lyrics');
+        <Button
+          className={`lyrics-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
+            isLyricsDrawerOpen || location.pathname.startsWith('/main-player/lyrics')
+              ? 'active after:opacity-100'
+              : 'after:opacity-0'
+          }`}
+          tooltipLabel={t('player.lyrics')}
+          clickHandler={() => {
+            if (location.pathname.startsWith('/main-player/lyrics')) {
+              history.back();
+            } else {
+              toggleLyricsDrawer();
+            }
           }}
-          className={`lyrics-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent [&.active]:after:opacity-100`}
-          title={t('player.lyrics')}
         >
-          <LyricsIcon className="h-6 w-6 opacity-60 transition-opacity group-[.active]:text-font-color-highlight group-[.active]:opacity-100 dark:group-[.active]:text-dark-font-color-highlight hover:opacity-80" />
-        </NavLink>
+          <LyricsIcon
+            className={`h-6 w-6 transition-opacity hover:opacity-80 ${
+              isLyricsDrawerOpen || location.pathname.startsWith('/main-player/lyrics')
+                ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
+                : 'opacity-60'
+            }`}
+          />
+        </Button>
       </div>
       <SeekBarContainer />
     </div>

@@ -27,6 +27,7 @@ export interface AppReducer {
   isOnBatteryPower: boolean;
   playerType: PlayerTypes;
   isLibraryDiagnosticsPanelOpen: boolean;
+  isLyricsDrawerOpen: boolean;
 }
 
 export type AppReducerStateActions =
@@ -38,6 +39,7 @@ export type AppReducerStateActions =
   | { type: 'ADD_NEW_NOTIFICATIONS'; data: AppNotification[] }
   | { type: 'UPDATE_NOTIFICATIONS'; data: AppNotification[] }
   | { type: 'TOGGLE_LIBRARY_DIAGNOSTICS_PANEL'; data?: boolean }
+  | { type: 'TOGGLE_LYRICS_DRAWER'; data?: boolean }
   | { type: 'CONTEXT_MENU_DATA_CHANGE'; data: ContextMenuData }
   | { type: 'CONTEXT_MENU_VISIBILITY_CHANGE'; data: boolean }
   | { type: 'CURRENT_ACTIVE_PAGE_DATA_UPDATE'; data: PageData }
@@ -147,6 +149,11 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
       return {
         ...state,
         isLibraryDiagnosticsPanelOpen: action.data ?? !state.isLibraryDiagnosticsPanelOpen
+      };
+    case 'TOGGLE_LYRICS_DRAWER':
+      return {
+        ...state,
+        isLyricsDrawerOpen: action.data ?? !state.isLyricsDrawerOpen
       };
     case 'CONTEXT_MENU_DATA_CHANGE':
       return {
@@ -724,7 +731,8 @@ export const DEFAULT_REDUCER_DATA: AppReducer = {
   multipleSelectionsData: { isEnabled: false, multipleSelections: [] },
   appUpdatesState: 'UNKNOWN',
   isOnBatteryPower: false,
-  isLibraryDiagnosticsPanelOpen: false
+  isLibraryDiagnosticsPanelOpen: false,
+  isLyricsDrawerOpen: false
 };
 
 export default reducer;
