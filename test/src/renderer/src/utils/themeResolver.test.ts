@@ -53,7 +53,7 @@ describe('themeResolver', () => {
   });
 
   describe('resolveTheme', () => {
-    it('should satisfy contract for all 14 presets in static mode', () => {
+    it('should return pure preset tokens for all 14 presets when intensity is 0 or palette is undefined', () => {
       const allPresets = Object.keys(themeRegistry) as ThemePreset[];
       expect(allPresets.length).toBe(14);
 
@@ -61,7 +61,7 @@ describe('themeResolver', () => {
         const theme = resolveTheme({
           preset,
           palette: mockPalette,
-          mode: 'static'
+          intensity: 0
         });
 
         for (const token of THEME_TOKEN_KEYS) {
@@ -195,6 +195,24 @@ describe('themeResolver', () => {
 
       const allPresets = Object.keys(themeRegistry) as ThemePreset[];
 
+      const requiredLightVars = [
+        '--background-color-1',
+        '--background-color-2',
+        '--background-color-3',
+        '--background-color-dimmed',
+        '--side-bar-background',
+        '--text-color',
+        '--text-color-dimmed',
+        '--text-color-highlight',
+        '--text-color-highlight-2',
+        '--seekbar-background-color',
+        '--seekbar-track-background-color',
+        '--foreground-color-1',
+        '--context-menu-background',
+        '--context-menu-list-hover'
+      ];
+      const requiredDarkVars = requiredLightVars.map((v) => v.replace('--', '--dark-'));
+
       for (const preset of allPresets) {
         let blockContent = '';
 
@@ -211,17 +229,27 @@ describe('themeResolver', () => {
           blockContent = match![1];
         }
 
-        // Validate each token against styles.css declaration
-        for (const token of THEME_TOKEN_KEYS) {
+        const mode = preset === 'default' ? 'adaptive' : themeRegistry[preset].mode;
+        const expectedTokens: string[] = [];
+        if (mode === 'adaptive' || mode === 'light') {
+          expectedTokens.push(...requiredLightVars);
+        }
+        if (mode === 'adaptive' || mode === 'dark') {
+          expectedTokens.push(...requiredDarkVars);
+        }
+
+        // Validate that every expected token exists in styles.css and exactly matches PRESET_RAW_TOKENS
+        for (const token of expectedTokens) {
           const varRegex = new RegExp(`${token}:\\s*([^;\\n\\r]+)[;\\n]`);
           const varMatch = varRegex.exec(blockContent);
 
-          if (varMatch) {
-            // Clean inline comments like /* hsl(...) */
-            const cssValue = varMatch[1].replace(/\/\*.*?\*\//g, '').trim();
-            const resolverValue = PRESET_RAW_TOKENS[preset][token as ThemeTokenKey].trim();
-            expect(resolverValue).toBe(cssValue);
-          }
+          // Strictly enforce that the variable exists in styles.css
+          expect(varMatch, `Token ${token} should exist in styles.css for preset ${preset}`).toBeTruthy();
+
+          // Clean inline comments like /* hsl(...) */
+          const cssValue = varMatch![1].replace(/\/\*.*?\*\//g, '').trim();
+          const resolverValue = PRESET_RAW_TOKENS[preset][token as ThemeTokenKey].trim();
+          expect(resolverValue, `Token ${token} value in PRESET_RAW_TOKENS should match styles.css for preset ${preset}`).toBe(cssValue);
         }
       }
     });

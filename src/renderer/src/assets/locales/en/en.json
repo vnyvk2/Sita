@@ -403,6 +403,10 @@
     "dynamicThemeIntensityArtwork": "Artwork (100%)",
     "resetIntensity": "Reset to 100%",
     "resolvedTones": "Derived Semantic Tones",
+    "primaryAccent": "Primary Accent",
+    "secondaryAccent": "Secondary Accent",
+    "darkCanvas": "Dark Canvas",
+    "lightCanvas": "Light Canvas",
 
     "language": "Language",
     "languageDescription": "Select the language you want Nora to be displayed in.",

@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect } from 'react';
 
 import { useEffectiveAppearance } from './useEffectiveAppearance';
+import { type ThemePreset } from '../../../common/themeRegistry';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
 import { resolveSemanticPalette } from '../utils/semanticPalette';
@@ -30,7 +31,7 @@ const resetStyles = () => {
  */
 const applyThemeTokens = (
   palette?: NodeVibrantPalette,
-  preset: string = 'default',
+  preset: ThemePreset = 'default',
   mode: DynamicThemeMode = 'dynamic-accent',
   intensity: number = 100
 ) => {

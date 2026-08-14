@@ -44,12 +44,19 @@ describe('DynamicThemeSettings component', () => {
 
     expect(accentButton).toBeDefined();
     expect(fullButton).toBeDefined();
-    // Visual selected state: accent is active by default
+    // Visual and accessibility selected state: accent is active by default
     expect(accentButton.className).toContain('bg-font-color-highlight');
     expect(fullButton.className).not.toContain('bg-font-color-highlight');
+    expect(accentButton.getAttribute('aria-pressed')).toBe('true');
+    expect(fullButton.getAttribute('aria-pressed')).toBe('false');
 
+    expect(screen.getByLabelText('Dynamic Theme Intensity')).toBeDefined();
     expect(screen.getByText(/Dynamic Theme Intensity:\s*100%/)).toBeDefined();
     expect(screen.getByText('Derived Semantic Tones')).toBeDefined();
+    expect(screen.getByText('Primary Accent')).toBeDefined();
+    expect(screen.getByText('Secondary Accent')).toBeDefined();
+    expect(screen.getByText('Dark Canvas')).toBeDefined();
+    expect(screen.getByText('Light Canvas')).toBeDefined();
   });
 
   it('should handle undefined preferences gracefully with dynamic-accent and 100% defaults', () => {
