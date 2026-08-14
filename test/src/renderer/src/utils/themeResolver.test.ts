@@ -99,6 +99,23 @@ describe('themeResolver', () => {
       }
     });
 
+    it('should default to dynamic-accent mode when mode option is omitted', () => {
+      const theme = resolveTheme({
+        preset: 'dracula',
+        palette: mockPalette,
+        intensity: 100
+      });
+
+      const accentKeySet = new Set<string>(ACCENT_TOKEN_KEYS);
+      for (const token of THEME_TOKEN_KEYS) {
+        if (accentKeySet.has(token)) {
+          expect(theme[token]).not.toBe(PRESET_RAW_TOKENS.dracula[token]);
+        } else {
+          expect(theme[token]).toBe(PRESET_RAW_TOKENS.dracula[token]);
+        }
+      }
+    });
+
     it('should override exactly 12 accent tokens in dynamic-accent mode', () => {
       const theme = resolveTheme({
         preset: 'dracula',
