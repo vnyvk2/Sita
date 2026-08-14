@@ -29,30 +29,30 @@ const TitleBarContainer = (props: Props) => {
 
   return (
     <div
-      className={`mini-player-title-bar z-10 flex h-[15%] max-h-[2.25rem] w-full justify-end opacity-0 transition-[visibility,opacity] select-none [-webkit-app-region:drag] group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${
+      className={`mini-player-title-bar z-10 flex h-8 w-full items-center justify-end opacity-0 transition-[visibility,opacity] select-none [-webkit-app-region:drag] group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${
         !isCurrentSongPlaying ? 'visible opacity-100' : ''
       }`}
     >
       <div
-        className={`special-controls-container flex transition-[visibility,opacity] [-webkit-app-region:no-drag] ${
+        className={`special-controls-container flex h-full items-center transition-[visibility,opacity] [-webkit-app-region:no-drag] ${
           isLyricsVisible
             ? 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
             : ''
         } ${!isCurrentSongPlaying ? 'visible! opacity-100!' : ''}`}
       >
         <Button
-          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mt-1! mr-0! rounded-md! border-0! bg-transparent! p-2! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
+          className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mr-1! rounded-md! border-0! bg-transparent! p-1.5! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
           tooltipLabel={t('player.goToMainPlayer')}
           iconName="pip_exit"
-          iconClassName="material-icons-round-outlined text-xl!"
+          iconClassName="material-icons-round-outlined text-lg!"
           clickHandler={() => updatePlayerType('normal')}
           removeFocusOnClick
         />
       </div>
-      <div className="window-controls-container flex [-webkit-app-region:no-drag]">
+      <div className="window-controls-container flex h-full items-center [-webkit-app-region:no-drag]">
         <button
           type="button"
-          className="minimize-btn m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white -outline-offset-2 transition-[background] ease-in-out hover:bg-[hsla(0deg,0%,80%,0.5)]! focus-visible:outline!"
+          className="minimize-btn m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white/80 transition-colors ease-in-out hover:bg-[hsla(0deg,0%,80%,0.3)]! hover:text-font-color-white focus-visible:outline-hidden"
           onClick={() => window.api.windowControls.minimizeApp()}
           title={t('titleBar.minimize')}
         >
@@ -60,7 +60,7 @@ const TitleBarContainer = (props: Props) => {
         </button>
         <button
           type="button"
-          className="close-btn hover:bg-font-color-crimson! hover:text-font-color-white! m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white -outline-offset-2 transition-[background] ease-in-out focus-visible:outline!"
+          className="close-btn m-0! flex h-full w-9 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! text-font-color-white/80 transition-colors ease-in-out hover:bg-[#e81123]! hover:text-white! focus-visible:outline-hidden"
           onClick={() => {
             if (hideWindowOnClose) window.api.windowControls.hideApp();
             else window.api.windowControls.closeApp();
