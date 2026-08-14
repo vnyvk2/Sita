@@ -69,7 +69,7 @@ const LyricsDrawer = () => {
 
   return (
     <aside
-      className="lyrics-drawer relative z-20 flex h-full w-96 min-w-[320px] max-w-[35vw] flex-col overflow-hidden border-l border-background-color-2 bg-background-color-1/95 backdrop-blur-xl transition-all duration-300 dark:border-dark-background-color-2 dark:bg-dark-background-color-1/95"
+      className="lyrics-drawer relative z-20 order-3 flex h-full w-96 min-w-[320px] max-w-[35vw] shrink-0 flex-col overflow-hidden border-l border-background-color-2 bg-background-color-1/95 backdrop-blur-xl transition-all duration-300 dark:border-dark-background-color-2 dark:bg-dark-background-color-1/95"
       aria-label={t('player.lyrics', 'Lyrics')}
     >
       {/* Ambient Artwork Background */}
