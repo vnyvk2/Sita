@@ -47,6 +47,7 @@ const SeekBarSlider = (props: Props) => {
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wheelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rAFIdRef = useRef<number | null>(null);
+  const pointerStartRef = useRef({ time: 0, hasMoved: false });
 
   const updateVisualProgress = useCallback((time: number, duration: number, updateValue = true) => {
     const input = seekbarRef.current;
@@ -103,6 +104,7 @@ const SeekBarSlider = (props: Props) => {
         latestSeekRef.current = null;
 
         if (player && seekbarRef.current) {
+          seekbarRef.current.removeAttribute('data-seeking');
           const actual = player.currentTime || 0;
           const dur = currentSongData.duration || player.duration || 0;
           updateVisualProgress(actual, dur);
@@ -138,6 +140,7 @@ const SeekBarSlider = (props: Props) => {
         latestSeekRef.current = null;
 
         if (seekbarRef.current) {
+          seekbarRef.current.removeAttribute('data-seeking');
           updateVisualProgress(actualTime, currentSongData.duration || player.duration || 0);
         }
 
@@ -193,9 +196,11 @@ const SeekBarSlider = (props: Props) => {
   }, [stopVisualLoop]);
 
   const handlePointerDown = (e: PointerEvent<HTMLInputElement>) => {
+    pointerStartRef.current = { time: Date.now(), hasMoved: false };
     interactionRef.current = 'scrubbing';
     stopVisualLoop();
     e.currentTarget.setPointerCapture(e.pointerId);
+    e.currentTarget.removeAttribute('data-seeking');
     e.currentTarget.setAttribute('data-scrubbing', 'true');
 
     const pos = e.currentTarget.valueAsNumber;
@@ -204,6 +209,7 @@ const SeekBarSlider = (props: Props) => {
   };
 
   const handleInput = (e: FormEvent<HTMLInputElement>) => {
+    pointerStartRef.current.hasMoved = true;
     const pos = e.currentTarget.valueAsNumber;
     updateVisualProgress(pos, currentSongData.duration || 0, false);
     if (onSeek) onSeek(pos);
@@ -212,6 +218,9 @@ const SeekBarSlider = (props: Props) => {
   const handlePointerUp = (e: PointerEvent<HTMLInputElement>) => {
     if (interactionRef.current === 'scrubbing') {
       const targetTime = e.currentTarget.valueAsNumber;
+      const wasClick =
+        !pointerStartRef.current.hasMoved && Date.now() - pointerStartRef.current.time < 400;
+
       e.currentTarget.removeAttribute('data-scrubbing');
 
       try {
@@ -220,6 +229,11 @@ const SeekBarSlider = (props: Props) => {
         }
       } catch {
         // Pointer capture may have already been released
+      }
+
+      if (wasClick) {
+        e.currentTarget.setAttribute('data-seeking', 'true');
+        updateVisualProgress(targetTime, currentSongData.duration || 0, false);
       }
 
       const token = ++seekTokenRef.current;
@@ -233,6 +247,7 @@ const SeekBarSlider = (props: Props) => {
   const handlePointerCancel = (e: PointerEvent<HTMLInputElement>) => {
     if (interactionRef.current === 'scrubbing') {
       e.currentTarget.removeAttribute('data-scrubbing');
+      e.currentTarget.removeAttribute('data-seeking');
 
       try {
         if (e.currentTarget.hasPointerCapture(e.pointerId)) {
