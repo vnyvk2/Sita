@@ -214,7 +214,7 @@ const ThemeSettings = () => {
             }
             labelContent={t('settingsPage.enableImageBasedDynamicThemes')}
           />
-          {enableImageBasedDynamicThemes && currentSongPaletteData && (
+          {enableImageBasedDynamicThemes && (
             <DynamicThemeSettings palette={currentSongPaletteData} />
           )}
         </li>

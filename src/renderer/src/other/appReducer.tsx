@@ -409,6 +409,8 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     showTrackNumberAsSongIndex: true,
     allowToPreventScreenSleeping: true,
     enableImageBasedDynamicThemes: false,
+    dynamicThemeMode: 'dynamic-accent',
+    dynamicThemeIntensity: 100,
     doNotShowHelpPageOnLyricsEditorStartUp: false,
     autoTranslateLyrics: false,
     autoConvertLyrics: false,
