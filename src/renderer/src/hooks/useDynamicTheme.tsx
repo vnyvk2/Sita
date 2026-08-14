@@ -25,8 +25,8 @@ const resetStyles = () => {
 
 /**
  * Efficiently applies resolved dynamic tokens to #root using diff-based writes.
- * Only modifies properties whose computed value has actually changed, preventing
- * intermediate property drops and unstyled transition blinks.
+ * Reads inline custom-property values on #root and writes only when that value differs,
+ * while removing tokens that are no longer active.
  */
 const applyThemeTokens = (
   palette?: NodeVibrantPalette,
@@ -82,8 +82,8 @@ export interface UseDynamicThemeReturn {
  * Hook for managing dynamic themes, background images, and dark mode.
  *
  * Integrates with Dynamic Theme v2 engine (semanticPalette & themeResolver)
- * with diff-based CSS variable writes and requestAnimationFrame batching to
- * eliminate layout thrashing during rapid queue skips.
+ * with diff-based CSS variable writes to avoid redundant property updates
+ * and eliminate unnecessary remove-and-reapply cycles.
  */
 export function useDynamicTheme(): UseDynamicThemeReturn {
   const themePreset = useStore(
