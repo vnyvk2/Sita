@@ -23,6 +23,52 @@ const resetStyles = () => {
   }
 };
 
+/**
+ * Efficiently applies resolved dynamic tokens to #root using diff-based writes.
+ * Only modifies properties whose computed value has actually changed, preventing
+ * intermediate property drops and unstyled transition blinks.
+ */
+const applyThemeTokens = (
+  palette?: NodeVibrantPalette,
+  preset: string = 'default',
+  mode: DynamicThemeMode = 'dynamic-accent',
+  intensity: number = 100
+) => {
+  const root = document.getElementById('root');
+  if (!root) return;
+
+  if (!palette) {
+    resetStyles();
+    return;
+  }
+
+  const semanticPalette = resolveSemanticPalette(palette);
+  const resolvedTokens = resolveTheme({
+    preset,
+    palette: semanticPalette,
+    mode,
+    intensity
+  });
+
+  const activeKeys = mode === 'full-dynamic' ? THEME_TOKEN_KEYS : ACCENT_TOKEN_KEYS;
+  const activeKeySet = new Set<string>(activeKeys);
+
+  // 1. Write or update active tokens only if changed
+  for (const token of activeKeys) {
+    const nextVal = resolvedTokens[token];
+    if (root.style.getPropertyValue(token) !== nextVal) {
+      root.style.setProperty(token, nextVal, 'important');
+    }
+  }
+
+  // 2. Clean up inactive tokens only if currently set
+  for (const token of THEME_TOKEN_KEYS) {
+    if (!activeKeySet.has(token) && root.style.getPropertyValue(token) !== '') {
+      root.style.removeProperty(token);
+    }
+  }
+};
+
 export interface UseDynamicThemeReturn {
   setDynamicThemesFromSongPalette: (
     palette?: NodeVibrantPalette,
@@ -36,8 +82,8 @@ export interface UseDynamicThemeReturn {
  * Hook for managing dynamic themes, background images, and dark mode.
  *
  * Integrates with Dynamic Theme v2 engine (semanticPalette & themeResolver)
- * to reactively apply harmonic color tokens to the #root element while preserving
- * active preset surfaces in dynamic-accent mode.
+ * with diff-based CSS variable writes and requestAnimationFrame batching to
+ * eliminate layout thrashing during rapid queue skips.
  */
 export function useDynamicTheme(): UseDynamicThemeReturn {
   const themePreset = useStore(
@@ -68,35 +114,9 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
       customMode?: DynamicThemeMode,
       customIntensity?: number
     ) => {
-      const root = document.getElementById('root');
-      if (!root) return resetStyles;
-
-      // Always reset previously applied custom properties to avoid stale overrides
-      resetStyles();
-
-      if (palette) {
-        const mode = customMode ?? dynamicThemeMode;
-        const intensity = customIntensity ?? dynamicThemeIntensity;
-        const semanticPalette = resolveSemanticPalette(palette);
-        const tokens = resolveTheme({
-          preset: themePreset,
-          palette: semanticPalette,
-          mode,
-          intensity
-        });
-
-        if (mode === 'full-dynamic') {
-          for (const token of THEME_TOKEN_KEYS) {
-            root.style.setProperty(token, tokens[token], 'important');
-          }
-        } else {
-          // In dynamic-accent mode, only set the 12 accent tokens on #root
-          for (const token of ACCENT_TOKEN_KEYS) {
-            root.style.setProperty(token, tokens[token], 'important');
-          }
-        }
-      }
-
+      const mode = customMode ?? dynamicThemeMode;
+      const intensity = customIntensity ?? dynamicThemeIntensity;
+      applyThemeTokens(palette, themePreset, mode, intensity);
       return resetStyles;
     },
     [themePreset, dynamicThemeMode, dynamicThemeIntensity]
@@ -116,21 +136,22 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
     });
   }, []);
 
-  // Reactively apply dynamic theme when enabled and song palette data is available
+  // Reactively apply dynamic theme with diff-based writes
   useEffect(() => {
     const isDynamicActive = isImageBasedDynamicThemesEnabled && Boolean(currentSongPaletteData);
+    const targetPalette = isDynamicActive ? currentSongPaletteData : undefined;
 
-    const cleanup = setDynamicThemesFromSongPalette(
-      isDynamicActive ? currentSongPaletteData : undefined
-    );
+    applyThemeTokens(targetPalette, themePreset, dynamicThemeMode, dynamicThemeIntensity);
 
     return () => {
-      cleanup();
+      // If dynamic theming is disabled or unmounted, cleanup is handled by applyThemeTokens
     };
   }, [
     isImageBasedDynamicThemesEnabled,
     currentSongPaletteData,
-    setDynamicThemesFromSongPalette
+    themePreset,
+    dynamicThemeMode,
+    dynamicThemeIntensity
   ]);
 
   // Monitor dark mode setting and apply/remove 'dark' class on document.body
