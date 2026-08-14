@@ -208,15 +208,7 @@ export const Album = (props: AlbumProp) => {
         })
         .flat();
     }
-    return (
-      <span
-        className={`text-xs font-normal ${
-          isAMultipleSelection ? 'text-font-color-black! dark:text-font-color-black!' : ''
-        }`}
-      >
-        {t(`common.unknownArtist`)}
-      </span>
-    );
+    return <span className="text-xs font-normal">{t('common.unknownArtist')}</span>;
   }, [isAMultipleSelection, props, t]);
 
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
