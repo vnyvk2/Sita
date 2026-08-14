@@ -115,7 +115,7 @@ const LyricsDrawer = () => {
       </div>
 
       {/* Lyrics Stream */}
-      <div className="lyrics-lines-container relative z-10 flex min-h-0 flex-1 w-full scrollbar-gutter-stable flex-col items-center overflow-y-auto px-4 py-6 [overflow-anchor:none]!">
+      <div className="lyrics-lines-container relative z-10 flex min-h-0 flex-1 w-full flex-col items-center overflow-y-auto px-6 py-8 [overflow-anchor:none]!">
         {isLoadingLyrics && (
           <div className="flex h-full w-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-font-color-highlight border-t-transparent dark:border-dark-font-color-highlight" />

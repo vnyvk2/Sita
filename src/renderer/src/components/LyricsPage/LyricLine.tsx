@@ -171,13 +171,13 @@ const LyricLine = (props: LyricProp) => {
         syncedLyrics
           ? `cursor-pointer blur-[1px] ${
               isInRange
-                ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-medium blur-none! [&>div>span]:mr-3!'
+                ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! [&>div>span]:mr-3!'
                 : 'scale-75!'
             }`
           : 'text-font-color-black! dark:text-font-color-white! scale-100! text-4xl! font-medium blur-none! [&>div>span]:mr-3'
       } ${playerType === 'mini' && 'text-font-color-white/20! mb-2! text-2xl!'} ${
         playerType === 'drawer' &&
-        'text-font-color-black/30! dark:text-font-color-white/30! mb-3! text-xl! md:text-2xl! leading-snug text-left! items-start! justify-start! w-full!'
+        'mb-4! text-2xl! leading-snug items-center! justify-center! text-center! w-full!'
       } ${
         playerType === 'full' &&
         'text-font-color-white/20! mb-6! origin-left items-start! justify-start! text-left! text-7xl!'
@@ -215,7 +215,7 @@ const LyricLine = (props: LyricProp) => {
       {lyricStringLineSecondaryUpper && (
         <div
           className={`flex flex-row flex-wrap ${
-            playerType !== 'full' && playerType !== 'drawer' && 'items-center justify-center'
+            playerType !== 'full' && 'items-center justify-center text-center'
           } ${
             playerType === 'drawer'
               ? 'text-xs!'
@@ -229,7 +229,7 @@ const LyricLine = (props: LyricProp) => {
       )}
       <div
         className={`flex flex-row flex-wrap ${
-          playerType !== 'full' && playerType !== 'drawer' && 'items-center justify-center'
+          playerType !== 'full' && 'items-center justify-center text-center'
         }`}
       >
         {lyricStringLinePrimary}
