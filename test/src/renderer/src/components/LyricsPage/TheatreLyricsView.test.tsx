@@ -86,8 +86,8 @@ describe('TheatreLyricsView', () => {
   });
 
   it('should trigger onClose when exit theatre button is clicked', () => {
-    const { container } = renderComponent();
-    const exitBtn = container.querySelector('.exit-theatre-btn') as HTMLButtonElement;
+    renderComponent();
+    const exitBtn = document.body.querySelector('.exit-theatre-btn') as HTMLButtonElement;
     expect(exitBtn).not.toBeNull();
     fireEvent.click(exitBtn);
     expect(mockClose).toHaveBeenCalledTimes(1);
