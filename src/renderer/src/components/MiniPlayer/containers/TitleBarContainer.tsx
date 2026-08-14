@@ -32,6 +32,7 @@ const TitleBarContainer = (props: Props) => {
       className={`mini-player-title-bar z-10 flex h-8 w-full items-center justify-end opacity-0 transition-[visibility,opacity] select-none [-webkit-app-region:drag] group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${
         !isCurrentSongPlaying ? 'visible opacity-100' : ''
       }`}
+      onDoubleClick={() => window.api.miniPlayer.resetToDefaultPosition()}
     >
       <div
         className={`special-controls-container flex h-full items-center transition-[visibility,opacity] [-webkit-app-region:no-drag] ${

@@ -84,6 +84,7 @@ import {
   getRendererLogs,
   IS_DEVELOPMENT,
   resetApp,
+  resetMiniPlayerToDefault,
   restartApp,
   restartRenderer,
   revealSongInFileExplorer,
@@ -662,6 +663,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       (_, bounds: { minWidth: number; minHeight: number }) =>
         setMiniPlayerMinimumBounds(bounds.minWidth, bounds.minHeight)
     );
+
+    ipcMain.handle('app/resetMiniPlayerToDefault', () => resetMiniPlayerToDefault());
 
     ipcMain.handle('app/showMiniPlayerContextMenu', (event, template: any[]) => {
       return new Promise((resolve) => {

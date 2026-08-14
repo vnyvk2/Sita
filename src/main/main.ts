@@ -66,8 +66,8 @@ const MAIN_WINDOW_MAX_ZOOM_FACTOR = 3;
 
 const MINI_PLAYER_MIN_SIZE_X = 240;
 const MINI_PLAYER_MIN_SIZE_Y = 80;
-const MINI_PLAYER_DEFAULT_SIZE_X = 340;
-const MINI_PLAYER_DEFAULT_SIZE_Y = 160;
+const MINI_PLAYER_DEFAULT_SIZE_X = 310;
+const MINI_PLAYER_DEFAULT_SIZE_Y = 240;
 const MINI_PLAYER_MAX_SIZE_X = 510;
 const MINI_PLAYER_MAX_SIZE_Y = 400;
 const MINI_PLAYER_ASPECT_RATIO = 0;
@@ -871,6 +871,30 @@ export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) 
   }
 }
 
+export async function resetMiniPlayerToDefault() {
+  if (mainWindow && playerType === 'mini') {
+    logger.debug('Resetting mini player to default position and dimensions');
+    const targetWidth = Math.max(MINI_PLAYER_DEFAULT_SIZE_X, currentMiniPlayerMinWidth);
+    const targetHeight = Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+
+    const display = screen.getDisplayMatching(mainWindow.getBounds());
+    const { workArea } = display;
+    const margin = 24;
+    const targetX = workArea.x + workArea.width - targetWidth - margin;
+    const targetY = workArea.y + workArea.height - targetHeight - margin;
+
+    mainWindow.setSize(targetWidth, targetHeight, true);
+    mainWindow.setPosition(targetX, targetY, true);
+
+    await saveUserSettings({
+      miniPlayerWidth: targetWidth,
+      miniPlayerHeight: targetHeight,
+      miniPlayerX: targetX,
+      miniPlayerY: targetY
+    });
+  }
+}
+
 export async function changePlayerType(type: PlayerTypes) {
   if (mainWindow) {
     logger.debug(`Changed player type.`, { type });
@@ -891,6 +915,7 @@ export async function changePlayerType(type: PlayerTypes) {
     if (type === 'mini') {
       if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
 
+      mainWindow.setMaximizable(false);
       mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
       mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
       mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
@@ -925,6 +950,7 @@ export async function changePlayerType(type: PlayerTypes) {
       }
       mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
     } else if (type === 'normal') {
+      mainWindow.setMaximizable(true);
       mainWindow.setMaximumSize(MAIN_WINDOW_MAX_SIZE_X, MAIN_WINDOW_MAX_SIZE_Y);
       mainWindow.setMinimumSize(MAIN_WINDOW_MIN_SIZE_X, MAIN_WINDOW_MIN_SIZE_Y);
       mainWindow.setAlwaysOnTop(false);
