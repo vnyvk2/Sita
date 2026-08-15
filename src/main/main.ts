@@ -907,20 +907,25 @@ function ensureWindowIsVisible(window: BrowserWindow) {
   }
 }
 
+export function applyMiniPlayerModeConstraints(mode: 'standard' | 'compact') {
+  if (!mainWindow || playerType !== 'mini') return;
+  if (mode === 'compact') {
+    mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+  } else {
+    mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+  }
+}
+
 export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) {
   logger.debug('Updating mini player dynamic minimum bounds', { minWidth, minHeight, currentMiniPlayerMode });
   currentMiniPlayerMinWidth = minWidth;
   currentMiniPlayerMinHeight = minHeight;
 
   if (mainWindow && playerType === 'mini') {
-    if (currentMiniPlayerMode === 'compact') {
-      mainWindow.setMinimumSize(minWidth, COMPACT_MINI_PLAYER_HEIGHT);
-      mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
-      return;
-    }
-
-    mainWindow.setMinimumSize(minWidth, minHeight);
-    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+    applyMiniPlayerModeConstraints(currentMiniPlayerMode);
+    if (currentMiniPlayerMode === 'compact') return;
 
     // Current-size protection: if the window is currently smaller than the new minimum, expand smoothly
     const [currentW, currentH] = mainWindow.getSize();
@@ -962,8 +967,7 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
     expandedDirection = null;
 
     // 3. Constrain native window size to compact height (50px)
-    mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
-    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+    applyMiniPlayerModeConstraints('compact');
 
     // 4. Atomically set bounds
     const targetWidth = Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH);
@@ -976,8 +980,7 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
   } else {
     // Standard Mode:
     // 1. Restore standard window constraints
-    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
-    mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+    applyMiniPlayerModeConstraints('standard');
 
     // 2. Restore standard height
     const targetHeight = Math.max(savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
@@ -1206,7 +1209,7 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     // Temporarily allow larger max height for expansion
     mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, calculatedExpandedHeight);
     setMiniPlayerBoundsProgrammatically({
-      x: currentX,
+      x: compactX ?? currentX,
       y: calculatedExpandedY,
       width,
       height: calculatedExpandedHeight
@@ -1217,13 +1220,17 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     // Collapse back to compact size
     isQueueExpanded = false;
 
-    const restoreHeight = compactHeight ?? currentMiniPlayerMinHeight;
+    const restoreHeight =
+      compactHeight ??
+      (currentMiniPlayerMode === 'compact'
+        ? COMPACT_MINI_PLAYER_HEIGHT
+        : currentMiniPlayerMinHeight);
     const restoreY = compactY ?? currentY;
     const restoreX = compactX ?? currentX;
 
-    logger.debug('Collapsing mini player queue', { restoreHeight, restoreY, restoreX });
+    logger.debug('Collapsing mini player queue', { restoreHeight, restoreY, restoreX, currentMiniPlayerMode });
 
-    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+    applyMiniPlayerModeConstraints(currentMiniPlayerMode);
     setMiniPlayerBoundsProgrammatically({
       x: restoreX,
       y: restoreY,

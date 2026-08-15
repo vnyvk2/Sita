@@ -97,11 +97,33 @@ const CompactMiniPlayer = (props: Props) => {
       .slice(0, maxSlots);
   }, [containerWidth, pinnedControls]);
 
+  // Two-finger tap detection to show context menu on touch devices for Compact Mode
+  const touchPointsCountRef = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchPointsCountRef.current = e.touches.length;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchPointsCountRef.current === 2) {
+      e.preventDefault();
+      const rect = containerRef.current?.getBoundingClientRect();
+      const syntheticEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect ? rect.left + rect.width / 2 : 0,
+        clientY: rect ? rect.top + rect.height / 2 : 0
+      });
+      containerRef.current?.dispatchEvent(syntheticEvent);
+    }
+    touchPointsCountRef.current = 0;
+  };
+
   return (
     <div
       ref={containerRef}
       data-testid="compact-mini-player"
       className="compact-mini-player group/compact relative flex h-[50px] min-h-[50px] w-full items-center justify-between overflow-visible px-2.5 select-none [-webkit-app-region:drag]"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* ── Left: Artwork Thumbnail ── */}
       <div

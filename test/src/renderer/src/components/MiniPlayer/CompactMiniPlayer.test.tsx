@@ -116,4 +116,33 @@ describe('CompactMiniPlayer (Single-Tier Progressive Strip)', () => {
     expect(container.querySelector('.volume-btn')).toBeNull();
     expect(container.querySelector('.queue-btn')).not.toBeNull();
   });
+
+  it('triggers contextmenu event on two-finger tap in Compact Mode', () => {
+    const { container } = render(
+      <CompactMiniPlayer
+        isQueueVisible={false}
+        isLyricsVisible={false}
+        onToggleQueue={vi.fn()}
+        onToggleLyrics={vi.fn()}
+        pinnedControls={['love']}
+      />
+    );
+
+    const compactPlayer = container.querySelector('.compact-mini-player')!;
+    const contextMenuHandler = vi.fn();
+    compactPlayer.addEventListener('contextmenu', contextMenuHandler);
+
+    // Simulate two-finger touch
+    const touchStartEvent = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(touchStartEvent, 'touches', {
+      value: [{ clientX: 10, clientY: 10 }, { clientX: 20, clientY: 20 }]
+    });
+    compactPlayer.dispatchEvent(touchStartEvent);
+
+    const touchEndEvent = new Event('touchend', { bubbles: true });
+    Object.defineProperty(touchEndEvent, 'touches', { value: [] });
+    compactPlayer.dispatchEvent(touchEndEvent);
+
+    expect(contextMenuHandler).toHaveBeenCalledTimes(1);
+  });
 });

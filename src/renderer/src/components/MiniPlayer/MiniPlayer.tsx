@@ -220,9 +220,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         }
         setIsQueueVisible(true);
       } else {
+        await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
         setIsQueueVisible(false);
         setQueueDirection('down');
-        await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
       }
     } finally {
       isQueueTransitioningRef.current = false;
@@ -449,6 +449,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     // On hover/focus/paused: title bar, song info, controls, seekbar fade in.
     <div
       className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full flex-col overflow-hidden !transition-none select-none ${
+        isQueueVisible && queueDirection === 'up' ? 'justify-end' : 'justify-start'
+      } ${
         !isCurrentSongPlaying && 'paused'
       } ${preferences?.isReducedMotion ? 'reduced-motion' : ''} ${className}`}
       onContextMenu={handleContextMenu}
