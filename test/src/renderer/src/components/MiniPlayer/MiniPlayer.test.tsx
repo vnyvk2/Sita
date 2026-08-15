@@ -123,11 +123,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
         setMinimumBounds: vi.fn(),
         setDynamicMinimumBounds: vi.fn(),
         resetToDefaultPosition: resetToDefaultPositionMock,
-        toggleMiniPlayerQueue: vi.fn(),
+        toggleMiniPlayerQueue: vi.fn().mockResolvedValue({ isExpanded: true, direction: 'down' }),
         toggleMiniPlayerAlwaysOnTop: vi.fn(),
-        showContextMenu: showContextMenuMock,
-        onQueueDirectionChange: vi.fn(),
-        removeQueueDirectionChangeListener: vi.fn()
+        showContextMenu: showContextMenuMock
       }
     } as any;
 
@@ -216,7 +214,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     expect(resetItem.label).toBe('Reset to Default Position');
   });
 
-  it('renders queue above deck when toggleMiniPlayerQueue returns up direction', async () => {
+  it('renders queue ABOVE deck when toggleMiniPlayerQueue returns up direction', async () => {
     (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockResolvedValueOnce({
       isExpanded: true,
       direction: 'up'
@@ -231,19 +229,83 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     );
 
     const root = container.querySelector('.mini-player')!;
-    fireEvent.contextMenu(root);
-
-    // Simulate clicking toggleQueue
-    const template = showContextMenuMock.mock.calls[0][0];
-    const toggleQueueItem = template.find((item: any) => item.id === 'toggleQueue');
-    expect(toggleQueueItem).toBeDefined();
-
-    // Trigger toggle via context menu
     showContextMenuMock.mockResolvedValueOnce('toggleQueue');
     fireEvent.contextMenu(root);
 
-    // After resolving, queue is visible
     const queue = await screen.findByTestId('queue-container');
+    const deck = screen.getByTestId('mini-player-deck');
+
     expect(queue).toBeDefined();
+    expect(deck).toBeDefined();
+    // In DOM order: queue is rendered before deck (deck follows queue)
+    const position = queue.compareDocumentPosition(deck);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders queue BELOW deck when toggleMiniPlayerQueue returns down direction', async () => {
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockResolvedValueOnce({
+      isExpanded: true,
+      direction: 'down'
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const root = container.querySelector('.mini-player')!;
+    showContextMenuMock.mockResolvedValueOnce('toggleQueue');
+    fireEvent.contextMenu(root);
+
+    const queue = await screen.findByTestId('queue-container');
+    const deck = screen.getByTestId('mini-player-deck');
+
+    expect(queue).toBeDefined();
+    expect(deck).toBeDefined();
+    // In DOM order: deck is rendered before queue (queue follows deck)
+    const position = deck.compareDocumentPosition(queue);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('guards against rapid queue toggle calls while transition is in flight', async () => {
+    let resolveFirstToggle: (val: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolveFirstToggle = resolve;
+    });
+
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(() => pendingPromise);
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const root = container.querySelector('.mini-player')!;
+
+    // Trigger first toggle
+    showContextMenuMock.mockResolvedValueOnce('toggleQueue');
+    fireEvent.contextMenu(root);
+
+    // Allow showContextMenu promise to resolve and start toggleMiniPlayerQueue
+    await Promise.resolve();
+    expect(window.api.miniPlayer.toggleMiniPlayerQueue).toHaveBeenCalledTimes(1);
+
+    // Trigger second toggle while first toggleMiniPlayerQueue is still pending
+    showContextMenuMock.mockResolvedValueOnce('toggleQueue');
+    fireEvent.contextMenu(root);
+    await Promise.resolve();
+
+    // Only one toggle invocation should have been dispatched to native
+    expect(window.api.miniPlayer.toggleMiniPlayerQueue).toHaveBeenCalledTimes(1);
+
+    // Resolve the first toggle
+    resolveFirstToggle!({ isExpanded: true, direction: 'up' });
+    await screen.findByTestId('queue-container');
   });
 });

@@ -198,7 +198,10 @@ const QueueContainer = (props: Props) => {
   if (!isQueueVisible) return null;
 
   return (
-    <div className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]">
+    <div
+      data-testid="queue-container"
+      className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]"
+    >
       {/* Header */}
       <div className="shrink-0 px-4 py-3 [-webkit-app-region:no-drag]">
         <div className="flex items-center justify-between">

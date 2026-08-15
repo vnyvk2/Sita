@@ -1096,8 +1096,6 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
       height: calculatedExpandedHeight
     });
 
-    // Notify renderer of the expansion direction
-    mainWindow.webContents.send('app/miniPlayerQueueDirection', direction);
     return { isExpanded: true, direction, height: calculatedExpandedHeight };
   } else {
     // Collapse back to compact size

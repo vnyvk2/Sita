@@ -190,32 +190,29 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   }, [manageKeyboardShortcuts]);
 
   const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
+  const isQueueTransitioningRef = useRef(false);
 
   const handleToggleQueue = useCallback(async () => {
-    const nextVisible = !isQueueVisible;
-    if (nextVisible) {
-      const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
-      if (result?.direction) {
-        setQueueDirection(result.direction);
+    if (isQueueTransitioningRef.current) return;
+    isQueueTransitioningRef.current = true;
+
+    try {
+      const nextVisible = !isQueueVisible;
+      if (nextVisible) {
+        const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
+        if (result?.direction) {
+          setQueueDirection(result.direction);
+        }
+        setIsQueueVisible(true);
+      } else {
+        setIsQueueVisible(false);
+        setQueueDirection('down');
+        await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
       }
-      setIsQueueVisible(true);
-    } else {
-      setIsQueueVisible(false);
-      setQueueDirection('down');
-      await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+    } finally {
+      isQueueTransitioningRef.current = false;
     }
   }, [isQueueVisible, queueLength]);
-
-  // Listen for external queue direction changes from main process if any
-  useEffect(() => {
-    const handleDirectionChange = (_: unknown, direction: 'up' | 'down') => {
-      setQueueDirection(direction);
-    };
-    window.api.miniPlayer.onQueueDirectionChange(handleDirectionChange);
-    return () => {
-      window.api.miniPlayer.removeQueueDirectionChangeListener(handleDirectionChange);
-    };
-  }, []);
 
   const handleSkipForwardClickWithParams = () => {
     handleSkipForwardClick('USER_SKIP');
@@ -462,6 +459,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
       {/* ═══ MINI PLAYER DECK (Strict fixed hierarchy: TOP -> MIDDLE -> BOTTOM) ═══ */}
       <div
+        data-testid="mini-player-deck"
         className={`mini-player-deck relative flex ${
           isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
         } flex-col overflow-hidden`}
