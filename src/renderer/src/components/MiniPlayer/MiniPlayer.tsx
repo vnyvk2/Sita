@@ -15,6 +15,7 @@ import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../VolumeSlider';
+import CompactLyricsPanel from './CompactLyricsPanel';
 import CompactMiniPlayer from './CompactMiniPlayer';
 import LyricsContainer from './containers/LyricsContainer';
 import QueueContainer from './containers/QueueContainer';
@@ -206,6 +207,37 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
   const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
   const isQueueTransitioningRef = useRef(false);
+  const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
+  const isLyricsTransitioningRef = useRef(false);
+
+  const handleToggleCompactLyrics = useCallback(async () => {
+    if (isLyricsTransitioningRef.current) return;
+    isLyricsTransitioningRef.current = true;
+
+    try {
+      const nextVisible = !isLyricsVisible;
+      if (nextVisible) {
+        // Mutually exclusive: collapse Queue if currently open
+        if (isQueueVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+          setIsQueueVisible(false);
+          setQueueDirection('down');
+        }
+
+        const result = await window.api.miniPlayer.toggleMiniPlayerLyrics(true);
+        if (result?.direction) {
+          setCompactLyricsDirection(result.direction);
+        }
+        setIsLyricsVisible(true);
+      } else {
+        await window.api.miniPlayer.toggleMiniPlayerLyrics(false);
+        setIsLyricsVisible(false);
+        setCompactLyricsDirection('down');
+      }
+    } finally {
+      isLyricsTransitioningRef.current = false;
+    }
+  }, [isLyricsVisible, isQueueVisible, queueLength]);
 
   const handleToggleQueue = useCallback(async () => {
     if (isQueueTransitioningRef.current) return;
@@ -214,6 +246,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     try {
       const nextVisible = !isQueueVisible;
       if (nextVisible) {
+        // Mutually exclusive in Compact Mode: collapse Lyrics if open
+        if (miniPlayerMode === 'compact' && isLyricsVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerLyrics(false);
+          setIsLyricsVisible(false);
+          setCompactLyricsDirection('down');
+        }
+
         const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
         if (result?.direction) {
           setQueueDirection(result.direction);
@@ -227,7 +266,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     } finally {
       isQueueTransitioningRef.current = false;
     }
-  }, [isQueueVisible, queueLength]);
+  }, [isQueueVisible, isLyricsVisible, miniPlayerMode, queueLength]);
 
   const handleSkipForwardClickWithParams = () => {
     handleSkipForwardClick('USER_SKIP');
@@ -449,7 +488,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     // On hover/focus/paused: title bar, song info, controls, seekbar fade in.
     <div
       className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full flex-col overflow-hidden !transition-none select-none ${
-        isQueueVisible && queueDirection === 'up' ? 'justify-end' : 'justify-start'
+        (isQueueVisible && queueDirection === 'up') ||
+        (miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up')
+          ? 'justify-end'
+          : 'justify-start'
       } ${
         !isCurrentSongPlaying && 'paused'
       } ${preferences?.isReducedMotion ? 'reduced-motion' : ''} ${className}`}
@@ -486,13 +528,21 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <QueueContainer isQueueVisible={isQueueVisible} />
       )}
 
+      {/* ── Compact Floating Lyrics Panel (Placed above strip when expanding upward) ── */}
+      {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up' && (
+        <CompactLyricsPanel
+          isLyricsVisible={isLyricsVisible}
+          onClose={handleToggleCompactLyrics}
+        />
+      )}
+
       {/* ── Progressively Revealed Compact Mode Strip OR Standard 3-Tier Deck ── */}
       {miniPlayerMode === 'compact' ? (
         <CompactMiniPlayer
           isQueueVisible={isQueueVisible}
           isLyricsVisible={isLyricsVisible}
           onToggleQueue={handleToggleQueue}
-          onToggleLyrics={() => setIsLyricsVisible((prev) => !prev)}
+          onToggleLyrics={handleToggleCompactLyrics}
           pinnedControls={pinnedControls}
         />
       ) : (
@@ -806,8 +856,16 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <QueueContainer isQueueVisible={isQueueVisible} />
       )}
 
-      {/* ── Lyrics overlay (absolute, within the entire window when lyrics on) ── */}
-      <LyricsContainer isLyricsVisible={isLyricsVisible} />
+      {/* ── Compact Floating Lyrics Panel (Placed below strip when expanding downward) ── */}
+      {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'down' && (
+        <CompactLyricsPanel
+          isLyricsVisible={isLyricsVisible}
+          onClose={handleToggleCompactLyrics}
+        />
+      )}
+
+      {/* ── Standard Mode Lyrics overlay (absolute, within the entire window when lyrics on) ── */}
+      {miniPlayerMode !== 'compact' && <LyricsContainer isLyricsVisible={isLyricsVisible} />}
     </div>
   );
 }

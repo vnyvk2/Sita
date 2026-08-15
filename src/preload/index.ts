@@ -505,6 +505,10 @@ const miniPlayer = {
     queueItemCount?: number
   ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
     ipcRenderer.invoke('app/toggleMiniPlayerQueue', isExpanded, queueItemCount),
+  toggleMiniPlayerLyrics: (
+    isExpanded: boolean
+  ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerLyrics', isExpanded),
   showContextMenu: (template: any[]): Promise<string | null> =>
     ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
   setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>

@@ -1138,7 +1138,11 @@ export async function changePlayerType(type: PlayerTypes) {
   }
 }
 
-export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
+export function expandMiniPlayer(
+  isExpanded: boolean,
+  queueItemCount = 0,
+  customExtensionHeight?: number
+) {
   if (!mainWindow || playerType !== 'mini') return { isExpanded: false, direction: 'down' as const };
 
   const [width, currentHeight] = mainWindow.getSize();
@@ -1155,10 +1159,12 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     const baseHeight = compactHeight;
     const baseY = compactY;
 
-    // Calculate needed queue height based on actual item count
-    const visibleItems = Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS);
-    const queuePanelHeight = visibleItems * QUEUE_ITEM_HEIGHT + QUEUE_HEADER_HEIGHT;
-    const totalHeight = baseHeight + queuePanelHeight;
+    // Calculate needed panel height (either custom extension e.g. lyrics, or queue based on item count)
+    const panelHeight =
+      customExtensionHeight ??
+      (Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS) * QUEUE_ITEM_HEIGHT +
+        QUEUE_HEADER_HEIGHT);
+    const totalHeight = baseHeight + panelHeight;
 
     // Determine available screen space using compact boundaries
     const display = screen.getDisplayMatching(mainWindow.getBounds());
@@ -1166,14 +1172,14 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     const spaceBelow = workArea.y + workArea.height - (baseY + baseHeight);
     const spaceAbove = baseY - workArea.y;
 
-    // Decide direction: pick whichever direction can show MORE of the queue.
+    // Decide direction: pick whichever direction can show MORE of the panel.
     // Default to down only when both directions can fully fit.
     let calculatedExpandedHeight: number;
     let calculatedExpandedY = baseY;
     let direction: 'down' | 'up' = 'down';
 
-    const canFitFullDown = spaceBelow >= queuePanelHeight;
-    const canFitFullUp = spaceAbove >= queuePanelHeight;
+    const canFitFullDown = spaceBelow >= panelHeight;
+    const canFitFullUp = spaceAbove >= panelHeight;
 
     if (canFitFullDown) {
       // Full fit downwards — ideal default
@@ -1197,8 +1203,9 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     expandedHeight = calculatedExpandedHeight;
     expandedDirection = direction;
 
-    logger.debug('Expanding mini player queue', {
+    logger.debug('Expanding mini player spatial extension', {
       queueItemCount,
+      customExtensionHeight,
       direction,
       compactHeight: baseHeight,
       expandedHeight: calculatedExpandedHeight,
@@ -1228,7 +1235,7 @@ export function expandMiniPlayer(isExpanded: boolean, queueItemCount = 0) {
     const restoreY = compactY ?? currentY;
     const restoreX = compactX ?? currentX;
 
-    logger.debug('Collapsing mini player queue', { restoreHeight, restoreY, restoreX, currentMiniPlayerMode });
+    logger.debug('Collapsing mini player extension', { restoreHeight, restoreY, restoreX, currentMiniPlayerMode });
 
     applyMiniPlayerModeConstraints(currentMiniPlayerMode);
     setMiniPlayerBoundsProgrammatically({

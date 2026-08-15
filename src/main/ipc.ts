@@ -657,6 +657,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         expandMiniPlayer(isExpanded, queueItemCount)
     );
 
+    ipcMain.handle('app/toggleMiniPlayerLyrics', (_, isExpanded: boolean) =>
+      expandMiniPlayer(isExpanded, 0, 160)
+    );
+
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>
       toggleMiniPlayerAlwaysOnTop(isMiniPlayerAlwaysOnTop)
     );
