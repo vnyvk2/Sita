@@ -71,7 +71,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
   const {
     toggleSongPlayback,
-    updatePlayerType,
     handleSkipBackwardClick,
     handleSkipForwardClick,
     toggleIsFavorite,
@@ -170,15 +169,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, [measureAndSyncBounds]);
 
-  const manageKeyboardShortcuts = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.ctrlKey) {
-        if (e.key === 'l') setIsLyricsVisible((prevState) => !prevState);
-        if (e.key === 'n') updatePlayerType('normal');
-      }
-    },
-    [updatePlayerType]
-  );
+  const manageKeyboardShortcuts = useCallback((e: KeyboardEvent) => {
+    if (e.ctrlKey && e.key === 'l') {
+      setIsLyricsVisible((prevState) => !prevState);
+    }
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', manageKeyboardShortcuts);
@@ -587,7 +582,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               iconClassName={`text-lg! ${
                 isAFavorite
-                  ? 'meterial-icons-round text-dark-background-color-3!'
+                  ? 'material-icons-round text-dark-background-color-3!'
                   : 'material-icons-round-outlined'
               }`}
               isDisabled={!currentSongData.isKnownSource}

@@ -1,9 +1,9 @@
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { useOpenMainPlayerRoute } from '@renderer/hooks/useOpenMainPlayerRoute';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +23,7 @@ const QueueContainer = (props: Props) => {
 
   const { changeQueueCurrentSongIndex } = useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const openMainPlayerRoute = useOpenMainPlayerRoute();
 
   const listRef = useRef<HTMLDivElement>(null);
   const isFirstScrollRef = useRef(true);
@@ -106,13 +106,18 @@ const QueueContainer = (props: Props) => {
     [changeQueueCurrentSongIndex, viewingQueueIndex, queue.currentQueueIndex, manager]
   );
 
+  const queuedSongsMap = useMemo(() => {
+    if (!queuedSongs) return new Map<number, SongData>();
+    return new Map(queuedSongs.map((s) => [s.songId, s]));
+  }, [queuedSongs]);
+
   const songItems = useMemo(() => {
     if (!queuedSongs) return null;
 
     const currentQueueSongIds = queue.queues[viewingQueueIndex]?.songIds || [];
 
     return currentQueueSongIds.map((id, index) => {
-      const song = queuedSongs.find((s) => s.songId === id);
+      const song = queuedSongsMap.get(id);
       if (!song) return null;
 
       const isActivePosition =
@@ -266,7 +271,7 @@ const QueueContainer = (props: Props) => {
             <button
               className="text-font-color-highlight dark:text-dark-font-color-highlight border-font-color-highlight dark:border-dark-font-color-highlight hover:bg-font-color-highlight rounded-full border px-4 py-2 transition-colors hover:text-white"
               onClick={() => {
-                navigate({
+                openMainPlayerRoute({
                   to: '/main-player/songs',
                   search: { action: 'add-to-queue', queueIndex: viewingQueueIndex }
                 });

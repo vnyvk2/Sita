@@ -1,9 +1,9 @@
-import { useNavigate } from '@tanstack/react-router';
-import { useStore } from '@tanstack/react-store';
 /* eslint-disable jsx-a11y/no-static-element-interactions */
+import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useOpenMainPlayerRoute } from '../../hooks/useOpenMainPlayerRoute';
 import { store } from '../../store/store';
 import Button from '../Button';
 
@@ -18,7 +18,7 @@ const UpNextSongPopup = (props: Props) => {
   const queue = useStore(store, (state) => state.localStorage.queue);
 
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const openMainPlayerRoute = useOpenMainPlayerRoute();
 
   const { onPopupAppears, isSemiTransparent = false, className } = props;
 
@@ -128,12 +128,12 @@ const UpNextSongPopup = (props: Props) => {
   const showSongInfoPage = useCallback(
     (songId: number) =>
       currentSongData.isKnownSource
-        ? navigate({
+        ? openMainPlayerRoute({
             to: '/main-player/songs/$songId',
             params: { songId: String(songId) }
           })
         : undefined,
-    [navigate, currentSongData.isKnownSource]
+    [openMainPlayerRoute, currentSongData.isKnownSource]
   );
 
   return upNextSongData ? (
@@ -165,7 +165,7 @@ const UpNextSongPopup = (props: Props) => {
               className="cursor-pointer outline-offset-1 hover:underline focus-visible:outline!"
               onClick={() =>
                 upNextSongData?.artists![0] &&
-                navigate({
+                openMainPlayerRoute({
                   to: '/main-player/artists/$artistId',
                   params: { artistId: String(upNextSongData.artists[0].artistId) }
                 })
@@ -173,7 +173,7 @@ const UpNextSongPopup = (props: Props) => {
               onKeyDown={(e) =>
                 e.key === 'Enter' &&
                 upNextSongData?.artists![0] &&
-                navigate({
+                openMainPlayerRoute({
                   to: '/main-player/artists/$artistId',
                   params: { artistId: String(upNextSongData.artists[0].artistId) }
                 })

@@ -886,7 +886,7 @@ input[type='checkbox']:checked ~ .checkmark .icon {
   height: clamp(0.5rem, 8cqh, 0.625rem);
 }
 
-.mini-player .container .seek-slider::-webkit-slider-runnable-track {
+.mini-player .seek-slider::-webkit-slider-runnable-track {
   width: 100%;
   height: 0.25rem;
   cursor: pointer;
