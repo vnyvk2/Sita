@@ -28,6 +28,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const isMuted = useStore(store, (state) => state.player.volume.isMuted);
+  const volume = useStore(store, (state) => state.player.volume.value);
   const isRepeating = useStore(store, (state) => state.player.isRepeating);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
@@ -695,10 +696,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             </button>
           )}
 
-          {/* Optional: Volume button + expanding slider */}
+          {/* Optional: Volume button + vertical flyout slider */}
           {pinnedControls.includes('volume') && (
             <div
-              className="mini-optional-btn relative flex shrink-0 items-center"
+              className="mini-optional-btn relative flex shrink-0 items-center justify-center"
               onMouseEnter={() => setIsVolumeHovered(true)}
               onMouseLeave={() => setIsVolumeHovered(false)}
               onFocus={() => setIsVolumeHovered(true)}
@@ -717,17 +718,25 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 clickHandler={() => toggleMutedState(!isMuted)}
                 removeFocusOnClick
               />
-              {/* Volume flyout slider: absolute overlay so it doesn't inflate measured layout geometry */}
+
+              {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
               <div
-                className={`absolute right-full top-1/2 -translate-y-1/2 mr-1 z-30 overflow-hidden transition-[width,opacity] duration-200 ease-in-out ${
-                  isVolumeHovered ? 'w-20 opacity-100' : 'w-0 opacity-0 pointer-events-none'
+                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-2 py-3 shadow-2xl backdrop-blur-md border border-white/10 transition-all duration-200 ease-out ${
+                  isVolumeHovered
+                    ? 'opacity-100 translate-y-0 pointer-events-auto visible scale-100'
+                    : 'opacity-0 translate-y-2 pointer-events-none invisible scale-95'
                 }`}
               >
-                <VolumeSlider
-                  name="mini-player-volume-slider"
-                  id="volumeSlider"
-                  className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight relative float-left m-0 h-6 w-20 appearance-none bg-transparent! p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--volume-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
-                />
+                <span className="text-[10px] font-semibold text-font-color-white/70 mb-2 select-none">
+                  {isMuted ? '0%' : `${Math.round(volume)}%`}
+                </span>
+                <div className="flex h-24 w-6 items-center justify-center overflow-hidden">
+                  <VolumeSlider
+                    name="mini-player-volume-slider"
+                    id="volumeSlider"
+                    className="w-24 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                  />
+                </div>
               </div>
             </div>
           )}
