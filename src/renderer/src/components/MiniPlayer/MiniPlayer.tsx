@@ -881,20 +881,21 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
               {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
               <div
-                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-2 py-3 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:top-full before:inset-x-0 before:h-4 before:bg-transparent transition-all duration-200 ease-out ${
+                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-1.5 py-2 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:top-full before:inset-x-0 before:h-4 before:bg-transparent transition-all duration-200 ease-out ${
                   isVolumeHovered
                     ? 'opacity-100 translate-y-0 pointer-events-auto visible scale-100'
                     : 'opacity-0 translate-y-2 pointer-events-none invisible scale-95'
                 }`}
               >
-                <span className="text-[10px] font-semibold text-font-color-white/70 mb-2 select-none">
+                <span className="text-[10px] font-semibold text-font-color-white/70 mb-1.5 select-none">
                   {isMuted ? '0%' : `${Math.round(volume)}%`}
                 </span>
-                <div className="flex h-32 w-6 items-center justify-center overflow-hidden">
+                <div className="relative flex h-28 w-6 items-center justify-center">
                   <VolumeSlider
                     name="mini-player-volume-slider"
                     id="volumeSlider"
-                    className="w-32 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                    sliderOpacity={0.85}
+                    className="absolute w-28 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
                   />
                 </div>
               </div>
