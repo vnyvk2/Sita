@@ -120,7 +120,10 @@ function setMiniPlayerBoundsProgrammatically(bounds: {
   height: number;
 }) {
   if (!mainWindow) return;
-  programmaticMoveTarget = { x: bounds.x, y: bounds.y };
+  const [currentX, currentY] = mainWindow.getPosition();
+  if (bounds.x !== currentX || bounds.y !== currentY) {
+    programmaticMoveTarget = { x: bounds.x, y: bounds.y };
+  }
   mainWindow.setBounds(bounds, false);
 }
 
@@ -901,10 +904,16 @@ export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) 
 
     // Current-size protection: if the window is currently smaller than the new minimum, expand smoothly
     const [currentW, currentH] = mainWindow.getSize();
+    const [currentX, currentY] = mainWindow.getPosition();
     if (currentW < minWidth || (!isQueueExpanded && currentH < minHeight)) {
       const targetW = Math.max(currentW, minWidth);
       const targetH = isQueueExpanded ? currentH : Math.max(currentH, minHeight);
-      mainWindow.setSize(targetW, targetH, true);
+      setMiniPlayerBoundsProgrammatically({
+        x: currentX,
+        y: currentY,
+        width: targetW,
+        height: targetH
+      });
     }
   }
 }
@@ -921,8 +930,12 @@ export async function resetMiniPlayerToDefault() {
     const targetX = workArea.x + workArea.width - targetWidth - margin;
     const targetY = workArea.y + workArea.height - targetHeight - margin;
 
-    mainWindow.setSize(targetWidth, targetHeight, true);
-    mainWindow.setPosition(targetX, targetY, true);
+    setMiniPlayerBoundsProgrammatically({
+      x: targetX,
+      y: targetY,
+      width: targetWidth,
+      height: targetHeight
+    });
 
     await saveUserSettings({
       miniPlayerWidth: targetWidth,

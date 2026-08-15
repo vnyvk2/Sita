@@ -91,7 +91,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
-  const metaRef = useRef<HTMLDivElement>(null);
   const lastBoundsRef = useRef<{ minWidth: number; minHeight: number } | null>(null);
 
   const measureAndSyncBounds = useCallback(() => {
@@ -111,7 +110,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     const bottomMinWidth =
       artworkWidth + titleFloor + deckGap + controlsWidth + deckPadding;
 
-    // 3. Top layer intrinsic requirement
     // 3. Top layer intrinsic requirement (pip_exit 24px + minimize 36px + close 36px)
     const topMinWidth = 96;
     const topBaseHeight = topRef.current.offsetHeight || 32;
@@ -164,7 +162,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     if (controlsRef.current) observer.observe(controlsRef.current);
     if (bottomRef.current) observer.observe(bottomRef.current);
     if (topRef.current) observer.observe(topRef.current);
-    if (metaRef.current) observer.observe(metaRef.current);
 
     return () => {
       cancelAnimationFrame(rafId);
@@ -543,7 +540,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
           {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
             <div
-              ref={metaRef}
               className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
             >
               {pinnedControls.includes('artwork') && (
@@ -721,9 +717,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 clickHandler={() => toggleMutedState(!isMuted)}
                 removeFocusOnClick
               />
+              {/* Volume flyout slider: absolute overlay so it doesn't inflate measured layout geometry */}
               <div
-                className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
-                  isVolumeHovered ? 'w-20' : 'w-0'
+                className={`absolute right-full top-1/2 -translate-y-1/2 mr-1 z-30 overflow-hidden transition-[width,opacity] duration-200 ease-in-out ${
+                  isVolumeHovered ? 'w-20 opacity-100' : 'w-0 opacity-0 pointer-events-none'
                 }`}
               >
                 <VolumeSlider

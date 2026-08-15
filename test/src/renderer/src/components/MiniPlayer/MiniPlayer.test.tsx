@@ -322,4 +322,110 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     resolveFirstToggle!({ isExpanded: true, direction: 'up' });
     await screen.findByTestId('queue-container');
   });
+
+  it('maintains constant minimum bounds regardless of volume hover state (resting geometry invariant)', async () => {
+    // Mock getBoundingClientRect for controls container
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.classList.contains('mini-deck-controls')) {
+        // Return 180px for the stable controls deck
+        return { width: 180, height: 40, top: 0, left: 0, right: 180, bottom: 40 } as DOMRect;
+      }
+      return originalGetBoundingClientRect.apply(this);
+    };
+
+    try {
+      queryClient.setQueryData(['settings'], {
+        miniPlayerPinnedControls: ['play', 'volume'],
+        isMiniPlayerAlwaysOnTop: false
+      });
+
+      const { container } = render(
+        <QueryClientProvider client={queryClient}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </QueryClientProvider>
+      );
+
+      // Wait for requestAnimationFrame to fire measureAndSyncBounds
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(window.api.miniPlayer.setDynamicMinimumBounds).toHaveBeenCalled();
+      const initialCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      const restingMinWidth = initialCall.minWidth;
+
+      // Hover over volume button
+      const volumeBtn = container.querySelector('.volume-btn')!;
+      expect(volumeBtn).not.toBeNull();
+      fireEvent.mouseEnter(volumeBtn.parentElement!);
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Re-verify that minWidth was NOT increased by volume slider expansion
+      const hoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      expect(hoverCall.minWidth).toBe(restingMinWidth);
+
+      // Unhover
+      fireEvent.mouseLeave(volumeBtn.parentElement!);
+      await new Promise((r) => setTimeout(r, 50));
+
+      const unhoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      expect(unhoverCall.minWidth).toBe(restingMinWidth);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
+  });
+
+  it('dynamically recalculates minimum bounds when controls are pinned', async () => {
+    let mockControlsWidth = 100;
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.classList.contains('mini-deck-controls')) {
+        return { width: mockControlsWidth, height: 40, top: 0, left: 0, right: mockControlsWidth, bottom: 40 } as DOMRect;
+      }
+      return originalGetBoundingClientRect.apply(this);
+    };
+
+    try {
+      queryClient.setQueryData(['settings'], {
+        miniPlayerPinnedControls: ['play'],
+        isMiniPlayerAlwaysOnTop: false
+      });
+
+      const { rerender } = render(
+        <QueryClientProvider client={queryClient}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </QueryClientProvider>
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const baseCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      const baseMinWidth = baseCall.minWidth;
+
+      // Simulate pinning artwork, title, and queue which increases controls width
+      mockControlsWidth = 220;
+      queryClient.setQueryData(['settings'], {
+        miniPlayerPinnedControls: ['play', 'artwork', 'title', 'queue'],
+        isMiniPlayerAlwaysOnTop: false
+      });
+
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </QueryClientProvider>
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const updatedCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      expect(updatedCall.minWidth).toBeGreaterThan(baseMinWidth);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
+  });
 });
