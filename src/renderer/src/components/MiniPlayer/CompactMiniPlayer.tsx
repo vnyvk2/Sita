@@ -21,7 +21,7 @@ import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import VolumeSlider from '../VolumeSlider';
 
-export const COMPACT_MINI_PLAYER_HEIGHT = 64;
+const COMPACT_MINI_PLAYER_HEIGHT = 64;
 
 const COMPACT_OPTIONAL_PRIORITY = [
   'love',
@@ -80,6 +80,44 @@ const CompactMiniPlayer = (props: Props) => {
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [songSecond, setSongSecond] = useState(0);
   const currentFloorSecondRef = useRef(0);
+
+  const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleVolumeMouseEnter = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+      volumeHoverTimeoutRef.current = null;
+    }
+    setIsVolumeHovered(true);
+  }, []);
+
+  const handleVolumeMouseLeave = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+    }
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setIsVolumeHovered(false);
+    }, 180);
+  }, []);
+
+  const handleVolumeBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+      volumeHoverTimeoutRef.current = setTimeout(() => {
+        setIsVolumeHovered(false);
+      }, 180);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Position updates for elapsed time counter
   useEffect(() => {
@@ -263,10 +301,10 @@ const CompactMiniPlayer = (props: Props) => {
           {visibleOptionalControls.includes('volume') && (
             <div
               className="compact-volume-container relative flex shrink-0 items-center justify-center"
-              onMouseEnter={() => setIsVolumeHovered(true)}
-              onMouseLeave={() => setIsVolumeHovered(false)}
-              onFocus={() => setIsVolumeHovered(true)}
-              onBlur={() => setIsVolumeHovered(false)}
+              onMouseEnter={handleVolumeMouseEnter}
+              onMouseLeave={handleVolumeMouseLeave}
+              onFocus={handleVolumeMouseEnter}
+              onBlur={handleVolumeBlur}
             >
               <Button
                 className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
@@ -284,7 +322,7 @@ const CompactMiniPlayer = (props: Props) => {
 
               {/* Horizontal Volume Flyout Card (Absolute overlay extending leftwards into metadata area) */}
               <div
-                className={`volume-flyout-card absolute right-full top-1/2 -translate-y-1/2 mr-1.5 z-40 flex items-center gap-1.5 rounded-full bg-[rgba(20,20,24,0.96)] px-2.5 py-1 shadow-2xl backdrop-blur-md border border-white/10 transition-all duration-200 ease-out ${
+                className={`volume-flyout-card absolute right-full top-1/2 -translate-y-1/2 mr-1.5 z-40 flex items-center gap-1.5 rounded-full bg-[rgba(20,20,24,0.96)] px-2.5 py-1 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:inset-y-0 before:left-full before:w-3 before:bg-transparent transition-all duration-200 ease-out ${
                   isVolumeHovered
                     ? 'opacity-100 translate-x-0 pointer-events-auto visible scale-100'
                     : 'opacity-0 translate-x-2 pointer-events-none invisible scale-95'

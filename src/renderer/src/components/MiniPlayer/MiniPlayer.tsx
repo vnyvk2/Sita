@@ -92,6 +92,44 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [queueDirection, setQueueDirection] = useState<'down' | 'up'>('down');
 
+  const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleVolumeMouseEnter = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+      volumeHoverTimeoutRef.current = null;
+    }
+    setIsVolumeHovered(true);
+  }, []);
+
+  const handleVolumeMouseLeave = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+    }
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setIsVolumeHovered(false);
+    }, 180);
+  }, []);
+
+  const handleVolumeBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+      volumeHoverTimeoutRef.current = setTimeout(() => {
+        setIsVolumeHovered(false);
+      }, 180);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -804,10 +842,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           {pinnedControls.includes('volume') && (
             <div
               className="mini-optional-btn relative flex shrink-0 items-center justify-center"
-              onMouseEnter={() => setIsVolumeHovered(true)}
-              onMouseLeave={() => setIsVolumeHovered(false)}
-              onFocus={() => setIsVolumeHovered(true)}
-              onBlur={() => setIsVolumeHovered(false)}
+              onMouseEnter={handleVolumeMouseEnter}
+              onMouseLeave={handleVolumeMouseLeave}
+              onFocus={handleVolumeMouseEnter}
+              onBlur={handleVolumeBlur}
             >
               <Button
                 className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
@@ -825,7 +863,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
               {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
               <div
-                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-2 py-3 shadow-2xl backdrop-blur-md border border-white/10 transition-all duration-200 ease-out ${
+                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-2 py-3 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:top-full before:inset-x-0 before:h-4 before:bg-transparent transition-all duration-200 ease-out ${
                   isVolumeHovered
                     ? 'opacity-100 translate-y-0 pointer-events-auto visible scale-100'
                     : 'opacity-0 translate-y-2 pointer-events-none invisible scale-95'
@@ -834,11 +872,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 <span className="text-[10px] font-semibold text-font-color-white/70 mb-2 select-none">
                   {isMuted ? '0%' : `${Math.round(volume)}%`}
                 </span>
-                <div className="flex h-24 w-6 items-center justify-center overflow-hidden">
+                <div className="flex h-32 w-6 items-center justify-center overflow-hidden">
                   <VolumeSlider
                     name="mini-player-volume-slider"
                     id="volumeSlider"
-                    className="w-24 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                    className="w-32 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
                   />
                 </div>
               </div>
