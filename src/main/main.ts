@@ -395,6 +395,13 @@ app
 
     mainWindow.on('restore', () => recordWindowState('normal'));
 
+    mainWindow.on('system-context-menu', (event) => {
+      event.preventDefault();
+      if (playerType === 'mini') {
+        sendMessageToRenderer({ messageCode: 'SHOW_MINI_PLAYER_CONTEXT_MENU' });
+      }
+    });
+
     // app.setPath('crashDumps', path.join(app.getPath('userData'), 'crashDumps'));
 
     app.on('will-finish-launching', () => {
