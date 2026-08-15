@@ -339,9 +339,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   );
 
   const handleContextMenu = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    async (e?: React.MouseEvent) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const template = [
         {
           id: 'compactMode',
@@ -530,6 +532,22 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       miniPlayerMode
     ]
   );
+
+  // Listen for native system context menu triggers (e.g. right-clicks on draggable regions on Windows)
+  useEffect(() => {
+    const handleMainMessage = (_: unknown, messageCode: MessageCodes) => {
+      if (messageCode === 'SHOW_MINI_PLAYER_CONTEXT_MENU') {
+        handleContextMenu();
+      }
+    };
+    if (window.api?.messages?.getMessageFromMain) {
+      window.api.messages.getMessageFromMain(handleMainMessage);
+      return () => {
+        window.api.messages.removeMessageToRendererEventListener?.(handleMainMessage);
+      };
+    }
+    return undefined;
+  }, [handleContextMenu]);
 
   // Controls and UI chrome are visible when: hovered, focused, or paused
   const showControls = !isCurrentSongPlaying;

@@ -555,4 +555,31 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
 
     expect(window.api.miniPlayer.toggleMiniPlayerLyrics).toHaveBeenCalledWith(true);
   });
+
+  it('triggers showContextMenu when receiving SHOW_MINI_PLAYER_CONTEXT_MENU from main process', async () => {
+    let messageCallback: ((_: unknown, code: string) => void) | undefined;
+    window.api = {
+      ...window.api,
+      messages: {
+        getMessageFromMain: vi.fn((cb) => {
+          messageCallback = cb;
+        }),
+        removeMessageToRendererEventListener: vi.fn()
+      }
+    } as any;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    expect(window.api.messages.getMessageFromMain).toHaveBeenCalled();
+    messageCallback?.(null, 'SHOW_MINI_PLAYER_CONTEXT_MENU');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(showContextMenuMock).toHaveBeenCalled();
+  });
 });

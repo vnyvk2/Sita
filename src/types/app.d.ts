@@ -1020,7 +1020,8 @@ declare global {
     | 'ARTWORK_SAVED'
     | 'RESYNC_SUCCESSFUL'
     | 'LIBRARY_SCHEDULER_UPDATE'
-    | 'LIBRARY_BATCH_COMPLETE';
+    | 'LIBRARY_BATCH_COMPLETE'
+    | 'SHOW_MINI_PLAYER_CONTEXT_MENU';
 
   interface RunningJobInfo {
     id: string;
