@@ -16,7 +16,7 @@ vi.mock('react-i18next', async (importOriginal) => {
   };
 });
 
-describe('CompactLyricsPanel (3-Line Focused Synced Lyrics Panel)', () => {
+describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
   const mockGetSongLyrics = vi.fn();
 
   beforeEach(() => {
@@ -57,7 +57,7 @@ describe('CompactLyricsPanel (3-Line Focused Synced Lyrics Panel)', () => {
     vi.clearAllMocks();
   });
 
-  it('renders 3-line focused synced lyrics and updates active line on position change', async () => {
+  it('renders scrollable synced lyrics and updates active line on position change', async () => {
     mockGetSongLyrics.mockResolvedValue({
       lyrics: {
         isSynced: true,
