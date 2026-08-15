@@ -664,6 +664,7 @@ export const USER_DATA_TEMPLATE: UserData = {
   lastFmSessionKey: null,
   lastFmSessionName: null,
   miniPlayerPinnedControls: ['love', 'lyrics', 'volume'],
+  miniPlayerMode: 'standard',
   mainWindowX: null,
   mainWindowY: null,
   mainWindowWidth: null,

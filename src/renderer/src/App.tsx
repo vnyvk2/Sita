@@ -233,18 +233,31 @@ export default function App() {
     playSong
   });
 
+  const transitionTokenRef = useRef(0);
+
   const updatePlayerType = useCallback(async (type: PlayerTypes) => {
     if (store.state.playerType !== type) {
+      const currentToken = ++transitionTokenRef.current;
+
       if (type === 'normal') {
         await window.api.windowControls.changePlayerType(type);
-        dispatch({ type: 'UPDATE_PLAYER_TYPE', data: type });
+        if (currentToken === transitionTokenRef.current) {
+          dispatch({ type: 'UPDATE_PLAYER_TYPE', data: type });
+        }
       } else if (type === 'mini') {
         dispatch({ type: 'UPDATE_PLAYER_TYPE', data: type });
-        setTimeout(() => {
-          window.api.windowControls.changePlayerType(type);
-        }, 50);
+        // Allow the mini-player route component to mount before resizing the native window
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+        if (currentToken === transitionTokenRef.current) {
+          await window.api.windowControls.changePlayerType(type);
+        }
       } else {
         dispatch({ type: 'UPDATE_PLAYER_TYPE', data: type });
+        if (currentToken === transitionTokenRef.current) {
+          await window.api.windowControls.changePlayerType(type);
+        }
       }
     }
   }, []);

@@ -500,16 +500,23 @@ const log = {
 const miniPlayer = {
   toggleMiniPlayerAlwaysOnTop: (isMiniPlayerAlwaysOnTop: boolean): Promise<void> =>
     ipcRenderer.invoke('app/toggleMiniPlayerAlwaysOnTop', isMiniPlayerAlwaysOnTop),
-  toggleMiniPlayerQueue: (isExpanded: boolean, queueItemCount?: number): void =>
-    ipcRenderer.send('app/toggleMiniPlayerQueue', isExpanded, queueItemCount),
-  onQueueDirectionChange: (callback: (_: unknown, direction: 'up' | 'down') => void) =>
-    ipcRenderer.on('app/miniPlayerQueueDirection', callback),
-  removeQueueDirectionChangeListener: (callback: (_: unknown, direction: 'up' | 'down') => void) =>
-    ipcRenderer.removeListener('app/miniPlayerQueueDirection', callback),
+  toggleMiniPlayerQueue: (
+    isExpanded: boolean,
+    queueItemCount?: number
+  ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerQueue', isExpanded, queueItemCount),
+  toggleMiniPlayerLyrics: (
+    isExpanded: boolean
+  ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerLyrics', isExpanded),
   showContextMenu: (template: any[]): Promise<string | null> =>
     ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
   setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>
     ipcRenderer.invoke('app/setMiniPlayerMinimumBounds', bounds),
+  setMiniPlayerMode: (
+    mode: 'standard' | 'compact'
+  ): Promise<{ mode: 'standard' | 'compact' }> =>
+    ipcRenderer.invoke('app/setMiniPlayerMode', mode),
   resetToDefaultPosition: (): Promise<void> => ipcRenderer.invoke('app/resetMiniPlayerToDefault')
 };
 

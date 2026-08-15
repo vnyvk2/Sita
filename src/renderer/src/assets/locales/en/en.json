@@ -747,7 +747,8 @@
     "compactMode": "Compact Mode",
     "artwork": "Artwork",
     "trackInfo": "Track Info",
-    "panelLayout": "Panel Layout"
+    "panelLayout": "Panel Layout",
+    "resetToDefault": "Reset to default position"
   },
 
   "time": {

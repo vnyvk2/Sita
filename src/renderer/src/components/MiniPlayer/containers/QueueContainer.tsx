@@ -1,9 +1,9 @@
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { useOpenMainPlayerRoute } from '@renderer/hooks/useOpenMainPlayerRoute';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,9 +23,10 @@ const QueueContainer = (props: Props) => {
 
   const { changeQueueCurrentSongIndex } = useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const openMainPlayerRoute = useOpenMainPlayerRoute();
 
   const listRef = useRef<HTMLDivElement>(null);
+  const isFirstScrollRef = useRef(true);
 
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
 
@@ -51,6 +52,11 @@ const QueueContainer = (props: Props) => {
 
   // Auto-scroll to the currently playing song when the queue opens
   useEffect(() => {
+    if (!isQueueVisible) {
+      isFirstScrollRef.current = true;
+      return;
+    }
+
     const activeQueue = queue.queues[queue.currentQueueIndex];
 
     if (
@@ -65,8 +71,10 @@ const QueueContainer = (props: Props) => {
         const itemHeight = 52;
         const containerHeight = listRef.current.clientHeight;
         const scrollTarget = activeIndex * itemHeight - containerHeight / 2 + itemHeight / 2;
+        const behavior = isFirstScrollRef.current ? 'instant' : 'smooth';
+        isFirstScrollRef.current = false;
         requestAnimationFrame(() => {
-          listRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+          listRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior });
         });
       }
     }
@@ -98,13 +106,18 @@ const QueueContainer = (props: Props) => {
     [changeQueueCurrentSongIndex, viewingQueueIndex, queue.currentQueueIndex, manager]
   );
 
+  const queuedSongsMap = useMemo(() => {
+    if (!queuedSongs) return new Map<number, SongData>();
+    return new Map(queuedSongs.map((s) => [s.songId, s]));
+  }, [queuedSongs]);
+
   const songItems = useMemo(() => {
     if (!queuedSongs) return null;
 
     const currentQueueSongIds = queue.queues[viewingQueueIndex]?.songIds || [];
 
     return currentQueueSongIds.map((id, index) => {
-      const song = queuedSongs.find((s) => s.songId === id);
+      const song = queuedSongsMap.get(id);
       if (!song) return null;
 
       const isActivePosition =
@@ -179,6 +192,7 @@ const QueueContainer = (props: Props) => {
     });
   }, [
     queuedSongs,
+    queuedSongsMap,
     queue.queues,
     viewingQueueIndex,
     queue.currentQueueIndex,
@@ -190,13 +204,16 @@ const QueueContainer = (props: Props) => {
   if (!isQueueVisible) return null;
 
   return (
-    <div className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md">
+    <div
+      data-testid="queue-container"
+      className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]"
+    >
       {/* Header */}
-      <div className="shrink-0 px-4 py-3">
+      <div className="shrink-0 px-4 py-3 [-webkit-app-region:no-drag]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev > 0 ? prev - 1 : queue.queues.length - 1))
@@ -204,7 +221,7 @@ const QueueContainer = (props: Props) => {
             >
               <span className="material-icons-round text-sm">chevron_left</span>
             </button>
-            <span className="text-font-color-white text-xs font-semibold tracking-wider uppercase opacity-60">
+            <span className="text-font-color-white text-xs font-semibold tracking-wider uppercase opacity-60 select-none">
               {viewingQueueIndex === queue.currentQueueIndex
                 ? t('currentQueuePage.queue', 'Currently Playing Queue')
                 : queue.queues[viewingQueueIndex]?.metadata?.title ||
@@ -213,7 +230,7 @@ const QueueContainer = (props: Props) => {
                     : `Queue ${viewingQueueIndex + 1}`)}
             </span>
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev < queue.queues.length - 1 ? prev + 1 : 0))
@@ -224,7 +241,7 @@ const QueueContainer = (props: Props) => {
             {viewingQueueIndex !== queue.currentQueueIndex &&
               (queue.queues[viewingQueueIndex]?.songIds?.length ?? 0) > 0 && (
                 <button
-                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 items-center justify-center rounded-full transition-colors focus-visible:outline-none"
+                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 items-center justify-center rounded-full transition-colors focus-visible:outline-none [-webkit-app-region:no-drag] cursor-pointer"
                   title={t('common.play', 'Play')}
                   onClick={() => {
                     if (manager) {
@@ -255,7 +272,7 @@ const QueueContainer = (props: Props) => {
             <button
               className="text-font-color-highlight dark:text-dark-font-color-highlight border-font-color-highlight dark:border-dark-font-color-highlight hover:bg-font-color-highlight rounded-full border px-4 py-2 transition-colors hover:text-white"
               onClick={() => {
-                navigate({
+                openMainPlayerRoute({
                   to: '/main-player/songs',
                   search: { action: 'add-to-queue', queueIndex: viewingQueueIndex }
                 });

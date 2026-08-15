@@ -463,6 +463,7 @@ declare global {
     windowState: string;
     recentSearches: string[];
     miniPlayerPinnedControls: string[];
+    miniPlayerMode?: 'standard' | 'compact';
     customLrcFilesSaveLocation: string | null;
     lastFmSessionName: string | null;
     lastFmSessionKey: string | null;

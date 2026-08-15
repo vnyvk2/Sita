@@ -570,6 +570,12 @@ export const userSettings = pgTable(
       .notNull()
       .default(['love', 'lyrics', 'volume']),
 
+    // Mini Player mode (standard 3-tier deck vs compact 1-tier progressive strip)
+    miniPlayerMode: varchar('mini_player_mode', { length: 20 })
+      .$type<'standard' | 'compact'>()
+      .notNull()
+      .default('standard'),
+
     // Optional settings
     customLrcFilesSaveLocation: text('custom_lrc_files_save_location'),
 

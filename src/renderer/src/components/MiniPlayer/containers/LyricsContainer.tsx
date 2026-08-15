@@ -1,6 +1,6 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import useSkipLyricsLines from '../../../hooks/useSkipLyricsLines';
@@ -19,10 +19,12 @@ const LyricsContainer = (props: Props) => {
   const { isLyricsVisible } = props;
 
   const [lyrics, setLyrics] = useState<SongLyrics | null | undefined>(null);
+  const requestIdRef = useRef(0);
   useSkipLyricsLines(lyrics);
 
   useEffect(() => {
     if (isLyricsVisible) {
+      const currentRequestId = ++requestIdRef.current;
       setLyrics(null);
       window.api.lyrics
         .getSongLyrics({
@@ -35,6 +37,7 @@ const LyricsContainer = (props: Props) => {
           duration: currentSongData.duration
         })
         .then(async (res) => {
+          if (currentRequestId !== requestIdRef.current) return;
           setLyrics(res);
 
           if (
@@ -42,18 +45,28 @@ const LyricsContainer = (props: Props) => {
             !res?.lyrics.isReset &&
             !res?.lyrics.isTranslated
           ) {
-            setLyrics(await window.api.lyrics.getTranslatedLyrics(i18n.language as LanguageCodes));
+            const translated = await window.api.lyrics.getTranslatedLyrics(i18n.language as LanguageCodes);
+            if (currentRequestId !== requestIdRef.current) return;
+            setLyrics(translated);
           }
           if (preferences.autoConvertLyrics && !res?.lyrics.isReset && !res?.lyrics.isRomanized) {
-            if (res?.lyrics.originalLanguage == 'zh')
-              setLyrics(await window.api.lyrics.convertLyricsToPinyin());
-            else if (res?.lyrics.originalLanguage == 'ja')
-              setLyrics(await window.api.lyrics.romanizeLyrics());
-            else if (res?.lyrics.originalLanguage == 'ko')
-              setLyrics(await window.api.lyrics.convertLyricsToRomaja());
+            let converted: SongLyrics | null | undefined;
+            if (res?.lyrics.originalLanguage === 'zh')
+              converted = await window.api.lyrics.convertLyricsToPinyin();
+            else if (res?.lyrics.originalLanguage === 'ja')
+              converted = await window.api.lyrics.romanizeLyrics();
+            else if (res?.lyrics.originalLanguage === 'ko')
+              converted = await window.api.lyrics.convertLyricsToRomaja();
+
+            if (currentRequestId !== requestIdRef.current) return;
+            if (converted) setLyrics(converted);
           }
         })
-        .catch((err) => console.error(err));
+        .catch((err) => {
+          if (currentRequestId === requestIdRef.current) {
+            console.error(err);
+          }
+        });
     }
   }, [
     currentSongData.album?.name,
@@ -145,15 +158,15 @@ const LyricsContainer = (props: Props) => {
       }`}
       id="miniPlayerLyricsContainer"
     >
-      {isLyricsVisible && lyricsComponents.length > 0 && lyrics && lyrics.lyrics.isSynced && (
+      {isLyricsVisible && lyricsComponents.length > 0 && lyrics && (
         <>
           {lyricsComponents}
           {lyricsSource}
         </>
       )}
-      {isLyricsVisible && lyrics && !lyrics.lyrics.isSynced && (
+      {isLyricsVisible && lyrics && lyricsComponents.length === 0 && (
         <div className="text-font-color-white flex h-full w-full items-center justify-center opacity-75">
-          {t('lyricsPage.noSyncedLyrics')}
+          {t('lyricsPage.noLyrics')}
         </div>
       )}
       {isLyricsVisible && lyrics === undefined && (

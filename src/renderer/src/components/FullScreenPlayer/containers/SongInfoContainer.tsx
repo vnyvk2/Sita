@@ -96,7 +96,7 @@ const SongInfoContainer = (props: Props) => {
               className="favorite-btn bg-background-color-3/15! text-font-color-white hover:bg-background-color-3/30! dark:text-font-color-white dark:after:bg-dark-font-color-highlight h-fit cursor-pointer border-0! p-3! outline-offset-1 backdrop-blur-lg! transition-[background] focus-visible:outline!"
               iconClassName={`!text-2xl ${
                 currentSongData.isAFavorite
-                  ? 'meterial-icons-round text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                  ? 'material-icons-round text-font-color-highlight! dark:text-dark-font-color-highlight!'
                   : 'material-icons-round-outlined'
               }`}
               isDisabled={!currentSongData.isKnownSource}

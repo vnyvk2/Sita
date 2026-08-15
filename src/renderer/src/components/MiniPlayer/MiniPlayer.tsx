@@ -15,6 +15,8 @@ import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../VolumeSlider';
+import CompactLyricsPanel from './CompactLyricsPanel';
+import CompactMiniPlayer from './CompactMiniPlayer';
 import LyricsContainer from './containers/LyricsContainer';
 import QueueContainer from './containers/QueueContainer';
 import TitleBarContainer from './containers/TitleBarContainer';
@@ -28,6 +30,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const isMuted = useStore(store, (state) => state.player.volume.isMuted);
+  const volume = useStore(store, (state) => state.player.volume.value);
   const isRepeating = useStore(store, (state) => state.player.isRepeating);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
@@ -37,13 +40,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     ...settingsQuery.all,
     select: (data) => ({
       miniPlayerPinnedControls: data.miniPlayerPinnedControls,
-      isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop
+      isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop,
+      miniPlayerMode: data.miniPlayerMode
     })
   });
   const pinnedControls = useMemo(
     () => settings?.miniPlayerPinnedControls || ['love', 'lyrics', 'volume'],
     [settings?.miniPlayerPinnedControls]
   );
+  const miniPlayerMode = settings?.miniPlayerMode || 'standard';
 
   const { mutate: toggleAlwaysOnTop } = useMutation({
     mutationKey: settingsMutation.toggleMiniPlayerAlwaysOnTop.mutationKey,
@@ -70,7 +75,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
   const {
     toggleSongPlayback,
-    updatePlayerType,
     handleSkipBackwardClick,
     handleSkipForwardClick,
     toggleIsFavorite,
@@ -88,13 +92,69 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [queueDirection, setQueueDirection] = useState<'down' | 'up'>('down');
 
+  const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleVolumeMouseEnter = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+      volumeHoverTimeoutRef.current = null;
+    }
+    setIsVolumeHovered(true);
+  }, []);
+
+  const handleVolumeMouseLeave = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+    }
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setIsVolumeHovered(false);
+    }, 180);
+  }, []);
+
+  const handleVolumeBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+      volumeHoverTimeoutRef.current = setTimeout(() => {
+        setIsVolumeHovered(false);
+      }, 180);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
-  const metaRef = useRef<HTMLDivElement>(null);
   const lastBoundsRef = useRef<{ minWidth: number; minHeight: number } | null>(null);
 
   const measureAndSyncBounds = useCallback(() => {
+    if (miniPlayerMode === 'compact') {
+      const calculatedMinWidth = 200;
+      const calculatedMinHeight = 64;
+
+      const prev = lastBoundsRef.current;
+      if (
+        !prev ||
+        Math.abs(prev.minWidth - calculatedMinWidth) >= 1 ||
+        Math.abs(prev.minHeight - calculatedMinHeight) >= 1
+      ) {
+        lastBoundsRef.current = { minWidth: calculatedMinWidth, minHeight: calculatedMinHeight };
+        window.api.miniPlayer.setDynamicMinimumBounds({
+          minWidth: calculatedMinWidth,
+          minHeight: calculatedMinHeight
+        });
+      }
+      return;
+    }
+
     if (!controlsRef.current || !bottomRef.current || !topRef.current) return;
 
     // 1. Controls deck intrinsic width (rigid playback buttons + pinned actions)
@@ -111,7 +171,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     const bottomMinWidth =
       artworkWidth + titleFloor + deckGap + controlsWidth + deckPadding;
 
-    // 3. Top layer intrinsic requirement
     // 3. Top layer intrinsic requirement (pip_exit 24px + minimize 36px + close 36px)
     const topMinWidth = 96;
     const topBaseHeight = topRef.current.offsetHeight || 32;
@@ -164,7 +223,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     if (controlsRef.current) observer.observe(controlsRef.current);
     if (bottomRef.current) observer.observe(bottomRef.current);
     if (topRef.current) observer.observe(topRef.current);
-    if (metaRef.current) observer.observe(metaRef.current);
 
     return () => {
       cancelAnimationFrame(rafId);
@@ -172,14 +230,56 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, [measureAndSyncBounds]);
 
+  const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
+  const isQueueTransitioningRef = useRef(false);
+  const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
+  const isLyricsTransitioningRef = useRef(false);
+
+  const handleToggleCompactLyrics = useCallback(async () => {
+    if (isLyricsTransitioningRef.current) return;
+    isLyricsTransitioningRef.current = true;
+
+    try {
+      const nextVisible = !isLyricsVisible;
+      if (nextVisible) {
+        // Mutually exclusive: collapse Queue if currently open
+        if (isQueueVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+          setIsQueueVisible(false);
+          setQueueDirection('down');
+        }
+
+        const result = await window.api.miniPlayer.toggleMiniPlayerLyrics(true);
+        if (result?.direction) {
+          setCompactLyricsDirection(result.direction);
+        }
+        setIsLyricsVisible(true);
+      } else {
+        await window.api.miniPlayer.toggleMiniPlayerLyrics(false);
+        setIsLyricsVisible(false);
+        setCompactLyricsDirection('down');
+      }
+    } finally {
+      isLyricsTransitioningRef.current = false;
+    }
+  }, [isLyricsVisible, isQueueVisible, queueLength]);
+
+  const handleToggleLyrics = useCallback(() => {
+    if (miniPlayerMode === 'compact') {
+      handleToggleCompactLyrics();
+      return;
+    }
+
+    setIsLyricsVisible((prev) => !prev);
+  }, [miniPlayerMode, handleToggleCompactLyrics]);
+
   const manageKeyboardShortcuts = useCallback(
     (e: KeyboardEvent) => {
-      if (e.ctrlKey) {
-        if (e.key === 'l') setIsLyricsVisible((prevState) => !prevState);
-        if (e.key === 'n') updatePlayerType('normal');
+      if (e.ctrlKey && e.key === 'l') {
+        handleToggleLyrics();
       }
     },
-    [updatePlayerType]
+    [handleToggleLyrics]
   );
 
   useEffect(() => {
@@ -189,23 +289,34 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, [manageKeyboardShortcuts]);
 
-  const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
+  const handleToggleQueue = useCallback(async () => {
+    if (isQueueTransitioningRef.current) return;
+    isQueueTransitioningRef.current = true;
 
-  useEffect(() => {
-    window.api.miniPlayer.toggleMiniPlayerQueue(isQueueVisible, queueLength);
-    if (!isQueueVisible) setQueueDirection('down');
-  }, [isQueueVisible, queueLength]);
+    try {
+      const nextVisible = !isQueueVisible;
+      if (nextVisible) {
+        // Mutually exclusive in Compact Mode: collapse Lyrics if open
+        if (miniPlayerMode === 'compact' && isLyricsVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerLyrics(false);
+          setIsLyricsVisible(false);
+          setCompactLyricsDirection('down');
+        }
 
-  // Listen for queue direction changes from main process
-  useEffect(() => {
-    const handleDirectionChange = (_: unknown, direction: 'up' | 'down') => {
-      setQueueDirection(direction);
-    };
-    window.api.miniPlayer.onQueueDirectionChange(handleDirectionChange);
-    return () => {
-      window.api.miniPlayer.removeQueueDirectionChangeListener(handleDirectionChange);
-    };
-  }, []);
+        const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
+        if (result?.direction) {
+          setQueueDirection(result.direction);
+        }
+        setIsQueueVisible(true);
+      } else {
+        await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+        setIsQueueVisible(false);
+        setQueueDirection('down');
+      }
+    } finally {
+      isQueueTransitioningRef.current = false;
+    }
+  }, [isQueueVisible, isLyricsVisible, miniPlayerMode, queueLength]);
 
   const handleSkipForwardClickWithParams = () => {
     handleSkipForwardClick('USER_SKIP');
@@ -234,7 +345,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const template = [
         {
           id: 'compactMode',
-          label: t('miniPlayer.compactMode', 'Compact Mode')
+          label:
+            miniPlayerMode === 'compact'
+              ? t('miniPlayer.switchToStandardMode', 'Switch to Standard Mode')
+              : t('miniPlayer.switchToCompactMode', 'Switch to Compact Mode')
         },
         {
           id: 'toggleQueue',
@@ -262,6 +376,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             }`,
             settings?.isMiniPlayerAlwaysOnTop ? 'Disable Always on Top' : 'Always on Top'
           )
+        },
+        {
+          id: 'resetMiniPlayer',
+          label: t('miniPlayer.resetToDefault', 'Reset to Default Position')
         },
         { type: 'separator' },
         {
@@ -328,11 +446,18 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const clickedId = await window.api.miniPlayer.showContextMenu(template);
 
       switch (clickedId) {
-        case 'compactMode':
-          // Placeholder for Compact Mode (to be implemented with intrinsic sizing engine in Task 2/3)
+        case 'compactMode': {
+          const nextMode = miniPlayerMode === 'compact' ? 'standard' : 'compact';
+          if (nextMode === 'compact') {
+            setIsQueueVisible(false);
+            setIsLyricsVisible(false);
+          }
+          await window.api.miniPlayer.setMiniPlayerMode(nextMode);
+          queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
+        }
         case 'toggleQueue':
-          setIsQueueVisible((prev) => !prev);
+          handleToggleQueue();
           break;
         case 'togglePlay':
           if (isCurrentSongPlaying) toggleSongPlayback();
@@ -347,13 +472,16 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           toggleRepeat();
           break;
         case 'toggleLyrics':
-          setIsLyricsVisible((prev) => !prev);
+          handleToggleLyrics();
           break;
         case 'search':
           /* TODO: open search */
           break;
         case 'toggleAlwaysOnTop':
           toggleAlwaysOnTop(!settings?.isMiniPlayerAlwaysOnTop);
+          break;
+        case 'resetMiniPlayer':
+          window.api.miniPlayer.resetToDefaultPosition();
           break;
         case 'pin_artwork':
           handleTogglePinnedControl('artwork');
@@ -396,7 +524,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       toggleSongPlayback,
       toggleQueueShuffle,
       settings?.isMiniPlayerAlwaysOnTop,
-      toggleAlwaysOnTop
+      toggleAlwaysOnTop,
+      handleToggleQueue,
+      handleToggleLyrics,
+      miniPlayerMode
     ]
   );
 
@@ -408,42 +539,76 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     // At rest (playing, not hovered): ONLY album art visible.
     // On hover/focus/paused: title bar, song info, controls, seekbar fade in.
     <div
-      className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full ${isQueueVisible && queueDirection === 'up' ? 'flex-col-reverse' : 'flex-col'} overflow-hidden !transition-none select-none ${
+      className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full flex-col overflow-hidden !transition-none select-none ${
+        (isQueueVisible && queueDirection === 'up') ||
+        (miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up')
+          ? 'justify-end'
+          : 'justify-start'
+      } ${
         !isCurrentSongPlaying && 'paused'
       } ${preferences?.isReducedMotion ? 'reduced-motion' : ''} ${className}`}
       onContextMenu={handleContextMenu}
     >
-      {/* ── Background Album Art (absolute, behind all tiers) ──────────────── */}
-      <div className="background-cover-img-container absolute inset-0 h-full w-full overflow-hidden">
-        <Img
-          src={currentSongData.artworkPath}
-          fallbackSrc={DefaultSongCover}
-          loading="eager"
-          alt="Song Cover"
-          className={`h-full w-full object-cover transition-[filter] delay-100 duration-200 ease-in-out group-focus-within:blur-[2px] group-focus-within:brightness-75 group-hover:blur-[2px] group-hover:brightness-75 group-focus:blur-[4px] group-focus:brightness-75 ${
-            isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
-          } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
+      {/* ── Background Album Art (absolute, behind all tiers in standard mode) ──────────────── */}
+      {miniPlayerMode !== 'compact' && (
+        <div className="background-cover-img-container absolute inset-0 h-full w-full overflow-hidden">
+          <Img
+            src={currentSongData.artworkPath}
+            fallbackSrc={DefaultSongCover}
+            loading="eager"
+            alt="Song Cover"
+            className={`h-full w-full object-cover transition-[filter] delay-100 duration-200 ease-in-out group-focus-within:blur-[2px] group-focus-within:brightness-75 group-hover:blur-[2px] group-hover:brightness-75 group-focus:blur-[4px] group-focus:brightness-75 ${
+              isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
+            } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
+          />
+
+          {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              isLyricsVisible
+                ? 'opacity-0'
+                : showControls || isQueueVisible
+                  ? 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-100'
+                  : 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
+            }`}
+          ></div>
+        </div>
+      )}
+
+      {/* ── Spatial Queue Container (Placed above deck when expanding upward) ── */}
+      {isQueueVisible && queueDirection === 'up' && (
+        <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
+
+      {/* ── Compact Floating Lyrics Panel (Placed above strip when expanding upward) ── */}
+      {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up' && (
+        <CompactLyricsPanel
+          isLyricsVisible={isLyricsVisible}
+          onClose={handleToggleLyrics}
         />
-        {/* Persistent top drag region */}
-        <div className="absolute top-0 left-0 z-0 h-8 max-h-[30%] w-full [-webkit-app-region:drag]"></div>
+      )}
 
-        {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
+      {/* ── Progressively Revealed Compact Mode Strip OR Standard 3-Tier Deck ── */}
+      {miniPlayerMode === 'compact' ? (
+        <CompactMiniPlayer
+          isQueueVisible={isQueueVisible}
+          isLyricsVisible={isLyricsVisible}
+          onToggleQueue={handleToggleQueue}
+          onToggleLyrics={handleToggleLyrics}
+          pinnedControls={pinnedControls}
+        />
+      ) : (
         <div
-          className={`absolute inset-0 transition-opacity duration-200 ${
-            isLyricsVisible
-              ? 'opacity-0'
-              : showControls || isQueueVisible
-                ? 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-100'
-                : 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
-          }`}
-        ></div>
-      </div>
-
-      {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
-      {/* Fades in on hover/focus/paused — same as old behavior.                */}
-      <div ref={topRef} className="relative z-30 w-full">
-        <TitleBarContainer isLyricsVisible={isLyricsVisible} />
-      </div>
+          data-testid="mini-player-deck"
+          className={`mini-player-deck relative flex ${
+            isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
+          } flex-col overflow-hidden`}
+        >
+          {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
+          {/* Fades in on hover/focus/paused — same as old behavior.                */}
+          <div ref={topRef} className="relative z-30 w-full">
+            <TitleBarContainer isLyricsVisible={isLyricsVisible} />
+          </div>
 
       {/* ═══ TIER 2 (MIDDLE): Song Info ══════════════════════════════════════ */}
       {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
@@ -513,12 +678,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             pinnedControls.includes('artwork') || pinnedControls.includes('title')
               ? 'justify-between gap-2 px-3'
               : 'justify-center px-1'
-          } overflow-hidden pt-1 pb-2`}
+          } pt-1 pb-2`}
         >
           {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
           {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
             <div
-              ref={metaRef}
               className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
             >
               {pinnedControls.includes('artwork') && (
@@ -565,7 +729,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               iconClassName={`text-lg! ${
                 isAFavorite
-                  ? 'meterial-icons-round text-dark-background-color-3!'
+                  ? 'material-icons-round text-dark-background-color-3!'
                   : 'material-icons-round-outlined'
               }`}
               isDisabled={!currentSongData.isKnownSource}
@@ -666,7 +830,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               onClick={(e) => {
                 e.currentTarget.blur();
-                setIsLyricsVisible((prevState) => !prevState);
+                handleToggleLyrics();
               }}
               title={t('player.lyrics')}
             >
@@ -674,14 +838,14 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             </button>
           )}
 
-          {/* Optional: Volume button + expanding slider */}
+          {/* Optional: Volume button + vertical flyout slider */}
           {pinnedControls.includes('volume') && (
             <div
-              className="mini-optional-btn relative flex shrink-0 items-center"
-              onMouseEnter={() => setIsVolumeHovered(true)}
-              onMouseLeave={() => setIsVolumeHovered(false)}
-              onFocus={() => setIsVolumeHovered(true)}
-              onBlur={() => setIsVolumeHovered(false)}
+              className="mini-optional-btn relative flex shrink-0 items-center justify-center"
+              onMouseEnter={handleVolumeMouseEnter}
+              onMouseLeave={handleVolumeMouseLeave}
+              onFocus={handleVolumeMouseEnter}
+              onBlur={handleVolumeBlur}
             >
               <Button
                 className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
@@ -696,16 +860,25 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                 clickHandler={() => toggleMutedState(!isMuted)}
                 removeFocusOnClick
               />
+
+              {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
               <div
-                className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
-                  isVolumeHovered ? 'w-20' : 'w-0'
+                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-2 py-3 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:top-full before:inset-x-0 before:h-4 before:bg-transparent transition-all duration-200 ease-out ${
+                  isVolumeHovered
+                    ? 'opacity-100 translate-y-0 pointer-events-auto visible scale-100'
+                    : 'opacity-0 translate-y-2 pointer-events-none invisible scale-95'
                 }`}
               >
-                <VolumeSlider
-                  name="mini-player-volume-slider"
-                  id="volumeSlider"
-                  className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight relative float-left m-0 h-6 w-20 appearance-none bg-transparent! p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--volume-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
-                />
+                <span className="text-[10px] font-semibold text-font-color-white/70 mb-2 select-none">
+                  {isMuted ? '0%' : `${Math.round(volume)}%`}
+                </span>
+                <div className="flex h-32 w-6 items-center justify-center overflow-hidden">
+                  <VolumeSlider
+                    name="mini-player-volume-slider"
+                    id="volumeSlider"
+                    className="w-32 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -718,7 +891,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               title={t('player.currentQueue', 'Queue')}
               onClick={(e) => {
                 e.currentTarget.blur();
-                setIsQueueVisible((prev) => !prev);
+                handleToggleQueue();
               }}
             >
               <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
@@ -727,12 +900,24 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           </div>
         </div>
       </div>
+    </div>
+    )}
 
-      {/* ── Lyrics overlay (absolute, within the entire window when lyrics on) ── */}
-      <LyricsContainer isLyricsVisible={isLyricsVisible} />
+      {/* ── Spatial Queue Container (Placed below deck when expanding downward) ── */}
+      {isQueueVisible && queueDirection === 'down' && (
+        <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
 
-      {/* ── Queue container (flex, takes up remaining space when expanded) ── */}
-      <QueueContainer isQueueVisible={isQueueVisible} />
+      {/* ── Compact Floating Lyrics Panel (Placed below strip when expanding downward) ── */}
+      {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'down' && (
+        <CompactLyricsPanel
+          isLyricsVisible={isLyricsVisible}
+          onClose={handleToggleLyrics}
+        />
+      )}
+
+      {/* ── Standard Mode Lyrics overlay (absolute, within the entire window when lyrics on) ── */}
+      {miniPlayerMode !== 'compact' && <LyricsContainer isLyricsVisible={isLyricsVisible} />}
     </div>
   );
 }
