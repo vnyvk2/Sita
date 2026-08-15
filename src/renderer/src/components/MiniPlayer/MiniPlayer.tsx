@@ -15,6 +15,7 @@ import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../VolumeSlider';
+import CompactMiniPlayer from './CompactMiniPlayer';
 import LyricsContainer from './containers/LyricsContainer';
 import QueueContainer from './containers/QueueContainer';
 import TitleBarContainer from './containers/TitleBarContainer';
@@ -38,13 +39,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     ...settingsQuery.all,
     select: (data) => ({
       miniPlayerPinnedControls: data.miniPlayerPinnedControls,
-      isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop
+      isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop,
+      miniPlayerMode: data.miniPlayerMode
     })
   });
   const pinnedControls = useMemo(
     () => settings?.miniPlayerPinnedControls || ['love', 'lyrics', 'volume'],
     [settings?.miniPlayerPinnedControls]
   );
+  const miniPlayerMode = settings?.miniPlayerMode || 'standard';
 
   const { mutate: toggleAlwaysOnTop } = useMutation({
     mutationKey: settingsMutation.toggleMiniPlayerAlwaysOnTop.mutationKey,
@@ -94,6 +97,25 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const lastBoundsRef = useRef<{ minWidth: number; minHeight: number } | null>(null);
 
   const measureAndSyncBounds = useCallback(() => {
+    if (miniPlayerMode === 'compact') {
+      const calculatedMinWidth = 200;
+      const calculatedMinHeight = 50;
+
+      const prev = lastBoundsRef.current;
+      if (
+        !prev ||
+        Math.abs(prev.minWidth - calculatedMinWidth) >= 1 ||
+        Math.abs(prev.minHeight - calculatedMinHeight) >= 1
+      ) {
+        lastBoundsRef.current = { minWidth: calculatedMinWidth, minHeight: calculatedMinHeight };
+        window.api.miniPlayer.setDynamicMinimumBounds({
+          minWidth: calculatedMinWidth,
+          minHeight: calculatedMinHeight
+        });
+      }
+      return;
+    }
+
     if (!controlsRef.current || !bottomRef.current || !topRef.current) return;
 
     // 1. Controls deck intrinsic width (rigid playback buttons + pinned actions)
@@ -234,7 +256,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const template = [
         {
           id: 'compactMode',
-          label: t('miniPlayer.compactMode', 'Compact Mode')
+          label:
+            miniPlayerMode === 'compact'
+              ? t('miniPlayer.switchToStandardMode', 'Switch to Standard Mode')
+              : t('miniPlayer.switchToCompactMode', 'Switch to Compact Mode')
         },
         {
           id: 'toggleQueue',
@@ -332,9 +357,16 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const clickedId = await window.api.miniPlayer.showContextMenu(template);
 
       switch (clickedId) {
-        case 'compactMode':
-          // Placeholder for Compact Mode (to be implemented with intrinsic sizing engine in Task 2/3)
+        case 'compactMode': {
+          const nextMode = miniPlayerMode === 'compact' ? 'standard' : 'compact';
+          if (nextMode === 'compact') {
+            setIsQueueVisible(false);
+            setIsLyricsVisible(false);
+          }
+          window.api.settings.saveUserSettings({ miniPlayerMode: nextMode });
+          queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
+        }
         case 'toggleQueue':
           handleToggleQueue();
           break;
@@ -450,18 +482,27 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <QueueContainer isQueueVisible={isQueueVisible} />
       )}
 
-      {/* ═══ MINI PLAYER DECK (Strict fixed hierarchy: TOP -> MIDDLE -> BOTTOM) ═══ */}
-      <div
-        data-testid="mini-player-deck"
-        className={`mini-player-deck relative flex ${
-          isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
-        } flex-col overflow-hidden`}
-      >
-        {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
-        {/* Fades in on hover/focus/paused — same as old behavior.                */}
-        <div ref={topRef} className="relative z-30 w-full">
-          <TitleBarContainer isLyricsVisible={isLyricsVisible} />
-        </div>
+      {/* ── Progressively Revealed Compact Mode Strip OR Standard 3-Tier Deck ── */}
+      {miniPlayerMode === 'compact' ? (
+        <CompactMiniPlayer
+          isQueueVisible={isQueueVisible}
+          isLyricsVisible={isLyricsVisible}
+          onToggleQueue={handleToggleQueue}
+          onToggleLyrics={() => setIsLyricsVisible((prev) => !prev)}
+          pinnedControls={pinnedControls}
+        />
+      ) : (
+        <div
+          data-testid="mini-player-deck"
+          className={`mini-player-deck relative flex ${
+            isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
+          } flex-col overflow-hidden`}
+        >
+          {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
+          {/* Fades in on hover/focus/paused — same as old behavior.                */}
+          <div ref={topRef} className="relative z-30 w-full">
+            <TitleBarContainer isLyricsVisible={isLyricsVisible} />
+          </div>
 
       {/* ═══ TIER 2 (MIDDLE): Song Info ══════════════════════════════════════ */}
       {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
@@ -754,6 +795,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         </div>
       </div>
     </div>
+    )}
 
       {/* ── Spatial Queue Container (Placed below deck when expanding downward) ── */}
       {isQueueVisible && queueDirection === 'down' && (

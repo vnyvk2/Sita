@@ -440,4 +440,29 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
     }
   });
+
+  it('renders CompactMiniPlayer when miniPlayerMode is compact and sets compact minimum bounds', async () => {
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['love', 'volume'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'compact'
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(container.querySelector('.compact-mini-player')).not.toBeNull();
+    expect(container.querySelector('.mini-player-deck')).toBeNull();
+
+    const compactBoundsCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+    expect(compactBoundsCall.minHeight).toBe(50);
+    expect(compactBoundsCall.minWidth).toBe(200);
+  });
 });
