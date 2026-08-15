@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { albumQuery } from '../queries/albums';
 import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
+import { homeQuery } from '../queries/home';
 import { searchQuery } from '../queries/search';
 import { songQuery } from '../queries/songs';
 
@@ -54,6 +55,7 @@ export function useDataSync(): void {
         if (songEvents.includes(dataEvent.dataType)) {
           queryClient.invalidateQueries({ queryKey: songQuery._def });
           queryClient.invalidateQueries({ queryKey: searchQuery.query._def });
+          queryClient.invalidateQueries({ queryKey: homeQuery._def });
         }
 
         // Artist events
@@ -68,6 +70,7 @@ export function useDataSync(): void {
         if (artistEvents.includes(dataEvent.dataType)) {
           queryClient.invalidateQueries({ queryKey: artistQuery._def });
           queryClient.invalidateQueries({ queryKey: searchQuery.query._def });
+          queryClient.invalidateQueries({ queryKey: homeQuery._def });
         }
 
         // Album events
@@ -95,6 +98,7 @@ export function useDataSync(): void {
         if (playlistEvents.includes(dataEvent.dataType)) {
           queryClient.invalidateQueries({ queryKey: collectionKeys.all });
           queryClient.invalidateQueries({ queryKey: searchQuery.query._def });
+          queryClient.invalidateQueries({ queryKey: homeQuery._def });
         }
 
         // Genre events
