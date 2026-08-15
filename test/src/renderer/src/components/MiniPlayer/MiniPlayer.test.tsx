@@ -214,11 +214,13 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     expect(resetItem.label).toBe('Reset to Default Position');
   });
 
-  it('renders queue ABOVE deck when toggleMiniPlayerQueue returns up direction', async () => {
-    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockResolvedValueOnce({
-      isExpanded: true,
-      direction: 'up'
+  it('does not render queue until toggleMiniPlayerQueue resolves with direction, then renders ABOVE deck for up', async () => {
+    let resolveToggle!: (value: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolveToggle = resolve;
     });
+
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(() => pendingPromise);
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -231,6 +233,18 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     const root = container.querySelector('.mini-player')!;
     showContextMenuMock.mockResolvedValueOnce('toggleQueue');
     fireEvent.contextMenu(root);
+
+    // Allow context menu handler to trigger toggleMiniPlayerQueue
+    await Promise.resolve();
+
+    // Verify queue is NOT rendered in the DOM before IPC resolution (prevents direction flash)
+    expect(screen.queryByTestId('queue-container')).toBeNull();
+
+    // Resolve toggle with direction 'up'
+    resolveToggle({
+      isExpanded: true,
+      direction: 'up'
+    });
 
     const queue = await screen.findByTestId('queue-container');
     const deck = screen.getByTestId('mini-player-deck');
