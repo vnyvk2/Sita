@@ -1,6 +1,6 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import calculateTime from '../../utils/calculateTime';
 import SeekBarSlider from '../SeekBarSlider';
@@ -9,46 +9,14 @@ const SeekBarContainer = () => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
-  const [songSecond, setSongSecond] = useState(0);
-  const currentFloorSecondRef = useRef(0);
+  const [songPos, setSongPos] = useState(0);
 
-  // Subscribe to position change for ~1 Hz whole-second time label updates
-  useEffect(() => {
-    const handlePositionChange = (e: Event) => {
-      if ('detail' in e && typeof e.detail === 'number') {
-        const floorSec = Math.floor(e.detail);
-        if (floorSec !== currentFloorSecondRef.current) {
-          currentFloorSecondRef.current = floorSec;
-          setSongSecond(floorSec);
-        }
-      }
-    };
-
-    document.addEventListener('player/positionChange', handlePositionChange);
-    return () => document.removeEventListener('player/positionChange', handlePositionChange);
-  }, []);
-
-  // Reset when song changes
-  useEffect(() => {
-    currentFloorSecondRef.current = 0;
-    setSongSecond(0);
-  }, [currentSongData.songId]);
-
-  // Handle immediate visual feedback during active user scrubbing
-  const handleSeek = useCallback((currentPosition: number) => {
-    const floorSec = Math.floor(currentPosition);
-    if (floorSec !== currentFloorSecondRef.current) {
-      currentFloorSecondRef.current = floorSec;
-      setSongSecond(floorSec);
-    }
-  }, []);
-
-  const currentSongPosition = calculateTime(songSecond);
+  const currentSongPosition = calculateTime(songPos);
   const songDuration = preferences?.showSongRemainingTime
-    ? (currentSongData.duration || 0) - songSecond >= 0
-      ? calculateTime((currentSongData.duration || 0) - songSecond)
+    ? currentSongData.duration - Math.floor(songPos) >= 0
+      ? calculateTime(currentSongData.duration - Math.floor(songPos))
       : calculateTime(0)
-    : calculateTime(currentSongData.duration || 0);
+    : calculateTime(currentSongData.duration);
 
   return (
     <div className="seekbar-and-song-durations-container flex h-1/3 w-full max-w-xl flex-row items-center justify-between text-sm">
@@ -59,7 +27,7 @@ const SeekBarContainer = () => {
         <SeekBarSlider
           id="seek-bar-slider"
           name="seek-bar-slider"
-          onSeek={handleSeek}
+          onSeek={(currentPosition) => setSongPos(currentPosition)}
         />
       </div>
       <div className="full-song-duration w-16 text-center text-sm font-light">
