@@ -136,6 +136,12 @@ const sendAudioData = async (
     logger.error(`No matching song to send audio data`, { audioId: songId });
     throw new Error('SONG_NOT_FOUND' as ErrorCodes);
   } catch (error) {
+    if (
+      (error as NodeJS.ErrnoException)?.code === 'SONG_NOT_FOUND' ||
+      (error as Error)?.message === 'SONG_NOT_FOUND'
+    ) {
+      throw error;
+    }
     logger.error(`Failed to send songs data.`, { err: error });
     throw new Error('SONG_DATA_SEND_FAILED' as ErrorCodes);
   }
