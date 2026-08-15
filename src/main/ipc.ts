@@ -90,6 +90,7 @@ import {
   revealSongInFileExplorer,
   sendMessageToRenderer,
   setMiniPlayerMinimumBounds,
+  setMiniPlayerMode,
   stopScreenSleeping,
   toggleAudioPlayingState,
   toggleAutoLaunch,
@@ -664,6 +665,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       'app/setMiniPlayerMinimumBounds',
       (_, bounds: { minWidth: number; minHeight: number }) =>
         setMiniPlayerMinimumBounds(bounds.minWidth, bounds.minHeight)
+    );
+
+    ipcMain.handle('app/setMiniPlayerMode', (_, mode: 'standard' | 'compact') =>
+      setMiniPlayerMode(mode)
     );
 
     ipcMain.handle('app/resetMiniPlayerToDefault', () => resetMiniPlayerToDefault());

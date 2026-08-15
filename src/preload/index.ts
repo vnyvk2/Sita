@@ -509,6 +509,10 @@ const miniPlayer = {
     ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
   setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>
     ipcRenderer.invoke('app/setMiniPlayerMinimumBounds', bounds),
+  setMiniPlayerMode: (
+    mode: 'standard' | 'compact'
+  ): Promise<{ mode: 'standard' | 'compact' }> =>
+    ipcRenderer.invoke('app/setMiniPlayerMode', mode),
   resetToDefaultPosition: (): Promise<void> => ipcRenderer.invoke('app/resetMiniPlayerToDefault')
 };
 

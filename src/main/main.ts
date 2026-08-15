@@ -112,6 +112,10 @@ let expandedDirection: 'up' | 'down' | null = null;
 let programmaticMoveTarget: { x: number; y: number } | null = null;
 let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
 let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
+export const COMPACT_MINI_PLAYER_HEIGHT = 50;
+export const COMPACT_MINI_PLAYER_MIN_WIDTH = 200;
+let currentMiniPlayerMode: 'standard' | 'compact' = 'standard';
+let savedStandardHeight = MINI_PLAYER_DEFAULT_SIZE_Y;
 
 function setMiniPlayerBoundsProgrammatically(bounds: {
   x: number;
@@ -702,14 +706,23 @@ function manageAppMoveEvent() {
 }
 
 function manageAppResizeEvent() {
-  const [x, y] = mainWindow.getSize();
-  logger.debug(`User resized the player`, { playerType, isQueueExpanded, coordinates: { x, y } });
+  const [width, height] = mainWindow.getSize();
+  logger.debug(`User resized the player`, { playerType, isQueueExpanded, dimensions: { width, height } });
 
   // Don't save the expanded queue size as the user's preferred compact size
   if (playerType === 'mini' && isQueueExpanded) return;
 
-  if (playerType === 'mini') saveUserSettings({ miniPlayerWidth: x, miniPlayerHeight: y });
-  else if (playerType === 'normal') saveUserSettings({ mainWindowWidth: x, mainWindowHeight: y });
+  if (playerType === 'mini') {
+    if (currentMiniPlayerMode === 'compact') {
+      // In Compact Mode, only save width so standard mode height is preserved
+      saveUserSettings({ miniPlayerWidth: width });
+    } else {
+      savedStandardHeight = height;
+      saveUserSettings({ miniPlayerWidth: width, miniPlayerHeight: height });
+    }
+  } else if (playerType === 'normal') {
+    saveUserSettings({ mainWindowWidth: width, mainWindowHeight: height });
+  }
 }
 
 async function handleSecondInstances(_: unknown, argv: string[]) {
@@ -895,12 +908,19 @@ function ensureWindowIsVisible(window: BrowserWindow) {
 }
 
 export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) {
-  logger.debug('Updating mini player dynamic minimum bounds', { minWidth, minHeight });
+  logger.debug('Updating mini player dynamic minimum bounds', { minWidth, minHeight, currentMiniPlayerMode });
   currentMiniPlayerMinWidth = minWidth;
   currentMiniPlayerMinHeight = minHeight;
 
   if (mainWindow && playerType === 'mini') {
+    if (currentMiniPlayerMode === 'compact') {
+      mainWindow.setMinimumSize(minWidth, COMPACT_MINI_PLAYER_HEIGHT);
+      mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+      return;
+    }
+
     mainWindow.setMinimumSize(minWidth, minHeight);
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
 
     // Current-size protection: if the window is currently smaller than the new minimum, expand smoothly
     const [currentW, currentH] = mainWindow.getSize();
@@ -918,11 +938,74 @@ export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) 
   }
 }
 
+export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
+  if (!mainWindow || playerType !== 'mini') return { mode };
+  logger.debug('Switching mini player mode', { mode, currentMiniPlayerMode });
+  currentMiniPlayerMode = mode;
+
+  const [currentX, currentY] = mainWindow.getPosition();
+  const [currentW, currentH] = mainWindow.getSize();
+
+  if (mode === 'compact') {
+    // 1. If currently in standard mode, remember the standard height
+    if (!isQueueExpanded && currentH > COMPACT_MINI_PLAYER_HEIGHT) {
+      savedStandardHeight = currentH;
+      await saveUserSettings({ miniPlayerHeight: currentH });
+    }
+
+    // 2. Collapse any open queue geometry state
+    isQueueExpanded = false;
+    compactHeight = null;
+    compactY = null;
+    compactX = null;
+    expandedHeight = null;
+    expandedDirection = null;
+
+    // 3. Constrain native window size to compact height (50px)
+    mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+
+    // 4. Atomically set bounds
+    const targetWidth = Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH);
+    setMiniPlayerBoundsProgrammatically({
+      x: currentX,
+      y: currentY,
+      width: targetWidth,
+      height: COMPACT_MINI_PLAYER_HEIGHT
+    });
+  } else {
+    // Standard Mode:
+    // 1. Restore standard window constraints
+    mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+    mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+
+    // 2. Restore standard height
+    const targetHeight = Math.max(savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+    const targetWidth = Math.max(currentW, currentMiniPlayerMinWidth);
+
+    // 3. Atomically set bounds
+    setMiniPlayerBoundsProgrammatically({
+      x: currentX,
+      y: currentY,
+      width: targetWidth,
+      height: targetHeight
+    });
+  }
+
+  await saveUserSettings({ miniPlayerMode: mode });
+  return { mode };
+}
+
 export async function resetMiniPlayerToDefault() {
   if (mainWindow && playerType === 'mini') {
     logger.debug('Resetting mini player to default position and dimensions');
-    const targetWidth = Math.max(MINI_PLAYER_DEFAULT_SIZE_X, currentMiniPlayerMinWidth);
-    const targetHeight = Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+    const targetWidth = Math.max(
+      MINI_PLAYER_DEFAULT_SIZE_X,
+      currentMiniPlayerMode === 'compact' ? COMPACT_MINI_PLAYER_MIN_WIDTH : currentMiniPlayerMinWidth
+    );
+    const targetHeight = currentMiniPlayerMode === 'compact'
+      ? COMPACT_MINI_PLAYER_HEIGHT
+      : Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
 
     const display = screen.getDisplayMatching(mainWindow.getBounds());
     const { workArea } = display;
@@ -937,12 +1020,21 @@ export async function resetMiniPlayerToDefault() {
       height: targetHeight
     });
 
-    await saveUserSettings({
-      miniPlayerWidth: targetWidth,
-      miniPlayerHeight: targetHeight,
-      miniPlayerX: targetX,
-      miniPlayerY: targetY
-    });
+    if (currentMiniPlayerMode === 'compact') {
+      await saveUserSettings({
+        miniPlayerWidth: targetWidth,
+        miniPlayerX: targetX,
+        miniPlayerY: targetY
+      });
+    } else {
+      savedStandardHeight = targetHeight;
+      await saveUserSettings({
+        miniPlayerWidth: targetWidth,
+        miniPlayerHeight: targetHeight,
+        miniPlayerX: targetX,
+        miniPlayerY: targetY
+      });
+    }
   }
 }
 
@@ -956,6 +1048,7 @@ export async function changePlayerType(type: PlayerTypes) {
       mainWindowWidth,
       miniPlayerHeight,
       miniPlayerWidth,
+      miniPlayerMode,
       mainWindowX,
       mainWindowY,
       miniPlayerX,
@@ -966,17 +1059,27 @@ export async function changePlayerType(type: PlayerTypes) {
     if (type === 'mini') {
       if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
 
+      currentMiniPlayerMode = miniPlayerMode || 'standard';
+      savedStandardHeight = miniPlayerHeight || MINI_PLAYER_DEFAULT_SIZE_Y;
+
       mainWindow.setMaximizable(false);
-      mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
-      mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
       mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
 
-      const targetWidth = miniPlayerWidth
+      let targetWidth = miniPlayerWidth
         ? Math.max(miniPlayerWidth, currentMiniPlayerMinWidth)
         : MINI_PLAYER_DEFAULT_SIZE_X;
-      const targetHeight = miniPlayerHeight
-        ? Math.max(miniPlayerHeight, currentMiniPlayerMinHeight)
-        : MINI_PLAYER_DEFAULT_SIZE_Y;
+
+      let targetHeight: number;
+      if (currentMiniPlayerMode === 'compact') {
+        targetWidth = Math.max(targetWidth, COMPACT_MINI_PLAYER_MIN_WIDTH);
+        targetHeight = COMPACT_MINI_PLAYER_HEIGHT;
+        mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
+        mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+      } else {
+        targetHeight = Math.max(savedStandardHeight, currentMiniPlayerMinHeight);
+        mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+        mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+      }
 
       mainWindow.setSize(targetWidth, targetHeight, true);
 

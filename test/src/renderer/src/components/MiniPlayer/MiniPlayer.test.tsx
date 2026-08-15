@@ -122,6 +122,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       miniPlayer: {
         setMinimumBounds: vi.fn(),
         setDynamicMinimumBounds: vi.fn(),
+        setMiniPlayerMode: vi.fn().mockResolvedValue({ mode: 'compact' }),
         resetToDefaultPosition: resetToDefaultPositionMock,
         toggleMiniPlayerQueue: vi.fn().mockResolvedValue({ isExpanded: true, direction: 'down' }),
         toggleMiniPlayerAlwaysOnTop: vi.fn(),
@@ -464,5 +465,30 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     const compactBoundsCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
     expect(compactBoundsCall.minHeight).toBe(50);
     expect(compactBoundsCall.minWidth).toBe(200);
+  });
+
+  it('triggers setMiniPlayerMode and collapses open overlays when switching modes via context menu', async () => {
+    showContextMenuMock.mockResolvedValue('compactMode');
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['love', 'volume'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const miniPlayerElement = container.querySelector('.mini-player')!;
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(window.api.miniPlayer.setMiniPlayerMode).toHaveBeenCalledWith('compact');
   });
 });

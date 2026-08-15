@@ -363,7 +363,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             setIsQueueVisible(false);
             setIsLyricsVisible(false);
           }
-          window.api.settings.saveUserSettings({ miniPlayerMode: nextMode });
+          await window.api.miniPlayer.setMiniPlayerMode(nextMode);
           queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
         }
@@ -453,29 +453,31 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       } ${preferences?.isReducedMotion ? 'reduced-motion' : ''} ${className}`}
       onContextMenu={handleContextMenu}
     >
-      {/* ── Background Album Art (absolute, behind all tiers) ──────────────── */}
-      <div className="background-cover-img-container absolute inset-0 h-full w-full overflow-hidden">
-        <Img
-          src={currentSongData.artworkPath}
-          fallbackSrc={DefaultSongCover}
-          loading="eager"
-          alt="Song Cover"
-          className={`h-full w-full object-cover transition-[filter] delay-100 duration-200 ease-in-out group-focus-within:blur-[2px] group-focus-within:brightness-75 group-hover:blur-[2px] group-hover:brightness-75 group-focus:blur-[4px] group-focus:brightness-75 ${
-            isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
-          } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
-        />
+      {/* ── Background Album Art (absolute, behind all tiers in standard mode) ──────────────── */}
+      {miniPlayerMode !== 'compact' && (
+        <div className="background-cover-img-container absolute inset-0 h-full w-full overflow-hidden">
+          <Img
+            src={currentSongData.artworkPath}
+            fallbackSrc={DefaultSongCover}
+            loading="eager"
+            alt="Song Cover"
+            className={`h-full w-full object-cover transition-[filter] delay-100 duration-200 ease-in-out group-focus-within:blur-[2px] group-focus-within:brightness-75 group-hover:blur-[2px] group-hover:brightness-75 group-focus:blur-[4px] group-focus:brightness-75 ${
+              isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
+            } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
+          />
 
-        {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
-        <div
-          className={`absolute inset-0 transition-opacity duration-200 ${
-            isLyricsVisible
-              ? 'opacity-0'
-              : showControls || isQueueVisible
-                ? 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-100'
-                : 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
-          }`}
-        ></div>
-      </div>
+          {/* Gradient overlay — only visible when NOT showing lyrics, fades in on hover */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              isLyricsVisible
+                ? 'opacity-0'
+                : showControls || isQueueVisible
+                  ? 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-100'
+                  : 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
+            }`}
+          ></div>
+        </div>
+      )}
 
       {/* ── Spatial Queue Container (Placed above deck when expanding upward) ── */}
       {isQueueVisible && queueDirection === 'up' && (
