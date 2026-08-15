@@ -125,8 +125,14 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
         setMiniPlayerMode: vi.fn().mockResolvedValue({ mode: 'compact' }),
         resetToDefaultPosition: resetToDefaultPositionMock,
         toggleMiniPlayerQueue: vi.fn().mockResolvedValue({ isExpanded: true, direction: 'down' }),
+        toggleMiniPlayerLyrics: vi
+          .fn()
+          .mockResolvedValue({ isExpanded: true, direction: 'down', height: 224 }),
         toggleMiniPlayerAlwaysOnTop: vi.fn(),
         showContextMenu: showContextMenuMock
+      },
+      lyrics: {
+        getSongLyrics: vi.fn().mockResolvedValue(null)
       }
     } as any;
 
@@ -490,5 +496,63 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(window.api.miniPlayer.setMiniPlayerMode).toHaveBeenCalledWith('compact');
+  });
+
+  it('triggers native spatial lyrics expansion via Ctrl+L keyboard shortcut in Compact Mode', async () => {
+    (window.api.miniPlayer.toggleMiniPlayerLyrics as any).mockResolvedValue({
+      isExpanded: true,
+      direction: 'down',
+      height: 224
+    });
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['love', 'volume'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'compact'
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'l', ctrlKey: true }));
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(window.api.miniPlayer.toggleMiniPlayerLyrics).toHaveBeenCalledWith(true);
+  });
+
+  it('triggers native spatial lyrics expansion via context menu in Compact Mode', async () => {
+    showContextMenuMock.mockResolvedValue('toggleLyrics');
+    (window.api.miniPlayer.toggleMiniPlayerLyrics as any).mockResolvedValue({
+      isExpanded: true,
+      direction: 'down',
+      height: 224
+    });
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['love', 'volume'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'compact'
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const miniPlayerElement = container.querySelector('.mini-player')!;
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(window.api.miniPlayer.toggleMiniPlayerLyrics).toHaveBeenCalledWith(true);
   });
 });

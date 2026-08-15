@@ -192,6 +192,7 @@ const QueueContainer = (props: Props) => {
     });
   }, [
     queuedSongs,
+    queuedSongsMap,
     queue.queues,
     viewingQueueIndex,
     queue.currentQueueIndex,

@@ -951,14 +951,25 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
   const [currentX, currentY] = mainWindow.getPosition();
   const [currentW, currentH] = mainWindow.getSize();
 
+  // Resolve resting unexpanded origin before collapsing geometry state
+  const restoreX = compactX ?? currentX;
+  const restoreY = compactY ?? currentY;
+
   if (mode === 'compact') {
     // 1. If currently in standard mode, remember the standard height
     if (!isQueueExpanded && currentH > COMPACT_MINI_PLAYER_HEIGHT) {
       savedStandardHeight = currentH;
       await saveUserSettings({ miniPlayerHeight: currentH });
+    } else if (
+      isQueueExpanded &&
+      compactHeight !== null &&
+      compactHeight > COMPACT_MINI_PLAYER_HEIGHT
+    ) {
+      savedStandardHeight = compactHeight;
+      await saveUserSettings({ miniPlayerHeight: compactHeight });
     }
 
-    // 2. Collapse any open queue geometry state
+    // 2. Collapse any open spatial extension geometry state
     isQueueExpanded = false;
     compactHeight = null;
     compactY = null;
@@ -966,30 +977,41 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
     expandedHeight = null;
     expandedDirection = null;
 
-    // 3. Constrain native window size to compact height (50px)
+    // 3. Constrain native window size to compact constraints
     applyMiniPlayerModeConstraints('compact');
 
     // 4. Atomically set bounds
     const targetWidth = Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH);
     setMiniPlayerBoundsProgrammatically({
-      x: currentX,
-      y: currentY,
+      x: restoreX,
+      y: restoreY,
       width: targetWidth,
       height: COMPACT_MINI_PLAYER_HEIGHT
     });
   } else {
     // Standard Mode:
-    // 1. Restore standard window constraints
+    // 1. Collapse any open spatial extension geometry state
+    isQueueExpanded = false;
+    compactHeight = null;
+    compactY = null;
+    compactX = null;
+    expandedHeight = null;
+    expandedDirection = null;
+
+    // 2. Restore standard window constraints
     applyMiniPlayerModeConstraints('standard');
 
-    // 2. Restore standard height
-    const targetHeight = Math.max(savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+    // 3. Restore standard height
+    const targetHeight = Math.max(
+      savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y,
+      currentMiniPlayerMinHeight
+    );
     const targetWidth = Math.max(currentW, currentMiniPlayerMinWidth);
 
-    // 3. Atomically set bounds
+    // 4. Atomically set bounds
     setMiniPlayerBoundsProgrammatically({
-      x: currentX,
-      y: currentY,
+      x: restoreX,
+      y: restoreY,
       width: targetWidth,
       height: targetHeight
     });

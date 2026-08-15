@@ -192,19 +192,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, [measureAndSyncBounds]);
 
-  const manageKeyboardShortcuts = useCallback((e: KeyboardEvent) => {
-    if (e.ctrlKey && e.key === 'l') {
-      setIsLyricsVisible((prevState) => !prevState);
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('keydown', manageKeyboardShortcuts);
-    return () => {
-      window.removeEventListener('keydown', manageKeyboardShortcuts);
-    };
-  }, [manageKeyboardShortcuts]);
-
   const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
   const isQueueTransitioningRef = useRef(false);
   const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
@@ -238,6 +225,31 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       isLyricsTransitioningRef.current = false;
     }
   }, [isLyricsVisible, isQueueVisible, queueLength]);
+
+  const handleToggleLyrics = useCallback(() => {
+    if (miniPlayerMode === 'compact') {
+      handleToggleCompactLyrics();
+      return;
+    }
+
+    setIsLyricsVisible((prev) => !prev);
+  }, [miniPlayerMode, handleToggleCompactLyrics]);
+
+  const manageKeyboardShortcuts = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'l') {
+        handleToggleLyrics();
+      }
+    },
+    [handleToggleLyrics]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', manageKeyboardShortcuts);
+    return () => {
+      window.removeEventListener('keydown', manageKeyboardShortcuts);
+    };
+  }, [manageKeyboardShortcuts]);
 
   const handleToggleQueue = useCallback(async () => {
     if (isQueueTransitioningRef.current) return;
@@ -422,7 +434,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           toggleRepeat();
           break;
         case 'toggleLyrics':
-          setIsLyricsVisible((prev) => !prev);
+          handleToggleLyrics();
           break;
         case 'search':
           /* TODO: open search */
@@ -475,7 +487,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       toggleQueueShuffle,
       settings?.isMiniPlayerAlwaysOnTop,
       toggleAlwaysOnTop,
-      handleToggleQueue
+      handleToggleQueue,
+      handleToggleLyrics,
+      miniPlayerMode
     ]
   );
 
@@ -532,7 +546,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up' && (
         <CompactLyricsPanel
           isLyricsVisible={isLyricsVisible}
-          onClose={handleToggleCompactLyrics}
+          onClose={handleToggleLyrics}
         />
       )}
 
@@ -542,7 +556,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           isQueueVisible={isQueueVisible}
           isLyricsVisible={isLyricsVisible}
           onToggleQueue={handleToggleQueue}
-          onToggleLyrics={handleToggleCompactLyrics}
+          onToggleLyrics={handleToggleLyrics}
           pinnedControls={pinnedControls}
         />
       ) : (
@@ -778,7 +792,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               onClick={(e) => {
                 e.currentTarget.blur();
-                setIsLyricsVisible((prevState) => !prevState);
+                handleToggleLyrics();
               }}
               title={t('player.lyrics')}
             >
@@ -860,7 +874,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'down' && (
         <CompactLyricsPanel
           isLyricsVisible={isLyricsVisible}
-          onClose={handleToggleCompactLyrics}
+          onClose={handleToggleLyrics}
         />
       )}
 
