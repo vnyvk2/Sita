@@ -26,47 +26,66 @@ export async function insertScrobble(
     trackTitle?: string;
     artistNames?: string;
   },
-  trx: DB | DBTransaction = db
+  trx?: DB | DBTransaction
 ): Promise<void> {
-  const count = await getPendingCount(trx);
-  if (count >= MAX_QUEUE_SIZE) {
-    logger.warn('Scrobble queue at capacity, dropping item', { count: MAX_QUEUE_SIZE });
-    return;
-  }
+  const execute = async (t: DB | DBTransaction) => {
+    const count = await getPendingCount(t);
+    if (count >= MAX_QUEUE_SIZE) {
+      logger.warn('Scrobble queue at capacity, dropping item', { count: MAX_QUEUE_SIZE });
+      return;
+    }
 
-  await trx.insert(scrobbleQueue).values({
-    songId: params.songId ?? null,
-    startTimeSecs: params.startTimeSecs != null ? Math.floor(params.startTimeSecs) : null,
-    operationType: params.operationType,
-    trackTitle: params.trackTitle ?? null,
-    artistNames: params.artistNames ?? null,
-    status: 'pending',
-    retryCount: 0
-  });
+    await t.insert(scrobbleQueue).values({
+      songId: params.songId ?? null,
+      startTimeSecs: params.startTimeSecs != null ? Math.floor(params.startTimeSecs) : null,
+      operationType: params.operationType,
+      trackTitle: params.trackTitle ?? null,
+      artistNames: params.artistNames ?? null,
+      status: 'pending',
+      retryCount: 0
+    });
+  };
+
+  if (trx) {
+    await execute(trx);
+  } else {
+    await db.transaction(async (innerTrx) => execute(innerTrx));
+  }
 }
 
 export async function claimPendingBatch(
   batchSize: number,
-  trx: DB | DBTransaction = db
+  trx?: DB | DBTransaction
 ): Promise<Array<typeof scrobbleQueue.$inferSelect>> {
-  const items = await trx
-    .select()
-    .from(scrobbleQueue)
-    .where(
-      and(eq(scrobbleQueue.status, 'pending'), lte(scrobbleQueue.retryCount, MAX_RETRY_COUNT - 1))
-    )
-    .orderBy(asc(scrobbleQueue.createdAt))
-    .limit(batchSize);
+  const execute = async (t: DB | DBTransaction) => {
+    const items = await t
+      .select()
+      .from(scrobbleQueue)
+      .where(
+        and(
+          eq(scrobbleQueue.status, 'pending'),
+          lte(scrobbleQueue.retryCount, MAX_RETRY_COUNT - 1)
+        )
+      )
+      .orderBy(asc(scrobbleQueue.createdAt))
+      .limit(batchSize);
 
-  if (items.length > 0) {
-    const ids = items.map((i) => i.id);
-    await trx
-      .update(scrobbleQueue)
-      .set({ status: 'sending' })
-      .where(inArray(scrobbleQueue.id, ids));
+    if (items.length > 0) {
+      const ids = items.map((i) => i.id);
+      await t
+        .update(scrobbleQueue)
+        .set({ status: 'sending' })
+        .where(inArray(scrobbleQueue.id, ids));
+    }
+
+    return items;
+  };
+
+  if (trx) {
+    return await execute(trx);
+  } else {
+    return await db.transaction(async (innerTrx) => execute(innerTrx));
   }
-
-  return items;
 }
 
 export async function markSent(id: number, trx: DB | DBTransaction = db): Promise<void> {
