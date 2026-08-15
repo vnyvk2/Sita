@@ -1,15 +1,16 @@
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useOpenMainPlayerRoute } from '@renderer/hooks/useOpenMainPlayerRoute';
 import { getQueuesManager } from '@renderer/other/queuesManager';
+import toggleSongIsFavorite from '@renderer/other/toggleSongIsFavorite';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../../assets/images/webp/song_cover_default.webp';
-import calculateTimeFromSeconds from '../../../utils/calculateTimeFromSeconds';
+import calculateTime from '../../../utils/calculateTime';
 import Img from '../../Img';
 
 type Props = { isQueueVisible: boolean };
@@ -21,9 +22,10 @@ const QueueContainer = (props: Props) => {
   const queue = useStore(store, (state) => state.localStorage.queue);
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
 
-  const { changeQueueCurrentSongIndex } = useContext(AppUpdateContext);
+  const { changeQueueCurrentSongIndex, toggleIsFavorite } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const openMainPlayerRoute = useOpenMainPlayerRoute();
+  const queryClient = useQueryClient();
 
   const listRef = useRef<HTMLDivElement>(null);
   const isFirstScrollRef = useRef(true);
@@ -98,12 +100,27 @@ const QueueContainer = (props: Props) => {
         } else {
           // If already in the active queue, trigger playback via context
           changeQueueCurrentSongIndex(index);
-          // Wait, changeQueueCurrentSongIndex(index) calls moveToPosition(index) again.
-          // But that's fine because if it's already there it might just re-trigger or we can just let changeQueueCurrentSongIndex handle it.
         }
       }
     },
-    [changeQueueCurrentSongIndex, viewingQueueIndex, queue.currentQueueIndex, manager]
+    [manager, viewingQueueIndex, queue.currentQueueIndex, changeQueueCurrentSongIndex]
+  );
+
+  const handleToggleFavorite = useCallback(
+    (e: React.MouseEvent, song: SongData) => {
+      e.stopPropagation();
+      toggleSongIsFavorite(song.songId, Boolean(song.isAFavorite)).then((newFavorite) => {
+        if (typeof newFavorite === 'boolean') {
+          if (song.songId === currentSongId) {
+            toggleIsFavorite(newFavorite);
+          }
+          queryClient.invalidateQueries({
+            queryKey: songQuery.queue(songIds).queryKey
+          });
+        }
+      });
+    },
+    [currentSongId, toggleIsFavorite, queryClient, songIds]
   );
 
   const queuedSongsMap = useMemo(() => {
@@ -124,13 +141,14 @@ const QueueContainer = (props: Props) => {
         viewingQueueIndex === queue.currentQueueIndex &&
         index === queue.queues[queue.currentQueueIndex]?.position;
 
-      const duration = calculateTimeFromSeconds(song.duration);
+      const { minutes, seconds } = calculateTime(song.duration);
+      const formattedDuration = `${Number(minutes)}:${seconds}`;
 
       return (
         <button
           key={`${id}-${index}`}
           type="button"
-          className={`queue-song-item flex h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
+          className={`queue-song-item group/songItem flex h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
             isActivePosition
               ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
               : 'hover:bg-font-color-white/10'
@@ -174,18 +192,36 @@ const QueueContainer = (props: Props) => {
             </div>
           </div>
 
-          {/* Right Side: Duration & Favorite */}
-          <div className="flex shrink-0 flex-col items-end justify-center gap-1">
-            <div className="text-font-color-white/40 text-xs tabular-nums">
-              {duration.timeString}
-            </div>
-            {song.isAFavorite ? (
-              <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-[14px]">
-                favorite
+          {/* Right Side: Favorite Heart Button + mm:ss Duration */}
+          <div className="flex shrink-0 items-center gap-1.5 [-webkit-app-region:no-drag]">
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={song.isAFavorite ? t('song.unlikeSong', 'Unlike') : t('song.likeSong', 'Like')}
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-font-color-white/40 hover:text-font-color-highlight hover:bg-white/10 transition-colors"
+              title={song.isAFavorite ? t('song.unlikeSong', 'Unlike') : t('song.likeSong', 'Like')}
+              onClick={(e) => handleToggleFavorite(e, song)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggleFavorite(e as any, song);
+                }
+              }}
+            >
+              <span
+                className={`material-icons-round text-base transition-colors ${
+                  song.isAFavorite
+                    ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
+                    : 'opacity-0 group-hover/songItem:opacity-60 hover:opacity-100! hover:text-font-color-highlight'
+                }`}
+              >
+                {song.isAFavorite ? 'favorite' : 'favorite_border'}
               </span>
-            ) : (
-              <div className="h-[14px] w-[14px]" />
-            )}
+            </span>
+
+            <div className="text-font-color-white/50 text-xs tabular-nums min-w-[30px] text-right">
+              {formattedDuration}
+            </div>
           </div>
         </button>
       );
@@ -198,6 +234,7 @@ const QueueContainer = (props: Props) => {
     queue.currentQueueIndex,
     isCurrentSongPlaying,
     handleSongClick,
+    handleToggleFavorite,
     t
   ]);
 
