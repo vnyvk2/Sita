@@ -99,7 +99,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const measureAndSyncBounds = useCallback(() => {
     if (miniPlayerMode === 'compact') {
       const calculatedMinWidth = 200;
-      const calculatedMinHeight = 50;
+      const calculatedMinHeight = 64;
 
       const prev = lastBoundsRef.current;
       if (

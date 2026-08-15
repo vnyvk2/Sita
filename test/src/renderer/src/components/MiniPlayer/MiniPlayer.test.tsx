@@ -463,7 +463,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     expect(container.querySelector('.mini-player-deck')).toBeNull();
 
     const compactBoundsCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
-    expect(compactBoundsCall.minHeight).toBe(50);
+    expect(compactBoundsCall.minHeight).toBe(64);
     expect(compactBoundsCall.minWidth).toBe(200);
   });
 
