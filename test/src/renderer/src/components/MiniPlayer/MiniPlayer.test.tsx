@@ -323,7 +323,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     await screen.findByTestId('queue-container');
   });
 
-  it('maintains constant minimum bounds regardless of volume hover state (resting geometry invariant)', async () => {
+  it('maintains constant minimum bounds and stable controls width regardless of volume hover state (resting geometry invariant)', async () => {
     // Mock getBoundingClientRect for controls container
     const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function () {
@@ -351,6 +351,11 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       // Wait for requestAnimationFrame to fire measureAndSyncBounds
       await new Promise((r) => setTimeout(r, 50));
 
+      const controlsDeck = container.querySelector('.mini-deck-controls')!;
+      expect(controlsDeck).not.toBeNull();
+      const restingControlsWidth = controlsDeck.getBoundingClientRect().width;
+      expect(restingControlsWidth).toBe(180);
+
       expect(window.api.miniPlayer.setDynamicMinimumBounds).toHaveBeenCalled();
       const initialCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
       const restingMinWidth = initialCall.minWidth;
@@ -361,6 +366,10 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       fireEvent.mouseEnter(volumeBtn.parentElement!);
       await new Promise((r) => setTimeout(r, 50));
 
+      // Assert controlsRef bounding rect remains identical during hover (not inflated by volume popout)
+      const hoverControlsWidth = controlsDeck.getBoundingClientRect().width;
+      expect(hoverControlsWidth).toBe(restingControlsWidth);
+
       // Re-verify that minWidth was NOT increased by volume slider expansion
       const hoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
       expect(hoverCall.minWidth).toBe(restingMinWidth);
@@ -369,6 +378,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       fireEvent.mouseLeave(volumeBtn.parentElement!);
       await new Promise((r) => setTimeout(r, 50));
 
+      const unhoverControlsWidth = controlsDeck.getBoundingClientRect().width;
+      expect(unhoverControlsWidth).toBe(restingControlsWidth);
+
       const unhoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
       expect(unhoverCall.minWidth).toBe(restingMinWidth);
     } finally {
@@ -376,7 +388,7 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     }
   });
 
-  it('dynamically recalculates minimum bounds when controls are pinned', async () => {
+  it('recalculates minimum bounds when stable controls geometry changes', async () => {
     let mockControlsWidth = 100;
     const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function () {

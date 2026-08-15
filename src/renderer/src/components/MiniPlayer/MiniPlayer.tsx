@@ -536,7 +536,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             pinnedControls.includes('artwork') || pinnedControls.includes('title')
               ? 'justify-between gap-2 px-3'
               : 'justify-center px-1'
-          } overflow-hidden pt-1 pb-2`}
+          } pt-1 pb-2`}
         >
           {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
           {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
