@@ -29,8 +29,8 @@ export interface FolderNode {
  * - Supports responsive cancellation via AbortSignal.
  * - Accepts an injectable database client for testing and controlled composition. Transaction
  *   ownership remains outside the scanner/reconciler API.
- * - Employs onConflictDoNothing with fallback retrieval for 100% race-condition immunity under
- *   concurrent execution.
+ * - Uses the database UNIQUE(path) constraint plus conflict recovery to safely resolve concurrent
+ *   folder creation attempts.
  */
 export const resolveOrCreateMusicFolders = async (
   rootId: number,
@@ -90,9 +90,9 @@ export const resolveOrCreateMusicFolders = async (
     if (existing) {
       folderMap.set(dirKey, existing.id);
     } else {
-      let folderIdToUse: number | undefined;
+      let resolvedNode: FolderNode | undefined;
 
-      // Insert new subfolder record into music_folders with race-condition immunity
+      // Insert new subfolder record into music_folders with race-safe conflict recovery
       const [inserted] = await database
         .insert(musicFolders)
         .values({
@@ -102,25 +102,43 @@ export const resolveOrCreateMusicFolders = async (
           isBlacklisted: false
         })
         .onConflictDoNothing({ target: musicFolders.path })
-        .returning({ id: musicFolders.id });
+        .returning({
+          id: musicFolders.id,
+          path: musicFolders.path,
+          parentId: musicFolders.parentId
+        });
 
       if (inserted) {
-        folderIdToUse = inserted.id;
+        resolvedNode = {
+          id: inserted.id,
+          path: inserted.path,
+          parentId: inserted.parentId
+        };
       } else {
-        // If onConflictDoNothing prevented insert due to concurrent race, retrieve existing record
+        // If onConflictDoNothing prevented insert due to concurrent race, retrieve authoritative DB record
         const [conflictRow] = await database
-          .select({ id: musicFolders.id })
+          .select({
+            id: musicFolders.id,
+            path: musicFolders.path,
+            parentId: musicFolders.parentId
+          })
           .from(musicFolders)
           .where(eq(musicFolders.path, dir));
 
-        folderIdToUse = conflictRow?.id;
+        if (conflictRow) {
+          resolvedNode = {
+            id: conflictRow.id,
+            path: conflictRow.path,
+            parentId: conflictRow.parentId
+          };
+        }
       }
 
-      if (folderIdToUse !== undefined) {
-        folderMap.set(dirKey, folderIdToUse);
-        existingMap.set(dirKey, { id: folderIdToUse, path: dir, parentId });
+      if (resolvedNode) {
+        folderMap.set(dirKey, resolvedNode.id);
+        existingMap.set(dirKey, resolvedNode);
         logger.debug(
-          `[folderHierarchy] Resolved music_folders record for '${dir}' (id: ${folderIdToUse}, parentId: ${parentId})`
+          `[folderHierarchy] Resolved music_folders record for '${dir}' (id: ${resolvedNode.id}, parentId: ${resolvedNode.parentId})`
         );
       } else {
         throw new Error(`Failed to insert music_folders record for '${dir}'`);

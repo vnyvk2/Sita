@@ -84,7 +84,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       })
       .mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 42 }])
+          where: vi.fn().mockResolvedValue([{ id: 42, path: 'C:\\Music\\Pop', parentId: 1 }])
         })
       });
 
