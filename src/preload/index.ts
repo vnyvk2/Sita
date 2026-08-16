@@ -401,7 +401,9 @@ const settings = {
   updateTraySingleClickBehavior: (enable: boolean): Promise<void> =>
     ipcRenderer.invoke('app/updateTraySingleClickBehavior', enable),
   updateSaveVerboseLogs: (enable: boolean): Promise<void> =>
-    ipcRenderer.invoke('app/saveUserSettings', { saveVerboseLogs: enable })
+    ipcRenderer.invoke('app/saveUserSettings', { saveVerboseLogs: enable }),
+  updateLibraryScanMode: (mode: LibraryScanMode): Promise<void> =>
+    ipcRenderer.invoke('app/updateLibraryScanMode', mode)
 };
 
 // $ FOLDER DATA

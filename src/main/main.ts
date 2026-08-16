@@ -36,9 +36,9 @@ import manageTaskbarPlaybackButtonControls from './core/manageTaskbarPlaybackBut
 import { closeDatabaseInstance } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
-import initializePassiveWatchers from './fs/initializePassiveWatchers';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
+import libraryLifecycleController from './library/LibraryLifecycleController';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
@@ -294,8 +294,8 @@ const createWindow = async () => {
   }
   mainWindow.once('ready-to-show', () => {
     if (app.hasSingleInstanceLock()) {
-      logger.info('Restoring passive library state on startup.');
-      initializePassiveWatchers();
+      logger.info('Initializing library lifecycle controller on startup.');
+      void libraryLifecycleController.initialize();
     }
   });
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {

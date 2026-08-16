@@ -11,6 +11,7 @@ import DefaultPageSettings from './Settings/DefaultPageSettings';
 // import StorageSettings from './Settings/StorageSettings';
 import EqualizerSettings from './Settings/EqualizerSettings';
 import LanguageSettings from './Settings/LanguageSettings';
+import LibrarySettings from './Settings/LibrarySettings';
 import LyricsSettings from './Settings/LyricsSettings';
 import PerformanceSettings from './Settings/PerformanceSettings';
 import PreferencesSettings from './Settings/PreferencesSettings';
@@ -59,6 +60,9 @@ const SettingsPage = () => {
 
           {/* STARTUP SETTINGS */}
           <StartupSettings />
+
+          {/* LIBRARY SCANNING SETTINGS */}
+          <LibrarySettings />
 
           {/* STORAGE SETTINGS */}
           <StorageSettings />

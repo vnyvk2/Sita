@@ -74,6 +74,9 @@ import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import libraryChangeTracker from './library/LibraryChangeTracker';
+import libraryLifecycleController, {
+  type LibraryScanMode
+} from './library/LibraryLifecycleController';
 import libraryScanner, { type ScanOptions } from './library/LibraryScanner';
 import logger, { logFilePath } from './logger';
 import {
@@ -540,9 +543,14 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());
     ipcMain.handle('library/resetChangeState', () => libraryChangeTracker.reset());
-    ipcMain.handle('library/startScan', (_, options?: ScanOptions) => libraryScanner.scan(options));
-    ipcMain.handle('library/cancelScan', () => libraryScanner.cancelScan());
-    ipcMain.handle('library/getScanStatus', () => libraryScanner.getState());
+    ipcMain.handle('library/startScan', (_, options?: ScanOptions) =>
+      libraryLifecycleController.scanNow(options)
+    );
+    ipcMain.handle('library/cancelScan', () => libraryLifecycleController.cancelScan());
+    ipcMain.handle('library/getScanStatus', () => libraryLifecycleController.getStatus());
+    ipcMain.handle('app/updateLibraryScanMode', (_, mode: LibraryScanMode) =>
+      libraryLifecycleController.setScanMode(mode)
+    );
 
     libraryScanner.on('progress', (progress) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -564,7 +572,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     });
 
     ipcMain.handle('app/resyncSongsLibrary', async () => {
-      const summary = await libraryScanner.scan();
+      const summary = await libraryLifecycleController.scanNow();
       if (summary.status === 'COMPLETED') {
         sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
       }
