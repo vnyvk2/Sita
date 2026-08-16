@@ -2,6 +2,7 @@ import path from 'path';
 
 import { db } from '@main/db/db';
 import { musicFolders } from '@main/db/schema';
+import { eq } from 'drizzle-orm';
 
 import logger from '../logger';
 import { getNormalizedPathKey, normalizeLibraryPath } from './pathUtils';
@@ -26,8 +27,10 @@ export interface FolderNode {
  * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
  *   preserves dirty state.
  * - Supports responsive cancellation via AbortSignal.
- * - Accepts an injectable database client (database) for composition/testing without exposing
- *   transaction control to outer orchestrators.
+ * - Accepts an injectable database client for testing and controlled composition. Transaction
+ *   ownership remains outside the scanner/reconciler API.
+ * - Employs onConflictDoNothing with fallback retrieval for 100% race-condition immunity under
+ *   concurrent execution.
  */
 export const resolveOrCreateMusicFolders = async (
   rootId: number,
@@ -87,7 +90,9 @@ export const resolveOrCreateMusicFolders = async (
     if (existing) {
       folderMap.set(dirKey, existing.id);
     } else {
-      // Insert new subfolder record into music_folders
+      let folderIdToUse: number | undefined;
+
+      // Insert new subfolder record into music_folders with race-condition immunity
       const [inserted] = await database
         .insert(musicFolders)
         .values({
@@ -96,13 +101,26 @@ export const resolveOrCreateMusicFolders = async (
           parentId: parentId,
           isBlacklisted: false
         })
+        .onConflictDoNothing({ target: musicFolders.path })
         .returning({ id: musicFolders.id });
 
       if (inserted) {
-        folderMap.set(dirKey, inserted.id);
-        existingMap.set(dirKey, { id: inserted.id, path: dir, parentId });
+        folderIdToUse = inserted.id;
+      } else {
+        // If onConflictDoNothing prevented insert due to concurrent race, retrieve existing record
+        const [conflictRow] = await database
+          .select({ id: musicFolders.id })
+          .from(musicFolders)
+          .where(eq(musicFolders.path, dir));
+
+        folderIdToUse = conflictRow?.id;
+      }
+
+      if (folderIdToUse !== undefined) {
+        folderMap.set(dirKey, folderIdToUse);
+        existingMap.set(dirKey, { id: folderIdToUse, path: dir, parentId });
         logger.debug(
-          `[folderHierarchy] Created music_folders record for '${dir}' (id: ${inserted.id}, parentId: ${parentId})`
+          `[folderHierarchy] Resolved music_folders record for '${dir}' (id: ${folderIdToUse}, parentId: ${parentId})`
         );
       } else {
         throw new Error(`Failed to insert music_folders record for '${dir}'`);

@@ -18,10 +18,12 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockImplementation((val) => ({
-          returning: vi.fn().mockImplementation(() => {
-            const row = { ...val, id: nextId++ };
-            insertedRows.push(row);
-            return Promise.resolve([row]);
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockImplementation(() => {
+              const row = { ...val, id: nextId++ };
+              insertedRows.push(row);
+              return Promise.resolve([row]);
+            })
           })
         }))
       })
@@ -58,20 +60,80 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     expect(jazzRow?.parentId).toBe(1); // parent is root (id: 1)
   });
 
+  it('should recover gracefully from onConflictDoNothing on concurrent folder creation', async () => {
+    const mockDatabase = {
+      select: vi.fn().mockImplementation(() => ({
+        from: vi.fn().mockImplementation(() => ({
+          where: vi.fn().mockResolvedValue([{ id: 42 }]) // Conflict select returns id 42
+        }))
+      })),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]) // Insert collided and returned empty
+          })
+        })
+      })
+    };
+
+    // First call to select from musicFolders during initial load
+    mockDatabase.select = vi
+      .fn()
+      .mockReturnValueOnce({
+        from: vi.fn().mockResolvedValue([])
+      })
+      .mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 42 }])
+        })
+      });
+
+    const folderMap = await resolveOrCreateMusicFolders(
+      1,
+      'C:\\Music',
+      ['C:\\Music\\Pop'],
+      'win32',
+      mockDatabase as unknown as DB
+    );
+
+    expect(folderMap.get('c:\\music\\pop')).toBe(42);
+  });
+
   it('should throw an explicit error on folder creation failure without falling back', async () => {
     const mockDatabase = {
       select: vi.fn().mockReturnValue({
-        from: vi.fn().mockResolvedValue([])
+        from: vi.fn().mockImplementation(() => ({
+          where: vi.fn().mockResolvedValue([]) // Conflict select also returned empty
+        }))
       }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]) // DB returned empty array on insert
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]) // DB returned empty array on insert
+          })
         })
       })
-    } as unknown as DB;
+    };
+
+    mockDatabase.select = vi
+      .fn()
+      .mockReturnValueOnce({
+        from: vi.fn().mockResolvedValue([])
+      })
+      .mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([])
+        })
+      });
 
     await expect(
-      resolveOrCreateMusicFolders(1, 'C:\\Music', ['C:\\Music\\Pop'], 'win32', mockDatabase)
+      resolveOrCreateMusicFolders(
+        1,
+        'C:\\Music',
+        ['C:\\Music\\Pop'],
+        'win32',
+        mockDatabase as unknown as DB
+      )
     ).rejects.toThrow('Failed to insert music_folders record for');
   });
 
