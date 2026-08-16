@@ -17,6 +17,7 @@ export class LibraryLifecycleController {
   private scanner: LibraryScanner;
   private watchersActive = false;
   private isInitialized = false;
+  private inFlightScan: Promise<ScanSummary> | null = null;
 
   constructor(scanner: LibraryScanner = libraryScanner) {
     this.scanner = scanner;
@@ -58,7 +59,14 @@ export class LibraryLifecycleController {
   private async applyPolicy(mode: LibraryScanMode, isStartup: boolean): Promise<void> {
     switch (mode) {
       case 'automatic': {
-        this.startWatchers();
+        try {
+          await this.startWatchers();
+        } catch (error) {
+          logger.error(
+            '[LibraryLifecycleController] Could not activate watchers under automatic mode:',
+            { error }
+          );
+        }
         if (isStartup) {
           this.triggerBackgroundScan();
         }
@@ -78,24 +86,34 @@ export class LibraryLifecycleController {
     }
   }
 
-  public startWatchers(): void {
+  public async startWatchers(): Promise<void> {
     if (this.watchersActive) {
       logger.debug('[LibraryLifecycleController] Watchers are already active.');
       return;
     }
     logger.info('[LibraryLifecycleController] Starting background folder watchers.');
-    this.watchersActive = true;
-    void initializePassiveWatchers();
+    try {
+      await initializePassiveWatchers();
+      this.watchersActive = true;
+    } catch (error) {
+      logger.error('[LibraryLifecycleController] Failed to start background folder watchers:', {
+        error
+      });
+      this.watchersActive = false;
+      throw error;
+    }
   }
 
   public stopWatchers(): void {
-    if (!this.watchersActive) {
-      logger.debug('[LibraryLifecycleController] Watchers are already inactive.');
-      return;
-    }
     logger.info('[LibraryLifecycleController] Stopping background folder watchers.');
     this.watchersActive = false;
-    closeAllAbortControllers();
+    try {
+      closeAllAbortControllers();
+    } catch (error) {
+      logger.error('[LibraryLifecycleController] Error stopping background folder watchers:', {
+        error
+      });
+    }
   }
 
   public areWatchersActive(): boolean {
@@ -108,13 +126,28 @@ export class LibraryLifecycleController {
     });
   }
 
-  public async scanNow(options?: ScanOptions): Promise<ScanSummary> {
-    logger.info('[LibraryLifecycleController] Scan requested.');
-    const summary = await this.scanner.scan(options);
-    if (summary.status === 'COMPLETED') {
-      await this.recordScanSuccess();
+  public scanNow(options?: ScanOptions): Promise<ScanSummary> {
+    if (this.inFlightScan) {
+      logger.info(
+        '[LibraryLifecycleController] Scan already in-flight, returning existing promise.'
+      );
+      return this.inFlightScan;
     }
-    return summary;
+
+    logger.info('[LibraryLifecycleController] Scan requested.');
+    this.inFlightScan = this.scanner
+      .scan(options)
+      .then(async (summary) => {
+        if (summary.status === 'COMPLETED') {
+          await this.recordScanSuccess();
+        }
+        return summary;
+      })
+      .finally(() => {
+        this.inFlightScan = null;
+      });
+
+    return this.inFlightScan;
   }
 
   public async cancelScan(): Promise<boolean> {

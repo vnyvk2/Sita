@@ -638,6 +638,26 @@ const libraryMetrics = {
   retryRecoverable: () => ipcRenderer.invoke('app/retryRecoverable')
 };
 
+const library = {
+  getChangeState: (): Promise<{
+    isDirty: boolean;
+    changedPaths: string[];
+    lastChangedAt: number | null;
+  }> => ipcRenderer.invoke('library/getChangeState'),
+  resetChangeState: (): Promise<void> => ipcRenderer.invoke('library/resetChangeState'),
+  startScan: (options?: { dryRun?: boolean }): Promise<ScanSummary> =>
+    ipcRenderer.invoke('library/startScan', options),
+  cancelScan: (): Promise<boolean> => ipcRenderer.invoke('library/cancelScan'),
+  getScanStatus: (): Promise<ScannerState> => ipcRenderer.invoke('library/getScanStatus'),
+  onScanProgress: (callback: (progress: ScannerProgress) => void) => {
+    const listener = (_: unknown, progress: ScannerProgress) => callback(progress);
+    ipcRenderer.on('library/scanProgress', listener);
+    return () => {
+      ipcRenderer.removeListener('library/scanProgress', listener);
+    };
+  }
+};
+
 const collections = {
   read: {
     getCollection: (id: number): Promise<CollectionDto | null> =>
@@ -779,6 +799,7 @@ export const api = {
   appControls,
   utils,
   queue,
+  library,
   libraryMetrics,
   collections,
   membership,

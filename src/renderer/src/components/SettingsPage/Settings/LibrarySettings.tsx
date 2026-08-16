@@ -26,15 +26,17 @@ const LibrarySettings = () => {
     }
   });
 
+  const libraryApi = window.api?.library ?? window.api?.audioLibraryControls;
+
   const { mutate: startScan, isPending: isStartingScan } = useMutation({
-    mutationFn: async () => window.api.library.startScan(),
+    mutationFn: async () => libraryApi?.startScan(),
     onSettled: () => {
       queryClient.invalidateQueries(settingsQuery.all);
     }
   });
 
   const { mutate: cancelScan, isPending: isCancellingScan } = useMutation({
-    mutationFn: async () => window.api.library.cancelScan(),
+    mutationFn: async () => libraryApi?.cancelScan(),
     onSettled: () => {
       queryClient.invalidateQueries(settingsQuery.all);
     }
@@ -42,46 +44,54 @@ const LibrarySettings = () => {
 
   useEffect(() => {
     // Check initial scanner status
-    window.api.library
-      .getScanStatus()
-      .then((status) => {
-        setScanStatus(status);
-        return undefined;
-      })
-      .catch((error) => console.error(error));
+    if (libraryApi?.getScanStatus) {
+      libraryApi
+        .getScanStatus()
+        .then((status) => {
+          setScanStatus(status);
+          return undefined;
+        })
+        .catch((error) => console.error(error));
+    }
 
     // Listen to live scan progress
-    const removeListener = window.api.library.onScanProgress((progress: unknown) => {
-      const p = progress as
-        | {
-            state?: string;
-            discoveredFiles?: number;
-            completedReconciliation?: number;
-            totalToReconcile?: number;
-          }
-        | undefined;
+    if (libraryApi?.onScanProgress) {
+      const removeListener = libraryApi.onScanProgress((...args: unknown[]) => {
+        const progress = (args.length > 1 ? args[1] : args[0]) as
+          | {
+              state?: string;
+              discoveredFiles?: number;
+              completedReconciliation?: number;
+              totalToReconcile?: number;
+            }
+          | undefined;
 
-      if (p?.state) {
-        setScanStatus(p.state);
-      }
-      if (typeof p?.discoveredFiles === 'number') {
-        setDiscoveredFiles(p.discoveredFiles);
-      }
-      if (
-        typeof p?.completedReconciliation === 'number' &&
-        typeof p?.totalToReconcile === 'number'
-      ) {
-        setReconcileProgress({
-          completed: p.completedReconciliation,
-          total: p.totalToReconcile
-        });
-      }
-    });
+        if (progress?.state) {
+          setScanStatus(progress.state);
+        }
+        if (typeof progress?.discoveredFiles === 'number') {
+          setDiscoveredFiles(progress.discoveredFiles);
+        }
+        if (
+          typeof progress?.completedReconciliation === 'number' &&
+          typeof progress?.totalToReconcile === 'number'
+        ) {
+          setReconcileProgress({
+            completed: progress.completedReconciliation,
+            total: progress.totalToReconcile
+          });
+        }
+      });
 
-    return () => {
-      removeListener();
-    };
-  }, []);
+      return () => {
+        if (typeof removeListener === 'function') {
+          removeListener();
+        }
+      };
+    }
+
+    return undefined;
+  }, [libraryApi]);
 
   const isScanning =
     scanStatus === 'DISCOVERING' ||
@@ -243,23 +253,31 @@ const LibrarySettings = () => {
               </span>
             ) : scanStatus === 'FAILED' ? (
               <span className="material-icons-round text-3xl text-red-500">error</span>
+            ) : !userSettings?.lastScanTime && scanStatus !== 'COMPLETED' ? (
+              <span className="material-icons-round text-3xl text-amber-500">info</span>
             ) : (
               <span className="material-icons-round text-3xl text-emerald-500">check_circle</span>
             )}
             <div className="flex flex-col">
               <span className="text-font-color-black dark:text-font-color-white text-base font-semibold">
                 {isScanning
-                  ? t('settingsPage.scanningLibrary', { defaultValue: 'Updating library…' })
+                  ? t('settingsPage.scanningLibrary', { defaultValue: 'Updating library...' })
                   : scanStatus === 'FAILED'
                     ? 'Last scan encountered errors'
-                    : t('settingsPage.libraryUpToDate', { defaultValue: 'Up to date' })}
+                    : !userSettings?.lastScanTime && scanStatus !== 'COMPLETED'
+                      ? t('settingsPage.libraryNotScannedYet', { defaultValue: 'Not scanned yet' })
+                      : t('settingsPage.libraryUpToDate', { defaultValue: 'Up to date' })}
               </span>
               <span className="text-xs font-thin opacity-75">
                 {isScanning
                   ? scanStatus === 'RECONCILING' && reconcileProgress.total > 0
-                    ? `Reconciling files (${reconcileProgress.completed}/${reconcileProgress.total})…`
-                    : `Discovered ${discoveredFiles} files…`
-                  : lastScanText}
+                    ? `Reconciling files (${reconcileProgress.completed}/${reconcileProgress.total})...`
+                    : `Discovered ${discoveredFiles} files...`
+                  : !userSettings?.lastScanTime && scanStatus !== 'COMPLETED'
+                    ? t('settingsPage.libraryNotScannedYetDescription', {
+                        defaultValue: 'Run your first scan to synchronize your library.'
+                      })
+                    : lastScanText}
               </span>
             </div>
           </div>

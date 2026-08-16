@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
-import { initializePassiveWatchers } from '../../fs/initializePassiveWatchers';
 import { closeAllAbortControllers } from '../../fs/controlAbortControllers';
-import {
-  LibraryLifecycleController,
-  type LibraryScanMode
-} from '../LibraryLifecycleController';
+import { initializePassiveWatchers } from '../../fs/initializePassiveWatchers';
+import { LibraryLifecycleController, type LibraryScanMode } from '../LibraryLifecycleController';
 import type { LibraryScanner, ScanSummary } from '../LibraryScanner';
 
 vi.mock('../LibraryScanner', () => ({
@@ -99,6 +96,7 @@ describe('LibraryLifecycleController', () => {
       libraryScanMode: 'automatic'
     } as unknown as UserSettings);
     vi.mocked(saveUserSettings).mockResolvedValue(undefined as any);
+    vi.mocked(initializePassiveWatchers).mockResolvedValue(undefined);
 
     mockScanner = {
       scan: vi.fn().mockResolvedValue(mockCompletedSummary),
@@ -118,7 +116,6 @@ describe('LibraryLifecycleController', () => {
       await controller.initialize();
 
       expect(initializePassiveWatchers).toHaveBeenCalledTimes(1);
-      expect(closeAllAbortControllers).not.toHaveBeenCalled();
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(true);
     });
@@ -130,6 +127,7 @@ describe('LibraryLifecycleController', () => {
 
       await controller.initialize();
 
+      expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(false);
@@ -142,6 +140,7 @@ describe('LibraryLifecycleController', () => {
 
       await controller.initialize();
 
+      expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).not.toHaveBeenCalled();
       expect(controller.areWatchersActive()).toBe(false);
@@ -168,11 +167,18 @@ describe('LibraryLifecycleController', () => {
       expect(initializePassiveWatchers).toHaveBeenCalledTimes(1);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
     });
+
+    it('handles watcher initialization failure by resetting watchersActive to false', async () => {
+      vi.mocked(initializePassiveWatchers).mockRejectedValueOnce(new Error('FS watcher failure'));
+
+      await expect(controller.startWatchers()).rejects.toThrow('FS watcher failure');
+      expect(controller.areWatchersActive()).toBe(false);
+    });
   });
 
   describe('Runtime Mode Transitions', () => {
     it('transitions automatic -> manual: stops active watchers and persists setting', async () => {
-      controller.startWatchers();
+      await controller.startWatchers();
       expect(controller.areWatchersActive()).toBe(true);
 
       await controller.setScanMode('manual');
@@ -195,7 +201,7 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('transitions automatic -> startup: stops watchers and persists setting without immediate scan', async () => {
-      controller.startWatchers();
+      await controller.startWatchers();
 
       await controller.setScanMode('startup');
 
@@ -205,10 +211,11 @@ describe('LibraryLifecycleController', () => {
       expect(mockScanner.scan).not.toHaveBeenCalled();
     });
 
-    it('transitions startup -> manual: watchers remain stopped', async () => {
+    it('transitions startup -> manual: unconditionally cleans up watchers', async () => {
       await controller.setScanMode('manual');
 
       expect(saveUserSettings).toHaveBeenCalledWith({ libraryScanMode: 'manual' });
+      expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(false);
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).not.toHaveBeenCalled();
@@ -246,7 +253,7 @@ describe('LibraryLifecycleController', () => {
       expect(saveUserSettings).not.toHaveBeenCalled();
     });
 
-    it('returns existing in-flight promise when scanNow is called concurrently', async () => {
+    it('returns existing in-flight promise when scanNow is called concurrently without duplicate scanner invocations', async () => {
       let resolveScan: (value: ScanSummary) => void;
       const scanPromise = new Promise<ScanSummary>((resolve) => {
         resolveScan = resolve;
@@ -257,12 +264,14 @@ describe('LibraryLifecycleController', () => {
       const call1 = controller.scanNow();
       const call2 = controller.scanNow();
 
-      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+      // Controller should only invoke the scanner ONCE and share the in-flight promise
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       resolveScan!(mockCompletedSummary);
 
       const [res1, res2] = await Promise.all([call1, call2]);
-      expect(res1).toBe(res2);
+      expect(res1).toBe(mockCompletedSummary);
+      expect(res2).toBe(mockCompletedSummary);
     });
 
     it('cancels scan via scanner delegate', async () => {
@@ -272,7 +281,7 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('shuts down cleanly by stopping watchers and cancelling scan', async () => {
-      controller.startWatchers();
+      await controller.startWatchers();
 
       await controller.shutdown();
 
