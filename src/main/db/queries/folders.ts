@@ -1,5 +1,6 @@
 import { basename } from 'path';
 
+import logger from '@main/logger';
 import { eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '../db';
@@ -135,73 +136,88 @@ const createOrUpdateFolderStructure = async (
   return { addedFolders, updatedFolders };
 };
 
-const getMusicFolder = async (
-  parentId: number | null = null,
-  trx: DB | DBTransaction = db
-): Promise<MusicFolder[]> => {
-  // Fetch folders with the given parentId
-  const folders = await trx.query.musicFolders.findMany({
-    where: parentId === null ? isNull(musicFolders.parentId) : eq(musicFolders.parentId, parentId),
+export const getAllMusicFolders = async (trx: DB | DBTransaction = db): Promise<MusicFolder[]> => {
+  const allFolders = await trx.query.musicFolders.findMany({
+    columns: {
+      id: true,
+      path: true,
+      parentId: true,
+      isBlacklisted: true,
+      lastModifiedAt: true,
+      lastChangedAt: true,
+      folderCreatedAt: true,
+      lastParsedAt: true
+    },
     with: {
       songs: {
         columns: { id: true }
       }
     }
   });
-  // .from(musicFolders)
-  // .where(parentId === null ? isNull(musicFolders.parentId) : eq(musicFolders.parentId, parentId));
 
-  const result: MusicFolder[] = [];
+  if (allFolders.length === 0) return [];
 
-  for (const folder of folders) {
-    const subFolders = await getMusicFolder(folder.id);
+  const folderMap = new Map<number, MusicFolder & { id: number; parentId: number | null }>();
+  const rootFolders: MusicFolder[] = [];
 
-    result.push({
-      path: folder.path,
+  for (let i = 0; i < allFolders.length; i++) {
+    const f = allFolders[i];
+    folderMap.set(f.id, {
+      id: f.id,
+      parentId: f.parentId,
+      path: f.path,
       stats: {
-        lastModifiedDate: folder.lastModifiedAt!,
-        lastChangedDate: folder.lastChangedAt!,
-        fileCreatedDate: folder.folderCreatedAt!,
-        lastParsedDate: folder.lastParsedAt!
+        lastModifiedDate: f.lastModifiedAt!,
+        lastChangedDate: f.lastChangedAt!,
+        fileCreatedDate: f.folderCreatedAt!,
+        lastParsedDate: f.lastParsedAt!
       },
-      songIds: folder.songs.map((song) => song.id),
-      isBlacklisted: folder.isBlacklisted,
-      subFolders
+      songIds: f.songs.map((s) => s.id),
+      isBlacklisted: f.isBlacklisted,
+      subFolders: []
     });
   }
 
-  return result;
-};
+  for (const folder of folderMap.values()) {
+    if (folder.parentId === null) {
+      rootFolders.push(folder);
+    } else {
+      const parent = folderMap.get(folder.parentId);
+      if (!parent) {
+        logger.error(
+          `Unable to resolve parent folder ID ${folder.parentId} for folder '${folder.path}' (ID: ${folder.id})`,
+          { folderId: folder.id, parentId: folder.parentId, folderPath: folder.path }
+        );
+        throw new Error(
+          `Unable to resolve parent folder ID ${folder.parentId} for '${folder.path}'`
+        );
+      }
+      parent.subFolders.push(folder);
+    }
+  }
 
-export const getAllMusicFolders = async (trx: DB | DBTransaction = db): Promise<MusicFolder[]> => {
-  const rootFolders = await trx.query.musicFolders.findMany({
-    where: isNull(musicFolders.parentId),
-    with: {
-      songs: {
-        columns: { id: true }
+  // Verify tree reachability (prevents circular parent cycles from silently dropping nodes)
+  let reachableCount = 0;
+  const countReachable = (nodes: MusicFolder[]) => {
+    for (const node of nodes) {
+      reachableCount++;
+      if (node.subFolders.length > 0) {
+        countReachable(node.subFolders);
       }
     }
-  });
+  };
+  countReachable(rootFolders);
 
-  const structures = await Promise.all(
-    rootFolders.map(
-      async (folder) =>
-        ({
-          path: folder.path,
-          stats: {
-            lastModifiedDate: folder.lastModifiedAt!,
-            lastChangedDate: folder.lastChangedAt!,
-            fileCreatedDate: folder.folderCreatedAt!,
-            lastParsedDate: folder.lastParsedAt!
-          },
-          songIds: folder.songs.map((song) => song.id),
-          isBlacklisted: folder.isBlacklisted,
-          subFolders: await getMusicFolder(folder.id, trx)
-        }) satisfies MusicFolder
-    )
-  );
+  if (reachableCount < folderMap.size) {
+    logger.error(
+      `Circular parent-child cycle detected in music folders: ${folderMap.size - reachableCount} folder(s) are unreachable from root.`
+    );
+    throw new Error(
+      `Circular parent-child cycle detected in music folders: ${folderMap.size - reachableCount} folder(s) unreachable from root.`
+    );
+  }
 
-  return structures;
+  return rootFolders;
 };
 
 export const getFoldersByIds = async (ids: number[], trx: DB | DBTransaction = db) => {
