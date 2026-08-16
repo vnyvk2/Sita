@@ -41,7 +41,7 @@ const playlistData: Playlist = {
 };
 
 function RecentlyAddedPlaylistInfoPage() {
-  const { scrollTopOffset, period: searchPeriod } = Route.useSearch();
+  const { period: searchPeriod } = Route.useSearch();
 
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
@@ -61,6 +61,11 @@ function RecentlyAddedPlaylistInfoPage() {
   const navigate = useNavigate({ from: '/main-player/playlists/recently-added' });
 
   const period = (searchPeriod as RecentlyAddedPeriod) || storedPeriod;
+
+  const scrollKey = useMemo(
+    () => `recently-added-playlist:${sortingOrder}:${period}`,
+    [sortingOrder, period]
+  );
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
@@ -226,13 +231,7 @@ function RecentlyAddedPlaylistInfoPage() {
       <VirtualizedList
         data={recentlyAddedSongs}
         fixedItemHeight={60}
-        scrollTopOffset={scrollTopOffset}
-        onDebouncedScroll={(range) => {
-          navigate({
-            replace: true,
-            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-          });
-        }}
+        scrollKey={scrollKey}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer

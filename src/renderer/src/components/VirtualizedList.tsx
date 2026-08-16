@@ -1,10 +1,13 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { type CSSProperties, type ReactNode, forwardRef } from 'react';
+import { type CSSProperties, type ReactNode, forwardRef, useEffect, useRef } from 'react';
 import { Virtuoso, type Components, type ListRange, type VirtuosoHandle } from 'react-virtuoso';
+
+import { scrollRegistry } from '../utils/scrollStore';
 
 type Props<T extends object> = {
   data: T[];
   fixedItemHeight: number;
+  scrollKey?: string;
   scrollTopOffset?: number;
   itemContent: (index: number, item: T) => ReactNode;
   components?: Components<T>;
@@ -16,115 +19,13 @@ type Props<T extends object> = {
   onDebouncedScroll?: (range: ListRange) => void;
 };
 
-// TODO: Tanstack Virtual cannot be implemented right now due to issues with react 19 compatibility as well as having scrolling and stuttering issues in both dev and production builds.
-// type VirtualListProps<T extends object> = {
-//   data: T[];
-//   fixedItemHeight: number;
-//   scrollTopOffset?: number;
-//   itemContent: (item: VirtualItem, dataItem: T) => ReactNode;
-//   overscan?: number;
-//   onChange?: (instance: Virtualizer<HTMLDivElement, Element>, sync: boolean) => void;
-//   onDebouncedScroll?: (instance: Virtualizer<HTMLDivElement, Element>, sync: boolean) => void;
-// };
-
-// export const VirtualList = <T extends object>(props: VirtualListProps<T>) => {
-//   const {
-//     data,
-//     fixedItemHeight,
-//     itemContent,
-//     overscan = 25,
-//     onChange,
-//     onDebouncedScroll,
-//     scrollTopOffset = 0
-//   } = props;
-
-//   const handleDebouncedScroll = useDebouncedCallback(
-//     (instance: Virtualizer<HTMLDivElement, Element>, sync: boolean) => {
-//       if (onDebouncedScroll) {
-//         onDebouncedScroll(instance, sync);
-//       }
-//     },
-//     { wait: 500 }
-//   );
-
-//   const parentRef = useRef<HTMLDivElement | null>(null);
-//   const { getTotalSize, getVirtualItems, scrollToOffset } = useVirtualizer({
-//     count: data.length,
-//     getScrollElement: () => parentRef.current,
-//     estimateSize: () => fixedItemHeight,
-//     onChange: (instance, sync) => {
-//       if (onChange) onChange(instance, sync);
-//       handleDebouncedScroll(instance, sync);
-//     },
-//     overscan
-//   });
-
-//   useEffect(() => {
-//     if (scrollTopOffset) scrollToOffset(scrollTopOffset);
-//   }, [scrollTopOffset, scrollToOffset]);
-
-//   return (
-//     <div
-//       className="list-container appear-from-bottom h-full flex-1 overflow-auto delay-100"
-//       ref={parentRef}
-//     >
-//       {/* The scrollable element for your list */}
-//       {/* The large inner element to hold all of the items */}
-//       <div
-//         style={{
-//           height: `${getTotalSize()}px`,
-//           width: '100%',
-//           position: 'relative'
-//         }}
-//       >
-//         {/* Only the visible items in the virtualizer, manually positioned to be in view */}
-//         {getVirtualItems().map((virtualItem) => {
-//           const index = virtualItem.index;
-//           const item = itemContent(virtualItem, data[index]);
-
-//           return (
-//             <div
-//               key={virtualItem.key}
-//               style={{
-//                 position: 'absolute',
-//                 top: 0,
-//                 left: 0,
-//                 width: '100%',
-//                 height: `${virtualItem.size}px`,
-//                 transform: `translateY(${virtualItem.start}px)`
-//               }}
-//             >
-//               {item}
-//             </div>
-//           );
-//         })}
-//       </div>
-//     </div>
-//   );
-// };
-
-// const ScrollSeekPlaceholder = ({ height, index }) => (
-//   <div
-//     style={{
-//       height,
-//       padding: '8px',
-//       boxSizing: 'border-box',
-//       overflow: 'hidden'
-//     }}
-//   >
-//     <div
-//       style={{
-//         background: index % 2 ? '#ccc' : '#eee'
-//       }}
-//     ></div>
-//   </div>
-// );
-
 const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
+
 const List = <T extends object>(props: Props<T>, ref) => {
   const {
     data,
     fixedItemHeight,
+    scrollKey,
     scrollTopOffset,
     itemContent,
     components = {},
@@ -135,6 +36,34 @@ const List = <T extends object>(props: Props<T>, ref) => {
     onDebouncedScroll
   } = props;
 
+  // Retrieve initial saved position for scrollKey if available
+  const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
+  const initialIndex =
+    typeof scrollTopOffset === 'number' ? scrollTopOffset : (savedPosition?.index ?? 0);
+  const initialOffset = savedPosition?.offset;
+
+  // Lifecycle restoration state machine: RESTORING -> TRACKING
+  const restorationStateRef = useRef<'RESTORING' | 'TRACKING'>(
+    initialIndex > 0 ? 'RESTORING' : 'TRACKING'
+  );
+  const targetIndexRef = useRef<number>(initialIndex);
+  const currentScrollTopRef = useRef<number | undefined>(initialOffset);
+  const currentScrollKeyRef = useRef<string | undefined>(scrollKey);
+
+  // When scrollKey changes (e.g. filter/sort change), update restoration lifecycle
+  useEffect(() => {
+    if (currentScrollKeyRef.current !== scrollKey) {
+      currentScrollKeyRef.current = scrollKey;
+      const newSavedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
+      const newTarget =
+        typeof scrollTopOffset === 'number' ? scrollTopOffset : (newSavedPosition?.index ?? 0);
+
+      targetIndexRef.current = newTarget;
+      currentScrollTopRef.current = newSavedPosition?.offset;
+      restorationStateRef.current = newTarget > 0 ? 'RESTORING' : 'TRACKING';
+    }
+  }, [scrollKey, scrollTopOffset]);
+
   const handleDebouncedScroll = useDebouncedCallback(
     (range: ListRange) => {
       if (onDebouncedScroll) {
@@ -143,6 +72,13 @@ const List = <T extends object>(props: Props<T>, ref) => {
     },
     { wait: 2500 }
   );
+
+  const initialTopMost =
+    initialIndex > 0
+      ? initialOffset !== undefined
+        ? { index: initialIndex, offset: initialOffset }
+        : initialIndex
+      : undefined;
 
   return (
     <Virtuoso
@@ -160,32 +96,54 @@ const List = <T extends object>(props: Props<T>, ref) => {
       useWindowScroll={useWindowScroll}
       fixedItemHeight={fixedItemHeight}
       components={{
-        // ScrollSeekPlaceholder,
         ...components
       }}
       ref={ref}
-      {...(typeof scrollTopOffset === 'number' ? { initialTopMostItemIndex: scrollTopOffset } : {})}
-      scrollerRef={scrollerRef}
+      {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
+      scrollerRef={(element) => {
+        if (typeof scrollerRef === 'function') {
+          scrollerRef(element);
+        } else if (scrollerRef && typeof scrollerRef === 'object') {
+          scrollerRef.current = element;
+        }
+
+        if (element && 'addEventListener' in element) {
+          const handleScroll = () => {
+            if ('scrollTop' in element) {
+              currentScrollTopRef.current = (element as HTMLElement).scrollTop;
+            }
+          };
+          element.addEventListener('scroll', handleScroll, { passive: true });
+        }
+      }}
       increaseViewportBy={{
         top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,
         bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
       }}
       rangeChanged={(range) => {
-        // To fix the issue of sending incorrect startIndex due to viewport increase
-        // range.startIndex = Math.max(0, range.startIndex);
+        // Guard: if currently restoring, ignore initial transient range events (e.g. 0 on mount)
+        if (restorationStateRef.current === 'RESTORING') {
+          if (
+            range.startIndex < targetIndexRef.current &&
+            range.endIndex < targetIndexRef.current
+          ) {
+            return;
+          }
+          // Target position reached; transition to normal tracking
+          restorationStateRef.current = 'TRACKING';
+        }
+
+        if (scrollKey && restorationStateRef.current === 'TRACKING') {
+          scrollRegistry.set(scrollKey, {
+            index: range.startIndex,
+            offset: currentScrollTopRef.current
+          });
+        }
 
         if (onChange) onChange(range);
         handleDebouncedScroll(range);
       }}
       itemContent={itemContent}
-      // skipAnimationFrameInResizeObserver={true}
-      // scrollSeekConfiguration={{
-      //   enter: (velocity) => Math.abs(velocity) > 1000,
-      //   exit: (velocity) => {
-      //     const shouldExit = Math.abs(velocity) < 200;
-      //     return shouldExit;
-      //   }
-      // }}
     />
   );
 };

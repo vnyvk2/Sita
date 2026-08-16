@@ -11,17 +11,17 @@ import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
-import { queryClient } from '@renderer/queryClient';
+import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { artistQuery } from '@renderer/queries/artists';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/artists/')({
@@ -59,18 +59,35 @@ function ArtistPage() {
   const sortingStates = useStore(store, (state) => state.localStorage.sortingStates);
 
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
-  const { scrollTopOffset, sortingOrder = sortingStates?.artistsPage || 'aToZ', filteringOrder = 'notSelected', keyword } =
-    Route.useSearch();
+  const {
+    sortingOrder = sortingStates?.artistsPage || 'aToZ',
+    filteringOrder = 'notSelected',
+    keyword
+  } = Route.useSearch();
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const scrollKey = useMemo(
+    () => `artists-grid:${sortingOrder}:${filteringOrder}:${keyword || ''}`,
+    [sortingOrder, filteringOrder, keyword]
+  );
+
   const {
     data: { data: artistsData }
-  } = useSuspenseQuery(artistQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' }));
+  } = useSuspenseQuery(
+    artistQuery.all({
+      sortType: sortingOrder,
+      filterType: filteringOrder,
+      start: 0,
+      end: 0,
+      keyword: keyword ?? ''
+    })
+  );
 
   const search = usePageSearch({
     keyword,
-    updateSearch: (val) => navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
+    updateSearch: (val) =>
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
   });
   // useEffect(() => {
   //   const manageArtistDataUpdatesInArtistsPage = (e: Event) => {
@@ -197,13 +214,7 @@ function ArtistPage() {
               data={artistsData}
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
-              scrollTopOffset={scrollTopOffset}
-              onDebouncedScroll={(range) => {
-                navigate({
-                  replace: true,
-                  search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                });
-              }}
+              scrollKey={scrollKey}
               itemContent={(index, artist) => {
                 return (
                   <Artist

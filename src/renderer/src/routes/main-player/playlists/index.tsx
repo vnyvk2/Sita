@@ -5,20 +5,20 @@ import Dropdown from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import NavLink from '@renderer/components/NavLink';
+import PageSearchInput from '@renderer/components/PageSearchInput';
 import { Playlist } from '@renderer/components/PlaylistsPage/Playlist';
 import { playlistSortOptions } from '@renderer/components/PlaylistsPage/PlaylistOptions';
 import SecondaryContainer from '@renderer/components/SecondaryContainer';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { queryClient } from '@renderer/queryClient';
-import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { playlistSearchSchema } from '@renderer/utils/zod/playlistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import PageSearchInput from '@renderer/components/PageSearchInput';
-import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
@@ -34,9 +34,7 @@ export const Route = createFileRoute('/main-player/playlists/')({
     sortingOrder: search.sortingOrder
   }),
   loader: async ({ deps }) => {
-    await queryClient.ensureQueryData(
-      rootCollectionsOptions(deps.sortingOrder || 'aToZ')
-    );
+    await queryClient.ensureQueryData(rootCollectionsOptions(deps.sortingOrder || 'aToZ'));
   }
 });
 
@@ -60,6 +58,10 @@ function PlaylistsPage() {
     (state) => state.localStorage.sortingStates.playlistsPage
   );
   const { sortingOrder = playlistsPageSortingState || 'aToZ', keyword } = Route.useSearch();
+  const scrollKey = useMemo(
+    () => `playlists-grid:${sortingOrder}:${keyword || ''}`,
+    [sortingOrder, keyword]
+  );
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) => state.multipleSelectionsData.isEnabled
@@ -70,9 +72,7 @@ function PlaylistsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const { data: playlists } = useSuspenseQuery(
-    rootCollectionsOptions(sortingOrder)
-  );
+  const { data: playlists } = useSuspenseQuery(rootCollectionsOptions(sortingOrder));
 
   const search = usePageSearch({
     keyword,
@@ -97,13 +97,7 @@ function PlaylistsPage() {
   const selectAllHandler = useSelectAllHandler(filteredPlaylists, 'playlist', 'id');
 
   const createNewPlaylist = useCallback(
-    () =>
-      changePromptMenuData(
-        true,
-        <NewPlaylistPrompt
-          currentPlaylists={playlists}
-        />
-      ),
+    () => changePromptMenuData(true, <NewPlaylistPrompt currentPlaylists={playlists} />),
     [changePromptMenuData, playlists, sortingOrder]
   );
 
@@ -134,8 +128,7 @@ function PlaylistsPage() {
             {
               label: t('playlistsPage.importPlaylist'),
               iconName: 'publish',
-              handlerFunction: () =>
-                CollectionClient.import().catch((err) => console.error(err))
+              handlerFunction: () => CollectionClient.import().catch((err) => console.error(err))
             }
           ],
           e.pageX,
@@ -186,17 +179,19 @@ function PlaylistsPage() {
                     className="batch-export-playlists-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                     iconName="file_upload"
                     clickHandler={() => {
-                      const selectedPlaylistIds = multipleSelectionsData.multipleSelections.map(Number);
+                      const selectedPlaylistIds =
+                        multipleSelectionsData.multipleSelections.map(Number);
                       changePromptMenuData(
                         true,
                         <Suspense fallback={null}>
-                          <PlaylistBatchExportSettingsPrompt
-                            playlistIds={selectedPlaylistIds}
-                          />
+                          <PlaylistBatchExportSettingsPrompt playlistIds={selectedPlaylistIds} />
                         </Suspense>
                       );
                     }}
-                    tooltipLabel={t('playlistsPage.exportSelectedPlaylists', 'Export selected playlists')}
+                    tooltipLabel={t(
+                      'playlistsPage.exportSelectedPlaylists',
+                      'Export selected playlists'
+                    )}
                   />
                 )}
                 {multipleSelectionsData.multipleSelections.length >= 2 && (
@@ -206,7 +201,8 @@ function PlaylistsPage() {
                     className="merge-playlists-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                     iconName="call_merge"
                     clickHandler={() => {
-                      const sourcePlaylistIds = multipleSelectionsData.multipleSelections.map(Number);
+                      const sourcePlaylistIds =
+                        multipleSelectionsData.multipleSelections.map(Number);
                       const sourcePlaylistNames = playlists
                         .filter((p) => sourcePlaylistIds.includes(p.id))
                         .map((p) => p.name);
@@ -218,7 +214,10 @@ function PlaylistsPage() {
                         />
                       );
                     }}
-                    tooltipLabel={t('playlistsPage.mergePlaylistsTitle', 'Merge selected playlists')}
+                    tooltipLabel={t(
+                      'playlistsPage.mergePlaylistsTitle',
+                      'Merge selected playlists'
+                    )}
                   />
                 )}
               </>
@@ -238,8 +237,7 @@ function PlaylistsPage() {
                 setIsDisabled(true);
                 setIsPending(true);
 
-                return CollectionClient
-                  .import()
+                return CollectionClient.import()
                   .finally(() => {
                     setIsDisabled(false);
                     setIsPending(false);
@@ -303,12 +301,7 @@ function PlaylistsPage() {
               data={filteredPlaylists}
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
-              onDebouncedScroll={(range) => {
-                navigate({
-                  replace: true,
-                  search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                });
-              }}
+              scrollKey={scrollKey}
               itemContent={(index, playlist) => {
                 return <Playlist index={index} selectAllHandler={selectAllHandler} {...playlist} />;
               }}
@@ -318,8 +311,15 @@ function PlaylistsPage() {
         {playlists.length > 0 && filteredPlaylists.length === 0 && (
           <div className="no-playlists-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
             <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
-            <span className="mb-2 font-medium">{t('playlistsPage.noMatchingPlaylistsTitle', 'No matching playlists found')}</span>
-            <span className="text-sm opacity-75">{t('playlistsPage.noMatchingPlaylistsDesc', { keyword, defaultValue: `No playlists match "${keyword}"` })}</span>
+            <span className="mb-2 font-medium">
+              {t('playlistsPage.noMatchingPlaylistsTitle', 'No matching playlists found')}
+            </span>
+            <span className="text-sm opacity-75">
+              {t('playlistsPage.noMatchingPlaylistsDesc', {
+                keyword,
+                defaultValue: `No playlists match "${keyword}"`
+              })}
+            </span>
           </div>
         )}
         {playlists.length === 0 && (

@@ -13,17 +13,17 @@ import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
-import { albumQuery } from '@renderer/queries/albums';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
+import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { albumQuery } from '@renderer/queries/albums';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { albumSearchSchema } from '@renderer/utils/zod/albumSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/albums/')({
@@ -71,6 +71,11 @@ function AlbumsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const scrollKey = useMemo(
+    () => `albums-grid:${sortingOrder}:${filteringOrder}:${keyword || ''}`,
+    [sortingOrder, filteringOrder, keyword]
+  );
+
   const {
     data: { data: albumsData }
   } = useSuspenseQuery(
@@ -85,7 +90,8 @@ function AlbumsPage() {
 
   const search = usePageSearch({
     keyword,
-    updateSearch: (val) => navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
+    updateSearch: (val) =>
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
   });
 
   // useEffect(() => {
@@ -213,12 +219,7 @@ function AlbumsPage() {
               data={albumsData}
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
-              onDebouncedScroll={(range) => {
-                navigate({
-                  replace: true,
-                  search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                });
-              }}
+              scrollKey={scrollKey}
               itemContent={(index, item) => {
                 return (
                   <Album

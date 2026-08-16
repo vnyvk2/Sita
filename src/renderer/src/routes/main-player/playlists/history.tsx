@@ -1,18 +1,18 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
+import type { DropdownProp } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
-import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
-import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
+import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
-import type { DropdownProp } from '@renderer/components/Dropdown';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
+import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -63,7 +63,7 @@ const mostPlayedLimitOptions = [
  * @returns A React element representing the History playlist information page.
  */
 function HistoryPlaylistInfoPage() {
-  const { scrollTopOffset, period: searchPeriod, mostPlayedLimit: searchLimit } = Route.useSearch();
+  const { period: searchPeriod, mostPlayedLimit: searchLimit } = Route.useSearch();
 
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
@@ -88,6 +88,11 @@ function HistoryPlaylistInfoPage() {
 
   const period = (searchPeriod as HistoryPeriod) || storedPeriod;
   const mostPlayedLimit = searchLimit || storedLimit;
+
+  const scrollKey = useMemo(
+    () => `history-playlist:${sortingOrder}:${period}:${mostPlayedLimit}`,
+    [sortingOrder, period, mostPlayedLimit]
+  );
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
@@ -179,10 +184,7 @@ function HistoryPlaylistInfoPage() {
   const createPlaylistFromHistory = useCallback(() => {
     if (historySongs.length === 0) return;
     const songIds = historySongs.map((song) => song.songId);
-    changePromptMenuData(
-      true,
-      <NewPlaylistPrompt songIds={songIds} />
-    );
+    changePromptMenuData(true, <NewPlaylistPrompt songIds={songIds} />);
   }, [changePromptMenuData, historySongs]);
 
   const isMostPlayedMode =
@@ -265,7 +267,10 @@ function HistoryPlaylistInfoPage() {
             isDisabled: !(historySongs.length > 0)
           },
           {
-            tooltipLabel: t('historyPage.createPlaylistFromHistory', 'Create Playlist from History'),
+            tooltipLabel: t(
+              'historyPage.createPlaylistFromHistory',
+              'Create Playlist from History'
+            ),
             iconName: 'playlist_add',
             clickHandler: createPlaylistFromHistory,
             isDisabled: !(historySongs.length > 0)
@@ -276,15 +281,14 @@ function HistoryPlaylistInfoPage() {
       <VirtualizedList
         data={historySongs}
         fixedItemHeight={60}
-        scrollTopOffset={scrollTopOffset}
-        onDebouncedScroll={(range) => {
-          navigate({
-            replace: true,
-            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-          });
-        }}
+        scrollKey={scrollKey}
         components={{
-          Header: () => <PlaylistInfoAndImgContainer playlist={mapLegacyPlaylistToDto(playlistData)} songs={historySongs} />
+          Header: () => (
+            <PlaylistInfoAndImgContainer
+              playlist={mapLegacyPlaylistToDto(playlistData)}
+              songs={historySongs}
+            />
+          )
         }}
         itemContent={(index, item) => {
           return (
@@ -309,4 +313,3 @@ function HistoryPlaylistInfoPage() {
     </MainContainer>
   );
 }
-

@@ -81,7 +81,6 @@ function SongsPage() {
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const {
-    scrollTopOffset,
     sortingOrder = songsPageSortingState || 'aToZ',
     filteringOrder = 'notSelected',
     action,
@@ -93,6 +92,20 @@ function SongsPage() {
     onlyFavoriteAlbums = false
   } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+
+  const scrollKey = useMemo(
+    () =>
+      `songs-list:${sortingOrder}:${filteringOrder}:${keyword || ''}:${genre || 'all'}:${language || 'all'}:${onlyFavoriteArtists}:${onlyFavoriteAlbums}`,
+    [
+      sortingOrder,
+      filteringOrder,
+      keyword,
+      genre,
+      language,
+      onlyFavoriteArtists,
+      onlyFavoriteAlbums
+    ]
+  );
 
   const {
     data: { data: songData }
@@ -617,16 +630,7 @@ function SongsPage() {
           <VirtualizedList
             data={filteredSongs}
             fixedItemHeight={60}
-            scrollTopOffset={scrollTopOffset}
-            onDebouncedScroll={(range) => {
-              navigate({
-                replace: true,
-                search: (prev) => ({
-                  ...prev,
-                  scrollTopOffset: range.startIndex
-                })
-              });
-            }}
+            scrollKey={scrollKey}
             itemContent={(index, song) => {
               if (song)
                 return (

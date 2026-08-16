@@ -6,16 +6,16 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import { genreQuery } from '@renderer/queries/genres';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect } from 'react';
+import { useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/genres/$genreId')({
@@ -51,11 +51,13 @@ function GenreInfoPage() {
   const { genreId } = Route.useParams({
     select: (params) => ({ genreId: Number(params.genreId) })
   });
-  const {
-    scrollTopOffset,
-    sortingOrder = genreDetailSortingState,
-    filteringOrder = 'notSelected'
-  } = Route.useSearch();
+  const { sortingOrder = genreDetailSortingState, filteringOrder = 'notSelected' } =
+    Route.useSearch();
+
+  const scrollKey = useMemo(
+    () => `genre-songs:${genreId}:${sortingOrder}:${filteringOrder}`,
+    [genreId, sortingOrder, filteringOrder]
+  );
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('genreDetailPage', sortingOrder);
@@ -185,13 +187,7 @@ function GenreInfoPage() {
       <VirtualizedList
         data={genreSongs}
         fixedItemHeight={60}
-        scrollTopOffset={scrollTopOffset}
-        onDebouncedScroll={(range) => {
-          navigate({
-            replace: true,
-            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-          });
-        }}
+        scrollKey={scrollKey}
         components={{
           Header: () => <GenreImgAndInfoContainer genreData={genreData} genreSongs={genreSongs} />
         }}

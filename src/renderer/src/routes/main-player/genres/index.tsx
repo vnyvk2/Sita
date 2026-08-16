@@ -8,15 +8,15 @@ import MainContainer from '@renderer/components/MainContainer';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import { genreQuery } from '@renderer/queries/genres';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { genreSearchSchema } from '@renderer/utils/zod/genreSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/genres/')({
@@ -54,6 +54,8 @@ function GenresPage() {
   );
   const { sortingOrder = genresPageSortingState || 'aToZ' } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+
+  const scrollKey = useMemo(() => `genres-grid:${sortingOrder}`, [sortingOrder]);
 
   const {
     data: { data: genresData }
@@ -156,12 +158,7 @@ function GenresPage() {
               data={genresData}
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
-              onDebouncedScroll={(range) => {
-                navigate({
-                  replace: true,
-                  search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                });
-              }}
+              scrollKey={scrollKey}
               itemContent={(index, genre) => {
                 return (
                   <Genre

@@ -11,10 +11,10 @@ import Song from '@renderer/components/SongsPage/Song';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store, dispatch } from '@renderer/store/store';
 import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
 import { baseInfoPageSearchParamsSchema } from '@renderer/utils/zod/baseInfoPageSearchParamsSchema';
@@ -55,8 +55,10 @@ function RouteComponent() {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const manager = getQueuesManager();
 
-  const { scrollTopOffset, queueIndex } = Route.useSearch();
+  const { queueIndex } = Route.useSearch();
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queueIndex ?? queue.currentQueueIndex);
+
+  const scrollKey = useMemo(() => `queue-list:${viewingQueueIndex}`, [viewingQueueIndex]);
 
   // Sync viewingQueueIndex if active queue is deleted or changed externally
   const prevActiveQueueRef = useRef(queue.currentQueueIndex);
@@ -472,13 +474,7 @@ function RouteComponent() {
                         fixedItemHeight={60}
                         ref={ListRef}
                         scrollerRef={droppableProvided.innerRef}
-                        scrollTopOffset={scrollTopOffset}
-                        onDebouncedScroll={(range) => {
-                          navigate({
-                            replace: true,
-                            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                          });
-                        }}
+                        scrollKey={scrollKey}
                         components={{
                           Item: ({ children, ...props }: { children?: ReactNode }) => (
                             <div {...props} className="height-preserving-container">
@@ -562,7 +558,7 @@ function RouteComponent() {
               )}
           </div>
           {currentQueue.length === 0 && (
-            <div className="no-songs-container flex h-full w-full flex-col items-center justify-center text-center text-2xl text-font-color-dimmed">
+            <div className="no-songs-container text-font-color-dimmed flex h-full w-full flex-col items-center justify-center text-center text-2xl">
               <Img src={NoSongsImage} className="mb-8 w-60" alt="" /> {t('currentQueuePage.empty')}
               <Button
                 label={t('currentQueuePage.addSongs', 'Add Songs')}

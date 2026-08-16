@@ -2,15 +2,15 @@ import { isLyricsEnhancedSynced } from '@common/isLyricsSynced';
 import Button from '@renderer/components/Button';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import LyricsMetadata from '@renderer/components/LyricsPage/LyricsMetadata';
+import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import TheatreLyricsView from '@renderer/components/LyricsPage/TheatreLyricsView';
-import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import MainContainer from '@renderer/components/MainContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
-import { queryClient } from '@renderer/queryClient';
 import { lyricsQuery } from '@renderer/queries/lyrics';
+import { queryClient } from '@renderer/queryClient';
 import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';
 import { lyricsSchema } from '@renderer/utils/zod/lyricsSchema';
@@ -536,7 +536,9 @@ function LyricsPage() {
                         }}
                         isDisabled={!lyrics.isOfflineLyricsAvailable}
                         tooltipLabel={
-                          !lyrics.isOfflineLyricsAvailable ? t('lyricsPage.noSavedLyrics') : undefined
+                          !lyrics.isOfflineLyricsAvailable
+                            ? t('lyricsPage.noSavedLyrics')
+                            : undefined
                         }
                       />
                       <Button

@@ -374,7 +374,10 @@ function SearchPage() {
           <>
             {/* MOST RELEVANT SEARCH RESULTS — only shown when filter is 'All' */}
             {(!filterBy || filterBy === 'All') && (
-              <MostRelevantSearchResultsContainer searchResults={searchResults} searchInput={keyword} />
+              <MostRelevantSearchResultsContainer
+                searchResults={searchResults}
+                searchInput={keyword}
+              />
             )}
             {/* DYNAMICALLY ORDERED SEARCH RESULT SECTIONS */}
             {sectionOrder.map((section) => renderSection(section))}

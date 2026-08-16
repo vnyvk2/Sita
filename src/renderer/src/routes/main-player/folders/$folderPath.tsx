@@ -31,11 +31,12 @@ function MusicFolderInfoPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: Route.fullPath });
   const { folderPath } = Route.useParams();
-  const {
-    scrollTopOffset,
-    filteringOrder = 'notSelected',
-    sortingOrder = 'aToZ'
-  } = Route.useSearch();
+  const { filteringOrder = 'notSelected', sortingOrder = 'aToZ' } = Route.useSearch();
+
+  const scrollKey = useMemo(
+    () => `folder-songs:${folderPath}:${sortingOrder}:${filteringOrder}`,
+    [folderPath, sortingOrder, filteringOrder]
+  );
 
   const [folderInfo, setFolderInfo] = useState<MusicFolder>();
   const [folderSongs, setFolderSongs] = useState<SongData[]>([]);
@@ -262,13 +263,7 @@ function MusicFolderInfoPage() {
             <VirtualizedList
               data={folderSongs}
               fixedItemHeight={60}
-              scrollTopOffset={scrollTopOffset}
-              onDebouncedScroll={(range) => {
-                navigate({
-                  replace: true,
-                  search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                });
-              }}
+              scrollKey={scrollKey}
               itemContent={(index, song) => {
                 if (song)
                   return (

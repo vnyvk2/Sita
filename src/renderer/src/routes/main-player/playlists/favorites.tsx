@@ -6,17 +6,17 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
+import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect } from 'react';
+import { useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
 
 import { SpecialPlaylists } from '../../../../../common/playlists.enum';
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -51,8 +51,6 @@ const playlistData: Playlist = {
  * @returns The React element representing the Favorites playlist info page.
  */
 function FavoritesPlaylistInfoPage() {
-  const { scrollTopOffset } = Route.useSearch();
-
   const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
@@ -63,6 +61,8 @@ function FavoritesPlaylistInfoPage() {
   const { t } = useTranslation();
   const { sortingOrder = playlistSortingState } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/favorites' });
+
+  const scrollKey = useMemo(() => `favorites-playlist:${sortingOrder}`, [sortingOrder]);
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
@@ -133,7 +133,8 @@ function FavoritesPlaylistInfoPage() {
   );
 
   const importSongsToFavorites = useCallback(() => {
-    window.api.collections.import({ targetPlaylistId: SpecialPlaylists.Favorites })
+    window.api.collections
+      .import({ targetPlaylistId: SpecialPlaylists.Favorites })
       .then(() => {
         queryClient.invalidateQueries({
           queryKey: songQuery.favorites({ sortType: sortingOrder }).queryKey
@@ -198,16 +199,13 @@ function FavoritesPlaylistInfoPage() {
       <VirtualizedList
         data={favoriteSongs}
         fixedItemHeight={60}
-        scrollTopOffset={scrollTopOffset}
-        onDebouncedScroll={(range) => {
-          navigate({
-            replace: true,
-            search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-          });
-        }}
+        scrollKey={scrollKey}
         components={{
           Header: () => (
-            <PlaylistInfoAndImgContainer playlist={mapLegacyPlaylistToDto(playlistData)} songs={favoriteSongs} />
+            <PlaylistInfoAndImgContainer
+              playlist={mapLegacyPlaylistToDto(playlistData)}
+              songs={favoriteSongs}
+            />
           )
         }}
         itemContent={(index, item) => {
@@ -220,7 +218,6 @@ function FavoritesPlaylistInfoPage() {
               selectAllHandler={selectAllHandler}
               {...item}
               trackNo={undefined}
-
             />
           );
         }}

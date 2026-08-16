@@ -1,7 +1,10 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import { collectionKeys } from '@renderer/api/collectionKeys';
+import Button from '@renderer/components/Button';
 import MainContainer from '@renderer/components/MainContainer';
+import PageSearchInput from '@renderer/components/PageSearchInput';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import {
@@ -14,13 +17,14 @@ import {
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import {
   collectionDetailOptions,
   collectionEntriesOptions
 } from '@renderer/hooks/collections/useCollectionQueries';
+import { usePageSearch } from '@renderer/hooks/usePageSearch';
+import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
@@ -29,10 +33,6 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import PageSearchInput from '@renderer/components/PageSearchInput';
-import { usePageSearch } from '@renderer/hooks/usePageSearch';
-import Button from '@renderer/components/Button';
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 const SensitiveActionConfirmPrompt = lazy(
   () => import('@renderer/components/SensitiveActionConfirmPrompt')
@@ -51,9 +51,7 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   validateSearch: songSearchSchema,
   component: PlaylistInfoPage,
   loader: async ({ params }) => {
-    await queryClient.ensureQueryData(
-      collectionDetailOptions(Number(params.playlistId))
-    );
+    await queryClient.ensureQueryData(collectionDetailOptions(Number(params.playlistId)));
   }
 });
 
@@ -74,18 +72,20 @@ function PlaylistInfoPage() {
   const {
     sortingOrder = playlistSortingState || 'customOrder',
     filteringOrder = 'notSelected',
-    keyword,
-    scrollTopOffset
+    keyword
   } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
+
+  const scrollKey = useMemo(
+    () => `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${keyword || ''}`,
+    [playlistId, sortingOrder, filteringOrder, keyword]
+  );
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
   }, [sortingOrder]);
 
-  const { data: playlistData } = useSuspenseQuery(
-    collectionDetailOptions(playlistId)
-  );
+  const { data: playlistData } = useSuspenseQuery(collectionDetailOptions(playlistId));
 
   if (!playlistData) {
     throw new Error('Playlist not found');
@@ -108,7 +108,7 @@ function PlaylistInfoPage() {
   const playlistSongs = useMemo(() => {
     if (isPersistentPlaylistOrder(sortingOrder) || !sortingOrder) {
       const songMap = new Map(rawPlaylistSongs.map((s) => [s.songId, s]));
-      const positionOrderedSongs: Array<typeof rawPlaylistSongs[0] & { entryId: number }> = [];
+      const positionOrderedSongs: Array<(typeof rawPlaylistSongs)[0] & { entryId: number }> = [];
       for (const entry of collectionEntries) {
         const song = songMap.get(entry.songId);
         if (song) {
@@ -156,29 +156,49 @@ function PlaylistInfoPage() {
 
     return playlistSongs.filter((song) => {
       const titleMatch = song.title?.toLowerCase().includes(lowerQ);
-      const artistsStr = song.artists?.map((a) => a.name).join(' ').toLowerCase() ?? '';
+      const artistsStr =
+        song.artists
+          ?.map((a) => a.name)
+          .join(' ')
+          .toLowerCase() ?? '';
       const artistMatch = artistsStr.includes(lowerQ);
       const albumMatch = song.album?.name?.toLowerCase().includes(lowerQ);
-      const genresStr = song.genres?.map((g) => g.name).join(' ').toLowerCase() ?? '';
+      const genresStr =
+        song.genres
+          ?.map((g) => g.name)
+          .join(' ')
+          .toLowerCase() ?? '';
       const genreMatch = genresStr.includes(lowerQ);
       return titleMatch || artistMatch || albumMatch || genreMatch;
     });
   }, [playlistSongs, keyword]);
 
   useEffect(() => {
-    console.log('[Pipeline Stage 3: collectionEntries]', collectionEntries.map((e) => ({ id: e.id, songId: e.songId, pos: e.position })));
+    console.log(
+      '[Pipeline Stage 3: collectionEntries]',
+      collectionEntries.map((e) => ({ id: e.id, songId: e.songId, pos: e.position }))
+    );
   }, [collectionEntries]);
 
   useEffect(() => {
-    console.log('[Pipeline Stage 4: rawPlaylistSongs]', rawPlaylistSongs.map((s) => s.songId));
+    console.log(
+      '[Pipeline Stage 4: rawPlaylistSongs]',
+      rawPlaylistSongs.map((s) => s.songId)
+    );
   }, [rawPlaylistSongs]);
 
   useEffect(() => {
-    console.log('[Pipeline Stage 5: playlistSongs]', playlistSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title })));
+    console.log(
+      '[Pipeline Stage 5: playlistSongs]',
+      playlistSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title }))
+    );
   }, [playlistSongs]);
 
   useEffect(() => {
-    console.log('[Pipeline Stage 6: filteredSongs]', filteredSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title })));
+    console.log(
+      '[Pipeline Stage 6: filteredSongs]',
+      filteredSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title }))
+    );
   }, [filteredSongs]);
 
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
@@ -243,7 +263,11 @@ function PlaylistInfoPage() {
       if (sourceIndex === destIndex) return;
 
       const draggedSong = filteredSongs[sourceIndex];
-      console.log('[Pipeline Stage 1: handleDragEnd]', { sourceIndex, destIndex, draggedEntryId: draggedSong?.entryId });
+      console.log('[Pipeline Stage 1: handleDragEnd]', {
+        sourceIndex,
+        destIndex,
+        draggedEntryId: draggedSong?.entryId
+      });
       if (draggedSong?.entryId) {
         moveSongAbsolute(draggedSong.entryId, destIndex, sourceIndex);
       }
@@ -304,7 +328,16 @@ function PlaylistInfoPage() {
 
       return items;
     },
-    [addNewNotifications, filteredSongs.length, moveSongAbsolute, moveSongRelative, playlistData.id, playlistData.name, sortingOrder, t]
+    [
+      addNewNotifications,
+      filteredSongs.length,
+      moveSongAbsolute,
+      moveSongRelative,
+      playlistData.id,
+      playlistData.name,
+      sortingOrder,
+      t
+    ]
   );
 
   const openAddSongsPrompt = useCallback(() => {
@@ -323,14 +356,7 @@ function PlaylistInfoPage() {
       const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(
-        queueSongIds,
-        'playlist',
-        false,
-        playlistData.id,
-        false,
-        playlistData.name
-      );
+      createQueue(queueSongIds, 'playlist', false, playlistData.id, false, playlistData.name);
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
     [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]
@@ -476,7 +502,11 @@ function PlaylistInfoPage() {
               queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
             });
           }
-        } else if (canReorder(sortingOrder) && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        } else if (
+          canReorder(sortingOrder) &&
+          e.altKey &&
+          (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+        ) {
           e.preventDefault();
           e.stopPropagation();
           const selectedSongIds = store.state.multipleSelectionsData.multipleSelections;
@@ -573,8 +603,8 @@ function PlaylistInfoPage() {
           }
         ]}
       />
-      {filteredSongs.length > 0 && (
-        canReorder(sortingOrder) ? (
+      {filteredSongs.length > 0 &&
+        (canReorder(sortingOrder) ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable
               droppableId="playlist-droppable"
@@ -604,13 +634,7 @@ function PlaylistInfoPage() {
                   data={filteredSongs}
                   fixedItemHeight={60}
                   scrollerRef={droppableProvided.innerRef}
-                  scrollTopOffset={scrollTopOffset}
-                  onDebouncedScroll={(range) => {
-                    navigate({
-                      replace: true,
-                      search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-                    });
-                  }}
+                  scrollKey={scrollKey}
                   components={{
                     Header: () => (
                       <PlaylistInfoAndImgContainer
@@ -651,13 +675,7 @@ function PlaylistInfoPage() {
           <VirtualizedList
             data={filteredSongs}
             fixedItemHeight={60}
-            scrollTopOffset={scrollTopOffset}
-            onDebouncedScroll={(range) => {
-              navigate({
-                replace: true,
-                search: (prev) => ({ ...prev, scrollTopOffset: range.startIndex })
-              });
-            }}
+            scrollKey={scrollKey}
             components={{
               Header: () => (
                 <PlaylistInfoAndImgContainer
@@ -680,8 +698,7 @@ function PlaylistInfoPage() {
               />
             )}
           />
-        )
-      )}
+        ))}
       {playlistSongs.length > 0 && filteredSongs.length === 0 && (
         <div className="flex h-full grow flex-col">
           <PlaylistInfoAndImgContainer
@@ -689,10 +706,17 @@ function PlaylistInfoPage() {
             songs={playlistSongs}
             filteredSongs={filteredSongs}
           />
-          <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80! py-12">
+          <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center py-12 text-center text-lg font-light opacity-80!">
             <span className="material-icons-round-outlined mb-4 text-5xl">search_off</span>
-            <span className="mb-2 font-medium text-xl">{t('searchPage.noResultsTitle', 'No matching songs found')}</span>
-            <span className="text-sm opacity-75">{t('searchPage.noResultsDesc', { keyword, defaultValue: `No songs match "${keyword}" in this playlist.` })}</span>
+            <span className="mb-2 text-xl font-medium">
+              {t('searchPage.noResultsTitle', 'No matching songs found')}
+            </span>
+            <span className="text-sm opacity-75">
+              {t('searchPage.noResultsDesc', {
+                keyword,
+                defaultValue: `No songs match "${keyword}" in this playlist.`
+              })}
+            </span>
           </div>
         </div>
       )}
