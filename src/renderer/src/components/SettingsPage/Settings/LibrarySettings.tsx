@@ -1,0 +1,294 @@
+import Button from '@renderer/components/Button';
+import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
+import calculateElapsedTime from '@renderer/utils/calculateElapsedTime';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const LibrarySettings = () => {
+  const { t } = useTranslation();
+  const { data: userSettings } = useQuery(settingsQuery.all);
+
+  const [scanStatus, setScanStatus] = useState<string>('IDLE');
+  const [discoveredFiles, setDiscoveredFiles] = useState<number>(0);
+  const [reconcileProgress, setReconcileProgress] = useState<{
+    completed: number;
+    total: number;
+  }>({ completed: 0, total: 0 });
+
+  const currentMode = userSettings?.libraryScanMode || 'automatic';
+
+  const { mutate: updateScanMode, isPending: isUpdatingMode } = useMutation({
+    mutationFn: (mode: LibraryScanMode) => window.api.settings.updateLibraryScanMode(mode),
+    onSettled: () => {
+      queryClient.invalidateQueries(settingsQuery.all);
+    }
+  });
+
+  const { mutate: startScan, isPending: isStartingScan } = useMutation({
+    mutationFn: async () => window.api.library.startScan(),
+    onSettled: () => {
+      queryClient.invalidateQueries(settingsQuery.all);
+    }
+  });
+
+  const { mutate: cancelScan, isPending: isCancellingScan } = useMutation({
+    mutationFn: async () => window.api.library.cancelScan(),
+    onSettled: () => {
+      queryClient.invalidateQueries(settingsQuery.all);
+    }
+  });
+
+  useEffect(() => {
+    // Check initial scanner status
+    window.api.library
+      .getScanStatus()
+      .then((status) => {
+        setScanStatus(status);
+        return undefined;
+      })
+      .catch((error) => console.error(error));
+
+    // Listen to live scan progress
+    const removeListener = window.api.library.onScanProgress((progress: unknown) => {
+      const p = progress as
+        | {
+            state?: string;
+            discoveredFiles?: number;
+            completedReconciliation?: number;
+            totalToReconcile?: number;
+          }
+        | undefined;
+
+      if (p?.state) {
+        setScanStatus(p.state);
+      }
+      if (typeof p?.discoveredFiles === 'number') {
+        setDiscoveredFiles(p.discoveredFiles);
+      }
+      if (
+        typeof p?.completedReconciliation === 'number' &&
+        typeof p?.totalToReconcile === 'number'
+      ) {
+        setReconcileProgress({
+          completed: p.completedReconciliation,
+          total: p.totalToReconcile
+        });
+      }
+    });
+
+    return () => {
+      removeListener();
+    };
+  }, []);
+
+  const isScanning =
+    scanStatus === 'DISCOVERING' ||
+    scanStatus === 'DIFFING' ||
+    scanStatus === 'RECONCILING' ||
+    isStartingScan;
+
+  const lastScanText = useMemo(() => {
+    if (!userSettings?.lastScanTime) {
+      return t('settingsPage.lastScanNever', { defaultValue: 'Last scan: Never' });
+    }
+
+    try {
+      const scanDate = new Date(userSettings.lastScanTime);
+      const elapsed = calculateElapsedTime(scanDate.getTime());
+      if (elapsed?.elapsedString) {
+        return t('settingsPage.lastScan', {
+          time: elapsed.elapsedString,
+          defaultValue: `Last scan: ${elapsed.elapsedString}`
+        });
+      }
+    } catch {
+      // Fallback if parsing fails
+    }
+
+    return t('settingsPage.lastScanNever', { defaultValue: 'Last scan: Never' });
+  }, [t, userSettings?.lastScanTime]);
+
+  return (
+    <li
+      className="main-container library-scanning-settings-container mb-16"
+      id="library-scanning-settings-container"
+    >
+      {/* Title */}
+      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
+        <span className="material-icons-round-outlined mr-2">sync_saved_locally</span>
+        {t('settingsPage.libraryScanning', { defaultValue: 'Library Scanning' })}
+      </div>
+      <p className="description mb-6">
+        {t('settingsPage.libraryScanningDescription', {
+          defaultValue: 'Configure when Nora scans and synchronizes your music library.'
+        })}
+      </p>
+
+      {/* Scanning Behavior Policy Selection */}
+      <div className="policy-section mb-6 max-w-3xl pl-4">
+        <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 text-xs font-semibold tracking-wider uppercase">
+          {t('settingsPage.scanBehavior', { defaultValue: 'Scanning Behavior' })}
+        </div>
+        <div className="flex flex-col gap-3">
+          {/* Automatic */}
+          <label
+            htmlFor="scanModeAutomatic"
+            aria-label={t('settingsPage.scanAutomatically', { defaultValue: 'Automatically' })}
+            className={`bg-background-color-2/75 hover:bg-background-color-2 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 flex cursor-pointer items-start rounded-lg p-4 transition-all focus-within:outline-2 ${
+              currentMode === 'automatic'
+                ? 'bg-background-color-3! dark:bg-dark-background-color-3! border-font-color-highlight/50 border'
+                : 'border border-transparent'
+            }`}
+          >
+            <input
+              type="radio"
+              name="libraryScanMode"
+              id="scanModeAutomatic"
+              value="automatic"
+              checked={currentMode === 'automatic'}
+              disabled={isUpdatingMode}
+              onChange={() => updateScanMode('automatic')}
+              className="text-font-color-highlight mt-1 mr-4 cursor-pointer"
+            />
+            <div className="flex flex-col">
+              <span className="text-font-color-black dark:text-font-color-white text-base font-medium">
+                {t('settingsPage.scanAutomatically', { defaultValue: 'Automatically' })}
+              </span>
+              <span className="text-sm font-thin opacity-80">
+                {t('settingsPage.scanAutomaticallyDescription', {
+                  defaultValue: 'Keep your library synchronized in the background.'
+                })}
+              </span>
+            </div>
+          </label>
+
+          {/* Startup */}
+          <label
+            htmlFor="scanModeStartup"
+            aria-label={t('settingsPage.scanOnStartup', { defaultValue: 'When Nora starts' })}
+            className={`bg-background-color-2/75 hover:bg-background-color-2 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 flex cursor-pointer items-start rounded-lg p-4 transition-all focus-within:outline-2 ${
+              currentMode === 'startup'
+                ? 'bg-background-color-3! dark:bg-dark-background-color-3! border-font-color-highlight/50 border'
+                : 'border border-transparent'
+            }`}
+          >
+            <input
+              type="radio"
+              name="libraryScanMode"
+              id="scanModeStartup"
+              value="startup"
+              checked={currentMode === 'startup'}
+              disabled={isUpdatingMode}
+              onChange={() => updateScanMode('startup')}
+              className="text-font-color-highlight mt-1 mr-4 cursor-pointer"
+            />
+            <div className="flex flex-col">
+              <span className="text-font-color-black dark:text-font-color-white text-base font-medium">
+                {t('settingsPage.scanOnStartup', { defaultValue: 'When Nora starts' })}
+              </span>
+              <span className="text-sm font-thin opacity-80">
+                {t('settingsPage.scanOnStartupDescription', {
+                  defaultValue: 'Check for changes whenever Nora starts.'
+                })}
+              </span>
+            </div>
+          </label>
+
+          {/* Manual */}
+          <label
+            htmlFor="scanModeManual"
+            aria-label={t('settingsPage.scanManually', { defaultValue: 'Manually' })}
+            className={`bg-background-color-2/75 hover:bg-background-color-2 dark:bg-dark-background-color-2/75 dark:hover:bg-dark-background-color-2 flex cursor-pointer items-start rounded-lg p-4 transition-all focus-within:outline-2 ${
+              currentMode === 'manual'
+                ? 'bg-background-color-3! dark:bg-dark-background-color-3! border-font-color-highlight/50 border'
+                : 'border border-transparent'
+            }`}
+          >
+            <input
+              type="radio"
+              name="libraryScanMode"
+              id="scanModeManual"
+              value="manual"
+              checked={currentMode === 'manual'}
+              disabled={isUpdatingMode}
+              onChange={() => updateScanMode('manual')}
+              className="text-font-color-highlight mt-1 mr-4 cursor-pointer"
+            />
+            <div className="flex flex-col">
+              <span className="text-font-color-black dark:text-font-color-white text-base font-medium">
+                {t('settingsPage.scanManually', { defaultValue: 'Manually' })}
+              </span>
+              <span className="text-sm font-thin opacity-80">
+                {t('settingsPage.scanManuallyDescription', {
+                  defaultValue: 'Only scan when you choose "Scan Now".'
+                })}
+              </span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Library Status Card */}
+      <div className="status-section max-w-3xl pl-4">
+        <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 text-xs font-semibold tracking-wider uppercase">
+          {t('settingsPage.libraryStatus', { defaultValue: 'Library Status' })}
+        </div>
+        <div className="bg-background-color-2/60 dark:bg-dark-background-color-2/60 flex flex-wrap items-center justify-between gap-4 rounded-lg p-5">
+          <div className="flex items-center gap-4">
+            {isScanning ? (
+              <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight animate-spin text-3xl">
+                sync
+              </span>
+            ) : scanStatus === 'FAILED' ? (
+              <span className="material-icons-round text-3xl text-red-500">error</span>
+            ) : (
+              <span className="material-icons-round text-3xl text-emerald-500">check_circle</span>
+            )}
+            <div className="flex flex-col">
+              <span className="text-font-color-black dark:text-font-color-white text-base font-semibold">
+                {isScanning
+                  ? t('settingsPage.scanningLibrary', { defaultValue: 'Updating library…' })
+                  : scanStatus === 'FAILED'
+                    ? 'Last scan encountered errors'
+                    : t('settingsPage.libraryUpToDate', { defaultValue: 'Up to date' })}
+              </span>
+              <span className="text-xs font-thin opacity-75">
+                {isScanning
+                  ? scanStatus === 'RECONCILING' && reconcileProgress.total > 0
+                    ? `Reconciling files (${reconcileProgress.completed}/${reconcileProgress.total})…`
+                    : `Discovered ${discoveredFiles} files…`
+                  : lastScanText}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {isScanning ? (
+              <Button
+                tooltipLabel={t('settingsPage.cancelScan', { defaultValue: 'Cancel' })}
+                labelContent={t('settingsPage.cancelScan', { defaultValue: 'Cancel' })}
+                iconName="close"
+                isDisabled={isCancellingScan}
+                clickHandler={() => cancelScan()}
+                className="cancel-scan-btn bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 text-sm"
+              />
+            ) : (
+              <Button
+                tooltipLabel={t('settingsPage.scanNow', { defaultValue: 'Scan Now' })}
+                labelContent={t('settingsPage.scanNow', { defaultValue: 'Scan Now' })}
+                iconName="sync"
+                isDisabled={isStartingScan}
+                clickHandler={() => startScan()}
+                className="scan-now-btn bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 text-sm"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+};
+
+export default LibrarySettings;

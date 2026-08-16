@@ -18,9 +18,13 @@ import {
   varchar
 } from 'drizzle-orm/pg-core';
 
-import type { SmartPlaylistRuleAST, OrderDefinition, SmartPlaylistField } from '../collections/query/ast';
-import type { OperationInverseInput, OperationType } from '../collections/operations/types';
 import type { CollectionContextData } from '../collections/context/types';
+import type { OperationInverseInput, OperationType } from '../collections/operations/types';
+import type {
+  SmartPlaylistRuleAST,
+  OrderDefinition,
+  SmartPlaylistField
+} from '../collections/query/ast';
 
 // ============================================================================
 // Data types
@@ -395,9 +399,7 @@ export const smartPlaylistRules = pgTable(
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
-  (t) => [
-    index('idx_smart_playlist_rules_playlist_id').on(t.playlistId)
-  ]
+  (t) => [index('idx_smart_playlist_rules_playlist_id').on(t.playlistId)]
 );
 
 export const playEvents = pgTable(
@@ -582,6 +584,13 @@ export const userSettings = pgTable(
     // LastFM session data
     lastFmSessionName: varchar('lastfm_session_name', { length: 255 }),
     lastFmSessionKey: varchar('lastfm_session_key', { length: 255 }),
+
+    // Library scanning policy & audit
+    libraryScanMode: varchar('library_scan_mode', { length: 20 })
+      .$type<'automatic' | 'startup' | 'manual'>()
+      .notNull()
+      .default('automatic'),
+    lastScanTime: timestamp('last_scan_time', { withTimezone: false }),
 
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
@@ -1237,9 +1246,7 @@ export const waveforms = pgTable(
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
-  (t) => [
-    index('idx_waveforms_song_id').on(t.songId)
-  ]
+  (t) => [index('idx_waveforms_song_id').on(t.songId)]
 );
 
 export const lyrics = pgTable(
@@ -1257,9 +1264,7 @@ export const lyrics = pgTable(
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
-  (t) => [
-    index('idx_lyrics_song_id').on(t.songId)
-  ]
+  (t) => [index('idx_lyrics_song_id').on(t.songId)]
 );
 
 export const replayGain = pgTable(
@@ -1278,9 +1283,7 @@ export const replayGain = pgTable(
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
-  (t) => [
-    index('idx_replay_gain_song_id').on(t.songId)
-  ]
+  (t) => [index('idx_replay_gain_song_id').on(t.songId)]
 );
 
 export const waveformsRelations = relations(waveforms, ({ one }) => ({
@@ -1344,7 +1347,5 @@ export const collectionContexts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
-  (t) => [
-    index('idx_collection_contexts_uri').on(t.collectionUri)
-  ]
+  (t) => [index('idx_collection_contexts_uri').on(t.collectionUri)]
 );

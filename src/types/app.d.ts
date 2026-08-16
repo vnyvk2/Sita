@@ -475,7 +475,11 @@ declare global {
     customLrcFilesSaveLocation: string | null;
     lastFmSessionName: string | null;
     lastFmSessionKey: string | null;
+    libraryScanMode?: LibraryScanMode;
+    lastScanTime?: string | Date | null;
   }
+
+  type LibraryScanMode = 'automatic' | 'startup' | 'manual';
 
   interface UserData extends UserSettings {}
 
