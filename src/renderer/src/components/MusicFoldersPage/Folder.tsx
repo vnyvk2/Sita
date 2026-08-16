@@ -1,6 +1,8 @@
-import { lazy, useCallback, useContext, useMemo, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { lazy, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import FolderImg from '../../assets/images/webp/empty-folder.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import Button from '../Button';
 import Img from '../Img';
@@ -8,17 +10,17 @@ import Img from '../Img';
 const RemoveFolderConfirmationPrompt = lazy(() => import('./RemoveFolderConfirmationPrompt'));
 const BlacklistFolderConfrimPrompt = lazy(() => import('./BlacklistFolderConfirmPrompt'));
 
-import { useNavigate } from '@tanstack/react-router';
-
-import FolderImg from '../../assets/images/webp/empty-folder.webp';
-
 type FolderProps = {
   folderPath: string;
   songIds: number[];
   subFolders?: MusicFolder[];
+  hasChildren?: boolean;
   isBlacklisted: boolean;
   className?: string;
   index: number;
+  depth?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: (folderPath: string) => void;
   selectAllHandler: (upToId?: number) => void;
 };
 
@@ -30,16 +32,18 @@ const Folder = (props: FolderProps) => {
     songIds,
     index,
     isBlacklisted = true,
-    className,
+    className = '',
     subFolders,
-    selectAllHandler
+    hasChildren,
+    depth = 0,
+    isExpanded = false,
+    onToggleExpand
   } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   const { length: noOfSongs } = songIds;
-
-  const [isSubFoldersVisible, setIsSubFoldersVisible] = useState(false);
+  const isFolderParent = hasChildren ?? (subFolders?.length ?? 0) > 0;
 
   const { folderName, prevDir } = useMemo(() => {
     if (folderPath) {
@@ -50,24 +54,6 @@ const Folder = (props: FolderProps) => {
     }
     return { prevDir: undefined, folderName: undefined };
   }, [folderPath]);
-
-  const subFoldersComponents = useMemo(() => {
-    if (Array.isArray(subFolders) && subFolders.length > 0) {
-      return subFolders.map((subFolder, i) => (
-        <Folder
-          index={i}
-          key={subFolder.path}
-          folderPath={subFolder.path}
-          subFolders={subFolder.subFolders}
-          isBlacklisted={subFolder.isBlacklisted}
-          songIds={subFolder.songIds}
-          selectAllHandler={selectAllHandler}
-          className={`w-full! ${className}`}
-        />
-      ));
-    }
-    return [];
-  }, [className, subFolders, selectAllHandler]);
 
   const isAMultipleSelection = useMemo(() => {
     // Folders don't support numeric-based multiple selections (no numeric IDs)
@@ -155,14 +141,23 @@ const Folder = (props: FolderProps) => {
   );
 
   return (
-    <div className={`mb-2 flex w-full flex-col justify-between ${className}`}>
+    <div
+      className={`mb-2 flex w-full flex-col justify-between ${className}`}
+      style={
+        depth > 0
+          ? {
+              paddingLeft: `${depth * 24}px`
+            }
+          : undefined
+      }
+    >
       <div
         role="button"
-        className={`group dark:text-font-color-white flex w-full cursor-pointer items-center justify-between rounded-md px-4 py-2 -outline-offset-2 transition-colors focus-visible:!outline ${
+        className={`group dark:text-font-color-white flex h-13 w-full cursor-pointer items-center justify-between rounded-md px-4 py-2 -outline-offset-2 transition-colors focus-visible:!outline ${
           isAMultipleSelection
             ? 'bg-background-color-3/90! text-font-color-black! dark:bg-dark-background-color-3/90! dark:text-font-color-black!'
             : 'hover:bg-background-color-2! dark:hover:bg-dark-background-color-2!'
-        } ${isBlacklisted && 'opacity-50!'} ${
+        } ${isBlacklisted ? 'opacity-50!' : ''} ${
           (index + 1) % 2 === 1
             ? 'bg-background-color-2/50 dark:bg-dark-background-color-2/40'
             : 'bg-background-color-1! dark:bg-dark-background-color-1!'
@@ -186,15 +181,15 @@ const Folder = (props: FolderProps) => {
           </div>
           <Img src={FolderImg} loading="eager" className="w-8 self-center" />
           <div className="folder-info ml-6 flex flex-col">
-            <span className="folder-name" title={`${prevDir}\${folderName}`}>
+            <span className="folder-name" title={`${prevDir}\\${folderName}`}>
               {folderName}
             </span>
             <div className="flex items-center opacity-75">
-              {(subFolders?.length ?? 0) > 0 && (
+              {isFolderParent && (
                 <>
                   <span className="no-of-sub-folders text-xs font-thin">
                     {t('common.subFolderWithCount', {
-                      count: subFolders!.length
+                      count: subFolders?.length ?? 0
                     })}
                   </span>
                   <span className="mx-1">&bull;</span>
@@ -219,24 +214,19 @@ const Folder = (props: FolderProps) => {
               block
             </span>
           )}
-          {(subFolders?.length ?? 0) > 0 && (
+          {isFolderParent && (
             <Button
               className="group-hover:bg-background-color-1 dark:group-hover:bg-dark-background-color-1 ml-4 rounded-full! border-none! p-1!"
               iconClassName="text-2xl! leading-none!"
-              iconName={isSubFoldersVisible ? 'arrow_drop_up' : 'arrow_drop_down'}
+              iconName={isExpanded ? 'arrow_drop_up' : 'arrow_drop_down'}
               clickHandler={(e) => {
                 e.stopPropagation();
-                setIsSubFoldersVisible((state) => !state);
+                onToggleExpand?.(folderPath);
               }}
             />
           )}
         </div>
       </div>
-      {(subFolders?.length ?? 0) > 0 && isSubFoldersVisible && (
-        <div className="border-background-color-2 dark:border-dark-background-color-2/50 mt-4 ml-4 border-l-[3px] pl-4">
-          {subFoldersComponents}
-        </div>
-      )}
     </div>
   );
 };
