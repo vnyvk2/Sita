@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import FolderImg from '../../assets/images/webp/empty-folder.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import type { FolderMetrics } from '../../utils/folderMetrics';
 import Button from '../Button';
 import Img from '../Img';
 
@@ -15,6 +16,7 @@ type FolderProps = {
   songIds: number[];
   subFolders?: MusicFolder[];
   hasChildren?: boolean;
+  metrics?: FolderMetrics;
   isBlacklisted: boolean;
   className?: string;
   index: number;
@@ -35,6 +37,7 @@ const Folder = (props: FolderProps) => {
     className = '',
     subFolders,
     hasChildren,
+    metrics,
     depth = 0,
     isExpanded = false,
     onToggleExpand
@@ -42,8 +45,10 @@ const Folder = (props: FolderProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const { length: noOfSongs } = songIds;
-  const isFolderParent = hasChildren ?? (subFolders?.length ?? 0) > 0;
+  const directSongCount = metrics?.directSongCount ?? songIds.length;
+  const totalSongCount = metrics?.totalSongCount ?? directSongCount;
+  const directFolderCount = metrics?.directFolderCount ?? subFolders?.length ?? 0;
+  const isFolderParent = hasChildren ?? directFolderCount > 0;
 
   const { folderName, prevDir } = useMemo(() => {
     if (folderPath) {
@@ -131,13 +136,13 @@ const Folder = (props: FolderProps) => {
       title: folderName || 'Unknown Folder',
       artworkPath: FolderImg,
       artworkClassName: 'w-6!',
-      subTitle: t('common.songWithCount', { count: noOfSongs }),
+      subTitle: t('common.songWithCount', { count: totalSongCount }),
       subTitle2:
-        (subFolders?.length ?? 0) > 0
-          ? t('common.subFolderWithCount', { count: subFolders!.length })
+        directFolderCount > 0
+          ? t('common.subFolderWithCount', { count: directFolderCount })
           : undefined
     }),
-    [folderName, noOfSongs, subFolders?.length, t]
+    [directFolderCount, folderName, t, totalSongCount]
   );
 
   return (
@@ -185,22 +190,42 @@ const Folder = (props: FolderProps) => {
               {folderName}
             </span>
             <div className="flex items-center opacity-75">
-              {isFolderParent && (
+              {directFolderCount > 0 && (
                 <>
                   <span className="no-of-sub-folders text-xs font-thin">
                     {t('common.subFolderWithCount', {
-                      count: subFolders?.length ?? 0
+                      count: directFolderCount
                     })}
                   </span>
                   <span className="mx-1">&bull;</span>
                 </>
               )}
-              <span className="no-of-songs mr-2 text-xs font-thin">
-                {t('common.songWithCount', { count: noOfSongs })}
-              </span>
+              {directFolderCount > 0 &&
+              directSongCount > 0 &&
+              directSongCount !== totalSongCount ? (
+                <>
+                  <span className="no-of-direct-songs text-xs font-thin">
+                    {directSongCount} direct
+                  </span>
+                  <span className="mx-1">&bull;</span>
+                  <span className="no-of-songs text-font-color-highlight dark:text-dark-font-color-highlight text-xs font-medium">
+                    {t('common.songWithCount', { count: totalSongCount })} total
+                  </span>
+                </>
+              ) : (
+                <span
+                  className={`no-of-songs text-xs ${
+                    directFolderCount > 0
+                      ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-medium'
+                      : 'font-thin'
+                  }`}
+                >
+                  {t('common.songWithCount', { count: totalSongCount })}
+                </span>
+              )}
               <span className="invisible text-xs font-thin opacity-0 transition-[visibility,opacity] group-hover:visible group-hover:opacity-100">
-                &bull;
-                <span className="folder-path ml-2">{prevDir}</span>
+                <span className="mx-1">&bull;</span>
+                <span className="folder-path">{prevDir}</span>
               </span>
             </div>
           </div>

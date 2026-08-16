@@ -10,6 +10,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { store } from '@renderer/store/store';
 import flattenVisibleFolders from '@renderer/utils/flattenVisibleFolders';
+import { computeFolderMetricsMap } from '@renderer/utils/folderMetrics';
 import storage from '@renderer/utils/localStorage';
 import { folderSearchSchema } from '@renderer/utils/zod/folderSchema';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -114,6 +115,21 @@ function MusicFoldersPage() {
 
   const selectAllHandler = useSelectAllHandler(musicFoldersWithPaths, 'folder', 'folderPath');
 
+  const metricsMap = useMemo(() => computeFolderMetricsMap(musicFolders), [musicFolders]);
+
+  const { totalLibraryFolders, totalLibrarySongs } = useMemo(() => {
+    let totalFolders = musicFolders.length;
+    let totalSongs = 0;
+    for (let i = 0; i < musicFolders.length; i++) {
+      const metrics = metricsMap.get(musicFolders[i].path);
+      if (metrics) {
+        totalFolders += metrics.totalFolderCount;
+        totalSongs += metrics.totalSongCount;
+      }
+    }
+    return { totalLibraryFolders: totalFolders, totalLibrarySongs: totalSongs };
+  }, [metricsMap, musicFolders]);
+
   const visibleFolders = useMemo(
     () => flattenVisibleFolders(musicFolders, expandedFolderPaths),
     [musicFolders, expandedFolderPaths]
@@ -181,7 +197,7 @@ function MusicFoldersPage() {
       <>
         {musicFolders && musicFolders.length > 0 && (
           <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-2 mb-8 flex items-center justify-between text-3xl font-medium">
-            <div className="container flex">
+            <div className="container flex items-baseline">
               {t('foldersPage.musicFolders')}
               <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
                 {isMultipleSelectionEnabled ? (
@@ -192,10 +208,12 @@ function MusicFoldersPage() {
                   </div>
                 ) : (
                   musicFolders.length > 0 && (
-                    <span className="no-of-folders">
-                      {t('common.folderWithCount', {
-                        count: musicFolders.length
-                      })}
+                    <span className="no-of-folders flex items-center">
+                      <span>{t('common.folderWithCount', { count: totalLibraryFolders })}</span>
+                      <span className="mx-2">&bull;</span>
+                      <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-medium">
+                        {t('common.songWithCount', { count: totalLibrarySongs })}
+                      </span>
                     </span>
                   )
                 )}
@@ -271,6 +289,7 @@ function MusicFoldersPage() {
                     folderPath={folder.path}
                     subFolders={folder.subFolders}
                     hasChildren={hasChildren}
+                    metrics={metricsMap.get(folder.path)}
                     index={index}
                     depth={depth}
                     isExpanded={isExpanded}
