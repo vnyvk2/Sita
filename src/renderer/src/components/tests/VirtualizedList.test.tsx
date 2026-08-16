@@ -135,9 +135,10 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
       />
     );
 
-    // Virtuoso MUST be imperatively instructed to scroll to dataset-b's target (120)
+    // Virtuoso MUST be imperatively instructed to scroll to dataset-b's target (120) with offset (8)
     expect(mockScrollToIndex).toHaveBeenCalledWith({
       index: 120,
+      offset: 8,
       align: 'start',
       behavior: 'auto'
     });

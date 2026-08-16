@@ -107,7 +107,8 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
         innerVirtuosoRef.current.scrollToIndex({
           index: newTarget,
           align: 'start',
-          behavior: 'auto'
+          behavior: 'auto',
+          ...(newSavedPosition?.offset !== undefined ? { offset: newSavedPosition.offset } : {})
         });
       }
     }
@@ -198,9 +199,7 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
         // Guard: if currently restoring, ignore transient intermediate ranges until target is reached
         if (restorationStateRef.current === 'RESTORING') {
           const target = targetIndexRef.current;
-          const isTargetReached =
-            (range.startIndex <= target && range.endIndex >= target) ||
-            Math.abs(range.startIndex - target) <= 1;
+          const isTargetReached = range.startIndex <= target && range.endIndex >= target;
 
           if (!isTargetReached) {
             return;
