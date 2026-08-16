@@ -5,9 +5,11 @@ import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import Folder from '@renderer/components/MusicFoldersPage/Folder';
 import { folderDropdownOptions } from '@renderer/components/MusicFoldersPage/folderOptions';
+import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { store } from '@renderer/store/store';
+import flattenVisibleFolders from '@renderer/utils/flattenVisibleFolders';
 import storage from '@renderer/utils/localStorage';
 import { folderSearchSchema } from '@renderer/utils/zod/folderSchema';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -41,10 +43,9 @@ function MusicFoldersPage() {
   const { sortingOrder = musicFoldersPageSortingState || 'aToZ' } = Route.useSearch();
 
   const [musicFolders, setMusicFolders] = useState<MusicFolder[]>([]);
+  const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(new Set());
 
-  // const scrollOffsetTimeoutIdRef = useRef(null as NodeJS.Timeout | null);
-  const foldersContainerRef = useRef(null as HTMLDivElement | null);
-  // const { width, height } = useResizeObserver(foldersContainerRef);
+  const foldersContainerRef = useRef<HTMLDivElement | null>(null);
 
   const fetchFoldersData = useCallback(
     () =>
@@ -85,29 +86,38 @@ function MusicFoldersPage() {
     storage.sortingStates.setSortingStates('musicFoldersPage', sortingOrder);
   }, [sortingOrder]);
 
-  const musicFoldersWithPaths = useMemo(
-    () => musicFolders.map((x) => ({ ...x, folderPath: x.path })),
-    [musicFolders]
-  );
+  const handleToggleExpand = useCallback((folderPath: string) => {
+    setExpandedFolderPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        next.delete(folderPath);
+      } else {
+        next.add(folderPath);
+      }
+      return next;
+    });
+  }, []);
+
+  const musicFoldersWithPaths = useMemo(() => {
+    const list: (MusicFolder & { folderPath: string })[] = [];
+    const traverse = (folders: MusicFolder[]) => {
+      for (let i = 0; i < folders.length; i++) {
+        list.push({ ...folders[i], folderPath: folders[i].path });
+        if (folders[i].subFolders.length > 0) {
+          traverse(folders[i].subFolders);
+        }
+      }
+    };
+    traverse(musicFolders);
+    return list;
+  }, [musicFolders]);
 
   const selectAllHandler = useSelectAllHandler(musicFoldersWithPaths, 'folder', 'folderPath');
 
-  const folderComponents = useMemo(() => {
-    return musicFolders.map((musicFolder, index) => {
-      const { path, songIds, isBlacklisted, subFolders } = musicFolder;
-      return (
-        <Folder
-          key={path}
-          folderPath={path}
-          subFolders={subFolders}
-          index={index}
-          isBlacklisted={isBlacklisted}
-          songIds={songIds}
-          selectAllHandler={selectAllHandler}
-        />
-      );
-    });
-  }, [musicFolders, selectAllHandler]);
+  const visibleFolders = useMemo(
+    () => flattenVisibleFolders(musicFolders, expandedFolderPaths),
+    [musicFolders, expandedFolderPaths]
+  );
 
   const addNewFolder = useCallback(() => {
     changePromptMenuData(true, <AddMusicFoldersPrompt onFailure={(err) => console.error(err)} />);
@@ -244,11 +254,35 @@ function MusicFoldersPage() {
 
         <div
           className={`folders-container [scrollbar-gutter:stable] ${
-            musicFolders && musicFolders.length > 0 && 'h-full'
+            musicFolders && musicFolders.length > 0 ? 'h-full' : ''
           }`}
           ref={foldersContainerRef}
         >
-          {folderComponents}
+          {visibleFolders.length > 0 && (
+            <VirtualizedList
+              data={visibleFolders}
+              fixedItemHeight={60}
+              scrollKey="musicFoldersPage"
+              itemContent={(index, item) => {
+                const { folder, depth, isExpanded, hasChildren } = item;
+                return (
+                  <Folder
+                    key={folder.path}
+                    folderPath={folder.path}
+                    subFolders={folder.subFolders}
+                    hasChildren={hasChildren}
+                    index={index}
+                    depth={depth}
+                    isExpanded={isExpanded}
+                    onToggleExpand={handleToggleExpand}
+                    isBlacklisted={folder.isBlacklisted}
+                    songIds={folder.songIds}
+                    selectAllHandler={selectAllHandler}
+                  />
+                );
+              }}
+            />
+          )}
         </div>
 
         {musicFolders.length === 0 && (
