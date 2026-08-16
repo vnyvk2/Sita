@@ -52,8 +52,8 @@ export class LibraryLifecycleController {
 
   public async setScanMode(mode: LibraryScanMode): Promise<void> {
     logger.info(`[LibraryLifecycleController] Transitioning scan mode to: ${mode}`);
-    await saveUserSettings({ libraryScanMode: mode });
     await this.applyPolicy(mode, false);
+    await saveUserSettings({ libraryScanMode: mode });
   }
 
   private async applyPolicy(mode: LibraryScanMode, isStartup: boolean): Promise<void> {
