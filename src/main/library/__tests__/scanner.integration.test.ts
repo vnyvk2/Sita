@@ -238,5 +238,151 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     expect(insertedSongs.map((s) => s.title)).toContain('01 - Rolling in the Deep');
     expect(insertedSongs.map((s) => s.title)).toContain('02 - Rumour Has It');
   });
+
+  it('Pipeline Step 4: Multi-source scan with mixed scenarios (track in existing album, new album in existing artist, new artist+album across multiple roots)', async () => {
+    // 1. Setup Root 1 and Root 2 directories on disk
+    const root1Dir = path.join(tempDir, 'Root1');
+    const root2Dir = path.join(tempDir, 'Root2');
+    await fs.mkdir(root1Dir, { recursive: true });
+    await fs.mkdir(root2Dir, { recursive: true });
+
+    // 2. Insert scan roots into DB
+    const [root1Folder] = await db.insert(musicFolders).values({
+      path: root1Dir,
+      name: 'Root1',
+      isScanRoot: true
+    }).returning();
+
+    const [root2Folder] = await db.insert(musicFolders).values({
+      path: root2Dir,
+      name: 'Root2',
+      isScanRoot: true
+    }).returning();
+
+    // 3. Setup existing Artist (Adele) and Album (21) in DB under Root 1
+    const adelePath = path.join(root1Dir, 'Adele');
+    const album21Path = path.join(adelePath, '21');
+    await fs.mkdir(album21Path, { recursive: true });
+
+    const [existingAdele] = await db.insert(musicFolders).values({
+      path: adelePath,
+      name: 'Adele',
+      parentId: root1Folder.id
+    }).returning();
+
+    const [existing21] = await db.insert(musicFolders).values({
+      path: album21Path,
+      name: '21',
+      parentId: existingAdele.id
+    }).returning();
+
+    // Existing song in DB
+    const existingSongPath = path.join(album21Path, 'ExistingSong.mp3');
+    await fs.writeFile(existingSongPath, 'existing audio');
+    const [existingSong] = await db.insert(songs).values({
+      title: 'ExistingSong',
+      duration: '180',
+      path: existingSongPath,
+      folderId: existing21.id,
+      fileCreatedAt: new Date(),
+      fileModifiedAt: new Date()
+    }).returning();
+
+    // 4. Create additions on disk:
+    // Root 1 Case A: Track added to existing album (Adele/21)
+    const newTrackInExistingAlbum = path.join(album21Path, 'NewTrackIn21.mp3');
+    await fs.writeFile(newTrackInExistingAlbum, 'audio data A');
+
+    // Root 1 Case B: New album under existing artist (Adele/25)
+    const album25Path = path.join(adelePath, '25');
+    await fs.mkdir(album25Path, { recursive: true });
+    const trackInNewAlbum = path.join(album25Path, 'Hello.mp3');
+    await fs.writeFile(trackInNewAlbum, 'audio data B');
+
+    // Root 1 Case C: Brand new artist and album (Coldplay/Parachutes)
+    const coldplayAlbumPath = path.join(root1Dir, 'Coldplay', 'Parachutes');
+    await fs.mkdir(coldplayAlbumPath, { recursive: true });
+    const trackInColdplay = path.join(coldplayAlbumPath, 'Yellow.mp3');
+    await fs.writeFile(trackInColdplay, 'audio data C');
+
+    // Root 2 Case D: Brand new artist and album on a different scan root (PinkFloyd/TheWall)
+    const pinkFloydAlbumPath = path.join(root2Dir, 'PinkFloyd', 'TheWall');
+    await fs.mkdir(pinkFloydAlbumPath, { recursive: true });
+    const trackInPinkFloyd = path.join(pinkFloydAlbumPath, 'ComfortablyNumb.mp3');
+    await fs.writeFile(trackInPinkFloyd, 'audio data D');
+
+    const scanRoots = [
+      { id: root1Folder.id, path: root1Dir },
+      { id: root2Folder.id, path: root2Dir }
+    ];
+
+    // 5. Execute fastDiskWalk on both roots
+    const walk = await fastDiskWalk(scanRoots);
+    expect(walk.snapshots).toHaveLength(5); // 1 existing + 4 new
+
+    // 6. Diff against DB (which only has existingSong)
+    const dbSongSnapshots = [
+      {
+        id: existingSong.id,
+        path: existingSong.path,
+        fileModifiedAt: existingSong.fileModifiedAt,
+        folderId: existingSong.folderId,
+        isBlacklisted: false
+      }
+    ];
+
+    const diff = diffFilesystemSnapshot(walk.snapshots, dbSongSnapshots, scanRoots);
+    expect(diff.added).toHaveLength(4);
+    expect(diff.unchangedCount).toBe(1);
+
+    // 7. Reconcile all 4 additions across both scan roots
+    const reconcileResult = await reconciler.reconcileAdded(diff.added, scanRoots);
+    expect(reconcileResult.successCount).toBe(4);
+    expect(reconcileResult.errorCount).toBe(0);
+    expect(reconcileResult.errors).toHaveLength(0);
+
+    // 8. Authoritative DB verification for folders
+    const allFolders = await db.select().from(musicFolders);
+    const adeleFolders = allFolders.filter((f) => path.basename(f.path) === 'Adele');
+    expect(adeleFolders).toHaveLength(1); // Adele was reused, not duplicated!
+
+    const album21Folders = allFolders.filter((f) => path.basename(f.path) === '21');
+    expect(album21Folders).toHaveLength(1); // 21 was reused, not duplicated!
+
+    const album25Folder = allFolders.find((f) => path.basename(f.path) === '25');
+    expect(album25Folder).toBeDefined();
+    expect(album25Folder?.parentId).toBe(existingAdele.id); // Adele/25 parent is Adele
+
+    const coldplayArtist = allFolders.find((f) => path.basename(f.path) === 'Coldplay');
+    const parachutesAlbum = allFolders.find((f) => path.basename(f.path) === 'Parachutes');
+    expect(coldplayArtist).toBeDefined();
+    expect(parachutesAlbum).toBeDefined();
+    expect(coldplayArtist?.parentId).toBe(root1Folder.id); // Under Root 1
+    expect(parachutesAlbum?.parentId).toBe(coldplayArtist?.id);
+
+    const pinkFloydArtist = allFolders.find((f) => path.basename(f.path) === 'PinkFloyd');
+    const theWallAlbum = allFolders.find((f) => path.basename(f.path) === 'TheWall');
+    expect(pinkFloydArtist).toBeDefined();
+    expect(theWallAlbum).toBeDefined();
+    expect(pinkFloydArtist?.parentId).toBe(root2Folder.id); // Under Root 2
+    expect(theWallAlbum?.parentId).toBe(pinkFloydArtist?.id);
+
+    // 9. Authoritative DB verification for all songs
+    const allDbSongs = await db.select().from(songs);
+    expect(allDbSongs).toHaveLength(5);
+
+    const newSongIn21 = allDbSongs.find((s) => s.title === 'NewTrackIn21');
+    expect(newSongIn21?.folderId).toBe(existing21.id);
+
+    const newSongIn25 = allDbSongs.find((s) => s.title === 'Hello');
+    expect(newSongIn25?.folderId).toBe(album25Folder?.id);
+
+    const yellowSong = allDbSongs.find((s) => s.title === 'Yellow');
+    expect(yellowSong?.folderId).toBe(parachutesAlbum?.id);
+
+    const numbSong = allDbSongs.find((s) => s.title === 'ComfortablyNumb');
+    expect(numbSong?.folderId).toBe(theWallAlbum?.id);
+  });
 });
+
 
