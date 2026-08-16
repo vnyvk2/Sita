@@ -121,4 +121,24 @@ describe('LibraryScanner', () => {
     expect(summary.status).toBe('FAILED');
     expect(libraryChangeTracker.getState().isDirty).toBe(true);
   });
+
+  it('should handle cancellation during reconciliation, return CANCELLED status, and preserve dirty state', async () => {
+    libraryChangeTracker.markDirty();
+
+    mockReconciler.reconcileAdded = vi.fn().mockImplementation(async () => {
+      // Simulate cancellation occurring while reconciliation is active
+      scanner.cancelScan();
+      return {
+        successCount: 0,
+        errorCount: 0,
+        errors: [],
+        cancelled: true
+      };
+    });
+
+    const summary = await scanner.scan();
+
+    expect(summary.status).toBe('CANCELLED');
+    expect(libraryChangeTracker.getState().isDirty).toBe(true);
+  });
 });

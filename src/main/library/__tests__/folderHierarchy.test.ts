@@ -98,4 +98,25 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     expect(folderMap.get('c:\\music')).toBe(1);
     expect(mockTrx.insert).not.toHaveBeenCalled();
   });
+
+  it('should throw an explicit error if an intermediate parent folder cannot be resolved (no silent root fallback)', async () => {
+    // DB has root (id: 1), but C:\Music\Rock is missing from DB and not in discoveredDirs
+    const existingFolders = [{ id: 1, path: 'C:\\Music', parentId: null }];
+
+    const mockTrx = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockResolvedValue(existingFolders)
+      }),
+      insert: vi.fn()
+    } as unknown as DB;
+
+    // Discovered Metallica under missing Rock
+    const discoveredDirs = ['C:\\Music\\Rock\\Metallica'];
+
+    await expect(
+      resolveOrCreateMusicFolders(1, 'C:\\Music', discoveredDirs, 'win32', mockTrx)
+    ).rejects.toThrow(
+      "Unable to resolve parent folder 'C:\\Music\\Rock' for 'C:\\Music\\Rock\\Metallica'"
+    );
+  });
 });

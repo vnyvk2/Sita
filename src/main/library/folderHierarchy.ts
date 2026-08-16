@@ -21,6 +21,8 @@ export interface FolderNode {
  * Invariants:
  *
  * - Uses platform-aware path manipulation (path.win32 vs path.posix).
+ * - Non-root directories must strictly resolve their immediate parent folder ID; never falls back to
+ *   rootId.
  * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
  *   preserves dirty state.
  * - Supports responsive cancellation via AbortSignal.
@@ -70,7 +72,11 @@ export const resolveOrCreateMusicFolders = async (
     // Find parent directory path using platform-specific path methods
     const parentDirPath = normalizeLibraryPath(pathModule.dirname(dir), platform);
     const parentKey = getNormalizedPathKey(parentDirPath, platform);
-    const parentId = folderMap.get(parentKey) ?? rootId;
+    const parentId = folderMap.get(parentKey);
+
+    if (parentId === undefined) {
+      throw new Error(`Unable to resolve parent folder '${parentDirPath}' for '${dir}'`);
+    }
 
     const folderName = pathModule.basename(dir) || dir;
 

@@ -22,13 +22,13 @@ export interface ReconcileOptions {
   onProgress?: (progress: ReconcileProgress) => void;
   batchSize?: number;
   platform?: NodeJS.Platform;
-  trx?: DB | DBTransaction;
 }
 
 export interface ReconcileResult {
   successCount: number;
   errorCount: number;
   errors: Array<{ path: string; error: string }>;
+  cancelled?: boolean;
 }
 
 export class LibraryReconciler {
@@ -42,6 +42,7 @@ export class LibraryReconciler {
    * - Platform-aware path calculations (path.win32 vs path.posix).
    * - Never falls back to rootId if a folder ID cannot be resolved; records an explicit error.
    * - Every failed track is accounted for in errorCount, guaranteeing exact track accounting.
+   * - Sets cancelled: true when abortSignal is triggered.
    */
   async reconcileAdded(
     added: DiskSongSnapshot[],
@@ -52,7 +53,7 @@ export class LibraryReconciler {
       return { successCount: 0, errorCount: 0, errors: [] };
     }
 
-    const { abortSignal, onProgress, platform = process.platform, trx = db } = options;
+    const { abortSignal, onProgress, platform = process.platform } = options;
     const pathModule = platform === 'win32' ? path.win32 : path.posix;
     logger.info(`[LibraryReconciler] Reconciling ${added.length} added tracks...`);
 
@@ -61,7 +62,14 @@ export class LibraryReconciler {
 
     // 1. Resolve and create missing music_folders for all added tracks
     for (const root of accessibleRoots) {
-      if (abortSignal?.aborted) break;
+      if (abortSignal?.aborted) {
+        return {
+          successCount: 0,
+          errorCount: errors.length,
+          errors,
+          cancelled: true
+        };
+      }
 
       const songsInRoot = added.filter(
         (s) => s.rootId === root.id || isPathInsideRoot(s.path, root.path, platform)
@@ -82,9 +90,18 @@ export class LibraryReconciler {
           root.path,
           uniqueDirs,
           platform,
-          trx,
+          db,
           abortSignal
         );
+
+        if (abortSignal?.aborted) {
+          return {
+            successCount: 0,
+            errorCount: errors.length,
+            errors,
+            cancelled: true
+          };
+        }
 
         for (const song of songsInRoot) {
           const dir = normalizeLibraryPath(song.dirPath ?? pathModule.dirname(song.path), platform);
@@ -118,6 +135,15 @@ export class LibraryReconciler {
       }
     }
 
+    if (abortSignal?.aborted) {
+      return {
+        successCount: 0,
+        errorCount: errors.length,
+        errors,
+        cancelled: true
+      };
+    }
+
     if (eligibleSongs.length === 0) {
       return {
         successCount: 0,
@@ -145,7 +171,8 @@ export class LibraryReconciler {
     return {
       successCount: poolResult.successCount,
       errorCount: errors.length + poolResult.errorCount,
-      errors: [...errors, ...poolResult.errors]
+      errors: [...errors, ...poolResult.errors],
+      cancelled: abortSignal?.aborted
     };
   }
 
@@ -168,7 +195,14 @@ export class LibraryReconciler {
     let successCount = 0;
 
     for (let i = 0; i < modified.length; i++) {
-      if (abortSignal?.aborted) break;
+      if (abortSignal?.aborted) {
+        return {
+          successCount,
+          errorCount: errors.length,
+          errors,
+          cancelled: true
+        };
+      }
 
       const item = modified[i];
       try {
@@ -199,7 +233,8 @@ export class LibraryReconciler {
     return {
       successCount,
       errorCount: errors.length,
-      errors
+      errors,
+      cancelled: abortSignal?.aborted
     };
   }
 
@@ -220,7 +255,14 @@ export class LibraryReconciler {
     let successCount = 0;
 
     for (let i = 0; i < paths.length; i += batchSize) {
-      if (abortSignal?.aborted) break;
+      if (abortSignal?.aborted) {
+        return {
+          successCount,
+          errorCount: errors.length,
+          errors,
+          cancelled: true
+        };
+      }
 
       const chunk = paths.slice(i, i + batchSize);
       try {
@@ -248,7 +290,8 @@ export class LibraryReconciler {
     return {
       successCount,
       errorCount: errors.length,
-      errors
+      errors,
+      cancelled: abortSignal?.aborted
     };
   }
 }
