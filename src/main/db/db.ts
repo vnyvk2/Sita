@@ -7,9 +7,9 @@ import { pgDump } from '@electric-sql/pglite-tools/pg_dump';
 import { citext } from '@electric-sql/pglite/contrib/citext';
 // PostgreSQL Database extensions
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import logger from '@main/logger';
 import ShutdownLogger from '@main/lifecycle/ShutdownLogger';
 import { ShutdownState } from '@main/lifecycle/ShutdownState';
+import logger from '@main/logger';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { app } from 'electron';
@@ -27,7 +27,11 @@ if (!isTest) {
 }
 
 ShutdownLogger.logBootMilestone('PGlite.create() start', { DB_PATH });
-const pgliteInstance = await PGlite.create(DB_PATH, { debug: 1, extensions: { pg_trgm, citext } });
+const isDebugDb = process.env.DEBUG_DB === '1';
+const pgliteInstance = await PGlite.create(DB_PATH, {
+  debug: isDebugDb ? 1 : 0,
+  extensions: { pg_trgm, citext }
+});
 ShutdownLogger.logBootMilestone('PGlite.create() completed');
 
 pgliteInstance.onNotification((notification) => {

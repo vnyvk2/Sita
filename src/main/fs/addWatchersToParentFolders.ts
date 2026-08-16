@@ -1,36 +1,31 @@
 import fsSync, { type WatchEventType } from 'fs';
 import path from 'path';
 
-import { getAllFolderStructures } from '@main/db/queries/folders';
-
+import libraryChangeTracker from '../library/LibraryChangeTracker';
 import logger from '../logger';
-import checkForFolderModifications from './checkForFolderModifications';
-import { saveAbortController } from './controlAbortControllers';
+import { getAbortController, saveAbortController } from './controlAbortControllers';
 import getParentFolderPaths from './getParentFolderPaths';
 
-const fileNameRegex = /^.{1,}\.\w{1,}$/;
-
-const parentFolderWatcherFunction = async (eventType: WatchEventType, filename?: string | null) => {
+const parentFolderWatcherFunction = (
+  _eventType: WatchEventType,
+  filename: string | null | undefined,
+  parentFolderPath: string
+) => {
   if (filename) {
-    if (eventType === 'rename') {
-      // if not a filename, it should be a directory
-      const isADirectory = !fileNameRegex.test(filename);
-
-      if (isADirectory) {
-        // possible folder addition or deletion
-        checkForFolderModifications(filename);
-      }
-    }
-  } else {
-    logger.warn('Failed to watch parent folders because watcher sent an undefined filename', {
-      eventType,
-      filename
+    libraryChangeTracker.markDirty({
+      path: parentFolderPath,
+      source: 'parent-watcher'
     });
   }
 };
 
-const addWatcherToParentFolder = (parentFolderPath: string) => {
+export const addWatcherToParentFolder = (parentFolderPath: string): void => {
   try {
+    const existingController = getAbortController(parentFolderPath);
+    if (existingController) {
+      return;
+    }
+
     const abortController = new AbortController();
     const watcher = fsSync.watch(
       parentFolderPath,
@@ -39,47 +34,46 @@ const addWatcherToParentFolder = (parentFolderPath: string) => {
         // TODO - recursive mode won't work on linux
         recursive: true
       },
-      (eventType, filename) => parentFolderWatcherFunction(eventType, filename)
+      (eventType, filename) => parentFolderWatcherFunction(eventType, filename, parentFolderPath)
     );
     logger.debug('Added watcher to a parent folder successfully.', { parentFolderPath });
 
     watcher.addListener('error', (error) =>
-      logger.error(`Error occurred when watching a folder.`, { error, parentFolderPath })
+      logger.warn(`Error occurred when watching a parent folder.`, { error, parentFolderPath })
     );
     watcher.addListener('close', () =>
       logger.debug(`Successfully closed the parent folder watcher.`, { parentFolderPath })
     );
     saveAbortController(parentFolderPath, abortController);
   } catch (error) {
-    logger.error(`Error occurred when watching a folder.`, { error, parentFolderPath });
+    logger.warn(`Failed to watch parent folder (path may be inaccessible or unmounted).`, {
+      error,
+      parentFolderPath
+    });
   }
 };
 
-/* Parent folder watchers only watch for folder modifications (not file modifications) inside the parent folder. */
-const addWatchersToParentFolders = async () => {
-  const musicFolders = await getAllFolderStructures();
-
-  const musicFolderPaths = musicFolders.map((folder) => folder.path);
-  const parentFolderPaths = getParentFolderPaths(musicFolderPaths);
-  logger.debug(`${parentFolderPaths.length} parent folders of music folders found.`);
-
-  if (parentFolderPaths.length > 0) {
-    for (const parentFolderPath of parentFolderPaths) {
-      try {
-        addWatcherToParentFolder(parentFolderPath);
-      } catch (error) {
-        logger.error(
-          `Failed to add watcher to '${path.basename(parentFolderPath)}' parent folder.`,
-          { error, parentFolderPath }
-        );
-      }
-    }
-    return;
-  }
-  logger.warn(
-    `Failed to add watchers to parent folders of music folders. No parent folders found.`,
-    { parentFolderPaths, musicFolderPaths }
+export const initializePassiveParentWatchers = (folderPaths: string[]): void => {
+  const parentFolderPaths = getParentFolderPaths(folderPaths);
+  logger.debug(
+    `Initializing passive parent watchers for ${parentFolderPaths.length} parent paths.`
   );
+
+  for (const parentFolderPath of parentFolderPaths) {
+    try {
+      addWatcherToParentFolder(parentFolderPath);
+    } catch (error) {
+      logger.warn(`Failed to add watcher to '${path.basename(parentFolderPath)}' parent folder.`, {
+        error,
+        parentFolderPath
+      });
+    }
+  }
+};
+
+const addWatchersToParentFolders = async (): Promise<void> => {
+  const { initializePassiveWatchers } = await import('./initializePassiveWatchers');
+  await initializePassiveWatchers();
 };
 
 export default addWatchersToParentFolders;

@@ -90,13 +90,11 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
 
     if (!queue || queue.queues.length === 0) {
       window.api.audioLibraryControls
-        .getAllSongs()
-        .then((audioData) => {
-          if (!audioData) return undefined;
-          createQueue(
-            audioData.data.map((song) => song.songId),
-            'songs'
-          );
+        .getAllSongIds()
+        .then((songIds) => {
+          if (songIds && songIds.length > 0) {
+            createQueue(songIds, 'songs');
+          }
           return undefined;
         })
         .catch((err) => console.error(err));

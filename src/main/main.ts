@@ -30,20 +30,18 @@ import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import roundTo from '../common/roundTo';
 import manageLastFmAuth from './auth/manageLastFmAuth';
 import changeAppTheme from './core/changeAppTheme';
-import checkForNewSongs from './core/checkForNewSongs';
 import checkForStartUpSongs from './core/checkForStartUpSongs';
 import manageTaskbarPlaybackButtonControls from './core/manageTaskbarPlaybackButtonControls';
 // import { fileURLToPath, pathToFileURL } from 'url';
 import { closeDatabaseInstance } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
-import addWatchersToFolders from './fs/addWatchersToFolders';
-import addWatchersToParentFolders from './fs/addWatchersToParentFolders';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
+import initializePassiveWatchers from './fs/initializePassiveWatchers';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
-import logger from './logger';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
+import logger from './logger';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
 import checkForUpdates from './update';
@@ -296,10 +294,8 @@ const createWindow = async () => {
   }
   mainWindow.once('ready-to-show', () => {
     if (app.hasSingleInstanceLock()) {
-      logger.info('Started checking for new songs during the application start.');
-      checkForNewSongs();
-      addWatchersToFolders();
-      addWatchersToParentFolders();
+      logger.info('Restoring passive library state on startup.');
+      initializePassiveWatchers();
     }
   });
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {
@@ -714,7 +710,11 @@ function manageAppMoveEvent() {
 
 function manageAppResizeEvent() {
   const [width, height] = mainWindow.getSize();
-  logger.debug(`User resized the player`, { playerType, isQueueExpanded, dimensions: { width, height } });
+  logger.debug(`User resized the player`, {
+    playerType,
+    isQueueExpanded,
+    dimensions: { width, height }
+  });
 
   // Don't save the expanded queue size as the user's preferred compact size
   if (playerType === 'mini' && isQueueExpanded) return;
@@ -926,7 +926,11 @@ export function applyMiniPlayerModeConstraints(mode: 'standard' | 'compact') {
 }
 
 export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) {
-  logger.debug('Updating mini player dynamic minimum bounds', { minWidth, minHeight, currentMiniPlayerMode });
+  logger.debug('Updating mini player dynamic minimum bounds', {
+    minWidth,
+    minHeight,
+    currentMiniPlayerMode
+  });
   currentMiniPlayerMinWidth = minWidth;
   currentMiniPlayerMinHeight = minHeight;
 
@@ -1033,11 +1037,14 @@ export async function resetMiniPlayerToDefault() {
     logger.debug('Resetting mini player to default position and dimensions');
     const targetWidth = Math.max(
       MINI_PLAYER_DEFAULT_SIZE_X,
-      currentMiniPlayerMode === 'compact' ? COMPACT_MINI_PLAYER_MIN_WIDTH : currentMiniPlayerMinWidth
+      currentMiniPlayerMode === 'compact'
+        ? COMPACT_MINI_PLAYER_MIN_WIDTH
+        : currentMiniPlayerMinWidth
     );
-    const targetHeight = currentMiniPlayerMode === 'compact'
-      ? COMPACT_MINI_PLAYER_HEIGHT
-      : Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+    const targetHeight =
+      currentMiniPlayerMode === 'compact'
+        ? COMPACT_MINI_PLAYER_HEIGHT
+        : Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
 
     const display = screen.getDisplayMatching(mainWindow.getBounds());
     const { workArea } = display;
@@ -1172,7 +1179,8 @@ export function expandMiniPlayer(
   queueItemCount = 0,
   customExtensionHeight?: number
 ) {
-  if (!mainWindow || playerType !== 'mini') return { isExpanded: false, direction: 'down' as const };
+  if (!mainWindow || playerType !== 'mini')
+    return { isExpanded: false, direction: 'down' as const };
 
   const [width, currentHeight] = mainWindow.getSize();
   const [currentX, currentY] = mainWindow.getPosition();
@@ -1191,8 +1199,8 @@ export function expandMiniPlayer(
     // Calculate needed panel height (either custom extension e.g. lyrics, or queue based on item count)
     const panelHeight =
       customExtensionHeight ??
-      (Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS) * QUEUE_ITEM_HEIGHT +
-        QUEUE_HEADER_HEIGHT);
+      Math.min(Math.max(queueItemCount, 1), QUEUE_MAX_VISIBLE_ITEMS) * QUEUE_ITEM_HEIGHT +
+        QUEUE_HEADER_HEIGHT;
     const totalHeight = baseHeight + panelHeight;
 
     // Determine available screen space using compact boundaries
@@ -1264,7 +1272,12 @@ export function expandMiniPlayer(
     const restoreY = compactY ?? currentY;
     const restoreX = compactX ?? currentX;
 
-    logger.debug('Collapsing mini player extension', { restoreHeight, restoreY, restoreX, currentMiniPlayerMode });
+    logger.debug('Collapsing mini player extension', {
+      restoreHeight,
+      restoreY,
+      restoreX,
+      currentMiniPlayerMode
+    });
 
     applyMiniPlayerModeConstraints(currentMiniPlayerMode);
     setMiniPlayerBoundsProgrammatically({

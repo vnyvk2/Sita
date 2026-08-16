@@ -245,6 +245,61 @@ export const getAllSongs = async (
   };
 };
 
+export const getAllSongIds = async (
+  options: {
+    sortType?: SongSortTypes;
+    filterType?: SongFilterTypes;
+  } = {},
+  trx: DB | DBTransaction = db
+): Promise<number[]> => {
+  const { sortType = 'aToZ', filterType = 'notSelected' } = options;
+
+  const filters: SQL[] = [];
+
+  if (filterType === 'favorites' || filterType === 'nonFavorites') {
+    filters.push(eq(songs.isFavorite, filterType === 'favorites'));
+  }
+
+  if (filterType === 'blacklistedSongs' || filterType === 'whitelistedSongs') {
+    filters.push(eq(songs.isBlacklisted, filterType === 'blacklistedSongs'));
+  }
+
+  let orderClauses: SQL[] = [];
+  if (sortType === 'aToZ') orderClauses = [asc(songs.title)];
+  else if (sortType === 'zToA') orderClauses = [desc(songs.title)];
+  else if (sortType === 'releasedYearAscending') orderClauses = [asc(songs.year), asc(songs.title)];
+  else if (sortType === 'releasedYearDescending')
+    orderClauses = [desc(songs.year), asc(songs.title)];
+  else if (sortType === 'trackNoAscending')
+    orderClauses = [asc(songs.trackNumber), asc(songs.title)];
+  else if (sortType === 'trackNoDescending')
+    orderClauses = [desc(songs.trackNumber), asc(songs.title)];
+  else if (sortType === 'dateAddedAscending')
+    orderClauses = [asc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'dateAddedDescending')
+    orderClauses = [desc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'dateModifiedAscending')
+    orderClauses = [asc(songs.fileModifiedAt), asc(songs.title)];
+  else if (sortType === 'dateModifiedDescending')
+    orderClauses = [desc(songs.fileModifiedAt), asc(songs.title)];
+  else if (sortType === 'addedOrder') orderClauses = [desc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'mostSkipped') orderClauses = [desc(songs.skipCount), asc(songs.title)];
+  else if (sortType === 'leastSkipped') orderClauses = [asc(songs.skipCount), asc(songs.title)];
+
+  const query = trx.select({ id: songs.id }).from(songs);
+
+  if (filters.length > 0) {
+    query.where(and(...filters));
+  }
+
+  if (orderClauses.length > 0) {
+    query.orderBy(...orderClauses);
+  }
+
+  const results = await query;
+  return results.map((r) => r.id);
+};
+
 export type GetNonNullSongReturnType = NonNullable<Awaited<ReturnType<typeof getSongById>>>;
 export const getSongById = async (songId: number, trx: DB | DBTransaction = db) => {
   const song = await trx.query.songs.findFirst({

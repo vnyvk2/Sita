@@ -64,7 +64,7 @@ import {
 } from './db/queries/ignoredItems';
 import { getDatabaseMetrics } from './db/queries/other';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
-import { getSongById } from './db/queries/songs';
+import { getAllSongIds, getSongById } from './db/queries/songs';
 import {
   getUserKeyboardShortcuts,
   saveUserKeyboardShortcuts,
@@ -74,6 +74,7 @@ import {
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
+import libraryChangeTracker from './library/LibraryChangeTracker';
 import logger, { logFilePath } from './logger';
 import {
   allowScreenSleeping,
@@ -531,6 +532,28 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         deleteSongsFromSystem(absoluteFilePaths, abortSignal, isPermanentDelete)
     );
 
+    ipcMain.handle(
+      'app/getAllSongIds',
+      (_, sortType?: SongSortTypes, filterType?: SongFilterTypes) =>
+        getAllSongIds({ sortType, filterType })
+    );
+
+    ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());
+    ipcMain.handle('library/resetChangeState', () => libraryChangeTracker.reset());
+
+    let diskChangeDebounceTimer: NodeJS.Timeout | null = null;
+    libraryChangeTracker.on('changed', ({ state }) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (diskChangeDebounceTimer) {
+          clearTimeout(diskChangeDebounceTimer);
+        }
+        diskChangeDebounceTimer = setTimeout(() => {
+          mainWindow.webContents.send('library/diskChanged', state);
+          diskChangeDebounceTimer = null;
+        }, 500);
+      }
+    });
+
     ipcMain.handle('app/resyncSongsLibrary', async () => {
       await checkForNewSongs();
       sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
@@ -651,10 +674,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/changePlayerType', (_, type: PlayerTypes) => changePlayerType(type));
 
-    ipcMain.handle(
-      'app/toggleMiniPlayerQueue',
-      (_, isExpanded: boolean, queueItemCount?: number) =>
-        expandMiniPlayer(isExpanded, queueItemCount)
+    ipcMain.handle('app/toggleMiniPlayerQueue', (_, isExpanded: boolean, queueItemCount?: number) =>
+      expandMiniPlayer(isExpanded, queueItemCount)
     );
 
     ipcMain.handle('app/toggleMiniPlayerLyrics', (_, isExpanded: boolean) =>

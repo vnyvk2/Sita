@@ -108,6 +108,14 @@ const audioLibraryControls = {
     paginatingData?: PaginatingData
   ): Promise<PaginatedResult<AudioInfo, SongSortTypes>> =>
     ipcRenderer.invoke('app/getAllSongs', sortType, filterType, paginatingData),
+  getAllSongIds: (sortType?: SongSortTypes, filterType?: SongFilterTypes): Promise<number[]> =>
+    ipcRenderer.invoke('app/getAllSongIds', sortType, filterType),
+  getLibraryChangeState: (): Promise<{
+    isDirty: boolean;
+    changedPaths: string[];
+    lastChangedAt: number | null;
+  }> => ipcRenderer.invoke('library/getChangeState'),
+  resetLibraryChangeState: (): Promise<void> => ipcRenderer.invoke('library/resetChangeState'),
   getSongInfo: (
     songIds: number[],
     sortType?: SongSortTypes,
@@ -513,9 +521,7 @@ const miniPlayer = {
     ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
   setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>
     ipcRenderer.invoke('app/setMiniPlayerMinimumBounds', bounds),
-  setMiniPlayerMode: (
-    mode: 'standard' | 'compact'
-  ): Promise<{ mode: 'standard' | 'compact' }> =>
+  setMiniPlayerMode: (mode: 'standard' | 'compact'): Promise<{ mode: 'standard' | 'compact' }> =>
     ipcRenderer.invoke('app/setMiniPlayerMode', mode),
   resetToDefaultPosition: (): Promise<void> => ipcRenderer.invoke('app/resetMiniPlayerToDefault')
 };
