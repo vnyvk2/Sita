@@ -69,12 +69,12 @@ function MusicFolderInfoPage() {
     [folderInfo, metricsMap]
   );
 
-  const allBranchSongIds = useMemo(
-    () => (folderInfo ? getAllSongIds(folderInfo) : []),
-    [folderInfo]
-  );
-
   const subFolders = useMemo(() => folderInfo?.subFolders || [], [folderInfo]);
+
+  const totalSongsDisplay = currentMetrics?.totalSongCount ?? folderSongs.length;
+  const directSongsDisplay = currentMetrics?.directSongCount ?? folderSongs.length;
+  const subFoldersDisplay = currentMetrics?.directFolderCount ?? subFolders.length;
+  const hasPlayableSongs = totalSongsDisplay > 0;
 
   const fetchFolderInfo = useCallback(() => {
     if (folderPath) {
@@ -163,10 +163,12 @@ function MusicFolderInfoPage() {
 
   const handlePlayAllBranch = useCallback(
     (shuffleQueue = false) => {
-      if (allBranchSongIds.length === 0) return;
-      createQueue(allBranchSongIds, 'folder', shuffleQueue, folderInfo?.path, true, folderName);
+      if (!folderInfo) return;
+      const songIds = getAllSongIds(folderInfo);
+      if (songIds.length === 0) return;
+      createQueue(songIds, 'folder', shuffleQueue, folderInfo.path, true, folderName);
     },
-    [allBranchSongIds, createQueue, folderInfo?.path, folderName]
+    [createQueue, folderInfo, folderName]
   );
 
   const otherOptions = useMemo(
@@ -179,10 +181,6 @@ function MusicFolderInfoPage() {
     ],
     [t]
   );
-
-  const totalSongsDisplay = currentMetrics?.totalSongCount ?? folderSongs.length;
-  const directSongsDisplay = currentMetrics?.directSongCount ?? folderSongs.length;
-  const subFoldersDisplay = currentMetrics?.directFolderCount ?? subFolders.length;
 
   return (
     <MainContainer
@@ -298,7 +296,7 @@ function MusicFolderInfoPage() {
                   )}
                 />
               )}
-              {allBranchSongIds.length > 0 && (
+              {hasPlayableSongs && (
                 <>
                   <Button
                     key={2}
@@ -397,11 +395,18 @@ function MusicFolderInfoPage() {
                         >
                           {subName}
                         </span>
-                        <span className="text-xs font-thin opacity-75">
-                          {subDirectFolders > 0
-                            ? `${subDirectFolders} ${subDirectFolders === 1 ? 'subfolder' : 'subfolders'} • ${subTotalSongs} songs`
-                            : `${subTotalSongs} songs`}
-                        </span>
+                        <div className="flex items-center text-xs font-thin opacity-75">
+                          {subDirectFolders > 0 && (
+                            <>
+                              <span>
+                                {subDirectFolders}{' '}
+                                {subDirectFolders === 1 ? 'subfolder' : 'subfolders'}
+                              </span>
+                              <span className="mx-1">&bull;</span>
+                            </>
+                          )}
+                          <span>{t('common.songWithCount', { count: subTotalSongs })}</span>
+                        </div>
                       </div>
                     </div>
                     <span className="material-icons-round-outlined text-font-color-black/40 dark:text-font-color-white/40 group-hover:text-font-color-highlight dark:group-hover:text-dark-font-color-highlight text-lg transition-colors">

@@ -143,15 +143,19 @@ describe('folderMetrics', () => {
   });
 
   describe('parseFolderBreadcrumbs', () => {
-    it('parses Windows path with drive letter into clickable breadcrumbs', () => {
+    it('parses Windows path with drive letter into clean clickable breadcrumbs (omits bare drive letter)', () => {
       const breadcrumbs = parseFolderBreadcrumbs('C:\\Music\\Adele\\21');
 
       expect(breadcrumbs).toEqual([
-        { label: 'C:', path: 'C:\\', isCurrent: false },
         { label: 'Music', path: 'C:\\Music', isCurrent: false },
         { label: 'Adele', path: 'C:\\Music\\Adele', isCurrent: false },
         { label: '21', path: 'C:\\Music\\Adele\\21', isCurrent: true }
       ]);
+    });
+
+    it('keeps bare drive letter if it is the only segment', () => {
+      const breadcrumbs = parseFolderBreadcrumbs('C:\\');
+      expect(breadcrumbs).toEqual([{ label: 'C:', path: 'C:\\', isCurrent: true }]);
     });
 
     it('parses Unix path into clickable breadcrumbs', () => {
