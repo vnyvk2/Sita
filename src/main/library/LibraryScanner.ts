@@ -48,6 +48,7 @@ export interface ScanSummary {
   removed: number;
   unchanged: number;
   skippedRoots: ScanRoot[];
+  failedSubtrees?: string[];
   durationMs: number;
   error?: string;
 }
@@ -144,8 +145,8 @@ export class LibraryScanner extends EventEmitter {
         return this.handleCancellation(startTime, skippedRoots);
       }
 
-      // Fast single-pass disk traversal across accessible roots
-      const diskSnapshots = await fastDiskWalk(accessibleRoots, {
+      // Fast single-pass disk traversal across accessible roots with subtree failure safety
+      const { snapshots: diskSnapshots, failedSubtrees } = await fastDiskWalk(accessibleRoots, {
         abortSignal,
         onFileDiscovered: (count, currentPath) => {
           this.setState('DISCOVERING', { discoveredFiles: count, currentPath });
@@ -183,7 +184,8 @@ export class LibraryScanner extends EventEmitter {
         diskSnapshots,
         dbSnapshots,
         accessibleRoots,
-        skippedRoots
+        skippedRoots,
+        failedSubtrees
       );
 
       logger.info('[LibraryScanner] Diff calculated.', {
@@ -191,7 +193,8 @@ export class LibraryScanner extends EventEmitter {
         modified: diff.modified.length,
         removed: diff.removed.length,
         unchanged: diff.unchangedCount,
-        skippedRoots: diff.skippedRoots.length
+        skippedRoots: diff.skippedRoots.length,
+        failedSubtrees: diff.failedSubtrees.length
       });
 
       if (abortSignal.aborted) {
@@ -199,10 +202,11 @@ export class LibraryScanner extends EventEmitter {
       }
 
       // ----------------------------------------------------
-      // PHASE 3: RECONCILING (Batch Mutations)
+      // PHASE 3: RECONCILING (Batch Mutations & Error Tracking)
       // ----------------------------------------------------
       const totalToReconcile = diff.added.length + diff.modified.length + diff.removed.length;
       let completedReconciliation = 0;
+      let reconciliationErrors = 0;
 
       if (!dryRun && totalToReconcile > 0) {
         this.setState('RECONCILING', {
@@ -215,7 +219,7 @@ export class LibraryScanner extends EventEmitter {
 
         // 1. Reconcile Removals first to avoid collisions
         if (diff.removed.length > 0 && !abortSignal.aborted) {
-          await this.reconciler.reconcileRemoved(diff.removed, {
+          const result = await this.reconciler.reconcileRemoved(diff.removed, {
             abortSignal,
             onProgress: (p) => {
               this.setState('RECONCILING', {
@@ -225,12 +229,13 @@ export class LibraryScanner extends EventEmitter {
               });
             }
           });
-          completedReconciliation += diff.removed.length;
+          completedReconciliation += result.successCount;
+          reconciliationErrors += result.errorCount;
         }
 
         // 2. Reconcile Additions
         if (diff.added.length > 0 && !abortSignal.aborted) {
-          await this.reconciler.reconcileAdded(diff.added, {
+          const result = await this.reconciler.reconcileAdded(diff.added, {
             abortSignal,
             onProgress: (p) => {
               this.setState('RECONCILING', {
@@ -240,12 +245,13 @@ export class LibraryScanner extends EventEmitter {
               });
             }
           });
-          completedReconciliation += diff.added.length;
+          completedReconciliation += result.successCount;
+          reconciliationErrors += result.errorCount;
         }
 
         // 3. Reconcile Modifications
         if (diff.modified.length > 0 && !abortSignal.aborted) {
-          await this.reconciler.reconcileModified(diff.modified, {
+          const result = await this.reconciler.reconcileModified(diff.modified, {
             abortSignal,
             onProgress: (p) => {
               this.setState('RECONCILING', {
@@ -255,7 +261,8 @@ export class LibraryScanner extends EventEmitter {
               });
             }
           });
-          completedReconciliation += diff.modified.length;
+          completedReconciliation += result.successCount;
+          reconciliationErrors += result.errorCount;
         }
       }
 
@@ -266,23 +273,34 @@ export class LibraryScanner extends EventEmitter {
       // ----------------------------------------------------
       // PHASE 4: COMPLETION
       // ----------------------------------------------------
-      this.setState('COMPLETED', {
-        totalToReconcile,
-        completedReconciliation: totalToReconcile
-      });
+      const hasErrors = reconciliationErrors > 0 || failedSubtrees.length > 0;
 
       if (!dryRun) {
-        libraryChangeTracker.reset(); // isDirty -> false
+        if (hasErrors) {
+          logger.warn(
+            `[LibraryScanner] Scan completed with ${reconciliationErrors} reconciliation errors and ${failedSubtrees.length} failed subtrees. Preserving dirty state.`
+          );
+          libraryChangeTracker.markDirty();
+        } else {
+          libraryChangeTracker.reset(); // isDirty -> false
+        }
       }
 
+      this.setState(hasErrors ? 'FAILED' : 'COMPLETED', {
+        totalToReconcile,
+        completedReconciliation
+      });
+
       const summary: ScanSummary = {
-        status: 'COMPLETED',
+        status: hasErrors ? 'FAILED' : 'COMPLETED',
         added: diff.added.length,
         modified: diff.modified.length,
         removed: diff.removed.length,
         unchanged: diff.unchangedCount,
         skippedRoots: diff.skippedRoots,
-        durationMs: Date.now() - startTime
+        failedSubtrees: diff.failedSubtrees,
+        durationMs: Date.now() - startTime,
+        error: hasErrors ? `${reconciliationErrors} errors during reconciliation` : undefined
       };
 
       this.setState('IDLE');

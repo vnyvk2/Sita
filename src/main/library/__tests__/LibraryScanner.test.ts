@@ -15,13 +15,17 @@ vi.mock('fs/promises', () => ({
 }));
 
 vi.mock('../fastDiskWalk', () => ({
-  fastDiskWalk: vi.fn().mockResolvedValue([
-    {
-      path: 'C:\\TestMusic\\SongA.mp3',
-      fileModifiedAt: new Date(10000),
-      rootId: 1
-    }
-  ])
+  fastDiskWalk: vi.fn().mockResolvedValue({
+    snapshots: [
+      {
+        path: 'C:\\TestMusic\\SongA.mp3',
+        fileModifiedAt: new Date(10000),
+        rootId: 1,
+        folderId: 1
+      }
+    ],
+    failedSubtrees: []
+  })
 }));
 
 vi.mock('@main/db/db', () => ({
@@ -43,9 +47,9 @@ describe('LibraryScanner', () => {
     libraryChangeTracker.reset();
 
     mockReconciler = {
-      reconcileAdded: vi.fn().mockResolvedValue(undefined),
-      reconcileModified: vi.fn().mockResolvedValue(undefined),
-      reconcileRemoved: vi.fn().mockResolvedValue(undefined)
+      reconcileAdded: vi.fn().mockResolvedValue({ successCount: 1, errorCount: 0, errors: [] }),
+      reconcileModified: vi.fn().mockResolvedValue({ successCount: 0, errorCount: 0, errors: [] }),
+      reconcileRemoved: vi.fn().mockResolvedValue({ successCount: 0, errorCount: 0, errors: [] })
     } as unknown as LibraryReconciler;
 
     scanner = new LibraryScanner(mockReconciler);
@@ -99,6 +103,21 @@ describe('LibraryScanner', () => {
 
     const summary = await scanPromise;
     expect(summary.status).toBe('CANCELLED');
+    expect(libraryChangeTracker.getState().isDirty).toBe(true);
+  });
+
+  it('should report FAILED and preserve dirty state when reconciliation has errors', async () => {
+    libraryChangeTracker.markDirty();
+
+    mockReconciler.reconcileAdded = vi.fn().mockResolvedValue({
+      successCount: 0,
+      errorCount: 1,
+      errors: [{ path: 'C:\\TestMusic\\SongA.mp3', error: 'Tag read error' }]
+    });
+
+    const summary = await scanner.scan();
+
+    expect(summary.status).toBe('FAILED');
     expect(libraryChangeTracker.getState().isDirty).toBe(true);
   });
 });

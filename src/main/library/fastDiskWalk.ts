@@ -4,32 +4,55 @@ import path from 'path';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
 import type { DiskSongSnapshot, ScanRoot } from './diffEngine';
+import { resolveOrCreateMusicFolders } from './folderHierarchy';
+import { getNormalizedPathKey } from './pathUtils';
 
 export interface DiskWalkOptions {
   abortSignal?: AbortSignal;
   onFileDiscovered?: (totalDiscovered: number, currentPath: string) => void;
+  platform?: NodeJS.Platform;
+}
+
+export interface DiskWalkResult {
+  snapshots: DiskSongSnapshot[];
+  failedSubtrees: string[];
 }
 
 /**
  * Performs a single-pass asynchronous recursive directory traversal over accessible scan roots.
- * Collects structural file snapshots (path, mtime, size) without reading audio tags.
+ * Collects structural file snapshots (path, mtime, size) without reading audio tags, ensures
+ * directory hierarchy exists in `music_folders`, and resolves accurate `folderId` per track.
  */
 export const fastDiskWalk = async (
   roots: ScanRoot[],
   options: DiskWalkOptions = {}
-): Promise<DiskSongSnapshot[]> => {
-  const { abortSignal, onFileDiscovered } = options;
-  const snapshots: DiskSongSnapshot[] = [];
+): Promise<DiskWalkResult> => {
+  const { abortSignal, onFileDiscovered, platform = process.platform } = options;
+  const rawSnapshots: Array<{
+    path: string;
+    fileModifiedAt: Date;
+    size: number;
+    rootId: number;
+    dirPath: string;
+  }> = [];
+  const discoveredDirs = new Set<string>();
+  const failedSubtrees: string[] = [];
   const supportedExtSet = new Set(supportedMusicExtensions.map((ext) => ext.toLowerCase()));
 
   const walkDirectory = async (dirPath: string, rootId: number): Promise<void> => {
     if (abortSignal?.aborted) return;
 
+    discoveredDirs.add(dirPath);
+
     let entries: import('fs').Dirent[];
     try {
       entries = await fs.readdir(dirPath, { withFileTypes: true });
     } catch (error) {
-      logger.warn(`[fastDiskWalk] Failed to read directory '${dirPath}', skipping.`, { error });
+      logger.warn(
+        `[fastDiskWalk] Failed to read directory '${dirPath}', marking subtree as unscanned.`,
+        { error }
+      );
+      failedSubtrees.push(dirPath);
       return;
     }
 
@@ -50,15 +73,16 @@ export const fastDiskWalk = async (
         if (supportedExtSet.has(ext)) {
           try {
             const stat = await fs.stat(fullPath);
-            snapshots.push({
+            rawSnapshots.push({
               path: fullPath,
               fileModifiedAt: stat.mtime,
               size: stat.size,
-              rootId
+              rootId,
+              dirPath
             });
 
             if (onFileDiscovered) {
-              onFileDiscovered(snapshots.length, fullPath);
+              onFileDiscovered(rawSnapshots.length, fullPath);
             }
           } catch (statError) {
             logger.warn(`[fastDiskWalk] Failed to stat file '${fullPath}'`, { error: statError });
@@ -78,5 +102,31 @@ export const fastDiskWalk = async (
     await walkDirectory(root.path, root.id);
   }
 
-  return snapshots;
+  // Resolve or create music_folders records for all discovered directories
+  const folderMapByRoot = new Map<number, Map<string, number>>();
+  for (const root of roots) {
+    const rootDirs = Array.from(discoveredDirs).filter((d) => d.startsWith(root.path));
+    const folderMap = await resolveOrCreateMusicFolders(root.id, root.path, rootDirs, platform);
+    folderMapByRoot.set(root.id, folderMap);
+  }
+
+  // Assign resolved folderId to each snapshot
+  const snapshots: DiskSongSnapshot[] = rawSnapshots.map((item) => {
+    const rootFolderMap = folderMapByRoot.get(item.rootId);
+    const dirKey = getNormalizedPathKey(item.dirPath, platform);
+    const resolvedFolderId = rootFolderMap?.get(dirKey) ?? item.rootId;
+
+    return {
+      path: item.path,
+      fileModifiedAt: item.fileModifiedAt,
+      size: item.size,
+      rootId: item.rootId,
+      folderId: resolvedFolderId
+    };
+  });
+
+  return {
+    snapshots,
+    failedSubtrees
+  };
 };

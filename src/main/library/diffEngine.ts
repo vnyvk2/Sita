@@ -10,13 +10,13 @@ export interface DiskSongSnapshot {
   fileModifiedAt: Date;
   size?: number;
   rootId: number;
+  folderId?: number;
 }
 
 export interface DbSongSnapshot {
   id: number;
   path: string;
   fileModifiedAt: Date;
-  size?: number | null;
   folderId: number | null;
 }
 
@@ -26,6 +26,7 @@ export interface DiffResult {
   removed: DbSongSnapshot[];
   unchangedCount: number;
   skippedRoots: ScanRoot[];
+  failedSubtrees: string[];
 }
 
 /**
@@ -44,6 +45,7 @@ export const diffFilesystemSnapshot = (
   dbSongs: DbSongSnapshot[],
   accessibleRoots: ScanRoot[],
   skippedRoots: ScanRoot[] = [],
+  failedSubtrees: string[] = [],
   toleranceMs = 1000,
   platform: NodeJS.Platform = process.platform
 ): DiffResult => {
@@ -83,7 +85,7 @@ export const diffFilesystemSnapshot = (
     }
   }
 
-  // 2. Identify Removed tracks (Root-Scoped Safety Boundary)
+  // 2. Identify Removed tracks (Root-Scoped & Subtree-Protected Boundary)
   const removed: DbSongSnapshot[] = [];
 
   for (const dbItem of dbSongs) {
@@ -94,13 +96,19 @@ export const diffFilesystemSnapshot = (
       continue;
     }
 
-    // Check if the DB song belongs to a skipped/disconnected root
+    // Safety check 1: Disconnected root protection
     const isUnderSkippedRoot = skippedRoots.some((skippedRoot) =>
       isPathInsideRoot(dbItem.path, skippedRoot.path, platform)
     );
-
     if (isUnderSkippedRoot) {
-      // Disconnected drive protection: preserve DB song records
+      continue;
+    }
+
+    // Safety check 2: Failed/un-scanned subtree protection
+    const isUnderFailedSubtree = failedSubtrees.some((failedDir) =>
+      isPathInsideRoot(dbItem.path, failedDir, platform)
+    );
+    if (isUnderFailedSubtree) {
       continue;
     }
 
@@ -119,6 +127,7 @@ export const diffFilesystemSnapshot = (
     modified,
     removed,
     unchangedCount,
-    skippedRoots
+    skippedRoots,
+    failedSubtrees
   };
 };
