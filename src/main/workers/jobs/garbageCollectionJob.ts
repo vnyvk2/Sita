@@ -87,14 +87,16 @@ export class GarbageCollectionJob implements Job {
         }
       }
 
-      // 2. Clean unreferenced .tmp files (>60s old and not associated with any active DB row)
+      // 2. Clean stale .tmp files (>60s old)
+      // Any .tmp file older than 60s that remains after Step 1 (e.g. leftover when .bin already exists,
+      // or unreferenced without DB row) is obsolete and must be deleted.
       for (const file of files) {
-        if (file.endsWith('.tmp') && !validTmpPaths.has(file)) {
+        if (file.endsWith('.tmp')) {
           const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath).catch(() => null);
           if (stats && now - stats.mtimeMs > 60_000) {
             await fs.unlink(filePath).catch((err) => {
-              logger.warn(`Failed to delete stale unreferenced waveform tmp file ${filePath}`, { error: err });
+              logger.warn(`Failed to delete stale waveform tmp file ${filePath}`, { error: err });
             });
             removedCount++;
           }

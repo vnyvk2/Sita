@@ -35,7 +35,9 @@ vi.mock('@main/core/songWorkerPool', () => ({
 
 let testDb: any;
 
-describe('LibraryReconciler PGlite Concurrency Stress Test', () => {
+// Note: reParseSong is mocked to isolate and validate PGlite transaction concurrency
+// and monotonic progress reporting under 8 concurrent reconciliation workers.
+describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
   beforeAll(async () => {
     const { db, client } = await import('@main/db/db');
     testDb = db;
@@ -54,7 +56,7 @@ describe('LibraryReconciler PGlite Concurrency Stress Test', () => {
     });
   });
 
-  it('should process 100 concurrent modified songs under PGlite with concurrency 8 without lock contention', async () => {
+  it('should process 100 concurrent reconciliation operations with 8 workers under real PGlite transactions with zero surfaced errors', async () => {
     vi.mocked(reParseSong).mockImplementation(async (songPath: string) => {
       const fileName = path.basename(songPath, path.extname(songPath));
       await testDb.transaction(async (trx: any) => {

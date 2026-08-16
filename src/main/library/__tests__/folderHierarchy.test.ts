@@ -205,6 +205,10 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
 
     expect(folderMap.get('c:\\music')).toBe(1);
     expect(mockDatabase.select).toHaveBeenCalled();
-    expect(whereClauseCalledWith).toBeDefined();
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const query = dialect.sqlToQuery(whereClauseCalledWith);
+
+    expect(query.params).toContain('C:\\Music\\%');
   });
 });

@@ -187,4 +187,37 @@ describe('WaveformJob & Publication Protocol', () => {
 
     expect(db.delete).toHaveBeenCalled();
   });
+
+  it('A-3 REGRESSION: Stale temp file (>60s) when final .bin already exists must be cleaned by GC', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue(['300_v1.bin', '300_v1.bin.tmp'] as any);
+
+    const now = Date.now();
+    vi.mocked(fs.stat).mockImplementation(async (filePath: any) => {
+      if (String(filePath).endsWith('300_v1.bin')) {
+        return { mtimeMs: now - 10_000 } as any; // valid published .bin exists
+      }
+      if (String(filePath).endsWith('300_v1.bin.tmp')) {
+        return { mtimeMs: now - 120_000 } as any; // stale leftover .tmp (>60s)
+      }
+      return { mtimeMs: now } as any;
+    });
+
+    vi.mocked(db.select).mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        { id: 3, path: '/cache/waveforms/300_v1.bin' }
+      ])
+    } as any);
+
+    const deleteWhereMock = vi.fn();
+    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
+
+    const gcJob = new GarbageCollectionJob();
+    await gcJob.execute();
+
+    // Invariant: Stale .tmp leftover is deleted
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/300_v1\.bin\.tmp$/));
+    // Invariant: Published .bin and DB row are preserved
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(fs.rename).not.toHaveBeenCalled();
+  });
 });
