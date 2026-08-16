@@ -1,5 +1,7 @@
 import path from 'path';
 
+import { db } from '@main/db/db';
+
 import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import logger from '../logger';
 import reParseSong from '../parseSong/reParseSong';
@@ -20,6 +22,7 @@ export interface ReconcileOptions {
   onProgress?: (progress: ReconcileProgress) => void;
   batchSize?: number;
   platform?: NodeJS.Platform;
+  trx?: DB | DBTransaction;
 }
 
 export interface ReconcileResult {
@@ -33,6 +36,12 @@ export class LibraryReconciler {
    * Reconciles newly added tracks into the library database via bounded concurrency.
    * Resolves/creates required `music_folders` hierarchy before ingesting songs, assigning accurate
    * immediate folder IDs to each track.
+   *
+   * Invariants:
+   *
+   * - Platform-aware path calculations (path.win32 vs path.posix).
+   * - Never falls back to rootId if a folder ID cannot be resolved; records an explicit error.
+   * - Every failed track is accounted for in errorCount, guaranteeing exact track accounting.
    */
   async reconcileAdded(
     added: DiskSongSnapshot[],
@@ -43,15 +52,14 @@ export class LibraryReconciler {
       return { successCount: 0, errorCount: 0, errors: [] };
     }
 
-    const { abortSignal, onProgress, platform = process.platform } = options;
+    const { abortSignal, onProgress, platform = process.platform, trx = db } = options;
+    const pathModule = platform === 'win32' ? path.win32 : path.posix;
     logger.info(`[LibraryReconciler] Reconciling ${added.length} added tracks...`);
 
     const errors: Array<{ path: string; error: string }> = [];
-
-    // 1. Resolve and create missing music_folders for all added tracks
-    const folderMapByRoot = new Map<number, Map<string, number>>();
     const eligibleSongs: Array<{ songPath: string; folderId: number }> = [];
 
+    // 1. Resolve and create missing music_folders for all added tracks
     for (const root of accessibleRoots) {
       if (abortSignal?.aborted) break;
 
@@ -62,7 +70,9 @@ export class LibraryReconciler {
 
       const uniqueDirs = Array.from(
         new Set(
-          songsInRoot.map((s) => normalizeLibraryPath(s.dirPath ?? path.dirname(s.path), platform))
+          songsInRoot.map((s) =>
+            normalizeLibraryPath(s.dirPath ?? pathModule.dirname(s.path), platform)
+          )
         )
       );
 
@@ -71,14 +81,23 @@ export class LibraryReconciler {
           root.id,
           root.path,
           uniqueDirs,
-          platform
+          platform,
+          trx,
+          abortSignal
         );
-        folderMapByRoot.set(root.id, folderMap);
 
         for (const song of songsInRoot) {
-          const dir = normalizeLibraryPath(song.dirPath ?? path.dirname(song.path), platform);
+          const dir = normalizeLibraryPath(song.dirPath ?? pathModule.dirname(song.path), platform);
           const dirKey = getNormalizedPathKey(dir, platform);
-          const folderId = folderMap.get(dirKey) ?? root.id;
+          const folderId = folderMap.get(dirKey);
+
+          if (folderId === undefined) {
+            errors.push({
+              path: song.path,
+              error: `Unable to resolve folder ID for directory '${dir}'`
+            });
+            continue;
+          }
 
           eligibleSongs.push({
             songPath: song.path,
@@ -93,14 +112,16 @@ export class LibraryReconciler {
             error: folderError
           }
         );
-        errors.push({ path: root.path, error: msg });
+        for (const song of songsInRoot) {
+          errors.push({ path: song.path, error: msg });
+        }
       }
     }
 
     if (eligibleSongs.length === 0) {
       return {
         successCount: 0,
-        errorCount: added.length,
+        errorCount: errors.length,
         errors
       };
     }

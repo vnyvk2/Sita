@@ -57,4 +57,45 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     const jazzRow = insertedRows.find((r) => r.path === 'C:\\Music\\Jazz');
     expect(jazzRow?.parentId).toBe(1); // parent is root (id: 1)
   });
+
+  it('should throw an explicit error on folder creation failure without falling back', async () => {
+    const mockTrx = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockResolvedValue([])
+      }),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]) // DB returned empty array on insert
+        })
+      })
+    } as unknown as DB;
+
+    await expect(
+      resolveOrCreateMusicFolders(1, 'C:\\Music', ['C:\\Music\\Pop'], 'win32', mockTrx)
+    ).rejects.toThrow('Failed to insert music_folders record for');
+  });
+
+  it('should abort cleanly when AbortSignal is triggered', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const mockTrx = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockResolvedValue([])
+      }),
+      insert: vi.fn()
+    } as unknown as DB;
+
+    const folderMap = await resolveOrCreateMusicFolders(
+      1,
+      'C:\\Music',
+      ['C:\\Music\\Pop'],
+      'win32',
+      mockTrx,
+      controller.signal
+    );
+
+    expect(folderMap.get('c:\\music')).toBe(1);
+    expect(mockTrx.insert).not.toHaveBeenCalled();
+  });
 });

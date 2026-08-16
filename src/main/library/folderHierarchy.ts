@@ -18,17 +18,23 @@ export interface FolderNode {
  * `music_folders` with the correct `parent_id`, and returns a lookup Map of directory keys to
  * folder IDs.
  *
- * Invariant: Never silently fall back to rootId on insertion failure; throw so the scan reports
- * failure and preserves dirty state.
+ * Invariants:
+ *
+ * - Uses platform-aware path manipulation (path.win32 vs path.posix).
+ * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
+ *   preserves dirty state.
+ * - Supports responsive cancellation via AbortSignal.
  */
 export const resolveOrCreateMusicFolders = async (
   rootId: number,
   rootPath: string,
   dirPaths: string[],
   platform: NodeJS.Platform = process.platform,
-  trx: DB | DBTransaction = db
+  trx: DB | DBTransaction = db,
+  abortSignal?: AbortSignal
 ): Promise<Map<string, number>> => {
   const folderMap = new Map<string, number>();
+  const pathModule = platform === 'win32' ? path.win32 : path.posix;
 
   // 1. Fetch all existing folders from DB
   const existingFolders = await trx
@@ -56,15 +62,17 @@ export const resolveOrCreateMusicFolders = async (
     .sort((a, b) => a.length - b.length);
 
   for (const dir of uniqueDirs) {
+    if (abortSignal?.aborted) break;
+
     const dirKey = getNormalizedPathKey(dir, platform);
     if (folderMap.has(dirKey)) continue;
 
-    // Find parent directory path
-    const parentDirPath = normalizeLibraryPath(path.dirname(dir), platform);
+    // Find parent directory path using platform-specific path methods
+    const parentDirPath = normalizeLibraryPath(pathModule.dirname(dir), platform);
     const parentKey = getNormalizedPathKey(parentDirPath, platform);
     const parentId = folderMap.get(parentKey) ?? rootId;
 
-    const folderName = path.basename(dir) || dir;
+    const folderName = pathModule.basename(dir) || dir;
 
     // Check if already in DB
     const existing = existingMap.get(dirKey);
