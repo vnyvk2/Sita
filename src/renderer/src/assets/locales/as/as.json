@@ -903,6 +903,7 @@
     "reload": "ৰিলোড",
     "openDevtools": "ডেভটুলছ খোলক",
     "openAppShortcutsPrompt": "এপ চৰ্টকাট প্ৰম্পট খোলক",
+    "resyncLibrary": "লাইব্ৰেৰী পুনৰ চিনক্ৰ'নাইজ কৰক",
 
     "enterKey": "এণ্টাৰ",
     "spaceKey": "স্পেচ",
@@ -910,6 +911,7 @@
     "shiftKey": "Shift",
     "altKey": "Alt",
     "homeKey": "Home",
+    "insertKey": "Insert",
     "rightArrowKey": "সোঁ এৰ'",
     "leftArrowKey": "বাওঁ এৰ'",
     "upArrowKey": "ওপৰৰ এৰ'",

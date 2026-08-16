@@ -913,6 +913,7 @@
     "reload": "Załaduj od nowa",
     "openDevtools": "Otwórz DevTools",
     "openAppShortcutsPrompt": "Otwórz podpowiedzi skrótów aplikacji",
+    "resyncLibrary": "Synchronizuj ponownie bibliotekę",
 
     "enterKey": "Enter",
     "spaceKey": "Spacja",
@@ -920,6 +921,7 @@
     "shiftKey": "Shift",
     "altKey": "Alt",
     "homeKey": "Home",
+    "insertKey": "Insert",
     "rightArrowKey": "Strzałka w prawo",
     "leftArrowKey": "Strzałka w lewo",
     "upArrowKey": "Strzałka w górę",

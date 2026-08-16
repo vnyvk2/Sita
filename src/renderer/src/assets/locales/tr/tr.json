@@ -786,16 +786,21 @@
     "toggleMiniPlayerAlwaysOnTop": "Mini Oynatıcıyı Her Zaman Üstte Aç/Kapat",
     "reload": "Yeniden yükle",
     "openDevtools": "Devtools'u Aç",
+    "openAppShortcutsPrompt": "Uygulama Kısayolları İstemini Aç",
+    "resyncLibrary": "Kitaplığı Yeniden Senkronize Et",
+
     "enterKey": "Gir",
     "spaceKey": "Boşluk",
     "ctrlKey": "Ctrl",
     "shiftKey": "Vardiya",
     "altKey": "Alt",
     "homeKey": "Ana Sayfa",
+    "insertKey": "Insert",
     "rightArrowKey": "Sağ Ok",
     "leftArrowKey": "Sol Ok",
     "upArrowKey": "Yukarı Ok",
     "downArrowKey": "Aşağı Ok",
+
     "mouseClick": "Fare Tıklaması",
     "doubleClick": "Çift Tıkla"
   },

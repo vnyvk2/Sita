@@ -989,6 +989,7 @@
     "reload": "Reload",
     "openDevtools": "Open devtools",
     "openAppShortcutsPrompt": "Open App Shortcuts prompt",
+    "resyncLibrary": "Resync library",
 
     "enterKey": "Enter",
     "spaceKey": "Space",
@@ -996,6 +997,7 @@
     "shiftKey": "Shift",
     "altKey": "Alt",
     "homeKey": "Home",
+    "insertKey": "Insert",
     "rightArrowKey": "Right arrow",
     "leftArrowKey": "Left arrow",
     "upArrowKey": "Up arrow",

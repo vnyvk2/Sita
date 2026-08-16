@@ -898,6 +898,7 @@
     "reload": "Tải lại",
     "openDevtools": "Mở DevTools",
     "openAppShortcutsPrompt": "Mở hộp thoại Phím tắt ứng dụng",
+    "resyncLibrary": "Đồng bộ lại thư viện",
 
     "enterKey": "Enter",
     "spaceKey": "Phím cách",
@@ -905,6 +906,7 @@
     "shiftKey": "Shift",
     "altKey": "Alt",
     "homeKey": "Home",
+    "insertKey": "Insert",
     "rightArrowKey": "Mũi tên phải",
     "leftArrowKey": "Mũi tên trái",
     "upArrowKey": "Mũi tên lên",

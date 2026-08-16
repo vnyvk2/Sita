@@ -917,6 +917,7 @@
     "reload": "Recharger",
     "openDevtools": "Outils de développement",
     "openAppShortcutsPrompt": "Raccourcis de l'application",
+    "resyncLibrary": "Resynchroniser la bibliothèque",
 
     "enterKey": "Entrée",
     "spaceKey": "Espace",
@@ -924,6 +925,7 @@
     "shiftKey": "Maj",
     "altKey": "Alt",
     "homeKey": "Début",
+    "insertKey": "Insert",
     "rightArrowKey": "Flèche droite",
     "leftArrowKey": "Flèche gauche",
     "upArrowKey": "Flèche haut",

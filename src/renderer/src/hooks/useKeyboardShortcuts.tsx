@@ -148,6 +148,8 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             return normalizedKeys.endKey;
           case 'Home':
             return normalizedKeys.homeKey;
+          case 'Insert':
+            return normalizedKeys.insertKey;
           case ']':
             return ']';
           case '[':
@@ -308,6 +310,9 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
               window.api.settingsHelpers.openDevtools();
             }
             break;
+          case i18n.t('appShortcutsPrompt.resyncLibrary'):
+            window.api.audioLibraryControls.resyncSongsLibrary();
+            break;
           default:
             console.warn(`Unhandled shortcut action: ${matchedShortcut.label}`);
         }
@@ -329,7 +334,9 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
       updatePlayerType,
       toggleMultipleSelections,
       changePromptMenuData,
-      player
+      player,
+      location.pathname,
+      history
     ]
   );
 

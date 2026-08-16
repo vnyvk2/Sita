@@ -918,6 +918,7 @@
     "reload": "Recarregar",
     "openDevtools": "Abrir ferramentas de desenvolvedor",
     "openAppShortcutsPrompt": "Abrir prompt de Atalhos do Aplicativo",
+    "resyncLibrary": "Ressincronizar biblioteca",
 
     "enterKey": "Enter",
     "spaceKey": "Espaço",
@@ -925,6 +926,7 @@
     "shiftKey": "Shift",
     "altKey": "Alt",
     "homeKey": "Início",
+    "insertKey": "Insert",
     "rightArrowKey": "Seta direita",
     "leftArrowKey": "Seta esquerda",
     "upArrowKey": "Seta para cima",

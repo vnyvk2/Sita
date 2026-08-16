@@ -1,5 +1,4 @@
 import i18n from '@renderer/i18n';
-import storage from '@renderer/utils/localStorage';
 import { type ReactNode } from 'react';
 
 import { normalizedKeys } from './appShortcuts';
@@ -637,6 +636,10 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
         {
           label: i18n.t('appShortcutsPrompt.openDevtools'),
           keys: ['F12']
+        },
+        {
+          label: i18n.t('appShortcutsPrompt.resyncLibrary'),
+          keys: [normalizedKeys.insertKey]
         }
       ]
     }
@@ -678,22 +681,20 @@ export const USER_DATA_TEMPLATE: UserData = {
   windowState: 'normal'
 };
 
-const localStorage = storage.getLocalStorage();
-
 export const DEFAULT_REDUCER_DATA: AppReducer = {
   playerType: 'normal',
   player: {
     isCurrentSongPlaying: false,
-    volume: localStorage.playback.volume,
-    isRepeating: localStorage.playback.isRepeating,
-    isShuffling: localStorage.playback.isShuffling,
+    volume: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.volume,
+    isRepeating: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.isRepeating,
+    isShuffling: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.isShuffling,
     songPosition: 0,
     isPlayerStalled: false,
-    playbackRate: localStorage.playback.playbackRate
+    playbackRate: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.playbackRate
   },
   currentSongData: {} as AudioPlayerData,
   upNextSongData: {} as AudioPlayerData,
-  localStorage,
+  localStorage: LOCAL_STORAGE_DEFAULT_TEMPLATE,
   navigationHistory: {
     pageHistoryIndex: 0,
     history: [
