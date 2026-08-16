@@ -47,22 +47,15 @@ vi.mock('@main/parseSong/parseSong', () => ({
   })
 }));
 
-vi.mock('@main/workers/jobScheduler', () => ({
-  libraryScheduler: {
-    enqueue: vi.fn(),
-    requestMaintenance: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn(),
-    getRawMetrics: vi.fn(() => ({
-      queuedJobs: 0,
-      runningJobs: 0,
-      completedJobs: 0,
-      failedJobs: 0,
-      concurrencyLimits: { interactive: 4, background: 2, maintenance: 1 }
-    })),
-    getRunningJobs: vi.fn(() => [])
-  }
+vi.mock('@main/other/artworks', () => ({
+  sweepUnusedArtworks: vi.fn().mockResolvedValue(undefined)
 }));
+
+vi.mock('@main/main', () => ({
+  dataUpdateEvent: vi.fn(),
+  sendMessageToRenderer: vi.fn()
+}));
+
 
 import { client, db } from '@main/db/db';
 import { diffFilesystemSnapshot, type DbSongSnapshot } from '../diffEngine';
@@ -383,6 +376,93 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     const numbSong = allDbSongs.find((s) => s.title === 'ComfortablyNumb');
     expect(numbSong?.folderId).toBe(theWallAlbum?.id);
   });
+
+  it('Pipeline Step 5: Deleting tracks from disk removes them from the DB, leaves remaining tracks intact, and updates subsequent scan identity', async () => {
+    // 1. Setup scan root in DB
+    const [rootFolder] = await db.insert(musicFolders).values({
+      path: tempDir,
+      name: 'Root',
+      isScanRoot: true
+    }).returning();
+
+    const scanRoot = { id: rootFolder.id, path: tempDir };
+
+    // 2. Setup 3 tracks on disk: Adele/21/SongA, Adele/21/SongB, Adele/25/SongC
+    const album21Dir = path.join(tempDir, 'Adele', '21');
+    const album25Dir = path.join(tempDir, 'Adele', '25');
+    await fs.mkdir(album21Dir, { recursive: true });
+    await fs.mkdir(album25Dir, { recursive: true });
+
+    const songAPath = path.join(album21Dir, 'SongA.mp3');
+    const songBPath = path.join(album21Dir, 'SongB.mp3');
+    const songCPath = path.join(album25Dir, 'SongC.mp3');
+    await fs.writeFile(songAPath, 'audio A');
+    await fs.writeFile(songBPath, 'audio B');
+    await fs.writeFile(songCPath, 'audio C');
+
+    // 3. Ingest all 3 tracks initially
+    const initialWalk = await fastDiskWalk([scanRoot]);
+    const initialDiff = diffFilesystemSnapshot(initialWalk.snapshots, [], [scanRoot]);
+    const addResult = await reconciler.reconcileAdded(initialDiff.added, [scanRoot]);
+    expect(addResult.successCount).toBe(3);
+    expect(addResult.errorCount).toBe(0);
+
+    const initialSongs = await db.select().from(songs);
+    expect(initialSongs).toHaveLength(3);
+
+    // 4. Delete SongB and SongC from disk (leaving only SongA)
+    await fs.rm(songBPath, { force: true });
+    await fs.rm(songCPath, { force: true });
+
+    // 5. Subsequent scan: fastDiskWalk discovers only SongA
+    const secondWalk = await fastDiskWalk([scanRoot]);
+    expect(secondWalk.snapshots).toHaveLength(1);
+    expect(secondWalk.snapshots[0].path).toBe(songAPath);
+
+    // 6. Diff engine calculates: added=0, unchanged=1 (SongA), removed=2 (SongB, SongC)
+    const dbSnapshots = initialSongs.map((s) => ({
+      id: s.id,
+      path: s.path,
+      fileModifiedAt: s.fileModifiedAt,
+      folderId: s.folderId,
+      isBlacklisted: false
+    }));
+
+    const removalDiff = diffFilesystemSnapshot(secondWalk.snapshots, dbSnapshots, [scanRoot]);
+    expect(removalDiff.added).toHaveLength(0);
+    expect(removalDiff.unchangedCount).toBe(1);
+    expect(removalDiff.removed).toHaveLength(2);
+    expect(removalDiff.removed.map((r) => r.path)).toContain(songBPath);
+    expect(removalDiff.removed.map((r) => r.path)).toContain(songCPath);
+
+    // 7. Reconcile removals through LibraryReconciler
+    const removalResult = await reconciler.reconcileRemoved(removalDiff.removed);
+    expect(removalResult.successCount).toBe(2);
+    expect(removalResult.errorCount).toBe(0);
+
+    // 8. Authoritative DB verification: Only SongA remains in database
+    const remainingSongs = await db.select().from(songs);
+    expect(remainingSongs).toHaveLength(1);
+    expect(remainingSongs[0].path).toBe(songAPath);
+    expect(remainingSongs[0].title).toBe('SongA');
+
+    // 9. Third scan with no further changes: pure identity (unchanged=1, 0 added/modified/removed)
+    const thirdWalk = await fastDiskWalk([scanRoot]);
+    const thirdDbSnapshots = remainingSongs.map((s) => ({
+      id: s.id,
+      path: s.path,
+      fileModifiedAt: s.fileModifiedAt,
+      folderId: s.folderId,
+      isBlacklisted: false
+    }));
+
+    const thirdDiff = diffFilesystemSnapshot(thirdWalk.snapshots, thirdDbSnapshots, [scanRoot]);
+    expect(thirdDiff.added).toHaveLength(0);
+    expect(thirdDiff.modified).toHaveLength(0);
+    expect(thirdDiff.removed).toHaveLength(0);
+    expect(thirdDiff.unchangedCount).toBe(1);
+  });
 });
+
 
 
