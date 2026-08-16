@@ -5,12 +5,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { getAllSongIds, getAllSongs } from '../songs';
 
-describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
+describe('getAllSongIds Query vs getAllSongs Projection Equivalence across ALL Sort Types', () => {
   const testSongIds: number[] = [];
 
   beforeEach(async () => {
-    const now = new Date();
-    // Insert test songs with varied titles, years, and dates
+    const t1 = new Date(Date.now() - 40000);
+    const t2 = new Date(Date.now() - 30000);
+    const t3 = new Date(Date.now() - 20000);
+    const t4 = new Date(Date.now() - 10000);
+
     const inserted = await db
       .insert(songs)
       .values([
@@ -23,8 +26,10 @@ describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
           isBlacklisted: false,
           isFavorite: true,
           duration: 180,
-          fileCreatedAt: now,
-          fileModifiedAt: now
+          skipCount: 5,
+          fileCreatedAt: t1,
+          fileModifiedAt: t4,
+          createdAt: t1
         },
         {
           title: 'Alpha Song',
@@ -35,8 +40,10 @@ describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
           isBlacklisted: false,
           isFavorite: false,
           duration: 200,
-          fileCreatedAt: now,
-          fileModifiedAt: now
+          skipCount: 15,
+          fileCreatedAt: t2,
+          fileModifiedAt: t3,
+          createdAt: t2
         },
         {
           title: 'Bravo Song',
@@ -47,8 +54,10 @@ describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
           isBlacklisted: false,
           isFavorite: true,
           duration: 220,
-          fileCreatedAt: now,
-          fileModifiedAt: now
+          skipCount: 0,
+          fileCreatedAt: t3,
+          fileModifiedAt: t2,
+          createdAt: t3
         },
         {
           title: 'Blacklisted Song',
@@ -59,8 +68,10 @@ describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
           isBlacklisted: true,
           isFavorite: false,
           duration: 150,
-          fileCreatedAt: now,
-          fileModifiedAt: now
+          skipCount: 2,
+          fileCreatedAt: t4,
+          fileModifiedAt: t1,
+          createdAt: t4
         }
       ])
       .returning({ id: songs.id });
@@ -77,21 +88,31 @@ describe('getAllSongIds Query vs getAllSongs Projection Equivalence', () => {
     testSongIds.length = 0;
   });
 
-  it('should return exact same order of IDs as getAllSongs for aToZ sort', async () => {
-    const fullResult = await getAllSongs({ sortType: 'aToZ', filterType: 'notSelected' });
-    const idResult = await getAllSongIds({ sortType: 'aToZ', filterType: 'notSelected' });
+  const allSortTypes: SongSortTypes[] = [
+    'aToZ',
+    'zToA',
+    'releasedYearAscending',
+    'releasedYearDescending',
+    'trackNoAscending',
+    'trackNoDescending',
+    'dateAddedAscending',
+    'dateAddedDescending',
+    'dateModifiedAscending',
+    'dateModifiedDescending',
+    'addedOrder',
+    'mostSkipped',
+    'leastSkipped'
+  ];
 
-    const expectedIds = fullResult.data.map((s) => s.id);
-    expect(idResult).toEqual(expectedIds);
-  });
+  for (const sortType of allSortTypes) {
+    it(`should return exact same order of IDs as getAllSongs for sortType: '${sortType}'`, async () => {
+      const fullResult = await getAllSongs({ sortType, filterType: 'notSelected' });
+      const idResult = await getAllSongIds({ sortType, filterType: 'notSelected' });
 
-  it('should return exact same order of IDs as getAllSongs for zToA sort', async () => {
-    const fullResult = await getAllSongs({ sortType: 'zToA', filterType: 'notSelected' });
-    const idResult = await getAllSongIds({ sortType: 'zToA', filterType: 'notSelected' });
-
-    const expectedIds = fullResult.data.map((s) => s.id);
-    expect(idResult).toEqual(expectedIds);
-  });
+      const expectedIds = fullResult.data.map((s) => s.id);
+      expect(idResult).toEqual(expectedIds);
+    });
+  }
 
   it('should filter favorites identically to getAllSongs', async () => {
     const fullResult = await getAllSongs({ sortType: 'aToZ', filterType: 'favorites' });
