@@ -133,13 +133,103 @@ export const toggleVerboseLogs = (isEnabled: boolean) => {
 //   debug: 5,
 //   silly: 6
 
-const logger = {
+export interface SerializedError {
+  name?: string;
+  message: string;
+  stack?: string;
+  code?: string | number;
+  errno?: number;
+  syscall?: string;
+  path?: string;
+  cause?: unknown;
+  [key: string]: unknown;
+}
+
+export const serializeError = (err: unknown): SerializedError => {
+  if (err instanceof Error) {
+    const errorObj = err as any;
+    const serialized: SerializedError = {
+      name: errorObj.name,
+      message: errorObj.message,
+      stack: errorObj.stack
+    };
+    if (errorObj.code !== undefined) serialized.code = errorObj.code;
+    if (errorObj.errno !== undefined) serialized.errno = errorObj.errno;
+    if (errorObj.syscall !== undefined) serialized.syscall = errorObj.syscall;
+    if (errorObj.path !== undefined) serialized.path = errorObj.path;
+    if (errorObj.cause !== undefined) {
+      serialized.cause = errorObj.cause instanceof Error ? serializeError(errorObj.cause) : errorObj.cause;
+    }
+    return serialized;
+  }
+  if (typeof err === 'object' && err !== null) {
+    return { ...(err as Record<string, unknown>), message: (err as any).message || String(err) };
+  }
+  return { message: String(err) };
+};
+
+export const normalizeErrorPayload = (
+  data?: Record<string, unknown> | unknown,
+  explicitError?: unknown
+): { data: Record<string, unknown>; errorMessage: string } => {
+  let errorMessage: string | undefined;
+  const resultData: Record<string, unknown> = {};
+
+  if (data instanceof Error) {
+    errorMessage = data.message;
+    resultData.error = serializeError(data);
+  } else if (typeof data === 'object' && data !== null) {
+    const dataObj = data as Record<string, unknown>;
+    for (const [key, value] of Object.entries(dataObj)) {
+      if (key === 'error' && value !== undefined) {
+        if (!errorMessage) {
+          errorMessage =
+            value instanceof Error
+              ? value.message
+              : typeof value === 'object' && value !== null && 'message' in value
+                ? String((value as any).message)
+                : String(value);
+        }
+        resultData.error = serializeError(value);
+      } else {
+        resultData[key] = value instanceof Error ? serializeError(value) : value;
+      }
+    }
+  } else if (data !== undefined) {
+    resultData.data = data;
+  }
+
+  if (explicitError !== undefined) {
+    if (!errorMessage) {
+      errorMessage = explicitError instanceof Error ? explicitError.message : String(explicitError);
+    }
+    resultData.error = serializeError(explicitError);
+  }
+
+  return {
+    data: resultData,
+    errorMessage: errorMessage || 'Unknown error'
+  };
+};
+
+export interface Logger {
+  info: (message: string, data?: object) => void;
+  error: {
+    (message: string, error: unknown): void;
+    (message: string, data: Record<string, unknown>, error?: unknown): void;
+  };
+  warn: (message: string, data?: object) => void;
+  debug: (message: string, data?: object) => void;
+  silly: (message: string, data?: object) => void;
+  verbose: (message: string, data?: object) => void;
+}
+
+const logger: Logger = {
   info: (message: string, data = {} as object) => {
     log.info(message, { process: 'MAIN', data });
   },
-  error: (message: string, data = {} as object, error?: unknown) => {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
+  error: (message: string, dataOrError: unknown = {}, explicitError?: unknown) => {
+    const { data, errorMessage } = normalizeErrorPayload(dataOrError, explicitError);
     log.error(message, { process: 'MAIN', error: errorMessage, data });
   },
   warn: (message: string, data = {} as object) => {

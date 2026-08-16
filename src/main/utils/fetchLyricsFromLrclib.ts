@@ -1,14 +1,14 @@
-import { version, repository } from '../../../package.json';
+import { repository, version } from '../../../package.json';
 import logger from '../logger';
 
-interface LrclibTrackInfoStructure {
+export interface LrclibTrackInfoStructure {
   track_name: string;
   artist_name: string;
   album_name?: string;
   duration: string;
 }
 
-interface LrclibLyrics {
+export interface LrclibLyrics {
   id: number;
   trackName: string;
   artistName: string;
@@ -19,7 +19,7 @@ interface LrclibLyrics {
   syncedLyrics: string;
 }
 
-type LrclibLyricsAPI =
+export type LrclibLyricsAPI =
   | LrclibLyrics
   | {
       statusCode: number;
@@ -27,7 +27,7 @@ type LrclibLyricsAPI =
       message: string;
     };
 
-type ParsedLrclibLyrics = {
+export type ParsedLrclibLyrics = {
   lrclibId: number;
   trackName: string;
   artistName: string;
@@ -36,9 +36,9 @@ type ParsedLrclibLyrics = {
   lyrics: string;
   lyricsType: LyricsTypes;
 };
-const LRCLIB_BASE_URL = 'https://lrclib.net/';
+export const LRCLIB_BASE_URL = 'https://lrclib.net/';
 
-const parseLrclibResponseData = (
+export const parseLrclibResponseData = (
   data: LrclibLyricsAPI,
   lyricsType: LyricsTypes
 ): ParsedLrclibLyrics | undefined => {
@@ -67,8 +67,9 @@ const parseLrclibResponseData = (
   };
 
   if (lyricsType === 'SYNCED') {
-    if ('syncedLyrics' in data) {
+    if ('syncedLyrics' in data && data.syncedLyrics) {
       output.lyrics = data.syncedLyrics;
+      return output;
     }
     return undefined;
   }
@@ -90,6 +91,13 @@ const fetchLyricsFromLrclib = async (
     if (typeof value === 'string') url.searchParams.set(key, value);
   }
 
+  const queryMeta = {
+    provider: 'lrclib',
+    artist: trackInfo.artist_name,
+    title: trackInfo.track_name,
+    album: trackInfo.album_name
+  };
+
   try {
     const res = await fetch(url, { headers, signal: abortSignal });
     if (res.ok) {
@@ -98,9 +106,31 @@ const fetchLyricsFromLrclib = async (
 
       return lyrics;
     }
-    throw new Error(`Error occurred when fetching lyrics from Lrclib.`);
+
+    if (res.status === 404) {
+      logger.debug(`No lyrics found on Lrclib (404 Not Found)`, {
+        ...queryMeta,
+        status: 404,
+        statusText: res.statusText
+      });
+      return undefined;
+    }
+
+    logger.warn(`Lrclib request failed with HTTP ${res.status}`, {
+      ...queryMeta,
+      status: res.status,
+      statusText: res.statusText
+    });
+    return undefined;
   } catch (error) {
-    logger.error('Failed to fetch lyrics from Lrclib', { error });
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.debug(`Lrclib fetch request aborted`, queryMeta);
+      return undefined;
+    }
+    logger.error('Failed to fetch lyrics from Lrclib due to network error', {
+      error,
+      ...queryMeta
+    });
     return undefined;
   }
 };

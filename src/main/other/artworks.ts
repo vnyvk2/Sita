@@ -84,20 +84,15 @@ const createArtworks = async (
 
 let isDefaultArtworkLocationCreated = false;
 
-const checkForDefaultArtworkSaveLocation = async () => {
+export const checkForDefaultArtworkSaveLocation = async () => {
   if (isDefaultArtworkLocationCreated) return;
 
-  try {
-    await fs.stat(DEFAULT_ARTWORK_SAVE_LOCATION);
-  } catch (error) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ('code' in (error as any) && (error as any).code === 'ENOENT') {
-      await fs.mkdir(DEFAULT_ARTWORK_SAVE_LOCATION);
-      isDefaultArtworkLocationCreated = true;
-    } else
-      logger.error(`Error occurred when checking for default artwork save location.`, { error });
-  }
+  await fs.mkdir(DEFAULT_ARTWORK_SAVE_LOCATION, { recursive: true });
   isDefaultArtworkLocationCreated = true;
+};
+
+export const _resetArtworkLocationCacheForTesting = () => {
+  isDefaultArtworkLocationCreated = false;
 };
 
 // In-memory lock to prevent concurrent identical artwork processing

@@ -28,10 +28,10 @@ export const getAllFoldersFromFolderStructures = (folderStructures: FolderStruct
 
 export const getAllFilePathsFromFolder = (folderPath: string) => {
   try {
-    const baseNames = fsSync.readdirSync(folderPath);
-    const filePaths = baseNames
-      .filter((baseName) => path.extname(baseName))
-      .map((baseName) => path.join(folderPath, baseName));
+    const entries = fsSync.readdirSync(folderPath, { withFileTypes: true });
+    const filePaths = entries
+      .filter((entry) => entry.isFile() && path.extname(entry.name))
+      .map((entry) => path.join(folderPath, entry.name));
 
     return filePaths;
   } catch (error) {
