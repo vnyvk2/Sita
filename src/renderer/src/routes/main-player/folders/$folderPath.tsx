@@ -257,7 +257,7 @@ function MusicFolderInfoPage() {
             </div>
           )}
         </div>
-        <div className="songs-container h-full flex-1 pb-2">
+        <div className="songs-container min-h-0 flex-1 pb-2">
           {folderSongs && folderSongs.length > 0 && (
             <VirtualizedList
               data={folderSongs}

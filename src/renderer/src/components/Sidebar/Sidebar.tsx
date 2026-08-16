@@ -5,9 +5,9 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
-import SideBarItem from './SideBarItem';
-import LibrarySchedulerStatus from './LibrarySchedulerStatus';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
+import LibrarySchedulerStatus from './LibrarySchedulerStatus';
+import SideBarItem from './SideBarItem';
 
 const Sidebar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
@@ -123,14 +123,14 @@ const Sidebar = memo(() => {
 
   return (
     <nav
-      className={`side-bar relative z-20 order-1 !h-full w-[30%] !max-w-[18rem] grow rounded-tr-2xl transition-[width] ${
+      className={`side-bar relative z-20 order-1 flex !h-full w-[30%] !max-w-[18rem] grow flex-col rounded-tr-2xl transition-[width] ${
         bodyBackgroundImage
           ? 'bg-side-bar-background/50 dark:bg-dark-background-color-2/50 backdrop-blur-md'
           : 'bg-side-bar-background dark:bg-dark-background-color-2'
       } delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`}
     >
       <ErrorBoundary>
-        <ul className="relative flex h-full! flex-col gap-1 overflow-x-hidden pt-4 pb-2">
+        <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden pt-4 pb-2">
           {sideBarItems}
         </ul>
         <LibrarySchedulerStatus />

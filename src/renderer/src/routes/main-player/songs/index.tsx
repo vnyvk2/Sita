@@ -1,19 +1,19 @@
 import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
-import PageSearchInput from '@renderer/components/PageSearchInput';
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
+import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { queryClient } from '@renderer/queryClient';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
@@ -97,7 +97,13 @@ function SongsPage() {
   const {
     data: { data: songData }
   } = useSuspenseQuery(
-    songQuery.all({ sortType: sortingOrder, filterType: filteringOrder, start: 0, end: 0, keyword: keyword ?? '' })
+    songQuery.all({
+      sortType: sortingOrder,
+      filterType: filteringOrder,
+      start: 0,
+      end: 0,
+      keyword: keyword ?? ''
+    })
   );
 
   const {
@@ -187,9 +193,10 @@ function SongsPage() {
 
       // 2. Genre filter
       if (genre && genre !== 'all') {
-        const hasGenre = ('genres' in song && song.genres) ? (song as SongData).genres!.some(
-          (g) => g.name.toLowerCase() === genre.toLowerCase()
-        ) : false;
+        const hasGenre =
+          'genres' in song && song.genres
+            ? (song as SongData).genres!.some((g) => g.name.toLowerCase() === genre.toLowerCase())
+            : false;
         if (!hasGenre) return false;
       }
 
@@ -207,18 +214,12 @@ function SongsPage() {
 
       return true;
     });
-  }, [
-    songData,
-    language,
-    genre,
-    onlyFavoriteArtists,
-    onlyFavoriteAlbums,
-    favoriteArtistIds
-  ]);
+  }, [songData, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums, favoriteArtistIds]);
 
   const search = usePageSearch({
     keyword,
-    updateSearch: (val) => navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
+    updateSearch: (val) =>
+      navigate({ search: (prev) => ({ ...prev, keyword: val }), replace: true })
   });
 
   const searchBar = (
@@ -611,7 +612,7 @@ function SongsPage() {
         )}
       </div>
 
-      <div className="songs-container appear-from-bottom h-full flex-1 delay-100">
+      <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100">
         {filteredSongs && filteredSongs.length > 0 && (
           <VirtualizedList
             data={filteredSongs}
