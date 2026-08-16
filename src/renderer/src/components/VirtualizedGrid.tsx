@@ -1,5 +1,13 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { type CSSProperties, type ReactNode, forwardRef, useEffect, useMemo, useRef } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import {
   type GridComponents,
   type ListRange,
@@ -57,8 +65,33 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
   const targetIndexRef = useRef<number>(initialIndex);
   const currentScrollTopRef = useRef<number | undefined>(initialOffset);
   const currentScrollKeyRef = useRef<string | undefined>(scrollKey);
+  const isInitialMountRef = useRef<boolean>(true);
+  const innerVirtuosoRef = useRef<VirtuosoGridHandle | null>(null);
+
+  // Scroller element ref & event listener with lifecycle cleanup
+  const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
+    if (!scrollerElement) return;
+
+    const handleScroll = () => {
+      currentScrollTopRef.current = scrollerElement.scrollTop;
+    };
+
+    scrollerElement.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      scrollerElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [scrollerElement]);
+
+  // Imperative restoration when scrollKey changes on an already-mounted grid
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
     if (currentScrollKeyRef.current !== scrollKey) {
       currentScrollKeyRef.current = scrollKey;
       const newSavedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
@@ -68,6 +101,15 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
       targetIndexRef.current = newTarget;
       currentScrollTopRef.current = newSavedPosition?.offset;
       restorationStateRef.current = newTarget > 0 ? 'RESTORING' : 'TRACKING';
+
+      // Imperatively scroll VirtuosoGrid to the restored position for the new dataset key
+      if (innerVirtuosoRef.current) {
+        innerVirtuosoRef.current.scrollToIndex({
+          index: newTarget,
+          align: 'start',
+          behavior: 'auto'
+        });
+      }
     }
   }, [scrollKey, scrollTopOffset]);
 
@@ -112,6 +154,15 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
     [fixedItemWidth]
   );
 
+  const setCombinedVirtuosoRef = (handle: VirtuosoGridHandle | null) => {
+    innerVirtuosoRef.current = handle;
+    if (typeof ref === 'function') {
+      ref(handle);
+    } else if (ref && typeof ref === 'object') {
+      (ref as React.MutableRefObject<VirtuosoGridHandle | null>).current = handle;
+    }
+  };
+
   return (
     <VirtuosoGrid
       style={{
@@ -124,7 +175,7 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
       overscan={25}
       useWindowScroll={useWindowScroll}
       components={{ ...gridComponents, ...components }}
-      ref={ref}
+      ref={setCombinedVirtuosoRef}
       initialTopMostItemIndex={{ index: initialIndex }}
       scrollerRef={(element) => {
         if (typeof scrollerRef === 'function') {
@@ -133,13 +184,10 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
           scrollerRef.current = element;
         }
 
-        if (element && 'addEventListener' in element) {
-          const handleScroll = () => {
-            if ('scrollTop' in element) {
-              currentScrollTopRef.current = (element as HTMLElement).scrollTop;
-            }
-          };
-          element.addEventListener('scroll', handleScroll, { passive: true });
+        if (element instanceof HTMLElement) {
+          setScrollerElement(element);
+        } else {
+          setScrollerElement(null);
         }
       }}
       increaseViewportBy={{
@@ -147,11 +195,14 @@ const Grid = <T extends object>(props: Props<T>, ref) => {
         bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
       }}
       rangeChanged={(range) => {
+        // Guard: if currently restoring, ignore transient intermediate ranges until target is reached
         if (restorationStateRef.current === 'RESTORING') {
-          if (
-            range.startIndex < targetIndexRef.current &&
-            range.endIndex < targetIndexRef.current
-          ) {
+          const target = targetIndexRef.current;
+          const isTargetReached =
+            (range.startIndex <= target && range.endIndex >= target) ||
+            Math.abs(range.startIndex - target) <= 1;
+
+          if (!isTargetReached) {
             return;
           }
           restorationStateRef.current = 'TRACKING';
