@@ -124,6 +124,11 @@ export const parseFolderBreadcrumbs = (folderPath: string): FolderBreadcrumbItem
       }
     }
 
+    // Omit bare drive letter (e.g. 'C:') from display when deeper folder segments exist
+    if (i === 0 && isDriveLetter && parts.length > 1) {
+      continue;
+    }
+
     const isCurrent = i === parts.length - 1;
     breadcrumbs.push({
       label: parts[i],
