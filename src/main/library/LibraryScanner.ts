@@ -123,6 +123,7 @@ export class LibraryScanner extends EventEmitter {
       // ----------------------------------------------------
       // PHASE 1: DISCOVERING ROOTS & PROBING HEALTH (100% Read-Only)
       // ----------------------------------------------------
+      performance.mark('scanner:discover-start');
       this.setState('DISCOVERING', { discoveredFiles: 0 });
 
       const configuredRoots = await getLibraryScanRoots();
@@ -158,6 +159,11 @@ export class LibraryScanner extends EventEmitter {
         }
       });
 
+      performance.mark('scanner:discover-end');
+      try {
+        performance.measure('scanner:discover', 'scanner:discover-start', 'scanner:discover-end');
+      } catch {}
+
       if (abortSignal.aborted) {
         return this.handleCancellation(startTime, skippedRoots);
       }
@@ -165,24 +171,26 @@ export class LibraryScanner extends EventEmitter {
       // ----------------------------------------------------
       // PHASE 2: DIFFING (Pure In-Memory Diff Engine)
       // ----------------------------------------------------
+      performance.mark('scanner:diff-start');
       this.setState('DIFFING', { discoveredFiles: diskSnapshots.length });
 
-      // Fetch 1 flat DB snapshot
+      // Fetch 1 flat DB snapshot (including blacklisted tracks for path diff matching)
       const dbSongs = await db
         .select({
           id: songs.id,
           path: songs.path,
           fileModifiedAt: songs.fileModifiedAt,
-          folderId: songs.folderId
+          folderId: songs.folderId,
+          isBlacklisted: songs.isBlacklisted
         })
-        .from(songs)
-        .where(eq(songs.isBlacklisted, false));
+        .from(songs);
 
       const dbSnapshots: DbSongSnapshot[] = dbSongs.map((s) => ({
         id: s.id,
         path: s.path,
         fileModifiedAt: s.fileModifiedAt,
-        folderId: s.folderId
+        folderId: s.folderId,
+        isBlacklisted: s.isBlacklisted
       }));
 
       const diff: DiffResult = diffFilesystemSnapshot(diskSnapshots, dbSnapshots, accessibleRoots, {
@@ -190,6 +198,11 @@ export class LibraryScanner extends EventEmitter {
         failedSubtrees,
         failedPaths
       });
+
+      performance.mark('scanner:diff-end');
+      try {
+        performance.measure('scanner:diff', 'scanner:diff-start', 'scanner:diff-end');
+      } catch {}
 
       logger.info('[LibraryScanner] Diff calculated.', {
         added: diff.added.length,
@@ -208,6 +221,7 @@ export class LibraryScanner extends EventEmitter {
       // ----------------------------------------------------
       // PHASE 3: RECONCILING (Batch Mutations & Error Tracking)
       // ----------------------------------------------------
+      performance.mark('scanner:reconcile-start');
       const totalToReconcile = diff.added.length + diff.modified.length + diff.removed.length;
       let completedReconciliation = 0;
       let reconciliationErrors = 0;
@@ -269,6 +283,11 @@ export class LibraryScanner extends EventEmitter {
           reconciliationErrors += result.errorCount;
         }
       }
+
+      performance.mark('scanner:reconcile-end');
+      try {
+        performance.measure('scanner:reconcile', 'scanner:reconcile-start', 'scanner:reconcile-end');
+      } catch {}
 
       if (abortSignal.aborted) {
         return this.handleCancellation(startTime, skippedRoots);

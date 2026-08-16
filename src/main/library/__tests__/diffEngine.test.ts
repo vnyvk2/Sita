@@ -320,4 +320,53 @@ describe('diffEngine', () => {
     expect(result.unchangedCount).toBe(1);
     expect(result.failedPaths).toHaveLength(1);
   });
+
+  it('A-6 REGRESSION: should recognize blacklisted DB songs on disk as unchanged without placing in added, modified, or removed sets', () => {
+    const disk: DiskSongSnapshot[] = [
+      {
+        path: 'C:\\Music\\BlacklistedSong.mp3',
+        fileModifiedAt: new Date(15000), // Newer mtime on disk
+        rootId: 1
+      },
+      {
+        path: 'C:\\Music\\NormalSong.mp3',
+        fileModifiedAt: new Date(10000),
+        rootId: 1
+      }
+    ];
+
+    const dbSongs: DbSongSnapshot[] = [
+      {
+        id: 101,
+        path: 'C:\\Music\\BlacklistedSong.mp3',
+        fileModifiedAt: new Date(10000),
+        folderId: 1,
+        isBlacklisted: true
+      },
+      {
+        id: 102,
+        path: 'C:\\Music\\NormalSong.mp3',
+        fileModifiedAt: new Date(10000),
+        folderId: 1,
+        isBlacklisted: false
+      },
+      // Blacklisted song missing from disk should NOT be emitted in removed
+      {
+        id: 103,
+        path: 'C:\\Music\\MissingBlacklistedSong.mp3',
+        fileModifiedAt: new Date(10000),
+        folderId: 1,
+        isBlacklisted: true
+      }
+    ];
+
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      platform: 'win32'
+    });
+
+    expect(result.added).toHaveLength(0); // Blacklisted song MUST NOT be categorized as added
+    expect(result.modified).toHaveLength(0); // Blacklisted song MUST NOT be categorized as modified
+    expect(result.removed).toHaveLength(0); // Missing blacklisted song MUST NOT be removed
+    expect(result.unchangedCount).toBe(2); // NormalSong (1) + BlacklistedSong (1)
+  });
 });

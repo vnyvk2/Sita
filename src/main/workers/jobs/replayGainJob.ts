@@ -54,6 +54,8 @@ export class ReplayGainJob implements Job {
       const song = await getSongById(this.songId);
       if (!song) return;
 
+      if (this.state === 'cancelled') return;
+
       // 2. Perform EBU R128 loudness analysis
       // Note: Full LUFS analysis requires decoding the audio (e.g. ffmpeg or Web Audio API).
       // For this architectural proof, we simulate the intensive CPU work and return mock LUFS.

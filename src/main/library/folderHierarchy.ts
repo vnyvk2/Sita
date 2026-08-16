@@ -2,7 +2,7 @@ import path from 'path';
 
 import { db } from '@main/db/db';
 import { musicFolders } from '@main/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, like, or } from 'drizzle-orm';
 
 import logger from '../logger';
 import { getNormalizedPathKey, normalizeLibraryPath } from './pathUtils';
@@ -43,14 +43,20 @@ export const resolveOrCreateMusicFolders = async (
   const folderMap = new Map<string, number>();
   const pathModule = platform === 'win32' ? path.win32 : path.posix;
 
-  // 1. Fetch all existing folders from DB
+  // 1. Selectively fetch existing folders under this root from DB
   const existingFolders = await database
     .select({
       id: musicFolders.id,
       path: musicFolders.path,
       parentId: musicFolders.parentId
     })
-    .from(musicFolders);
+    .from(musicFolders)
+    .where(
+      or(
+        eq(musicFolders.path, rootPath),
+        like(musicFolders.path, `${rootPath}%`)
+      )
+    );
 
   const existingMap = new Map<string, FolderNode>();
   for (const folder of existingFolders) {

@@ -21,6 +21,7 @@ export interface ReconcileOptions {
   abortSignal?: AbortSignal;
   onProgress?: (progress: ReconcileProgress) => void;
   batchSize?: number;
+  concurrency?: number;
   platform?: NodeJS.Platform;
 }
 
@@ -177,8 +178,9 @@ export class LibraryReconciler {
   }
 
   /**
-   * Reconciles modified tracks by re-parsing updated ID3 tags. Explicitly tracks and returns errors
-   * if any track fails to re-parse.
+   * Reconciles modified tracks by re-parsing updated ID3 tags with bounded concurrency.
+   * Explicitly tracks and returns errors if any track fails to re-parse.
+   * Guarantees monotonic progress emission.
    */
   async reconcileModified(
     modified: DiskSongSnapshot[],
@@ -188,53 +190,66 @@ export class LibraryReconciler {
       return { successCount: 0, errorCount: 0, errors: [] };
     }
 
-    const { abortSignal, onProgress } = options;
+    const { abortSignal, onProgress, concurrency = 8 } = options;
     logger.info(`[LibraryReconciler] Reconciling ${modified.length} modified tracks...`);
 
     const errors: Array<{ path: string; error: string }> = [];
     let successCount = 0;
+    let completedCount = 0;
+    let index = 0;
+    let hasAborted = false;
 
-    for (let i = 0; i < modified.length; i++) {
-      if (abortSignal?.aborted) {
-        return {
-          successCount,
-          errorCount: errors.length,
-          errors,
-          cancelled: true
-        };
-      }
-
-      const item = modified[i];
-      try {
-        const result = await reParseSong(item.path);
-        if (result) {
-          successCount++;
-        } else {
-          errors.push({ path: item.path, error: 'reParseSong returned undefined' });
+    const worker = async () => {
+      while (true) {
+        if (hasAborted || index >= modified.length) break;
+        if (abortSignal?.aborted) {
+          hasAborted = true;
+          break;
         }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        errors.push({ path: item.path, error: msg });
-        logger.error(`[LibraryReconciler] Failed to re-parse modified track '${item.path}'`, {
-          error
-        });
-      }
 
-      if (onProgress) {
-        onProgress({
-          phase: 'modified',
-          completed: i + 1,
-          total: modified.length,
-          currentPath: item.path
-        });
+        const currentIndex = index++;
+        const item = modified[currentIndex];
+
+        try {
+          const result = await reParseSong(item.path);
+          if (result) {
+            successCount++;
+          } else {
+            errors.push({ path: item.path, error: 'reParseSong returned undefined' });
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          errors.push({ path: item.path, error: msg });
+          logger.error(`[LibraryReconciler] Failed to re-parse modified track '${item.path}'`, {
+            error
+          });
+        } finally {
+          completedCount++;
+          if (onProgress) {
+            onProgress({
+              phase: 'modified',
+              completed: completedCount,
+              total: modified.length,
+              currentPath: item.path
+            });
+          }
+        }
       }
+    };
+
+    const workers: Promise<void>[] = [];
+    const poolSize = Math.min(concurrency, modified.length);
+    for (let i = 0; i < poolSize; i++) {
+      workers.push(worker());
     }
+
+    await Promise.all(workers);
 
     return {
       successCount,
       errorCount: errors.length,
       errors,
-      cancelled: abortSignal?.aborted
+      cancelled: abortSignal?.aborted || hasAborted
     };
   }
 

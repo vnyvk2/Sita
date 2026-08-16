@@ -1,10 +1,12 @@
+import { app } from 'electron';
+import { eq } from 'drizzle-orm';
+import fs from 'fs/promises';
+import path from 'path';
+
 import { collectGarbageArtworks } from '@main/core/garbageCollector';
 import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
-import { app } from 'electron';
-import fs from 'fs/promises';
-import path from 'path';
 import type { Job, JobClass, JobState } from '../types';
 
 export class GarbageCollectionJob implements Job {
@@ -48,17 +50,46 @@ export class GarbageCollectionJob implements Job {
         throw e;
       }
       
-      const dbWaveforms = await db.select({ path: waveforms.path }).from(waveforms);
+      const now = Date.now();
+      let removedCount = 0;
+
+      // 1. Clean stale in-flight .tmp files (>60s old) from abandoned crashes
+      for (const file of files) {
+        if (file.endsWith('.tmp')) {
+          const filePath = path.join(cacheDir, file);
+          const stats = await fs.stat(filePath).catch(() => null);
+          if (stats && now - stats.mtimeMs > 60_000) {
+            await fs.unlink(filePath).catch((err) => {
+              logger.warn(`Failed to delete stale waveform tmp file ${filePath}`, { error: err });
+            });
+            removedCount++;
+          }
+        }
+      }
+
+      // 2. Clean orphaned .bin files (>60s old and not referenced in DB)
+      const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
       const validPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
       
-      let removedCount = 0;
       for (const file of files) {
         if (file.endsWith('.bin') && !validPaths.has(file)) {
           const filePath = path.join(cacheDir, file);
-          await fs.unlink(filePath).catch((err) => {
-            logger.warn(`Failed to delete orphaned waveform ${filePath}`, { error: err });
-          });
-          removedCount++;
+          const stats = await fs.stat(filePath).catch(() => null);
+          if (stats && now - stats.mtimeMs > 60_000) {
+            await fs.unlink(filePath).catch((err) => {
+              logger.warn(`Failed to delete orphaned waveform ${filePath}`, { error: err });
+            });
+            removedCount++;
+          }
+        }
+      }
+
+      // 3. Crash recovery: Clean orphaned DB rows that reference missing .bin files on disk
+      for (const row of dbWaveforms) {
+        const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
+        if (!fileExists) {
+          logger.warn(`[GarbageCollection] Waveform DB row ${row.id} points to missing file ${row.path}. Removing orphaned row.`);
+          await db.delete(waveforms).where(eq(waveforms.id, row.id));
         }
       }
       

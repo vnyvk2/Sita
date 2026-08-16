@@ -51,7 +51,6 @@ export const tryToParseSong = (
         const result = await parseSong(songPath, folderId, reparseToSync, noRendererMessages);
         logger.debug(`song added to the library.`, { songPath });
 
-        dataUpdateEvent('songs/newSong');
         pathsQueue.delete(songPath);
         return result;
       } catch (error) {
@@ -116,79 +115,62 @@ export const parseSong = async (
     return undefined;
   }
 
-  // const start1 = timeEnd(start, 'Time to fetch songs,artists,albums,genres');
-
   try {
-    // const songFileStream = createReadStream(absoluteFilePath);
-
-    // songFileStream.on('error', (err) => {
-    //  logger.debug(err);
-    //   throw err;
-    // });
-
-    // if (!songFileStream.readable)
-    //  logger.debug('song stream not readable', undefined, 'ERROR');
-
     const stats = await fs.stat(absoluteFilePath);
     const file = File.createFromPath(absoluteFilePath);
-    const metadata = file.tag;
 
-    // songFileStream.close();
+    let isSongEligibleForParsing = false;
+    let songTitle = '';
+    let artistsData: string[] = [];
+    let albumArtistsData: string[] = [];
+    let albumData: string | undefined;
+    let genresData: string[] = [];
+    let songInfo: typeof songs.$inferInsert | undefined;
+    let rawPictureBytes: Uint8Array | undefined;
 
-    // const start2 = timeEnd(start1, 'Time to fetch stats and parse metadata');
+    try {
+      const metadata = file.tag;
+      const isSongAvailable = await isSongWithPathAvailable(absoluteFilePath);
+      isSongEligibleForParsing = Boolean(metadata && (reparseToSync || !isSongAvailable));
 
-    const isSongAvailable = await isSongWithPathAvailable(absoluteFilePath);
-    const isSongEligibleForParsing = metadata && (reparseToSync || !isSongAvailable);
+      if (isSongEligibleForParsing) {
+        parseQueue.add(absoluteFilePath);
 
-    if (isSongEligibleForParsing) {
-      parseQueue.add(absoluteFilePath);
+        songTitle =
+          metadata.title ||
+          path.basename(absoluteFilePath, path.extname(absoluteFilePath)) ||
+          'Unknown Title';
 
-      // timeEnd(start2, 'Time to start organizing metadata');
+        artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
+        albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
+        albumData = getAlbumInfoFromSong(metadata.album);
+        genresData = getGenreInfoFromSong(metadata.genres);
 
-      const songTitle =
-        metadata.title ||
-        path.basename(absoluteFilePath, path.extname(absoluteFilePath)) ||
-        'Unknown Title';
+        songInfo = {
+          title: songTitle,
+          duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
+          year: metadata.year || undefined,
+          path: absoluteFilePath,
+          sampleRate: file.properties.audioSampleRate,
+          bitRate: file.properties.audioBitrate ? Math.ceil(file.properties.audioBitrate) : undefined,
+          noOfChannels: file.properties.audioChannels,
+          diskNumber: metadata.disc ?? undefined,
+          trackNumber: metadata.track ?? undefined,
+          fileCreatedAt: stats ? stats.birthtime : new Date(),
+          fileModifiedAt: stats ? stats.mtime : new Date(),
+          folderId
+        };
 
-      // const start3 = timeStart();
+        rawPictureBytes = metadata.pictures?.at(0)
+          ? metadata.pictures[0].data.toByteArray()
+          : undefined;
+      }
+    } finally {
+      file.dispose?.();
+    }
 
-      // const start4 = timeEnd(start3, 'Time to generate random id');
-
-      // const coverBuffer = await generateCoverBuffer(metadata.common.picture);
-
-      // const start6 = timeEnd(start4, 'Time to generate store artwork');
-
-      // const palette = await generatePalette(coverBuffer, false);
-
-      // const start7 = timeEnd(start6, 'Time to generate palette');
-
-      // if (metadata.common.lyrics)
-      //   consolelogger.debug(metadata.common.title, metadata.common.lyrics);
-
-      const artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
-      const albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
-      const albumData = getAlbumInfoFromSong(metadata.album);
-      const genresData = getGenreInfoFromSong(metadata.genres);
-
-      const songInfo: typeof songs.$inferInsert = {
-        title: songTitle,
-        duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
-        year: metadata.year || undefined,
-        path: absoluteFilePath,
-        sampleRate: file.properties.audioSampleRate,
-        bitRate: file.properties.audioBitrate ? Math.ceil(file.properties.audioBitrate) : undefined,
-        noOfChannels: file.properties.audioChannels,
-        diskNumber: metadata.disc ?? undefined,
-        trackNumber: metadata.track ?? undefined,
-        fileCreatedAt: stats ? stats.birthtime : new Date(),
-        fileModifiedAt: stats ? stats.mtime : new Date(),
-        folderId
-      };
-
-      const processedArtwork = await processArtworkFiles(
-        'songs',
-        metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined
-      );
+    if (isSongEligibleForParsing && songInfo) {
+      const processedArtwork = await processArtworkFiles('songs', rawPictureBytes);
 
       const res = await db.transaction(async (trx) => {
         const songData = await saveSong(songInfo, trx);
@@ -199,7 +181,9 @@ export const parseSong = async (
         }
 
         await linkArtworksToSong(
-          artworkData && artworkData.length > 0 ? artworkData.map((artwork: any) => ({ songId: songData.id, artworkId: artwork.id })) : [],
+          artworkData && artworkData.length > 0
+            ? artworkData.map((artwork) => ({ songId: songData.id, artworkId: artwork.id }))
+            : [],
           trx
         );
 
@@ -216,18 +200,7 @@ export const parseSong = async (
           },
           trx
         );
-        // const start9 = timeEnd(start8, 'Time to manage albums');
 
-        // if (songInfo.album && relevantAlbum)
-        //   songInfo.album = {
-        //     name: relevantAlbum.title,
-        //     albumId: relevantAlbum.albumId
-        //   };
-
-        // const start10 = timeEnd(
-        //   start9,
-        //   'Time to update album data in songInfo object'
-        // );
         const { newArtists, relevantArtists } = await manageArtistsOfParsedSong(
           {
             songId: songData.id,
@@ -236,17 +209,11 @@ export const parseSong = async (
           },
           trx
         );
-        // const start11 = timeEnd(start10, 'Time to manage artists');
 
         const { newAlbumArtists, relevantAlbumArtists } = await manageAlbumArtistOfParsedSong(
           { albumArtists: albumArtistsData, albumId: relevantAlbum?.id },
           trx
         );
-
-        // const start12 = timeEnd(
-        //   start11,
-        //   'Time to update artist data in songInfo object'
-        // );
 
         const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
           {
@@ -281,10 +248,6 @@ export const parseSong = async (
       dataUpdateEvent('songs/newSong', [res.songData.id]);
 
       parseQueue.delete(absoluteFilePath);
-
-      // timeEnd(start14, 'Time to reach end of the parsing process.');
-
-      // const start15 = timeEnd(start, 'Time to finish the parsing process.');
 
       if (res.newArtists.length > 0) {
         dataUpdateEvent(

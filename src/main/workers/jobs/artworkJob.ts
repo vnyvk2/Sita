@@ -66,6 +66,8 @@ export class ArtworkJob implements Job {
         logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
+      if (this.state === 'cancelled') return;
+
       // 2. Read ID3 tags
       const taglib = await import('node-taglib-sharp');
       const file = taglib.File.createFromPath(this.sampleSongPath);
@@ -80,8 +82,12 @@ export class ArtworkJob implements Job {
         file.dispose();
       }
 
+      if (this.state === 'cancelled') return;
+
       // 3. Store artwork (process outside transaction)
       const processedArtwork = await processArtworkFiles('album', pictureData);
+
+      if (this.state === 'cancelled') return;
 
       // 4. Save and link artwork in a transaction
       const artworkData = await db.transaction(async (trx) => {
@@ -105,12 +111,10 @@ export class ArtworkJob implements Job {
       });
 
       if (artworkData && artworkData.length > 0) {
-        if (this.state === 'cancelled') return;
-
         // Find the optimized artwork specifically intended for palette generation
         const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
         
-        // 5. Emit business event with a structured payload
+        // 5. Post-commit guarantee: event MUST fire after successful commit
         this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
           albumId: this.albumId,
           artworkId: optimizedArtwork.id,

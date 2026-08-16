@@ -32,8 +32,10 @@ vi.mock('../fastDiskWalk', () => ({
 vi.mock('@main/db/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([])
+      from: vi.fn().mockImplementation(() => {
+        const p = Promise.resolve([]);
+        (p as any).where = vi.fn().mockResolvedValue([]);
+        return p;
       })
     })
   }

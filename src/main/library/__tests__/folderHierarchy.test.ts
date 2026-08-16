@@ -2,6 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { resolveOrCreateMusicFolders } from '../folderHierarchy';
 
+const createSelectMock = (result: any = []) => {
+  return vi.fn().mockImplementation(() => ({
+    from: vi.fn().mockImplementation(() => {
+      const p = Promise.resolve(result);
+      (p as any).where = vi.fn().mockResolvedValue(result);
+      return p;
+    })
+  }));
+};
+
 describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
   it('should map subdirectories to existing folder IDs and create new folders with correct parent IDs', async () => {
     const existingFolders = [
@@ -13,9 +23,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     let nextId = 3;
 
     const mockDatabase = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockResolvedValue(existingFolders)
-      }),
+      select: createSelectMock(existingFolders),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockImplementation((val) => ({
           onConflictDoNothing: vi.fn().mockReturnValue({
@@ -62,11 +70,20 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
 
   it('should recover gracefully from onConflictDoNothing on concurrent folder creation', async () => {
     const mockDatabase = {
-      select: vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockImplementation(() => ({
-          where: vi.fn().mockResolvedValue([{ id: 42 }]) // Conflict select returns id 42
+      select: vi
+        .fn()
+        .mockImplementationOnce(() => ({
+          from: vi.fn().mockImplementation(() => {
+            const p = Promise.resolve([]);
+            (p as any).where = vi.fn().mockResolvedValue([]);
+            return p;
+          })
         }))
-      })),
+        .mockImplementation(() => ({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([{ id: 42, path: 'C:\\Music\\Pop', parentId: 1 }])
+          })
+        })),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
           onConflictDoNothing: vi.fn().mockReturnValue({
@@ -75,18 +92,6 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
         })
       })
     };
-
-    // First call to select from musicFolders during initial load
-    mockDatabase.select = vi
-      .fn()
-      .mockReturnValueOnce({
-        from: vi.fn().mockResolvedValue([])
-      })
-      .mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 42, path: 'C:\\Music\\Pop', parentId: 1 }])
-        })
-      });
 
     const folderMap = await resolveOrCreateMusicFolders(
       1,
@@ -101,11 +106,20 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
 
   it('should throw an explicit error on folder creation failure without falling back', async () => {
     const mockDatabase = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockImplementation(() => ({
-          where: vi.fn().mockResolvedValue([]) // Conflict select also returned empty
+      select: vi
+        .fn()
+        .mockImplementationOnce(() => ({
+          from: vi.fn().mockImplementation(() => {
+            const p = Promise.resolve([]);
+            (p as any).where = vi.fn().mockResolvedValue([]);
+            return p;
+          })
         }))
-      }),
+        .mockImplementation(() => ({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([])
+          })
+        })),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
           onConflictDoNothing: vi.fn().mockReturnValue({
@@ -114,17 +128,6 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
         })
       })
     };
-
-    mockDatabase.select = vi
-      .fn()
-      .mockReturnValueOnce({
-        from: vi.fn().mockResolvedValue([])
-      })
-      .mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([])
-        })
-      });
 
     await expect(
       resolveOrCreateMusicFolders(
@@ -142,9 +145,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     controller.abort();
 
     const mockDatabase = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockResolvedValue([])
-      }),
+      select: createSelectMock([]),
       insert: vi.fn()
     } as unknown as DB;
 
@@ -166,9 +167,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     const existingFolders = [{ id: 1, path: 'C:\\Music', parentId: null }];
 
     const mockDatabase = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockResolvedValue(existingFolders)
-      }),
+      select: createSelectMock(existingFolders),
       insert: vi.fn()
     } as unknown as DB;
 

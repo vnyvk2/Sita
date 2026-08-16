@@ -33,45 +33,57 @@ import {
 
 const reParseSong = async (filePath: string) => {
   const songPath = removeDefaultAppProtocolFromFilePath(filePath);
-  const songData = await getSongByPath(songPath);
   try {
+    const songData = await getSongByPath(songPath);
     if (songData) {
       const song = convertToSongData(songData);
       const { songId } = song;
       const stats = await fs.stat(songPath);
 
       const file = File.createFromPath(songPath);
-      const metadata = file.tag;
+      let updatedSong: Partial<typeof songs.$inferInsert> | undefined;
+      let artistsData: string[] = [];
+      let albumArtistsData: string[] = [];
+      let albumData: string | undefined;
+      let genresData: string[] = [];
+      let rawPictureBytes: Uint8Array | undefined;
 
-      const songTitle =
-        metadata.title || path.basename(songPath, path.extname(songPath)) || 'Unknown Title';
+      try {
+        const metadata = file.tag;
+        const songTitle =
+          metadata?.title || path.basename(songPath, path.extname(songPath)) || 'Unknown Title';
 
-      if (metadata) {
-        const updatedSong: Partial<typeof songs.$inferInsert> = {
-          title: songTitle,
-          duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
-          year: metadata.year || undefined,
-          path: songPath,
-          sampleRate: file.properties.audioSampleRate,
-          bitRate: file.properties.audioBitrate
-            ? Math.ceil(file.properties.audioBitrate)
-            : undefined,
-          noOfChannels: file.properties.audioChannels,
-          diskNumber: metadata.disc ?? undefined,
-          trackNumber: metadata.track ?? undefined,
-          fileCreatedAt: stats ? stats.birthtime : new Date(),
-          fileModifiedAt: stats ? stats.mtime : new Date()
-        };
+        if (metadata) {
+          updatedSong = {
+            title: songTitle,
+            duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
+            year: metadata.year || undefined,
+            path: songPath,
+            sampleRate: file.properties.audioSampleRate,
+            bitRate: file.properties.audioBitrate
+              ? Math.ceil(file.properties.audioBitrate)
+              : undefined,
+            noOfChannels: file.properties.audioChannels,
+            diskNumber: metadata.disc ?? undefined,
+            trackNumber: metadata.track ?? undefined,
+            fileCreatedAt: stats ? stats.birthtime : new Date(),
+            fileModifiedAt: stats ? stats.mtime : new Date()
+          };
 
-        const artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
-        const albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
-        const albumData = getAlbumInfoFromSong(metadata.album);
-        const genresData = getGenreInfoFromSong(metadata.genres);
+          artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
+          albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
+          albumData = getAlbumInfoFromSong(metadata.album);
+          genresData = getGenreInfoFromSong(metadata.genres);
+          rawPictureBytes = metadata.pictures?.at(0)
+            ? metadata.pictures[0].data.toByteArray()
+            : undefined;
+        }
+      } finally {
+        file.dispose?.();
+      }
 
-        const processedArtwork = await processArtworkFiles(
-          'songs',
-          metadata.pictures?.at(0) ? metadata.pictures[0].data.toByteArray() : undefined
-        );
+      if (updatedSong) {
+        const processedArtwork = await processArtworkFiles('songs', rawPictureBytes);
 
         await db.transaction(async (trx) => {
           await removeDeletedArtistDataOfSong(song, trx);
@@ -153,14 +165,22 @@ const reParseSong = async (filePath: string) => {
         dataUpdateEvent('albums/updatedAlbum');
         dataUpdateEvent('genres/updatedGenre');
 
-        setTimeout(() => generatePalettes(), 1000);
+        setTimeout(() => {
+          generatePalettes().catch((error) => {
+            logger.error('Failed to generate palettes after song reparse', { error, songPath: song.path });
+          });
+        }, 1000);
         return song;
       }
     }
     return undefined;
   } catch (error) {
     logger.error('Error occurred when re-parsing the song.', { error, filePath });
-    return sendMessageToRenderer({ messageCode: 'SONG_REPARSE_FAILED' });
+    sendMessageToRenderer({
+      messageCode: 'SONG_REPARSE_FAILED',
+      data: { path: songPath }
+    });
+    return undefined;
   }
 };
 

@@ -65,15 +65,21 @@ export class WaveformJob implements Job {
 
       if (this.state === 'cancelled') return;
 
-      // 3. Serialize to .bin file
+      // 3. Serialize to .tmp file first (in-flight files invisible to GC)
       const cacheDir = path.join(app.getPath('userData'), 'cache', 'waveforms');
       await fs.mkdir(cacheDir, { recursive: true });
       
       const fileName = `${this.songId}_v${CURRENT_WAVEFORM_GENERATOR_VERSION}.bin`;
       const filePath = path.join(cacheDir, fileName);
+      const tempPath = `${filePath}.tmp`;
       
       const buffer = Buffer.from(peaks.buffer);
-      await fs.writeFile(filePath, buffer);
+      await fs.writeFile(tempPath, buffer);
+
+      if (this.state === 'cancelled') {
+        await fs.unlink(tempPath).catch(() => {});
+        return;
+      }
 
       // 4. Save to DB
       await db.transaction(async (trx) => {
@@ -98,7 +104,17 @@ export class WaveformJob implements Job {
         }
       });
 
-      // 5. Emit event
+      // 5. Defensive publication: rename temp -> final .bin
+      try {
+        await fs.unlink(filePath).catch(() => {});
+        await fs.rename(tempPath, filePath);
+      } catch (renameErr) {
+        logger.error(`[WaveformJob] Failed to publish waveform file from temp ${tempPath}`, { error: renameErr });
+        await fs.unlink(tempPath).catch(() => {});
+        throw renameErr;
+      }
+
+      // 6. Post-commit guarantee: emit event
       this.eventBus.emit(ASSET_EVENTS.WAVEFORM_CREATED, {
         songId: this.songId,
         path: filePath

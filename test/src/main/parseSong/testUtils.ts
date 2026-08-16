@@ -38,7 +38,8 @@ export function createMockSongMetadata(overrides: Partial<MockSongMetadata> = {}
       audioSampleRate: merged.audioSampleRate,
       audioBitrate: merged.audioBitrate,
       audioChannels: merged.audioChannels
-    }
+    },
+    dispose: vi.fn()
   };
 }
 
@@ -228,6 +229,7 @@ export interface MockFileObject {
     audioBitrate: number;
     audioChannels: number;
   };
+  dispose?: () => void;
 }
 
 export interface MockFileStats {

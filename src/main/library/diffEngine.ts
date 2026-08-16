@@ -19,6 +19,7 @@ export interface DbSongSnapshot {
   path: string;
   fileModifiedAt: Date;
   folderId: number | null;
+  isBlacklisted?: boolean;
 }
 
 export interface DiffOptions {
@@ -49,6 +50,7 @@ export interface DiffResult {
  * - $|disk - db| \le toleranceMs \implies unchanged$
  * - $disk > db + toleranceMs \implies modified$
  * - $disk < db - toleranceMs \implies unchanged$
+ * - Blacklisted DB songs participate in path matching but are excluded from Added/Modified/Removed reconciliation.
  * - Songs belonging to skipped/disconnected roots are strictly excluded from the `removed` set.
  * - Songs belonging to failed/unscanned subtrees or failed-stat paths are strictly excluded from the
  *   `removed` set.
@@ -92,6 +94,9 @@ export const diffFilesystemSnapshot = (
 
     if (!dbItem) {
       added.push(diskItem);
+    } else if (dbItem.isBlacklisted) {
+      // Existing blacklisted track: recognized on disk, bypass reconciliation
+      unchangedCount++;
     } else {
       const diskTime = diskItem.fileModifiedAt.getTime();
       const dbTime = dbItem.fileModifiedAt.getTime();
@@ -109,6 +114,10 @@ export const diffFilesystemSnapshot = (
   const removed: DbSongSnapshot[] = [];
 
   for (const dbItem of dbSongs) {
+    if (dbItem.isBlacklisted) {
+      continue;
+    }
+
     const key = getNormalizedPathKey(dbItem.path, platform);
 
     // If song is present on disk, it is not removed
