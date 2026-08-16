@@ -10,6 +10,7 @@ export interface DiskSongSnapshot {
   fileModifiedAt: Date;
   size?: number;
   rootId: number;
+  dirPath?: string;
   folderId?: number;
 }
 
@@ -20,6 +21,14 @@ export interface DbSongSnapshot {
   folderId: number | null;
 }
 
+export interface DiffOptions {
+  skippedRoots?: ScanRoot[];
+  failedSubtrees?: string[];
+  failedPaths?: string[];
+  toleranceMs?: number;
+  platform?: NodeJS.Platform;
+}
+
 export interface DiffResult {
   added: DiskSongSnapshot[];
   modified: DiskSongSnapshot[];
@@ -27,28 +36,37 @@ export interface DiffResult {
   unchangedCount: number;
   skippedRoots: ScanRoot[];
   failedSubtrees: string[];
+  failedPaths: string[];
 }
 
 /**
  * Pure in-memory diff engine. Computes Added, Modified, Removed, and Unchanged sets with
- * root-scoped safety and timestamp tolerance.
+ * root-scoped safety, failed-subtree protection, and failed-stat path safety.
  *
  * Invariants:
  *
+ * - Discovery & diffing are 100% side-effect free.
  * - $|disk - db| \le toleranceMs \implies unchanged$
  * - $disk > db + toleranceMs \implies modified$
  * - $disk < db - toleranceMs \implies unchanged$
  * - Songs belonging to skipped/disconnected roots are strictly excluded from the `removed` set.
+ * - Songs belonging to failed/unscanned subtrees or failed-stat paths are strictly excluded from the
+ *   `removed` set.
  */
 export const diffFilesystemSnapshot = (
   disk: DiskSongSnapshot[],
   dbSongs: DbSongSnapshot[],
   accessibleRoots: ScanRoot[],
-  skippedRoots: ScanRoot[] = [],
-  failedSubtrees: string[] = [],
-  toleranceMs = 1000,
-  platform: NodeJS.Platform = process.platform
+  options: DiffOptions = {}
 ): DiffResult => {
+  const {
+    skippedRoots = [],
+    failedSubtrees = [],
+    failedPaths = [],
+    toleranceMs = 1000,
+    platform = process.platform
+  } = options;
+
   const diskMap = new Map<string, DiskSongSnapshot>();
   for (const item of disk) {
     const key = getNormalizedPathKey(item.path, platform);
@@ -60,6 +78,8 @@ export const diffFilesystemSnapshot = (
     const key = getNormalizedPathKey(item.path, platform);
     dbMap.set(key, item);
   }
+
+  const failedPathKeySet = new Set(failedPaths.map((p) => getNormalizedPathKey(p, platform)));
 
   const added: DiskSongSnapshot[] = [];
   const modified: DiskSongSnapshot[] = [];
@@ -85,7 +105,7 @@ export const diffFilesystemSnapshot = (
     }
   }
 
-  // 2. Identify Removed tracks (Root-Scoped & Subtree-Protected Boundary)
+  // 2. Identify Removed tracks (Root-Scoped & Unverified-Filesystem Protected Boundary)
   const removed: DbSongSnapshot[] = [];
 
   for (const dbItem of dbSongs) {
@@ -96,7 +116,12 @@ export const diffFilesystemSnapshot = (
       continue;
     }
 
-    // Safety check 1: Disconnected root protection
+    // Safety check 1: Individual file stat failure protection
+    if (failedPathKeySet.has(key)) {
+      continue;
+    }
+
+    // Safety check 2: Disconnected root protection
     const isUnderSkippedRoot = skippedRoots.some((skippedRoot) =>
       isPathInsideRoot(dbItem.path, skippedRoot.path, platform)
     );
@@ -104,7 +129,7 @@ export const diffFilesystemSnapshot = (
       continue;
     }
 
-    // Safety check 2: Failed/un-scanned subtree protection
+    // Safety check 3: Failed/un-scanned directory subtree protection
     const isUnderFailedSubtree = failedSubtrees.some((failedDir) =>
       isPathInsideRoot(dbItem.path, failedDir, platform)
     );
@@ -128,6 +153,7 @@ export const diffFilesystemSnapshot = (
     removed,
     unchangedCount,
     skippedRoots,
-    failedSubtrees
+    failedSubtrees,
+    failedPaths
   };
 };

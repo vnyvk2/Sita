@@ -13,10 +13,13 @@ export interface FolderNode {
 }
 
 /**
- * Resolves or creates hierarchical `music_folders` records for all discovered directories. Ensures
- * that every subdirectory between the scan root and the song's immediate parent directory exists in
+ * Resolves or creates hierarchical `music_folders` records for discovered directories. Ensures that
+ * every subdirectory between the scan root and the song's immediate parent directory exists in
  * `music_folders` with the correct `parent_id`, and returns a lookup Map of directory keys to
  * folder IDs.
+ *
+ * Invariant: Never silently fall back to rootId on insertion failure; throw so the scan reports
+ * failure and preserves dirty state.
  */
 export const resolveOrCreateMusicFolders = async (
   rootId: number,
@@ -63,37 +66,31 @@ export const resolveOrCreateMusicFolders = async (
 
     const folderName = path.basename(dir) || dir;
 
-    try {
-      // Check if already in DB
-      const existing = existingMap.get(dirKey);
-      if (existing) {
-        folderMap.set(dirKey, existing.id);
-      } else {
-        // Insert new subfolder record into music_folders
-        const [inserted] = await trx
-          .insert(musicFolders)
-          .values({
-            path: dir,
-            name: folderName,
-            parentId: parentId,
-            isBlacklisted: false
-          })
-          .returning({ id: musicFolders.id });
+    // Check if already in DB
+    const existing = existingMap.get(dirKey);
+    if (existing) {
+      folderMap.set(dirKey, existing.id);
+    } else {
+      // Insert new subfolder record into music_folders
+      const [inserted] = await trx
+        .insert(musicFolders)
+        .values({
+          path: dir,
+          name: folderName,
+          parentId: parentId,
+          isBlacklisted: false
+        })
+        .returning({ id: musicFolders.id });
 
-        if (inserted) {
-          folderMap.set(dirKey, inserted.id);
-          existingMap.set(dirKey, { id: inserted.id, path: dir, parentId });
-          logger.debug(
-            `[folderHierarchy] Created music_folders record for '${dir}' (id: ${inserted.id}, parentId: ${parentId})`
-          );
-        }
+      if (inserted) {
+        folderMap.set(dirKey, inserted.id);
+        existingMap.set(dirKey, { id: inserted.id, path: dir, parentId });
+        logger.debug(
+          `[folderHierarchy] Created music_folders record for '${dir}' (id: ${inserted.id}, parentId: ${parentId})`
+        );
+      } else {
+        throw new Error(`Failed to insert music_folders record for '${dir}'`);
       }
-    } catch (error) {
-      logger.error(`[folderHierarchy] Failed to resolve/create music_folders record for '${dir}'`, {
-        error
-      });
-      // Fallback to rootId if insertion fails
-      folderMap.set(dirKey, rootId);
     }
   }
 

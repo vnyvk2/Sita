@@ -33,7 +33,7 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], { platform: 'win32' });
 
     expect(result.added).toHaveLength(1);
     expect(result.added[0].path).toBe('C:\\Music\\Rock\\SongB.mp3');
@@ -65,7 +65,7 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], { platform: 'win32' });
 
     expect(result.added).toHaveLength(0);
     expect(result.modified).toHaveLength(0);
@@ -92,7 +92,10 @@ describe('diffEngine', () => {
     ];
 
     // Difference is 5000ms > 1000ms tolerance
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      toleranceMs: 1000,
+      platform: 'win32'
+    });
 
     expect(result.added).toHaveLength(0);
     expect(result.modified).toHaveLength(1);
@@ -119,7 +122,10 @@ describe('diffEngine', () => {
     ];
 
     // Difference is 500ms <= 1000ms tolerance
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      toleranceMs: 1000,
+      platform: 'win32'
+    });
 
     expect(result.added).toHaveLength(0);
     expect(result.modified).toHaveLength(0);
@@ -144,7 +150,10 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      toleranceMs: 1000,
+      platform: 'win32'
+    });
 
     expect(result.modified).toHaveLength(0);
     expect(result.unchangedCount).toBe(1);
@@ -168,7 +177,10 @@ describe('diffEngine', () => {
     ];
 
     // Root E:\Music is disconnected/skipped
-    const result = diffFilesystemSnapshot(disk, dbSongs, [], [rootE], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [], {
+      skippedRoots: [rootE],
+      platform: 'win32'
+    });
 
     expect(result.added).toHaveLength(0);
     expect(result.modified).toHaveLength(0);
@@ -202,7 +214,10 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [rootE], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      skippedRoots: [rootE],
+      platform: 'win32'
+    });
 
     expect(result.added).toHaveLength(1);
     expect(result.added[0].path).toBe('C:\\Music\\NewSong.mp3');
@@ -228,7 +243,7 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], [], [], 1000, 'win32');
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], { platform: 'win32' });
 
     expect(result.added).toHaveLength(0);
     expect(result.modified).toHaveLength(0);
@@ -260,19 +275,49 @@ describe('diffEngine', () => {
       }
     ];
 
-    const result = diffFilesystemSnapshot(
-      disk,
-      dbSongs,
-      [rootC],
-      [],
-      ['C:\\Music\\Rock'], // Failed subtree
-      1000,
-      'win32'
-    );
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      failedSubtrees: ['C:\\Music\\Rock'], // Failed subtree
+      platform: 'win32'
+    });
 
     expect(result.added).toHaveLength(0);
     expect(result.removed).toHaveLength(0); // Song2 in Rock MUST NOT be removed!
     expect(result.unchangedCount).toBe(1);
     expect(result.failedSubtrees).toHaveLength(1);
+  });
+
+  it('should NEVER remove songs whose stat call failed on disk (File Stat Failure Safety)', () => {
+    const disk: DiskSongSnapshot[] = [
+      {
+        path: 'C:\\Music\\Good.mp3',
+        fileModifiedAt: new Date(10000),
+        rootId: 1
+      }
+    ];
+    const dbSongs: DbSongSnapshot[] = [
+      {
+        id: 101,
+        path: 'C:\\Music\\Good.mp3',
+        fileModifiedAt: new Date(10000),
+        folderId: 1
+      },
+      // Song on disk whose fs.stat() failed (e.g. locked/permission)
+      {
+        id: 102,
+        path: 'C:\\Music\\Locked.mp3',
+        fileModifiedAt: new Date(10000),
+        folderId: 1
+      }
+    ];
+
+    const result = diffFilesystemSnapshot(disk, dbSongs, [rootC], {
+      failedPaths: ['C:\\Music\\Locked.mp3'], // Failed stat path
+      platform: 'win32'
+    });
+
+    expect(result.added).toHaveLength(0);
+    expect(result.removed).toHaveLength(0); // Locked.mp3 MUST NOT be removed!
+    expect(result.unchangedCount).toBe(1);
+    expect(result.failedPaths).toHaveLength(1);
   });
 });

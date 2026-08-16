@@ -49,6 +49,7 @@ export interface ScanSummary {
   unchanged: number;
   skippedRoots: ScanRoot[];
   failedSubtrees?: string[];
+  failedPaths?: string[];
   durationMs: number;
   error?: string;
 }
@@ -120,7 +121,7 @@ export class LibraryScanner extends EventEmitter {
 
     try {
       // ----------------------------------------------------
-      // PHASE 1: DISCOVERING ROOTS & PROBING HEALTH
+      // PHASE 1: DISCOVERING ROOTS & PROBING HEALTH (100% Read-Only)
       // ----------------------------------------------------
       this.setState('DISCOVERING', { discoveredFiles: 0 });
 
@@ -145,8 +146,12 @@ export class LibraryScanner extends EventEmitter {
         return this.handleCancellation(startTime, skippedRoots);
       }
 
-      // Fast single-pass disk traversal across accessible roots with subtree failure safety
-      const { snapshots: diskSnapshots, failedSubtrees } = await fastDiskWalk(accessibleRoots, {
+      // Fast single-pass disk traversal across accessible roots with subtree & stat failure safety
+      const {
+        snapshots: diskSnapshots,
+        failedSubtrees,
+        failedPaths
+      } = await fastDiskWalk(accessibleRoots, {
         abortSignal,
         onFileDiscovered: (count, currentPath) => {
           this.setState('DISCOVERING', { discoveredFiles: count, currentPath });
@@ -180,13 +185,11 @@ export class LibraryScanner extends EventEmitter {
         folderId: s.folderId
       }));
 
-      const diff: DiffResult = diffFilesystemSnapshot(
-        diskSnapshots,
-        dbSnapshots,
-        accessibleRoots,
+      const diff: DiffResult = diffFilesystemSnapshot(diskSnapshots, dbSnapshots, accessibleRoots, {
         skippedRoots,
-        failedSubtrees
-      );
+        failedSubtrees,
+        failedPaths
+      });
 
       logger.info('[LibraryScanner] Diff calculated.', {
         added: diff.added.length,
@@ -194,7 +197,8 @@ export class LibraryScanner extends EventEmitter {
         removed: diff.removed.length,
         unchanged: diff.unchangedCount,
         skippedRoots: diff.skippedRoots.length,
-        failedSubtrees: diff.failedSubtrees.length
+        failedSubtrees: diff.failedSubtrees.length,
+        failedPaths: diff.failedPaths.length
       });
 
       if (abortSignal.aborted) {
@@ -233,9 +237,9 @@ export class LibraryScanner extends EventEmitter {
           reconciliationErrors += result.errorCount;
         }
 
-        // 2. Reconcile Additions
+        // 2. Reconcile Additions (Resolves/Creates folder hierarchy strictly during reconciliation)
         if (diff.added.length > 0 && !abortSignal.aborted) {
-          const result = await this.reconciler.reconcileAdded(diff.added, {
+          const result = await this.reconciler.reconcileAdded(diff.added, accessibleRoots, {
             abortSignal,
             onProgress: (p) => {
               this.setState('RECONCILING', {
@@ -273,12 +277,13 @@ export class LibraryScanner extends EventEmitter {
       // ----------------------------------------------------
       // PHASE 4: COMPLETION
       // ----------------------------------------------------
-      const hasErrors = reconciliationErrors > 0 || failedSubtrees.length > 0;
+      const hasErrors =
+        reconciliationErrors > 0 || failedSubtrees.length > 0 || failedPaths.length > 0;
 
       if (!dryRun) {
         if (hasErrors) {
           logger.warn(
-            `[LibraryScanner] Scan completed with ${reconciliationErrors} reconciliation errors and ${failedSubtrees.length} failed subtrees. Preserving dirty state.`
+            `[LibraryScanner] Scan completed with ${reconciliationErrors} errors, ${failedSubtrees.length} failed subtrees, ${failedPaths.length} failed stats. Preserving dirty state.`
           );
           libraryChangeTracker.markDirty();
         } else {
@@ -299,6 +304,7 @@ export class LibraryScanner extends EventEmitter {
         unchanged: diff.unchangedCount,
         skippedRoots: diff.skippedRoots,
         failedSubtrees: diff.failedSubtrees,
+        failedPaths: diff.failedPaths,
         durationMs: Date.now() - startTime,
         error: hasErrors ? `${reconciliationErrors} errors during reconciliation` : undefined
       };

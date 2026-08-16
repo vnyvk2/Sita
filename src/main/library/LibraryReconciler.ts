@@ -1,8 +1,12 @@
+import path from 'path';
+
 import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import logger from '../logger';
 import reParseSong from '../parseSong/reParseSong';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
-import type { DbSongSnapshot, DiskSongSnapshot } from './diffEngine';
+import type { DbSongSnapshot, DiskSongSnapshot, ScanRoot } from './diffEngine';
+import { resolveOrCreateMusicFolders } from './folderHierarchy';
+import { getNormalizedPathKey, isPathInsideRoot, normalizeLibraryPath } from './pathUtils';
 
 export interface ReconcileProgress {
   phase: 'added' | 'modified' | 'removed';
@@ -15,6 +19,7 @@ export interface ReconcileOptions {
   abortSignal?: AbortSignal;
   onProgress?: (progress: ReconcileProgress) => void;
   batchSize?: number;
+  platform?: NodeJS.Platform;
 }
 
 export interface ReconcileResult {
@@ -25,48 +30,101 @@ export interface ReconcileResult {
 
 export class LibraryReconciler {
   /**
-   * Reconciles newly added tracks into the library database via bounded concurrency. Assigns the
-   * exact resolved folderId to each track.
+   * Reconciles newly added tracks into the library database via bounded concurrency.
+   * Resolves/creates required `music_folders` hierarchy before ingesting songs, assigning accurate
+   * immediate folder IDs to each track.
    */
   async reconcileAdded(
     added: DiskSongSnapshot[],
+    accessibleRoots: ScanRoot[],
     options: ReconcileOptions = {}
   ): Promise<ReconcileResult> {
     if (added.length === 0) {
       return { successCount: 0, errorCount: 0, errors: [] };
     }
 
-    const { abortSignal, onProgress } = options;
+    const { abortSignal, onProgress, platform = process.platform } = options;
     logger.info(`[LibraryReconciler] Reconciling ${added.length} added tracks...`);
-
-    const mappedSongs = added.map((item) => ({
-      songPath: item.path,
-      folderId: item.folderId ?? item.rootId
-    }));
 
     const errors: Array<{ path: string; error: string }> = [];
 
-    try {
-      await processSongsWithWorkerPool(mappedSongs, abortSignal, (current, total) => {
+    // 1. Resolve and create missing music_folders for all added tracks
+    const folderMapByRoot = new Map<number, Map<string, number>>();
+    const eligibleSongs: Array<{ songPath: string; folderId: number }> = [];
+
+    for (const root of accessibleRoots) {
+      if (abortSignal?.aborted) break;
+
+      const songsInRoot = added.filter(
+        (s) => s.rootId === root.id || isPathInsideRoot(s.path, root.path, platform)
+      );
+      if (songsInRoot.length === 0) continue;
+
+      const uniqueDirs = Array.from(
+        new Set(
+          songsInRoot.map((s) => normalizeLibraryPath(s.dirPath ?? path.dirname(s.path), platform))
+        )
+      );
+
+      try {
+        const folderMap = await resolveOrCreateMusicFolders(
+          root.id,
+          root.path,
+          uniqueDirs,
+          platform
+        );
+        folderMapByRoot.set(root.id, folderMap);
+
+        for (const song of songsInRoot) {
+          const dir = normalizeLibraryPath(song.dirPath ?? path.dirname(song.path), platform);
+          const dirKey = getNormalizedPathKey(dir, platform);
+          const folderId = folderMap.get(dirKey) ?? root.id;
+
+          eligibleSongs.push({
+            songPath: song.path,
+            folderId
+          });
+        }
+      } catch (folderError) {
+        const msg = folderError instanceof Error ? folderError.message : String(folderError);
+        logger.error(
+          `[LibraryReconciler] Folder hierarchy creation failed for root '${root.path}'`,
+          {
+            error: folderError
+          }
+        );
+        errors.push({ path: root.path, error: msg });
+      }
+    }
+
+    if (eligibleSongs.length === 0) {
+      return {
+        successCount: 0,
+        errorCount: added.length,
+        errors
+      };
+    }
+
+    // 2. Ingest songs with bounded concurrency worker pool
+    const poolResult = await processSongsWithWorkerPool(
+      eligibleSongs,
+      abortSignal,
+      (current, total) => {
         if (onProgress) {
           onProgress({
             phase: 'added',
             completed: current,
             total,
-            currentPath: mappedSongs[current - 1]?.songPath
+            currentPath: eligibleSongs[current - 1]?.songPath
           });
         }
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      errors.push({ path: 'batch_added', error: msg });
-      logger.error('[LibraryReconciler] Error during batch addition', { error });
-    }
+      }
+    );
 
     return {
-      successCount: added.length - errors.length,
-      errorCount: errors.length,
-      errors
+      successCount: poolResult.successCount,
+      errorCount: errors.length + poolResult.errorCount,
+      errors: [...errors, ...poolResult.errors]
     };
   }
 

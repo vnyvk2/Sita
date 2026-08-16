@@ -4,45 +4,36 @@ import path from 'path';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
 import type { DiskSongSnapshot, ScanRoot } from './diffEngine';
-import { resolveOrCreateMusicFolders } from './folderHierarchy';
-import { getNormalizedPathKey } from './pathUtils';
 
 export interface DiskWalkOptions {
   abortSignal?: AbortSignal;
   onFileDiscovered?: (totalDiscovered: number, currentPath: string) => void;
-  platform?: NodeJS.Platform;
 }
 
 export interface DiskWalkResult {
   snapshots: DiskSongSnapshot[];
   failedSubtrees: string[];
+  failedPaths: string[];
 }
 
 /**
- * Performs a single-pass asynchronous recursive directory traversal over accessible scan roots.
- * Collects structural file snapshots (path, mtime, size) without reading audio tags, ensures
- * directory hierarchy exists in `music_folders`, and resolves accurate `folderId` per track.
+ * Performs a 100% read-only, single-pass asynchronous recursive directory traversal over accessible
+ * scan roots. Collects structural file snapshots (path, mtime, size) without reading audio tags or
+ * mutating the database. Protects against false deletions by recording failedSubtrees and
+ * failedPaths on I/O errors.
  */
 export const fastDiskWalk = async (
   roots: ScanRoot[],
   options: DiskWalkOptions = {}
 ): Promise<DiskWalkResult> => {
-  const { abortSignal, onFileDiscovered, platform = process.platform } = options;
-  const rawSnapshots: Array<{
-    path: string;
-    fileModifiedAt: Date;
-    size: number;
-    rootId: number;
-    dirPath: string;
-  }> = [];
-  const discoveredDirs = new Set<string>();
+  const { abortSignal, onFileDiscovered } = options;
+  const snapshots: DiskSongSnapshot[] = [];
   const failedSubtrees: string[] = [];
+  const failedPaths: string[] = [];
   const supportedExtSet = new Set(supportedMusicExtensions.map((ext) => ext.toLowerCase()));
 
   const walkDirectory = async (dirPath: string, rootId: number): Promise<void> => {
     if (abortSignal?.aborted) return;
-
-    discoveredDirs.add(dirPath);
 
     let entries: import('fs').Dirent[];
     try {
@@ -73,7 +64,7 @@ export const fastDiskWalk = async (
         if (supportedExtSet.has(ext)) {
           try {
             const stat = await fs.stat(fullPath);
-            rawSnapshots.push({
+            snapshots.push({
               path: fullPath,
               fileModifiedAt: stat.mtime,
               size: stat.size,
@@ -82,10 +73,14 @@ export const fastDiskWalk = async (
             });
 
             if (onFileDiscovered) {
-              onFileDiscovered(rawSnapshots.length, fullPath);
+              onFileDiscovered(snapshots.length, fullPath);
             }
           } catch (statError) {
-            logger.warn(`[fastDiskWalk] Failed to stat file '${fullPath}'`, { error: statError });
+            logger.warn(
+              `[fastDiskWalk] Failed to stat file '${fullPath}', marking path as unverified.`,
+              { error: statError }
+            );
+            failedPaths.push(fullPath);
           }
         }
       }
@@ -102,31 +97,9 @@ export const fastDiskWalk = async (
     await walkDirectory(root.path, root.id);
   }
 
-  // Resolve or create music_folders records for all discovered directories
-  const folderMapByRoot = new Map<number, Map<string, number>>();
-  for (const root of roots) {
-    const rootDirs = Array.from(discoveredDirs).filter((d) => d.startsWith(root.path));
-    const folderMap = await resolveOrCreateMusicFolders(root.id, root.path, rootDirs, platform);
-    folderMapByRoot.set(root.id, folderMap);
-  }
-
-  // Assign resolved folderId to each snapshot
-  const snapshots: DiskSongSnapshot[] = rawSnapshots.map((item) => {
-    const rootFolderMap = folderMapByRoot.get(item.rootId);
-    const dirKey = getNormalizedPathKey(item.dirPath, platform);
-    const resolvedFolderId = rootFolderMap?.get(dirKey) ?? item.rootId;
-
-    return {
-      path: item.path,
-      fileModifiedAt: item.fileModifiedAt,
-      size: item.size,
-      rootId: item.rootId,
-      folderId: resolvedFolderId
-    };
-  });
-
   return {
     snapshots,
-    failedSubtrees
+    failedSubtrees,
+    failedPaths
   };
 };

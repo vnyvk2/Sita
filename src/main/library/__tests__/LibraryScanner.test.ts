@@ -21,10 +21,11 @@ vi.mock('../fastDiskWalk', () => ({
         path: 'C:\\TestMusic\\SongA.mp3',
         fileModifiedAt: new Date(10000),
         rootId: 1,
-        folderId: 1
+        dirPath: 'C:\\TestMusic'
       }
     ],
-    failedSubtrees: []
+    failedSubtrees: [],
+    failedPaths: []
   })
 }));
 
