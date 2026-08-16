@@ -183,4 +183,60 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     expect(diff2.removed).toHaveLength(0);
     expect(diff2.unchangedCount).toBe(1);
   });
+
+  it('Pipeline Step 3: Incremental scan discovers newly added nested artist/album directory structure, creates hierarchical folders, and ingests songs with 0 errors', async () => {
+    // 1. Initial DB state has only the scan root
+    const [rootFolder] = await db.insert(musicFolders).values({
+      path: tempDir,
+      name: path.basename(tempDir) || 'Root',
+      isScanRoot: true
+    }).returning();
+
+    const scanRoot = { id: rootFolder.id, path: tempDir };
+
+    // 2. Add brand-new nested directory structure on disk: Root / Adele / 21
+    const adeleDir = path.join(tempDir, 'Adele');
+    const album21Dir = path.join(adeleDir, '21');
+    await fs.mkdir(album21Dir, { recursive: true });
+
+    const track1Path = path.join(album21Dir, '01 - Rolling in the Deep.mp3');
+    const track2Path = path.join(album21Dir, '02 - Rumour Has It.mp3');
+    await fs.writeFile(track1Path, 'audio data 1');
+    await fs.writeFile(track2Path, 'audio data 2');
+
+    // 3. Fast disk walk discovers the 2 new files
+    const walk = await fastDiskWalk([scanRoot]);
+    expect(walk.snapshots).toHaveLength(2);
+    expect(walk.failedSubtrees).toHaveLength(0);
+
+    // 4. Diff engine detects 2 additions
+    const diff = diffFilesystemSnapshot(walk.snapshots, [], [scanRoot]);
+    expect(diff.added).toHaveLength(2);
+    expect(diff.modified).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+
+    // 5. Reconcile added tracks through the full pipeline
+    const reconcileResult = await reconciler.reconcileAdded(diff.added, [scanRoot]);
+    expect(reconcileResult.successCount).toBe(2);
+    expect(reconcileResult.errorCount).toBe(0);
+    expect(reconcileResult.errors).toHaveLength(0);
+
+    // 6. Authoritative DB verification: hierarchy & parent-child relationships
+    const allFolders = await db.select().from(musicFolders);
+    const adeleDbFolder = allFolders.find((f) => path.basename(f.path) === 'Adele');
+    const album21DbFolder = allFolders.find((f) => path.basename(f.path) === '21');
+
+    expect(adeleDbFolder).toBeDefined();
+    expect(album21DbFolder).toBeDefined();
+    expect(adeleDbFolder?.parentId).toBe(rootFolder.id);
+    expect(album21DbFolder?.parentId).toBe(adeleDbFolder?.id);
+
+    // 7. Authoritative DB verification: songs correctly linked to album folder
+    const insertedSongs = await db.select().from(songs);
+    expect(insertedSongs).toHaveLength(2);
+    expect(insertedSongs.every((s) => s.folderId === album21DbFolder?.id)).toBe(true);
+    expect(insertedSongs.map((s) => s.title)).toContain('01 - Rolling in the Deep');
+    expect(insertedSongs.map((s) => s.title)).toContain('02 - Rumour Has It');
+  });
 });
+

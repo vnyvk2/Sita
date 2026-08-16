@@ -5,13 +5,49 @@ import { musicFolders } from '@main/db/schema';
 import { eq, like, or } from 'drizzle-orm';
 
 import logger from '../logger';
-import { getNormalizedPathKey, normalizeLibraryPath } from './pathUtils';
+import { getNormalizedPathKey, isPathInsideRoot, normalizeLibraryPath } from './pathUtils';
 
 export interface FolderNode {
   id: number;
   path: string;
   parentId: number | null;
 }
+
+/**
+ * Expands a directory path into all its ancestor directories up to (but not including) rootPath.
+ * Stops strictly at rootPath and does not traverse above rootPath.
+ */
+export const expandDirectoryAncestors = (
+  dir: string,
+  rootPath: string,
+  platform: NodeJS.Platform = process.platform
+): string[] => {
+  const pathModule = platform === 'win32' ? path.win32 : path.posix;
+  const rootKey = getNormalizedPathKey(rootPath, platform);
+  const normalizedDir = normalizeLibraryPath(dir, platform);
+
+  if (!normalizedDir || !isPathInsideRoot(normalizedDir, rootPath, platform)) {
+    return [];
+  }
+
+  if (getNormalizedPathKey(normalizedDir, platform) === rootKey) {
+    return [];
+  }
+
+  const ancestors: string[] = [];
+  let current = normalizedDir;
+
+  while (getNormalizedPathKey(current, platform) !== rootKey) {
+    ancestors.push(current);
+    const parent = normalizeLibraryPath(pathModule.dirname(current), platform);
+    if (parent === current || !isPathInsideRoot(parent, rootPath, platform)) {
+      break;
+    }
+    current = parent;
+  }
+
+  return ancestors;
+};
 
 /**
  * Resolves or creates hierarchical `music_folders` records for discovered directories. Ensures that
@@ -22,6 +58,8 @@ export interface FolderNode {
  * Invariants:
  *
  * - Uses platform-aware path manipulation (path.win32 vs path.posix).
+ * - Expands intermediate ancestor directories up to rootPath so nested structures (e.g. Root/Artist/Album)
+ *   are created in shallow-to-deep topological order.
  * - Non-root directories must strictly resolve their immediate parent folder ID; never falls back to
  *   rootId.
  * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
@@ -71,8 +109,14 @@ export const resolveOrCreateMusicFolders = async (
   const rootKey = getNormalizedPathKey(rootPath, platform);
   folderMap.set(rootKey, rootId);
 
-  // 2. Sort directories by path depth (shallowest first) to ensure parents are created before children
-  const uniqueDirs = Array.from(new Set(dirPaths.map((d) => normalizeLibraryPath(d, platform))))
+  // 2. Expand all input directories to include intermediate ancestors up to rootPath
+  const allDirsToProcess: string[] = [];
+  for (const d of dirPaths) {
+    allDirsToProcess.push(...expandDirectoryAncestors(d, rootPath, platform));
+  }
+
+  // 3. Sort directories by path depth (shallowest first) to ensure parents are created before children
+  const uniqueDirs = Array.from(new Set(allDirsToProcess.map((d) => normalizeLibraryPath(d, platform))))
     .filter((d) => getNormalizedPathKey(d, platform) !== rootKey)
     .sort((a, b) => a.length - b.length);
 
