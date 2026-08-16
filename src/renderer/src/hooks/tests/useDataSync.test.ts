@@ -1,10 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-import {
-  DataSyncBatcher,
-  getInvalidationTargetsForEvent
-} from '../useDataSync';
+import { DataSyncBatcher, getInvalidationTargetsForEvent } from '../useDataSync';
 
 describe('useDataSync - Query Invalidation & Batching', () => {
   describe('getInvalidationTargetsForEvent mapping', () => {

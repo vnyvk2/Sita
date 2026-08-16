@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import '@renderer/store/store';
 
 import i18n from '../../i18n';
-import { DEFAULT_REDUCER_DATA } from '../../other/appReducer';
-import { store } from '../../store/store';
 import storage from '../../utils/localStorage';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 
