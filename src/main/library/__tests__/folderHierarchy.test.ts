@@ -12,7 +12,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     const insertedRows: Array<{ path: string; parentId: number; id: number }> = [];
     let nextId = 3;
 
-    const mockTrx = {
+    const mockDatabase = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockResolvedValue(existingFolders)
       }),
@@ -39,7 +39,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       'C:\\Music',
       discoveredDirs,
       'win32',
-      mockTrx
+      mockDatabase
     );
 
     // Existing folders
@@ -59,7 +59,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
   });
 
   it('should throw an explicit error on folder creation failure without falling back', async () => {
-    const mockTrx = {
+    const mockDatabase = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockResolvedValue([])
       }),
@@ -71,7 +71,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     } as unknown as DB;
 
     await expect(
-      resolveOrCreateMusicFolders(1, 'C:\\Music', ['C:\\Music\\Pop'], 'win32', mockTrx)
+      resolveOrCreateMusicFolders(1, 'C:\\Music', ['C:\\Music\\Pop'], 'win32', mockDatabase)
     ).rejects.toThrow('Failed to insert music_folders record for');
   });
 
@@ -79,7 +79,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     const controller = new AbortController();
     controller.abort();
 
-    const mockTrx = {
+    const mockDatabase = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockResolvedValue([])
       }),
@@ -91,19 +91,19 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       'C:\\Music',
       ['C:\\Music\\Pop'],
       'win32',
-      mockTrx,
+      mockDatabase,
       controller.signal
     );
 
     expect(folderMap.get('c:\\music')).toBe(1);
-    expect(mockTrx.insert).not.toHaveBeenCalled();
+    expect(mockDatabase.insert).not.toHaveBeenCalled();
   });
 
   it('should throw an explicit error if an intermediate parent folder cannot be resolved (no silent root fallback)', async () => {
     // DB has root (id: 1), but C:\Music\Rock is missing from DB and not in discoveredDirs
     const existingFolders = [{ id: 1, path: 'C:\\Music', parentId: null }];
 
-    const mockTrx = {
+    const mockDatabase = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockResolvedValue(existingFolders)
       }),
@@ -114,7 +114,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
     const discoveredDirs = ['C:\\Music\\Rock\\Metallica'];
 
     await expect(
-      resolveOrCreateMusicFolders(1, 'C:\\Music', discoveredDirs, 'win32', mockTrx)
+      resolveOrCreateMusicFolders(1, 'C:\\Music', discoveredDirs, 'win32', mockDatabase)
     ).rejects.toThrow(
       "Unable to resolve parent folder 'C:\\Music\\Rock' for 'C:\\Music\\Rock\\Metallica'"
     );

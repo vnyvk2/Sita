@@ -26,20 +26,22 @@ export interface FolderNode {
  * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
  *   preserves dirty state.
  * - Supports responsive cancellation via AbortSignal.
+ * - Accepts an injectable database client (database) for composition/testing without exposing
+ *   transaction control to outer orchestrators.
  */
 export const resolveOrCreateMusicFolders = async (
   rootId: number,
   rootPath: string,
   dirPaths: string[],
   platform: NodeJS.Platform = process.platform,
-  trx: DB | DBTransaction = db,
+  database: DB | DBTransaction = db,
   abortSignal?: AbortSignal
 ): Promise<Map<string, number>> => {
   const folderMap = new Map<string, number>();
   const pathModule = platform === 'win32' ? path.win32 : path.posix;
 
   // 1. Fetch all existing folders from DB
-  const existingFolders = await trx
+  const existingFolders = await database
     .select({
       id: musicFolders.id,
       path: musicFolders.path,
@@ -86,7 +88,7 @@ export const resolveOrCreateMusicFolders = async (
       folderMap.set(dirKey, existing.id);
     } else {
       // Insert new subfolder record into music_folders
-      const [inserted] = await trx
+      const [inserted] = await database
         .insert(musicFolders)
         .values({
           path: dir,
