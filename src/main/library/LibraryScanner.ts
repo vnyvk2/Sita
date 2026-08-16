@@ -1,0 +1,330 @@
+import { EventEmitter } from 'events';
+import fs from 'fs/promises';
+
+import { db } from '@main/db/db';
+import { songs } from '@main/db/schema';
+import { eq } from 'drizzle-orm';
+
+import logger from '../logger';
+import {
+  diffFilesystemSnapshot,
+  type DbSongSnapshot,
+  type DiffResult,
+  type ScanRoot
+} from './diffEngine';
+import { fastDiskWalk } from './fastDiskWalk';
+import { getLibraryScanRoots } from './getLibraryScanRoots';
+import libraryChangeTracker from './LibraryChangeTracker';
+import libraryReconciler, { LibraryReconciler } from './LibraryReconciler';
+
+export type ScannerState =
+  | 'IDLE'
+  | 'DISCOVERING'
+  | 'DIFFING'
+  | 'RECONCILING'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'FAILED';
+
+export interface ScanOptions {
+  dryRun?: boolean;
+}
+
+export interface ScannerProgress {
+  state: ScannerState;
+  discoveredFiles?: number;
+  totalToReconcile?: number;
+  completedReconciliation?: number;
+  addedCount?: number;
+  modifiedCount?: number;
+  removedCount?: number;
+  currentPath?: string;
+}
+
+export interface ScanSummary {
+  status: 'COMPLETED' | 'CANCELLED' | 'FAILED';
+  added: number;
+  modified: number;
+  removed: number;
+  unchanged: number;
+  skippedRoots: ScanRoot[];
+  durationMs: number;
+  error?: string;
+}
+
+export class LibraryScanner extends EventEmitter {
+  private state: ScannerState = 'IDLE';
+  private activeScanPromise: Promise<ScanSummary> | null = null;
+  private activeAbortController: AbortController | null = null;
+  private reconciler: LibraryReconciler;
+
+  constructor(reconciler: LibraryReconciler = libraryReconciler) {
+    super();
+    this.reconciler = reconciler;
+  }
+
+  public getState(): ScannerState {
+    return this.state;
+  }
+
+  private setState(newState: ScannerState, extraProgress?: Partial<ScannerProgress>): void {
+    this.state = newState;
+    const progress: ScannerProgress = {
+      state: this.state,
+      ...extraProgress
+    };
+    this.emit('progress', progress);
+  }
+
+  /**
+   * Initiates a library scan according to Contract 8 (Single Active Scan Invariant). If a scan is
+   * already running, returns the existing active scan promise.
+   */
+  public scan(options: ScanOptions = {}): Promise<ScanSummary> {
+    if (this.activeScanPromise) {
+      logger.warn(
+        '[LibraryScanner] A library scan is already active. Returning existing scan promise.'
+      );
+      return this.activeScanPromise;
+    }
+
+    this.activeAbortController = new AbortController();
+    const abortSignal = this.activeAbortController.signal;
+    const startTime = Date.now();
+
+    this.activeScanPromise = this.executeScan(options, abortSignal, startTime).finally(() => {
+      this.activeScanPromise = null;
+      this.activeAbortController = null;
+    });
+
+    return this.activeScanPromise;
+  }
+
+  public cancelScan(): boolean {
+    if (this.activeAbortController && !this.activeAbortController.signal.aborted) {
+      logger.info('[LibraryScanner] Cancelling active library scan...');
+      this.activeAbortController.abort();
+      return true;
+    }
+    return false;
+  }
+
+  private async executeScan(
+    options: ScanOptions,
+    abortSignal: AbortSignal,
+    startTime: number
+  ): Promise<ScanSummary> {
+    const { dryRun = false } = options;
+    logger.info(`[LibraryScanner] Starting library scan (dryRun: ${dryRun})...`);
+
+    try {
+      // ----------------------------------------------------
+      // PHASE 1: DISCOVERING ROOTS & PROBING HEALTH
+      // ----------------------------------------------------
+      this.setState('DISCOVERING', { discoveredFiles: 0 });
+
+      const configuredRoots = await getLibraryScanRoots();
+      const accessibleRoots: ScanRoot[] = [];
+      const skippedRoots: ScanRoot[] = [];
+
+      for (const root of configuredRoots) {
+        if (abortSignal.aborted) break;
+        try {
+          await fs.access(root.path);
+          accessibleRoots.push(root);
+        } catch {
+          logger.warn(
+            `[LibraryScanner] Root '${root.path}' is inaccessible/disconnected. Skipping root for safety.`
+          );
+          skippedRoots.push(root);
+        }
+      }
+
+      if (abortSignal.aborted) {
+        return this.handleCancellation(startTime, skippedRoots);
+      }
+
+      // Fast single-pass disk traversal across accessible roots
+      const diskSnapshots = await fastDiskWalk(accessibleRoots, {
+        abortSignal,
+        onFileDiscovered: (count, currentPath) => {
+          this.setState('DISCOVERING', { discoveredFiles: count, currentPath });
+        }
+      });
+
+      if (abortSignal.aborted) {
+        return this.handleCancellation(startTime, skippedRoots);
+      }
+
+      // ----------------------------------------------------
+      // PHASE 2: DIFFING (Pure In-Memory Diff Engine)
+      // ----------------------------------------------------
+      this.setState('DIFFING', { discoveredFiles: diskSnapshots.length });
+
+      // Fetch 1 flat DB snapshot
+      const dbSongs = await db
+        .select({
+          id: songs.id,
+          path: songs.path,
+          fileModifiedAt: songs.fileModifiedAt,
+          folderId: songs.folderId
+        })
+        .from(songs)
+        .where(eq(songs.isBlacklisted, false));
+
+      const dbSnapshots: DbSongSnapshot[] = dbSongs.map((s) => ({
+        id: s.id,
+        path: s.path,
+        fileModifiedAt: s.fileModifiedAt,
+        folderId: s.folderId
+      }));
+
+      const diff: DiffResult = diffFilesystemSnapshot(
+        diskSnapshots,
+        dbSnapshots,
+        accessibleRoots,
+        skippedRoots
+      );
+
+      logger.info('[LibraryScanner] Diff calculated.', {
+        added: diff.added.length,
+        modified: diff.modified.length,
+        removed: diff.removed.length,
+        unchanged: diff.unchangedCount,
+        skippedRoots: diff.skippedRoots.length
+      });
+
+      if (abortSignal.aborted) {
+        return this.handleCancellation(startTime, skippedRoots);
+      }
+
+      // ----------------------------------------------------
+      // PHASE 3: RECONCILING (Batch Mutations)
+      // ----------------------------------------------------
+      const totalToReconcile = diff.added.length + diff.modified.length + diff.removed.length;
+      let completedReconciliation = 0;
+
+      if (!dryRun && totalToReconcile > 0) {
+        this.setState('RECONCILING', {
+          totalToReconcile,
+          completedReconciliation: 0,
+          addedCount: diff.added.length,
+          modifiedCount: diff.modified.length,
+          removedCount: diff.removed.length
+        });
+
+        // 1. Reconcile Removals first to avoid collisions
+        if (diff.removed.length > 0 && !abortSignal.aborted) {
+          await this.reconciler.reconcileRemoved(diff.removed, {
+            abortSignal,
+            onProgress: (p) => {
+              this.setState('RECONCILING', {
+                totalToReconcile,
+                completedReconciliation: completedReconciliation + p.completed,
+                currentPath: p.currentPath
+              });
+            }
+          });
+          completedReconciliation += diff.removed.length;
+        }
+
+        // 2. Reconcile Additions
+        if (diff.added.length > 0 && !abortSignal.aborted) {
+          await this.reconciler.reconcileAdded(diff.added, {
+            abortSignal,
+            onProgress: (p) => {
+              this.setState('RECONCILING', {
+                totalToReconcile,
+                completedReconciliation: completedReconciliation + p.completed,
+                currentPath: p.currentPath
+              });
+            }
+          });
+          completedReconciliation += diff.added.length;
+        }
+
+        // 3. Reconcile Modifications
+        if (diff.modified.length > 0 && !abortSignal.aborted) {
+          await this.reconciler.reconcileModified(diff.modified, {
+            abortSignal,
+            onProgress: (p) => {
+              this.setState('RECONCILING', {
+                totalToReconcile,
+                completedReconciliation: completedReconciliation + p.completed,
+                currentPath: p.currentPath
+              });
+            }
+          });
+          completedReconciliation += diff.modified.length;
+        }
+      }
+
+      if (abortSignal.aborted) {
+        return this.handleCancellation(startTime, skippedRoots);
+      }
+
+      // ----------------------------------------------------
+      // PHASE 4: COMPLETION
+      // ----------------------------------------------------
+      this.setState('COMPLETED', {
+        totalToReconcile,
+        completedReconciliation: totalToReconcile
+      });
+
+      if (!dryRun) {
+        libraryChangeTracker.reset(); // isDirty -> false
+      }
+
+      const summary: ScanSummary = {
+        status: 'COMPLETED',
+        added: diff.added.length,
+        modified: diff.modified.length,
+        removed: diff.removed.length,
+        unchanged: diff.unchangedCount,
+        skippedRoots: diff.skippedRoots,
+        durationMs: Date.now() - startTime
+      };
+
+      this.setState('IDLE');
+      return summary;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('[LibraryScanner] Library scan failed', { error });
+
+      libraryChangeTracker.markDirty(); // Failure keeps isDirty = true
+      this.setState('FAILED');
+      this.setState('IDLE');
+
+      return {
+        status: 'FAILED',
+        added: 0,
+        modified: 0,
+        removed: 0,
+        unchanged: 0,
+        skippedRoots: [],
+        durationMs: Date.now() - startTime,
+        error: errorMsg
+      };
+    }
+  }
+
+  private handleCancellation(startTime: number, skippedRoots: ScanRoot[]): ScanSummary {
+    logger.warn('[LibraryScanner] Library scan cancelled by user.');
+    libraryChangeTracker.markDirty(); // Cancellation preserves isDirty = true
+    this.setState('CANCELLED');
+    this.setState('IDLE');
+
+    return {
+      status: 'CANCELLED',
+      added: 0,
+      modified: 0,
+      removed: 0,
+      unchanged: 0,
+      skippedRoots,
+      durationMs: Date.now() - startTime
+    };
+  }
+}
+
+export const libraryScanner = new LibraryScanner();
+export default libraryScanner;

@@ -11,7 +11,6 @@ import addSongsFromFolderStructures from './core/addMusicFolder';
 import blacklistFolders from './core/blacklistFolders';
 import blacklistSongs from './core/blacklistSongs';
 import changeAppTheme from './core/changeAppTheme';
-import checkForNewSongs from './core/checkForNewSongs';
 import checkForStartUpSongs from './core/checkForStartUpSongs';
 import clearSearchHistoryResults from './core/clearSeachHistoryResults';
 import clearSongHistory from './core/clearSongHistory';
@@ -75,6 +74,7 @@ import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import libraryChangeTracker from './library/LibraryChangeTracker';
+import libraryScanner, { type ScanOptions } from './library/LibraryScanner';
 import logger, { logFilePath } from './logger';
 import {
   allowScreenSleeping,
@@ -540,6 +540,15 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());
     ipcMain.handle('library/resetChangeState', () => libraryChangeTracker.reset());
+    ipcMain.handle('library/startScan', (_, options?: ScanOptions) => libraryScanner.scan(options));
+    ipcMain.handle('library/cancelScan', () => libraryScanner.cancelScan());
+    ipcMain.handle('library/getScanStatus', () => libraryScanner.getState());
+
+    libraryScanner.on('progress', (progress) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('library/scanProgress', progress);
+      }
+    });
 
     let diskChangeDebounceTimer: NodeJS.Timeout | null = null;
     libraryChangeTracker.on('changed', ({ state }) => {
@@ -555,10 +564,13 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     });
 
     ipcMain.handle('app/resyncSongsLibrary', async () => {
-      await checkForNewSongs();
-      sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
+      const summary = await libraryScanner.scan();
+      if (summary.status === 'COMPLETED') {
+        sendMessageToRenderer({ messageCode: 'RESYNC_SUCCESSFUL' });
+      }
 
       libraryScheduler.requestMaintenance();
+      return summary;
     });
 
     ipcMain.handle('app/getBlacklistData', getBlacklistData);

@@ -116,6 +116,14 @@ const audioLibraryControls = {
     lastChangedAt: number | null;
   }> => ipcRenderer.invoke('library/getChangeState'),
   resetLibraryChangeState: (): Promise<void> => ipcRenderer.invoke('library/resetChangeState'),
+  startScan: (options?: { dryRun?: boolean }): Promise<ScanSummary> =>
+    ipcRenderer.invoke('library/startScan', options),
+  cancelScan: (): Promise<boolean> => ipcRenderer.invoke('library/cancelScan'),
+  getScanStatus: (): Promise<ScannerState> => ipcRenderer.invoke('library/getScanStatus'),
+  onScanProgress: (callback: (_: unknown, progress: ScannerProgress) => void) =>
+    ipcRenderer.on('library/scanProgress', callback),
+  removeScanProgressEventListener: (callback: (_: unknown, progress: ScannerProgress) => void) =>
+    ipcRenderer.removeListener('library/scanProgress', callback),
   getSongInfo: (
     songIds: number[],
     sortType?: SongSortTypes,

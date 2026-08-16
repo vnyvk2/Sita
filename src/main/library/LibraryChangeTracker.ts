@@ -26,15 +26,19 @@ export class LibraryChangeTracker extends EventEmitter {
     return this.instance;
   }
 
-  public markDirty(entry: ChangeEntry): void {
+  public markDirty(entry?: ChangeEntry): void {
     this.isDirty = true;
-    this.changedPaths.add(entry.path);
+    if (entry?.path) {
+      this.changedPaths.add(entry.path);
+    }
     this.lastChangedAt = Date.now();
 
-    logger.debug(`[LibraryChangeTracker] Marked dirty from ${entry.source}: '${entry.path}'`);
+    logger.debug(
+      `[LibraryChangeTracker] Marked dirty${entry ? ` from ${entry.source}: '${entry.path}'` : ''}`
+    );
 
     const state = this.getState();
-    this.emit('changed', { state, entry });
+    this.emit('changed', { state, entry: entry ?? null });
   }
 
   public getState(): LibraryChangeState {

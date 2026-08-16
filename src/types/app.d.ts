@@ -33,6 +33,10 @@ declare global {
     | 'library/getChangeState'
     | 'library/resetChangeState'
     | 'library/diskChanged'
+    | 'library/startScan'
+    | 'library/cancelScan'
+    | 'library/getScanStatus'
+    | 'library/scanProgress'
     | 'app/toggleLikeSongs'
     | 'app/saveUserData'
     | 'app/getUserData'
@@ -1480,5 +1484,36 @@ declare global {
   type LyricsEditorRouteState = { songId: number; lyrics?: LyricData[] };
   interface RouteStates {
     'lyrics-editor': LyricsEditorRouteState;
+  }
+
+  type ScannerState =
+    | 'IDLE'
+    | 'DISCOVERING'
+    | 'DIFFING'
+    | 'RECONCILING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'FAILED';
+
+  interface ScannerProgress {
+    state: ScannerState;
+    discoveredFiles?: number;
+    totalToReconcile?: number;
+    completedReconciliation?: number;
+    addedCount?: number;
+    modifiedCount?: number;
+    removedCount?: number;
+    currentPath?: string;
+  }
+
+  interface ScanSummary {
+    status: 'COMPLETED' | 'CANCELLED' | 'FAILED';
+    added: number;
+    modified: number;
+    removed: number;
+    unchanged: number;
+    skippedRoots: { id: number; path: string }[];
+    durationMs: number;
+    error?: string;
   }
 }
