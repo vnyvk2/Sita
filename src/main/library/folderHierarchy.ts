@@ -43,6 +43,8 @@ export const resolveOrCreateMusicFolders = async (
   const folderMap = new Map<string, number>();
   const pathModule = platform === 'win32' ? path.win32 : path.posix;
 
+  const rootPathWithSep = rootPath.endsWith(pathModule.sep) ? rootPath : `${rootPath}${pathModule.sep}`;
+
   // 1. Selectively fetch existing folders under this root from DB
   const existingFolders = await database
     .select({
@@ -54,7 +56,7 @@ export const resolveOrCreateMusicFolders = async (
     .where(
       or(
         eq(musicFolders.path, rootPath),
-        like(musicFolders.path, `${rootPath}%`)
+        like(musicFolders.path, `${rootPathWithSep}%`)
       )
     );
 

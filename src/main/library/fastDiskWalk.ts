@@ -131,7 +131,7 @@ export const fastDiskWalk = async (
     }
   };
 
-  const poolSize = Math.min(maxConcurrency, Math.max(1, roots.length));
+  const poolSize = Math.max(1, maxConcurrency);
   const workers: Promise<void>[] = [];
   for (let i = 0; i < poolSize; i++) {
     workers.push(worker());

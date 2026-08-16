@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fastDiskWalk } from '../fastDiskWalk';
@@ -170,5 +171,58 @@ describe('fastDiskWalk', () => {
 
     // Traversal stopped after abort
     expect(result.failedSubtrees).toHaveLength(0);
+  });
+
+  it('C-2 REGRESSION: should achieve bounded parallel traversal (concurrency > 1) for a single root with multiple subdirectories', async () => {
+    const root = { id: 1, path: 'C:\\Music' };
+    const subDirCount = 20;
+
+    let activeReaddirWorkers = 0;
+    let maxObservedConcurrency = 0;
+
+    vi.mocked(fs.readdir).mockImplementation(async (dirPath: any) => {
+      activeReaddirWorkers++;
+      if (activeReaddirWorkers > maxObservedConcurrency) {
+        maxObservedConcurrency = activeReaddirWorkers;
+      }
+
+      // Small async delay to simulate disk I/O overlap
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      activeReaddirWorkers--;
+
+      if (dirPath === 'C:\\Music') {
+        // Root contains 20 subdirectories
+        return Array.from({ length: subDirCount }, (_, i) => ({
+          name: `Folder_${i}`,
+          isFile: () => false,
+          isDirectory: () => true
+        })) as any;
+      }
+
+      // Each subfolder contains 1 song
+      const folderName = path.basename(String(dirPath));
+      return [
+        {
+          name: `${folderName}_track.mp3`,
+          isFile: () => true,
+          isDirectory: () => false
+        }
+      ] as any;
+    });
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      mtime: new Date(),
+      size: 1024
+    } as any);
+
+    const result = await fastDiskWalk([root], { maxConcurrency: 4 });
+
+    // Invariant: All 20 tracks discovered
+    expect(result.snapshots).toHaveLength(20);
+    expect(result.failedSubtrees).toHaveLength(0);
+
+    // Invariant: Pool size allowed parallel execution across subdirectories
+    expect(maxObservedConcurrency).toBeGreaterThan(1);
+    expect(maxObservedConcurrency).toBeLessThanOrEqual(4);
   });
 });

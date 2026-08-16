@@ -104,9 +104,8 @@ export class WaveformJob implements Job {
         }
       });
 
-      // 5. Defensive publication: rename temp -> final .bin
+      // 5. Atomic publication: rename temp -> final .bin directly
       try {
-        await fs.unlink(filePath).catch(() => {});
         await fs.rename(tempPath, filePath);
       } catch (renameErr) {
         logger.error(`[WaveformJob] Failed to publish waveform file from temp ${tempPath}`, { error: renameErr });

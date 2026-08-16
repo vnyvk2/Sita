@@ -53,26 +53,57 @@ export class GarbageCollectionJob implements Job {
       const now = Date.now();
       let removedCount = 0;
 
-      // 1. Clean stale in-flight .tmp files (>60s old) from abandoned crashes
+      const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
+      const validBinPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
+      const validTmpPaths = new Set(dbWaveforms.map((w) => `${path.basename(w.path)}.tmp`));
+
+      // 1. Crash recovery & in-flight protection for DB rows
+      for (const row of dbWaveforms) {
+        const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
+        if (!fileExists) {
+          const tempPath = `${row.path}.tmp`;
+          const tempStats = await fs.stat(tempPath).catch(() => null);
+
+          if (tempStats) {
+            if (now - tempStats.mtimeMs < 60_000) {
+              // In-flight publication race protection: file is actively being written/renamed
+              logger.debug(`[GarbageCollection] Waveform ${row.id} has active in-flight temp file. Preserving DB row.`);
+              continue;
+            } else {
+              // Crash recovery: Process crashed after DB commit but before rename
+              // Deterministic promotion of matching temp file restores published asset
+              logger.info(`[GarbageCollection] Recovering unpromoted waveform tmp file for DB row ${row.id}: ${tempPath} -> ${row.path}`);
+              const promoted = await fs.rename(tempPath, row.path).then(() => true).catch((err) => {
+                logger.warn(`[GarbageCollection] Failed to promote recovered waveform tmp file`, { error: err });
+                return false;
+              });
+              if (promoted) continue;
+            }
+          }
+
+          // Neither final .bin nor valid in-flight/recoverable .tmp exists
+          logger.warn(`[GarbageCollection] Waveform DB row ${row.id} points to missing file ${row.path}. Removing orphaned row.`);
+          await db.delete(waveforms).where(eq(waveforms.id, row.id));
+        }
+      }
+
+      // 2. Clean unreferenced .tmp files (>60s old and not associated with any active DB row)
       for (const file of files) {
-        if (file.endsWith('.tmp')) {
+        if (file.endsWith('.tmp') && !validTmpPaths.has(file)) {
           const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath).catch(() => null);
           if (stats && now - stats.mtimeMs > 60_000) {
             await fs.unlink(filePath).catch((err) => {
-              logger.warn(`Failed to delete stale waveform tmp file ${filePath}`, { error: err });
+              logger.warn(`Failed to delete stale unreferenced waveform tmp file ${filePath}`, { error: err });
             });
             removedCount++;
           }
         }
       }
 
-      // 2. Clean orphaned .bin files (>60s old and not referenced in DB)
-      const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
-      const validPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
-      
+      // 3. Clean unreferenced .bin files (>60s old and not referenced in DB)
       for (const file of files) {
-        if (file.endsWith('.bin') && !validPaths.has(file)) {
+        if (file.endsWith('.bin') && !validBinPaths.has(file)) {
           const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath).catch(() => null);
           if (stats && now - stats.mtimeMs > 60_000) {
@@ -81,15 +112,6 @@ export class GarbageCollectionJob implements Job {
             });
             removedCount++;
           }
-        }
-      }
-
-      // 3. Crash recovery: Clean orphaned DB rows that reference missing .bin files on disk
-      for (const row of dbWaveforms) {
-        const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
-        if (!fileExists) {
-          logger.warn(`[GarbageCollection] Waveform DB row ${row.id} points to missing file ${row.path}. Removing orphaned row.`);
-          await db.delete(waveforms).where(eq(waveforms.id, row.id));
         }
       }
       

@@ -106,7 +106,7 @@ describe('parseSong native File.dispose() lifecycle', () => {
     expect(res).toBeDefined();
   });
 
-  it('A-2 REGRESSION: should call file.dispose() even if metadata reading fails or throws', async () => {
+  it('A-2 REGRESSION: should call file.dispose() even if metadata reading fails or throws in DB check', async () => {
     vi.mocked(fs.stat).mockResolvedValue({
       birthtime: new Date(),
       mtime: new Date()
@@ -118,5 +118,31 @@ describe('parseSong native File.dispose() lifecycle', () => {
 
     // file.dispose() must still be called via finally block
     expect(mockDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('A-2 REGRESSION: should call file.dispose() when native file.tag getter throws corrupted header error', async () => {
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    const corruptMockDispose = vi.fn();
+    const corruptFile = {
+      get tag(): any {
+        throw new Error('Corrupted ID3 header');
+      },
+      properties: {
+        durationMilliseconds: 180000
+      },
+      dispose: corruptMockDispose
+    };
+
+    const { File } = await import('node-taglib-sharp');
+    vi.mocked(File.createFromPath).mockReturnValueOnce(corruptFile as any);
+
+    await expect(parseSong('/music/corrupt.mp3')).rejects.toThrow('Corrupted ID3 header');
+
+    // Native file.dispose() must be guaranteed via try/finally block
+    expect(corruptMockDispose).toHaveBeenCalledTimes(1);
   });
 });

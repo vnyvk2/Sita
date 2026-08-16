@@ -3,10 +3,9 @@ import fs from 'fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
-import { waveforms } from '@main/db/schema';
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { GarbageCollectionJob } from '../garbageCollectionJob';
-import { CURRENT_WAVEFORM_GENERATOR_VERSION, WaveformJob } from '../waveformJob';
+import { WaveformJob } from '../waveformJob';
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -41,15 +40,15 @@ describe('WaveformJob & Publication Protocol', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(fs.unlink).mockResolvedValue(undefined as any);
     eventBus = new EventEmitter();
   });
 
-  it('A-3: should write .tmp file, commit to DB, and publish to .bin', async () => {
+  it('A-3: should write .tmp file, commit to DB, and atomically publish directly to .bin (no prior unlink)', async () => {
     vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
     vi.mocked(fs.stat).mockResolvedValue({ size: 1024 } as any);
     vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
     vi.mocked(fs.writeFile).mockResolvedValue(undefined as any);
-    vi.mocked(fs.unlink).mockResolvedValue(undefined as any);
     vi.mocked(fs.rename).mockResolvedValue(undefined as any);
 
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
@@ -69,7 +68,8 @@ describe('WaveformJob & Publication Protocol', () => {
 
     await job.execute();
 
-    // Verify rename from .tmp to .bin
+    // Verify atomic rename directly from .tmp to .bin (NO prior unlink of destination)
+    expect(fs.unlink).not.toHaveBeenCalledWith(expect.stringMatching(/123_v1\.bin$/));
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringMatching(/123_v1\.bin\.tmp$/),
       expect.stringMatching(/123_v1\.bin$/)
@@ -98,53 +98,93 @@ describe('WaveformJob & Publication Protocol', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('A-3: GarbageCollectionJob should clean stale .tmp files and recover orphaned DB rows', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue(['stale.tmp', 'fresh.tmp', 'orphan.bin', 'valid.bin'] as any);
+  it('A-3 REGRESSION Race A: In-flight GC must NOT delete DB row while temp file is fresh (<60s)', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue(['100_v1.bin.tmp'] as any);
 
     const now = Date.now();
     vi.mocked(fs.stat).mockImplementation(async (filePath: any) => {
-      if (String(filePath).includes('stale.tmp')) {
-        return { mtimeMs: now - 120_000 } as any; // 2 minutes old -> STALE
+      if (String(filePath).endsWith('100_v1.bin')) {
+        throw new Error('ENOENT'); // final .bin not yet published
       }
-      if (String(filePath).includes('fresh.tmp')) {
-        return { mtimeMs: now - 10_000 } as any; // 10 seconds old -> FRESH in-flight
-      }
-      if (String(filePath).includes('orphan.bin')) {
-        return { mtimeMs: now - 120_000 } as any; // 2 minutes old -> ORPHAN
-      }
-      if (String(filePath).includes('valid.bin')) {
-        return { mtimeMs: now - 10_000 } as any;
-      }
-      if (String(filePath).includes('missing_on_disk.bin')) {
-        throw new Error('ENOENT'); // File missing on disk
+      if (String(filePath).endsWith('100_v1.bin.tmp')) {
+        return { mtimeMs: now - 5_000 } as any; // 5 seconds old -> in-flight
       }
       return { mtimeMs: now } as any;
     });
 
-    // DB has valid.bin and a row for missing_on_disk.bin
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockResolvedValue([
-        { id: 1, path: '/cache/waveforms/valid.bin' },
-        { id: 2, path: '/cache/waveforms/missing_on_disk.bin' }
+        { id: 1, path: '/cache/waveforms/100_v1.bin' }
       ])
     } as any);
 
     const deleteWhereMock = vi.fn();
-    vi.mocked(db.delete).mockReturnValue({
-      where: deleteWhereMock
-    } as any);
+    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
 
     const gcJob = new GarbageCollectionJob();
     await gcJob.execute();
 
-    // Stale .tmp cleaned
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/stale\.tmp$/));
-    // Fresh .tmp untouched
-    expect(fs.unlink).not.toHaveBeenCalledWith(expect.stringMatching(/fresh\.tmp$/));
-    // Orphan .bin cleaned
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/orphan\.bin$/));
+    // Invariant: DB row MUST NOT be deleted during in-flight publication window
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(fs.unlink).not.toHaveBeenCalledWith(expect.stringMatching(/100_v1\.bin\.tmp$/));
+  });
 
-    // Crash recovery: DB row referencing missing file on disk is deleted
+  it('A-3 REGRESSION Crash Recovery: Stale temp file (>60s) with valid DB row must be self-healed and promoted', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue(['200_v1.bin.tmp'] as any);
+
+    const now = Date.now();
+    vi.mocked(fs.stat).mockImplementation(async (filePath: any) => {
+      if (String(filePath).endsWith('200_v1.bin')) {
+        throw new Error('ENOENT'); // crashed before rename
+      }
+      if (String(filePath).endsWith('200_v1.bin.tmp')) {
+        return { mtimeMs: now - 120_000 } as any; // 2 minutes old -> crashed abandoned write
+      }
+      return { mtimeMs: now } as any;
+    });
+
+    vi.mocked(fs.rename).mockResolvedValue(undefined as any);
+
+    vi.mocked(db.select).mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        { id: 2, path: '/cache/waveforms/200_v1.bin' }
+      ])
+    } as any);
+
+    const deleteWhereMock = vi.fn();
+    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
+
+    const gcJob = new GarbageCollectionJob();
+    await gcJob.execute();
+
+    // Self-healing: promote matching .tmp to .bin
+    expect(fs.rename).toHaveBeenCalledWith(
+      '/cache/waveforms/200_v1.bin.tmp',
+      '/cache/waveforms/200_v1.bin'
+    );
+    // DB row is preserved
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('A-3: Orphaned DB row with neither .bin nor .tmp must be deleted by GC', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue([] as any);
+
+    vi.mocked(fs.stat).mockImplementation(async () => {
+      throw new Error('ENOENT'); // neither .bin nor .tmp exists
+    });
+
+    vi.mocked(db.select).mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        { id: 999, path: '/cache/waveforms/nonexistent.bin' }
+      ])
+    } as any);
+
+    const deleteWhereMock = vi.fn();
+    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
+
+    const gcJob = new GarbageCollectionJob();
+    await gcJob.execute();
+
     expect(db.delete).toHaveBeenCalled();
   });
 });

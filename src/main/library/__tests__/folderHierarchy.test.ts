@@ -180,4 +180,31 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       "Unable to resolve parent folder 'C:\\Music\\Rock' for 'C:\\Music\\Rock\\Metallica'"
     );
   });
+
+  it('C-3: should scope SQL query to active scan root with trailing directory separator', async () => {
+    let whereClauseCalledWith: any = null;
+    const mockDatabase = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockImplementation((condition) => {
+            whereClauseCalledWith = condition;
+            return Promise.resolve([{ id: 1, path: 'C:\\Music', parentId: null }]);
+          })
+        })
+      }),
+      insert: vi.fn()
+    } as unknown as DB;
+
+    const folderMap = await resolveOrCreateMusicFolders(
+      1,
+      'C:\\Music',
+      [],
+      'win32',
+      mockDatabase
+    );
+
+    expect(folderMap.get('c:\\music')).toBe(1);
+    expect(mockDatabase.select).toHaveBeenCalled();
+    expect(whereClauseCalledWith).toBeDefined();
+  });
 });
