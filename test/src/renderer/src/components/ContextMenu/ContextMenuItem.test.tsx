@@ -46,6 +46,16 @@ const mockContextValue: AppUpdateContextType = {
 describe('ContextMenuItem & Fly-Out Submenu Behavior', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1200
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: 800
+    });
   });
 
   afterEach(() => {
@@ -116,7 +126,11 @@ describe('ContextMenuItem & Fly-Out Submenu Behavior', () => {
 
     render(
       <AppUpdateContext.Provider value={{ ...mockContextValue, updateContextMenuData }}>
-        <ContextMenuItem {...parentItem} />
+        <div id="context-menu-root" style={{ width: '200px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
       </AppUpdateContext.Provider>
     );
 
@@ -182,5 +196,117 @@ describe('ContextMenuItem & Fly-Out Submenu Behavior', () => {
 
     // Submenu is now closed
     expect(screen.queryByText('Chill Vibes')).toBeNull();
+  });
+
+  it('calculates right placement when within viewport boundaries', () => {
+    const parentItem: ContextMenuItem = {
+      label: 'Include in Playlist',
+      iconName: 'playlist_add',
+      handlerFunction: null,
+      innerContextMenus: [{ label: 'Chill Vibes', handlerFunction: vi.fn() }]
+    };
+
+    const { container } = render(
+      <AppUpdateContext.Provider value={mockContextValue}>
+        <div id="context-menu-root" style={{ width: '200px', left: '100px', top: '100px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
+      </AppUpdateContext.Provider>
+    );
+
+    const rootElement = container.querySelector('#context-menu-root') as HTMLElement;
+    const parentContainer = screen
+      .getByText('Include in Playlist')
+      .closest('.relative') as HTMLElement;
+
+    // Mock getBoundingClientRect for normal position (left = 100, right = 300, window width = 1200)
+    vi.spyOn(rootElement, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      left: 100,
+      right: 300,
+      bottom: 400,
+      width: 200,
+      height: 300,
+      x: 100,
+      y: 100,
+      toJSON: () => {}
+    });
+
+    vi.spyOn(parentContainer, 'getBoundingClientRect').mockReturnValue({
+      top: 150,
+      left: 100,
+      right: 300,
+      bottom: 180,
+      width: 200,
+      height: 30,
+      x: 100,
+      y: 150,
+      toJSON: () => {}
+    });
+
+    fireEvent.mouseEnter(parentContainer);
+
+    const submenu = screen.getByTestId('flyout-submenu');
+    expect(submenu).toBeDefined();
+    // left is set to rootRect.width (200px)
+    expect(submenu.style.left).toBe('200px');
+  });
+
+  it('flips to left placement when near right edge of viewport', () => {
+    const parentItem: ContextMenuItem = {
+      label: 'Include in Playlist',
+      iconName: 'playlist_add',
+      handlerFunction: null,
+      innerContextMenus: [{ label: 'Chill Vibes', handlerFunction: vi.fn() }]
+    };
+
+    const { container } = render(
+      <AppUpdateContext.Provider value={mockContextValue}>
+        <div id="context-menu-root" style={{ width: '200px', left: '1050px', top: '100px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
+      </AppUpdateContext.Provider>
+    );
+
+    const rootElement = container.querySelector('#context-menu-root') as HTMLElement;
+    const parentContainer = screen
+      .getByText('Include in Playlist')
+      .closest('.relative') as HTMLElement;
+
+    // Mock getBoundingClientRect near right edge (right = 1150px, +240 > 1200)
+    vi.spyOn(rootElement, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      left: 950,
+      right: 1150,
+      bottom: 400,
+      width: 200,
+      height: 300,
+      x: 950,
+      y: 100,
+      toJSON: () => {}
+    });
+
+    vi.spyOn(parentContainer, 'getBoundingClientRect').mockReturnValue({
+      top: 150,
+      left: 950,
+      right: 1150,
+      bottom: 180,
+      width: 200,
+      height: 30,
+      x: 950,
+      y: 150,
+      toJSON: () => {}
+    });
+
+    fireEvent.mouseEnter(parentContainer);
+
+    const submenu = screen.getByTestId('flyout-submenu');
+    expect(submenu).toBeDefined();
+    // right is set to rootRect.width (200px)
+    expect(submenu.style.right).toBe('200px');
   });
 });
