@@ -2,6 +2,7 @@ import fsSync, { type WatchEventType } from 'fs';
 import path from 'path';
 
 import libraryChangeTracker from '../library/LibraryChangeTracker';
+import libraryLifecycleController from '../library/LibraryLifecycleController';
 import logger from '../logger';
 import { getAbortController, saveAbortController } from './controlAbortControllers';
 import getParentFolderPaths from './getParentFolderPaths';
@@ -20,6 +21,13 @@ const parentFolderWatcherFunction = (
 };
 
 export const addWatcherToParentFolder = (parentFolderPath: string): void => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug('[Watchers] Skipping parent watcher registration (scan mode is not automatic).', {
+      parentFolderPath
+    });
+    return;
+  }
+
   try {
     const existingController = getAbortController(parentFolderPath);
     if (existingController) {
@@ -54,6 +62,13 @@ export const addWatcherToParentFolder = (parentFolderPath: string): void => {
 };
 
 export const initializePassiveParentWatchers = (folderPaths: string[]): void => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug(
+      '[Watchers] Skipping passive parent watchers initialization (scan mode is not automatic).'
+    );
+    return;
+  }
+
   const parentFolderPaths = getParentFolderPaths(folderPaths);
   logger.debug(
     `Initializing passive parent watchers for ${parentFolderPaths.length} parent paths.`
@@ -72,6 +87,13 @@ export const initializePassiveParentWatchers = (folderPaths: string[]): void => 
 };
 
 const addWatchersToParentFolders = async (): Promise<void> => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug(
+      '[Watchers] Skipping addWatchersToParentFolders execution (scan mode is not automatic).'
+    );
+    return;
+  }
+
   const { initializePassiveWatchers } = await import('./initializePassiveWatchers');
   await initializePassiveWatchers();
 };

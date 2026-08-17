@@ -1,5 +1,6 @@
 import { closeDatabaseInstance } from '@main/db/db';
 import { closeAllAbortControllers } from '@main/fs/controlAbortControllers';
+import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
 import logger from '@main/logger';
 import { clearTempArtworkFolder } from '@main/other/artworks';
 import { clearDiscordRpcActivity } from '@main/other/discordRPC';
@@ -40,14 +41,15 @@ export class ShutdownCoordinator {
     let hasPartialFailures = false;
     ShutdownLogger.logShutdownTransition(ShutdownState.Started, source);
 
-    // 1. Stop schedulers & background engines
+    // 1. Stop schedulers, background engines, and active library scans
     ShutdownLogger.logShutdownTransition(ShutdownState.StoppingSchedulers, source);
     try {
       await libraryScheduler.stop();
       adaptivePolicyEngine.stop();
+      await libraryLifecycleController.shutdown();
     } catch (error) {
       hasPartialFailures = true;
-      logger.error('Error stopping schedulers during shutdown:', { error });
+      logger.error('Error stopping schedulers and library lifecycle during shutdown:', { error });
     }
 
     // 2. Save pending state

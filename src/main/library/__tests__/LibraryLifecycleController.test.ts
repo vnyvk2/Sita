@@ -272,6 +272,19 @@ describe('LibraryLifecycleController', () => {
 
       expect(saveUserSettings).not.toHaveBeenCalled();
     });
+
+    it('accurately reports canAttachWatchers only in automatic mode', async () => {
+      expect(controller.canAttachWatchers()).toBe(true);
+
+      await controller.setScanMode('manual');
+      expect(controller.canAttachWatchers()).toBe(false);
+
+      await controller.setScanMode('startup');
+      expect(controller.canAttachWatchers()).toBe(false);
+
+      await controller.setScanMode('automatic');
+      expect(controller.canAttachWatchers()).toBe(true);
+    });
   });
 
   describe('Scan Now & Invariants', () => {

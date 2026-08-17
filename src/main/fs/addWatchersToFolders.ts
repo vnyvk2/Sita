@@ -1,6 +1,7 @@
 import fsSync, { type WatchEventType } from 'fs';
 
 import libraryChangeTracker from '../library/LibraryChangeTracker';
+import libraryLifecycleController from '../library/LibraryLifecycleController';
 import logger from '../logger';
 import { getAbortController, saveAbortController } from './controlAbortControllers';
 
@@ -18,6 +19,13 @@ const folderWatcherFunction = (
 };
 
 export const addWatcherToFolder = (folder: { id?: number; path: string }): void => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug('[Watchers] Skipping folder watcher registration (scan mode is not automatic).', {
+      folderPath: folder.path
+    });
+    return;
+  }
+
   try {
     const existingController = getAbortController(folder.path);
     if (existingController) {
@@ -51,6 +59,13 @@ export const addWatcherToFolder = (folder: { id?: number; path: string }): void 
 };
 
 export const initializePassiveFolderWatchers = (folders: { id?: number; path: string }[]): void => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug(
+      '[Watchers] Skipping passive folder watchers initialization (scan mode is not automatic).'
+    );
+    return;
+  }
+
   logger.debug(`Initializing passive folder watchers for ${folders.length} folders.`);
   for (const folder of folders) {
     addWatcherToFolder(folder);
@@ -58,6 +73,13 @@ export const initializePassiveFolderWatchers = (folders: { id?: number; path: st
 };
 
 const addWatchersToFolders = async (folders?: FolderStructure[]): Promise<void> => {
+  if (!libraryLifecycleController.canAttachWatchers()) {
+    logger.debug(
+      '[Watchers] Skipping addWatchersToFolders execution (scan mode is not automatic).'
+    );
+    return;
+  }
+
   if (folders && folders.length > 0) {
     for (const folder of folders) {
       addWatcherToFolder(folder);

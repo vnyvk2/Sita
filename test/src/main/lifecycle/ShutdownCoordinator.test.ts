@@ -1,11 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { closeDatabaseInstance } from '@main/db/db';
+import { closeAllAbortControllers } from '@main/fs/controlAbortControllers';
+import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
 import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/workers/jobScheduler', () => ({
   libraryScheduler: { stop: vi.fn().mockResolvedValue(undefined) }
 }));
 vi.mock('@main/workers/adaptivePolicyEngine', () => ({
   adaptivePolicyEngine: { stop: vi.fn() }
+}));
+vi.mock('@main/library/LibraryLifecycleController', () => ({
+  libraryLifecycleController: {
+    shutdown: vi.fn().mockResolvedValue(undefined)
+  }
 }));
 vi.mock('@main/other/discordRPC', () => ({
   clearDiscordRpcActivity: vi.fn().mockResolvedValue(undefined)
@@ -42,6 +50,9 @@ describe('ShutdownCoordinator', () => {
     await promise;
     expect(ShutdownCoordinator.isShuttingDown()).toBe(true);
 
+    expect(libraryLifecycleController.shutdown).toHaveBeenCalledTimes(1);
+    expect(closeDatabaseInstance).toHaveBeenCalledTimes(1);
+
     ShutdownCoordinator.resetStateForTesting();
     expect(ShutdownCoordinator.isShuttingDown()).toBe(false);
   });
@@ -51,5 +62,7 @@ describe('ShutdownCoordinator', () => {
     const p2 = ShutdownCoordinator.shutdown('source-2');
     expect(p1).toBe(p2);
     await Promise.all([p1, p2]);
+
+    expect(libraryLifecycleController.shutdown).toHaveBeenCalledTimes(1);
   });
 });

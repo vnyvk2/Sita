@@ -91,6 +91,10 @@ export class LibraryLifecycleController {
     return this.currentMode;
   }
 
+  public canAttachWatchers(): boolean {
+    return this.currentMode === 'automatic';
+  }
+
   private async applyPolicy(mode: LibraryScanMode, isStartup: boolean): Promise<void> {
     switch (mode) {
       case 'automatic': {
