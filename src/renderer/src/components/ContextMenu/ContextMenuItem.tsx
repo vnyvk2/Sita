@@ -46,8 +46,8 @@ const ContextMenuItem = (props: ContextMenuItem) => {
     const itemRect = itemRef.current.getBoundingClientRect();
     const rootRect = rootElement ? rootElement.getBoundingClientRect() : itemRect;
 
-    const estimatedSubmenuWidth = 240;
-    const estimatedSubmenuHeight = 320;
+    const estimatedSubmenuWidth = 352;
+    const estimatedSubmenuHeight = 352;
 
     const isRight = itemRect.right + estimatedSubmenuWidth <= window.innerWidth;
     const isTop = itemRect.top + estimatedSubmenuHeight <= window.innerHeight;
