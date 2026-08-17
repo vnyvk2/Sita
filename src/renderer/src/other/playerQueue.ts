@@ -14,6 +14,7 @@ class PlayerQueue {
   position: number;
   queueBeforeShuffle?: number[];
   metadata?: PlayerQueueMetadata;
+  private _structureVersion = 0;
   private listeners: Map<QueueEventType, Set<QueueEventCallback<unknown>>>;
 
   constructor(
@@ -32,7 +33,16 @@ class PlayerQueue {
     this.position = position;
     this.metadata = metadata;
     this.queueBeforeShuffle = queueBeforeShuffle;
+    this._structureVersion = 0;
     this.listeners = new Map();
+  }
+
+  get structureVersion(): number {
+    return this._structureVersion;
+  }
+
+  private incrementStructureVersion(): void {
+    this._structureVersion = (this._structureVersion + 1) | 0;
   }
 
   get currentSongId(): number | null {
@@ -47,6 +57,7 @@ class PlayerQueue {
       this.songIds.push(songId);
       this.position = this.songIds.length - 1;
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
     }
   }
 
@@ -284,6 +295,7 @@ class PlayerQueue {
    */
   addSongIdsToNext(songIds: number[]): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
     logQueue('[PlayerQueue.addSongIdsToNext]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -308,6 +320,7 @@ class PlayerQueue {
    */
   addSongIdsToEnd(songIds: number[]): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
     logQueue('[PlayerQueue.addSongIdsToEnd]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -332,9 +345,24 @@ class PlayerQueue {
    */
   addSongIdToNext(songId: number): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
     this.songIds.splice(this.position + 1, 0, songId);
     this.emit('songAdded', { songId, position: this.position + 1 });
     this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+  }
+
+  /**
+   * Adds songs to play next, removing any existing duplicate occurrences of those songs
+   * from the queue and adjusting the current playback position seamlessly.
+   *
+   * @param songIds - A single song ID or array of song IDs to play next
+   */
+  playNext(songIds: number | number[]): void {
+    const ids = Array.isArray(songIds) ? songIds : [songIds];
+    if (ids.length === 0) return;
+
+    ids.forEach((id) => this.removeSongId(id));
+    this.addSongIdsToNext(ids);
   }
 
   /**
@@ -344,6 +372,7 @@ class PlayerQueue {
    */
   addSongIdToEnd(songId: number): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
     const position = this.songIds.length;
     this.songIds.push(songId);
     this.emit('songAdded', { songId, position });
@@ -366,6 +395,7 @@ class PlayerQueue {
     });
     if (index !== -1) {
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
       this.songIds.splice(index, 1);
       this.emit('songRemoved', { songId, position: index });
       logQueue('[PlayerQueue.removeSongId.removed]', {
@@ -406,6 +436,7 @@ class PlayerQueue {
   removeSongAtPosition(position: number): number | null {
     if (position >= 0 && position < this.songIds.length) {
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
       const [removed] = this.songIds.splice(position, 1);
       this.emit('songRemoved', { songId: removed, position });
       // Adjust current position if necessary
@@ -439,6 +470,7 @@ class PlayerQueue {
       currentPosition: this.position
     });
     this.songIds = [];
+    this.incrementStructureVersion();
     const oldPosition = this.position;
     this.position = 0;
     this.queueBeforeShuffle = undefined;
@@ -482,6 +514,7 @@ class PlayerQueue {
     const oldPosition = this.position;
     const oldMetadata = this.metadata;
     this.songIds = [...songIds];
+    this.incrementStructureVersion();
     this.position = newPosition >= 0 && newPosition < songIds.length ? newPosition : 0;
     if (clearShuffleHistory) {
       this.queueBeforeShuffle = undefined;
@@ -546,6 +579,7 @@ class PlayerQueue {
     const oldPosition = this.position;
     this.position = 0;
     this.queueBeforeShuffle = positions;
+    this.incrementStructureVersion();
 
     logQueue('[PlayerQueue.shuffle.done]', {
       newQueueLength: this.songIds.length,
@@ -589,6 +623,7 @@ class PlayerQueue {
 
     const oldPosition = this.position;
     this.songIds = restoredQueue;
+    this.incrementStructureVersion();
 
     if (currentSongId) {
       const newPosition = this.songIds.indexOf(currentSongId);

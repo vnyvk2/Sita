@@ -30,12 +30,15 @@ export class QueuesManager {
   private isSyncingFromStore = false;
   private isSyncingToStore = false;
   private listeners: Map<QueuesManagerEvent, Set<QueuesManagerCallback>>;
-  private queueListeners: Map<string, (() => void)[]> = new Map();
+  private queueListeners: Map<string, (() => void)[]>;
+  private lastSyncedStructureVersions: Map<string, number>;
 
   constructor() {
     this.queues = [];
     this.activeQueueIndex = 0;
     this.listeners = new Map();
+    this.queueListeners = new Map();
+    this.lastSyncedStructureVersions = new Map();
   }
 
   on(event: QueuesManagerEvent, callback: QueuesManagerCallback) {
@@ -251,18 +254,19 @@ export class QueuesManager {
   }
 
   private bindQueueEvents(queue: PlayerQueue) {
-    this.unbindQueueEvents(queue); // Ensure no double-binding
+    this.unbindQueueEvents(queue);
 
-    const unsubs: (() => void)[] = [];
-
-    const onChange = () => {
-      this.emit('queuesChanged');
-      this.triggerStoreSync();
-    };
-
-    unsubs.push(queue.on('queueChange', onChange));
-    unsubs.push(queue.on('positionChange', onChange));
-    unsubs.push(queue.on('metadataChange', onChange));
+    const unsubs = [
+      queue.on('queueChange', () => {
+        this.triggerStoreSync();
+      }),
+      queue.on('positionChange', () => {
+        this.triggerStoreSync();
+      }),
+      queue.on('metadataChange', () => {
+        this.triggerStoreSync();
+      })
+    ];
 
     this.queueListeners.set(queue.id, unsubs);
   }
@@ -272,6 +276,7 @@ export class QueuesManager {
     if (unsubs) {
       unsubs.forEach((unsub) => unsub());
       this.queueListeners.delete(queue.id);
+      this.lastSyncedStructureVersions.delete(queue.id);
     }
   }
 
@@ -279,6 +284,9 @@ export class QueuesManager {
     if (this.isSyncingFromStore || this.isSyncingToStore) return;
     this.isSyncingToStore = true;
     try {
+      this.queues.forEach((q) => {
+        this.lastSyncedStructureVersions.set(q.id, q.structureVersion);
+      });
       store.setState((state) => ({
         ...state,
         localStorage: {
@@ -289,11 +297,6 @@ export class QueuesManager {
           }
         }
       }));
-
-      storage.queue.setQueue({
-        queues: this.queues.map((q) => q.toJSON()),
-        currentQueueIndex: this.activeQueueIndex
-      });
     } finally {
       this.isSyncingToStore = false;
     }
@@ -334,8 +337,12 @@ export class QueuesManager {
         for (let i = 0; i < this.queues.length; i++) {
           const q = this.queues[i];
           const sq = storeQueuesState.queues[i];
+          const lastVersion = this.lastSyncedStructureVersions.get(q.id);
+          const hasStructureVersionChanged =
+            lastVersion !== undefined && lastVersion !== q.structureVersion;
           if (
-            JSON.stringify(q.getAllSongIds()) !== JSON.stringify(sq.songIds) ||
+            q.songIds !== sq.songIds ||
+            hasStructureVersionChanged ||
             q.position !== sq.position ||
             q.metadata?.title !== sq.metadata?.title ||
             !!q.queueBeforeShuffle !== !!sq.queueBeforeShuffle
@@ -353,13 +360,15 @@ export class QueuesManager {
           if (needsFullSync) {
             this.queues.forEach((q) => {
               this.unbindQueueEvents(q);
-              q.removeAllListeners();
             });
 
             this.queues = storeQueuesState.queues.map((qState) => {
               return PlayerQueue.fromJSON(qState);
             });
-            this.queues.forEach((q) => this.bindQueueEvents(q));
+            this.queues.forEach((q) => {
+              this.bindQueueEvents(q);
+              this.lastSyncedStructureVersions.set(q.id, q.structureVersion);
+            });
 
             this.activeQueueIndex = storeQueuesState.currentQueueIndex;
             this.emit('queuesChanged');
@@ -377,14 +386,20 @@ export class QueuesManager {
                 continue;
               }
 
-              if (
-                JSON.stringify(q.getAllSongIds()) !== JSON.stringify(sq.songIds) ||
-                q.position !== sq.position ||
-                q.metadata?.title !== sq.metadata?.title ||
-                !!q.queueBeforeShuffle !== !!sq.queueBeforeShuffle
-              ) {
+              const lastVersion = this.lastSyncedStructureVersions.get(q.id);
+              const hasStructureVersionChanged =
+                lastVersion !== undefined && lastVersion !== q.structureVersion;
+              const songIdsChanged = q.songIds !== sq.songIds || hasStructureVersionChanged;
+              const positionChanged = q.position !== sq.position;
+              const metadataChanged = q.metadata?.title !== sq.metadata?.title;
+              const shuffleChanged = !!q.queueBeforeShuffle !== !!sq.queueBeforeShuffle;
+
+              if (songIdsChanged || metadataChanged || shuffleChanged) {
                 q.replaceQueue(sq.songIds, sq.position ?? 0, false, sq.metadata);
                 q.queueBeforeShuffle = sq.queueBeforeShuffle;
+                this.lastSyncedStructureVersions.set(q.id, q.structureVersion);
+              } else if (positionChanged) {
+                q.moveToPosition(sq.position ?? 0);
               }
             }
             if (indexChanged) {
