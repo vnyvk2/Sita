@@ -274,7 +274,7 @@ describe('MiniPlayer QueueContainer Virtualization & Invariants (Phase 4)', () =
     expect(screen.getByText('equalizer')).toBeDefined();
   });
 
-  it('maintains zero metadata refetch on shuffle when queue is reordered in MiniPlayer', () => {
+  it('maintains zero metadata refetch on shuffle when queue is reordered in MiniPlayer', async () => {
     const queue = new PlayerQueue([101, 102, 103], 0, undefined, undefined, 'zero-ipc-mini');
     const manager = new QueuesManager();
     manager.queues = [queue];
@@ -293,7 +293,10 @@ describe('MiniPlayer QueueContainer Virtualization & Invariants (Phase 4)', () =
 
     renderComponent(true);
 
+    // Wait for initial hydration to complete and confirm calls occurred
+    await screen.findByText('Track 101');
     const initialFetchCount = mockGetSongInfo.mock.calls.length;
+    expect(initialFetchCount).toBeGreaterThan(0);
 
     // Shuffle queue in place
     queue.shuffle();
@@ -310,7 +313,10 @@ describe('MiniPlayer QueueContainer Virtualization & Invariants (Phase 4)', () =
       }
     }));
 
-    // IPC call count should NOT increase on shuffle
+    // Flush any pending React updates/microtasks
+    await Promise.resolve();
+
+    // IPC call count MUST strictly remain unchanged after shuffle
     expect(mockGetSongInfo.mock.calls.length).toBe(initialFetchCount);
   });
 });
