@@ -1,24 +1,24 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex */
 
-import { queryClient } from '@renderer/queryClient';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { type KeyboardEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { themeRegistry, type ThemePreset } from '../../../../../common/themeRegistry';
 import HomeImgDark from '../../../assets/images/webp/home-skeleton-dark.webp';
 import HomeImgLightDark from '../../../assets/images/webp/home-skeleton-light-dark.webp';
 import HomeImgLight from '../../../assets/images/webp/home-skeleton-light.webp';
+import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
 import ThemePreviewGrid from './ThemePreviewGrid';
-import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
-import { themeRegistry, type ThemePreset } from '../../../../../common/themeRegistry';
 
 const ThemeSettings = () => {
   const [showThemeGrid, setShowThemeGrid] = useState(false);
@@ -62,6 +62,10 @@ const ThemeSettings = () => {
     store,
     (state) => state.localStorage.preferences?.themePreset ?? 'default'
   );
+  const isSongCardDynamicArtworkBackgroundEnabled = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isSongCardDynamicArtworkBackgroundEnabled ?? false
+  );
 
   const { t } = useTranslation();
 
@@ -89,14 +93,18 @@ const ThemeSettings = () => {
           <div className="description">
             {t('settingsPage.changeTheme')}
             {isThemeControlled && (
-              <span className="ml-2 font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+              <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-2 font-medium">
                 {t('settingsPage.controlledByTheme', 'Controlled by {{theme}}', {
-                  theme: t((themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey)
+                  theme: t(
+                    (themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey
+                  )
                 })}
               </span>
             )}
           </div>
-          <div className={`theme-change-radio-btns flex max-w-3xl items-center justify-between pt-4 pl-4 ${isThemeControlled ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div
+            className={`theme-change-radio-btns flex max-w-3xl items-center justify-between pt-4 pl-4 ${isThemeControlled ? 'pointer-events-none opacity-50' : ''}`}
+          >
             <label
               htmlFor="lightThemeRadioBtn"
               tabIndex={isThemeControlled ? -1 : 0}
@@ -178,24 +186,31 @@ const ThemeSettings = () => {
         <li className="secondary-container change-theme-preset my-4">
           <div className="description">{t('settingsPage.themePresetDescription')}</div>
           <div className="mt-4 flex w-full flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
-                {t('settingsPage.themePreset')}: <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-1">{t((themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey)}</span>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-sm font-medium">
+                {t('settingsPage.themePreset')}:{' '}
+                <span className="text-font-color-highlight dark:text-dark-font-color-highlight ml-1">
+                  {t((themeRegistry[themePreset as ThemePreset] ?? themeRegistry.default).nameKey)}
+                </span>
               </span>
               <button
                 type="button"
-                className="rounded-md bg-background-color-2 px-4 py-2 text-sm font-medium hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 transition-colors"
+                className="bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 rounded-md px-4 py-2 text-sm font-medium transition-colors"
                 onClick={() => setShowThemeGrid((prev) => !prev)}
               >
-                {showThemeGrid ? t('settingsPage.hideThemes', 'Hide Themes') : t('settingsPage.browseThemes', 'Browse Themes')}
+                {showThemeGrid
+                  ? t('settingsPage.hideThemes', 'Hide Themes')
+                  : t('settingsPage.browseThemes', 'Browse Themes')}
               </button>
             </div>
-            
+
             {showThemeGrid && (
-              <div className="mt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="animate-in fade-in slide-in-from-top-4 mt-2 duration-300">
                 <ThemePreviewGrid
                   currentTheme={themePreset as ThemePreset}
-                  onThemeChange={(theme) => storage.preferences.setPreferences('themePreset', theme)}
+                  onThemeChange={(theme) =>
+                    storage.preferences.setPreferences('themePreset', theme)
+                  }
                 />
               </div>
             )}
@@ -217,6 +232,20 @@ const ThemeSettings = () => {
           {enableImageBasedDynamicThemes && (
             <DynamicThemeSettings palette={currentSongPaletteData} />
           )}
+        </li>
+
+        <li className="secondary-container enable-song-card-dynamic-artwork-background mb-4">
+          <div className="description">
+            {t('settingsPage.enableSongCardDynamicArtworkBackgroundDescription')}
+          </div>
+          <Checkbox
+            id="toggleEnableSongCardDynamicArtworkBackground"
+            isChecked={isSongCardDynamicArtworkBackgroundEnabled}
+            checkedStateUpdateFunction={(state) =>
+              storage.preferences.setPreferences('isSongCardDynamicArtworkBackgroundEnabled', state)
+            }
+            labelContent={t('settingsPage.enableSongCardDynamicArtworkBackground')}
+          />
         </li>
       </ul>
     </li>

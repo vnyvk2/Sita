@@ -375,6 +375,9 @@
     "enableImageBasedDynamicThemes": "Activer les thèmes dynamiques",
     "enableImageBasedDynamicThemesDescription": "Change le thème de l'application dynamiquement selon la pochette de la chanson en cours.",
 
+    "enableSongCardDynamicArtworkBackground": "Teinte dynamique de pochette",
+    "enableSongCardDynamicArtworkBackgroundDescription": "Utilise les couleurs extraites de la pochette pour appliquer une teinte ambiante subtile aux cartes de chanson.",
+
     "language": "Langue",
     "languageDescription": "Sélectionnez la langue d'affichage de Nora.",
 

@@ -318,6 +318,8 @@
     "lightTheme": "Açık Tema",
     "darkTheme": "Koyu Tema",
     "systemTheme": "Sistem Teması",
+    "enableSongCardDynamicArtworkBackground": "Dinamik Albüm Kapağı Tonu",
+    "enableSongCardDynamicArtworkBackgroundDescription": "Şarkı kartlarına hafif bir ortam tonu eklemek için kapak resminden çıkarılan renkleri kullanın.",
     "language": "Dil",
     "languageDescription": "Nora'nın görüntülemesini istediğiniz dili seçin",
     "audioPlayback": "Ses Oynatma",

@@ -363,6 +363,9 @@
     "enableImageBasedDynamicThemes": "Bật chủ đề động",
     "enableImageBasedDynamicThemesDescription": "Thay đổi chủ đề ứng dụng dựa trên chủ đề của ảnh bìa bài hát đang phát",
 
+    "enableSongCardDynamicArtworkBackground": "Màu sắc bìa động cho thẻ bài hát",
+    "enableSongCardDynamicArtworkBackgroundDescription": "Sử dụng màu sắc trích xuất từ ảnh bìa để thêm hiệu ứng màu tinh tế cho các thẻ bài hát.",
+
     "language": "Ngôn ngữ",
     "languageDescription": "Chọn ngôn ngữ bạn muốn Nora hiển thị.",
 

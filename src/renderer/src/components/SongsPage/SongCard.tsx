@@ -13,6 +13,7 @@ import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import SongArtist from './SongArtist';
+import { getSongCardBackground } from './songCardBackground';
 import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
 
 const BlacklistSongConfrimPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
@@ -41,6 +42,10 @@ const SongCard = (props: SongCardProp) => {
   const doNotShowBlacklistSongConfirm = useStore(
     store,
     (state) => state.localStorage.preferences.doNotShowBlacklistSongConfirm
+  );
+  const isDynamicTintEnabled = useStore(
+    store,
+    (state) => state.localStorage.preferences.isSongCardDynamicArtworkBackgroundEnabled ?? false
   );
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const isMultipleSelectionEnabled = useStore(
@@ -120,14 +125,10 @@ const SongCard = (props: SongCardProp) => {
     toggleIsFavorite
   ]);
 
-  const background = useMemo(() => {
-    const defaultColor = '#000000';
-    const darkVibrant = palette?.DarkVibrant?.hex ?? defaultColor;
-    const vibrant = palette?.Vibrant?.hex ?? defaultColor;
-    const darkMuted = palette?.DarkMuted?.hex ?? defaultColor;
-
-    return `linear-gradient(135deg, ${darkVibrant}CC, ${vibrant}BF, ${darkMuted}99)`;
-  }, [palette]);
+  const background = useMemo(
+    () => getSongCardBackground(palette, isDynamicTintEnabled),
+    [palette, isDynamicTintEnabled]
+  );
 
   const contextMenuItemData: ContextMenuAdditionalData = useMemo(
     () =>

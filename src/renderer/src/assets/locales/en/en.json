@@ -409,6 +409,9 @@
     "darkCanvas": "Dark Canvas",
     "lightCanvas": "Light Canvas",
 
+    "enableSongCardDynamicArtworkBackground": "Dynamic Artwork Tint",
+    "enableSongCardDynamicArtworkBackgroundDescription": "Use colors extracted from artwork to add a subtle ambient tint to song cards.",
+
     "language": "Language",
     "languageDescription": "Select the language you want Nora to be displayed in.",
 

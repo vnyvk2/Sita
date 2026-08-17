@@ -375,6 +375,9 @@
     "enableImageBasedDynamicThemes": "Ativar Temas Dinâmicos",
     "enableImageBasedDynamicThemesDescription": "Alterar o tema do aplicativo dinamicamente com base no tema da imagem de capa da música atual",
 
+    "enableSongCardDynamicArtworkBackground": "Tonalidade dinâmica da capa",
+    "enableSongCardDynamicArtworkBackgroundDescription": "Use cores extraídas da arte da capa para adicionar um tom ambiente sutil aos cartões de música.",
+
     "language": "Idioma",
     "languageDescription": "Selecione o idioma no qual deseja que o Nora seja exibido.",
 

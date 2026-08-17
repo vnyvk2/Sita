@@ -566,6 +566,7 @@ declare global {
     lyricsArtworkBlur?: number;
     lyricsArtworkDarkness?: number;
     lyricsArtworkAnimation?: boolean;
+    isSongCardDynamicArtworkBackgroundEnabled?: boolean;
   }
 
   interface CurrentSong {
