@@ -307,14 +307,14 @@ function RouteComponent() {
       const isMultipleSelectionsEnabled =
         isEnabled && selectionType === 'songs' && selectedSongIds.length !== 1;
 
-      const currentQ = currentQueueRef.current;
-      const updatedQueue = currentQ.filter((id) =>
-        isMultipleSelectionsEnabled ? !selectedSongIds.includes(id) : id !== songId
-      );
       const queueToUpdate = manager.queues[viewingQueueIndex];
       if (queueToUpdate) {
-        queueToUpdate.replaceQueue(updatedQueue, queueToUpdate.position, false);
-        toggleMultipleSelections(false);
+        if (isMultipleSelectionsEnabled) {
+          queueToUpdate.removeSongIds(selectedSongIds);
+          toggleMultipleSelections(false);
+        } else {
+          queueToUpdate.removeSongId(songId);
+        }
       }
     },
     [manager, toggleMultipleSelections, viewingQueueIndex]

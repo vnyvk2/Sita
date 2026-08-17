@@ -377,8 +377,132 @@ class PlayerQueue {
     const ids = Array.isArray(songIds) ? songIds : [songIds];
     if (ids.length === 0) return;
 
-    ids.forEach((id) => this.removeSongId(id));
+    this.removeSongIds(ids);
     this.addSongIdsToNext(ids);
+  }
+
+  /**
+   * Removes multiple songs from the queue by their positions in a single O(N) pass
+   *
+   * @param positions - Set or Array of 0-indexed positions to remove
+   * @returns True if at least one song was removed, false otherwise
+   */
+  removeSongsAtPositions(positions: Set<number> | number[] | Iterable<number>): boolean {
+    if (this.songIds.length === 0) return false;
+    const positionsSet = positions instanceof Set ? positions : new Set(positions);
+    if (positionsSet.size === 0) return false;
+
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+    let removedAny = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      if (positionsSet.has(i)) {
+        removedAny = true;
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(this.songIds[i]);
+      }
+    }
+
+    if (!removedAny) return false;
+
+    this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
+
+    const oldPosition = this.position;
+    let newPosition = 0;
+    if (newSongIds.length > 0) {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+    }
+
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
+
+    return true;
+  }
+
+  /**
+   * Removes multiple songs from the queue by their song IDs in a single O(N) pass,
+   * removing all duplicate occurrences of those IDs.
+   *
+   * @param songIds - Set or Array of song IDs to remove
+   * @returns True if at least one song was removed, false otherwise
+   */
+  removeSongIds(songIds: Set<number> | number[] | Iterable<number>): boolean {
+    if (this.songIds.length === 0) return false;
+    const idsSet = songIds instanceof Set ? songIds : new Set(songIds);
+    if (idsSet.size === 0) return false;
+
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+    let removedAny = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      const id = this.songIds[i];
+      if (idsSet.has(id)) {
+        removedAny = true;
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(id);
+      }
+    }
+
+    if (!removedAny) return false;
+
+    this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
+
+    const oldPosition = this.position;
+    let newPosition = 0;
+    if (newSongIds.length > 0) {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+    }
+
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
+
+    return true;
   }
 
   /**
@@ -603,24 +727,28 @@ class PlayerQueue {
       currentPosition: this.position,
       currentSongId: this.currentSongId
     });
-    const positions: number[] = [];
     const initialQueue = this.songIds.slice(0);
+    const initialIndices = Array.from({ length: this.songIds.length }, (_, i) => i);
     const currentSongId = this.songIds.splice(this.position, 1)[0];
+    const currentSongOriginalIndex = initialIndices.splice(this.position, 1)[0];
 
-    // Fisher-Yates shuffle
+    // Fisher-Yates shuffle both songIds and initialIndices in lockstep
     for (let i = this.songIds.length - 1; i > 0; i -= 1) {
       const randomIndex = Math.floor(Math.random() * (i + 1));
       [this.songIds[i], this.songIds[randomIndex]] = [this.songIds[randomIndex], this.songIds[i]];
+      [initialIndices[i], initialIndices[randomIndex]] = [initialIndices[randomIndex], initialIndices[i]];
     }
 
     // Place current song at the beginning
-    if (currentSongId) {
+    if (currentSongId !== undefined) {
       this.songIds.unshift(currentSongId);
+      initialIndices.unshift(currentSongOriginalIndex);
     }
 
-    // Create position mapping
-    for (let i = 0; i < initialQueue.length; i += 1) {
-      positions.push(this.songIds.indexOf(initialQueue[i]));
+    // Create O(N) position mapping: positions[originalIndex] = shuffledIndex
+    const positions = new Array<number>(initialQueue.length);
+    for (let j = 0; j < initialIndices.length; j += 1) {
+      positions[initialIndices[j]] = j;
     }
 
     const oldPosition = this.position;
