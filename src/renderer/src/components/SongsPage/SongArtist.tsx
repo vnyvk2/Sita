@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { type CSSProperties, useCallback, useContext } from 'react';
+import { type CSSProperties, memo, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
@@ -13,7 +13,7 @@ interface SongArtistProp {
   style?: CSSProperties;
 }
 
-function SongArtist(props: SongArtistProp) {
+const SongArtist = memo(function SongArtist(props: SongArtistProp) {
   const { updateContextMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -58,6 +58,7 @@ function SongArtist(props: SongArtistProp) {
       {name}
     </NavLink>
   );
-}
+});
 
+SongArtist.displayName = 'SongArtist';
 export default SongArtist;

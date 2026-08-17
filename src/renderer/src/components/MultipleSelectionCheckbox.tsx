@@ -1,8 +1,8 @@
-import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useMemo } from 'react';
+import { memo, useContext } from 'react';
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
+import { store } from '../store/store';
 import Checkbox from './Checkbox';
 
 type Props = {
@@ -11,19 +11,18 @@ type Props = {
   className?: string;
 };
 
-const MultipleSelectionCheckbox = (props: Props) => {
+const MultipleSelectionCheckbox = memo(function MultipleSelectionCheckbox(props: Props) {
   const { id, selectionType, className = '' } = props;
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+
+  const isChecked = useStore(
+    store,
+    (state) =>
+      state.multipleSelectionsData.selectionType === selectionType &&
+      state.multipleSelectionsData.multipleSelections.includes(id)
+  );
+  const isEnabled = useStore(store, (state) => state.multipleSelectionsData.isEnabled);
 
   const { updateMultipleSelections } = useContext(AppUpdateContext);
-
-  const isChecked = useMemo(() => {
-    if (multipleSelectionsData.selectionType !== selectionType) return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (multipleSelectionsData.multipleSelections.some((selectionId) => selectionId === id))
-      return true;
-    return false;
-  }, [id, multipleSelectionsData, selectionType]);
 
   return (
     <Checkbox
@@ -33,10 +32,11 @@ const MultipleSelectionCheckbox = (props: Props) => {
         updateMultipleSelections(id, selectionType, state ? 'remove' : 'add')
       }
       className={`dark:peer-checked:[&>.checkmark]:border-font-color-highlight! dark:peer-checked:[&>.checkmark]:bg-font-color-highlight! dark:peer-checked:[&>.checkmark]:text-font-color-highlight! peer-checked:[&>.checkmark]:shadow-lg! ${
-        multipleSelectionsData.isEnabled ? '' : 'hidden'
+        isEnabled ? '' : 'hidden'
       } m-0! ${className}`}
     />
   );
-};
+});
 
+MultipleSelectionCheckbox.displayName = 'MultipleSelectionCheckbox';
 export default MultipleSelectionCheckbox;

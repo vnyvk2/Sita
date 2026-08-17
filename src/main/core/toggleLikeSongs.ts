@@ -20,6 +20,13 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
 
   await db.transaction(async (trx) => {
     if (isLikeSong !== undefined) {
+      await updateSongFavoriteStatuses(songIds, isLikeSong, trx);
+      if (isLikeSong) {
+        result.likes.push(...songIds);
+      } else {
+        result.dislikes.push(...songIds);
+      }
+    } else {
       if (likeGroupedSongData.liked) {
         const dislikedSongIds = likeGroupedSongData.liked.map((status) => status.id);
 
@@ -35,8 +42,6 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
 
         result.likes.push(...likedSongIds);
       }
-    } else {
-      await updateSongFavoriteStatuses(songIds, isLikeSong!, trx);
     }
   });
 

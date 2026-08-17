@@ -62,7 +62,7 @@ export function getInvalidationTargetsForEvent(
 
     // 2. Song likes / favorites
     case 'songs/likes':
-      return ['songs:favorites', 'home:mostLovedSongs', 'songs:all', 'songs:singleInfo'];
+      return ['songs:favorites', 'home:mostLovedSongs', 'songs:singleInfo'];
 
     // 3. Song Artworks: affects getAllSongs because its returned rows include artworkPaths.
     case 'songs/artworks':

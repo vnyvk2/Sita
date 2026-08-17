@@ -181,23 +181,7 @@ export const getAllSongs = async (
       },
       artworks: {
         with: {
-          artwork: {
-            with: {
-              palette: {
-                columns: { id: true },
-                with: {
-                  swatches: {}
-                }
-              }
-            }
-          }
-        }
-      },
-      playlists: {
-        with: {
-          playlist: {
-            columns: { id: true, name: true }
-          }
+          artwork: true
         }
       }
     },
