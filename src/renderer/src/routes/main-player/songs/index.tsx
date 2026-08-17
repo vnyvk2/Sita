@@ -20,7 +20,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { lazy, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/songs/')({
@@ -68,9 +68,20 @@ function SongsPage() {
   );
   const isMultipleSelectionEnabled = useStore(
     store,
-    (state) => state.multipleSelectionsData.isEnabled
+    (state) =>
+      state.multipleSelectionsData.isEnabled &&
+      state.multipleSelectionsData.selectionType === 'songs'
   );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const multipleSelectionsCount = useStore(
+    store,
+    (state) => state.multipleSelectionsData.multipleSelections.length
+  );
+  const isMultipleSelectionEmpty = useStore(
+    store,
+    (state) =>
+      state.multipleSelectionsData.multipleSelections.length === 0 ||
+      state.multipleSelectionsData.selectionType !== 'songs'
+  );
 
   const {
     createQueue,
@@ -130,15 +141,31 @@ function SongsPage() {
     return new Set(favoriteArtistsData.map((artist) => artist.artistId));
   }, [favoriteArtistsData]);
 
-  const availableLanguages = useMemo(() => {
-    if (!songData) return [];
+  const { availableLanguages, availableGenres } = useMemo(() => {
+    if (!songData || songData.length === 0) {
+      return { availableLanguages: [] as string[], availableGenres: [] as string[] };
+    }
     const langs = new Set<string>();
-    for (const song of songData) {
+    const genres = new Set<string>();
+
+    for (const item of songData) {
+      const song = item as SongData;
       if (song.language && song.language.trim() !== '') {
         langs.add(song.language.trim());
       }
+      if ('genres' in song && song.genres && Array.isArray(song.genres)) {
+        for (const g of song.genres) {
+          if (g.name && g.name.trim() !== '') {
+            genres.add(g.name.trim());
+          }
+        }
+      }
     }
-    return Array.from(langs).sort();
+
+    return {
+      availableLanguages: Array.from(langs).sort(),
+      availableGenres: Array.from(genres).sort()
+    };
   }, [songData]);
 
   const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
@@ -154,21 +181,6 @@ function SongsPage() {
     }
     return options;
   }, [availableLanguages, t]);
-
-  const availableGenres = useMemo(() => {
-    if (!songData) return [];
-    const genresSet = new Set<string>();
-    for (const song of songData) {
-      if ('genres' in song && song.genres) {
-        for (const g of (song as SongData).genres!) {
-          if (g.name && g.name.trim() !== '') {
-            genresSet.add(g.name.trim());
-          }
-        }
-      }
-    }
-    return Array.from(genresSet).sort();
-  }, [songData]);
 
   const genreDropdownOptions: DropdownOption<string>[] = useMemo(() => {
     const options: DropdownOption<string>[] = [
@@ -228,6 +240,9 @@ function SongsPage() {
       return true;
     });
   }, [songData, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums, favoriteArtistIds]);
+
+  const filteredSongsRef = useRef(filteredSongs);
+  filteredSongsRef.current = filteredSongs;
 
   const search = usePageSearch({
     keyword,
@@ -309,7 +324,7 @@ function SongsPage() {
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = filteredSongs
+      const queueSongIds = filteredSongsRef.current
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(
@@ -322,7 +337,24 @@ function SongsPage() {
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [filteredSongs, createQueue, updateQueueData, t]
+    [createQueue, updateQueueData, t]
+  );
+
+  const renderSong = useCallback(
+    (index: number, song: SongData | AudioInfo | undefined) => {
+      if (song)
+        return (
+          <Song
+            index={index}
+            isIndexingSongs={isSongIndexingEnabled}
+            onPlayClick={handleSongPlayBtnClick}
+            selectAllHandler={selectAllHandler}
+            {...(song as SongData)}
+          />
+        );
+      return <div>Bad Index</div>;
+    },
+    [isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler]
   );
 
   const hasActiveSubFilters =
@@ -354,7 +386,7 @@ function SongsPage() {
             {isMultipleSelectionEnabled ? (
               <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
                 {t('common.selectionWithCount', {
-                  count: multipleSelectionsData.multipleSelections.length
+                  count: multipleSelectionsCount
                 })}
               </div>
             ) : (
@@ -377,20 +409,15 @@ function SongsPage() {
                 className="add-to-queue-btn bg-background-color-3 dark:bg-dark-background-color-3 mr-2 flex items-center rounded-full px-4 py-1 text-sm font-semibold shadow-sm md:text-lg"
                 iconName="add"
                 label={t('currentQueuePage.addSongs', 'Add to Queue')}
-                isDisabled={
-                  multipleSelectionsData.multipleSelections.length === 0 ||
-                  multipleSelectionsData.selectionType !== 'songs'
-                }
+                isDisabled={isMultipleSelectionEmpty}
                 clickHandler={() => {
                   const manager = getQueuesManager();
                   const targetQueueIndex = queueIndex ?? manager.activeQueueIndex;
                   const targetQueueId = manager.queues[targetQueueIndex]?.id;
+                  const currentSelectedIds = store.state.multipleSelectionsData.multipleSelections;
 
-                  if (targetQueueId) {
-                    manager.addSongsToQueue(
-                      targetQueueId,
-                      multipleSelectionsData.multipleSelections as number[]
-                    );
+                  if (targetQueueId && currentSelectedIds.length > 0) {
+                    manager.addSongsToQueue(targetQueueId, currentSelectedIds as number[]);
                   }
 
                   toggleMultipleSelections(false, 'songs');
@@ -456,7 +483,7 @@ function SongsPage() {
               );
             }}
           />
-          {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && (
+          {isMultipleSelectionEnabled && (
             <Button
               key="select-all-btn"
               className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
@@ -470,13 +497,7 @@ function SongsPage() {
             className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
             clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'songs')}
-            tooltipLabel={t(
-              `common.${
-                isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs'
-                  ? 'unselectAll'
-                  : 'select'
-              }`
-            )}
+            tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
           />
           <Button
             key={2}
@@ -631,20 +652,7 @@ function SongsPage() {
             data={filteredSongs}
             fixedItemHeight={60}
             scrollKey={scrollKey}
-            itemContent={(index, song) => {
-              if (song)
-                return (
-                  <Song
-                    key={index}
-                    index={index}
-                    isIndexingSongs={isSongIndexingEnabled}
-                    onPlayClick={handleSongPlayBtnClick}
-                    selectAllHandler={selectAllHandler}
-                    {...song}
-                  />
-                );
-              return <div>Bad Index</div>;
-            }}
+            itemContent={renderSong}
           />
         )}
       </div>
@@ -672,3 +680,5 @@ function SongsPage() {
     </MainContainer>
   );
 }
+
+export default SongsPage;
