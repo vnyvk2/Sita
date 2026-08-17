@@ -1,4 +1,3 @@
-/* eslint-disable react/only-export-components */
 import { Droppable, DragDropContext, type DropResult } from '@hello-pangea/dnd';
 // import DefaultSongCover from '@renderer/assets/images/webp/song_cover_default.webp';
 // import DefaultPlaylistCover from '@renderer/assets/images/webp/playlist_cover_default.webp';
@@ -48,6 +47,7 @@ export const Route = createFileRoute('/main-player/queue/')({
   validateSearch: queuePageSearchParamsSchema
 });
 
+// eslint-disable-next-line react/only-export-components
 function RouteComponent() {
   const navigate = useNavigate({ from: Route.fullPath });
   const currentSongData = useStore(store, (state) => state.currentSongData);

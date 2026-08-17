@@ -9,26 +9,48 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 type BenchmarkRecord = {
   operation: string;
   n: string;
-  timeMs: string;
+  medianTimeMs: string;
   versionDelta: string;
   eventCount: string;
 };
 
 const benchmarkResults: BenchmarkRecord[] = [];
 
+/**
+ * Runs warmup cycles then measures multiple iterations and returns the median duration in ms.
+ * This filters out JIT warm-up spikes, GC pauses, and Windows thread scheduling noise.
+ */
+function measureMedianMs(
+  fn: () => void,
+  iterations = 5,
+  warmups = 2
+): number {
+  for (let w = 0; w < warmups; w += 1) {
+    fn();
+  }
+  const samples: number[] = [];
+  for (let i = 0; i < iterations; i += 1) {
+    const t0 = performance.now();
+    fn();
+    const t1 = performance.now();
+    samples.push(t1 - t0);
+  }
+  samples.sort((a, b) => a - b);
+  const mid = Math.floor(samples.length / 2);
+  return samples.length % 2 === 0 ? (samples[mid - 1] + samples[mid]) / 2 : samples[mid];
+}
+
 const recordBenchmark = (
   operation: string,
   n: number | string,
-  startTime: number,
-  endTime: number,
+  elapsedMs: number,
   versionDelta = '+1',
   eventCount = '1'
 ) => {
-  const elapsed = (endTime - startTime).toFixed(2);
   benchmarkResults.push({
     operation,
     n: typeof n === 'number' ? (n >= 1000 ? `${n / 1000}k` : `${n}`) : n,
-    timeMs: `${elapsed} ms`,
+    medianTimeMs: `${elapsedMs.toFixed(2)} ms`,
     versionDelta,
     eventCount
   });
@@ -38,7 +60,7 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
   afterAll(() => {
     // Print formatted benchmark summary table
     console.log('\n========================================================================');
-    console.log('               NORA QUEUE 50K/100K PERFORMANCE BENCHMARK REPORT          ');
+    console.log('         NORA QUEUE 50K/100K PERFORMANCE BENCHMARK REPORT (MEDIAN)       ');
     console.log('========================================================================');
     console.table(benchmarkResults);
     console.log('========================================================================\n');
@@ -50,75 +72,92 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
     for (const N of tiers) {
       it(`benchmarks single-pass batch removal at N = ${N}`, () => {
         const songIds = Array.from({ length: N }, (_, i) => i + 1);
-        const q = new PlayerQueue(songIds, Math.floor(N / 2));
         const toRemovePositions = new Set(
           Array.from({ length: Math.min(500, Math.floor(N / 10)) }, (_, i) => i * 2)
         );
 
-        const initialStructure = q.structureVersion;
-        const initialMembership = q.membershipVersion;
-
-        const t0 = performance.now();
-        const success = q.removeSongsAtPositions(toRemovePositions);
-        const t1 = performance.now();
+        // Functional invariant check
+        const testQueue = new PlayerQueue([...songIds], Math.floor(N / 2));
+        const initialStructure = testQueue.structureVersion;
+        const initialMembership = testQueue.membershipVersion;
+        const success = testQueue.removeSongsAtPositions(toRemovePositions);
 
         expect(success).toBe(true);
-        expect(q.structureVersion).toBe(initialStructure + 1);
-        expect(q.membershipVersion).toBe(initialMembership + 1);
+        expect(testQueue.structureVersion).toBe(initialStructure + 1);
+        expect(testQueue.membershipVersion).toBe(initialMembership + 1);
 
-        recordBenchmark('removeSongsAtPositions (500)', N, t0, t1);
+        // Median performance measurement
+        const medianMs = measureMedianMs(() => {
+          const q = new PlayerQueue([...songIds], Math.floor(N / 2));
+          q.removeSongsAtPositions(toRemovePositions);
+        });
+
+        recordBenchmark('removeSongsAtPositions (500)', N, medianMs);
       });
 
       it(`benchmarks atomic playNext at N = ${N}`, () => {
         const songIds = Array.from({ length: N }, (_, i) => i + 1);
-        const q = new PlayerQueue(songIds, Math.floor(N / 2));
         const incomingIds = [N - 1, N - 2, N - 3, N - 4, N - 5];
 
-        const initialStructure = q.structureVersion;
-        const initialMembership = q.membershipVersion;
+        // Functional invariant check
+        const testQueue = new PlayerQueue([...songIds], Math.floor(N / 2));
+        const initialStructure = testQueue.structureVersion;
+        const initialMembership = testQueue.membershipVersion;
+        testQueue.playNext(incomingIds);
 
-        const t0 = performance.now();
-        q.playNext(incomingIds);
-        const t1 = performance.now();
+        expect(testQueue.structureVersion).toBe(initialStructure + 1);
+        expect(testQueue.membershipVersion).toBe(initialMembership); // pure reorder
 
-        expect(q.structureVersion).toBe(initialStructure + 1);
-        expect(q.membershipVersion).toBe(initialMembership); // pure reorder
+        // Median performance measurement
+        const medianMs = measureMedianMs(() => {
+          const q = new PlayerQueue([...songIds], Math.floor(N / 2));
+          q.playNext(incomingIds);
+        });
 
-        recordBenchmark('playNext existing reorder (5)', N, t0, t1, '+1 s / +0 m');
+        recordBenchmark('playNext existing reorder (5)', N, medianMs, '+1 s / +0 m');
       });
 
       it(`benchmarks O(N) Fisher-Yates shuffle and restore at N = ${N}`, () => {
         const originalQueue = Array.from({ length: N }, (_, i) => i + 1);
         const currentSong = originalQueue[Math.floor(N / 2)];
-        const q = new PlayerQueue([...originalQueue], Math.floor(N / 2));
 
-        const t0 = performance.now();
-        const { shuffledQueue, positions } = q.shuffle();
-        const t1 = performance.now();
+        // Functional invariant check
+        const testQueue = new PlayerQueue([...originalQueue], Math.floor(N / 2));
+        const { shuffledQueue, positions } = testQueue.shuffle();
 
         expect(shuffledQueue.length).toBe(N);
         expect(shuffledQueue[0]).toBe(currentSong);
 
-        recordBenchmark('shuffle (O(N) index tracking)', N, t0, t1);
+        testQueue.restoreFromPositions(positions, currentSong);
+        expect(testQueue.songIds).toEqual(originalQueue);
 
-        const t2 = performance.now();
-        q.restoreFromPositions(positions, currentSong);
-        const t3 = performance.now();
+        // Median shuffle measurement
+        const medianShuffleMs = measureMedianMs(() => {
+          const q = new PlayerQueue([...originalQueue], Math.floor(N / 2));
+          q.shuffle();
+        });
+        recordBenchmark('shuffle (O(N) index tracking)', N, medianShuffleMs);
 
-        expect(q.songIds).toEqual(originalQueue);
-        recordBenchmark('restoreFromPositions', N, t2, t3);
+        // Median restore measurement
+        const medianRestoreMs = measureMedianMs(() => {
+          const q = new PlayerQueue([...shuffledQueue], 0);
+          q.restoreFromPositions(positions, currentSong);
+        });
+        recordBenchmark('restoreFromPositions', N, medianRestoreMs);
       });
 
       it(`benchmarks toJSON() serialization at N = ${N}`, () => {
         const songIds = Array.from({ length: N }, (_, i) => i + 1);
         const q = new PlayerQueue(songIds, Math.floor(N / 2));
 
-        const t0 = performance.now();
         const serialized = q.toJSON();
-        const t1 = performance.now();
-
         expect(serialized.songIds.length).toBe(N);
-        recordBenchmark('toJSON() serialization', N, t0, t1, 'N/A', 'N/A');
+
+        const medianMs = measureMedianMs(() => {
+          q.toJSON();
+        });
+
+        recordBenchmark('toJSON() serialization', N, medianMs, 'N/A', 'N/A');
       });
     }
   });
@@ -130,7 +169,7 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       const activeIndex = 25005;
       const activeSongId = songIds[activeIndex];
 
-      const q = new PlayerQueue(songIds, activeIndex);
+      const q = new PlayerQueue([...songIds], activeIndex);
       const queueChangeSpy = vi.fn();
       const positionChangeSpy = vi.fn();
       q.on('queueChange', queueChangeSpy);
@@ -142,9 +181,7 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       // Remove every 10th position (5,000 items total: 0, 10, 20, ..., 49990)
       const positionsToRemove = new Set(Array.from({ length: 5000 }, (_, i) => i * 10));
 
-      const t0 = performance.now();
       const success = q.removeSongsAtPositions(positionsToRemove);
-      const t1 = performance.now();
 
       expect(success).toBe(true);
       expect(q.songIds.length).toBe(45000);
@@ -162,14 +199,19 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       expect(q.currentSongId).toBe(activeSongId);
       expect(q.songIds[22504]).toBe(activeSongId);
 
-      recordBenchmark('remove 5,000 positions', N, t0, t1);
+      const medianMs = measureMedianMs(() => {
+        const benchmarkQ = new PlayerQueue([...songIds], activeIndex);
+        benchmarkQ.removeSongsAtPositions(positionsToRemove);
+      });
+
+      recordBenchmark('remove 5,000 positions', N, medianMs);
     });
 
     it('removes 2,500 distinct IDs from a 50,000 song queue with duplicate multiplicities', () => {
       const N = 50000;
       // 5,000 unique IDs repeated 10 times = 50,000 items
       const songIds = Array.from({ length: N }, (_, i) => (i % 5000) + 1);
-      const q = new PlayerQueue(songIds, 25000);
+      const q = new PlayerQueue([...songIds], 25000);
 
       const queueChangeSpy = vi.fn();
       q.on('queueChange', queueChangeSpy);
@@ -177,9 +219,7 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       // Remove IDs 1 to 2,500 (removes 2,500 * 10 = 25,000 items in total)
       const idsToRemove = new Set(Array.from({ length: 2500 }, (_, i) => i + 1));
 
-      const t0 = performance.now();
       const success = q.removeSongIds(idsToRemove);
-      const t1 = performance.now();
 
       expect(success).toBe(true);
       expect(q.songIds.length).toBe(25000);
@@ -192,7 +232,12 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       expect(q.membershipVersion).toBe(1);
       expect(queueChangeSpy).toHaveBeenCalledTimes(1);
 
-      recordBenchmark('remove 25,000 duplicate items by ID', N, t0, t1);
+      const medianMs = measureMedianMs(() => {
+        const benchmarkQ = new PlayerQueue([...songIds], 25000);
+        benchmarkQ.removeSongIds(idsToRemove);
+      });
+
+      recordBenchmark('remove 25,000 duplicate items by ID', N, medianMs);
     });
   });
 
@@ -205,27 +250,30 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
       const currentSong = originalQueue[activePosition];
 
       const q = new PlayerQueue([...originalQueue], activePosition);
-
-      const t0 = performance.now();
       const { shuffledQueue, positions } = q.shuffle();
-      const t1 = performance.now();
 
       expect(shuffledQueue.length).toBe(N);
       expect(shuffledQueue[0]).toBe(currentSong);
       expect(q.position).toBe(0);
 
-      recordBenchmark('shuffle 50k heavy duplicates', N, t0, t1);
-
-      const t2 = performance.now();
       q.restoreFromPositions(positions, currentSong);
-      const t3 = performance.now();
 
       // Proves 100% exact occurrence identity restoration (not just multiset equality)
       expect(q.songIds).toEqual(originalQueue);
       expect(q.position).toBe(activePosition);
       expect(q.currentSongId).toBe(currentSong);
 
-      recordBenchmark('restore 50k heavy duplicates', N, t2, t3);
+      const medianShuffleMs = measureMedianMs(() => {
+        const benchmarkQ = new PlayerQueue([...originalQueue], activePosition);
+        benchmarkQ.shuffle();
+      });
+      recordBenchmark('shuffle 50k heavy duplicates', N, medianShuffleMs);
+
+      const medianRestoreMs = measureMedianMs(() => {
+        const benchmarkQ = new PlayerQueue([...shuffledQueue], 0);
+        benchmarkQ.restoreFromPositions(positions, currentSong);
+      });
+      recordBenchmark('restore 50k heavy duplicates', N, medianRestoreMs);
     });
   });
 
@@ -271,17 +319,15 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
         const songIds = Array.from({ length: N }, (_, i) => (i % 1000) + 1);
         // Build mock queuedSongsMap
         const queuedSongsMap = new Map<number, { duration: number }>();
-        for (let id = 1; id <= 1000; id++) {
+        for (let id = 1; id <= 1000; id += 1) {
           queuedSongsMap.set(id, { duration: 180 + (id % 120) });
         }
 
         // Execute exact production suffix sum computation from queueDuration utility
-        const t0 = performance.now();
         const { suffixDurations, queueDuration } = calculateQueueSuffixDurations(
           songIds,
           queuedSongsMap
         );
-        const t1 = performance.now();
 
         expect(suffixDurations).not.toBeNull();
         expect(suffixDurations!.length).toBe(N);
@@ -292,7 +338,11 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
         const remainingDuration = getRemainingQueueDuration(suffixDurations, queryPos);
         expect(remainingDuration).not.toBe('0:00');
 
-        recordBenchmark('suffix sum duration (backward pass)', N, t0, t1, 'O(1) query', 'N/A');
+        const medianMs = measureMedianMs(() => {
+          calculateQueueSuffixDurations(songIds, queuedSongsMap);
+        });
+
+        recordBenchmark('suffix sum duration (backward pass)', N, medianMs, 'O(1) query', 'N/A');
       });
     }
   });
