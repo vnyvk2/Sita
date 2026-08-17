@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
 import { closeAllAbortControllers } from '../../fs/controlAbortControllers';
 import { initializePassiveWatchers } from '../../fs/initializePassiveWatchers';
+import libraryChangeTracker from '../LibraryChangeTracker';
 import { LibraryLifecycleController, type LibraryScanMode } from '../LibraryLifecycleController';
 import type { LibraryScanner, ScanSummary } from '../LibraryScanner';
 
@@ -91,6 +92,7 @@ describe('LibraryLifecycleController', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    libraryChangeTracker.reset();
 
     vi.mocked(getUserSettings).mockResolvedValue({
       libraryScanMode: 'automatic'
@@ -284,6 +286,211 @@ describe('LibraryLifecycleController', () => {
 
       await controller.setScanMode('automatic');
       expect(controller.canAttachWatchers()).toBe(true);
+    });
+  });
+
+  describe('Reactive Live Changes (Automatic Mode)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      controller.stopWatchers();
+      vi.useRealTimers();
+    });
+
+    it('triggers a debounced scan when LibraryChangeTracker marks dirty in automatic mode', async () => {
+      await controller.startWatchers();
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/NewSong.mp3', source: 'folder-watcher' });
+
+      // Before debounce window
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+
+      // After 2000ms debounce
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('coalesces rapid burst change events into a single scan execution', async () => {
+      await controller.startWatchers();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(500);
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      await vi.advanceTimersByTimeAsync(500);
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+
+      // Advance full 2000ms after last event
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('schedules and executes a follow-up scan when changes arrive while a scan is in-flight', async () => {
+      await controller.initialize();
+      mockScanner.scan.mockClear();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // File changes while Scan A is running (increments generation)
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+
+      // Ensure no concurrent second scan was started yet
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Scan A finishes
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveScanA!(mockCompletedSummary);
+
+      // Advance follow-up debounce timer
+      await vi.advanceTimersByTimeAsync(2000);
+
+      // Scan B should have been triggered cleanly
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not trigger a follow-up scan if no changes occurred during an active scan', async () => {
+      await controller.initialize();
+      mockScanner.scan.mockClear();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Scan A finishes with NO new changes arriving during the scan
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveScanA!(mockCompletedSummary);
+
+      // Advance timers past debounce window
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // No follow-up scan should have been scheduled
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('coalesces multiple change events arriving during an active scan into exactly one follow-up scan', async () => {
+      await controller.initialize();
+      mockScanner.scan.mockClear();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Multiple files change during Scan A
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/4.mp3' });
+
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveScanA!(mockCompletedSummary);
+
+      await vi.advanceTimersByTimeAsync(2000);
+
+      // Exactly 1 follow-up scan (total 2 scans)
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears pending debounce timer and avoids duplicate scan when user clicks Scan Now during debounce', async () => {
+      await controller.startWatchers();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(500);
+
+      // User triggers manual scanNow while debounce is pending
+      const scanPromise = controller.scanNow();
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      await scanPromise;
+
+      // Advance timers past original debounce window
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // No extra scan should execute
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT trigger live scan on filesystem change when in startup mode', async () => {
+      await controller.setScanMode('startup');
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('does NOT trigger live scan on filesystem change when in manual mode', async () => {
+      await controller.setScanMode('manual');
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('clears pending debounce timer and pending state when transitioning automatic -> manual', async () => {
+      await controller.startWatchers();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await controller.setScanMode('manual');
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('clears pending debounce timer and pending state when transitioning automatic -> startup', async () => {
+      await controller.startWatchers();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await controller.setScanMode('startup');
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('clears pending debounce timer and removes listener during shutdown', async () => {
+      await controller.startWatchers();
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await controller.shutdown();
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).not.toHaveBeenCalled();
     });
   });
 

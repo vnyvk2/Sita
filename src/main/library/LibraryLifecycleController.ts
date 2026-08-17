@@ -1,6 +1,7 @@
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
 import { closeAllAbortControllers } from '@main/fs/controlAbortControllers';
 import { initializePassiveWatchers } from '@main/fs/initializePassiveWatchers';
+import libraryChangeTracker from '@main/library/LibraryChangeTracker';
 import logger from '@main/logger';
 
 import libraryScanner, {
@@ -19,6 +20,9 @@ export class LibraryLifecycleController {
   private isInitialized = false;
   private currentMode: LibraryScanMode = 'automatic';
   private inFlightScan: Promise<ScanSummary> | null = null;
+  private changeGeneration = 0;
+  private changeDebounceTimer: NodeJS.Timeout | null = null;
+  private readonly changeDebounceMs = 2000;
 
   constructor(scanner: LibraryScanner = libraryScanner) {
     this.scanner = scanner;
@@ -127,11 +131,13 @@ export class LibraryLifecycleController {
     try {
       await initializePassiveWatchers();
       this.watchersActive = true;
+      this.attachChangeTrackerListener();
     } catch (error) {
       logger.error('[LibraryLifecycleController] Failed to start background folder watchers:', {
         error
       });
       this.watchersActive = false;
+      this.detachChangeTrackerListener();
       throw error;
     }
   }
@@ -139,6 +145,7 @@ export class LibraryLifecycleController {
   public stopWatchers(): void {
     logger.info('[LibraryLifecycleController] Stopping background folder watchers.');
     this.watchersActive = false;
+    this.detachChangeTrackerListener();
     try {
       closeAllAbortControllers();
     } catch (error) {
@@ -150,6 +157,58 @@ export class LibraryLifecycleController {
 
   public areWatchersActive(): boolean {
     return this.watchersActive;
+  }
+
+  private onLibraryChanged = (): void => {
+    if (!this.canAttachWatchers()) {
+      return;
+    }
+
+    this.changeGeneration += 1;
+
+    if (this.changeDebounceTimer) {
+      clearTimeout(this.changeDebounceTimer);
+    }
+
+    logger.debug(
+      `[LibraryLifecycleController] Filesystem change detected (generation ${this.changeGeneration}), scheduling background scan...`
+    );
+
+    this.changeDebounceTimer = setTimeout(() => {
+      this.changeDebounceTimer = null;
+      if (!this.canAttachWatchers()) {
+        return;
+      }
+
+      if (this.inFlightScan) {
+        logger.debug(
+          '[LibraryLifecycleController] Scan currently in flight; generation tracking will schedule follow-up on completion.'
+        );
+        return;
+      }
+
+      logger.info(
+        '[LibraryLifecycleController] Executing debounced background scan for live filesystem changes.'
+      );
+      this.scanNow().catch((error) => {
+        logger.error('[LibraryLifecycleController] Debounced live change scan failed:', {
+          error
+        });
+      });
+    }, this.changeDebounceMs);
+  };
+
+  private attachChangeTrackerListener(): void {
+    libraryChangeTracker.off('changed', this.onLibraryChanged);
+    libraryChangeTracker.on('changed', this.onLibraryChanged);
+  }
+
+  private detachChangeTrackerListener(): void {
+    if (this.changeDebounceTimer) {
+      clearTimeout(this.changeDebounceTimer);
+      this.changeDebounceTimer = null;
+    }
+    libraryChangeTracker.off('changed', this.onLibraryChanged);
   }
 
   private triggerBackgroundScan(): void {
@@ -166,7 +225,16 @@ export class LibraryLifecycleController {
       return this.inFlightScan;
     }
 
-    logger.info('[LibraryLifecycleController] Scan requested.');
+    // Capture the current change generation at scan snapshot start
+    const scanGeneration = this.changeGeneration;
+
+    // Clear any pending debounce timer as this scan will cover all changes up to scanGeneration
+    if (this.changeDebounceTimer) {
+      clearTimeout(this.changeDebounceTimer);
+      this.changeDebounceTimer = null;
+    }
+
+    logger.info(`[LibraryLifecycleController] Scan requested (generation ${scanGeneration}).`);
     this.inFlightScan = this.scanner
       .scan(options)
       .then(async (summary) => {
@@ -177,9 +245,40 @@ export class LibraryLifecycleController {
       })
       .finally(() => {
         this.inFlightScan = null;
+
+        // If filesystem changes arrived after this scan's starting generation, schedule a follow-up scan
+        if (
+          this.changeGeneration !== scanGeneration &&
+          this.canAttachWatchers() &&
+          this.isInitialized
+        ) {
+          logger.info(
+            `[LibraryLifecycleController] Changes observed during scan (generation ${this.changeGeneration} !== ${scanGeneration}); triggering follow-up scan.`
+          );
+          this.scheduleFollowUpScan();
+        }
       });
 
     return this.inFlightScan;
+  }
+
+  private scheduleFollowUpScan(): void {
+    if (!this.canAttachWatchers() || !this.isInitialized) {
+      return;
+    }
+
+    if (this.changeDebounceTimer) {
+      clearTimeout(this.changeDebounceTimer);
+    }
+
+    this.changeDebounceTimer = setTimeout(() => {
+      this.changeDebounceTimer = null;
+      if (this.canAttachWatchers() && !this.inFlightScan && this.isInitialized) {
+        this.scanNow().catch((error) => {
+          logger.error('[LibraryLifecycleController] Follow-up background scan failed:', { error });
+        });
+      }
+    }, this.changeDebounceMs);
   }
 
   public async cancelScan(): Promise<boolean> {
@@ -203,9 +302,9 @@ export class LibraryLifecycleController {
 
   public async shutdown(): Promise<void> {
     logger.info('[LibraryLifecycleController] Shutting down lifecycle controller.');
+    this.isInitialized = false;
     this.stopWatchers();
     await this.cancelScan();
-    this.isInitialized = false;
   }
 }
 
