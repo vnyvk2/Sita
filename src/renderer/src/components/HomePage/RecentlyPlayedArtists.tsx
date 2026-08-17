@@ -26,7 +26,7 @@ const RecentlyPlayedArtists = (props: Props) => {
               <Artist
                 index={index}
                 name={val.name}
-                key={val.artistId}
+                key={`${val.artistId}-${index}`}
                 artworkPaths={val.artworkPaths}
                 artistId={val.artistId}
                 songIds={val.songs.map((song) => song.songId)}
