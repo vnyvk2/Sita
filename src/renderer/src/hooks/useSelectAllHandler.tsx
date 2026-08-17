@@ -1,4 +1,3 @@
-import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext } from 'react';
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
@@ -17,8 +16,6 @@ const useSelectAllHandler = <Obj extends Record<string, any>>(
   selectionType: QueueTypes,
   idProperty: keyof Obj
 ) => {
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
 
   const selectAllHandler = useCallback(
@@ -32,7 +29,8 @@ const useSelectAllHandler = <Obj extends Record<string, any>>(
         return undefined;
       };
 
-      const ids: number[] = multipleSelectionsData.multipleSelections;
+      const multipleSelectionsData = store.state.multipleSelectionsData;
+      const ids: number[] = [...multipleSelectionsData.multipleSelections];
       if (upToId !== undefined) {
         if (multipleSelectionsData.multipleSelections.length > 0) {
           const currIndex = getItemFromIndex(upToId);
@@ -58,13 +56,7 @@ const useSelectAllHandler = <Obj extends Record<string, any>>(
       const uniqueIds = new Set(ids);
       toggleMultipleSelections(true, selectionType, [...uniqueIds], true);
     },
-    [
-      arr,
-      idProperty,
-      multipleSelectionsData.multipleSelections,
-      selectionType,
-      toggleMultipleSelections
-    ]
+    [arr, idProperty, selectionType, toggleMultipleSelections]
   );
 
   return selectAllHandler;
