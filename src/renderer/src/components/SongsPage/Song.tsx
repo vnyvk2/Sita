@@ -147,7 +147,8 @@ const Song = memo(
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
 
-    const handleLikeButtonClick = useCallback(() => {
+    // Unified single-song favorite mutation handler shared by direct button and context menu
+    const toggleSingleSongFavorite = useCallback(() => {
       const nextFav = !isAFavorite;
       const currentSeq = ++likeMutationSeqRef.current;
 
@@ -426,70 +427,7 @@ const Song = memo(
                   ]);
                 });
             } else {
-              const nextFav = !isAFavorite;
-              const currentSeq = ++likeMutationSeqRef.current;
-
-              queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-                { queryKey: songQuery.all._def },
-                (old) => {
-                  if (!old?.data) return old;
-                  return {
-                    ...old,
-                    data: old.data.map((s) =>
-                      s.songId === songId ? { ...s, isAFavorite: nextFav } : s
-                    )
-                  };
-                }
-              );
-              if (isCurrentSong) toggleIsFavorite(nextFav, true);
-
-              window.api.playerControls
-                .toggleLikeSongs([songId], nextFav)
-                .then((res) => {
-                  if (likeMutationSeqRef.current !== currentSeq) return;
-
-                  if (res && res.likes.length + res.dislikes.length === 0) {
-                    queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-                      { queryKey: songQuery.all._def },
-                      (old) => {
-                        if (!old?.data) return old;
-                        return {
-                          ...old,
-                          data: old.data.map((s) =>
-                            s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-                          )
-                        };
-                      }
-                    );
-                    if (isCurrentSong) toggleIsFavorite(!nextFav, true);
-                  }
-                })
-                .catch((err) => {
-                  if (likeMutationSeqRef.current !== currentSeq) return;
-
-                  console.error(err);
-                  queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-                    { queryKey: songQuery.all._def },
-                    (old) => {
-                      if (!old?.data) return old;
-                      return {
-                        ...old,
-                        data: old.data.map((s) =>
-                          s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-                        )
-                      };
-                    }
-                  );
-                  if (isCurrentSong) toggleIsFavorite(!nextFav, true);
-                  addNewNotifications([
-                    {
-                      id: `toggleLikeError-${songId}`,
-                      content: t('song.toggleLikeFailed'),
-                      iconName: 'error',
-                      duration: 5000
-                    }
-                  ]);
-                });
+              toggleSingleSongFavorite();
             }
             toggleMultipleSelections(false);
           }
@@ -679,7 +617,8 @@ const Song = memo(
       artists,
       path,
       isBlacklisted,
-      doNotShowBlacklistSongConfirm
+      doNotShowBlacklistSongConfirm,
+      toggleSingleSongFavorite
     ]);
 
     return (
@@ -871,7 +810,7 @@ const Song = memo(
               tooltipLabel={t(`song.${isAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
               clickHandler={(e) => {
                 e.stopPropagation();
-                handleLikeButtonClick();
+                toggleSingleSongFavorite();
               }}
             />
             <span className="">

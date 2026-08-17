@@ -181,7 +181,13 @@ export const getAllSongs = async (
       },
       artworks: {
         with: {
-          artwork: true
+          artwork: {
+            columns: {
+              id: true,
+              path: true,
+              isOptimized: true
+            }
+          }
         }
       }
     },
