@@ -84,6 +84,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
       .where(inArray(songs.id, [song1Id, song2Id, song3Id]));
 
     expect(dbRows.every((r) => r.isFavorite === true)).toBe(true);
+    expect(dataUpdateEvent).toHaveBeenCalledTimes(1);
     expect(dataUpdateEvent).toHaveBeenCalledWith('songs/likes', [song1Id, song2Id, song3Id]);
   });
 
@@ -99,6 +100,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
       .where(inArray(songs.id, [song1Id, song2Id, song3Id]));
 
     expect(dbRows.every((r) => r.isFavorite === false)).toBe(true);
+    expect(dataUpdateEvent).toHaveBeenCalledTimes(1);
     expect(dataUpdateEvent).toHaveBeenCalledWith('songs/likes', [song1Id, song2Id, song3Id]);
   });
 
@@ -120,6 +122,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
     expect(map.get(song2Id)).toBe(true);
     expect(map.get(song3Id)).toBe(false);
 
+    expect(dataUpdateEvent).toHaveBeenCalledTimes(1);
     expect(dataUpdateEvent).toHaveBeenCalledWith('songs/likes', [song2Id, song1Id, song3Id]);
   });
 });

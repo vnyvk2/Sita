@@ -630,9 +630,11 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
     let cache = queryClient.getQueryData<any>(testQuery.queryKey);
     expect(cache?.data[0].isAFavorite).toBe(true);
 
+    const updatedFavBtn = await screen.findByTitle('song.likedThisSong');
+
     // Rapid Click 2: toggles true -> false (Mutation Seq = 2)
     await act(async () => {
-      fireEvent.click(favBtn);
+      fireEvent.click(updatedFavBtn);
     });
     cache = queryClient.getQueryData<any>(testQuery.queryKey);
     expect(cache?.data[0].isAFavorite).toBe(false);
@@ -732,5 +734,187 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
         })
       ])
     );
+  });
+
+  it('Test H (Late-Success Out-of-Order Resolution): Out-of-order resolution does not overwrite newer state', async () => {
+    let resolveCall1: any;
+    const call1Promise = new Promise((resolve) => {
+      resolveCall1 = resolve;
+    });
+
+    let resolveCall2: any;
+    const call2Promise = new Promise((resolve) => {
+      resolveCall2 = resolve;
+    });
+
+    let callCount = 0;
+    const toggleLikeSongsMock = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return call1Promise;
+      return call2Promise;
+    });
+    (window as any).api.playerControls.toggleLikeSongs = toggleLikeSongsMock;
+
+    const testQuery = songQuery.all({
+      sortType: 'aToZ',
+      filterType: 'notSelected',
+      start: 0,
+      end: 0,
+      keyword: ''
+    });
+    queryClient.setQueryData(testQuery.queryKey, {
+      data: [{ songId: 10, isAFavorite: false }],
+      total: 1,
+      sortType: 'aToZ',
+      start: 0,
+      end: 0
+    });
+
+    const ReactiveSong = () => {
+      const { data } = useQuery({
+        queryKey: testQuery.queryKey,
+        queryFn: () => ({
+          data: [{ songId: 10, isAFavorite: false }],
+          total: 1,
+          sortType: 'aToZ' as const,
+          start: 0,
+          end: 0
+        })
+      });
+      const songData = data?.data[0] || { songId: 10, isAFavorite: false };
+      return (
+        <AppUpdateContext.Provider value={mockContextValue}>
+          <Song {...createSongProps(10, songData.isAFavorite)} isAFavorite={songData.isAFavorite} />
+        </AppUpdateContext.Provider>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ReactiveSong />
+      </QueryClientProvider>
+    );
+
+    const song10Element = screen.getByText('Test Song 10').closest('.group') as HTMLElement;
+    const favBtn = song10Element.querySelector(
+      'button[title*="disliked"], button[title*="liked"]'
+    ) as HTMLButtonElement;
+
+    // Click 1: false -> true (seq 1)
+    await act(async () => {
+      fireEvent.click(favBtn);
+    });
+    let cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(true);
+
+    const updatedFavBtn = await screen.findByTitle('song.likedThisSong');
+
+    // Click 2: true -> false (seq 2)
+    await act(async () => {
+      fireEvent.click(updatedFavBtn);
+    });
+    cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(false);
+
+    // Call 1 resolves LATE with { likes: [10] } (which wants true)
+    await act(async () => {
+      resolveCall1({ likes: [10], dislikes: [] });
+    });
+
+    // Verify cache remains FALSE (not overridden back to true by stale Call 1 resolution!)
+    cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(false);
+
+    // Call 2 resolves
+    await act(async () => {
+      resolveCall2({ likes: [], dislikes: [10] });
+    });
+    cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(false);
+  });
+
+  it('Test I (Second Mutation Failure Rollback): Failure on active mutation rolls back to previous valid server state', async () => {
+    let rejectCall2: any;
+    const call2Promise = new Promise((_resolve, reject) => {
+      rejectCall2 = reject;
+    });
+
+    let callCount = 0;
+    const toggleLikeSongsMock = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve({ likes: [10], dislikes: [] });
+      return call2Promise;
+    });
+    (window as any).api.playerControls.toggleLikeSongs = toggleLikeSongsMock;
+
+    const testQuery = songQuery.all({
+      sortType: 'aToZ',
+      filterType: 'notSelected',
+      start: 0,
+      end: 0,
+      keyword: ''
+    });
+    queryClient.setQueryData(testQuery.queryKey, {
+      data: [{ songId: 10, isAFavorite: false }],
+      total: 1,
+      sortType: 'aToZ',
+      start: 0,
+      end: 0
+    });
+
+    const ReactiveSong = () => {
+      const { data } = useQuery({
+        queryKey: testQuery.queryKey,
+        queryFn: () => ({
+          data: [{ songId: 10, isAFavorite: false }],
+          total: 1,
+          sortType: 'aToZ' as const,
+          start: 0,
+          end: 0
+        })
+      });
+      const songData = data?.data[0] || { songId: 10, isAFavorite: false };
+      return (
+        <AppUpdateContext.Provider value={mockContextValue}>
+          <Song {...createSongProps(10, songData.isAFavorite)} isAFavorite={songData.isAFavorite} />
+        </AppUpdateContext.Provider>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ReactiveSong />
+      </QueryClientProvider>
+    );
+
+    const song10Element = screen.getByText('Test Song 10').closest('.group') as HTMLElement;
+    const favBtn = song10Element.querySelector(
+      'button[title*="disliked"], button[title*="liked"]'
+    ) as HTMLButtonElement;
+
+    // Click 1: false -> true (resolves successfully)
+    await act(async () => {
+      fireEvent.click(favBtn);
+    });
+    let cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(true);
+
+    const updatedFavBtn = await screen.findByTitle('song.likedThisSong');
+
+    // Click 2: true -> false (optimistically updates to false, seq 2)
+    await act(async () => {
+      fireEvent.click(updatedFavBtn);
+    });
+    cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(false);
+
+    // Call 2 fails
+    await act(async () => {
+      rejectCall2(new Error('Network error on Call 2'));
+    });
+
+    // Active mutation seq 2 rolls back to true!
+    cache = queryClient.getQueryData<any>(testQuery.queryKey);
+    expect(cache?.data[0].isAFavorite).toBe(true);
   });
 });
