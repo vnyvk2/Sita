@@ -95,7 +95,7 @@ describe('LibraryLifecycleController', () => {
     vi.mocked(getUserSettings).mockResolvedValue({
       libraryScanMode: 'automatic'
     } as unknown as UserSettings);
-    vi.mocked(saveUserSettings).mockResolvedValue(undefined as any);
+    vi.mocked(saveUserSettings).mockResolvedValue(undefined as unknown as void);
     vi.mocked(initializePassiveWatchers).mockResolvedValue(undefined);
 
     mockScanner = {
@@ -118,6 +118,7 @@ describe('LibraryLifecycleController', () => {
       expect(initializePassiveWatchers).toHaveBeenCalledTimes(1);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(true);
+      expect(controller.getScanMode()).toBe('automatic');
     });
 
     it('initializes in startup mode: ensures watchers stopped and triggers startup scan', async () => {
@@ -131,6 +132,7 @@ describe('LibraryLifecycleController', () => {
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('startup');
     });
 
     it('initializes in manual mode: ensures watchers stopped and does NOT trigger scan', async () => {
@@ -144,6 +146,7 @@ describe('LibraryLifecycleController', () => {
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).not.toHaveBeenCalled();
       expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
     });
 
     it('safely falls back to automatic mode if database query fails on startup', async () => {
@@ -154,6 +157,7 @@ describe('LibraryLifecycleController', () => {
       expect(initializePassiveWatchers).toHaveBeenCalledTimes(1);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(true);
+      expect(controller.getScanMode()).toBe('automatic');
     });
 
     it('ignores second initialize call idempotently', async () => {
@@ -186,10 +190,12 @@ describe('LibraryLifecycleController', () => {
       expect(saveUserSettings).toHaveBeenCalledWith({ libraryScanMode: 'manual' });
       expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
       expect(mockScanner.scan).not.toHaveBeenCalled();
     });
 
     it('transitions manual -> automatic: starts watchers and persists setting without immediate scan', async () => {
+      await controller.setScanMode('manual');
       expect(controller.areWatchersActive()).toBe(false);
 
       await controller.setScanMode('automatic');
@@ -197,6 +203,7 @@ describe('LibraryLifecycleController', () => {
       expect(saveUserSettings).toHaveBeenCalledWith({ libraryScanMode: 'automatic' });
       expect(initializePassiveWatchers).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(true);
+      expect(controller.getScanMode()).toBe('automatic');
       expect(mockScanner.scan).not.toHaveBeenCalled();
     });
 
@@ -208,17 +215,62 @@ describe('LibraryLifecycleController', () => {
       expect(saveUserSettings).toHaveBeenCalledWith({ libraryScanMode: 'startup' });
       expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('startup');
       expect(mockScanner.scan).not.toHaveBeenCalled();
     });
 
     it('transitions startup -> manual: unconditionally cleans up watchers', async () => {
+      await controller.setScanMode('startup');
       await controller.setScanMode('manual');
 
       expect(saveUserSettings).toHaveBeenCalledWith({ libraryScanMode: 'manual' });
-      expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
+      expect(closeAllAbortControllers).toHaveBeenCalledTimes(2);
       expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
       expect(initializePassiveWatchers).not.toHaveBeenCalled();
       expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('rolls back runtime policy when database persistence fails in setScanMode', async () => {
+      // Start in manual mode
+      await controller.setScanMode('manual');
+      expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
+
+      // Attempt to transition to automatic, but DB save fails
+      vi.mocked(saveUserSettings).mockRejectedValueOnce(new Error('DB write lock'));
+
+      await expect(controller.setScanMode('automatic')).rejects.toThrow('DB write lock');
+
+      // Watchers should have been rolled back to stopped (manual)
+      expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
+    });
+
+    it('does not persist to database when watcher activation fails in setScanMode', async () => {
+      await controller.setScanMode('manual');
+      vi.mocked(saveUserSettings).mockClear();
+
+      vi.mocked(initializePassiveWatchers).mockRejectedValueOnce(new Error('Permission denied'));
+
+      await expect(controller.setScanMode('automatic')).rejects.toThrow('Permission denied');
+
+      // DB should never have been touched
+      expect(saveUserSettings).not.toHaveBeenCalled();
+      expect(controller.areWatchersActive()).toBe(false);
+      expect(controller.getScanMode()).toBe('manual');
+    });
+
+    it('no-ops when transitioning to the current mode after initialization', async () => {
+      vi.mocked(getUserSettings).mockResolvedValueOnce({
+        libraryScanMode: 'automatic'
+      } as unknown as UserSettings);
+      await controller.initialize();
+
+      vi.mocked(saveUserSettings).mockClear();
+      await controller.setScanMode('automatic');
+
+      expect(saveUserSettings).not.toHaveBeenCalled();
     });
   });
 

@@ -17,6 +17,7 @@ export class LibraryLifecycleController {
   private scanner: LibraryScanner;
   private watchersActive = false;
   private isInitialized = false;
+  private currentMode: LibraryScanMode = 'automatic';
   private inFlightScan: Promise<ScanSummary> | null = null;
 
   constructor(scanner: LibraryScanner = libraryScanner) {
@@ -40,33 +41,60 @@ export class LibraryLifecycleController {
     try {
       const settings = await getUserSettings();
       const mode: LibraryScanMode = (settings?.libraryScanMode as LibraryScanMode) || 'automatic';
+      this.currentMode = mode;
       logger.info(`[LibraryLifecycleController] Initializing with mode: ${mode}`);
 
       await this.applyPolicy(mode, true);
     } catch (error) {
       logger.error('[LibraryLifecycleController] Failed to load settings on startup:', { error });
-      // Fallback to automatic policy safely
+      this.currentMode = 'automatic';
       await this.applyPolicy('automatic', true);
     }
   }
 
   public async setScanMode(mode: LibraryScanMode): Promise<void> {
-    logger.info(`[LibraryLifecycleController] Transitioning scan mode to: ${mode}`);
-    await this.applyPolicy(mode, false);
-    await saveUserSettings({ libraryScanMode: mode });
+    if (this.currentMode === mode && this.isInitialized) {
+      logger.debug(
+        `[LibraryLifecycleController] Mode already set to ${mode}. No transition needed.`
+      );
+      return;
+    }
+
+    const previousMode = this.currentMode;
+    logger.info(
+      `[LibraryLifecycleController] Transitioning scan mode from ${previousMode} to: ${mode}`
+    );
+
+    try {
+      // 1. Apply runtime policy transition first
+      await this.applyPolicy(mode, false);
+
+      // 2. Persist to database only if runtime policy transition succeeded
+      await saveUserSettings({ libraryScanMode: mode });
+      this.currentMode = mode;
+    } catch (error) {
+      logger.error(
+        `[LibraryLifecycleController] Failed to transition to mode '${mode}', rolling back to '${previousMode}':`,
+        { error }
+      );
+      // Rollback runtime policy to previous state
+      try {
+        await this.applyPolicy(previousMode, false);
+      } catch (rollbackError) {
+        logger.error('[LibraryLifecycleController] Rollback failed:', { rollbackError });
+      }
+      throw error;
+    }
+  }
+
+  public getScanMode(): LibraryScanMode {
+    return this.currentMode;
   }
 
   private async applyPolicy(mode: LibraryScanMode, isStartup: boolean): Promise<void> {
     switch (mode) {
       case 'automatic': {
-        try {
-          await this.startWatchers();
-        } catch (error) {
-          logger.error(
-            '[LibraryLifecycleController] Could not activate watchers under automatic mode:',
-            { error }
-          );
-        }
+        await this.startWatchers();
         if (isStartup) {
           this.triggerBackgroundScan();
         }
