@@ -1,7 +1,7 @@
 import { db } from '@db/db';
 import { musicFolders, songs } from '@db/schema';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
 
 export const isSongWithPathAvailable = async (path: string, trx: DB | DBTransaction = db) => {
   const count = await trx.$count(songs, eq(songs.path, path));
@@ -559,6 +559,22 @@ export const updateSongFavoriteStatuses = async (
     .update(songs)
     .set({ isFavorite, isFavoriteUpdatedAt: new Date() })
     .where(inArray(songs.id, songIds));
+  return data;
+};
+
+export const invertSongFavoriteStatuses = async (
+  songIds: number[],
+  trx: DB | DBTransaction = db
+) => {
+  if (songIds.length === 0) return [];
+  const data = await trx
+    .update(songs)
+    .set({
+      isFavorite: sql`NOT ${songs.isFavorite}`,
+      isFavoriteUpdatedAt: new Date()
+    })
+    .where(inArray(songs.id, songIds))
+    .returning({ id: songs.id, isFavorite: songs.isFavorite });
   return data;
 };
 
