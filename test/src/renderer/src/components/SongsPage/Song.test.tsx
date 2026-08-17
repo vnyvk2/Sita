@@ -144,6 +144,14 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
         playerControls: {
           toggleLikeSongs: vi.fn().mockResolvedValue({ likes: [10], dislikes: [] })
         },
+        membership: {
+          getCollectionsContaining: vi.fn().mockResolvedValue([])
+        },
+        collections: {
+          read: {
+            getChildren: vi.fn().mockResolvedValue([])
+          }
+        },
         properties: {
           isInDevelopment: false
         }
@@ -438,7 +446,9 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
 
     // Right-click on Song 1 (which is part of the selection)
     const songElement = screen.getByText('Test Song 1').closest('.group') as HTMLElement;
-    fireEvent.contextMenu(songElement);
+    await act(async () => {
+      fireEvent.contextMenu(songElement);
+    });
 
     // Find the toggle like action
     const toggleLikeItem = contextMenuCallback?.find((item: any) => item.iconName === 'favorite');
@@ -500,7 +510,7 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
     expect(delta).toBe(0);
   });
 
-  it('Test E (Context Menu Semantics on Selected vs Unselected Rows): Right-clicking selected row opens bulk menu, unselected row opens single-song menu', () => {
+  it('Test E (Context Menu Semantics on Selected vs Unselected Rows): Right-clicking selected row opens bulk menu, unselected row opens single-song menu', async () => {
     let capturedHeaderData: any = null;
     let capturedMenuItems: any = null;
 
@@ -538,7 +548,9 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
 
     // Case 1: Right-click Song 1 (isAMultipleSelection = true)
     const song1Element = screen.getByText('Test Song 1').closest('.group') as HTMLElement;
-    fireEvent.contextMenu(song1Element);
+    await act(async () => {
+      fireEvent.contextMenu(song1Element);
+    });
 
     expect(capturedHeaderData?.title).toBe('3 songs selected');
     // Bulk createQueue option is enabled
@@ -549,7 +561,9 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
 
     // Case 2: Right-click Song 8 (isAMultipleSelection = false, not part of selection)
     const song8Element = screen.getByText('Test Song 8').closest('.group') as HTMLElement;
-    fireEvent.contextMenu(song8Element);
+    await act(async () => {
+      fireEvent.contextMenu(song8Element);
+    });
 
     expect(capturedHeaderData?.title).toBe('Test Song 8');
     // Bulk createQueue option is disabled (operates as single song)
@@ -712,7 +726,9 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
     );
 
     const song1Element = screen.getByText('Test Song 1').closest('.group') as HTMLElement;
-    fireEvent.contextMenu(song1Element);
+    await act(async () => {
+      fireEvent.contextMenu(song1Element);
+    });
 
     const toggleLikeItem = contextMenuCallback?.find((item: any) => item.iconName === 'favorite');
     expect(toggleLikeItem).toBeDefined();
