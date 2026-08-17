@@ -15,6 +15,7 @@ class PlayerQueue {
   queueBeforeShuffle?: number[];
   metadata?: PlayerQueueMetadata;
   private _structureVersion = 0;
+  private _membershipVersion = 0;
   private listeners: Map<QueueEventType, Set<QueueEventCallback<unknown>>>;
 
   constructor(
@@ -34,6 +35,7 @@ class PlayerQueue {
     this.metadata = metadata;
     this.queueBeforeShuffle = queueBeforeShuffle;
     this._structureVersion = 0;
+    this._membershipVersion = 0;
     this.listeners = new Map();
   }
 
@@ -43,6 +45,14 @@ class PlayerQueue {
 
   private incrementStructureVersion(): void {
     this._structureVersion = (this._structureVersion + 1) | 0;
+  }
+
+  get membershipVersion(): number {
+    return this._membershipVersion;
+  }
+
+  private incrementMembershipVersion(): void {
+    this._membershipVersion = (this._membershipVersion + 1) | 0;
   }
 
   get currentSongId(): number | null {
@@ -58,6 +68,7 @@ class PlayerQueue {
       this.position = this.songIds.length - 1;
       this.queueBeforeShuffle = undefined;
       this.incrementStructureVersion();
+      this.incrementMembershipVersion();
     }
   }
 
@@ -294,8 +305,10 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToNext(songIds: number[]): void {
+    if (songIds.length === 0) return;
     this.queueBeforeShuffle = undefined;
     this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     logQueue('[PlayerQueue.addSongIdsToNext]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -319,8 +332,10 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToEnd(songIds: number[]): void {
+    if (songIds.length === 0) return;
     this.queueBeforeShuffle = undefined;
     this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     logQueue('[PlayerQueue.addSongIdsToEnd]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -346,6 +361,7 @@ class PlayerQueue {
   addSongIdToNext(songId: number): void {
     this.queueBeforeShuffle = undefined;
     this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     this.songIds.splice(this.position + 1, 0, songId);
     this.emit('songAdded', { songId, position: this.position + 1 });
     this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
@@ -373,6 +389,7 @@ class PlayerQueue {
   addSongIdToEnd(songId: number): void {
     this.queueBeforeShuffle = undefined;
     this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     const position = this.songIds.length;
     this.songIds.push(songId);
     this.emit('songAdded', { songId, position });
@@ -396,6 +413,7 @@ class PlayerQueue {
     if (index !== -1) {
       this.queueBeforeShuffle = undefined;
       this.incrementStructureVersion();
+      this.incrementMembershipVersion();
       this.songIds.splice(index, 1);
       this.emit('songRemoved', { songId, position: index });
       logQueue('[PlayerQueue.removeSongId.removed]', {
@@ -437,6 +455,7 @@ class PlayerQueue {
     if (position >= 0 && position < this.songIds.length) {
       this.queueBeforeShuffle = undefined;
       this.incrementStructureVersion();
+      this.incrementMembershipVersion();
       const [removed] = this.songIds.splice(position, 1);
       this.emit('songRemoved', { songId: removed, position });
       // Adjust current position if necessary
@@ -469,6 +488,9 @@ class PlayerQueue {
       queueLengthBefore: this.songIds.length,
       currentPosition: this.position
     });
+    if (this.songIds.length > 0) {
+      this.incrementMembershipVersion();
+    }
     this.songIds = [];
     this.incrementStructureVersion();
     const oldPosition = this.position;
@@ -513,8 +535,33 @@ class PlayerQueue {
     const oldQueue = [...this.songIds];
     const oldPosition = this.position;
     const oldMetadata = this.metadata;
+
+    // Check if membership set changed (order changes do NOT increment membershipVersion)
+    let membershipChanged = oldQueue.length !== songIds.length;
+    if (!membershipChanged) {
+      const counts = new Map<number, number>();
+      for (let i = 0; i < oldQueue.length; i++) {
+        const id = oldQueue[i];
+        counts.set(id, (counts.get(id) || 0) + 1);
+      }
+      for (let i = 0; i < songIds.length; i++) {
+        const id = songIds[i];
+        const count = counts.get(id);
+        if (!count) {
+          membershipChanged = true;
+          break;
+        }
+        if (count === 1) counts.delete(id);
+        else counts.set(id, count - 1);
+      }
+      if (counts.size > 0) membershipChanged = true;
+    }
+
     this.songIds = [...songIds];
     this.incrementStructureVersion();
+    if (membershipChanged) {
+      this.incrementMembershipVersion();
+    }
     this.position = newPosition >= 0 && newPosition < songIds.length ? newPosition : 0;
     if (clearShuffleHistory) {
       this.queueBeforeShuffle = undefined;
