@@ -3,7 +3,10 @@ import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollect
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
-import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
+import {
+  reconstructPlaylistCoverSongs,
+  resolvePlaylistCover
+} from '@renderer/utils/resolvePlaylistCover';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useEffect, useMemo, useState } from 'react';
@@ -90,16 +93,10 @@ const PlaylistCover = (props: Props) => {
   });
 
   // 4. Preserve exact playlist position order matching collectionEntries (0, 1, 2, 3...)
+  // and append any configured custom collage songs that reside beyond the entry limit
   const playlistSongs: SongData[] = useMemo(() => {
-    if (songs) return songs;
-    const songMap = new Map(fetchedSongData.map((s) => [s.songId, s]));
-    const positionOrderedSongs: SongData[] = [];
-    for (const entry of collectionEntries) {
-      const song = songMap.get(entry.songId);
-      if (song) positionOrderedSongs.push(song);
-    }
-    return positionOrderedSongs;
-  }, [songs, fetchedSongData, collectionEntries]);
+    return reconstructPlaylistCoverSongs(collectionEntries, fetchedSongData, settings, songs);
+  }, [songs, fetchedSongData, collectionEntries, settings]);
 
   // 5. Priority Chain:
   //    (1) Custom Collage (if explicitly set by user, always renders via resolvePlaylistCover)
