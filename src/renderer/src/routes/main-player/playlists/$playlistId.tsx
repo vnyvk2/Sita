@@ -23,15 +23,16 @@ import {
 } from '@renderer/hooks/collections/useCollectionQueries';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SensitiveActionConfirmPrompt = lazy(
@@ -60,7 +61,6 @@ function PlaylistInfoPage() {
     select: (params) => ({ playlistId: Number(params.playlistId) })
   });
 
-  const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'customOrder'
@@ -394,7 +394,7 @@ function PlaylistInfoPage() {
     const validSongIds = filteredSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
-    updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...validSongIds]);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
@@ -407,9 +407,7 @@ function PlaylistInfoPage() {
   }, [
     addNewNotifications,
     filteredSongs,
-    queue.queues[queue.currentQueueIndex].songIds,
-    t,
-    updateQueueData
+    t
   ]);
 
   const shuffleAndPlaySongs = useCallback(

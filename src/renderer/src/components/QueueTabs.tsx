@@ -18,7 +18,21 @@ interface QueueTabsProps {
 
 export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: QueueTabsProps) {
   const { t } = useTranslation();
-  const queueState = useStore(store, (state) => state.localStorage.queue);
+  const currentQueueIndex = useStore(
+    store,
+    (state) => state.localStorage?.queue?.currentQueueIndex ?? 0
+  );
+  const queueTabsData = useStore(store, (state) => {
+    const qs = state.localStorage?.queue?.queues || [];
+    return qs.map((q, index) => ({
+      id: q.id || `queue-fallback-${index}`,
+      title:
+        q.metadata?.title ||
+        (q.metadata?.queueType === 'songs' ? 'All Songs' : `Queue ${index + 1}`),
+      isLocked: !!q.metadata?.isLocked,
+      queueType: q.metadata?.queueType
+    }));
+  });
   const manager = getQueuesManager();
 
   const { updateContextMenuData, addNewNotifications, changePromptMenuData } =
@@ -146,13 +160,11 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
               {...provided.droppableProps}
               className="scrollbar-hide no-scrollbar flex flex-1 items-center overflow-x-auto"
             >
-              {queueState.queues.map((q, index) => {
-                const isActive = index === queueState.currentQueueIndex;
+              {queueTabsData.map((q, index) => {
+                const isActive = index === currentQueueIndex;
                 const isViewing = index === viewingQueueIndex;
-                const title =
-                  q.metadata?.title ||
-                  (q.metadata?.queueType === 'songs' ? 'All Songs' : `Queue ${index + 1}`);
-                const queueId = q.id || `queue-fallback-${index}`;
+                const title = q.title;
+                const queueId = q.id;
 
                 return (
                   <Draggable key={queueId} draggableId={queueId} index={index}>
@@ -200,10 +212,10 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
                                   }
                                 },
                                 {
-                                  label: q.metadata?.isLocked
+                                  label: q.isLocked
                                     ? t('currentQueuePage.unlockQueue', 'Unlock Queue')
                                     : t('currentQueuePage.lockQueue', 'Lock Queue'),
-                                  iconName: q.metadata?.isLocked ? 'lock_open' : 'lock',
+                                  iconName: q.isLocked ? 'lock_open' : 'lock',
                                   handlerFunction: () => {
                                     if (manager) {
                                       manager.toggleQueueLock(q.id);
@@ -214,7 +226,7 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
                                   label: t('currentQueuePage.deleteQueue', 'Delete Queue'),
                                   iconName: 'delete',
                                   isDisabled:
-                                    queueState.queues.length <= 1 || !!q.metadata?.isLocked,
+                                    queueTabsData.length <= 1 || !!q.isLocked,
                                   handlerFunction: () => handleDeleteQueue(q.id, index)
                                 }
                               ],

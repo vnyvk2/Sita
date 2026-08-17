@@ -1,3 +1,4 @@
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -23,7 +24,6 @@ export const Album = (props: AlbumProp) => {
     (state) => state.multipleSelectionsData.isEnabled
   );
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
 
   const {
     createQueue,
@@ -128,10 +128,10 @@ export const Album = (props: AlbumProp) => {
       })
       .then((songs) => {
         if (Array.isArray(songs)) {
-          queue.queues[queue.currentQueueIndex].songIds.push(
-            ...songs.filter((song) => !song.isBlacklisted).map((song) => song.songId)
-          );
-          updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
+          const songIdsToAdd = songs
+            .filter((song) => !song.isBlacklisted)
+            .map((song) => song.songId);
+          getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
           addNewNotifications([
             {
               id: 'newSongsToQueue',
@@ -146,9 +146,7 @@ export const Album = (props: AlbumProp) => {
   }, [
     addNewNotifications,
     multipleSelectionsData,
-    queue.queues[queue.currentQueueIndex].songIds,
-    t,
-    updateQueueData
+    t
   ]);
 
   const showAlbumInfoPage = useCallback(
@@ -243,10 +241,8 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
           else {
-            queue.queues[queue.currentQueueIndex].songIds.push(
-              ...props.songs.map((song) => song.songId)
-            );
-            updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
+            const songIdsToAdd = props.songs.map((song) => song.songId);
+            getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
             addNewNotifications([
               {
                 id: 'newSongsToQueue',
@@ -321,13 +317,11 @@ export const Album = (props: AlbumProp) => {
     playAlbumSongsForMultipleSelections,
     props.albumId,
     props.songs,
-    queue.queues[queue.currentQueueIndex].songIds,
     showAlbumInfoPage,
     t,
     toggleLikeAlbum,
     toggleMultipleSelections,
-    updateMultipleSelections,
-    updateQueueData
+    updateMultipleSelections
   ]);
 
   const contextMenuItemData = useMemo(

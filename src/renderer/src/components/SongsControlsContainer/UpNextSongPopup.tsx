@@ -15,7 +15,19 @@ type Props = {
 
 const UpNextSongPopup = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
+  const nextSongId = useStore(store, (state) => {
+    const activeQueue =
+      state.localStorage?.queue?.queues?.[state.localStorage?.queue?.currentQueueIndex];
+    if (
+      !activeQueue ||
+      typeof activeQueue.position !== 'number' ||
+      !Array.isArray(activeQueue.songIds) ||
+      activeQueue.songIds.length <= 1
+    ) {
+      return undefined;
+    }
+    return activeQueue.songIds[activeQueue.position + 1];
+  });
 
   const { t } = useTranslation();
   const openMainPlayerRoute = useOpenMainPlayerRoute();
@@ -83,47 +95,34 @@ const UpNextSongPopup = (props: Props) => {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     let timeIntervalId: NodeJS.Timeout;
-    if (
-      queue.queues[queue.currentQueueIndex].songIds.length > 1 &&
-      queue.queues[queue.currentQueueIndex].position !== null
-    ) {
+
+    if (nextSongId !== undefined) {
       setUpNextSongData(undefined);
-      const nextSongIndex =
-        queue.queues[queue.currentQueueIndex].songIds[
-          queue.queues[queue.currentQueueIndex].position + 1
-        ];
+      timeoutId = setTimeout(
+        () =>
+          window.api.audioLibraryControls
+            .getSongInfo([nextSongId])
+            .then((res) => {
+              if (res && res[0]) {
+                const [nextSongData] = res;
+                upNextSongDataCache.current = nextSongData;
+                timeIntervalId = setInterval(showPopup, 40000);
+              }
 
-      if (nextSongIndex) {
-        timeoutId = setTimeout(
-          () =>
-            window.api.audioLibraryControls
-              .getSongInfo([nextSongIndex])
-              .then((res) => {
-                if (res && res[0]) {
-                  const [nextSongData] = res;
-                  upNextSongDataCache.current = nextSongData;
-                  // changeUpNextSongData(upNextSongDataCache.current);
-
-                  timeIntervalId = setInterval(showPopup, 40000);
-                }
-
-                return undefined;
-              })
-              .catch((err) => console.error(err)),
-          5000
-        );
-      }
+              return undefined;
+            })
+            .catch((err) => console.error(err)),
+        5000
+      );
+    } else {
+      setUpNextSongData(undefined);
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (timeIntervalId) clearInterval(timeIntervalId);
     };
-  }, [
-    queue.queues[queue.currentQueueIndex].position,
-    queue.queues[queue.currentQueueIndex].songIds,
-    showPopup
-  ]);
+  }, [nextSongId, showPopup]);
 
   const showSongInfoPage = useCallback(
     (songId: number) =>

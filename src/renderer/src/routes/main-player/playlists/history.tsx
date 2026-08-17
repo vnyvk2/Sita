@@ -9,7 +9,9 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
@@ -17,7 +19,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { type ChangeEvent, useCallback, useContext, useEffect, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import historyPlaylistCoverImage from '../../../assets/images/webp/history-playlist-icon.webp';
@@ -65,7 +67,6 @@ const mostPlayedLimitOptions = [
 function HistoryPlaylistInfoPage() {
   const { period: searchPeriod, mostPlayedLimit: searchLimit } = Route.useSearch();
 
-  const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
@@ -139,7 +140,7 @@ function HistoryPlaylistInfoPage() {
     const validSongIds = historySongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
-    updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...validSongIds]);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
@@ -152,9 +153,7 @@ function HistoryPlaylistInfoPage() {
   }, [
     addNewNotifications,
     historySongs,
-    queue.queues[queue.currentQueueIndex].songIds,
-    t,
-    updateQueueData
+    t
   ]);
 
   const shuffleAndPlaySongs = useCallback(
