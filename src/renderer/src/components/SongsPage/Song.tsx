@@ -29,8 +29,8 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import SongArtist from './SongArtist';
+import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
 
-const AddSongsToPlaylistsPrompt = lazy(() => import('./AddSongsToPlaylistsPrompt'));
 const BlacklistSongConfrimPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
 const DeleteSongsFromSystemConfrimPrompt = lazy(
   () => import('./DeleteSongsFromSystemConfrimPrompt')
@@ -276,7 +276,7 @@ const Song = memo(
     // Context menu construction is called on-demand only during `onContextMenu`.
     // We intentionally inspect `store.state` at invocation time to avoid subscribing
     // all 25+ mounted rows to the whole multipleSelections array.
-    const getContextMenuItems = useCallback((): ContextMenuItem[] => {
+    const getContextMenuItems = useCallback(async (): Promise<ContextMenuItem[]> => {
       const state = store.state;
       const currentSelections = state.multipleSelectionsData;
       const isMultiSelectionActive =
@@ -286,6 +286,15 @@ const Song = memo(
         isAMultipleSelection;
 
       const songIds = currentSelections.multipleSelections;
+
+      const playlistMenuItem = await buildSongPlaylistMenuItem({
+        songIds: isMultiSelectionActive ? songIds : [songId],
+        title,
+        t,
+        addNewNotifications,
+        changePromptMenuData,
+        toggleMultipleSelections
+      });
 
       const items: ContextMenuItem[] = [
         {
@@ -432,20 +441,7 @@ const Song = memo(
             toggleMultipleSelections(false);
           }
         },
-        {
-          label: t('song.addToPlaylists'),
-          iconName: 'playlist_add',
-          handlerFunction: () => {
-            changePromptMenuData(
-              true,
-              <AddSongsToPlaylistsPrompt
-                songIds={isAMultipleSelection ? songIds : [songId]}
-                title={title}
-              />
-            );
-            toggleMultipleSelections(false);
-          }
-        },
+        playlistMenuItem,
         {
           label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
           iconName: 'checklist',
@@ -640,9 +636,11 @@ const Song = memo(
                     : 'bg-background-color-1! dark:bg-dark-background-color-1!'
                 }`
         } ${!isAMultipleSelection && isBlacklisted && 'opacity-30!'}`}
-        onContextMenu={(e) => {
+        onContextMenu={async (e) => {
           e.preventDefault();
           e.stopPropagation();
+          const pageX = e.pageX;
+          const pageY = e.pageY;
           const state = store.state;
           const currentSelections = state.multipleSelectionsData;
           const contextMenuItemData: ContextMenuAdditionalData =
@@ -661,7 +659,8 @@ const Song = memo(
                     artists?.map((artist) => artist.name).join(', ') ?? t('common.unknownArtist'),
                   artworkPath: artworkPaths?.optimizedArtworkPath || DefaultSongCover
                 };
-          updateContextMenuData(true, getContextMenuItems(), e.pageX, e.pageY, contextMenuItemData);
+          const items = await getContextMenuItems();
+          updateContextMenuData(true, items, pageX, pageY, contextMenuItemData);
         }}
         onClick={(e) => {
           e.preventDefault();
