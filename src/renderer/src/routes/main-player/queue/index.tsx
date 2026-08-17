@@ -103,8 +103,16 @@ function RouteComponent() {
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 
+  const viewingQueue = manager?.queues?.[viewingQueueIndex];
+  const queueId = viewingQueue?.id ?? queue.queues[viewingQueueIndex]?.id ?? 'active';
+  const membershipVersion = viewingQueue?.membershipVersion ?? 0;
+
   const { data: queuedSongs } = useQuery({
-    ...songQuery.queue(currentQueue),
+    ...songQuery.queue({
+      songIds: currentQueue,
+      queueId,
+      membershipVersion
+    }),
     enabled: currentQueue.length > 0
   });
 
@@ -242,25 +250,34 @@ function RouteComponent() {
     [centerCurrentlyPlayingSong, t]
   );
 
-  const queueDuration = useMemo(() => {
-    if (!queuedSongs || queuedSongs.length === 0) return '0:00';
-    let total = 0;
-    for (let i = 0; i < queuedSongs.length; i++) {
-      total += queuedSongs[i].duration;
+  // Precomputed suffix sum array and total duration in a single backward pass
+  const { suffixDurations, queueDuration } = useMemo(() => {
+    if (currentQueue.length === 0 || queuedSongsMap.size === 0) {
+      return { suffixDurations: null, queueDuration: '0:00' };
     }
-    return calculateTimeFromSeconds(total).timeString;
-  }, [queuedSongs]);
+    const len = currentQueue.length;
+    const suffix = new Float64Array(len);
+    let running = 0;
+    for (let i = len - 1; i >= 0; i--) {
+      const song = queuedSongsMap.get(currentQueue[i]);
+      if (song) {
+        running += song.duration;
+      }
+      suffix[i] = running;
+    }
+    return {
+      suffixDurations: suffix,
+      queueDuration: calculateTimeFromSeconds(running).timeString
+    };
+  }, [currentQueue, queuedSongsMap]);
 
   const activeQueuePosition = queue.queues[queue.currentQueueIndex]?.position ?? 0;
   const completedQueueDuration = useMemo(() => {
-    if (!queuedSongs || queuedSongs.length === 0) return '0:00';
-    const startIdx = Math.max(0, activeQueuePosition);
-    let remaining = 0;
-    for (let i = startIdx; i < queuedSongs.length; i++) {
-      remaining += queuedSongs[i].duration;
-    }
+    if (!suffixDurations || suffixDurations.length === 0) return '0:00';
+    const pos = Math.max(0, Math.min(activeQueuePosition, suffixDurations.length - 1));
+    const remaining = suffixDurations[pos] ?? 0;
     return calculateTimeFromSeconds(remaining).timeString;
-  }, [activeQueuePosition, queuedSongs]);
+  }, [activeQueuePosition, suffixDurations]);
 
   const multipleSelectionsDataRef = useRef(multipleSelectionsData);
   multipleSelectionsDataRef.current = multipleSelectionsData;
@@ -408,9 +425,6 @@ function RouteComponent() {
                       currentQueueIndex: manager.activeQueueIndex
                     }
                   });
-                  queryClient.invalidateQueries(
-                    songQuery.queue(manager.queues[viewingQueueIndex].songIds)
-                  );
 
                   addNewNotifications([
                     {
@@ -485,7 +499,7 @@ function RouteComponent() {
                 <div className="queue-title text-3xl">{queueInfo?.title}</div>
                 <div className="other-info flex text-sm font-light">
                   <div className="queue-no-of-songs">
-                    {t('common.songWithCount', { count: queuedSongs?.length })}
+                    {t('common.songWithCount', { count: currentQueue.length })}
                   </div>
                   <span className="mx-1">&bull;</span>
                   <div className="queue-duration">
@@ -504,18 +518,17 @@ function RouteComponent() {
             </div>
           )}
           <div
-            className={`songs-container overflow-auto ${queuedSongs && queuedSongs?.length > 0 ? 'h-full' : 'h-0'}`}
+            className={`songs-container overflow-auto ${currentQueue.length > 0 ? 'h-full' : 'h-0'}`}
           >
-            {queuedSongs &&
-              queuedSongs.length > 0 && (
-                // $ Enabling StrictMode throws an error in the CurrentQueuePage when using react-beautiful-dnd for drag and drop.
-
+            {currentQueue.length > 0 && (
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable
                     droppableId="droppable"
                     mode="virtual"
                     renderClone={(provided, _, rubric) => {
-                      const data = queuedSongs[rubric.source.index];
+                      const songId = currentQueue[rubric.source.index];
+                      const data = queuedSongsMap.get(songId);
+                      if (!data) return null;
                       return (
                         <Song
                           provided={provided}

@@ -76,17 +76,20 @@ export const songQuery = createQueryKeys('songs', {
       }
     };
   },
-  queue: (songIds: number[]) => {
+  queue: (data: { songIds: number[]; queueId?: string; membershipVersion?: number } | number[]) => {
+    const songIds = Array.isArray(data) ? data : data.songIds;
+    const queueId = Array.isArray(data) ? 'active' : (data.queueId ?? 'active');
+    const membershipVersion = Array.isArray(data) ? 0 : (data.membershipVersion ?? 0);
+
     return {
-      // Avoid mutating the provided queue array when building the cache key
-      queryKey: [`songIds=${[...songIds].sort().join(',')}`],
+      queryKey: [queueId, `v=${membershipVersion}`],
       queryFn: () =>
         window.api.audioLibraryControls.getSongInfo(
           songIds,
           'addedOrder',
           undefined,
           undefined,
-          true
+          false
         )
     };
   },

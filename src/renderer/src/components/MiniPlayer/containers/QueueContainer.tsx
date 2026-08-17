@@ -46,9 +46,15 @@ const QueueContainer = (props: Props) => {
 
   const currentQueue = queue.queues[viewingQueueIndex];
   const songIds = currentQueue?.songIds || [];
+  const queueId = currentQueue?.id ?? 'active';
+  const membershipVersion = manager?.queues?.[viewingQueueIndex]?.membershipVersion ?? 0;
 
   const { data: queuedSongs } = useQuery({
-    ...songQuery.queue(songIds),
+    ...songQuery.queue({
+      songIds,
+      queueId,
+      membershipVersion
+    }),
     enabled: songIds.length > 0 && isQueueVisible
   });
 
@@ -115,12 +121,16 @@ const QueueContainer = (props: Props) => {
             toggleIsFavorite(newFavorite);
           }
           queryClient.invalidateQueries({
-            queryKey: songQuery.queue(songIds).queryKey
+            queryKey: songQuery.queue({
+              songIds,
+              queueId,
+              membershipVersion
+            }).queryKey
           });
         }
       });
     },
-    [currentSongId, toggleIsFavorite, queryClient, songIds]
+    [currentSongId, toggleIsFavorite, queryClient, songIds, queueId, membershipVersion]
   );
 
   const queuedSongsMap = useMemo(() => {
