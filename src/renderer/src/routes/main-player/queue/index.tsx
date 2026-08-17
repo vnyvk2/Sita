@@ -1,4 +1,5 @@
-import { Draggable, Droppable, DragDropContext, type DropResult } from '@hello-pangea/dnd';
+/* eslint-disable react/only-export-components */
+import { Droppable, DragDropContext, type DropResult } from '@hello-pangea/dnd';
 // import DefaultSongCover from '@renderer/assets/images/webp/song_cover_default.webp';
 // import DefaultPlaylistCover from '@renderer/assets/images/webp/playlist_cover_default.webp';
 // import FolderImg from '@renderer/assets/images/webp/empty-folder.webp';
@@ -7,7 +8,7 @@ import Button from '@renderer/components/Button';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import QueueTabs from '@renderer/components/QueueTabs';
-import Song from '@renderer/components/SongsPage/Song';
+import QueueRow from '@renderer/components/SongsPage/QueueRow';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
@@ -15,8 +16,11 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
 import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
-import { store, dispatch } from '@renderer/store/store';
-import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
+import { store } from '@renderer/store/store';
+import {
+  calculateQueueSuffixDurations,
+  getRemainingQueueDuration
+} from '@renderer/utils/queueDuration';
 import { baseInfoPageSearchParamsSchema } from '@renderer/utils/zod/baseInfoPageSearchParamsSchema';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -38,6 +42,7 @@ const queuePageSearchParamsSchema = baseInfoPageSearchParamsSchema.extend({
   queueIndex: z.coerce.number().optional()
 });
 
+// eslint-disable-next-line react/only-export-components
 export const Route = createFileRoute('/main-player/queue/')({
   component: RouteComponent,
   validateSearch: queuePageSearchParamsSchema
@@ -74,18 +79,52 @@ function RouteComponent() {
     }
   }, [queueIndex, queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
 
-  const currentQueue = queue.queues[viewingQueueIndex]?.songIds || [];
+  const songIdsRef = useRef<number[]>([]);
+  const currentQueue = useMemo(() => {
+    const nextIds = queue.queues[viewingQueueIndex]?.songIds;
+    if (!nextIds || nextIds.length === 0) {
+      if (songIdsRef.current.length === 0) return songIdsRef.current;
+      songIdsRef.current = [];
+      return songIdsRef.current;
+    }
+    const prevIds = songIdsRef.current;
+    if (prevIds.length === nextIds.length) {
+      let isSame = true;
+      for (let i = 0; i < nextIds.length; i++) {
+        if (prevIds[i] !== nextIds[i]) {
+          isSame = false;
+          break;
+        }
+      }
+      if (isSame) {
+        return prevIds;
+      }
+    }
+    songIdsRef.current = nextIds;
+    return nextIds;
+  }, [queue.queues, viewingQueueIndex]);
 
   const { addNewNotifications, updateContextMenuData, toggleMultipleSelections, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 
+  const viewingQueue = manager?.queues?.[viewingQueueIndex];
+  const queueId = viewingQueue?.id ?? queue.queues[viewingQueueIndex]?.id ?? 'active';
+  const membershipVersion = viewingQueue?.membershipVersion ?? 0;
+
   const { data: queuedSongs } = useQuery({
-    ...songQuery.queue(currentQueue),
+    ...songQuery.queue({
+      songIds: currentQueue,
+      queueId,
+      membershipVersion
+    }),
     enabled: currentQueue.length > 0
   });
 
-  const queueData = useMemo(() => currentQueue.map((id) => ({ id })), [currentQueue]);
+  const queuedSongsMap = useMemo(() => {
+    if (!queuedSongs || queuedSongs.length === 0) return new Map<number, SongData>();
+    return new Map(queuedSongs.map((s) => [s.songId, s]));
+  }, [queuedSongs]);
 
   const { data: queueInfo } = useQuery({
     ...queueQuery.info({
@@ -182,13 +221,6 @@ function RouteComponent() {
     }
 
     queueToUpdate.replaceQueue(updatedQueue, newPosition, false);
-    dispatch({
-      type: 'UPDATE_QUEUE',
-      data: {
-        queues: manager.queues.map((q) => q.toJSON()),
-        currentQueueIndex: manager.activeQueueIndex
-      }
-    });
     return undefined;
   };
 
@@ -216,21 +248,57 @@ function RouteComponent() {
     [centerCurrentlyPlayingSong, t]
   );
 
-  const queueDuration = useMemo(
-    () =>
-      calculateTimeFromSeconds(queuedSongs?.reduce((prev, current) => prev + current.duration, 0))
-        .timeString,
-    [queuedSongs]
+  // Precomputed suffix sum array and total duration in a single backward pass
+  const { suffixDurations, queueDuration } = useMemo(
+    () => calculateQueueSuffixDurations(currentQueue, queuedSongsMap),
+    [currentQueue, queuedSongsMap]
   );
 
+  const activeQueuePosition = queue.queues[queue.currentQueueIndex]?.position ?? 0;
   const completedQueueDuration = useMemo(
-    () =>
-      calculateTimeFromSeconds(
-        queuedSongs
-          ?.slice(queue.queues[queue.currentQueueIndex].position ?? 0)
-          .reduce((prev, current) => prev + current.duration, 0)
-      ).timeString,
-    [queue.queues[queue.currentQueueIndex].position, queuedSongs]
+    () => getRemainingQueueDuration(suffixDurations, activeQueuePosition),
+    [activeQueuePosition, suffixDurations]
+  );
+
+  const multipleSelectionsDataRef = useRef(multipleSelectionsData);
+  multipleSelectionsDataRef.current = multipleSelectionsData;
+
+  const currentQueueRef = useRef(currentQueue);
+  currentQueueRef.current = currentQueue;
+
+  const handlePlaySong = useCallback(
+    (index: number, songId: number) => {
+      const queueToPlay = manager.queues[viewingQueueIndex];
+      if (queueToPlay) {
+        queueToPlay.moveToPosition(index);
+        if (viewingQueueIndex !== manager.activeQueueIndex) {
+          manager.switchQueue(viewingQueueIndex);
+        } else {
+          playSong(songId, true);
+        }
+      }
+    },
+    [manager, viewingQueueIndex, playSong]
+  );
+
+  const handleRemoveSong = useCallback(
+    (songId: number) => {
+      const { multipleSelections: selectedSongIds, selectionType, isEnabled } =
+        multipleSelectionsDataRef.current;
+      const isMultipleSelectionsEnabled =
+        isEnabled && selectionType === 'songs' && selectedSongIds.length !== 1;
+
+      const queueToUpdate = manager.queues[viewingQueueIndex];
+      if (queueToUpdate) {
+        if (isMultipleSelectionsEnabled) {
+          queueToUpdate.removeSongIds(selectedSongIds);
+          toggleMultipleSelections(false);
+        } else {
+          queueToUpdate.removeSongId(songId);
+        }
+      }
+    },
+    [manager, toggleMultipleSelections, viewingQueueIndex]
   );
 
   return (
@@ -331,16 +399,6 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].shuffle();
-                  dispatch({
-                    type: 'UPDATE_QUEUE',
-                    data: {
-                      queues: manager.queues.map((q) => q.toJSON()),
-                      currentQueueIndex: manager.activeQueueIndex
-                    }
-                  });
-                  queryClient.invalidateQueries(
-                    songQuery.queue(manager.queues[viewingQueueIndex].songIds)
-                  );
 
                   addNewNotifications([
                     {
@@ -372,13 +430,6 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].clear();
-                  dispatch({
-                    type: 'UPDATE_QUEUE',
-                    data: {
-                      queues: manager.queues.map((q) => q.toJSON()),
-                      currentQueueIndex: manager.activeQueueIndex
-                    }
-                  });
                   addNewNotifications([
                     {
                       id: 'clearQueue',
@@ -415,7 +466,7 @@ function RouteComponent() {
                 <div className="queue-title text-3xl">{queueInfo?.title}</div>
                 <div className="other-info flex text-sm font-light">
                   <div className="queue-no-of-songs">
-                    {t('common.songWithCount', { count: queuedSongs?.length })}
+                    {t('common.songWithCount', { count: currentQueue.length })}
                   </div>
                   <span className="mx-1">&bull;</span>
                   <div className="queue-duration">
@@ -434,18 +485,17 @@ function RouteComponent() {
             </div>
           )}
           <div
-            className={`songs-container overflow-auto ${queuedSongs && queuedSongs?.length > 0 ? 'h-full' : 'h-0'}`}
+            className={`songs-container overflow-auto ${currentQueue.length > 0 ? 'h-full' : 'h-0'}`}
           >
-            {queuedSongs &&
-              queuedSongs.length > 0 && (
-                // $ Enabling StrictMode throws an error in the CurrentQueuePage when using react-beautiful-dnd for drag and drop.
-
+            {currentQueue.length > 0 && (
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable
                     droppableId="droppable"
                     mode="virtual"
                     renderClone={(provided, _, rubric) => {
-                      const data = queuedSongs[rubric.source.index];
+                      const songId = currentQueue[rubric.source.index];
+                      const data = queuedSongsMap.get(songId);
+                      if (!data) return null;
                       return (
                         <Song
                           provided={provided}
@@ -470,7 +520,7 @@ function RouteComponent() {
                   >
                     {(droppableProvided) => (
                       <VirtualizedList
-                        data={queueData}
+                        data={currentQueue}
                         fixedItemHeight={60}
                         ref={ListRef}
                         scrollerRef={droppableProvided.innerRef}
@@ -482,73 +532,21 @@ function RouteComponent() {
                             </div>
                           )
                         }}
-                        itemContent={(index, item) => {
-                          const songId = item.id;
-                          const song = queuedSongs?.find((s) => s.songId === songId);
+                        itemContent={(index, songId) => {
+                          const song = queuedSongsMap.get(songId);
                           if (!song) return null;
 
                           return (
-                            <Draggable
-                              draggableId={`${song.songId}-${index}`}
-                              index={index}
+                            <QueueRow
                               key={`${song.songId}-${index}`}
-                            >
-                              {(provided) => {
-                                const { multipleSelections: selectedSongIds } =
-                                  multipleSelectionsData;
-                                const isMultipleSelectionsEnabled =
-                                  multipleSelectionsData.selectionType === 'songs' &&
-                                  multipleSelectionsData.multipleSelections.length !== 1;
-
-                                return (
-                                  <Song
-                                    provided={provided}
-                                    key={`${song.songId}-${index}`}
-                                    isDraggable
-                                    index={index}
-                                    ref={provided.innerRef}
-                                    isIndexingSongs={preferences?.isSongIndexingEnabled}
-                                    {...song}
-                                    trackNo={undefined}
-                                    selectAllHandler={selectAllHandler}
-                                    onPlayClick={(_songId) => {
-                                      const queueToPlay = manager.queues[viewingQueueIndex];
-                                      if (queueToPlay) {
-                                        // First update position silently or with event
-                                        queueToPlay.moveToPosition(index);
-
-                                        if (viewingQueueIndex !== manager.activeQueueIndex) {
-                                          // Switching queue will trigger autoPlay with the new position
-                                          manager.switchQueue(viewingQueueIndex);
-                                        } else {
-                                          playSong(_songId, true);
-                                        }
-                                      }
-                                    }}
-                                    additionalContextMenuItems={[
-                                      {
-                                        label: t('common.removeFromQueue'),
-                                        iconName: 'remove_circle_outline',
-                                        handlerFunction: () => {
-                                          const updatedQueue = currentQueue.filter((id) =>
-                                            isMultipleSelectionsEnabled
-                                              ? !selectedSongIds.includes(id)
-                                              : id !== song.songId
-                                          );
-                                          const queueToUpdate = manager.queues[viewingQueueIndex];
-                                          queueToUpdate.replaceQueue(
-                                            updatedQueue,
-                                            queueToUpdate.position,
-                                            false
-                                          );
-                                          toggleMultipleSelections(false);
-                                        }
-                                      }
-                                    ]}
-                                  />
-                                );
-                              }}
-                            </Draggable>
+                              index={index}
+                              songId={songId}
+                              song={song}
+                              isIndexingSongs={Boolean(preferences?.isSongIndexingEnabled)}
+                              selectAllHandler={selectAllHandler}
+                              onPlaySong={handlePlaySong}
+                              onRemoveSong={handleRemoveSong}
+                            />
                           );
                         }}
                       />

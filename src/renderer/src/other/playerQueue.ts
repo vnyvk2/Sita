@@ -14,6 +14,8 @@ class PlayerQueue {
   position: number;
   queueBeforeShuffle?: number[];
   metadata?: PlayerQueueMetadata;
+  private _structureVersion = 0;
+  private _membershipVersion = 0;
   private listeners: Map<QueueEventType, Set<QueueEventCallback<unknown>>>;
 
   constructor(
@@ -32,7 +34,25 @@ class PlayerQueue {
     this.position = position;
     this.metadata = metadata;
     this.queueBeforeShuffle = queueBeforeShuffle;
+    this._structureVersion = 0;
+    this._membershipVersion = 0;
     this.listeners = new Map();
+  }
+
+  get structureVersion(): number {
+    return this._structureVersion;
+  }
+
+  private incrementStructureVersion(): void {
+    this._structureVersion = (this._structureVersion + 1) | 0;
+  }
+
+  get membershipVersion(): number {
+    return this._membershipVersion;
+  }
+
+  private incrementMembershipVersion(): void {
+    this._membershipVersion = (this._membershipVersion + 1) | 0;
   }
 
   get currentSongId(): number | null {
@@ -47,6 +67,8 @@ class PlayerQueue {
       this.songIds.push(songId);
       this.position = this.songIds.length - 1;
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
+      this.incrementMembershipVersion();
     }
   }
 
@@ -283,7 +305,10 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToNext(songIds: number[]): void {
+    if (songIds.length === 0) return;
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     logQueue('[PlayerQueue.addSongIdsToNext]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -307,7 +332,10 @@ class PlayerQueue {
    * @param songIds - Array of song IDs to add
    */
   addSongIdsToEnd(songIds: number[]): void {
+    if (songIds.length === 0) return;
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     logQueue('[PlayerQueue.addSongIdsToEnd]', {
       addingCount: songIds.length,
       currentPosition: this.position,
@@ -332,9 +360,231 @@ class PlayerQueue {
    */
   addSongIdToNext(songId: number): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     this.songIds.splice(this.position + 1, 0, songId);
     this.emit('songAdded', { songId, position: this.position + 1 });
     this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+  }
+
+  /**
+   * Adds songs to play next, atomically removing any existing duplicate occurrences of those songs
+   * from the queue, inserting the incoming batch after the current position, and adjusting
+   * playback position in a single atomic O(N) mutation.
+   *
+   * Only increments membershipVersion if new song IDs were introduced to the queue or existing
+   * duplicate multiplicities changed. If playNext only reorders songs already present in the queue,
+   * membershipVersion remains unchanged (0 IPC / 0 DB query refetch).
+   *
+   * @param songIds - A single song ID or array of song IDs to play next
+   */
+  playNext(songIds: number | number[]): void {
+    const ids = Array.isArray(songIds) ? songIds : [songIds];
+    if (ids.length === 0) return;
+
+    this.queueBeforeShuffle = undefined;
+
+    if (this.songIds.length === 0) {
+      this.songIds = [...ids];
+      this.position = 0;
+      this.incrementStructureVersion();
+      this.incrementMembershipVersion();
+      this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+      return;
+    }
+
+    const removalSet = new Set(ids);
+    const incomingCounts = new Map<number, number>();
+    for (let i = 0; i < ids.length; i += 1) {
+      const id = ids[i];
+      incomingCounts.set(id, (incomingCounts.get(id) || 0) + 1);
+    }
+
+    const removedCounts = new Map<number, number>();
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      const id = this.songIds[i];
+      if (removalSet.has(id)) {
+        removedCounts.set(id, (removedCounts.get(id) || 0) + 1);
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(id);
+      }
+    }
+
+    // Determine if membership changed (i.e. new song IDs added or duplicate counts differed)
+    let membershipChanged = incomingCounts.size !== removedCounts.size;
+    if (!membershipChanged) {
+      for (const [id, count] of incomingCounts) {
+        if (removedCounts.get(id) !== count) {
+          membershipChanged = true;
+          break;
+        }
+      }
+    }
+
+    let newPosition = 0;
+    if (newSongIds.length === 0) {
+      newSongIds.push(...ids);
+      newPosition = 0;
+    } else {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+      newSongIds.splice(newPosition + 1, 0, ...ids);
+    }
+
+    const oldPosition = this.position;
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.incrementStructureVersion();
+    if (membershipChanged) {
+      this.incrementMembershipVersion();
+    }
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
+  }
+
+  /**
+   * Removes multiple songs from the queue by their positions in a single O(N) pass
+   *
+   * @param positions - Set or Array of 0-indexed positions to remove
+   * @returns True if at least one song was removed, false otherwise
+   */
+  removeSongsAtPositions(positions: Set<number> | number[] | Iterable<number>): boolean {
+    if (this.songIds.length === 0) return false;
+    const positionsSet = positions instanceof Set ? positions : new Set(positions);
+    if (positionsSet.size === 0) return false;
+
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+    let removedAny = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      if (positionsSet.has(i)) {
+        removedAny = true;
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(this.songIds[i]);
+      }
+    }
+
+    if (!removedAny) return false;
+
+    this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
+
+    const oldPosition = this.position;
+    let newPosition = 0;
+    if (newSongIds.length > 0) {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+    }
+
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
+
+    return true;
+  }
+
+  /**
+   * Removes multiple songs from the queue by their song IDs in a single O(N) pass,
+   * removing all duplicate occurrences of those IDs.
+   *
+   * @param songIds - Set or Array of song IDs to remove
+   * @returns True if at least one song was removed, false otherwise
+   */
+  removeSongIds(songIds: Set<number> | number[] | Iterable<number>): boolean {
+    if (this.songIds.length === 0) return false;
+    const idsSet = songIds instanceof Set ? songIds : new Set(songIds);
+    if (idsSet.size === 0) return false;
+
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+    let removedAny = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      const id = this.songIds[i];
+      if (idsSet.has(id)) {
+        removedAny = true;
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(id);
+      }
+    }
+
+    if (!removedAny) return false;
+
+    this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
+
+    const oldPosition = this.position;
+    let newPosition = 0;
+    if (newSongIds.length > 0) {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+    }
+
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
+
+    return true;
   }
 
   /**
@@ -344,6 +594,8 @@ class PlayerQueue {
    */
   addSongIdToEnd(songId: number): void {
     this.queueBeforeShuffle = undefined;
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
     const position = this.songIds.length;
     this.songIds.push(songId);
     this.emit('songAdded', { songId, position });
@@ -366,6 +618,8 @@ class PlayerQueue {
     });
     if (index !== -1) {
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
+      this.incrementMembershipVersion();
       this.songIds.splice(index, 1);
       this.emit('songRemoved', { songId, position: index });
       logQueue('[PlayerQueue.removeSongId.removed]', {
@@ -406,6 +660,8 @@ class PlayerQueue {
   removeSongAtPosition(position: number): number | null {
     if (position >= 0 && position < this.songIds.length) {
       this.queueBeforeShuffle = undefined;
+      this.incrementStructureVersion();
+      this.incrementMembershipVersion();
       const [removed] = this.songIds.splice(position, 1);
       this.emit('songRemoved', { songId: removed, position });
       // Adjust current position if necessary
@@ -438,7 +694,11 @@ class PlayerQueue {
       queueLengthBefore: this.songIds.length,
       currentPosition: this.position
     });
+    if (this.songIds.length > 0) {
+      this.incrementMembershipVersion();
+    }
     this.songIds = [];
+    this.incrementStructureVersion();
     const oldPosition = this.position;
     this.position = 0;
     this.queueBeforeShuffle = undefined;
@@ -481,7 +741,33 @@ class PlayerQueue {
     const oldQueue = [...this.songIds];
     const oldPosition = this.position;
     const oldMetadata = this.metadata;
+
+    // Check if membership set changed (order changes do NOT increment membershipVersion)
+    let membershipChanged = oldQueue.length !== songIds.length;
+    if (!membershipChanged) {
+      const counts = new Map<number, number>();
+      for (let i = 0; i < oldQueue.length; i++) {
+        const id = oldQueue[i];
+        counts.set(id, (counts.get(id) || 0) + 1);
+      }
+      for (let i = 0; i < songIds.length; i++) {
+        const id = songIds[i];
+        const count = counts.get(id);
+        if (!count) {
+          membershipChanged = true;
+          break;
+        }
+        if (count === 1) counts.delete(id);
+        else counts.set(id, count - 1);
+      }
+      if (counts.size > 0) membershipChanged = true;
+    }
+
     this.songIds = [...songIds];
+    this.incrementStructureVersion();
+    if (membershipChanged) {
+      this.incrementMembershipVersion();
+    }
     this.position = newPosition >= 0 && newPosition < songIds.length ? newPosition : 0;
     if (clearShuffleHistory) {
       this.queueBeforeShuffle = undefined;
@@ -523,29 +809,34 @@ class PlayerQueue {
       currentPosition: this.position,
       currentSongId: this.currentSongId
     });
-    const positions: number[] = [];
     const initialQueue = this.songIds.slice(0);
+    const initialIndices = Array.from({ length: this.songIds.length }, (_, i) => i);
     const currentSongId = this.songIds.splice(this.position, 1)[0];
+    const currentSongOriginalIndex = initialIndices.splice(this.position, 1)[0];
 
-    // Fisher-Yates shuffle
+    // Fisher-Yates shuffle both songIds and initialIndices in lockstep
     for (let i = this.songIds.length - 1; i > 0; i -= 1) {
       const randomIndex = Math.floor(Math.random() * (i + 1));
       [this.songIds[i], this.songIds[randomIndex]] = [this.songIds[randomIndex], this.songIds[i]];
+      [initialIndices[i], initialIndices[randomIndex]] = [initialIndices[randomIndex], initialIndices[i]];
     }
 
     // Place current song at the beginning
-    if (currentSongId) {
+    if (currentSongId !== undefined) {
       this.songIds.unshift(currentSongId);
+      initialIndices.unshift(currentSongOriginalIndex);
     }
 
-    // Create position mapping
-    for (let i = 0; i < initialQueue.length; i += 1) {
-      positions.push(this.songIds.indexOf(initialQueue[i]));
+    // Create O(N) position mapping: positions[originalIndex] = shuffledIndex
+    const positions = new Array<number>(initialQueue.length);
+    for (let j = 0; j < initialIndices.length; j += 1) {
+      positions[initialIndices[j]] = j;
     }
 
     const oldPosition = this.position;
     this.position = 0;
     this.queueBeforeShuffle = positions;
+    this.incrementStructureVersion();
 
     logQueue('[PlayerQueue.shuffle.done]', {
       newQueueLength: this.songIds.length,
@@ -589,12 +880,19 @@ class PlayerQueue {
 
     const oldPosition = this.position;
     this.songIds = restoredQueue;
+    this.incrementStructureVersion();
 
-    if (currentSongId) {
-      const newPosition = this.songIds.indexOf(currentSongId);
-      this.position = newPosition !== -1 ? newPosition : 0;
+    if (currentSongId !== undefined) {
+      const originalActiveIndex = positionMapping.indexOf(0);
+      if (originalActiveIndex !== -1 && this.songIds[originalActiveIndex] === currentSongId) {
+        this.position = originalActiveIndex;
+      } else {
+        const newPosition = this.songIds.indexOf(currentSongId);
+        this.position = newPosition !== -1 ? newPosition : 0;
+      }
     } else {
-      this.position = 0;
+      const originalActiveIndex = positionMapping.indexOf(0);
+      this.position = originalActiveIndex !== -1 ? originalActiveIndex : 0;
     }
 
     // Clear the shuffle history since we've restored

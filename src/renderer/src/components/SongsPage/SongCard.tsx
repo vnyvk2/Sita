@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { getQueuesManager } from '../../other/queuesManager';
 import { store } from '../../store/store';
 import Button from '../Button';
 import Img from '../Img';
@@ -38,7 +39,19 @@ interface SongCardProp {
 
 const SongCard = (props: SongCardProp) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
+  const isPlayingNext = useStore(store, (state) => {
+    const activeQueue =
+      state.localStorage?.queue?.queues?.[state.localStorage?.queue?.currentQueueIndex];
+    if (
+      !activeQueue ||
+      typeof activeQueue.position !== 'number' ||
+      !Array.isArray(activeQueue.songIds) ||
+      activeQueue.songIds.length === 0
+    ) {
+      return false;
+    }
+    return activeQueue.songIds[activeQueue.position + 1] === props.songId;
+  });
   const doNotShowBlacklistSongConfirm = useStore(
     store,
     (state) => state.localStorage.preferences.doNotShowBlacklistSongConfirm
@@ -200,33 +213,7 @@ const SongCard = (props: SongCardProp) => {
         iconName: 'shortcut',
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) {
-            let currentSongIndex =
-              queue.queues[queue.currentQueueIndex].position ??
-              queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
-            const duplicateIds: number[] = [];
-
-            const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => {
-              const isADuplicate = songIds.includes(id);
-              if (isADuplicate) duplicateIds.push(id);
-
-              return !isADuplicate;
-            });
-
-            for (const duplicateId of duplicateIds) {
-              const duplicateIdPosition =
-                queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
-
-              if (
-                duplicateIdPosition !== -1 &&
-                duplicateIdPosition < currentSongIndex &&
-                currentSongIndex - 1 >= 0
-              )
-                currentSongIndex -= 1;
-            }
-
-            newQueue.splice(currentSongIndex + 1, 0, ...songIds);
-
-            updateQueueData(currentSongIndex, newQueue, undefined, false);
+            getQueuesManager().getActiveQueue().playNext(songIds);
             addNewNotifications([
               {
                 id: `${title}PlayNext`,
@@ -237,22 +224,7 @@ const SongCard = (props: SongCardProp) => {
               }
             ]);
           } else {
-            const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter(
-              (id) => id !== songId
-            );
-            newQueue.splice(newQueue.indexOf(currentSongData.songId) + 1 || 0, 0, songId);
-
-            const duplicateSongIndex =
-              queue.queues[queue.currentQueueIndex].songIds.indexOf(songId);
-
-            const currentSongIndex =
-              queue.queues[queue.currentQueueIndex].position &&
-              duplicateSongIndex !== -1 &&
-              duplicateSongIndex < queue.queues[queue.currentQueueIndex].position
-                ? queue.queues[queue.currentQueueIndex].position - 1
-                : undefined;
-
-            updateQueueData(currentSongIndex, newQueue, undefined, false);
+            getQueuesManager().getActiveQueue().playNext(songId);
             addNewNotifications([
               {
                 id: `${title}PlayNext`,
@@ -269,11 +241,7 @@ const SongCard = (props: SongCardProp) => {
         iconName: 'queue',
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) {
-            updateQueueData(
-              undefined,
-              [...queue.queues[queue.currentQueueIndex].songIds, ...songIds],
-              false
-            );
+            getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
             addNewNotifications([
               {
                 id: `${songIds.length}AddedToQueueFromMultiSelection`,
@@ -284,11 +252,7 @@ const SongCard = (props: SongCardProp) => {
               }
             ]);
           } else {
-            updateQueueData(
-              undefined,
-              [...queue.queues[queue.currentQueueIndex].songIds, songId],
-              false
-            );
+            getQueuesManager().getActiveQueue().addSongIdToEnd(songId);
             addNewNotifications([
               {
                 id: `${title}AddedToQueue`,
@@ -467,11 +431,8 @@ const SongCard = (props: SongCardProp) => {
     toggleMultipleSelections,
     handlePlayBtnClick,
     createQueue,
-    queue.queues,
-    queue.currentQueueIndex,
     currentSongData.songId,
     currentSongData.isAFavorite,
-    updateQueueData,
     artworkPath,
     isSongAFavorite,
     toggleIsFavorite,
@@ -564,35 +525,21 @@ const SongCard = (props: SongCardProp) => {
       >
         <div className="song-states-container flex items-center justify-between">
           <div className="state-info flex">
-            {typeof queue.queues[queue.currentQueueIndex].position === 'number' &&
-              Array.isArray(queue.queues[queue.currentQueueIndex].songIds) &&
-              queue.queues[queue.currentQueueIndex].songIds.length > 0 &&
-              queue?.queues[queue.currentQueueIndex]?.songIds?.at(
-                queue.queues[queue.currentQueueIndex].position + 1
-              ) === songId && (
-                <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
-                  {t('song.playingNext')}
-                </span>
-              )}
+            {isPlayingNext && (
+              <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
+                {t('song.playingNext')}
+              </span>
+            )}
             {currentSongData.songId === songId && (
               <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
                 {t('song.playingNow')}
               </span>
             )}
-            {isBlacklisted &&
-              !(
-                typeof queue.queues[queue.currentQueueIndex].position === 'number' &&
-                Array.isArray(queue.queues[queue.currentQueueIndex].songIds) &&
-                queue.queues[queue.currentQueueIndex].songIds.length > 0 &&
-                queue?.queues[queue.currentQueueIndex]?.songIds?.at(
-                  queue.queues[queue.currentQueueIndex].position + 1
-                ) === songId &&
-                currentSongData.songId === songId
-              ) && (
-                <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
-                  {t('song.blacklisted')}
-                </span>
-              )}
+            {isBlacklisted && !isPlayingNext && currentSongData.songId !== songId && (
+              <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
+                {t('song.blacklisted')}
+              </span>
+            )}
           </div>
           <div className="state-icons flex">
             <Button

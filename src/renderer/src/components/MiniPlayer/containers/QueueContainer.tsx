@@ -6,14 +6,161 @@ import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type VirtuosoHandle } from 'react-virtuoso';
 
 import DefaultSongCover from '../../../assets/images/webp/song_cover_default.webp';
 import calculateTime from '../../../utils/calculateTime';
 import Img from '../../Img';
+import VirtualizedList from '../../VirtualizedList';
+
+type MiniQueueRowProps = {
+  index: number;
+  songId: number;
+  song: SongData | undefined;
+  isActivePosition: boolean;
+  isCurrentSongPlaying: boolean;
+  onSongClick: (index: number) => void;
+  onToggleFavorite: (e: React.MouseEvent, song: SongData) => void;
+  unknownArtistText: string;
+  unknownAlbumText: string;
+  likeText: string;
+  unlikeText: string;
+};
+
+const MiniQueueRow = memo((props: MiniQueueRowProps) => {
+  const {
+    index,
+    song,
+    isActivePosition,
+    isCurrentSongPlaying,
+    onSongClick,
+    onToggleFavorite,
+    unknownArtistText,
+    unknownAlbumText,
+    likeText,
+    unlikeText
+  } = props;
+
+  const handleClick = useCallback(() => {
+    onSongClick(index);
+  }, [onSongClick, index]);
+
+  const handleFavoriteClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (song) {
+        onToggleFavorite(e, song);
+      }
+    },
+    [onToggleFavorite, song]
+  );
+
+  const handleFavoriteKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if ((e.key === 'Enter' || e.key === ' ') && song) {
+        e.preventDefault();
+        onToggleFavorite(e as unknown as React.MouseEvent, song);
+      }
+    },
+    [onToggleFavorite, song]
+  );
+
+  if (!song) {
+    return (
+      <div className="queue-song-item flex h-[52px] min-h-[52px] max-h-[52px] w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 opacity-50">
+        <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
+        <div className="min-w-0 flex-1">
+          <div className="h-3.5 w-24 rounded bg-white/10" />
+        </div>
+      </div>
+    );
+  }
+
+  const { minutes, seconds } = calculateTime(song.duration);
+  const formattedDuration = `${Number(minutes)}:${seconds}`;
+  const isAFavorite = Boolean(song.isAFavorite);
+
+  return (
+    <button
+      type="button"
+      className={`queue-song-item group/songItem flex h-[52px] min-h-[52px] max-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
+        isActivePosition
+          ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
+          : 'hover:bg-font-color-white/10'
+      }`}
+      onClick={handleClick}
+    >
+      {/* Artwork */}
+      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded">
+        <Img
+          src={song.artworkPaths?.optimizedArtworkPath || song.artworkPaths?.artworkPath}
+          fallbackSrc={DefaultSongCover}
+          loading="lazy"
+          alt={song.title}
+          className="h-full w-full object-cover"
+        />
+        {isActivePosition && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+              {isCurrentSongPlaying ? 'equalizer' : 'pause'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Song Info */}
+      <div className="min-w-0 flex-1">
+        <div
+          className={`truncate text-sm leading-tight ${
+            isActivePosition
+              ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-medium'
+              : 'text-font-color-white'
+          }`}
+        >
+          {song.title}
+        </div>
+        <div className="text-font-color-white/60 mt-0.5 truncate text-xs leading-tight">
+          {song.artists?.map((a) => a.name).join(', ') || unknownArtistText}
+        </div>
+        <div className="text-font-color-white/40 mt-0.5 truncate text-xs leading-tight">
+          {song.album?.name || unknownAlbumText}
+        </div>
+      </div>
+
+      {/* Right Side: Favorite Heart Button + mm:ss Duration */}
+      <div className="flex shrink-0 items-center gap-1.5 [-webkit-app-region:no-drag]">
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={isAFavorite ? unlikeText : likeText}
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-font-color-white/40 hover:text-font-color-highlight hover:bg-white/10 transition-colors"
+          title={isAFavorite ? unlikeText : likeText}
+          onClick={handleFavoriteClick}
+          onKeyDown={handleFavoriteKeyDown}
+        >
+          <span
+            className={`material-icons-round text-base transition-colors ${
+              isAFavorite
+                ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
+                : 'opacity-0 group-hover/songItem:opacity-60 hover:opacity-100! hover:text-font-color-highlight'
+            }`}
+          >
+            {isAFavorite ? 'favorite' : 'favorite_border'}
+          </span>
+        </span>
+
+        <div className="text-font-color-white/50 text-xs tabular-nums min-w-[30px] text-right">
+          {formattedDuration}
+        </div>
+      </div>
+    </button>
+  );
+});
 
 type Props = { isQueueVisible: boolean };
+
+const EMPTY_SONG_IDS: readonly number[] = [];
 
 const QueueContainer = (props: Props) => {
   const { isQueueVisible } = props;
@@ -27,7 +174,7 @@ const QueueContainer = (props: Props) => {
   const openMainPlayerRoute = useOpenMainPlayerRoute();
   const queryClient = useQueryClient();
 
-  const listRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const isFirstScrollRef = useRef(true);
 
   const [viewingQueueIndex, setViewingQueueIndex] = useState(queue.currentQueueIndex);
@@ -45,49 +192,38 @@ const QueueContainer = (props: Props) => {
   const manager = getQueuesManager();
 
   const currentQueue = queue.queues[viewingQueueIndex];
-  const songIds = currentQueue?.songIds || [];
+  const songIds = currentQueue?.songIds ?? EMPTY_SONG_IDS;
+  const queueId = currentQueue?.id ?? 'active';
+  const membershipVersion = manager?.queues?.[viewingQueueIndex]?.membershipVersion ?? 0;
 
   const { data: queuedSongs } = useQuery({
-    ...songQuery.queue(songIds),
+    ...songQuery.queue({
+      songIds,
+      queueId,
+      membershipVersion
+    }),
     enabled: songIds.length > 0 && isQueueVisible
   });
 
-  // Auto-scroll to the currently playing song when the queue opens
+  const activePosition = queue.queues[queue.currentQueueIndex]?.position ?? -1;
+  const isViewingActiveQueue = viewingQueueIndex === queue.currentQueueIndex;
+
+  // Auto-scroll to the currently playing song when the queue opens or active song changes
   useEffect(() => {
     if (!isQueueVisible) {
       isFirstScrollRef.current = true;
       return;
     }
 
-    const activeQueue = queue.queues[queue.currentQueueIndex];
-
-    if (
-      isQueueVisible &&
-      queuedSongs &&
-      listRef.current &&
-      viewingQueueIndex === queue.currentQueueIndex
-    ) {
-      const activeIndex = activeQueue?.position ?? -1;
-      if (activeIndex >= 0) {
-        // Each item is ~52px tall. Scroll so the active item is centered.
-        const itemHeight = 52;
-        const containerHeight = listRef.current.clientHeight;
-        const scrollTarget = activeIndex * itemHeight - containerHeight / 2 + itemHeight / 2;
-        const behavior = isFirstScrollRef.current ? 'instant' : 'smooth';
-        isFirstScrollRef.current = false;
-        requestAnimationFrame(() => {
-          listRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior });
-        });
-      }
+    if (isViewingActiveQueue && activePosition >= 0 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: activePosition,
+        align: 'center',
+        behavior: isFirstScrollRef.current ? 'auto' : 'smooth'
+      });
+      isFirstScrollRef.current = false;
     }
-  }, [
-    isQueueVisible,
-    queuedSongs,
-    currentSongId,
-    queue.queues[queue.currentQueueIndex]?.songIds,
-    viewingQueueIndex,
-    queue.currentQueueIndex
-  ]);
+  }, [isQueueVisible, isViewingActiveQueue, activePosition]);
 
   const handleSongClick = useCallback(
     (index: number) => {
@@ -109,134 +245,32 @@ const QueueContainer = (props: Props) => {
   const handleToggleFavorite = useCallback(
     (e: React.MouseEvent, song: SongData) => {
       e.stopPropagation();
-      toggleSongIsFavorite(song.songId, Boolean(song.isAFavorite)).then((newFavorite) => {
-        if (typeof newFavorite === 'boolean') {
-          if (song.songId === currentSongId) {
-            toggleIsFavorite(newFavorite);
+      toggleSongIsFavorite(song.songId, Boolean(song.isAFavorite))
+        .then((newFavorite) => {
+          if (typeof newFavorite === 'boolean') {
+            if (song.songId === currentSongId) {
+              toggleIsFavorite(newFavorite);
+            }
+            queryClient.invalidateQueries({
+              queryKey: songQuery.queue({
+                songIds,
+                queueId,
+                membershipVersion
+              }).queryKey
+            });
           }
-          queryClient.invalidateQueries({
-            queryKey: songQuery.queue(songIds).queryKey
-          });
-        }
-      });
+        })
+        .catch((err) => {
+          console.error('Failed to toggle song favorite:', err);
+        });
     },
-    [currentSongId, toggleIsFavorite, queryClient, songIds]
+    [currentSongId, toggleIsFavorite, queryClient, songIds, queueId, membershipVersion]
   );
 
   const queuedSongsMap = useMemo(() => {
     if (!queuedSongs) return new Map<number, SongData>();
     return new Map(queuedSongs.map((s) => [s.songId, s]));
   }, [queuedSongs]);
-
-  const songItems = useMemo(() => {
-    if (!queuedSongs) return null;
-
-    const currentQueueSongIds = queue.queues[viewingQueueIndex]?.songIds || [];
-
-    return currentQueueSongIds.map((id, index) => {
-      const song = queuedSongsMap.get(id);
-      if (!song) return null;
-
-      const isActivePosition =
-        viewingQueueIndex === queue.currentQueueIndex &&
-        index === queue.queues[queue.currentQueueIndex]?.position;
-
-      const { minutes, seconds } = calculateTime(song.duration);
-      const formattedDuration = `${Number(minutes)}:${seconds}`;
-
-      return (
-        <button
-          key={`${id}-${index}`}
-          type="button"
-          className={`queue-song-item group/songItem flex h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
-            isActivePosition
-              ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
-              : 'hover:bg-font-color-white/10'
-          }`}
-          onClick={() => handleSongClick(index)}
-        >
-          {/* Artwork */}
-          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded">
-            <Img
-              src={song.artworkPaths?.optimizedArtworkPath || song.artworkPaths?.artworkPath}
-              fallbackSrc={DefaultSongCover}
-              loading="lazy"
-              alt={song.title}
-              className="h-full w-full object-cover"
-            />
-            {isActivePosition && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
-                  {isCurrentSongPlaying ? 'equalizer' : 'pause'}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Song Info */}
-          <div className="min-w-0 flex-1">
-            <div
-              className={`truncate text-sm leading-tight ${
-                isActivePosition
-                  ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-medium'
-                  : 'text-font-color-white'
-              }`}
-            >
-              {song.title}
-            </div>
-            <div className="text-font-color-white/60 mt-0.5 truncate text-xs leading-tight">
-              {song.artists?.map((a) => a.name).join(', ') || t('common.unknownArtist')}
-            </div>
-            <div className="text-font-color-white/40 mt-0.5 truncate text-xs leading-tight">
-              {song.album?.name || t('common.unknownAlbum', 'Unknown Album')}
-            </div>
-          </div>
-
-          {/* Right Side: Favorite Heart Button + mm:ss Duration */}
-          <div className="flex shrink-0 items-center gap-1.5 [-webkit-app-region:no-drag]">
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label={song.isAFavorite ? t('song.unlikeSong', 'Unlike') : t('song.likeSong', 'Like')}
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-font-color-white/40 hover:text-font-color-highlight hover:bg-white/10 transition-colors"
-              title={song.isAFavorite ? t('song.unlikeSong', 'Unlike') : t('song.likeSong', 'Like')}
-              onClick={(e) => handleToggleFavorite(e, song)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleToggleFavorite(e as any, song);
-                }
-              }}
-            >
-              <span
-                className={`material-icons-round text-base transition-colors ${
-                  song.isAFavorite
-                    ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
-                    : 'opacity-0 group-hover/songItem:opacity-60 hover:opacity-100! hover:text-font-color-highlight'
-                }`}
-              >
-                {song.isAFavorite ? 'favorite' : 'favorite_border'}
-              </span>
-            </span>
-
-            <div className="text-font-color-white/50 text-xs tabular-nums min-w-[30px] text-right">
-              {formattedDuration}
-            </div>
-          </div>
-        </button>
-      );
-    });
-  }, [
-    queuedSongs,
-    queuedSongsMap,
-    queue.queues,
-    viewingQueueIndex,
-    queue.currentQueueIndex,
-    isCurrentSongPlaying,
-    handleSongClick,
-    handleToggleFavorite,
-    t
-  ]);
 
   if (!isQueueVisible) return null;
 
@@ -291,18 +325,36 @@ const QueueContainer = (props: Props) => {
               )}
           </div>
           <span className="text-font-color-white/40 text-xs">
-            {queuedSongs ? t('common.songWithCount', { count: queuedSongs.length }) : ''}
+            {songIds.length > 0 ? t('common.songWithCount', { count: songIds.length }) : ''}
           </span>
         </div>
       </div>
 
-      {/* Song List */}
-      <div
-        ref={listRef}
-        className="custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-4"
-      >
-        {queuedSongs && queuedSongs.length > 0 ? (
-          songItems
+      {/* Virtualized Song List */}
+      <div className="min-h-0 flex-1 overflow-hidden px-1 pb-2">
+        {songIds.length > 0 ? (
+          <VirtualizedList<number>
+            ref={virtuosoRef}
+            data={songIds}
+            fixedItemHeight={52}
+            initialItemCount={15}
+            style={{ height: '100%' }}
+            itemContent={(index, id) => (
+              <MiniQueueRow
+                index={index}
+                songId={id}
+                song={queuedSongsMap.get(id)}
+                isActivePosition={isViewingActiveQueue && index === activePosition}
+                isCurrentSongPlaying={isCurrentSongPlaying}
+                onSongClick={handleSongClick}
+                onToggleFavorite={handleToggleFavorite}
+                unknownArtistText={t('common.unknownArtist')}
+                unknownAlbumText={t('common.unknownAlbum', 'Unknown Album')}
+                likeText={t('song.likeSong', 'Like')}
+                unlikeText={t('song.unlikeSong', 'Unlike')}
+              />
+            )}
+          />
         ) : (
           <div className="text-font-color-white/40 flex h-full flex-col items-center justify-center gap-4 text-sm">
             {t('currentQueuePage.empty', 'Queue is empty')}

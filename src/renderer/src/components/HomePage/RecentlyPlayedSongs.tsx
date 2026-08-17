@@ -26,7 +26,7 @@ const RecentlyPlayedSongs = (props: Props) => {
           return (
             <SongCard
               index={index}
-              key={song.songId}
+              key={`${song.songId}-${index}`}
               title={song.title}
               artworkPath={song.artworkPaths?.artworkPath || DefaultSongCover}
               path={song.path}

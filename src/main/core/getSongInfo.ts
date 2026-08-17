@@ -40,24 +40,28 @@ const getSongInfo = async (
       const languageMap = new Map<number, string>();
 
       if (fetchedSongIds.length > 0) {
-        const languageOverrides = await trx
-          .select({
-            entityId: metadataOverrides.entityId,
-            stringValue: metadataOverrides.stringValue
-          })
-          .from(metadataOverrides)
-          .where(
-            and(
-              eq(metadataOverrides.entityKind, 'song'),
-              eq(metadataOverrides.fieldId, 'language'),
-              inArray(metadataOverrides.entityId, fetchedSongIds)
-            )
-          );
+        const OVERRIDE_CHUNK_SIZE = 500;
+        for (let i = 0; i < fetchedSongIds.length; i += OVERRIDE_CHUNK_SIZE) {
+          const chunk = fetchedSongIds.slice(i, i + OVERRIDE_CHUNK_SIZE);
+          const languageOverrides = await trx
+            .select({
+              entityId: metadataOverrides.entityId,
+              stringValue: metadataOverrides.stringValue
+            })
+            .from(metadataOverrides)
+            .where(
+              and(
+                eq(metadataOverrides.entityKind, 'song'),
+                eq(metadataOverrides.fieldId, 'language'),
+                inArray(metadataOverrides.entityId, chunk)
+              )
+            );
 
-        for (const override of languageOverrides) {
-          const sId = Number(override.entityId);
-          if (!isNaN(sId) && override.stringValue) {
-            languageMap.set(sId, override.stringValue);
+          for (const override of languageOverrides) {
+            const sId = Number(override.entityId);
+            if (!isNaN(sId) && override.stringValue) {
+              languageMap.set(sId, override.stringValue);
+            }
           }
         }
       }

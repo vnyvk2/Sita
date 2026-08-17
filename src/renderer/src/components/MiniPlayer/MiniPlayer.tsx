@@ -34,7 +34,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const isRepeating = useStore(store, (state) => state.player.isRepeating);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const queue = useStore(store, (state) => state.localStorage.queue);
+  const queueLength = useStore(
+    store,
+    (state) =>
+      state.localStorage?.queue?.queues?.[state.localStorage?.queue?.currentQueueIndex]?.songIds
+        ?.length ?? 0
+  );
 
   const { data: settings } = useSuspenseQuery({
     ...settingsQuery.all,
@@ -230,7 +235,6 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, [measureAndSyncBounds]);
 
-  const queueLength = queue.queues[queue.currentQueueIndex]?.songIds?.length ?? 0;
   const isQueueTransitioningRef = useRef(false);
   const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
   const isLyricsTransitioningRef = useRef(false);

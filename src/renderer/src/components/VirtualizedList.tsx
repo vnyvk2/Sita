@@ -4,11 +4,12 @@ import { Virtuoso, type Components, type ListRange, type VirtuosoHandle } from '
 
 import { scrollRegistry } from '../utils/scrollStore';
 
-type Props<T extends object> = {
-  data: T[];
+type Props<T> = {
+  data: readonly T[];
   fixedItemHeight: number;
   scrollKey?: string;
   scrollTopOffset?: number;
+  initialItemCount?: number;
   itemContent: (index: number, item: T) => ReactNode;
   components?: Components<T>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,12 +22,13 @@ type Props<T extends object> = {
 
 const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
 
-const List = <T extends object>(props: Props<T>, ref) => {
+const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   const {
     data,
     fixedItemHeight,
     scrollKey,
     scrollTopOffset,
+    initialItemCount,
     itemContent,
     components = {},
     scrollerRef,
@@ -142,6 +144,7 @@ const List = <T extends object>(props: Props<T>, ref) => {
         ...components
       }}
       ref={setCombinedVirtuosoRef}
+      {...(initialItemCount !== undefined ? { initialItemCount } : {})}
       {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
       scrollerRef={(element) => {
         if (typeof scrollerRef === 'function') {
@@ -188,7 +191,7 @@ const List = <T extends object>(props: Props<T>, ref) => {
   );
 };
 
-const VirtualizedList = forwardRef(List) as <T extends object>(
+const VirtualizedList = forwardRef(List) as <T>(
   props: Props<T> & { ref?: React.ForwardedRef<VirtuosoHandle> }
 ) => ReturnType<typeof List>;
 

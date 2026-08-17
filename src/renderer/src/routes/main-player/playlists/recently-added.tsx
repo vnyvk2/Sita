@@ -9,6 +9,7 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -43,7 +44,6 @@ const playlistData: Playlist = {
 function RecentlyAddedPlaylistInfoPage() {
   const { period: searchPeriod } = Route.useSearch();
 
-  const queue = useStore(store, (state) => state.localStorage.queue);
   const playlistSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
@@ -100,7 +100,7 @@ function RecentlyAddedPlaylistInfoPage() {
     const validSongIds = recentlyAddedSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
-    updateQueueData(undefined, [...queue.queues[queue.currentQueueIndex].songIds, ...validSongIds]);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
@@ -113,10 +113,7 @@ function RecentlyAddedPlaylistInfoPage() {
   }, [
     addNewNotifications,
     recentlyAddedSongs,
-    queue.queues,
-    queue.currentQueueIndex,
-    t,
-    updateQueueData
+    t
   ]);
 
   const shuffleAndPlaySongs = useCallback(

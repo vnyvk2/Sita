@@ -9,6 +9,7 @@ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { genreQuery } from '@renderer/queries/genres';
 import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
@@ -37,7 +38,6 @@ export const Route = createFileRoute('/main-player/genres/$genreId')({
  *   virtualized list of songs for the current genre.
  */
 function GenreInfoPage() {
-  const queue = useStore(store, (state) => state.localStorage.queue);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const genreDetailSortingState = useStore(
     store,
@@ -133,15 +133,8 @@ function GenreInfoPage() {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: () => {
-              updateQueueData(
-                undefined,
-                [
-                  ...queue.queues[queue.currentQueueIndex].songIds,
-                  ...genreSongs.map((song) => song.songId)
-                ],
-                false,
-                false
-              );
+              const songIdsToAdd = genreSongs.map((song) => song.songId);
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
               addNewNotifications([
                 {
                   id: String(genreData?.genreId || ''),

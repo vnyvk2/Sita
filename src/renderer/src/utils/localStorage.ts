@@ -119,7 +119,6 @@ const getAllItems = (): LocalStorage => {
 
 const setAllItems = (storage: LocalStorage) => {
   try {
-    setLocalStorage(storage);
     dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: { ...storage } });
   } catch (error) {
     console.error(error);
