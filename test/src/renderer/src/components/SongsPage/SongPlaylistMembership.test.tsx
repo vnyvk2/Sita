@@ -16,7 +16,6 @@ import {
 import { rootCollectionsOptions } from '../../../../../../src/renderer/src/hooks/collections/useCollectionQueries';
 import { songPlaylistsQuery } from '../../../../../../src/renderer/src/queries/songPlaylists';
 import { queryClient } from '../../../../../../src/renderer/src/queryClient';
-import { dispatch } from '../../../../../../src/renderer/src/store/store';
 
 // Mock dependencies
 vi.mock('react-i18next', async (importOriginal) => {
@@ -182,9 +181,10 @@ describe('MusicBee-Style Lazy Playlist Membership & Context Menu', () => {
     expect(workoutItem?.iconName).toBe('check_box_outline_blank');
   });
 
-  it('Test 2: Clicking unincluded playlist triggers addSongs, optimistically updates cache, and invalidates playlist queries', async () => {
+  it('Test 2: Clicking unincluded playlist triggers addSongs, optimistically updates cache, and invalidates single-song membership query', async () => {
     const addNewNotifications = vi.fn();
     const changePromptMenuData = vi.fn();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     const menuItem = await buildSongPlaylistMenuItem({
       songIds: [10],
@@ -212,11 +212,17 @@ describe('MusicBee-Style Lazy Playlist Membership & Context Menu', () => {
     const cached = queryClient.getQueryData<number[]>(songPlaylistsQuery.membership(10).queryKey);
     expect(cached).toContain(3);
     expect(addNewNotifications).toHaveBeenCalled();
+
+    // 3. Assert single-song membership query was invalidated
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: songPlaylistsQuery.membership(10).queryKey
+    });
   });
 
   it('Test 3: Clicking included playlist triggers removeSongs, optimistically updates cache, and notifies user', async () => {
     const addNewNotifications = vi.fn();
     const changePromptMenuData = vi.fn();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     const menuItem = await buildSongPlaylistMenuItem({
       songIds: [10],
@@ -243,6 +249,11 @@ describe('MusicBee-Style Lazy Playlist Membership & Context Menu', () => {
     // 2. Assert query cache updated to exclude playlist 1
     const cached = queryClient.getQueryData<number[]>(songPlaylistsQuery.membership(10).queryKey);
     expect(cached).not.toContain(1);
+
+    // 3. Assert single-song membership query was invalidated
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: songPlaylistsQuery.membership(10).queryKey
+    });
   });
 
   it('Test 4: Mutation failure rolls back optimistic query cache update and shows error notification', async () => {
@@ -368,5 +379,20 @@ describe('MusicBee-Style Lazy Playlist Membership & Context Menu', () => {
     const playlistMenu = capturedMenuItems.find((i: any) => i.label === 'Include in Playlist');
     expect(playlistMenu).toBeDefined();
     expect(playlistMenu.innerContextMenus.length).toBeGreaterThan(0);
+  });
+
+  it('Test 9 (IPC Error Propagation): songPlaylistsQuery.membership rejects on IPC failure rather than caching empty array', async () => {
+    (window as any).api.membership.getCollectionsContaining = vi
+      .fn()
+      .mockRejectedValue(new Error('IPC Disconnected'));
+
+    // Verify fetchQuery rejects
+    await expect(queryClient.fetchQuery(songPlaylistsQuery.membership(99))).rejects.toThrow(
+      'IPC Disconnected'
+    );
+
+    // Verify nothing is cached as successful empty array
+    const cached = queryClient.getQueryData(songPlaylistsQuery.membership(99).queryKey);
+    expect(cached).toBeUndefined();
   });
 });

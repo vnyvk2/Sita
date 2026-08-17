@@ -17,9 +17,9 @@ interface BuildSongPlaylistMenuParams {
 }
 
 /**
- * Builds a lazy MusicBee-style "Include in Playlist" context menu item with submenus. Single song:
- * renders checkboxes indicating membership and toggles membership on click. Multi-song: renders
- * playlist options to add all selected songs to that playlist.
+ * Builds an on-demand MusicBee-style "Include in Playlist" context menu item with submenus. Single
+ * song: renders checkboxes indicating membership and toggles membership on click. Multi-song:
+ * renders playlist options to add all selected songs to that playlist.
  */
 export async function buildSongPlaylistMenuItem(
   params: BuildSongPlaylistMenuParams
@@ -138,7 +138,10 @@ export async function buildSongPlaylistMenuItem(
               }
             ]);
           } finally {
-            // Invalidate playlist detail/entries to keep count and songs in sync
+            // Invalidate this song's playlist membership cache as well as playlist detail/entries
+            queryClient.invalidateQueries({
+              queryKey: songPlaylistsQuery.membership(singleSongId).queryKey
+            });
             queryClient.invalidateQueries({ queryKey: collectionKeys.detail(playlist.id) });
             queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlist.id) });
             queryClient.invalidateQueries({ queryKey: collectionKeys.children(null) });
