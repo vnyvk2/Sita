@@ -129,101 +129,200 @@ export const getAllSongs = async (
   const limit = end - start === 0 ? undefined : end - start;
 
   const timer = timeStart();
-  // Fetch all songs with their relations
-  const songsData = await trx.query.songs.findMany({
-    where: (s) => {
-      const filters: SQL[] = [];
+  const CHUNK_SIZE = 500;
+  type SongQueryResult = Awaited<ReturnType<typeof trx.query.songs.findMany>>;
+  let songsData: SongQueryResult = [];
 
-      if (songIds && songIds.length > 0) {
-        filters.push(inArray(s.id, songIds));
-      }
-
-      if (filterType === 'favorites' || filterType === 'nonFavorites') {
-        filters.push(eq(s.isFavorite, filterType === 'favorites'));
-      }
-
-      if (filterType === 'blacklistedSongs' || filterType === 'whitelistedSongs') {
-        filters.push(eq(s.isBlacklisted, filterType === 'blacklistedSongs'));
-      }
-
-      return filters.length > 0 ? and(...filters) : undefined;
-    },
-    with: {
-      artists: {
-        with: {
-          artist: {
-            columns: { id: true, name: true }
-          }
+  const relationsConfig = {
+    artists: {
+      with: {
+        artist: {
+          columns: { id: true, name: true }
         }
-      },
-      albums: {
-        with: {
-          album: {
-            columns: { id: true, title: true, isFavorite: true },
-            with: {
-              artists: {
-                with: {
-                  artist: {
-                    columns: { id: true, name: true }
-                  }
+      }
+    },
+    albums: {
+      with: {
+        album: {
+          columns: { id: true, title: true, isFavorite: true },
+          with: {
+            artists: {
+              with: {
+                artist: {
+                  columns: { id: true, name: true }
                 }
               }
             }
           }
         }
-      },
-      genres: {
-        with: {
-          genre: {
-            columns: { id: true, name: true }
-          }
-        }
-      },
-      artworks: {
-        with: {
-          artwork: {
-            columns: {
-              id: true,
-              path: true,
-              isOptimized: true
-            }
-          }
+      }
+    },
+    genres: {
+      with: {
+        genre: {
+          columns: { id: true, name: true }
         }
       }
     },
-    orderBy: (songs) => {
-      if (sortType === 'aToZ') return [asc(songs.title)];
-      if (sortType === 'zToA') return [desc(songs.title)];
-      if (sortType === 'releasedYearAscending') return [asc(songs.year), asc(songs.title)];
-      if (sortType === 'releasedYearDescending') return [desc(songs.year), asc(songs.title)];
-      if (sortType === 'trackNoAscending') return [asc(songs.trackNumber), asc(songs.title)];
-      if (sortType === 'trackNoDescending') return [desc(songs.trackNumber), asc(songs.title)];
-      if (sortType === 'dateAddedAscending') return [asc(songs.createdAt), asc(songs.title)];
-      if (sortType === 'dateAddedDescending') return [desc(songs.createdAt), asc(songs.title)];
-      if (sortType === 'dateModifiedAscending')
-        return [asc(songs.fileModifiedAt), asc(songs.title)];
-      if (sortType === 'dateModifiedDescending')
-        return [desc(songs.fileModifiedAt), asc(songs.title)];
-      if (sortType === 'addedOrder') return [desc(songs.createdAt), asc(songs.title)];
-      if (sortType === 'mostSkipped') return [desc(songs.skipCount), asc(songs.title)];
-      if (sortType === 'leastSkipped') return [asc(songs.skipCount), asc(songs.title)];
+    artworks: {
+      with: {
+        artwork: {
+          columns: {
+            id: true,
+            path: true,
+            isOptimized: true
+          }
+        }
+      }
+    }
+  } as const;
 
-      return [];
-    },
-    offset: start,
-    limit: limit
-  });
+  if (songIds && songIds.length > CHUNK_SIZE) {
+    const uniqueSongIds = Array.from(new Set(songIds));
+    for (let i = 0; i < uniqueSongIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueSongIds.slice(i, i + CHUNK_SIZE);
+      const chunkResults = await trx.query.songs.findMany({
+        where: (s) => {
+          const filters: SQL[] = [inArray(s.id, chunk)];
+
+          if (filterType === 'favorites' || filterType === 'nonFavorites') {
+            filters.push(eq(s.isFavorite, filterType === 'favorites'));
+          }
+
+          if (filterType === 'blacklistedSongs' || filterType === 'whitelistedSongs') {
+            filters.push(eq(s.isBlacklisted, filterType === 'blacklistedSongs'));
+          }
+
+          return and(...filters);
+        },
+        with: relationsConfig
+      });
+      songsData.push(...chunkResults);
+    }
+  } else {
+    songsData = await trx.query.songs.findMany({
+      where: (s) => {
+        const filters: SQL[] = [];
+
+        if (songIds && songIds.length > 0) {
+          filters.push(inArray(s.id, songIds));
+        }
+
+        if (filterType === 'favorites' || filterType === 'nonFavorites') {
+          filters.push(eq(s.isFavorite, filterType === 'favorites'));
+        }
+
+        if (filterType === 'blacklistedSongs' || filterType === 'whitelistedSongs') {
+          filters.push(eq(s.isBlacklisted, filterType === 'blacklistedSongs'));
+        }
+
+        return filters.length > 0 ? and(...filters) : undefined;
+      },
+      with: relationsConfig,
+      orderBy: (songs) => {
+        if (sortType === 'aToZ') return [asc(songs.title)];
+        if (sortType === 'zToA') return [desc(songs.title)];
+        if (sortType === 'releasedYearAscending') return [asc(songs.year), asc(songs.title)];
+        if (sortType === 'releasedYearDescending') return [desc(songs.year), asc(songs.title)];
+        if (sortType === 'trackNoAscending') return [asc(songs.trackNumber), asc(songs.title)];
+        if (sortType === 'trackNoDescending') return [desc(songs.trackNumber), asc(songs.title)];
+        if (sortType === 'dateAddedAscending') return [asc(songs.createdAt), asc(songs.title)];
+        if (sortType === 'dateAddedDescending') return [desc(songs.createdAt), asc(songs.title)];
+        if (sortType === 'dateModifiedAscending')
+          return [asc(songs.fileModifiedAt), asc(songs.title)];
+        if (sortType === 'dateModifiedDescending')
+          return [desc(songs.fileModifiedAt), asc(songs.title)];
+        if (sortType === 'addedOrder') return [desc(songs.createdAt), asc(songs.title)];
+        if (sortType === 'mostSkipped') return [desc(songs.skipCount), asc(songs.title)];
+        if (sortType === 'leastSkipped') return [asc(songs.skipCount), asc(songs.title)];
+
+        return [];
+      },
+      offset: start,
+      limit: limit
+    });
+  }
   timeEnd(timer);
 
-  // If preserveIdOrder is true, sort the results to match the input songIds order
+  // If preserveIdOrder is true, build an ID -> song map once, then reconstruct requested sequence in O(N) naturally preserving duplicate occurrences
   let sortedData = songsData;
   if (preserveIdOrder && songIds.length > 0) {
-    const idToIndex = new Map(songIds.map((id, index) => [id, index]));
-    sortedData = songsData.sort((a, b) => {
-      const indexA = idToIndex.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const indexB = idToIndex.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      return indexA - indexB;
-    });
+    const songsById = new Map<number, (typeof songsData)[0]>();
+    for (let i = 0; i < songsData.length; i++) {
+      songsById.set(songsData[i].id, songsData[i]);
+    }
+    const orderedData: typeof songsData = [];
+    for (let i = 0; i < songIds.length; i++) {
+      const song = songsById.get(songIds[i]);
+      if (song) {
+        orderedData.push(song);
+      }
+    }
+    sortedData = orderedData;
+    if (start > 0 || (limit !== undefined && limit > 0)) {
+      sortedData = sortedData.slice(start, limit !== undefined ? start + limit : undefined);
+    }
+  } else if (songIds && songIds.length > CHUNK_SIZE) {
+    // For chunked queries without preserveIdOrder, apply sortType and pagination in-memory
+    if (sortType === 'aToZ') {
+      sortedData.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortType === 'zToA') {
+      sortedData.sort((a, b) => b.title.localeCompare(a.title));
+    } else if (sortType === 'releasedYearAscending') {
+      sortedData.sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.title.localeCompare(b.title));
+    } else if (sortType === 'releasedYearDescending') {
+      sortedData.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title));
+    } else if (sortType === 'trackNoAscending') {
+      sortedData.sort(
+        (a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0) || a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'trackNoDescending') {
+      sortedData.sort(
+        (a, b) => (b.trackNumber ?? 0) - (a.trackNumber ?? 0) || a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'dateAddedAscending') {
+      sortedData.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+          a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'dateAddedDescending') {
+      sortedData.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+          a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'dateModifiedAscending') {
+      sortedData.sort(
+        (a, b) =>
+          new Date(a.fileModifiedAt).getTime() - new Date(b.fileModifiedAt).getTime() ||
+          a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'dateModifiedDescending') {
+      sortedData.sort(
+        (a, b) =>
+          new Date(b.fileModifiedAt).getTime() - new Date(a.fileModifiedAt).getTime() ||
+          a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'addedOrder') {
+      sortedData.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+          a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'mostSkipped') {
+      sortedData.sort(
+        (a, b) => (b.skipCount ?? 0) - (a.skipCount ?? 0) || a.title.localeCompare(b.title)
+      );
+    } else if (sortType === 'leastSkipped') {
+      sortedData.sort(
+        (a, b) => (a.skipCount ?? 0) - (b.skipCount ?? 0) || a.title.localeCompare(b.title)
+      );
+    }
+
+    if (start > 0 || (limit !== undefined && limit > 0)) {
+      sortedData = sortedData.slice(start, limit !== undefined ? start + limit : undefined);
+    }
   }
 
   return {
