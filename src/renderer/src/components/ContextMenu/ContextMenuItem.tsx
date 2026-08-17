@@ -1,18 +1,21 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
 const ContextMenuItem = (props: ContextMenuItem) => {
   const { updateContextMenuData } = useContext(AppUpdateContext);
   const [isOpen, setIsOpen] = useState(false);
-  const [flyoutPlacement, setFlyoutPlacement] = useState<{
-    horizontal: 'right' | 'left';
-    vertical: 'top' | 'bottom';
-  }>({ horizontal: 'right', vertical: 'top' });
+  const [flyoutStyle, setFlyoutStyle] = useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  }>({ top: 0, left: 0 });
 
   const itemRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasInnerMenus =
@@ -36,21 +39,54 @@ const ContextMenuItem = (props: ContextMenuItem) => {
     );
   }
 
+  const calculatePlacement = () => {
+    if (!itemRef.current) return;
+
+    const rootElement = itemRef.current.closest('#context-menu-root') as HTMLElement | null;
+    const itemRect = itemRef.current.getBoundingClientRect();
+    const rootRect = rootElement ? rootElement.getBoundingClientRect() : itemRect;
+
+    const estimatedSubmenuWidth = 240;
+    const estimatedSubmenuHeight = 320;
+
+    const isRight = itemRect.right + estimatedSubmenuWidth <= window.innerWidth;
+    const isTop = itemRect.top + estimatedSubmenuHeight <= window.innerHeight;
+
+    let topOffset = itemRect.top - rootRect.top;
+    if (!isTop) {
+      const overflowBottom = itemRect.top + estimatedSubmenuHeight - window.innerHeight;
+      topOffset = Math.max(0, topOffset - overflowBottom - 10);
+    }
+
+    if (rootElement) {
+      if (isRight) {
+        setFlyoutStyle({
+          top: topOffset,
+          left: rootRect.width
+        });
+      } else {
+        setFlyoutStyle({
+          top: topOffset,
+          right: rootRect.width
+        });
+      }
+    } else {
+      // Fallback for standalone rendering without root
+      setFlyoutStyle({
+        top: 0,
+        [isRight ? 'left' : 'right']: 0
+      });
+    }
+  };
+
   const handleMouseEnter = () => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
 
-    if (hasInnerMenus && itemRef.current) {
-      const rect = itemRef.current.getBoundingClientRect();
-      const estimatedSubmenuWidth = 240;
-      const estimatedSubmenuHeight = 320;
-
-      const horizontal = rect.right + estimatedSubmenuWidth > window.innerWidth ? 'left' : 'right';
-      const vertical = rect.top + estimatedSubmenuHeight > window.innerHeight ? 'bottom' : 'top';
-
-      setFlyoutPlacement({ horizontal, vertical });
+    if (hasInnerMenus) {
+      calculatePlacement();
       setIsOpen(true);
     }
   };
@@ -62,6 +98,28 @@ const ContextMenuItem = (props: ContextMenuItem) => {
       }, 150);
     }
   };
+
+  const rootContainer = itemRef.current?.closest('#context-menu-root');
+
+  const submenuContent = hasInnerMenus && isOpen && (
+    <div
+      ref={submenuRef}
+      data-testid="flyout-submenu"
+      className="bg-context-menu-background/95 text-font-color-black dark:bg-dark-context-menu-background/95 dark:text-font-color-white border-font-color-black/10 dark:border-font-color-white/10 absolute z-50 flex max-h-[22rem] max-w-[22rem] min-w-[15rem] flex-col overflow-x-hidden overflow-y-auto rounded-lg border p-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.28)] backdrop-blur-md"
+      style={{
+        top: `${flyoutStyle.top}px`,
+        left: flyoutStyle.left !== undefined ? `${flyoutStyle.left}px` : undefined,
+        right: flyoutStyle.right !== undefined ? `${flyoutStyle.right}px` : undefined
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {props.innerContextMenus?.map((innerItem, index) => (
+        <ContextMenuItem key={`${innerItem.label}-${index}`} {...innerItem} />
+      ))}
+    </div>
+  );
 
   return (
     <div
@@ -77,6 +135,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
         onClick={(e) => {
           e.stopPropagation();
           if (hasInnerMenus) {
+            calculatePlacement();
             setIsOpen((prev) => !prev);
           } else if (props.handlerFunction) {
             props.handlerFunction();
@@ -101,18 +160,9 @@ const ContextMenuItem = (props: ContextMenuItem) => {
         )}
       </div>
 
-      {hasInnerMenus && isOpen && (
-        <div
-          className={`bg-context-menu-background/95 text-font-color-black dark:bg-dark-context-menu-background/95 dark:text-font-color-white border-font-color-black/10 dark:border-font-color-white/10 absolute z-50 flex max-h-[22rem] max-w-[22rem] min-w-[15rem] flex-col overflow-x-hidden overflow-y-auto rounded-lg border p-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.28)] backdrop-blur-md ${
-            flyoutPlacement.horizontal === 'left' ? 'right-[99%]' : 'left-[99%]'
-          } ${flyoutPlacement.vertical === 'bottom' ? 'bottom-0' : 'top-0'}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {props.innerContextMenus?.map((innerItem, index) => (
-            <ContextMenuItem key={`${innerItem.label}-${index}`} {...innerItem} />
-          ))}
-        </div>
-      )}
+      {rootContainer && submenuContent
+        ? createPortal(submenuContent, rootContainer)
+        : submenuContent}
     </div>
   );
 };
