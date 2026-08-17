@@ -370,7 +370,11 @@ class PlayerQueue {
   /**
    * Adds songs to play next, atomically removing any existing duplicate occurrences of those songs
    * from the queue, inserting the incoming batch after the current position, and adjusting
-   * playback position in a single atomic pass with exactly one version increment.
+   * playback position in a single atomic O(N) mutation.
+   *
+   * Only increments membershipVersion if new song IDs were introduced to the queue or existing
+   * duplicate multiplicities changed. If playNext only reorders songs already present in the queue,
+   * membershipVersion remains unchanged (0 IPC / 0 DB query refetch).
    *
    * @param songIds - A single song ID or array of song IDs to play next
    */
@@ -390,6 +394,13 @@ class PlayerQueue {
     }
 
     const removalSet = new Set(ids);
+    const incomingCounts = new Map<number, number>();
+    for (let i = 0; i < ids.length; i += 1) {
+      const id = ids[i];
+      incomingCounts.set(id, (incomingCounts.get(id) || 0) + 1);
+    }
+
+    const removedCounts = new Map<number, number>();
     const newSongIds: number[] = [];
     let removedBeforeCurrent = 0;
     let currentWasRemoved = false;
@@ -397,6 +408,7 @@ class PlayerQueue {
     for (let i = 0; i < this.songIds.length; i += 1) {
       const id = this.songIds[i];
       if (removalSet.has(id)) {
+        removedCounts.set(id, (removedCounts.get(id) || 0) + 1);
         if (i < this.position) {
           removedBeforeCurrent += 1;
         }
@@ -405,6 +417,17 @@ class PlayerQueue {
         }
       } else {
         newSongIds.push(id);
+      }
+    }
+
+    // Determine if membership changed (i.e. new song IDs added or duplicate counts differed)
+    let membershipChanged = incomingCounts.size !== removedCounts.size;
+    if (!membershipChanged) {
+      for (const [id, count] of incomingCounts) {
+        if (removedCounts.get(id) !== count) {
+          membershipChanged = true;
+          break;
+        }
       }
     }
 
@@ -426,7 +449,9 @@ class PlayerQueue {
     this.position = newPosition;
 
     this.incrementStructureVersion();
-    this.incrementMembershipVersion();
+    if (membershipChanged) {
+      this.incrementMembershipVersion();
+    }
 
     this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
     if (oldPosition !== newPosition || currentWasRemoved) {

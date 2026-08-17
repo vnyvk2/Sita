@@ -174,25 +174,67 @@ describe('Phase 5: Batch Queue Operations & Algorithmic Optimizations', () => {
       expect(q.currentSongId).toBe(101);
     });
 
-    it('executes playNext atomically with exactly +1 version increment and 1 queueChange event', () => {
+    it('does not bump membershipVersion when playNext preserves queue membership', () => {
+      const q = new PlayerQueue([100, 101, 102, 103], 1);
+      const initialStructureVersion = q.structureVersion;
+      const initialMembershipVersion = q.membershipVersion;
+
+      q.playNext([103, 102]);
+
+      // Structure increments because order changed, membership remains unchanged (0 IPC / 0 refetch)
+      expect(q.structureVersion).toBe(initialStructureVersion + 1);
+      expect(q.membershipVersion).toBe(initialMembershipVersion);
+      expect(q.songIds).toEqual([100, 101, 103, 102]);
+    });
+
+    it('bumps membershipVersion when playNext introduces new song IDs to the queue', () => {
+      const q = new PlayerQueue([100, 101, 102], 0);
+      const initialStructureVersion = q.structureVersion;
+      const initialMembershipVersion = q.membershipVersion;
+
+      q.playNext([200, 201]);
+
+      expect(q.structureVersion).toBe(initialStructureVersion + 1);
+      expect(q.membershipVersion).toBe(initialMembershipVersion + 1);
+      expect(q.songIds).toEqual([100, 200, 201, 101, 102]);
+    });
+
+    it('handles transition cleanly when current playing song itself is in playNext', () => {
+      // Queue: [100, 101, 102], position 1 (playing 101)
+      const q = new PlayerQueue([100, 101, 102], 1);
+      const positionChangeSpy = vi.fn();
+      q.on('positionChange', positionChangeSpy);
+
+      // Call playNext with current song 101
+      q.playNext([101]);
+
+      // 101 is removed from pos 1, queue becomes [100, 102], newPosition is 1 (now song 102)
+      // 101 is inserted after newPosition (index 2): [100, 102, 101]
+      expect(q.songIds).toEqual([100, 102, 101]);
+      expect(q.position).toBe(1);
+      expect(q.currentSongId).toBe(102);
+
+      // Emits positionChange because the active track at index 1 changed from 101 to 102
+      expect(positionChangeSpy).toHaveBeenCalledTimes(1);
+      expect(positionChangeSpy).toHaveBeenCalledWith({
+        oldPosition: 1,
+        newPosition: 1,
+        currentSongId: 102
+      });
+    });
+
+    it('executes playNext atomically with exactly 1 queueChange event', () => {
       const q = new PlayerQueue([100, 101, 102, 103, 104], 1);
       const queueChangeSpy = vi.fn();
       const positionChangeSpy = vi.fn();
       q.on('queueChange', queueChangeSpy);
       q.on('positionChange', positionChangeSpy);
 
-      const initialStructureVersion = q.structureVersion;
-      const initialMembershipVersion = q.membershipVersion;
+      // playNext with reordered existing tracks
+      q.playNext([104, 102]);
 
-      // playNext with multiple tracks
-      q.playNext([104, 102, 104]);
-
-      // Must be atomic: exactly +1, not +2
-      expect(q.structureVersion).toBe(initialStructureVersion + 1);
-      expect(q.membershipVersion).toBe(initialMembershipVersion + 1);
       expect(queueChangeSpy).toHaveBeenCalledTimes(1);
-
-      // Position remained on song 101 at index 1 -> no spurious positionChange event
+      // Active song 101 at index 1 survived without position change
       expect(positionChangeSpy).not.toHaveBeenCalled();
     });
   });
