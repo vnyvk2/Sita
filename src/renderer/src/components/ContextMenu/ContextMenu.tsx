@@ -1,8 +1,8 @@
-import { store } from '@renderer/store/store';
-import { useStore } from '@tanstack/react-store';
 /* eslint-disable jsx-a11y/click-events-have-key-events */
+import { useStore } from '@tanstack/react-store';
 import { memo, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
+import { store } from '../../store/store';
 import ContextMenuDataItem from './ContextMenuDataItem';
 import ContextMenuItem from './ContextMenuItem';
 
@@ -11,7 +11,7 @@ const ContextMenu = memo(() => {
 
   const { isVisible, menuItems, data } = contextMenuData;
 
-  const contextMenuRef = useRef(null as null | HTMLDivElement);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState({
     width: 0,
     height: 0,
@@ -33,7 +33,6 @@ const ContextMenu = memo(() => {
       const viewportWidth = window.innerWidth;
       const menuHeight = contextMenuRef.current.clientHeight;
       const menuWidth = contextMenuRef.current.clientWidth;
-      // console.log('viewportHeight', viewportHeight, 'viewportWidth', viewportWidth, 'menuHeight', menuHeight, 'menuWidth', menuWidth, 'pageX', pageX, 'pageY', pageY);
 
       setDimensions({
         width: menuWidth,
@@ -41,11 +40,7 @@ const ContextMenu = memo(() => {
         positionX: pageX + menuWidth > viewportWidth ? pageX - menuWidth : pageX,
         positionY:
           pageY + menuHeight > viewportHeight
-            ? pageY -
-              menuHeight +
-              // ? 40px get added to stop the context menu from reaching the title-bar.
-              // ? Height of the title bar is  40px (2.5rem).
-              (pageY - menuHeight > 40 ? 0 : Math.abs(pageY - menuHeight) + 40)
+            ? pageY - menuHeight + (pageY - menuHeight > 40 ? 0 : Math.abs(pageY - menuHeight) + 40)
             : pageY,
         transformOrigin: `${
           pageY + menuHeight > viewportHeight ? 'bottom' : 'top'
@@ -62,27 +57,27 @@ const ContextMenu = memo(() => {
           if (menuItem.isContextMenuItemSeperator)
             return (
               <div
-                key={index}
+                key={`sep-${index}`}
                 role="separator"
-                className="context-menu-item-seperator float-right my-2 h-[1px] w-[95%] bg-[hsla(0deg,0%,57%,0.5)]"
+                className="context-menu-item-seperator my-1.5 h-[1px] w-[92%] self-center bg-[hsla(0deg,0%,57%,0.3)]"
               />
             );
-          return <ContextMenuItem key={menuItem.label} {...menuItem} />;
+          return <ContextMenuItem key={`${menuItem.label}-${index}`} {...menuItem} />;
         }),
     [menuItems]
   );
+
   return (
     <div
       className={`context-menu invisible scale-75 opacity-0 ${
         isVisible ? 'visible! scale-100! opacity-100!' : ''
       } ${
         !data && 'pt-2'
-      } bg-context-menu-background/90 text-font-color-black dark:bg-dark-context-menu-background/90 dark:text-font-color-white absolute z-50 h-fit w-fit min-w-[15rem] origin-top-left overflow-hidden overflow-y-auto rounded-lg pt-1 pb-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.22)] backdrop-blur-md transition-[opacity,scale,transform,visibility,width,height]!`}
+      } bg-context-menu-background/90 text-font-color-black dark:bg-dark-context-menu-background/90 dark:text-font-color-white absolute z-50 flex h-fit w-fit min-w-[15rem] origin-top-left flex-col overflow-visible rounded-lg pt-1 pb-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.22)] backdrop-blur-md transition-[opacity,scale,transform,visibility,width,height]!`}
       onClick={(e) => e.stopPropagation()}
       style={{
         top: dimensions.positionY,
         left: dimensions.positionX,
-        // transform: `translate(${dimensions.positionX}px,${dimensions.positionY}px)`,
         transformOrigin: dimensions.transformOrigin
       }}
       ref={contextMenuRef}

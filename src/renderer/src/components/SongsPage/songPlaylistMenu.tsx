@@ -187,7 +187,7 @@ export async function buildSongPlaylistMenuItem(
     {
       label: 'Hr',
       isContextMenuItemSeperator: true,
-      handlerFunction: () => true
+      handlerFunction: null
     },
     {
       label: t('song.addToPlaylistsPrompt', { defaultValue: 'More options...' }),
