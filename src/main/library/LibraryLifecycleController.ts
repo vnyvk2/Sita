@@ -316,7 +316,18 @@ export class LibraryLifecycleController {
     logger.info('[LibraryLifecycleController] Shutting down lifecycle controller.');
     this.isInitialized = false;
     this.stopWatchers();
-    await this.cancelScan();
+    this.cancelScan();
+
+    if (this.inFlightScan) {
+      try {
+        await this.inFlightScan;
+      } catch (error) {
+        logger.debug(
+          '[LibraryLifecycleController] In-flight scan error during shutdown unwinding:',
+          { error }
+        );
+      }
+    }
   }
 }
 
