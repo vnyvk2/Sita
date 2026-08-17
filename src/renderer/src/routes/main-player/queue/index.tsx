@@ -8,13 +8,13 @@ import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import QueueTabs from '@renderer/components/QueueTabs';
 import QueueRow from '@renderer/components/SongsPage/QueueRow';
+import Song from '@renderer/components/SongsPage/Song';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
 import { songQuery } from '@renderer/queries/songs';
-import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import {
   calculateQueueSuffixDurations,
