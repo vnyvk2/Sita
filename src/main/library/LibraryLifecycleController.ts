@@ -1,7 +1,10 @@
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
 import { closeAllAbortControllers } from '@main/fs/controlAbortControllers';
 import { initializePassiveWatchers } from '@main/fs/initializePassiveWatchers';
-import libraryChangeTracker from '@main/library/LibraryChangeTracker';
+import libraryChangeTracker, {
+  type ChangeEntry,
+  type LibraryChangeState
+} from '@main/library/LibraryChangeTracker';
 import logger from '@main/logger';
 
 import libraryScanner, {
@@ -159,8 +162,17 @@ export class LibraryLifecycleController {
     return this.watchersActive;
   }
 
-  private onLibraryChanged = (): void => {
+  private onLibraryChanged = (event?: {
+    state?: LibraryChangeState;
+    entry?: ChangeEntry | null;
+  }): void => {
     if (!this.canAttachWatchers()) {
+      return;
+    }
+
+    // Ignore internal scanner bookkeeping events (markDirty without entry, reset)
+    // Only real filesystem watcher events carrying a ChangeEntry increment changeGeneration
+    if (!event?.entry) {
       return;
     }
 
@@ -171,7 +183,7 @@ export class LibraryLifecycleController {
     }
 
     logger.debug(
-      `[LibraryLifecycleController] Filesystem change detected (generation ${this.changeGeneration}), scheduling background scan...`
+      `[LibraryLifecycleController] Filesystem change detected (generation ${this.changeGeneration}, source: ${event.entry.source}, path: '${event.entry.path}'), scheduling background scan...`
     );
 
     this.changeDebounceTimer = setTimeout(() => {
