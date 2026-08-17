@@ -29,7 +29,7 @@ export function useQueueOperations() {
   const removeSongs = useCallback(
     (songIds: number[]) => {
       const playerQueue = getActiveQueue();
-      songIds.forEach((id) => playerQueue.removeSongId(id));
+      playerQueue.removeSongIds(songIds);
       return songIds.length;
     },
     [getActiveQueue]
@@ -43,8 +43,7 @@ export function useQueueOperations() {
   const playNext = useCallback(
     (songIds: number[]) => {
       const playerQueue = getActiveQueue();
-      songIds.forEach((id) => playerQueue.removeSongId(id));
-      playerQueue.addSongIdsToNext(songIds);
+      playerQueue.playNext(songIds);
       return songIds.length;
     },
     [getActiveQueue]
