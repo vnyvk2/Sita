@@ -160,6 +160,8 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
 
 type Props = { isQueueVisible: boolean };
 
+const EMPTY_SONG_IDS: readonly number[] = [];
+
 const QueueContainer = (props: Props) => {
   const { isQueueVisible } = props;
 
@@ -190,7 +192,7 @@ const QueueContainer = (props: Props) => {
   const manager = getQueuesManager();
 
   const currentQueue = queue.queues[viewingQueueIndex];
-  const songIds = useMemo(() => currentQueue?.songIds || [], [currentQueue?.songIds]);
+  const songIds = currentQueue?.songIds ?? EMPTY_SONG_IDS;
   const queueId = currentQueue?.id ?? 'active';
   const membershipVersion = manager?.queues?.[viewingQueueIndex]?.membershipVersion ?? 0;
 
