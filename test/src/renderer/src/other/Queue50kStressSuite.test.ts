@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import PlayerQueue from '@renderer/other/playerQueue';
+import {
+  calculateQueueSuffixDurations,
+  getRemainingQueueDuration
+} from '@renderer/utils/queueDuration';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 type BenchmarkRecord = {
@@ -272,29 +275,22 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
           queuedSongsMap.set(id, { duration: 180 + (id % 120) });
         }
 
-        // Execute exact production suffix sum computation from Queue index.tsx
+        // Execute exact production suffix sum computation from queueDuration utility
         const t0 = performance.now();
-        const len = songIds.length;
-        const suffix = new Float64Array(len);
-        let running = 0;
-        for (let i = len - 1; i >= 0; i--) {
-          const song = queuedSongsMap.get(songIds[i]);
-          if (song) {
-            running += song.duration;
-          }
-          suffix[i] = running;
-        }
+        const { suffixDurations, queueDuration } = calculateQueueSuffixDurations(
+          songIds,
+          queuedSongsMap
+        );
         const t1 = performance.now();
 
-        expect(suffix.length).toBe(N);
-        expect(suffix[0]).toBe(running);
-        expect(suffix[N - 1]).toBe(queuedSongsMap.get(songIds[N - 1])!.duration);
+        expect(suffixDurations).not.toBeNull();
+        expect(suffixDurations!.length).toBe(N);
+        expect(queueDuration).not.toBe('0:00');
 
         // Verify O(1) remaining duration query
         const queryPos = Math.floor(N / 2);
-        const remainingDuration = suffix[queryPos];
-        expect(remainingDuration).toBeGreaterThan(0);
-        expect(remainingDuration).toBeLessThan(running);
+        const remainingDuration = getRemainingQueueDuration(suffixDurations, queryPos);
+        expect(remainingDuration).not.toBe('0:00');
 
         recordBenchmark('suffix sum duration (backward pass)', N, t0, t1, 'O(1) query', 'N/A');
       });

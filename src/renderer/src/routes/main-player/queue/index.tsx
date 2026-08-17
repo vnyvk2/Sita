@@ -1,3 +1,4 @@
+/* eslint-disable react/only-export-components */
 import { Droppable, DragDropContext, type DropResult } from '@hello-pangea/dnd';
 // import DefaultSongCover from '@renderer/assets/images/webp/song_cover_default.webp';
 // import DefaultPlaylistCover from '@renderer/assets/images/webp/playlist_cover_default.webp';
@@ -15,8 +16,11 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
 import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
-import { store, dispatch } from '@renderer/store/store';
-import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
+import { store } from '@renderer/store/store';
+import {
+  calculateQueueSuffixDurations,
+  getRemainingQueueDuration
+} from '@renderer/utils/queueDuration';
 import { baseInfoPageSearchParamsSchema } from '@renderer/utils/zod/baseInfoPageSearchParamsSchema';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -38,6 +42,7 @@ const queuePageSearchParamsSchema = baseInfoPageSearchParamsSchema.extend({
   queueIndex: z.coerce.number().optional()
 });
 
+// eslint-disable-next-line react/only-export-components
 export const Route = createFileRoute('/main-player/queue/')({
   component: RouteComponent,
   validateSearch: queuePageSearchParamsSchema
@@ -216,13 +221,6 @@ function RouteComponent() {
     }
 
     queueToUpdate.replaceQueue(updatedQueue, newPosition, false);
-    dispatch({
-      type: 'UPDATE_QUEUE',
-      data: {
-        queues: manager.queues.map((q) => q.toJSON()),
-        currentQueueIndex: manager.activeQueueIndex
-      }
-    });
     return undefined;
   };
 
@@ -251,33 +249,16 @@ function RouteComponent() {
   );
 
   // Precomputed suffix sum array and total duration in a single backward pass
-  const { suffixDurations, queueDuration } = useMemo(() => {
-    if (currentQueue.length === 0 || queuedSongsMap.size === 0) {
-      return { suffixDurations: null, queueDuration: '0:00' };
-    }
-    const len = currentQueue.length;
-    const suffix = new Float64Array(len);
-    let running = 0;
-    for (let i = len - 1; i >= 0; i--) {
-      const song = queuedSongsMap.get(currentQueue[i]);
-      if (song) {
-        running += song.duration;
-      }
-      suffix[i] = running;
-    }
-    return {
-      suffixDurations: suffix,
-      queueDuration: calculateTimeFromSeconds(running).timeString
-    };
-  }, [currentQueue, queuedSongsMap]);
+  const { suffixDurations, queueDuration } = useMemo(
+    () => calculateQueueSuffixDurations(currentQueue, queuedSongsMap),
+    [currentQueue, queuedSongsMap]
+  );
 
   const activeQueuePosition = queue.queues[queue.currentQueueIndex]?.position ?? 0;
-  const completedQueueDuration = useMemo(() => {
-    if (!suffixDurations || suffixDurations.length === 0) return '0:00';
-    const pos = Math.max(0, Math.min(activeQueuePosition, suffixDurations.length - 1));
-    const remaining = suffixDurations[pos] ?? 0;
-    return calculateTimeFromSeconds(remaining).timeString;
-  }, [activeQueuePosition, suffixDurations]);
+  const completedQueueDuration = useMemo(
+    () => getRemainingQueueDuration(suffixDurations, activeQueuePosition),
+    [activeQueuePosition, suffixDurations]
+  );
 
   const multipleSelectionsDataRef = useRef(multipleSelectionsData);
   multipleSelectionsDataRef.current = multipleSelectionsData;
@@ -418,13 +399,6 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].shuffle();
-                  dispatch({
-                    type: 'UPDATE_QUEUE',
-                    data: {
-                      queues: manager.queues.map((q) => q.toJSON()),
-                      currentQueueIndex: manager.activeQueueIndex
-                    }
-                  });
 
                   addNewNotifications([
                     {
@@ -456,13 +430,6 @@ function RouteComponent() {
                 isDisabled={currentQueue.length > 0 === false}
                 clickHandler={() => {
                   manager.queues[viewingQueueIndex].clear();
-                  dispatch({
-                    type: 'UPDATE_QUEUE',
-                    data: {
-                      queues: manager.queues.map((q) => q.toJSON()),
-                      currentQueueIndex: manager.activeQueueIndex
-                    }
-                  });
                   addNewNotifications([
                     {
                       id: 'clearQueue',
