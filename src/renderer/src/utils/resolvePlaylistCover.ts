@@ -39,3 +39,44 @@ export function resolvePlaylistCoverFromDraft(
     artworks
   };
 }
+
+/**
+ * Reconstructs the candidate songs array for playlist cover rendering: 1. Preserves exact playlist
+ * position order matching collectionEntries (0, 1, 2, 3...). 2. Appends any configured custom
+ * collage song IDs that reside beyond the entry limit. 3. Deduplicates to ensure unique song
+ * representations.
+ */
+export function reconstructPlaylistCoverSongs(
+  collectionEntries: Array<{ songId: number }> = [],
+  fetchedSongData: SongData[] = [],
+  settings?: PlaylistCoverSettings,
+  providedSongs?: SongData[]
+): SongData[] {
+  if (providedSongs) return providedSongs;
+
+  const songMap = new Map(fetchedSongData.map((s) => [s.songId, s]));
+  const positionOrderedSongs: SongData[] = [];
+  const addedSongIds = new Set<number>();
+
+  for (const entry of collectionEntries) {
+    const song = songMap.get(entry.songId);
+    if (song) {
+      positionOrderedSongs.push(song);
+      addedSongIds.add(song.songId);
+    }
+  }
+
+  if (settings?.type === 'collage' && settings?.collage?.songIds) {
+    for (const id of settings.collage.songIds) {
+      if (id > 0 && !addedSongIds.has(id)) {
+        const song = songMap.get(id);
+        if (song) {
+          positionOrderedSongs.push(song);
+          addedSongIds.add(id);
+        }
+      }
+    }
+  }
+
+  return positionOrderedSongs;
+}
