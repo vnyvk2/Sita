@@ -4,8 +4,8 @@ import { Virtuoso, type Components, type ListRange, type VirtuosoHandle } from '
 
 import { scrollRegistry } from '../utils/scrollStore';
 
-type Props<T extends object> = {
-  data: T[];
+type Props<T> = {
+  data: readonly T[];
   fixedItemHeight: number;
   scrollKey?: string;
   scrollTopOffset?: number;
@@ -21,7 +21,7 @@ type Props<T extends object> = {
 
 const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
 
-const List = <T extends object>(props: Props<T>, ref) => {
+const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   const {
     data,
     fixedItemHeight,
@@ -188,7 +188,7 @@ const List = <T extends object>(props: Props<T>, ref) => {
   );
 };
 
-const VirtualizedList = forwardRef(List) as <T extends object>(
+const VirtualizedList = forwardRef(List) as <T>(
   props: Props<T> & { ref?: React.ForwardedRef<VirtuosoHandle> }
 ) => ReturnType<typeof List>;
 
