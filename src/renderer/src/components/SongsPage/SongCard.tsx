@@ -1,26 +1,24 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
+import { useNavigate } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
 import { lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { store } from '../../store/store';
 import Button from '../Button';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
+import NavLink from '../NavLink';
 import SongArtist from './SongArtist';
+import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
 
-const AddSongsToPlaylistsPrompt = lazy(() => import('./AddSongsToPlaylistsPrompt'));
 const BlacklistSongConfrimPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
 const DeleteSongsFromSystemConfrimPrompt = lazy(
   () => import('./DeleteSongsFromSystemConfrimPrompt')
 );
-
-import { useNavigate } from '@tanstack/react-router';
-import { useStore } from '@tanstack/react-store';
-
-import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
-import { store } from '../../store/store';
-import NavLink from '../NavLink';
 
 interface SongCardProp {
   index: number;
@@ -58,128 +56,89 @@ const SongCard = (props: SongCardProp) => {
     addNewNotifications,
     changePromptMenuData,
     toggleIsFavorite,
+    createQueue,
     toggleMultipleSelections,
-    updateMultipleSelections,
-    createQueue
+    updateMultipleSelections
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   const {
-    title,
-    artworkPath,
-    index,
-    isAFavorite,
-    path,
     songId,
+    artworkPath,
+    title,
     artists,
     album,
-    className,
-    isBlacklisted,
     palette,
+    isAFavorite,
+    className,
+    index,
+    isBlacklisted,
+    path,
     selectAllHandler
   } = props;
 
-  const [isSongAFavorite, setIsSongAFavorite] = useState(
-    songId === currentSongData.songId ? currentSongData.isAFavorite : isAFavorite
-  );
-  const [isSongPlaying, setIsSongPlaying] = useState(
-    currentSongData ? currentSongData.songId === songId && isCurrentSongPlaying : false
-  );
-  useEffect(() => {
-    setIsSongPlaying(() => {
-      if (currentSongData) return currentSongData.songId === songId && isCurrentSongPlaying;
-      return false;
-    });
-  }, [currentSongData?.songId, isCurrentSongPlaying, songId]);
+  const [isSongAFavorite, setIsSongAFavorite] = useState(isAFavorite);
 
   useEffect(() => {
-    setIsSongAFavorite(() => {
-      if (currentSongData?.songId === songId) return currentSongData.isAFavorite;
-      return isAFavorite;
-    });
-  }, [currentSongData?.songId, currentSongData?.isAFavorite, songId, isAFavorite]);
+    setIsSongAFavorite(isAFavorite);
+  }, [isAFavorite]);
 
-  const [h, s, l] = useMemo(() => {
-    const swatch = palette?.LightVibrant;
-    if (swatch?.hsl) {
-      const { hsl } = swatch;
-
-      return [`${hsl[0] * 360}`, `${hsl[1] * 100}%`, `${hsl[2] * 100}%`];
-    }
-    return ['0', '0%', '0%'];
-  }, [palette?.LightVibrant]);
-
-  const background = `linear-gradient(to top,hsl(${h} ${s} ${l} / 0.35) 0%, hsl(${h} ${s} ${l} / 0.15) 40%), linear-gradient(to top,rgba(0,0,0,0.8)0%,rgba(0,0,0,0.1) 60%)`;
-
-  const handlePlayBtnClick = useCallback(() => {
-    playSong(songId);
-  }, [playSong, songId]);
-
-  const isAMultipleSelection = useMemo(() => {
-    if (!multipleSelectionsData.isEnabled) return false;
-    if (multipleSelectionsData.selectionType !== 'songs') return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (multipleSelectionsData.multipleSelections.some((selectionId) => selectionId === songId))
-      return true;
-    return false;
-  }, [multipleSelectionsData, songId]);
-
-  const contextMenuItemData =
+  const isSongPlaying = isCurrentSongPlaying && currentSongData.songId === songId;
+  const isAMultipleSelection =
     isMultipleSelectionEnabled &&
     multipleSelectionsData.selectionType === 'songs' &&
-    isAMultipleSelection
-      ? {
-          title: t('song.selectedSongCount', {
-            count: multipleSelectionsData.multipleSelections.length
-          }),
-          artworkPath: DefaultSongCover
-        }
-      : {
-          title: title || t('common.unknownTitle'),
-          subTitle: artists?.map((artist) => artist.name).join(', ') ?? t('common.unknownArtist'),
-          artworkPath
-        };
+    multipleSelectionsData.multipleSelections.includes(songId);
+
+  const handlePlayBtnClick = useCallback(() => {
+    return playSong(songId);
+  }, [playSong, songId]);
 
   const handleLikeButtonClick = useCallback(() => {
     window.api.playerControls
       .toggleLikeSongs([songId], !isSongAFavorite)
       .then((res) => {
         if (res && res.likes.length + res.dislikes.length > 0) {
-          if (currentSongData.songId === songId)
-            toggleIsFavorite(!currentSongData.isAFavorite, true);
+          if (currentSongData.songId === songId) toggleIsFavorite(!currentSongData.isAFavorite);
           return setIsSongAFavorite((prevData) => !prevData);
         }
         return undefined;
       })
-      .catch((err) => {
-        console.error(err);
-        addNewNotifications([
-          {
-            id: `toggleLikeError-${songId}`,
-            content: t('song.toggleLikeFailed'),
-            iconName: 'error',
-            duration: 5000
-          }
-        ]);
-      });
+      .catch((err) => console.error(err));
   }, [
-    addNewNotifications,
     currentSongData.isAFavorite,
     currentSongData.songId,
     isSongAFavorite,
     songId,
-    t,
     toggleIsFavorite
   ]);
 
-  const contextMenuItems: ContextMenuItem[] = useMemo(() => {
+  const background = useMemo(() => {
+    const defaultColor = '#000000';
+    const darkVibrant = palette?.DarkVibrant?.hex ?? defaultColor;
+    const vibrant = palette?.Vibrant?.hex ?? defaultColor;
+    const darkMuted = palette?.DarkMuted?.hex ?? defaultColor;
+
+    return `linear-gradient(135deg, ${darkVibrant}CC, ${vibrant}BF, ${darkMuted}99)`;
+  }, [palette]);
+
+  const getContextMenuItems = useCallback(async (): Promise<ContextMenuItem[]> => {
     const isMultipleSelectionsEnabled =
+      multipleSelectionsData.isEnabled &&
       multipleSelectionsData.selectionType === 'songs' &&
       multipleSelectionsData.multipleSelections.length !== 1 &&
       isAMultipleSelection;
 
     const { multipleSelections: songIds } = multipleSelectionsData;
+
+    const playlistMenuItem = await buildSongPlaylistMenuItem({
+      songIds: isMultipleSelectionsEnabled ? songIds : [songId],
+      title,
+      t,
+      addNewNotifications,
+      changePromptMenuData,
+      toggleMultipleSelections
+    });
 
     const items: ContextMenuItem[] = [
       {
@@ -200,7 +159,6 @@ const SongCard = (props: SongCardProp) => {
         iconName: 'queue_music',
         isDisabled: !isMultipleSelectionsEnabled
       },
-
       {
         label: t(`common.${isMultipleSelectionsEnabled ? 'playNextAll' : 'playNext'}`),
         iconName: 'shortcut',
@@ -342,20 +300,7 @@ const SongCard = (props: SongCardProp) => {
           toggleMultipleSelections(false);
         }
       },
-      {
-        label: t('song.addToPlaylists'),
-        iconName: 'playlist_add',
-        handlerFunction: () => {
-          changePromptMenuData(
-            true,
-            <AddSongsToPlaylistsPrompt
-              songIds={isAMultipleSelection ? songIds : [songId]}
-              title={title}
-            />
-          );
-          toggleMultipleSelections(false);
-        }
-      },
+      playlistMenuItem,
       {
         label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
         iconName: 'checklist',
@@ -370,12 +315,6 @@ const SongCard = (props: SongCardProp) => {
           return toggleMultipleSelections(!isAMultipleSelection, 'songs', [songId]);
         }
       },
-      // {
-      //   label: 'Select/Unselect All',
-      //   iconName: 'checklist',
-      //   isDisabled: !selectAllHandler,
-      //   handlerFunction: () => selectAllHandler && selectAllHandler(),
-      // },
       {
         label: 'Hr',
         isContextMenuItemSeperator: true,
@@ -479,32 +418,33 @@ const SongCard = (props: SongCardProp) => {
         }
       }
     ];
+
     return items;
   }, [
     multipleSelectionsData,
     isAMultipleSelection,
+    title,
     t,
-    isSongAFavorite,
-    album,
-    isBlacklisted,
-    handlePlayBtnClick,
+    addNewNotifications,
+    changePromptMenuData,
     toggleMultipleSelections,
+    handlePlayBtnClick,
     createQueue,
-    queue.queues[queue.currentQueueIndex].position,
-    queue.queues[queue.currentQueueIndex].songIds,
+    queue.queues,
+    queue.currentQueueIndex,
     currentSongData.songId,
     currentSongData.isAFavorite,
-    updateQueueData,
-    addNewNotifications,
-    title,
     songId,
+    updateQueueData,
     artworkPath,
+    isSongAFavorite,
     toggleIsFavorite,
-    changePromptMenuData,
     isMultipleSelectionEnabled,
     updateMultipleSelections,
     navigate,
+    album,
     path,
+    isBlacklisted,
     doNotShowBlacklistSongConfirm
   ]);
 
@@ -554,10 +494,29 @@ const SongCard = (props: SongCardProp) => {
       }`}
       data-song-id={songId}
       onDoubleClick={handlePlayBtnClick}
-      onContextMenu={(e) => {
+      onContextMenu={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        updateContextMenuData(true, contextMenuItems, e.pageX, e.pageY, contextMenuItemData);
+        const pageX = e.pageX;
+        const pageY = e.pageY;
+        const contextMenuItemData: ContextMenuAdditionalData =
+          isMultipleSelectionEnabled &&
+          multipleSelectionsData.selectionType === 'songs' &&
+          isAMultipleSelection
+            ? {
+                title: t('song.selectedSongCount', {
+                  count: multipleSelectionsData.multipleSelections.length
+                }),
+                artworkPath: DefaultSongCover
+              }
+            : {
+                title: title || t('common.unknownTitle'),
+                subTitle:
+                  artists?.map((artist) => artist.name).join(', ') ?? t('common.unknownArtist'),
+                artworkPath: artworkPath || DefaultSongCover
+              };
+        const items = await getContextMenuItems();
+        updateContextMenuData(true, items, pageX, pageY, contextMenuItemData);
       }}
       onClick={(e) => {
         e.preventDefault();
@@ -602,76 +561,51 @@ const SongCard = (props: SongCardProp) => {
                 {t('song.playingNow')}
               </span>
             )}
-            {isBlacklisted &&
-              !(
-                typeof queue.queues[queue.currentQueueIndex].position === 'number' &&
-                Array.isArray(queue.queues[queue.currentQueueIndex].songIds) &&
-                queue.queues[queue.currentQueueIndex].songIds.length > 0 &&
-                queue?.queues[queue.currentQueueIndex]?.songIds?.at(
-                  queue.queues[queue.currentQueueIndex].position + 1
-                ) === songId &&
-                currentSongData.songId === songId
-              ) && (
-                <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
-                  {t('song.blacklisted')}
-                </span>
-              )}
+            {isBlacklisted && (
+              <span className="text-font-color-white! mr-2 font-semibold uppercase opacity-50 transition-opacity group-hover/songCard:opacity-90 last:mr-0">
+                {t('song.blacklisted')}
+              </span>
+            )}
           </div>
-          <div className="state-icons flex">
+          {isMultipleSelectionEnabled ? (
+            <div className="bg-background-color-1 text-font-color-highlight dark:bg-dark-background-color-1 dark:text-dark-background-color-3 flex h-fit items-center rounded-lg p-1">
+              <MultipleSelectionCheckbox id={songId} selectionType="songs" />
+            </div>
+          ) : (
             <Button
-              className="order-2 m-0! rounded-none! border-0! bg-transparent p-1! text-inherit! opacity-50 outline-offset-1 transition-opacity group-focus-within/songCard:opacity-100 group-hover/songCard:opacity-100 hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
+              className="mt-1 mr-0! rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent"
               iconName="favorite"
               iconClassName={`${
                 isSongAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
-              } !text-2xl !text-font-color-white !leading-none`}
-              tooltipLabel={isSongAFavorite ? t('song.likedThisSong') : undefined}
-              clickHandler={(e) => {
-                e.stopPropagation();
-                handleLikeButtonClick();
-              }}
+              } text-font-color-white! dark:text-font-color-white! leading-none! text-xl! font-light!`}
+              tooltipLabel={t(`song.${isSongAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
+              clickHandler={handleLikeButtonClick}
             />
-          </div>
+          )}
         </div>
-        <div className="song-info-and-play-btn-container flex w-full items-center justify-between">
-          <div className="song-info-container text-font-color-white dark:text-font-color-white max-w-[75%]">
+        <div className="song-info-and-play-btn-container flex items-center justify-between">
+          <div className="song-info max-w-[80%] text-white">
             <NavLink
               to="/main-player/songs/$songId"
               params={{ songId: String(songId) }}
-              preload={isMultipleSelectionEnabled ? false : undefined}
-              className={`song-title cursor-pointer overflow-hidden text-xl font-normal text-ellipsis whitespace-nowrap outline-offset-1 transition-none hover:underline focus-visible:outline!`}
               title={title}
-              tabIndex={0}
+              className="song-title block w-full truncate text-lg font-medium outline-offset-1 hover:underline focus-visible:outline!"
               disabled={isMultipleSelectionEnabled}
             >
               {title}
             </NavLink>
-            <div
-              className="song-artists w-full max-w-full truncate text-sm transition-none"
-              title={artists ? artists.map((x) => x.name).join(', ') : t('common.unknownArtist')}
-              data-song-id={songId}
-            >
-              {songArtistComponents}
-            </div>
+            <div className="song-artists w-full truncate text-xs">{songArtistComponents}</div>
           </div>
-          <div className="play-btn-and-multiple-selection-checkbox-container">
-            {isMultipleSelectionEnabled ? (
-              multipleSelectionsData.selectionType === 'songs' && (
-                <MultipleSelectionCheckbox id={songId} selectionType="songs" className="mr-1!" />
-              )
-            ) : (
-              <Button
-                className={`!m-0 !rounded-none !border-0 bg-transparent !p-0 opacity-60 outline-offset-1 transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
-                  currentSongData.songId === songId && 'opacity-100!'
-                } group-focus-within/songCard:opacity-100 group-hover/songCard:opacity-100`}
-                iconName={isSongPlaying ? 'pause_circle' : 'play_circle'}
-                iconClassName="text-4xl! leading-none! text-font-color-white transition-opacity"
-                clickHandler={(e) => {
-                  e.stopPropagation();
-                  handlePlayBtnClick();
-                }}
-              />
-            )}
-          </div>
+          <Button
+            className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
+            iconClassName={`text-4xl! text-font-color-white/0 leading-none! ${
+              currentSongData.songId === songId && 'text-font-color-white/100'
+            } group-focus-within/songCard:text-font-color-white/100 group-hover/songCard:text-font-color-white/100 ${
+              isSongPlaying && 'text-font-color-white/75!'
+            }`}
+            clickHandler={handlePlayBtnClick}
+            iconName={isSongPlaying ? 'pause_circle' : 'play_circle'}
+          />
         </div>
       </div>
     </div>
