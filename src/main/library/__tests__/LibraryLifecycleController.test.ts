@@ -492,6 +492,221 @@ describe('LibraryLifecycleController', () => {
       await vi.advanceTimersByTimeAsync(5000);
       expect(mockScanner.scan).not.toHaveBeenCalled();
     });
+
+    it('schedules a follow-up scan when a filesystem change occurs during the startup automatic scan', async () => {
+      let resolveStartupScan: (val: ScanSummary) => void;
+      const startupScanPromise = new Promise<ScanSummary>((resolve) => {
+        resolveStartupScan = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(startupScanPromise);
+
+      // Trigger automatic startup initialization
+      const initPromise = controller.initialize();
+      await vi.waitFor(() => {
+        expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+      });
+
+      // Filesystem change arrives during startup scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/NewSong.mp3' });
+
+      // Startup scan finishes
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveStartupScan!(mockCompletedSummary);
+      await initPromise;
+
+      // Advance follow-up debounce timer
+      await vi.advanceTimersByTimeAsync(2000);
+
+      // Exactly 2 scans: 1 startup scan + 1 follow-up scan
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('does NOT trigger follow-up scan when mode is changed to manual during an active scan', async () => {
+      await controller.startWatchers();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Filesystem change arrives during scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+
+      // User transitions to manual mode while scan is in flight
+      await controller.setScanMode('manual');
+
+      // Scan A finishes
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveScanA!(mockCompletedSummary);
+
+      // Advance timers
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // No follow-up scan should execute because mode is now manual
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('schedules a follow-up scan when an automatic scan is cancelled after filesystem changes occurred', async () => {
+      await controller.startWatchers();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Filesystem change arrives during scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+
+      // Scan A finishes with CANCELLED status
+      mockScanner.scan.mockResolvedValueOnce(mockCancelledSummary);
+      resolveScanA!(mockCancelledSummary);
+
+      // Advance follow-up debounce timer
+      await vi.advanceTimersByTimeAsync(2000);
+
+      // Follow-up scan must occur so un-reconciled filesystem changes are not lost
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('resets follow-up debounce timer when new changes arrive during the follow-up debounce window', async () => {
+      await controller.startWatchers();
+
+      let resolveScanA: (val: ScanSummary) => void;
+      const scanAPromise = new Promise<ScanSummary>((resolve) => {
+        resolveScanA = resolve;
+      });
+      mockScanner.scan.mockReturnValueOnce(scanAPromise);
+
+      // Trigger first scan
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Change arrives during Scan A
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+
+      // Scan A finishes
+      mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
+      resolveScanA!(mockCompletedSummary);
+
+      // 1000ms into the follow-up debounce window, another change arrives
+      await vi.advanceTimersByTimeAsync(1000);
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
+
+      // At 2000ms total (1000ms after new change), Scan B should NOT have fired yet
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // At 3000ms total (2000ms after new change), Scan B fires
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('does NOT trigger follow-up scan when scanner internally calls libraryChangeTracker.reset() during scan completion', async () => {
+      await controller.startWatchers();
+
+      mockScanner.scan.mockImplementation(async () => {
+        // Real scanner calls reset() on clean completion
+        libraryChangeTracker.reset();
+        return mockCompletedSummary;
+      });
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Advance timers far past debounce window to ensure no follow-up scan runs
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT trigger follow-up scan when scanner internally calls libraryChangeTracker.markDirty() without entry on error/cancellation', async () => {
+      await controller.startWatchers();
+
+      mockScanner.scan.mockImplementation(async () => {
+        // Real scanner calls markDirty() with no arguments on failure/cancellation
+        libraryChangeTracker.markDirty();
+        return mockFailedSummary;
+      });
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Advance timers far past debounce window to ensure no follow-up scan runs
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT trigger a live scan when IPC resetChangeState calls libraryChangeTracker.reset()', async () => {
+      await controller.startWatchers();
+
+      // Renderer calls resetChangeState
+      libraryChangeTracker.reset();
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('handles FAILED scan followed by a real filesystem event and executes a subsequent debounced scan', async () => {
+      await controller.startWatchers();
+
+      mockScanner.scan.mockImplementationOnce(async () => {
+        libraryChangeTracker.markDirty();
+        return mockFailedSummary;
+      });
+
+      // First scan fails
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Subsequent real filesystem event arrives
+      mockScanner.scan.mockImplementationOnce(async () => {
+        libraryChangeTracker.reset();
+        return mockCompletedSummary;
+      });
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles CANCELLED scan followed by a real filesystem event and executes a subsequent debounced scan', async () => {
+      await controller.startWatchers();
+
+      mockScanner.scan.mockImplementationOnce(async () => {
+        libraryChangeTracker.markDirty();
+        return mockCancelledSummary;
+      });
+
+      // First scan cancelled
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(1);
+
+      // Subsequent real filesystem event arrives
+      mockScanner.scan.mockImplementationOnce(async () => {
+        libraryChangeTracker.reset();
+        return mockCompletedSummary;
+      });
+
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockScanner.scan).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('Scan Now & Invariants', () => {
