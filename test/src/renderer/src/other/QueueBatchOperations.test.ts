@@ -173,6 +173,28 @@ describe('Phase 5: Batch Queue Operations & Algorithmic Optimizations', () => {
       expect(q.position).toBe(1);
       expect(q.currentSongId).toBe(101);
     });
+
+    it('executes playNext atomically with exactly +1 version increment and 1 queueChange event', () => {
+      const q = new PlayerQueue([100, 101, 102, 103, 104], 1);
+      const queueChangeSpy = vi.fn();
+      const positionChangeSpy = vi.fn();
+      q.on('queueChange', queueChangeSpy);
+      q.on('positionChange', positionChangeSpy);
+
+      const initialStructureVersion = q.structureVersion;
+      const initialMembershipVersion = q.membershipVersion;
+
+      // playNext with multiple tracks
+      q.playNext([104, 102, 104]);
+
+      // Must be atomic: exactly +1, not +2
+      expect(q.structureVersion).toBe(initialStructureVersion + 1);
+      expect(q.membershipVersion).toBe(initialMembershipVersion + 1);
+      expect(queueChangeSpy).toHaveBeenCalledTimes(1);
+
+      // Position remained on song 101 at index 1 -> no spurious positionChange event
+      expect(positionChangeSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('5. Occurrence-Preserving O(N) Shuffle & Restore with Duplicates', () => {
