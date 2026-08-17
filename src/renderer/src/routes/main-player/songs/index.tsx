@@ -357,11 +357,18 @@ function SongsPage() {
     [isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler]
   );
 
+  const normalizedKeyword = keyword?.trim();
   const hasActiveSubFilters =
     (language && language !== 'all') ||
     (genre && genre !== 'all') ||
     onlyFavoriteArtists ||
     onlyFavoriteAlbums;
+
+  const hasActiveFilter =
+    Boolean(normalizedKeyword) || hasActiveSubFilters || filteringOrder !== 'notSelected';
+
+  const isLibraryEmpty = (songData?.length ?? 0) === 0 && !hasActiveFilter;
+  const isFilteredEmpty = filteredSongs.length === 0 && hasActiveFilter;
 
   return (
     <MainContainer
@@ -646,17 +653,22 @@ function SongsPage() {
         )}
       </div>
 
-      <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100">
-        {filteredSongs && filteredSongs.length > 0 && (
-          <VirtualizedList
-            data={filteredSongs}
-            fixedItemHeight={60}
-            scrollKey={scrollKey}
-            itemContent={renderSong}
-          />
-        )}
-      </div>
-      {filteredSongs.length === 0 && (
+      {isFilteredEmpty ? (
+        <div className="no-songs-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
+          <span className="material-icons-round-outlined mb-3 text-4xl opacity-75">search_off</span>
+          <span className="mb-1 text-lg font-medium">
+            {t('songsPage.noMatchingSongsTitle', 'No matching songs found')}
+          </span>
+          <span className="text-xs opacity-70">
+            {normalizedKeyword
+              ? t('songsPage.noMatchingSongsDesc', {
+                  keyword: normalizedKeyword,
+                  defaultValue: `No songs match "${normalizedKeyword}"`
+                })
+              : t('songsPage.noFilteredSongsDesc', 'No songs match the selected filters')}
+          </span>
+        </div>
+      ) : isLibraryEmpty ? (
         <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[8%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
           <Img src={NoSongsImage} alt="" className="mb-8 w-60" />
           <span>{t('songsPage.empty')}</span>
@@ -675,6 +687,15 @@ function SongsPage() {
               clickHandler={importAppData}
             />
           </div>
+        </div>
+      ) : (
+        <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100">
+          <VirtualizedList
+            data={filteredSongs}
+            fixedItemHeight={60}
+            scrollKey={scrollKey}
+            itemContent={renderSong}
+          />
         </div>
       )}
     </MainContainer>

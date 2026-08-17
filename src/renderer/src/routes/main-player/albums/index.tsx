@@ -117,6 +117,11 @@ function AlbumsPage() {
 
   const selectAllHandler = useSelectAllHandler(albumsData, 'album', 'albumId');
 
+  const normalizedKeyword = keyword?.trim();
+  const hasActiveFilter = Boolean(normalizedKeyword) || filteringOrder !== 'notSelected';
+  const isFilteredEmpty = albumsData.length === 0 && hasActiveFilter;
+  const isLibraryEmpty = albumsData.length === 0 && !hasActiveFilter;
+
   return (
     <MainContainer
       className="appear-from-bottom albums-list-container h-full! overflow-hidden pb-0!"
@@ -134,87 +139,112 @@ function AlbumsPage() {
       }}
     >
       <>
-        {albumsData.length > 0 && (
-          <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
-            <div className="container flex">
-              {t('common.album_other')}{' '}
-              <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
-                {isMultipleSelectionEnabled ? (
-                  <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
-                    {t('common.selectionWithCount', {
-                      count: multipleSelectionsData.multipleSelections.length
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
+          <div className="container flex">
+            {t('common.album_other')}{' '}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
+                albumsData &&
+                albumsData.length > 0 && (
+                  <span className="no-of-albums">
+                    {t('common.albumWithCount', {
+                      count: albumsData.length
                     })}
-                  </div>
-                ) : (
-                  albumsData.length > 0 && (
-                    <span className="no-of-albums">
-                      {t('common.albumWithCount', { count: albumsData.length })}
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-            <div className="other-controls-container flex">
-              <PageSearchInput
-                inputRef={search.inputRef}
-                value={search.value}
-                onChange={search.onChange}
-                onCompositionStart={search.onCompositionStart}
-                onCompositionEnd={search.onCompositionEnd}
-                placeholder={t('searchPage.searchPlaceholderAlbums', 'Search albums...')}
-              />
-              {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' && (
-                <Button
-                  key="select-all-btn"
-                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                  iconName="select_all"
-                  clickHandler={() => selectAllHandler()}
-                  tooltipLabel={t('common.selectAll')}
-                />
+                  </span>
+                )
               )}
-              <Button
-                tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
-                className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
-                clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'album')}
-              />
-              <Dropdown
-                name="albumPageFilterDropdown"
-                value={filteringOrder}
-                options={albumFilterOptions}
-                onChange={(e) => {
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      filteringOrder: e.currentTarget.value as AlbumFilterTypes
-                    })
-                  });
-                }}
-              />
-              <Dropdown
-                name="albumSortDropdown"
-                value={sortingOrder}
-                options={albumSortOptions}
-                onChange={(e) => {
-                  storage.sortingStates.setSortingStates(
-                    'albumsPage',
-                    e.currentTarget.value as AlbumSortTypes
-                  );
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      sortingOrder: e.currentTarget.value as AlbumSortTypes
-                    })
-                  });
-                }}
-              />
             </div>
           </div>
-        )}
-        <div
-          className={`albums-container h-full w-full grow ${!(albumsData && albumsData.length > 0) && 'hidden'}`}
-        >
-          {albumsData && albumsData.length > 0 && (
+          <div className="other-controls-container flex">
+            <PageSearchInput
+              inputRef={search.inputRef}
+              value={search.value}
+              onChange={search.onChange}
+              onCompositionStart={search.onCompositionStart}
+              onCompositionEnd={search.onCompositionEnd}
+              placeholder={t('searchPage.searchPlaceholderAlbums', 'Search albums...')}
+            />
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
+            <Button
+              tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
+              className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+              iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
+              clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'album')}
+              isDisabled={albumsData.length === 0}
+            />
+            <Dropdown
+              name="albumPageFilterDropdown"
+              type={`${t('common.filterBy')} :`}
+              value={filteringOrder}
+              options={albumFilterOptions}
+              onChange={(e) => {
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    filteringOrder: e.currentTarget.value as AlbumFilterTypes
+                  })
+                });
+              }}
+            />
+            <Dropdown
+              name="albumSortDropdown"
+              type={`${t('common.sortBy')} :`}
+              value={sortingOrder}
+              options={albumSortOptions}
+              onChange={(e) => {
+                storage.sortingStates.setSortingStates(
+                  'albumsPage',
+                  e.currentTarget.value as AlbumSortTypes
+                );
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    sortingOrder: e.currentTarget.value as AlbumSortTypes
+                  })
+                });
+              }}
+            />
+          </div>
+        </div>
+
+        {isFilteredEmpty ? (
+          <div className="no-albums-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
+            <span className="material-icons-round-outlined mb-3 text-4xl opacity-75">
+              search_off
+            </span>
+            <span className="mb-1 text-lg font-medium">
+              {t('albumsPage.noMatchingAlbumsTitle', 'No matching albums found')}
+            </span>
+            <span className="text-xs opacity-70">
+              {normalizedKeyword
+                ? t('albumsPage.noMatchingAlbumsDesc', {
+                    keyword: normalizedKeyword,
+                    defaultValue: `No albums match "${normalizedKeyword}"`
+                  })
+                : t('albumsPage.noFilteredAlbumsDesc', 'No albums match the selected filter')}
+            </span>
+          </div>
+        ) : isLibraryEmpty ? (
+          <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
+            <Img src={NoAlbumsImage} alt="No songs available." className="mb-8 w-60" />
+            <div>{t('albumsPage.empty')}</div>
+          </div>
+        ) : (
+          <div className="albums-container h-full w-full grow">
             <VirtualizedGrid
               data={albumsData}
               fixedItemWidth={MIN_ITEM_WIDTH}
@@ -231,22 +261,6 @@ function AlbumsPage() {
                 );
               }}
             />
-          )}
-        </div>
-        {/* {albumsData && albumsData.length === 0 && (
-          <div className="no-songs-container my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-2xl text-font-color-dimmed">
-            <Img
-              src={FetchingDataImage}
-              alt="No songs available."
-              className="mb-8 w-60"
-            />
-            <div>We&apos;re already there...</div>
-          </div>
-        )} */}
-        {albumsData && albumsData.length === 0 && (
-          <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
-            <Img src={NoAlbumsImage} alt="No songs available." className="mb-8 w-60" />
-            <div>{t('albumsPage.empty')}</div>
           </div>
         )}
       </>

@@ -28,6 +28,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@renderer': path.resolve(__dirname, './src/renderer/src'),
+      '@assets': path.resolve(__dirname, './src/renderer/src/assets'),
       '@common': path.resolve(__dirname, './src/common'),
       '@main': path.resolve(__dirname, './src/main'),
       '@db': path.resolve(__dirname, './src/main/db'),

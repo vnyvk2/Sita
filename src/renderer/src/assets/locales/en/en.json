@@ -329,11 +329,17 @@
 
   "songsPage": {
     "loading": "Hold on. We are getting everything ready for you...",
-    "empty": "There's nothing here.."
+    "empty": "There's nothing here..",
+    "noMatchingSongsTitle": "No matching songs found",
+    "noMatchingSongsDesc": "No songs match \"{{keyword}}\"",
+    "noFilteredSongsDesc": "No songs match the selected filters"
   },
 
   "artistsPage": {
-    "empty": "There's nothing here..."
+    "empty": "There's nothing here...",
+    "noMatchingArtistsTitle": "No matching artists found",
+    "noMatchingArtistsDesc": "No artists match \"{{keyword}}\"",
+    "noFilteredArtistsDesc": "No artists match the selected filter"
   },
 
   "foldersPage": {
@@ -359,7 +365,10 @@
   },
 
   "albumsPage": {
-    "empty": "There's nothing here..."
+    "empty": "There's nothing here...",
+    "noMatchingAlbumsTitle": "No matching albums found",
+    "noMatchingAlbumsDesc": "No albums match \"{{keyword}}\"",
+    "noFilteredAlbumsDesc": "No albums match the selected filter"
   },
 
   "genresPage": {

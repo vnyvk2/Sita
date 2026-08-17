@@ -111,6 +111,12 @@ function ArtistPage() {
   }, [sortingOrder]);
 
   const selectAllHandler = useSelectAllHandler(artistsData, 'artist', 'artistId');
+
+  const normalizedKeyword = keyword?.trim();
+  const hasActiveFilter = Boolean(normalizedKeyword) || filteringOrder !== 'notSelected';
+  const isFilteredEmpty = artistsData.length === 0 && hasActiveFilter;
+  const isLibraryEmpty = artistsData.length === 0 && !hasActiveFilter;
+
   return (
     <MainContainer
       className="appear-from-bottom artists-list-container h-full! overflow-hidden pb-0!"
@@ -128,88 +134,108 @@ function ArtistPage() {
       }}
     >
       <>
-        {artistsData.length > 0 && (
-          <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
-            <div className="container flex">
-              {t('common.artist_other')}{' '}
-              <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
-                {isMultipleSelectionEnabled ? (
-                  <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
-                    {t('common.selectionWithCount', {
-                      count: multipleSelectionsData.multipleSelections.length
+        <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-8 flex items-center pr-4 text-3xl font-medium">
+          <div className="container flex">
+            {t('common.artist_other')}{' '}
+            <div className="other-stats-container text-font-color-black dark:text-font-color-white ml-12 flex items-center text-xs">
+              {isMultipleSelectionEnabled ? (
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                  {t('common.selectionWithCount', {
+                    count: multipleSelectionsData.multipleSelections.length
+                  })}
+                </div>
+              ) : (
+                artistsData &&
+                artistsData.length > 0 && (
+                  <span className="no-of-artists">
+                    {t('common.artistWithCount', {
+                      count: artistsData.length
                     })}
-                  </div>
-                ) : (
-                  artistsData &&
-                  artistsData.length > 0 && (
-                    <span className="no-of-artists">
-                      {t('common.artistWithCount', {
-                        count: artistsData.length
-                      })}
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-            <div className="other-control-container flex">
-              <PageSearchInput
-                inputRef={search.inputRef}
-                value={search.value}
-                onChange={search.onChange}
-                onCompositionStart={search.onCompositionStart}
-                onCompositionEnd={search.onCompositionEnd}
-                placeholder={t('searchPage.searchPlaceholderArtists', 'Search artists...')}
-              />
-              {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
-                <Button
-                  key="select-all-btn"
-                  className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                  iconName="select_all"
-                  clickHandler={() => selectAllHandler()}
-                  tooltipLabel={t('common.selectAll')}
-                />
+                  </span>
+                )
               )}
-              <Button
-                tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
-                className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
-                clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'artist')}
-              />
-              <Dropdown
-                name="artistPageFilterDropdown"
-                type={`${t('common.filterBy')} :`}
-                value={filteringOrder}
-                options={artistFilterOptions}
-                onChange={(e) => {
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      filteringOrder: e.currentTarget.value as ArtistFilterTypes
-                    })
-                  });
-                }}
-              />
-              <Dropdown
-                name="artistsSortDropdown"
-                type={`${t('common.sortBy')} :`}
-                value={sortingOrder}
-                options={artistSortOptions}
-                onChange={(e) => {
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      sortingOrder: e.currentTarget.value as ArtistSortTypes
-                    })
-                  });
-                }}
-              />
             </div>
           </div>
-        )}
-        <div
-          className={`artists-container flex h-full! flex-wrap ${!(artistsData && artistsData.length > 0) ? 'hidden' : ''}`}
-        >
-          {artistsData && artistsData.length > 0 && (
+          <div className="other-control-container flex">
+            <PageSearchInput
+              inputRef={search.inputRef}
+              value={search.value}
+              onChange={search.onChange}
+              onCompositionStart={search.onCompositionStart}
+              onCompositionEnd={search.onCompositionEnd}
+              placeholder={t('searchPage.searchPlaceholderArtists', 'Search artists...')}
+            />
+            {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
+              <Button
+                key="select-all-btn"
+                className="select-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="select_all"
+                clickHandler={() => selectAllHandler()}
+                tooltipLabel={t('common.selectAll')}
+              />
+            )}
+            <Button
+              tooltipLabel={t(`common.${isMultipleSelectionEnabled ? 'unselectAll' : 'select'}`)}
+              className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+              iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
+              clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'artist')}
+              isDisabled={artistsData.length === 0}
+            />
+            <Dropdown
+              name="artistPageFilterDropdown"
+              type={`${t('common.filterBy')} :`}
+              value={filteringOrder}
+              options={artistFilterOptions}
+              onChange={(e) => {
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    filteringOrder: e.currentTarget.value as ArtistFilterTypes
+                  })
+                });
+              }}
+            />
+            <Dropdown
+              name="artistsSortDropdown"
+              type={`${t('common.sortBy')} :`}
+              value={sortingOrder}
+              options={artistSortOptions}
+              onChange={(e) => {
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    sortingOrder: e.currentTarget.value as ArtistSortTypes
+                  })
+                });
+              }}
+            />
+          </div>
+        </div>
+
+        {isFilteredEmpty ? (
+          <div className="no-artists-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
+            <span className="material-icons-round-outlined mb-3 text-4xl opacity-75">
+              search_off
+            </span>
+            <span className="mb-1 text-lg font-medium">
+              {t('artistsPage.noMatchingArtistsTitle', 'No matching artists found')}
+            </span>
+            <span className="text-xs opacity-70">
+              {normalizedKeyword
+                ? t('artistsPage.noMatchingArtistsDesc', {
+                    keyword: normalizedKeyword,
+                    defaultValue: `No artists match "${normalizedKeyword}"`
+                  })
+                : t('artistsPage.noFilteredArtistsDesc', 'No artists match the selected filter')}
+            </span>
+          </div>
+        ) : isLibraryEmpty ? (
+          <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
+            <Img src={NoArtistImage} alt="Sun in a desert" className="mb-8 w-60" />
+            <div>{t('artistsPage.empty')}</div>
+          </div>
+        ) : (
+          <div className="artists-container flex h-full! flex-wrap">
             <VirtualizedGrid
               data={artistsData}
               fixedItemWidth={MIN_ITEM_WIDTH}
@@ -229,22 +255,6 @@ function ArtistPage() {
                 );
               }}
             />
-          )}
-        </div>
-        {/* {artistsData && artistsData.length === 0 && (
-          <div className="no-songs-container my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl text-font-color-black dark:text-font-color-white">
-            <Img
-              src={FetchingDataImage}
-              alt="No songs available."
-              className="mb-8 w-60"
-            />
-            <div>What about a Lemonade? They are cool, right ?</div>
-          </div>
-        )} */}
-        {artistsData && artistsData.length === 0 && (
-          <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
-            <Img src={NoArtistImage} alt="Sun in a desert" className="mb-8 w-60" />
-            <div>{t('artistsPage.empty')}</div>
           </div>
         )}
       </>
