@@ -882,11 +882,17 @@ class PlayerQueue {
     this.songIds = restoredQueue;
     this.incrementStructureVersion();
 
-    if (currentSongId) {
-      const newPosition = this.songIds.indexOf(currentSongId);
-      this.position = newPosition !== -1 ? newPosition : 0;
+    if (currentSongId !== undefined) {
+      const originalActiveIndex = positionMapping.indexOf(0);
+      if (originalActiveIndex !== -1 && this.songIds[originalActiveIndex] === currentSongId) {
+        this.position = originalActiveIndex;
+      } else {
+        const newPosition = this.songIds.indexOf(currentSongId);
+        this.position = newPosition !== -1 ? newPosition : 0;
+      }
     } else {
-      this.position = 0;
+      const originalActiveIndex = positionMapping.indexOf(0);
+      this.position = originalActiveIndex !== -1 ? originalActiveIndex : 0;
     }
 
     // Clear the shuffle history since we've restored
