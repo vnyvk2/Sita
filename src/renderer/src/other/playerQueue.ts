@@ -368,8 +368,9 @@ class PlayerQueue {
   }
 
   /**
-   * Adds songs to play next, removing any existing duplicate occurrences of those songs
-   * from the queue and adjusting the current playback position seamlessly.
+   * Adds songs to play next, atomically removing any existing duplicate occurrences of those songs
+   * from the queue, inserting the incoming batch after the current position, and adjusting
+   * playback position in a single atomic pass with exactly one version increment.
    *
    * @param songIds - A single song ID or array of song IDs to play next
    */
@@ -377,8 +378,64 @@ class PlayerQueue {
     const ids = Array.isArray(songIds) ? songIds : [songIds];
     if (ids.length === 0) return;
 
-    this.removeSongIds(ids);
-    this.addSongIdsToNext(ids);
+    this.queueBeforeShuffle = undefined;
+
+    if (this.songIds.length === 0) {
+      this.songIds = [...ids];
+      this.position = 0;
+      this.incrementStructureVersion();
+      this.incrementMembershipVersion();
+      this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+      return;
+    }
+
+    const removalSet = new Set(ids);
+    const newSongIds: number[] = [];
+    let removedBeforeCurrent = 0;
+    let currentWasRemoved = false;
+
+    for (let i = 0; i < this.songIds.length; i += 1) {
+      const id = this.songIds[i];
+      if (removalSet.has(id)) {
+        if (i < this.position) {
+          removedBeforeCurrent += 1;
+        }
+        if (i === this.position) {
+          currentWasRemoved = true;
+        }
+      } else {
+        newSongIds.push(id);
+      }
+    }
+
+    let newPosition = 0;
+    if (newSongIds.length === 0) {
+      newSongIds.push(...ids);
+      newPosition = 0;
+    } else {
+      if (currentWasRemoved) {
+        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+      } else {
+        newPosition = this.position - removedBeforeCurrent;
+      }
+      newSongIds.splice(newPosition + 1, 0, ...ids);
+    }
+
+    const oldPosition = this.position;
+    this.songIds = newSongIds;
+    this.position = newPosition;
+
+    this.incrementStructureVersion();
+    this.incrementMembershipVersion();
+
+    this.emit('queueChange', { queue: [...this.songIds], length: this.songIds.length });
+    if (oldPosition !== newPosition || currentWasRemoved) {
+      this.emit('positionChange', {
+        oldPosition,
+        newPosition: this.position,
+        currentSongId: this.currentSongId
+      });
+    }
   }
 
   /**
