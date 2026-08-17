@@ -9,6 +9,7 @@ type Props<T> = {
   fixedItemHeight: number;
   scrollKey?: string;
   scrollTopOffset?: number;
+  initialItemCount?: number;
   itemContent: (index: number, item: T) => ReactNode;
   components?: Components<T>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,6 +28,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     fixedItemHeight,
     scrollKey,
     scrollTopOffset,
+    initialItemCount,
     itemContent,
     components = {},
     scrollerRef,
@@ -142,6 +144,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
         ...components
       }}
       ref={setCombinedVirtuosoRef}
+      {...(initialItemCount !== undefined ? { initialItemCount } : {})}
       {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
       scrollerRef={(element) => {
         if (typeof scrollerRef === 'function') {
