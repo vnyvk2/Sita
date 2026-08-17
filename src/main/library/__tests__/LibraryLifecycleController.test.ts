@@ -767,13 +767,80 @@ describe('LibraryLifecycleController', () => {
       expect(cancelled).toBe(true);
     });
 
-    it('shuts down cleanly by stopping watchers and cancelling scan', async () => {
+    it('shuts down cleanly with no active in-flight scan', async () => {
       await controller.startWatchers();
 
       await controller.shutdown();
 
       expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
       expect(mockScanner.cancelScan).toHaveBeenCalledTimes(1);
+      expect(controller.areWatchersActive()).toBe(false);
+    });
+
+    it('awaits in-flight scan completion before shutdown resolves (unwinding ordering test)', async () => {
+      let resolveScan: (summary: ScanSummary) => void;
+      const deferredScan = new Promise<ScanSummary>((resolve) => {
+        resolveScan = resolve;
+      });
+      mockScanner.scan.mockReturnValue(deferredScan);
+
+      await controller.startWatchers();
+
+      // Trigger an active scan
+      const scanPromise = controller.scanNow();
+
+      let isShutdownComplete = false;
+      const shutdownPromise = controller.shutdown().then(() => {
+        isShutdownComplete = true;
+        return true;
+      });
+
+      // Verification of ordering: cancelScan has been called, but shutdown is STILL waiting for in-flight scan
+      expect(mockScanner.cancelScan).toHaveBeenCalledTimes(1);
+      expect(isShutdownComplete).toBe(false);
+
+      // Now simulate the cooperative scanner cancellation unwinding and resolving
+      const cancelledSummary: ScanSummary = {
+        status: 'CANCELLED',
+        added: 0,
+        modified: 0,
+        removed: 0,
+        unchanged: 0,
+        skippedRoots: [],
+        durationMs: 15
+      };
+      resolveScan!(cancelledSummary);
+
+      await Promise.all([scanPromise, shutdownPromise]);
+
+      expect(isShutdownComplete).toBe(true);
+      expect(closeAllAbortControllers).toHaveBeenCalledTimes(1);
+      expect(controller.areWatchersActive()).toBe(false);
+    });
+
+    it('handles in-flight scan rejection gracefully during shutdown without throwing', async () => {
+      let rejectScan: (err: Error) => void;
+      const deferredScan = new Promise<ScanSummary>((_resolve, reject) => {
+        rejectScan = reject;
+      });
+      mockScanner.scan.mockReturnValue(deferredScan);
+
+      const scanPromise = controller.scanNow().catch(() => {});
+
+      let isShutdownComplete = false;
+      const shutdownPromise = controller.shutdown().then(() => {
+        isShutdownComplete = true;
+        return true;
+      });
+
+      expect(isShutdownComplete).toBe(false);
+
+      // Scanner fails during cancellation unwinding
+      rejectScan!(new Error('Disk disconnected during shutdown scan'));
+
+      await Promise.all([scanPromise, shutdownPromise]);
+
+      expect(isShutdownComplete).toBe(true);
       expect(controller.areWatchersActive()).toBe(false);
     });
   });

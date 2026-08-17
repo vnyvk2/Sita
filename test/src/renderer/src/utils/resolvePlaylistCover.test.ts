@@ -2,6 +2,7 @@ import type { PlaylistDto } from '@common/collections/dtos';
 import type { PlaylistCoverSettings } from '@renderer/types/playlistCover';
 import type { MaterializedCoverDraft } from '@renderer/types/playlistCoverDraft';
 import {
+  reconstructPlaylistCoverSongs,
   resolvePlaylistCover,
   resolvePlaylistCoverFromDraft
 } from '@renderer/utils/resolvePlaylistCover';
@@ -149,6 +150,161 @@ describe('resolvePlaylistCover', () => {
     // Slot 0 falls back to song 1 (first available unused song), remaining slots keep [2, 3, 4]
     expect(result.artworks).toEqual(['cover-1.jpg', 'cover-2.jpg', 'cover-3.jpg', 'cover-4.jpg']);
   });
+
+  describe('Custom Collage Invariants & Deep Position Resolution', () => {
+    it('should resolve custom song IDs when selected within the first 10 positions', () => {
+      const playlist = createMockPlaylist({ itemCount: 20 });
+      const songs = Array.from({ length: 20 }, (_, i) =>
+        createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+      );
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 4,
+          songIds: [2, 4, 6, 8]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, songs);
+
+      expect(result.artworks).toHaveLength(4);
+      expect(result.artworks).toEqual(['cover-2.jpg', 'cover-4.jpg', 'cover-6.jpg', 'cover-8.jpg']);
+    });
+
+    it('should resolve custom song IDs when selected beyond the first 10 playlist positions (e.g. Song 26)', () => {
+      const playlist = createMockPlaylist({ itemCount: 50 });
+      // Reconstructed songs array containing top 10 positions plus appended custom picks
+      const top10Songs = Array.from({ length: 10 }, (_, i) =>
+        createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+      );
+      const customSong26 = createMockMockSongWithArt(26, 'cover-26.jpg');
+      const playlistSongs = [...top10Songs, customSong26];
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 4,
+          songIds: [26, 2, 3, 4]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, playlistSongs);
+
+      expect(result.artworks).toHaveLength(4);
+      expect(result.artworks).toEqual([
+        'cover-26.jpg',
+        'cover-2.jpg',
+        'cover-3.jpg',
+        'cover-4.jpg'
+      ]);
+    });
+
+    it('should resolve multiple custom song IDs all selected beyond the first 10 positions', () => {
+      const playlist = createMockPlaylist({ itemCount: 100 });
+      const top10Songs = Array.from({ length: 10 }, (_, i) =>
+        createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+      );
+      const customSong25 = createMockMockSongWithArt(25, 'cover-25.jpg');
+      const customSong30 = createMockMockSongWithArt(30, 'cover-30.jpg');
+      const customSong40 = createMockMockSongWithArt(40, 'cover-40.jpg');
+      const playlistSongs = [...top10Songs, customSong25, customSong30, customSong40];
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 3,
+          songIds: [25, 30, 40]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, playlistSongs);
+
+      expect(result.artworks).toHaveLength(3);
+      expect(result.artworks).toEqual(['cover-25.jpg', 'cover-30.jpg', 'cover-40.jpg']);
+    });
+
+    it('allows intentional duplicate custom collage slots for the same song', () => {
+      const playlist = createMockPlaylist({ itemCount: 20 });
+      const songs = Array.from({ length: 20 }, (_, i) =>
+        createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+      );
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 4,
+          songIds: [1, 1, 2, 3]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, songs);
+
+      expect(result.artworks).toHaveLength(4);
+      expect(result.artworks).toEqual(['cover-1.jpg', 'cover-1.jpg', 'cover-2.jpg', 'cover-3.jpg']);
+    });
+
+    it('should ignore unused collage slots marked with 0 and fallback to available playlist songs', () => {
+      const playlist = createMockPlaylist({ itemCount: 10 });
+      const top10Songs = Array.from({ length: 10 }, (_, i) =>
+        createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+      );
+      const customSong50 = createMockMockSongWithArt(50, 'cover-50.jpg');
+      const playlistSongs = [...top10Songs, customSong50];
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 4,
+          songIds: [50, 0, 0, 0]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, playlistSongs);
+
+      expect(result.artworks).toHaveLength(4);
+      // Slot 0 is custom 50, remaining 3 slots auto-fill with first unused playlist songs [1, 2, 3]
+      expect(result.artworks).toEqual([
+        'cover-50.jpg',
+        'cover-1.jpg',
+        'cover-2.jpg',
+        'cover-3.jpg'
+      ]);
+    });
+
+    it('should resolve correctly when playlist has fewer than 10 total songs', () => {
+      const playlist = createMockPlaylist({ itemCount: 2 });
+      const songs = [
+        createMockMockSongWithArt(101, 'cover-101.jpg'),
+        createMockMockSongWithArt(102, 'cover-102.jpg')
+      ];
+
+      const settings: PlaylistCoverSettings = {
+        version: 1,
+        type: 'collage',
+        collage: {
+          layout: 'grid',
+          size: 2,
+          songIds: [102, 101]
+        }
+      };
+
+      const result = resolvePlaylistCover(playlist, settings, songs);
+
+      expect(result.artworks).toHaveLength(2);
+      expect(result.artworks).toEqual(['cover-102.jpg', 'cover-101.jpg']);
+    });
+  });
 });
 
 describe('resolvePlaylistCoverFromDraft', () => {
@@ -174,6 +330,111 @@ describe('resolvePlaylistCoverFromDraft', () => {
     expect(result.layout).toBe('fan');
     expect(result.variant).toBe('standard');
     expect(result.artworks).toEqual(['draft-10.jpg', 'draft-20.jpg']);
+  });
+});
+
+describe('reconstructPlaylistCoverSongs', () => {
+  it('should reconstruct songs in exact position order matching collectionEntries', () => {
+    const collectionEntries = [{ songId: 1 }, { songId: 2 }, { songId: 3 }];
+    const fetchedSongData = [
+      createMockMockSongWithArt(3, 'cover-3.jpg'),
+      createMockMockSongWithArt(1, 'cover-1.jpg'),
+      createMockMockSongWithArt(2, 'cover-2.jpg')
+    ];
+
+    const result = reconstructPlaylistCoverSongs(collectionEntries, fetchedSongData);
+
+    expect(result).toHaveLength(3);
+    expect(result.map((s) => s.songId)).toEqual([1, 2, 3]);
+  });
+
+  it('should append custom collage songs that reside beyond the collectionEntries limit (e.g. Song 26 at position 45)', () => {
+    const collectionEntries = Array.from({ length: 10 }, (_, i) => ({ songId: i + 1 }));
+    const top10Songs = Array.from({ length: 10 }, (_, i) =>
+      createMockMockSongWithArt(i + 1, `cover-${i + 1}.jpg`)
+    );
+    const customSong26 = createMockMockSongWithArt(26, 'cover-26.jpg');
+    const fetchedSongData = [...top10Songs, customSong26];
+
+    const settings: PlaylistCoverSettings = {
+      version: 1,
+      type: 'collage',
+      collage: {
+        layout: 'grid',
+        size: 4,
+        songIds: [26, 2, 3, 4]
+      }
+    };
+
+    const reconstructed = reconstructPlaylistCoverSongs(
+      collectionEntries,
+      fetchedSongData,
+      settings
+    );
+
+    // Verify reconstructed array preserves top-10 in order and appends song 26
+    expect(reconstructed).toHaveLength(11);
+    expect(reconstructed.map((s) => s.songId)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 26]);
+
+    // End-to-end: verify resolvePlaylistCover resolves Song 26's artwork in slot 0
+    const playlist = createMockPlaylist({ itemCount: 50 });
+    const cover = resolvePlaylistCover(playlist, settings, reconstructed);
+    expect(cover.artworks[0]).toBe('cover-26.jpg');
+  });
+
+  it('should deduplicate custom collage songs that are already in collectionEntries', () => {
+    const collectionEntries = [{ songId: 1 }, { songId: 2 }, { songId: 3 }];
+    const fetchedSongData = [
+      createMockMockSongWithArt(1, 'cover-1.jpg'),
+      createMockMockSongWithArt(2, 'cover-2.jpg'),
+      createMockMockSongWithArt(3, 'cover-3.jpg')
+    ];
+
+    const settings: PlaylistCoverSettings = {
+      version: 1,
+      type: 'collage',
+      collage: {
+        layout: 'grid',
+        size: 4,
+        songIds: [1, 2, 3, 0]
+      }
+    };
+
+    const result = reconstructPlaylistCoverSongs(collectionEntries, fetchedSongData, settings);
+
+    expect(result).toHaveLength(3);
+    expect(result.map((s) => s.songId)).toEqual([1, 2, 3]);
+  });
+
+  it('should ignore unused slot 0 in collage settings', () => {
+    const collectionEntries = [{ songId: 10 }, { songId: 20 }];
+    const fetchedSongData = [
+      createMockMockSongWithArt(10, 'cover-10.jpg'),
+      createMockMockSongWithArt(20, 'cover-20.jpg'),
+      createMockMockSongWithArt(99, 'cover-99.jpg')
+    ];
+
+    const settings: PlaylistCoverSettings = {
+      version: 1,
+      type: 'collage',
+      collage: {
+        layout: 'grid',
+        size: 4,
+        songIds: [99, 0, 0, 0]
+      }
+    };
+
+    const result = reconstructPlaylistCoverSongs(collectionEntries, fetchedSongData, settings);
+
+    expect(result).toHaveLength(3);
+    expect(result.map((s) => s.songId)).toEqual([10, 20, 99]);
+  });
+
+  it('should bypass reconstruction when providedSongs is already supplied', () => {
+    const provided = [createMockMockSongWithArt(777, 'cover-777.jpg')];
+    const result = reconstructPlaylistCoverSongs([], [], undefined, provided);
+
+    expect(result).toBe(provided);
   });
 });
 

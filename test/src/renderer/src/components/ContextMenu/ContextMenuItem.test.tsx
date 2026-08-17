@@ -370,4 +370,110 @@ describe('ContextMenuItem & Fly-Out Submenu Behavior', () => {
     // top is adjusted upwards to 0px
     expect(submenu.style.top).toBe('0px');
   });
+
+  it('dismisses submenu when parent menu surface scrolls', () => {
+    const parentItem: ContextMenuItem = {
+      label: 'Include in Playlist',
+      iconName: 'playlist_add',
+      handlerFunction: null,
+      innerContextMenus: [{ label: 'Chill Vibes', handlerFunction: vi.fn() }]
+    };
+
+    const { container } = render(
+      <AppUpdateContext.Provider value={mockContextValue}>
+        <div id="context-menu-root" style={{ width: '200px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
+      </AppUpdateContext.Provider>
+    );
+
+    const parentContainer = screen
+      .getByText('Include in Playlist')
+      .closest('.relative') as HTMLElement;
+    const menuSurface = container.querySelector('.main-menu-surface') as HTMLElement;
+
+    // Hover in -> opens submenu
+    fireEvent.mouseEnter(parentContainer);
+    expect(screen.getByTestId('flyout-submenu')).toBeDefined();
+
+    // Scroll parent menu surface
+    fireEvent.scroll(menuSurface);
+
+    // Submenu is immediately dismissed
+    expect(screen.queryByTestId('flyout-submenu')).toBeNull();
+  });
+
+  it('keeps submenu open when scrolling inside the submenu itself', () => {
+    const parentItem: ContextMenuItem = {
+      label: 'Include in Playlist',
+      iconName: 'playlist_add',
+      handlerFunction: null,
+      innerContextMenus: [
+        { label: 'Playlist 1', handlerFunction: vi.fn() },
+        { label: 'Playlist 2', handlerFunction: vi.fn() },
+        { label: 'Playlist 3', handlerFunction: vi.fn() }
+      ]
+    };
+
+    render(
+      <AppUpdateContext.Provider value={mockContextValue}>
+        <div id="context-menu-root" style={{ width: '200px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
+      </AppUpdateContext.Provider>
+    );
+
+    const parentContainer = screen
+      .getByText('Include in Playlist')
+      .closest('.relative') as HTMLElement;
+
+    // Hover in -> opens submenu
+    fireEvent.mouseEnter(parentContainer);
+    const submenu = screen.getByTestId('flyout-submenu');
+    expect(submenu).toBeDefined();
+
+    // Scroll inside the submenu itself
+    fireEvent.scroll(submenu);
+
+    // Submenu remains open
+    expect(screen.getByTestId('flyout-submenu')).toBeDefined();
+    expect(screen.getByText('Playlist 1')).toBeDefined();
+  });
+
+  it('dismisses submenu when window / background scrolls', () => {
+    const parentItem: ContextMenuItem = {
+      label: 'Include in Playlist',
+      iconName: 'playlist_add',
+      handlerFunction: null,
+      innerContextMenus: [{ label: 'Chill Vibes', handlerFunction: vi.fn() }]
+    };
+
+    render(
+      <AppUpdateContext.Provider value={mockContextValue}>
+        <div id="context-menu-root" style={{ width: '200px' }}>
+          <div className="main-menu-surface overflow-y-auto">
+            <ContextMenuItem {...parentItem} />
+          </div>
+        </div>
+      </AppUpdateContext.Provider>
+    );
+
+    const parentContainer = screen
+      .getByText('Include in Playlist')
+      .closest('.relative') as HTMLElement;
+
+    // Hover in -> opens submenu
+    fireEvent.mouseEnter(parentContainer);
+    expect(screen.getByTestId('flyout-submenu')).toBeDefined();
+
+    // Scroll window
+    fireEvent.scroll(window);
+
+    // Submenu is immediately dismissed
+    expect(screen.queryByTestId('flyout-submenu')).toBeNull();
+  });
 });

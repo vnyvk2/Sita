@@ -29,6 +29,29 @@ const ContextMenuItem = (props: ContextMenuItem) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleScroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && submenuRef.current?.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, {
+      capture: true,
+      passive: true
+    });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll, {
+        capture: true
+      });
+    };
+  }, [isOpen]);
+
   // Render separator without any label or click behavior
   if (props.isContextMenuItemSeperator) {
     return (
