@@ -95,6 +95,8 @@ const DEFAULT_SAVE_DIALOG_OPTIONS: SaveDialogOptions = {
 export let mainWindow: BrowserWindow;
 let tray: Tray;
 let playerType: PlayerTypes = 'normal';
+let isChangingPlayerType = false;
+let playerTypeTransitionPromise: Promise<void> = Promise.resolve();
 // let isConnectedToInternet = false;
 let isAudioPlaying = false;
 let isOnBatteryPower = false;
@@ -678,6 +680,8 @@ export async function showSaveDialog(saveDialogOptions = DEFAULT_SAVE_DIALOG_OPT
 }
 
 function manageAppMoveEvent() {
+  if (isChangingPlayerType) return;
+
   const [x, y] = mainWindow.getPosition();
   logger.debug(`User moved the player`, { playerType, coordinates: { x, y } });
 
@@ -709,6 +713,8 @@ function manageAppMoveEvent() {
 }
 
 function manageAppResizeEvent() {
+  if (isChangingPlayerType) return;
+
   const [width, height] = mainWindow.getSize();
   logger.debug(`User resized the player`, {
     playerType,
@@ -1032,6 +1038,19 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
   return { mode };
 }
 
+function getDefaultMiniPlayerBounds(targetWidth: number, targetHeight: number) {
+  const display = screen.getDisplayMatching(mainWindow.getBounds());
+  const { workArea } = display;
+  const margin = 24;
+
+  return {
+    x: workArea.x + workArea.width - targetWidth - margin,
+    y: workArea.y + workArea.height - targetHeight - margin,
+    width: targetWidth,
+    height: targetHeight
+  };
+}
+
 export async function resetMiniPlayerToDefault() {
   if (mainWindow && playerType === 'mini') {
     logger.debug('Resetting mini player to default position and dimensions');
@@ -1046,132 +1065,131 @@ export async function resetMiniPlayerToDefault() {
         ? COMPACT_MINI_PLAYER_HEIGHT
         : Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
 
-    const display = screen.getDisplayMatching(mainWindow.getBounds());
-    const { workArea } = display;
-    const margin = 24;
-    const targetX = workArea.x + workArea.width - targetWidth - margin;
-    const targetY = workArea.y + workArea.height - targetHeight - margin;
+    const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
 
-    setMiniPlayerBoundsProgrammatically({
-      x: targetX,
-      y: targetY,
-      width: targetWidth,
-      height: targetHeight
-    });
+    setMiniPlayerBoundsProgrammatically(defaultBounds);
 
     if (currentMiniPlayerMode === 'compact') {
       await saveUserSettings({
         miniPlayerWidth: targetWidth,
-        miniPlayerX: targetX,
-        miniPlayerY: targetY
+        miniPlayerX: defaultBounds.x,
+        miniPlayerY: defaultBounds.y
       });
     } else {
       savedStandardHeight = targetHeight;
       await saveUserSettings({
         miniPlayerWidth: targetWidth,
         miniPlayerHeight: targetHeight,
-        miniPlayerX: targetX,
-        miniPlayerY: targetY
+        miniPlayerX: defaultBounds.x,
+        miniPlayerY: defaultBounds.y
       });
     }
   }
 }
 
-export async function changePlayerType(type: PlayerTypes) {
-  if (mainWindow) {
+export async function changePlayerType(type: PlayerTypes): Promise<void> {
+  const runTransition = async () => {
+    if (!mainWindow) return;
+    if (playerType === type) return;
+
     logger.debug(`Changed player type.`, { type });
-    playerType = type;
+    isChangingPlayerType = true;
 
-    const {
-      mainWindowHeight,
-      mainWindowWidth,
-      miniPlayerHeight,
-      miniPlayerWidth,
-      miniPlayerMode,
-      mainWindowX,
-      mainWindowY,
-      miniPlayerX,
-      miniPlayerY,
-      isMiniPlayerAlwaysOnTop
-    } = await getUserSettings();
+    try {
+      const {
+        mainWindowHeight,
+        mainWindowWidth,
+        miniPlayerHeight,
+        miniPlayerWidth,
+        miniPlayerMode,
+        mainWindowX,
+        mainWindowY,
+        miniPlayerX,
+        miniPlayerY,
+        isMiniPlayerAlwaysOnTop
+      } = await getUserSettings();
 
-    if (type === 'mini') {
-      if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
+      if (type === 'mini') {
+        if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
 
-      currentMiniPlayerMode = miniPlayerMode || 'standard';
-      savedStandardHeight = miniPlayerHeight || MINI_PLAYER_DEFAULT_SIZE_Y;
+        currentMiniPlayerMode = miniPlayerMode || 'standard';
+        savedStandardHeight = miniPlayerHeight || MINI_PLAYER_DEFAULT_SIZE_Y;
 
-      mainWindow.setMaximizable(false);
-      mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
+        mainWindow.setMaximizable(false);
+        mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
 
-      let targetWidth = miniPlayerWidth
-        ? Math.max(miniPlayerWidth, currentMiniPlayerMinWidth)
-        : MINI_PLAYER_DEFAULT_SIZE_X;
+        let targetWidth = miniPlayerWidth
+          ? Math.max(miniPlayerWidth, currentMiniPlayerMinWidth)
+          : MINI_PLAYER_DEFAULT_SIZE_X;
 
-      let targetHeight: number;
-      if (currentMiniPlayerMode === 'compact') {
-        targetWidth = Math.max(targetWidth, COMPACT_MINI_PLAYER_MIN_WIDTH);
-        targetHeight = COMPACT_MINI_PLAYER_HEIGHT;
-        mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
-        mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+        let targetHeight: number;
+        if (currentMiniPlayerMode === 'compact') {
+          targetWidth = Math.max(targetWidth, COMPACT_MINI_PLAYER_MIN_WIDTH);
+          targetHeight = COMPACT_MINI_PLAYER_HEIGHT;
+          mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
+          mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
+        } else {
+          targetHeight = Math.max(savedStandardHeight, currentMiniPlayerMinHeight);
+          mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
+          mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+        }
+
+        mainWindow.setSize(targetWidth, targetHeight, true);
+
+        // Reset queue expansion state when switching to mini player
+        isQueueExpanded = false;
+        compactHeight = null;
+        compactY = null;
+        compactX = null;
+        expandedHeight = null;
+        expandedDirection = null;
+        programmaticMoveTarget = null;
+
+        if (miniPlayerX !== null && miniPlayerY !== null) {
+          mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
+          ensureWindowIsVisible(mainWindow);
+        } else {
+          // Smart bottom-right screen anchoring on first launch
+          const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
+          mainWindow.setPosition(defaultBounds.x, defaultBounds.y, true);
+          await saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y });
+        }
+        mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
+        playerType = 'mini';
+      } else if (type === 'normal') {
+        mainWindow.setMaximizable(true);
+        mainWindow.setMaximumSize(MAIN_WINDOW_MAX_SIZE_X, MAIN_WINDOW_MAX_SIZE_Y);
+        mainWindow.setMinimumSize(MAIN_WINDOW_MIN_SIZE_X, MAIN_WINDOW_MIN_SIZE_Y);
+        mainWindow.setAlwaysOnTop(false);
+        mainWindow.setFullScreen(false);
+
+        if (mainWindowWidth !== null && mainWindowHeight !== null) {
+          mainWindow.setSize(mainWindowWidth, mainWindowHeight, true);
+        } else mainWindow.setSize(MAIN_WINDOW_DEFAULT_SIZE_X, MAIN_WINDOW_DEFAULT_SIZE_Y, true);
+
+        if (mainWindowX !== null && mainWindowY !== null) {
+          mainWindow.setPosition(mainWindowX, mainWindowY, true);
+          ensureWindowIsVisible(mainWindow);
+        } else {
+          mainWindow.center();
+          const [x, y] = mainWindow.getPosition();
+          await saveUserSettings({ mainWindowX: x, mainWindowY: y });
+        }
+        mainWindow.setAspectRatio(MAIN_WINDOW_ASPECT_RATIO);
+        playerType = 'normal';
       } else {
-        targetHeight = Math.max(savedStandardHeight, currentMiniPlayerMinHeight);
-        mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
-        mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
+        mainWindow.setMaximumSize(MAIN_WINDOW_MAX_SIZE_X, MAIN_WINDOW_MAX_SIZE_Y);
+        mainWindow.setMinimumSize(MAIN_WINDOW_MIN_SIZE_X, MAIN_WINDOW_MIN_SIZE_Y);
+        mainWindow.setFullScreen(true);
+        playerType = type;
       }
-
-      mainWindow.setSize(targetWidth, targetHeight, true);
-
-      // Reset queue expansion state when switching to mini player
-      isQueueExpanded = false;
-      compactHeight = null;
-      compactY = null;
-      compactX = null;
-      expandedHeight = null;
-      expandedDirection = null;
-      programmaticMoveTarget = null;
-
-      if (miniPlayerX !== null && miniPlayerY !== null) {
-        mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
-        ensureWindowIsVisible(mainWindow);
-      } else {
-        // Smart bottom-right screen anchoring on first launch
-        const display = screen.getDisplayMatching(mainWindow.getBounds());
-        const { workArea } = display;
-        const margin = 24;
-        const targetX = workArea.x + workArea.width - targetWidth - margin;
-        const targetY = workArea.y + workArea.height - targetHeight - margin;
-
-        mainWindow.setPosition(targetX, targetY, true);
-        await saveUserSettings({ miniPlayerX: targetX, miniPlayerY: targetY });
-      }
-      mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
-    } else if (type === 'normal') {
-      mainWindow.setMaximizable(true);
-      mainWindow.setMaximumSize(MAIN_WINDOW_MAX_SIZE_X, MAIN_WINDOW_MAX_SIZE_Y);
-      mainWindow.setMinimumSize(MAIN_WINDOW_MIN_SIZE_X, MAIN_WINDOW_MIN_SIZE_Y);
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.setFullScreen(false);
-
-      if (mainWindowWidth !== null && mainWindowHeight !== null) {
-        mainWindow.setSize(mainWindowWidth, mainWindowHeight, true);
-      } else mainWindow.setSize(MAIN_WINDOW_DEFAULT_SIZE_X, MAIN_WINDOW_DEFAULT_SIZE_Y, true);
-
-      if (mainWindowX !== null && mainWindowY !== null) {
-        mainWindow.setPosition(mainWindowX, mainWindowY, true);
-        ensureWindowIsVisible(mainWindow);
-      } else {
-        mainWindow.center();
-        const [x, y] = mainWindow.getPosition();
-        await saveUserSettings({ mainWindowX: x, mainWindowY: y });
-      }
-      mainWindow.setAspectRatio(MAIN_WINDOW_ASPECT_RATIO);
-    } else {
-      mainWindow.setMaximumSize(MAIN_WINDOW_MAX_SIZE_X, MAIN_WINDOW_MAX_SIZE_Y);
-      mainWindow.setMinimumSize(MAIN_WINDOW_MIN_SIZE_X, MAIN_WINDOW_MIN_SIZE_Y);
-      mainWindow.setFullScreen(true);
+    } finally {
+      isChangingPlayerType = false;
     }
-  }
+  };
+
+  playerTypeTransitionPromise = playerTypeTransitionPromise.then(runTransition, runTransition);
+  return playerTypeTransitionPromise;
 }
 
 export function expandMiniPlayer(
