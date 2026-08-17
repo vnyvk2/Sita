@@ -1,3 +1,4 @@
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -29,7 +30,6 @@ const Genre = (props: GenreProp) => {
     (state) => state.multipleSelectionsData.isEnabled
   );
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
 
   const {
     createQueue,
@@ -138,10 +138,10 @@ const Genre = (props: GenreProp) => {
       })
       .then((songs) => {
         if (Array.isArray(songs)) {
-          queue.queues[queue.currentQueueIndex].songIds.push(
-            ...songs.filter((song) => !song.isBlacklisted).map((song) => song.songId)
-          );
-          updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
+          const songIdsToAdd = songs
+            .filter((song) => !song.isBlacklisted)
+            .map((song) => song.songId);
+          getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
           addNewNotifications([
             {
               id: 'newSongsToQueue',
@@ -158,9 +158,7 @@ const Genre = (props: GenreProp) => {
   }, [
     addNewNotifications,
     multipleSelectionsData,
-    queue.queues[queue.currentQueueIndex].songIds,
-    t,
-    updateQueueData
+    t
   ]);
 
   const isAMultipleSelection = useMemo(() => {
@@ -205,8 +203,7 @@ const Genre = (props: GenreProp) => {
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
           else {
-            queue.queues[queue.currentQueueIndex].songIds.push(...songIds);
-            updateQueueData(undefined, queue.queues[queue.currentQueueIndex].songIds);
+            getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
             addNewNotifications([
               {
                 id: 'newSongsToQueue',
@@ -263,9 +260,7 @@ const Genre = (props: GenreProp) => {
     playGenreSongs,
     toggleMultipleSelections,
     addToQueueForMultipleSelections,
-    queue,
     songIds,
-    updateQueueData,
     addNewNotifications,
     isMultipleSelectionEnabled,
     genreId,

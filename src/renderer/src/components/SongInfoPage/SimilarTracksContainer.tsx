@@ -1,3 +1,4 @@
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -15,7 +16,6 @@ type Props = { songId: number };
 
 const SimilarTracksContainer = (props: Props) => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
-  const queue = useStore(store, (state) => state.localStorage.queue);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
@@ -53,31 +53,7 @@ const SimilarTracksContainer = (props: Props) => {
     const songs = similarTracks.sortedAvailTracks.map((song) => song.songData!);
     const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
 
-    let currentSongIndex =
-      queue.queues[queue.currentQueueIndex].position ??
-      queue.queues[queue.currentQueueIndex].songIds.indexOf(currentSongData.songId);
-    const duplicateIds: number[] = [];
-
-    const newQueue = queue.queues[queue.currentQueueIndex].songIds.filter((id) => {
-      const isADuplicate = queueSongIds.includes(id);
-      if (isADuplicate) duplicateIds.push(id);
-
-      return !isADuplicate;
-    });
-
-    for (const duplicateId of duplicateIds) {
-      const duplicateIdPosition =
-        queue.queues[queue.currentQueueIndex].songIds.indexOf(duplicateId);
-
-      if (
-        duplicateIdPosition !== -1 &&
-        duplicateIdPosition < currentSongIndex &&
-        currentSongIndex - 1 >= 0
-      )
-        currentSongIndex -= 1;
-    }
-    newQueue.splice(currentSongIndex + 1, 0, ...queueSongIds);
-    updateQueueData(currentSongIndex, newQueue, undefined, false);
+    getQueuesManager().getActiveQueue().playNext(queueSongIds);
     addNewNotifications([
       {
         id: `${queueSongIds.length}PlayNext`,
@@ -88,15 +64,7 @@ const SimilarTracksContainer = (props: Props) => {
         iconName: 'shortcut'
       }
     ]);
-  }, [
-    similarTracks.sortedAvailTracks,
-    queue.queues[queue.currentQueueIndex].position,
-    queue.queues[queue.currentQueueIndex].songIds,
-    currentSongData.songId,
-    updateQueueData,
-    addNewNotifications,
-    t
-  ]);
+  }, [similarTracks.sortedAvailTracks, addNewNotifications, t]);
 
   const availableSimilarTrackComponents = useMemo(
     () =>

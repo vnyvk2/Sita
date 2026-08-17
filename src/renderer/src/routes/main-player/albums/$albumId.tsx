@@ -10,6 +10,7 @@ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { albumQuery } from '@renderer/queries/albums';
 import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
@@ -55,7 +56,6 @@ function AlbumInfoPage() {
   );
 
   const preferences = useStore(store, (state) => state?.localStorage?.preferences);
-  const queue = useStore(store, (state) => state.localStorage.queue);
 
   const { createQueue, updateQueueData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -145,15 +145,8 @@ function AlbumInfoPage() {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: () => {
-              updateQueueData(
-                undefined,
-                [
-                  ...queue.queues[queue.currentQueueIndex].songIds,
-                  ...albumSongs.map((song) => song.songId)
-                ],
-                false,
-                false
-              );
+              const songIdsToAdd = albumSongs.map((song) => song.songId);
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
               addNewNotifications([
                 {
                   id: String(albumData.albumId),

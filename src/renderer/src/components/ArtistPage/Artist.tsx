@@ -1,3 +1,4 @@
+import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -33,7 +34,6 @@ export const Artist = (props: ArtistProp) => {
     (state) => state.multipleSelectionsData.isEnabled
   );
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
 
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -159,11 +159,7 @@ export const Artist = (props: ArtistProp) => {
                 .map((artist) => artist.songs.map((song) => song.songId))
                 .flat();
               const uniqueSongIds = [...new Set(songIds)];
-              updateQueueData(
-                undefined,
-                [...queue.queues[queue.currentQueueIndex].songIds, ...uniqueSongIds],
-                false
-              );
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(uniqueSongIds);
               return addNewNotifications([
                 {
                   id: `${uniqueSongIds.length}AddedToQueueFromMultiSelection`,
@@ -175,12 +171,7 @@ export const Artist = (props: ArtistProp) => {
               ]);
             });
           }
-          updateQueueData(
-            undefined,
-            [...queue.queues[queue.currentQueueIndex].songIds, ...props.songIds],
-            false,
-            false
-          );
+          getQueuesManager().getActiveQueue().addSongIdsToEnd(props.songIds);
           return addNewNotifications([
             {
               id: 'addSongsToQueue',
@@ -265,8 +256,6 @@ export const Artist = (props: ArtistProp) => {
     goToArtistInfoPage,
     playArtistSongsForMultipleSelections,
     playArtistSongs,
-    updateQueueData,
-    queue.queues[queue.currentQueueIndex].songIds,
     props.songIds,
     props.artistId,
     addNewNotifications,
