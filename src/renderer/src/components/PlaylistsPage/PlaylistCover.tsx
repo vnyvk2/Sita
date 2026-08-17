@@ -1,12 +1,13 @@
 import type { PlaylistDto } from '@common/collections/dtos';
+import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
+import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
+import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useEffect, useMemo, useState } from 'react';
-import { collectionEntriesOptions } from '@renderer/hooks/collections/useCollectionQueries';
-import { songQuery } from '@renderer/queries/songs';
-import { resolvePlaylistCover } from '@renderer/utils/resolvePlaylistCover';
-import storage from '@renderer/utils/localStorage';
+
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import Img from '../Img';
 import MultipleArtworksCover from './MultipleArtworksCover';
@@ -21,7 +22,14 @@ type Props = {
 };
 
 const PlaylistCover = (props: Props) => {
-  const { playlist, songs, className = '', imgClassName = '', holderClassName = '', enableImgFadeIns } = props;
+  const {
+    playlist,
+    songs,
+    className = '',
+    imgClassName = '',
+    holderClassName = '',
+    enableImgFadeIns
+  } = props;
 
   const enableArtworkFromSongCovers = useStore(
     store,
@@ -47,21 +55,38 @@ const PlaylistCover = (props: Props) => {
   // 1. Read stored settings for this playlist
   const settings = storage.playlistCoverSettings.getSettings(playlist.id);
   const hasCustomCollage = settings?.type === 'collage';
-  const isAutoMode = !hasCustomCollage;
 
-  // 2. Fetch playlist entry pointers when songs prop is not provided (ALWAYS CALL HOOKS AT TOP OF COMPONENT)
+  // Determine if song-based cover resolution requires fetching song metadata
+  const requiresSongCovers =
+    !songs &&
+    (hasCustomCollage ||
+      (enableArtworkFromSongCovers && (playlist.itemCount ?? 0) > 0 && !playlist.artworkPath));
+
+  // 2. Fetch minimal playlist entry pointers (limit to 10 for collage, 5 for auto)
+  const entryLimit = hasCustomCollage ? 10 : 5;
   const { data: collectionEntries = [] } = useQuery({
-    ...collectionEntriesOptions(playlist.id),
-    enabled: !songs && hasCustomCollage
+    ...collectionEntriesOptions(playlist.id, 0, entryLimit),
+    enabled: requiresSongCovers
   });
+
+  // Calculate target song IDs without fetching the entire playlist
+  const targetSongIds = useMemo(() => {
+    if (!requiresSongCovers) return [];
+    if (hasCustomCollage) {
+      const configuredIds = (settings?.collage?.songIds ?? []).filter((id) => id > 0);
+      const entryIds = collectionEntries.map((e) => e.songId);
+      return Array.from(new Set([...configuredIds, ...entryIds]));
+    }
+    return collectionEntries.map((e) => e.songId);
+  }, [requiresSongCovers, hasCustomCollage, settings?.collage?.songIds, collectionEntries]);
 
   // 3. Fetch full SongData objects using Nora's cached songQuery.allSongInfo
   const { data: fetchedSongData = [] } = useQuery({
     ...songQuery.allSongInfo({
-      songIds: collectionEntries.map((e) => e.songId),
+      songIds: targetSongIds,
       sortType: 'addedOrder'
     }),
-    enabled: !songs && hasCustomCollage && collectionEntries.length > 0
+    enabled: requiresSongCovers && targetSongIds.length > 0
   });
 
   // 4. Preserve exact playlist position order matching collectionEntries (0, 1, 2, 3...)
@@ -76,16 +101,14 @@ const PlaylistCover = (props: Props) => {
     return positionOrderedSongs;
   }, [songs, fetchedSongData, collectionEntries]);
 
-  // --- ALL HOOKS ARE NOW EXECUTED UNCONDITIONALLY AT THE TOP ---
-
-  // 5. Option A Priority Chain:
-  //    (1) Custom Collage (if explicitly set by user)
+  // 5. Priority Chain:
+  //    (1) Custom Collage (if explicitly set by user, always renders via resolvePlaylistCover)
   //    (2) Playlist Artwork (if user manually uploaded/assigned artwork or static special playlist icon)
-  //    (3) Automatic Song Collage (if enableArtworkFromSongCovers is true and itemCount > 1)
+  //    (3) Automatic Song Collage (if enableArtworkFromSongCovers is true and itemCount > 0)
   //    (4) Default Playlist Cover (pink fallback)
   if (!hasCustomCollage && playlist.artworkPath) {
     return (
-      <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
+      <div className={`relative aspect-square overflow-hidden rounded-lg shadow-md ${className}`}>
         <Img
           src={playlist.artworkPath}
           fallbackSrc={DefaultPlaylistCover}
@@ -97,9 +120,9 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  if (!hasCustomCollage && (!enableArtworkFromSongCovers || playlist.itemCount <= 1)) {
+  if (!hasCustomCollage && (!enableArtworkFromSongCovers || playlist.itemCount <= 0)) {
     return (
-      <div className={`relative overflow-hidden rounded-lg shadow-md aspect-square ${className}`}>
+      <div className={`relative aspect-square overflow-hidden rounded-lg shadow-md ${className}`}>
         <Img
           src={DefaultPlaylistCover}
           fallbackSrc={DefaultPlaylistCover}
@@ -111,27 +134,15 @@ const PlaylistCover = (props: Props) => {
     );
   }
 
-  // 6. If in auto mode and no pre-loaded songs array: delegate directly to legacy collectionId caching in MultipleArtworksCover
-  if (isAutoMode && !songs) {
-    return (
-      <MultipleArtworksCover
-        collectionId={playlist.id}
-        className={className}
-        imgClassName={imgClassName}
-        holderClassName={holderClassName}
-        enableImgFadeIns={enableImgFadeIns}
-      />
-    );
-  }
+  // 6. Resolve layout and artwork paths via single source of truth resolver utility
+  const { layout, variant, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
 
-  // 7. Resolve layout and artwork paths via pure resolver utility (strictly type-checked SongData[])
-  const { layout, artworks } = resolvePlaylistCover(playlist, settings, playlistSongs);
-
-  // 8. Render presentation component
+  // 7. Render presentation component
   return (
     <MultipleArtworksCover
       resolvedArtworks={artworks}
       layout={layout}
+      variant={variant}
       requestedCount={settings?.collage?.size}
       className={className}
       imgClassName={imgClassName}
