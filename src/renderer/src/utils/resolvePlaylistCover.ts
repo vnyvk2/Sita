@@ -1,4 +1,5 @@
 import type { PlaylistDto } from '@common/collections/dtos';
+
 import DefaultImgCover from '../assets/images/webp/song_cover_default.webp';
 import type { PlaylistCoverSettings, ResolvedPlaylistCover } from '../types/playlistCover';
 import type { MaterializedCoverDraft } from '../types/playlistCoverDraft';
@@ -11,7 +12,7 @@ export function resolvePlaylistCover(
   playlistSongs: SongData[] = []
 ): ResolvedPlaylistCover {
   // 0. If playlist has a custom static artworkPath set and no custom collage: return custom artworkPath
-  if ((!settings || settings.type === 'auto') && playlist.artworkPath && playlistSongs.length === 0) {
+  if ((!settings || settings.type === 'auto') && playlist.artworkPath) {
     return { layout: 'grid', artworks: [playlist.artworkPath] };
   }
 
