@@ -121,9 +121,7 @@ const getAllSongs = async (
       }
     }
 
-    result.data = songsData.data.map((song) =>
-      convertToSongData(song, languageMap.get(song.id))
-    );
+    result.data = songsData.data.map((song) => convertToSongData(song, languageMap.get(song.id)));
 
     result.total = songsData.data.length;
     result.start = songsData.start;
