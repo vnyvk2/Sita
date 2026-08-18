@@ -10,6 +10,7 @@ import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
 import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
+import { extractFrontCover } from '../utils/extractFrontCover';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -161,9 +162,7 @@ export const parseSong = async (
           folderId
         };
 
-        rawPictureBytes = metadata.pictures?.at(0)
-          ? metadata.pictures[0].data.toByteArray()
-          : undefined;
+        rawPictureBytes = extractFrontCover(metadata.pictures);
       }
     } finally {
       file.dispose?.();

@@ -6,6 +6,7 @@ import { db } from '@main/db/db';
 import logger from '@main/logger';
 import { processArtworkFiles } from '@main/other/artworks';
 import { saveArtworks } from '@main/db/queries/artworks';
+import { extractFrontCover } from '@main/utils/extractFrontCover';
 import { ASSET_EVENTS } from '../libraryChoreography';
 
 import type { Job, JobClass, JobState } from '../types';
@@ -75,9 +76,7 @@ export class ArtworkJob implements Job {
       
       try {
         const tag = file.tag;
-        pictureData = tag?.pictures?.at(0)
-          ? tag.pictures[0].data.toByteArray()
-          : undefined;
+        pictureData = extractFrontCover(tag?.pictures);
       } finally {
         file.dispose();
       }

@@ -48,6 +48,7 @@ export interface AlbumMetadata {
   discCount?: number;
   trackCount?: number;
   releaseId?: string;
+  releaseGroupId?: string;
   provider?: MetadataProviderId;
 }
 
@@ -56,11 +57,13 @@ export interface ResolvedAlbumRelease {
   tracks: OfficialTrackInput[];
   provider: MetadataProviderId;
   providerReleaseId: string;
+  releaseGroupId?: string;
 }
 
 export interface CanonicalReleaseContext {
   mbid?: string;
   releaseId?: string;
+  releaseGroupId?: string;
   title: string;
   artist?: string;
   year?: number;

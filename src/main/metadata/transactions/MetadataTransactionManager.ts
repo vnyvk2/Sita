@@ -1,8 +1,9 @@
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { UndoToken } from '../domain/UndoToken';
-import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
-import { ArtworkDownloaderService } from './ArtworkDownloaderService';
+import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
+import { ArtworkDownloaderService } from './ArtworkDownloaderService';
+import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { MutationExecutor } from './MutationExecutor';
 import { SnapshotBuilder, type DraftSnapshot } from './SnapshotBuilder';
@@ -34,9 +35,13 @@ export class MetadataTransactionManager {
   constructor(options?: {
     dbUpdater?: SongDbUpdater;
     historyService?: MetadataHistoryService;
+    requestPipeline?: RequestPipeline;
+    artworkDownloader?: ArtworkDownloaderService;
   }) {
     this.relationalSync = new LibraryRelationalSyncService(options?.dbUpdater);
-    this.artworkDownloader = new ArtworkDownloaderService();
+    this.artworkDownloader =
+      options?.artworkDownloader ??
+      new ArtworkDownloaderService(options?.requestPipeline);
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.mutationExecutor = new MutationExecutor(this.relationalSync);

@@ -17,7 +17,7 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
   public readonly displayName = 'Artwork Auto Tag';
 
   public readonly supportedFields: WorkflowSupportedField[] = [
-    { fieldId: 'artworkUrl', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
+    { fieldId: 'artworkPath', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
   ];
 
   public readonly preferredProviders: MetadataProviderId[] = ['coverartarchive', 'discogs'];
@@ -70,7 +70,7 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
 
     if (providerId === 'coverartarchive') {
       const contrib = await this.caaAdapter.fetchContribution({ mbid: candidateId });
-      coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl')?.value as string;
+      coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl' || c.fieldId === 'artworkPath')?.value as string;
     } else {
       const release = await this.discogsAdapter.resolveRelease(candidateId);
       coverArtUrl = release?.album.artwork?.primaryPath || release?.album.artwork?.onlineUrls?.[0];
@@ -84,12 +84,12 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
         title: local.title,
         artist: local.artist,
         album: local.album,
-        artworkUrl: coverArtUrl
+        artworkPath: coverArtUrl
       },
       confidence: 0.9,
       fieldDiffs: [
         MetadataDiffBuilder.createFieldDiff({
-          fieldId: 'artworkUrl',
+          fieldId: 'artworkPath',
           oldVal: undefined,
           newVal: coverArtUrl,
           providerId,

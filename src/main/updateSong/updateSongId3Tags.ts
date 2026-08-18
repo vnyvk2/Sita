@@ -30,6 +30,7 @@ import {
 } from '../db/queries/artists';
 import {
   saveArtworks,
+  syncAlbumArtworks,
   syncSongArtworks
 } from '@main/db/queries/artworks';
 import {
@@ -925,19 +926,23 @@ const updateSongId3Tags = async (
       );
 
       // / / / / / SONG ARTWORK / / / / / / /
+      let artworkData: any;
       if (processedArtwork) {
-        let artworkData = processedArtwork.existing;
+        artworkData = processedArtwork.existing;
         if (!artworkData && processedArtwork.payloads) {
           artworkData = await saveArtworks(processedArtwork.payloads, trx);
         }
 
         if (artworkData && artworkData.length > 0) {
+          const artworkIds = artworkData.map((art: any) => art.id);
           // Link artwork to song
-          await syncSongArtworks(
-            songId,
-            artworkData.map((art: any) => art.id),
-            trx
-          );
+          await syncSongArtworks(songId, artworkIds, trx);
+
+          // Invariant BUG-08: Synchronize album artwork for song's current album
+          const songAlbumId = song.albums?.[0]?.album?.id;
+          if (songAlbumId) {
+            await syncAlbumArtworks(songAlbumId, artworkIds, trx);
+          }
         }
       }
 
@@ -1044,12 +1049,16 @@ const updateSongId3Tags = async (
           }
         }
 
-        // Relational Sync: Ensure all song artists are linked to the target album
+        // Relational Sync: Ensure all song artists and artworks are linked to the target album
         if (targetAlbumId) {
           const updatedSongState = await getSongById(songId, trx);
           const songArtistIds = updatedSongState?.artists?.map((a) => a.artist.id) ?? [];
           for (const artistId of songArtistIds) {
             await linkArtistToAlbum(targetAlbumId, artistId, trx);
+          }
+
+          if (processedArtwork && artworkData && artworkData.length > 0) {
+            await syncAlbumArtworks(targetAlbumId, artworkData.map((art: any) => art.id), trx);
           }
         }
       } else if (song.albums && song.albums.length > 0) {
