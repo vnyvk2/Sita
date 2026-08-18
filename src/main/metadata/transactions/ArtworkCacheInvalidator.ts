@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+import { resetArtworkCache } from '../../fs/resolveFilePaths';
+
 export class ArtworkCacheInvalidator {
   public invalidateArtworkCache(songArtworksPath?: string, albumArtworksPath?: string): void {
     const safeRemove = (dir?: string) => {
@@ -17,5 +19,8 @@ export class ArtworkCacheInvalidator {
 
     safeRemove(songArtworksPath);
     safeRemove(albumArtworksPath);
+
+    resetArtworkCache('songArtworks');
+    resetArtworkCache('albumArtworks');
   }
 }

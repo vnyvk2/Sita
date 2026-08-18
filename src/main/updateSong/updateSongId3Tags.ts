@@ -208,8 +208,24 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
 };
 
 const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
-  // Kept to be saved later
-  pendingMetadataUpdates.set(data.songPath, data);
+  // Coalesce field-by-field if a pending write already exists for this song
+  const existing = pendingMetadataUpdates.get(data.songPath);
+  if (existing) {
+    const mergedTags: TagData = { ...existing.tags };
+    for (const [key, value] of Object.entries(data.tags)) {
+      if (value !== undefined) {
+        (mergedTags as any)[key] = value;
+      }
+    }
+    pendingMetadataUpdates.set(data.songPath, {
+      ...existing,
+      ...data,
+      tags: mergedTags
+    });
+  } else {
+    pendingMetadataUpdates.set(data.songPath, data);
+  }
+
   const currentSongPath = getCurrentSongPath();
 
   const isACurrentlyPlayingSong = data.songPath === currentSongPath;
