@@ -5,7 +5,7 @@ import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
 // ? MAIN APP COMPONENTS
 import ErrorBoundary from './components/ErrorBoundary';
-import { MetadataCenterDialog } from './components/metadatacenter/MetadataCenterDialog';
+import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';

@@ -13,9 +13,10 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 
 export interface MetadataCenterDialogProps {
   isOpen: boolean;
-  localSongs: AutoTagSongInput[];
+  localSongs: any[];
   initialAlbumName?: string;
   initialArtistName?: string;
+  initialWorkflow?: string;
   operationId?: string;
   onClose: () => void;
 }
