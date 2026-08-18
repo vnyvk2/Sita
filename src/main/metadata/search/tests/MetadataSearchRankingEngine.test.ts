@@ -58,4 +58,51 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
     expect(ranked[0].totalScore).toBeGreaterThan(ranked[1].totalScore);
     expect(ranked[1].candidate.id).toBe('comp-1');
   });
+
+  it('awards +10 track count bonus when candidate trackCount matches targetTrackCount', () => {
+    const normQuery = MetadataQueryNormalizer.normalize('SOUR', 'Olivia Rodrigo');
+
+    const candidate11Tracks: SearchCandidate = {
+      id: 'sour-11',
+      title: 'SOUR',
+      artist: 'Olivia Rodrigo',
+      status: 'Official',
+      primaryType: 'Album',
+      trackCount: 11,
+      baseScore: 90
+    };
+
+    const candidate16Tracks: SearchCandidate = {
+      id: 'sour-16',
+      title: 'SOUR',
+      artist: 'Olivia Rodrigo',
+      status: 'Official',
+      primaryType: 'Album',
+      trackCount: 16,
+      baseScore: 90
+    };
+
+    // When targetTrackCount is 11, 11-track release receives +10 bonus over identical 16-track release
+    const rankedWithTarget = MetadataSearchRankingEngine.rankCandidates(
+      [candidate16Tracks, candidate11Tracks],
+      normQuery,
+      11
+    );
+
+    expect(rankedWithTarget[0].candidate.id).toBe('sour-11');
+    expect(rankedWithTarget[0].totalScore - rankedWithTarget[1].totalScore).toBe(10);
+    expect(rankedWithTarget[0].breakdown.trackCountBonus).toBe(10);
+    expect(rankedWithTarget[1].breakdown.trackCountBonus).toBe(0);
+
+    // When targetTrackCount is undefined, both receive +0 bonus and have identical scores
+    const rankedWithoutTarget = MetadataSearchRankingEngine.rankCandidates(
+      [candidate16Tracks, candidate11Tracks],
+      normQuery,
+      undefined
+    );
+
+    expect(rankedWithoutTarget[0].breakdown.trackCountBonus).toBe(0);
+    expect(rankedWithoutTarget[1].breakdown.trackCountBonus).toBe(0);
+    expect(rankedWithoutTarget[0].totalScore).toBe(rankedWithoutTarget[1].totalScore);
+  });
 });

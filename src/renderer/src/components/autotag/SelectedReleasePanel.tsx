@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AlbumTagPreview } from '../../../../common/metadata/types';
+import { getProviderDisplayName } from '../../../../common/metadata/displayNames';
 import type { ArtworkSourceOption } from '../../hooks/useAlbumAutoTag';
 import { ConfidenceBadge } from './ConfidenceBadge';
 
@@ -100,7 +101,7 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
         {/* Identity & Metadata Attributes */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem' }}>
           <div style={{ background: 'rgba(59, 130, 246, 0.25)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '4px', padding: '3px 10px', color: '#93C5FD', fontWeight: 600 }}>
-            Provider: {preview.provider}
+            Provider: {getProviderDisplayName(preview.provider)}
           </div>
 
           <div style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '4px', padding: '3px 10px', color: '#CBD5E1' }}>

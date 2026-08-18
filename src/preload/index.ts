@@ -805,8 +805,8 @@ export const api = {
   membership,
   metadata,
   metadataAutoTag: {
-    searchAlbums: (albumName: string, artistName?: string, limit?: number, operationId?: string) =>
-      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, operationId),
+    searchAlbums: (albumName: string, artistName?: string, limit?: number, targetTrackCount?: number, operationId?: string) =>
+      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, targetTrackCount, operationId),
     buildPreview: (
       localSongs: unknown[],
       releaseId: string,

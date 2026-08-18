@@ -251,18 +251,12 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           <SearchCriteriaBar
             album={state.searchAlbum}
             artist={state.searchArtist}
-            trackNo={state.searchTrackNo}
-            discNo={state.searchDiscNo}
             totalTracks={state.searchTotalTracks}
-            selectedProvider={state.selectedProvider}
             searchExpanded={state.searchExpanded}
             loading={state.loadingCandidates}
             onAlbumChange={actions.setSearchAlbum}
             onArtistChange={actions.setSearchArtist}
-            onTrackNoChange={actions.setSearchTrackNo}
-            onDiscNoChange={actions.setSearchDiscNo}
             onTotalTracksChange={actions.setSearchTotalTracks}
-            onProviderChange={actions.setSelectedProvider}
             onToggleExpanded={actions.toggleSearchExpanded}
             onSearch={() => actions.searchReleases()}
           />

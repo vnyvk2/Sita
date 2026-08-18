@@ -51,6 +51,8 @@ export interface AlbumMetadata {
   releaseId?: string;
   releaseGroupId?: string;
   provider?: MetadataProviderId;
+  /** Raw additive ranking score computed by MetadataSearchRankingEngine (heuristic range: ~-55 to 227). */
+  rankingScore?: number;
 }
 
 export interface ResolvedAlbumRelease {

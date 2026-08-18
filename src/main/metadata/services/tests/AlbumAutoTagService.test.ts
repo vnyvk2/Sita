@@ -64,10 +64,11 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     });
 
     // 1. Search Releases
-    const releases = await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, undefined, 'op-search');
+    const releases = await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, 11, undefined, 'op-search');
     expect(releases).toHaveLength(1);
     expect(stages).toContain('searching');
     expect(stages).toContain('completed');
+    expect(releases[0].rankingScore).toBeDefined();
 
     // 2. Build Preview
     const localSongs = [
@@ -133,7 +134,22 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     // Cancel op-1
     autoTagService.cancel('op-1');
 
-    await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, signal1, 'op-1')).rejects.toThrow(/aborted/);
+    await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, undefined, signal1, 'op-1')).rejects.toThrow(/aborted/);
+  });
+
+  it('forwards targetTrackCount to AlbumMetadataService.search', async () => {
+    const mockMetadataService = {
+      search: vi.fn().mockResolvedValue([]),
+      searchAlbums: vi.fn().mockResolvedValue([]),
+      resolveRelease: vi.fn().mockResolvedValue(null),
+      buildAlbumMatch: vi.fn(),
+      applyAlbum: vi.fn()
+    };
+
+    const autoTagService = new AlbumAutoTagService({ albumMetadataService: mockMetadataService as any });
+    await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, 11, undefined, 'op-track-count');
+
+    expect(mockMetadataService.search).toHaveBeenCalledWith('SOUR', 'Olivia Rodrigo', 10, 11);
   });
 
   it('updates all 7 metadata fields in DB fallback when applyPreview is called', async () => {

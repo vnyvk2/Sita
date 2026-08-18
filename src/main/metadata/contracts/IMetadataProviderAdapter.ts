@@ -24,7 +24,7 @@ export interface IMetadataProviderAdapter {
   /**
    * Structured album search returning domain AlbumMetadata[].
    */
-  searchAlbums?(album: string, artist?: string, limit?: number): Promise<AlbumMetadata[]>;
+  searchAlbums?(album: string, artist?: string, limit?: number, targetTrackCount?: number): Promise<AlbumMetadata[]>;
 
   /**
    * Resolves release details and official track listing into ResolvedAlbumRelease domain model.

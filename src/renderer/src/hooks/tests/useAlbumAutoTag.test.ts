@@ -29,8 +29,8 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
       api: {
         metadataAutoTag: {
           searchAlbums: vi.fn().mockResolvedValue([
-            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-sour-2021', provider: 'musicbrainz' },
-            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2022, releaseId: 'mb-sour-2022', provider: 'musicbrainz' }
+            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-sour-2021', provider: 'musicbrainz', rankingScore: 185 },
+            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2022, releaseId: 'mb-sour-2022', provider: 'musicbrainz', rankingScore: 163 }
           ]),
           buildPreview: vi.fn().mockImplementation(async (_songs, releaseId) => {
             if (releaseId === 'mb-sour-2021') {
@@ -86,7 +86,7 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     ]
                   }
                 ]
-              } as AlbumTagPreview;
+              } as unknown as AlbumTagPreview;
             } else {
               return {
                 album: { title: 'SOUR (Deluxe)', artist: 'Olivia Rodrigo', year: 2022 },
@@ -111,7 +111,7 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     ]
                   }
                 ]
-              } as AlbumTagPreview;
+              } as unknown as AlbumTagPreview;
             }
           }),
           applyPreview: vi.fn().mockResolvedValue({ success: true, updatedCount: 2, failedCount: 0, errors: [] }),
@@ -129,9 +129,10 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
   it('provides metadataAutoTag API integration methods and supports single listener count safety', async () => {
     const api = (window as any).api.metadataAutoTag;
-    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 'op-1');
+    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 11, 'op-1');
     expect(candidates).toHaveLength(2);
     expect(candidates[0].title).toBe('SOUR');
+    expect(candidates[0].rankingScore).toBe(185);
 
     const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
     expect(preview.overallConfidence).toBe(0.94);
@@ -148,6 +149,20 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
     unsubscribe();
     expect(listenerCount).toBe(0);
     expect(mockUnsubscribe).toHaveBeenCalled();
+  });
+
+  it('correctly parses searchTotalTracks string into integer targetTrackCount for search API invocation', () => {
+    const parseTracks = (val: string) => {
+      const parsed = val.trim() ? parseInt(val.trim(), 10) : undefined;
+      return Number.isInteger(parsed) && (parsed as number) > 0 ? parsed : undefined;
+    };
+
+    expect(parseTracks('11')).toBe(11);
+    expect(parseTracks('  16  ')).toBe(16);
+    expect(parseTracks('')).toBeUndefined();
+    expect(parseTracks('   ')).toBeUndefined();
+    expect(parseTracks('abc')).toBeUndefined();
+    expect(parseTracks('-5')).toBeUndefined();
   });
 
   it('calculates exact change count distinguishing global fields from per-track fields', async () => {

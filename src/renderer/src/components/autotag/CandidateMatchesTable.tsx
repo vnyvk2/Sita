@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AlbumMetadata } from '../../../../common/metadata/types';
+import { getProviderDisplayName } from '../../../../common/metadata/displayNames';
 
 export interface CandidateMatchesTableProps {
   candidates: AlbumMetadata[];
@@ -32,15 +33,6 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
     );
   }
 
-  const getConfidenceInfo = (index: number, candidate: AlbumMetadata) => {
-    const score = Math.max(70, Math.round(96 - index * 4));
-    const starCount = Math.round((score / 100) * 5);
-    const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
-    return { score, stars };
-  };
-
-  const bestMatchScore = candidates.length > 0 ? getConfidenceInfo(0, candidates[0]).score : 0;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {/* Section Header */}
@@ -48,11 +40,6 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
         <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
           Candidate Releases ({candidates.length})
         </span>
-        {candidates.length > 0 && (
-          <span style={{ fontSize: '0.82rem', color: '#34D399', fontWeight: 700 }}>
-            Best match: {bestMatchScore}%
-          </span>
-        )}
       </div>
 
       {/* Table Container */}
@@ -78,8 +65,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
             {candidates.map((cand, idx) => {
               const candidateKey = cand.releaseId ?? cand.title;
               const isSelected = selectedCandidateId === candidateKey;
-              const { score, stars } = getConfidenceInfo(idx, cand);
-              const providerLabel = cand.provider === 'discogs' ? 'Discogs' : 'MusicBrainz';
+              const providerLabel = getProviderDisplayName(cand.provider);
 
               return (
                 <tr
@@ -132,15 +118,31 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                     {cand.year ?? '—'}
                   </td>
 
-                  {/* Match Confidence & Provider */}
+                  {/* Match Rank & Provider */}
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: '#FBBF24', fontSize: '0.85rem', letterSpacing: '1px' }}>{stars}</span>
-                      <span style={{ fontWeight: 700, fontSize: '0.82rem', color: isSelected ? '#93C5FD' : '#FFFFFF' }}>
-                        {score}%
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                          color: idx === 0 ? '#34D399' : '#94A3B8',
+                          border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
+                        }}
+                      >
+                        {idx === 0 ? 'Best Match' : `#${idx + 1}`}
                       </span>
+                      {cand.rankingScore !== undefined && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
+                          Score {cand.rankingScore}
+                        </span>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '2px', fontWeight: 500 }}>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px', fontWeight: 500 }}>
                       {providerLabel}
                     </div>
                   </td>

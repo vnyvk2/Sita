@@ -1,21 +1,14 @@
 import React from 'react';
-import type { ProviderFilterOption } from '../../hooks/useAlbumAutoTag';
 
 export interface SearchCriteriaBarProps {
   album: string;
   artist: string;
-  trackNo: string;
-  discNo: string;
   totalTracks: string;
-  selectedProvider: ProviderFilterOption;
   searchExpanded: boolean;
   loading: boolean;
   onAlbumChange: (val: string) => void;
   onArtistChange: (val: string) => void;
-  onTrackNoChange: (val: string) => void;
-  onDiscNoChange: (val: string) => void;
   onTotalTracksChange: (val: string) => void;
-  onProviderChange: (provider: ProviderFilterOption) => void;
   onToggleExpanded: () => void;
   onSearch: () => void;
 }
@@ -23,18 +16,12 @@ export interface SearchCriteriaBarProps {
 export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
   album,
   artist,
-  trackNo,
-  discNo,
   totalTracks,
-  selectedProvider,
   searchExpanded,
   loading,
   onAlbumChange,
   onArtistChange,
-  onTrackNoChange,
-  onDiscNoChange,
   onTotalTracksChange,
-  onProviderChange,
   onToggleExpanded,
   onSearch
 }) => {
@@ -60,7 +47,15 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
     >
       {/* Collapsed Header Summary */}
       <div
+        role="button"
+        tabIndex={0}
         onClick={onToggleExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleExpanded();
+          }
+        }}
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -76,7 +71,8 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
           {!searchExpanded && (
             <span style={{ fontSize: '0.88rem', color: '#E2E8F0' }}>
               {artist ? <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{artist} — </span> : ''}
-              <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{album || 'No Album'}</span> · <span style={{ textTransform: 'capitalize', color: '#38BDF8', fontWeight: 600 }}>{selectedProvider}</span>
+              <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{album || 'No Album'}</span>
+              {totalTracks ? <span style={{ color: '#94A3B8', fontWeight: 500 }}> · {totalTracks} tracks</span> : ''}
             </span>
           )}
         </div>
@@ -105,13 +101,14 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
       {/* Expanded Search Inputs Form */}
       {searchExpanded && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '12px', alignItems: 'flex-end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '12px', alignItems: 'flex-end' }}>
             {/* Album Artist */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+              <label htmlFor="autotag-artist-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 ALBUM ARTIST
               </label>
               <input
+                id="autotag-artist-input"
                 type="text"
                 placeholder="e.g. Olivia Rodrigo"
                 value={artist}
@@ -130,10 +127,11 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
 
             {/* Album */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+              <label htmlFor="autotag-album-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 ALBUM TITLE *
               </label>
               <input
+                id="autotag-album-input"
                 type="text"
                 placeholder="e.g. SOUR"
                 value={album}
@@ -151,59 +149,15 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
               />
             </div>
 
-            {/* Track # */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
-                TRACK #
-              </label>
-              <input
-                type="text"
-                placeholder="optional"
-                value={trackNo}
-                onChange={(e) => onTrackNoChange(e.target.value)}
-                style={{
-                  padding: '9px 10px',
-                  borderRadius: '7px',
-                  background: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  outline: 'none',
-                  fontSize: '0.88rem',
-                  textAlign: 'center'
-                }}
-              />
-            </div>
-
-            {/* Disc # */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
-                DISC #
-              </label>
-              <input
-                type="text"
-                placeholder="1"
-                value={discNo}
-                onChange={(e) => onDiscNoChange(e.target.value)}
-                style={{
-                  padding: '9px 10px',
-                  borderRadius: '7px',
-                  background: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  outline: 'none',
-                  fontSize: '0.88rem',
-                  textAlign: 'center'
-                }}
-              />
-            </div>
-
             {/* Total Tracks */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
-                TRACKS
+              <label htmlFor="autotag-tracks-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+                TOTAL TRACKS
               </label>
               <input
-                type="text"
+                id="autotag-tracks-input"
+                type="number"
+                min="1"
                 placeholder="e.g. 11"
                 value={totalTracks}
                 onChange={(e) => onTotalTracksChange(e.target.value)}
@@ -221,36 +175,14 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
             </div>
           </div>
 
-          {/* Provider Selection & Find Action */}
+          {/* Provider Architecture Description & Find Action */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginRight: '4px' }}>
-                Provider:
-              </span>
-              {(['auto', 'musicbrainz', 'discogs'] as const).map((prov) => {
-                const isActive = selectedProvider === prov;
-                const label = prov === 'auto' ? 'Auto / Best Match' : prov === 'musicbrainz' ? 'MusicBrainz' : 'Discogs';
-                return (
-                  <button
-                    key={prov}
-                    type="button"
-                    onClick={() => onProviderChange(prov)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      fontWeight: isActive ? 600 : 500,
-                      background: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.06)',
-                      border: isActive ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.14)',
-                      color: isActive ? '#FFFFFF' : '#94A3B8',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#94A3B8' }}>
+              <span style={{ fontWeight: 600, color: '#CBD5E1' }}>Release source:</span> MusicBrainz
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span>Discogs genre/style enrichment</span>
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span>Cover Art Archive artwork</span>
             </div>
 
             <button

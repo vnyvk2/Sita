@@ -60,7 +60,7 @@ export interface AlbumPreview {
 }
 
 export interface IAlbumMetadataService {
-  search(albumName: string, artistName?: string, limit?: number): Promise<AlbumMetadata[]>;
+  search(albumName: string, artistName?: string, limit?: number, targetTrackCount?: number): Promise<AlbumMetadata[]>;
   resolveRelease(releaseId: string, providerId?: MetadataProviderId): Promise<ResolvedAlbumRelease | null>;
   buildAlbumMatch(
     localSongs: LocalSongInput[],
@@ -82,15 +82,15 @@ export class AlbumMetadataService implements IAlbumMetadataService {
   /**
    * Stage 2 — Search Album Releases via MetadataProviderRuntime
    */
-  public async search(albumName: string, artistName?: string, limit = 10): Promise<AlbumMetadata[]> {
+  public async search(albumName: string, artistName?: string, limit = 10, targetTrackCount?: number): Promise<AlbumMetadata[]> {
     if (!this.runtime) {
       throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime instance.');
     }
-    return this.runtime.searchAlbums(albumName, artistName, limit);
+    return this.runtime.searchAlbums(albumName, artistName, limit, targetTrackCount);
   }
 
-  public async searchAlbums(albumName: string, artistName?: string, limit = 10): Promise<AlbumMetadata[]> {
-    return this.search(albumName, artistName, limit);
+  public async searchAlbums(albumName: string, artistName?: string, limit = 10, targetTrackCount?: number): Promise<AlbumMetadata[]> {
+    return this.search(albumName, artistName, limit, targetTrackCount);
   }
 
   /**

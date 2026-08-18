@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { IdentityResolutionCache } from '@main/metadata/cache/IdentityResolutionCache';
 import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
@@ -134,5 +134,65 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     expect(resolved?.tracks).toHaveLength(2);
     expect(mockPipeline.lastParams?.inc).not.toContain('record-level-relations');
     expect(mockPipeline.lastParams?.inc).toContain('artists recordings release-groups media discids tags genres');
+  });
+
+  it('propagates exact integer rankingScore from ranking engine to AlbumMetadata during searchAlbums', async () => {
+    const mockPipeline = new MockRequestPipeline();
+    const apiClient = new MusicBrainzApiClient(mockPipeline as unknown as RequestPipeline);
+    const adapter = new MusicBrainzAdapter(apiClient);
+
+    vi.spyOn(apiClient, 'searchReleases').mockResolvedValueOnce([
+      {
+        id: 'rel-sour-1',
+        title: 'SOUR',
+        status: 'Official',
+        date: '2021-05-21',
+        'artist-credit': [{ name: 'Olivia Rodrigo' }],
+        score: 95,
+        'release-group': { id: 'rg-1', 'primary-type': 'Album' },
+        media: [{ position: 1, 'track-count': 11 }]
+      } as unknown as MusicBrainzReleaseDto
+    ]);
+
+    const results = await adapter.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 11);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe('SOUR');
+    // Exact expected score: 95 (base) + 30 (artist) + 30 (title) + 20 (official) + 15 (album) + 10 (11-track match) = 200
+    expect(results[0].rankingScore).toBe(200);
+  });
+
+  it('isolates cache entries when targetTrackCount differs', async () => {
+    const mockPipeline = new MockRequestPipeline();
+    const apiClient = new MusicBrainzApiClient(mockPipeline as unknown as RequestPipeline);
+    const cache = new IdentityResolutionCache();
+    const adapter = new MusicBrainzAdapter(apiClient, { cache });
+
+    const searchSpy = vi.spyOn(apiClient, 'searchReleases').mockResolvedValue([
+      {
+        id: 'rel-sour-1',
+        title: 'SOUR',
+        status: 'Official',
+        date: '2021-05-21',
+        'artist-credit': [{ name: 'Olivia Rodrigo' }],
+        score: 90,
+        'release-group': { id: 'rg-1', 'primary-type': 'Album' },
+        media: [{ position: 1, 'track-count': 11 }]
+      } as unknown as MusicBrainzReleaseDto
+    ]);
+
+    // Search with targetTrackCount = 11 (receives +10 track bonus -> total 195)
+    const results11 = await adapter.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 11);
+    expect(results11[0].rankingScore).toBe(195);
+    expect(searchSpy).toHaveBeenCalledTimes(1);
+
+    // Search with targetTrackCount = 16 (different cache key -> calls API, receives +0 track bonus -> total 185)
+    const results16 = await adapter.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 16);
+    expect(results16[0].rankingScore).toBe(185);
+    expect(searchSpy).toHaveBeenCalledTimes(2);
+
+    // Repeated search with targetTrackCount = 11 (cache hit -> does NOT call API again)
+    const cached11 = await adapter.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 11);
+    expect(cached11[0].rankingScore).toBe(195);
+    expect(searchSpy).toHaveBeenCalledTimes(2);
   });
 });

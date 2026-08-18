@@ -59,6 +59,7 @@ export class AlbumAutoTagService extends EventEmitter {
     albumName: string,
     artistName?: string,
     limit = 10,
+    targetTrackCount?: number,
     signal?: AbortSignal,
     operationId = 'default'
   ): Promise<AlbumMetadata[]> {
@@ -68,7 +69,7 @@ export class AlbumAutoTagService extends EventEmitter {
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
-      const results = await this.metadataService.search(albumName, artistName, limit);
+      const results = await this.metadataService.search(albumName, artistName, limit, targetTrackCount);
       this.checkCancelled(signal);
       this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);
       this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);

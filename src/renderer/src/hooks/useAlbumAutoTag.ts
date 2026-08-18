@@ -21,7 +21,6 @@ import { songQuery } from '../queries/songs';
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
 export type PreviewFilterOption = 'all' | 'changed' | 'low_confidence' | 'warnings';
 export type PreviewSortOption = 'trackNumber' | 'confidence' | 'title';
-export type ProviderFilterOption = 'auto' | 'musicbrainz' | 'discogs';
 export type ArtworkSourceOption = 'musicbrainz' | 'coverartarchive' | 'local';
 
 export interface GlobalFieldDiff {
@@ -42,10 +41,7 @@ export interface UseAlbumAutoTagState {
   // Search Criteria
   searchAlbum: string;
   searchArtist: string;
-  searchTrackNo: string;
-  searchDiscNo: string;
   searchTotalTracks: string;
-  selectedProvider: ProviderFilterOption;
   searchExpanded: boolean;
 
   // Candidate Matches
@@ -88,10 +84,7 @@ export interface UseAlbumAutoTagState {
 export interface UseAlbumAutoTagActions {
   setSearchAlbum: (val: string) => void;
   setSearchArtist: (val: string) => void;
-  setSearchTrackNo: (val: string) => void;
-  setSearchDiscNo: (val: string) => void;
   setSearchTotalTracks: (val: string) => void;
-  setSelectedProvider: (provider: ProviderFilterOption) => void;
   setSearchExpanded: (expanded: boolean) => void;
   toggleSearchExpanded: () => void;
 
@@ -143,10 +136,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   // Search Criteria Inputs
   const [searchAlbum, setSearchAlbum] = useState('');
   const [searchArtist, setSearchArtist] = useState('');
-  const [searchTrackNo, setSearchTrackNo] = useState('');
-  const [searchDiscNo, setSearchDiscNo] = useState('');
   const [searchTotalTracks, setSearchTotalTracks] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState<ProviderFilterOption>('auto');
   const [searchExpanded, setSearchExpanded] = useState(true);
 
   // Candidate Matches & Selection
@@ -217,8 +207,9 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       setStep('search');
 
       try {
-        const providerId = selectedProvider === 'auto' ? undefined : selectedProvider;
-        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, 10, operationId);
+        const parsedTracks = searchTotalTracks.trim() ? parseInt(searchTotalTracks.trim(), 10) : undefined;
+        const targetTrackCount = Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
+        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, 10, targetTrackCount, operationId);
         setSearchCandidates(results);
 
         // Auto-select best match candidate if available
@@ -235,7 +226,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
         setLoadingCandidates(false);
       }
     },
-    [searchAlbum, searchArtist, selectedProvider, operationId, initialSongs]
+    [searchAlbum, searchArtist, searchTotalTracks, operationId, initialSongs]
   );
 
   // Initialize preview state from response
@@ -667,10 +658,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       progressPercent,
       searchAlbum,
       searchArtist,
-      searchTrackNo,
-      searchDiscNo,
       searchTotalTracks,
-      selectedProvider,
       searchExpanded,
       searchCandidates,
       selectedCandidateId,
@@ -700,10 +688,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     actions: {
       setSearchAlbum,
       setSearchArtist,
-      setSearchTrackNo,
-      setSearchDiscNo,
       setSearchTotalTracks,
-      setSelectedProvider,
       setSearchExpanded,
       toggleSearchExpanded,
       searchReleases,

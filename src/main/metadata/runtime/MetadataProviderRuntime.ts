@@ -151,7 +151,7 @@ export class MetadataProviderRuntime {
    * Search albums concurrently across registered providers sorted by priority.
    * Merges, deduplicates by title::artist::year, and ranks search results cleanly.
    */
-  public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {
+  public async searchAlbums(album: string, artist?: string, limit = 10, targetTrackCount?: number): Promise<AlbumMetadata[]> {
     if (!this.isAvailable() || this.providers.size === 0) return [];
 
     const adapters = this.getSortedAdapters();
@@ -159,7 +159,7 @@ export class MetadataProviderRuntime {
       const providerId = adapter.identity.id.toLowerCase();
       if (typeof adapter.searchAlbums === 'function') {
         const startTime = Date.now();
-        const results = await adapter.searchAlbums(album, artist, limit);
+        const results = await adapter.searchAlbums(album, artist, limit, targetTrackCount);
         this.recordSuccess(providerId, Date.now() - startTime);
         return results;
       }

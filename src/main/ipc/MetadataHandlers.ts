@@ -35,9 +35,9 @@ export function registerMetadataHandlers(
   // --- Legacy Album AutoTag IPC Endpoints ---
   ipcMain.handle(
     'metadata/searchAlbums',
-    async (_, albumName: string, artistName?: string, limit?: number, operationId = 'default') => {
+    async (_, albumName: string, artistName?: string, limit?: number, targetTrackCount?: number, operationId = 'default') => {
       const signal = autoTagService.createAbortSignal(operationId);
-      return autoTagService.searchReleases(albumName, artistName, limit, signal, operationId);
+      return autoTagService.searchReleases(albumName, artistName, limit, targetTrackCount, signal, operationId);
     }
   );
 

@@ -176,9 +176,10 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }));
 
     const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(searchCandidates, normQuery, targetTrackCount);
-    const topReleases = rankedCandidates.slice(0, limit).map((c) => c.candidate.rawItem as MusicBrainzReleaseDto);
-
-    const results: AlbumMetadata[] = topReleases.map((rel) => this.releaseMapper.toAlbumMetadata(rel, artist));
+    const results: AlbumMetadata[] = rankedCandidates.slice(0, limit).map((scored) => ({
+      ...this.releaseMapper.toAlbumMetadata(scored.candidate.rawItem as MusicBrainzReleaseDto, artist),
+      rankingScore: Math.round(scored.totalScore)
+    }));
 
     if (this.cache && results.length > 0) {
       this.cache.set(this.identity.id, cacheKey, results);
