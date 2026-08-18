@@ -56,6 +56,8 @@ export class CircuitBreakerStage implements IProviderExecutionStage {
       });
     }
 
+    breaker.recordProbeStart();
+
     try {
       const result = await next();
       if (result.status === 'success') {
@@ -64,9 +66,16 @@ export class CircuitBreakerStage implements IProviderExecutionStage {
         breaker.onFailure(result.error);
       }
       return result;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      breaker.onFailure(errorMsg);
+    } catch (err: unknown) {
+      const isCancelled =
+        context.execContext?.cancellationToken?.isCancelled ||
+        (err as { name?: string })?.name === 'AbortError' ||
+        (err as { code?: string })?.code === 'ABORT_ERR';
+
+      if (!isCancelled) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        breaker.onFailure(errorMsg);
+      }
       throw err;
     }
   }

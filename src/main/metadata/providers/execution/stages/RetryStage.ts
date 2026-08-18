@@ -26,7 +26,10 @@ export class RetryStage implements IProviderExecutionStage {
       return await this.retryPolicy.execute(
         async () => {
           lastResult = await next();
-          if (lastResult.status === 'failed' || lastResult.status === 'timeout') {
+          const isCancelled =
+            context.execContext?.cancellationToken?.isCancelled ||
+            lastResult.status === 'skipped';
+          if (!isCancelled && (lastResult.status === 'failed' || lastResult.status === 'timeout')) {
             throw new Error(lastResult.error ?? `Provider result status: ${lastResult.status}`);
           }
           return lastResult;
@@ -35,7 +38,13 @@ export class RetryStage implements IProviderExecutionStage {
           maxAttempts,
           baseDelayMs,
           backoffMultiplier,
-          retryPredicate: () => true,
+          retryPredicate: (err: unknown) => {
+            const isCancelled =
+              context.execContext?.cancellationToken?.isCancelled ||
+              (err as { name?: string })?.name === 'AbortError' ||
+              (err as { code?: string })?.code === 'ABORT_ERR';
+            return !isCancelled;
+          },
           onRetry: (attempt, maxAttemptsCount, delayMs, error) => {
             context.eventBus.emit('ProviderRetry', {
               providerInfo: context.provider.info,
