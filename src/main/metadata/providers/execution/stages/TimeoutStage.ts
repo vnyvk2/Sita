@@ -42,7 +42,15 @@ export class TimeoutStage implements IProviderExecutionStage {
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const status = errorMsg.toLowerCase().includes('cancelled') ? 'skipped' : 'timeout';
+      const isCancelled =
+        context.execContext?.cancellationToken?.isCancelled ||
+        context.execContext?.cancellationToken?.isCancellationRequested?.() ||
+        (err as { name?: string })?.name === 'AbortError' ||
+        (err as { code?: string })?.code === 'ABORT_ERR' ||
+        errorMsg.toLowerCase().includes('cancelled') ||
+        errorMsg.toLowerCase().includes('aborted');
+
+      const status = isCancelled ? 'skipped' : 'timeout';
 
       return new ConcreteProviderResult<TDTO>({
         payload: null,

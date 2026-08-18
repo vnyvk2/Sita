@@ -7,9 +7,15 @@ import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderExecutionContext } from '@main/metadata/models/ProviderExecutionContext';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
+import { RetryStage } from '@main/metadata/providers/execution/stages/RetryStage';
+import { TimeoutStage } from '@main/metadata/providers/execution/stages/TimeoutStage';
+import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
+import { DefaultProviderExecutionStrategy } from '@main/metadata/providers/strategies/DefaultProviderExecutionStrategy';
 import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
 import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
+import { ProviderCircuitBreakerRegistry } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreakerRegistry';
 import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
 
 describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => {
@@ -75,10 +81,9 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
   it('guarantees that user cancellation immediately skips subsequent providers and does not poison circuit breakers', async () => {
     const eventBus = new MetadataEventBus();
     const registry = new MetadataProviderRegistry();
+    const breakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
     const token = { isCancelled: false };
     const executedProviders: string[] = [];
-
-    const breakerA = new ProviderCircuitBreaker('prov-abort-a', eventBus, { failureThreshold: 3 });
 
     const pA: IMetadataProvider = {
       info: new MetadataProviderInfo({ id: 'prov-abort-a', displayName: 'Provider A', priority: 100 }),
@@ -120,7 +125,15 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     registry.register(pA);
     registry.register(pB);
 
-    const executor = new MetadataProviderExecutor({ registry, eventBus });
+    const circuitBreakerStage = new CircuitBreakerStage(breakerRegistry);
+    const executionPipeline = new ProviderExecutionPipeline([
+      circuitBreakerStage,
+      new RetryStage(),
+      new TimeoutStage()
+    ]);
+    const executionStrategy = new DefaultProviderExecutionStrategy(eventBus, executionPipeline);
+    const executor = new MetadataProviderExecutor({ registry, eventBus, executionStrategy });
+
     const execContext = new ProviderExecutionContext({ cancellationToken: token });
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 20 });
 
@@ -132,8 +145,10 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     expect(results[1].status).toBe('skipped');
 
     // Invariant: Cancellation must NOT increment breaker failure count
-    expect(breakerA.getFailureCount()).toBe(0);
-    expect(breakerA.getState()).toBe('Closed');
+    const breakerA = breakerRegistry.get('prov-abort-a');
+    expect(breakerA).toBeDefined();
+    expect(breakerA!.getFailureCount()).toBe(0);
+    expect(breakerA!.getState()).toBe('Closed');
   });
 
   it('orchestrates complete circuit breaker lifecycle with HalfOpen probe throttling and recovery', () => {

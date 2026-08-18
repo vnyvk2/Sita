@@ -60,10 +60,17 @@ export class CircuitBreakerStage implements IProviderExecutionStage {
 
     try {
       const result = await next();
-      if (result.status === 'success') {
-        breaker.onSuccess();
-      } else if (result.status === 'failed' || result.status === 'timeout') {
-        breaker.onFailure(result.error);
+      const isCancelled =
+        context.execContext?.cancellationToken?.isCancelled ||
+        context.execContext?.cancellationToken?.isCancellationRequested?.() ||
+        result.status === 'skipped';
+
+      if (!isCancelled) {
+        if (result.status === 'success') {
+          breaker.onSuccess();
+        } else if (result.status === 'failed' || result.status === 'timeout') {
+          breaker.onFailure(result.error);
+        }
       }
       return result;
     } catch (err: unknown) {

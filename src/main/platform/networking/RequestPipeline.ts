@@ -30,7 +30,12 @@ export class RequestPipeline {
 
   constructor(options?: RequestPipelineOptions) {
     this.client = options?.client ?? new FetchHttpClient();
-    this.maxConcurrentRequests = options?.maxConcurrentRequests ?? 6;
+
+    const maxConcurrentRequests = options?.maxConcurrentRequests ?? 6;
+    if (!Number.isInteger(maxConcurrentRequests) || maxConcurrentRequests < 1) {
+      throw new Error('maxConcurrentRequests must be a positive integer');
+    }
+    this.maxConcurrentRequests = maxConcurrentRequests;
 
     if (options?.rateLimiter) {
       this.rateLimiter =
@@ -63,11 +68,11 @@ export class RequestPipeline {
     const authenticatedOptions = this.authenticator.applyAuthentication(opts);
 
     return this.retryPolicy.execute(async () => {
+      if (this.rateLimiter) {
+        await this.rateLimiter.acquire();
+      }
       await this.acquireSlot(authenticatedOptions.signal);
       try {
-        if (this.rateLimiter) {
-          await this.rateLimiter.acquire();
-        }
         return await this.client.request<T>(authenticatedOptions);
       } finally {
         this.releaseSlot();

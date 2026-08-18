@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 import { HttpError } from '@main/platform/networking/FetchHttpClient';
+import { RateLimiter } from '@main/platform/networking/RateLimiter';
+import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 import type { IHttpClient, HttpRequestOptions, HttpResponse } from '@main/platform/networking/IHttpClient';
 
 describe('RequestPipeline (Phase 2 Concurrency & Cancellation)', () => {
@@ -33,6 +34,42 @@ describe('RequestPipeline (Phase 2 Concurrency & Cancellation)', () => {
     expect(results).toHaveLength(10);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(3);
     expect(pipeline.getActiveAttempts()).toBe(0);
+    expect(pipeline.getQueueLength()).toBe(0);
+  });
+
+  it('validates that maxConcurrentRequests is a positive integer', () => {
+    expect(() => new RequestPipeline({ maxConcurrentRequests: 0 })).toThrow('positive integer');
+    expect(() => new RequestPipeline({ maxConcurrentRequests: -1 })).toThrow('positive integer');
+    expect(() => new RequestPipeline({ maxConcurrentRequests: 1.5 })).toThrow('positive integer');
+  });
+
+  it('does not acquire concurrency slot while waiting for rate limiter token', async () => {
+    const rateLimiter = new RateLimiter({ maxRequests: 1, perIntervalMs: 150 });
+    // Consume the single initial token so the next acquire must wait for refill
+    await rateLimiter.acquire();
+
+    const mockClient: IHttpClient = {
+      request: vi.fn().mockImplementation(async () => {
+        return { status: 200, data: 'ok', headers: {} } as HttpResponse<unknown>;
+      })
+    };
+
+    const pipeline = new RequestPipeline({
+      client: mockClient,
+      maxConcurrentRequests: 1,
+      rateLimiter
+    });
+
+    const task = pipeline.execute('https://api.test.com/rate-limit-test');
+
+    // While rateLimiter has 0 tokens and is waiting for refill:
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(rateLimiter.getQueueLength()).toBe(1); // Request is waiting in rate limiter queue
+    expect(pipeline.getActiveAttempts()).toBe(0); // Concurrency slot has NOT been acquired!
+
+    await task;
+    expect(pipeline.getActiveAttempts()).toBe(0);
+    expect(rateLimiter.getQueueLength()).toBe(0);
   });
 
   it('aborts queued request before it reaches IHttpClient if cancelled while waiting for a slot', async () => {
