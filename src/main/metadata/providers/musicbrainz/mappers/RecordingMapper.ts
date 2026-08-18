@@ -64,7 +64,9 @@ export class MusicBrainzRecordingMapper {
     const fields: Record<string, unknown> = {
       ...candidate.recording,
       ...candidate.provider,
-      mbid: candidate.provider.providerRecordingId
+      mbid: candidate.provider.providerRecordingId,
+      musicBrainzRecordingId: candidate.provider.providerRecordingId,
+      isrc: candidate.provider.isrc
     };
 
     return new ProviderResult({

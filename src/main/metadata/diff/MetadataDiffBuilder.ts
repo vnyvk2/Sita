@@ -59,7 +59,9 @@ export class MetadataDiffBuilder {
       this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre'))
+      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
+      this.compareField('isrc', 'ISRC', song.isrc, pair?.remoteTrack?.isrc ?? (pair?.remoteTrack as any)?.recording?.isrc ?? merged.isrc, merged.fieldAttributions.isrc, mapAlternatives('isrc')),
+      this.compareField('musicBrainzRecordingId', 'MusicBrainz Recording ID', song.musicBrainzRecordingId, pair?.remoteTrack?.musicBrainzRecordingId ?? (pair?.remoteTrack as any)?.recording?.musicBrainzRecordingId ?? merged.musicBrainzRecordingId, merged.fieldAttributions.musicBrainzRecordingId, mapAlternatives('musicBrainzRecordingId'))
     ];
 
     const conf = pair?.confidence ?? 0.95;

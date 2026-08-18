@@ -113,6 +113,13 @@
       "when": 1786100000000,
       "tag": "0015_add_library_scan_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786200000000,
+      "tag": "0016_add_mbid_isrc_to_songs",
+      "breakpoints": true
     }
   ]
 }

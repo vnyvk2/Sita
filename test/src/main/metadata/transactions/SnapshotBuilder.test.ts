@@ -4,7 +4,7 @@ import { MetadataTransactionManager } from '@main/metadata/transactions/Metadata
 import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
 
 describe('SnapshotBuilder', () => {
-  it('captures all 7 mutable metadata fields in both previousSongs and updatedSongs', () => {
+  it('captures all metadata fields including MBID and ISRC in both previousSongs and updatedSongs', () => {
     const drafts: DraftSnapshot[] = [
       {
         songId: 42,
@@ -16,7 +16,9 @@ describe('SnapshotBuilder', () => {
           year: 2000,
           trackNumber: 1,
           discNumber: 1,
-          genre: 'Rock'
+          genre: 'Rock',
+          musicBrainzRecordingId: 'rec-old-123',
+          isrc: 'USRC10000001'
         },
         appliedTags: {
           title: 'New Title',
@@ -25,7 +27,9 @@ describe('SnapshotBuilder', () => {
           year: 2024,
           trackNumber: 5,
           discNumber: 2,
-          genre: 'Indie Rock'
+          genre: 'Indie Rock',
+          musicBrainzRecordingId: 'rec-new-456',
+          isrc: 'USRC10000002'
         }
       }
     ];
@@ -51,6 +55,8 @@ describe('SnapshotBuilder', () => {
     expect(prev.trackNumber).toBe(1);
     expect(prev.discNumber).toBe(1);
     expect(prev.genre).toBe('Rock');
+    expect(prev.musicBrainzRecordingId).toBe('rec-old-123');
+    expect(prev.isrc).toBe('USRC10000001');
 
     expect(snapshot.updatedSongs).toHaveLength(1);
     const updated = snapshot.updatedSongs[0];
@@ -61,6 +67,8 @@ describe('SnapshotBuilder', () => {
     expect(updated.trackNumber).toBe(5);
     expect(updated.discNumber).toBe(2);
     expect(updated.genre).toBe('Indie Rock');
+    expect(updated.musicBrainzRecordingId).toBe('rec-new-456');
+    expect(updated.isrc).toBe('USRC10000002');
   });
 
   it('handles undefined optional fields gracefully without inserting NaN', () => {
@@ -90,11 +98,13 @@ describe('SnapshotBuilder', () => {
     expect(prev.trackNumber).toBeUndefined();
     expect(prev.discNumber).toBeUndefined();
     expect(prev.genre).toBeUndefined();
+    expect(prev.musicBrainzRecordingId).toBeUndefined();
+    expect(prev.isrc).toBeUndefined();
   });
 });
 
 describe('MetadataTransactionManager Rollback', () => {
-  it('restores trackNumber, discNumber, and genre along with standard tags on rollback', async () => {
+  it('restores trackNumber, discNumber, genre, MBID, and ISRC along with standard tags on rollback', async () => {
     let lastPassedTags: Record<string, string | number | undefined> | null = null;
     const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
       lastPassedTags = tags;
@@ -116,7 +126,9 @@ describe('MetadataTransactionManager Rollback', () => {
           { fieldId: 'year', oldValue: 1995, newValue: 2025 },
           { fieldId: 'trackNumber', oldValue: 3, newValue: 7 },
           { fieldId: 'discNumber', oldValue: 1, newValue: 2 },
-          { fieldId: 'genre', oldValue: 'Grunge', newValue: 'Pop' }
+          { fieldId: 'genre', oldValue: 'Grunge', newValue: 'Pop' },
+          { fieldId: 'musicBrainzRecordingId', oldValue: 'rec-prev-001', newValue: 'rec-new-002' },
+          { fieldId: 'isrc', oldValue: 'USRC19950001', newValue: 'USRC20250002' }
         ]
       }
     ];
@@ -129,7 +141,7 @@ describe('MetadataTransactionManager Rollback', () => {
     expect(rollbackResult.success).toBe(true);
     expect(rollbackResult.revertedCount).toBe(1);
 
-    // Verify all 7 fields were passed back to dbUpdater
+    // Verify all fields including MBID and ISRC were passed back to dbUpdater
     expect(lastPassedTags).toEqual({
       title: 'Original Title',
       artist: 'Original Artist',
@@ -137,7 +149,43 @@ describe('MetadataTransactionManager Rollback', () => {
       year: 1995,
       trackNumber: 3,
       discNumber: 1,
-      genre: 'Grunge'
+      genre: 'Grunge',
+      musicBrainzRecordingId: 'rec-prev-001',
+      isrc: 'USRC19950001'
+    });
+  });
+
+  it('explicitly clears MBID/ISRC on rollback if previously absent (absent -> new -> rollback -> empty)', async () => {
+    let lastPassedTags: Record<string, string | number | undefined> | null = null;
+    const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
+      lastPassedTags = tags;
+      return true;
+    });
+
+    const txManager = new MetadataTransactionManager({
+      dbUpdater: mockDbUpdater
+    });
+
+    const mutations: ResourceMutationPayload[] = [
+      {
+        resourceId: 201,
+        filePath: '/music/clean.mp3',
+        fieldMutations: [
+          { fieldId: 'title', oldValue: 'Clean Title', newValue: 'Tagged Title' },
+          { fieldId: 'musicBrainzRecordingId', oldValue: undefined, newValue: 'rec-fresh-123' },
+          { fieldId: 'isrc', oldValue: undefined, newValue: 'USRC20269999' }
+        ]
+      }
+    ];
+
+    await txManager.executeTransaction('op-fresh-ids', mutations);
+    await txManager.rollbackLastTransaction();
+
+    // Invariant: Rollback sends empty string '' so updateSongBasicFields/taglib clears the fields
+    expect(lastPassedTags).toEqual({
+      title: 'Clean Title',
+      musicBrainzRecordingId: '',
+      isrc: ''
     });
   });
 });

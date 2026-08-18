@@ -1365,6 +1365,7 @@ declare global {
     albumArtists?: SongTagsArtistData[];
     albums?: SongTagsAlbumData[];
     trackNumber?: number;
+    discNumber?: number;
     releasedYear?: number;
     genres?: SongTagsGenreData[];
     composer?: string;
@@ -1375,6 +1376,8 @@ declare global {
     duration: number;
     isLyricsSavePending?: boolean;
     isMetadataSavePending?: boolean;
+    musicBrainzRecordingId?: string;
+    isrc?: string;
   }
 
   interface SongOutsideLibraryData {

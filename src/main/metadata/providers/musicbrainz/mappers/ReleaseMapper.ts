@@ -52,7 +52,8 @@ export class MusicBrainzReleaseMapper {
               trackNumber: isNaN(trackNo) ? officialTracks.length + 1 : trackNo,
               discNumber,
               duration,
-              musicBrainzRecordingId: track.recording?.id
+              musicBrainzRecordingId: track.recording?.id,
+              isrc: track.recording?.isrcs?.[0]
             });
           }
         }

@@ -24,6 +24,8 @@ export interface MetadataFieldChanges {
   year?: number;
   trackNumber?: number;
   discNumber?: number;
+  isrc?: string;
+  musicBrainzRecordingId?: string;
   artworkPath?: string;
 }
 
@@ -83,8 +85,14 @@ export class SongMetadataBuilder {
           ? SongMetadataBuilder.mergeGenresAndStyles(changes.genre, changes.style, currentGenres)
           : currentGenres,
 
-      releasedYear: changes.year ?? currentSong.year ?? undefined,
-      trackNumber: changes.trackNumber ?? currentSong.trackNumber ?? undefined,
+      releasedYear: changes.year !== undefined ? changes.year : (currentSong.year ?? undefined),
+      trackNumber: changes.trackNumber !== undefined ? changes.trackNumber : (currentSong.trackNumber ?? undefined),
+      discNumber: changes.discNumber !== undefined ? changes.discNumber : (currentSong.diskNumber ?? undefined),
+      musicBrainzRecordingId:
+        changes.musicBrainzRecordingId !== undefined
+          ? changes.musicBrainzRecordingId
+          : (currentSong.musicBrainzRecordingId ?? undefined),
+      isrc: changes.isrc !== undefined ? changes.isrc : (currentSong.isrc ?? undefined),
       artworkPath: changes.artworkPath ?? undefined
     };
   }

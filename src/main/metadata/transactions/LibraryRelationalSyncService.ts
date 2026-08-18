@@ -11,6 +11,8 @@ export type SongDbUpdater = (
     year?: number;
     trackNumber?: number;
     discNumber?: number;
+    isrc?: string;
+    musicBrainzRecordingId?: string;
     artworkPath?: string;
   }
 ) => Promise<unknown>;
@@ -48,6 +50,8 @@ export class LibraryRelationalSyncService {
           year: fieldMutations.year as number | undefined,
           trackNumber: fieldMutations.trackNumber as number | undefined,
           discNumber: fieldMutations.discNumber as number | undefined,
+          isrc: fieldMutations.isrc as string | undefined,
+          musicBrainzRecordingId: fieldMutations.musicBrainzRecordingId as string | undefined,
           artworkPath: fieldMutations.artworkPath as string | undefined
         });
         const isDeferred =

@@ -48,6 +48,8 @@ export type SongDbUpdater = (
     year?: number;
     trackNumber?: number;
     discNumber?: number;
+    isrc?: string;
+    musicBrainzRecordingId?: string;
   }
 ) => Promise<unknown>;
 

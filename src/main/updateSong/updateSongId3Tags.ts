@@ -76,9 +76,12 @@ type TagData = {
   genres?: string[];
   composer?: string;
   trackNumber?: number;
+  discNumber?: number;
   year?: number;
   artwork?: Picture;
   lyrics?: string;
+  musicBrainzRecordingId?: string;
+  isrc?: string;
 };
 
 type PendingMetadataUpdates = {
@@ -120,7 +123,14 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (tags.genres) file.tag.genres = tags.genres;
           if (tags.composer) file.tag.composers = [tags.composer];
           if (tags.trackNumber !== undefined) file.tag.track = tags.trackNumber;
+          if (tags.discNumber !== undefined) file.tag.disc = tags.discNumber;
           if (tags.year !== undefined) file.tag.year = tags.year;
+          if (tags.musicBrainzRecordingId !== undefined) {
+            file.tag.musicBrainzRecordingId = tags.musicBrainzRecordingId || undefined;
+          }
+          if (tags.isrc !== undefined) {
+            file.tag.isrc = tags.isrc || undefined;
+          }
 
           // Handle artwork
           if (tags.artwork) {
@@ -920,7 +930,10 @@ const updateSongId3Tags = async (
         {
           title: tags.title,
           year: tags.releasedYear,
-          trackNumber: tags.trackNumber
+          trackNumber: tags.trackNumber,
+          discNumber: tags.discNumber,
+          musicBrainzRecordingId: tags.musicBrainzRecordingId,
+          isrc: tags.isrc
         },
         trx
       );
@@ -1141,9 +1154,12 @@ const updateSongId3Tags = async (
       genres: tags.genres?.map((genre) => genre.name),
       composer: tags.composer,
       trackNumber: tags.trackNumber,
+      discNumber: tags.discNumber,
       year: tags.releasedYear,
       artwork,
-      lyrics: lyricsText
+      lyrics: lyricsText,
+      musicBrainzRecordingId: tags.musicBrainzRecordingId,
+      isrc: tags.isrc
     };
 
     // Add to pending queue for file write

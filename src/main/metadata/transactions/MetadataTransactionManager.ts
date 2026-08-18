@@ -233,6 +233,8 @@ export class MetadataTransactionManager {
       if (song.trackNumber !== undefined) revertTags.trackNumber = song.trackNumber;
       if (song.discNumber !== undefined) revertTags.discNumber = song.discNumber;
       if (song.genre !== undefined) revertTags.genre = song.genre;
+      revertTags.isrc = song.isrc ?? '';
+      revertTags.musicBrainzRecordingId = song.musicBrainzRecordingId ?? '';
 
       const res = await this.mutationExecutor.executeSingleMutation({
         songId: song.songId,
