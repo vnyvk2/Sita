@@ -267,12 +267,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                             Track-Level Fields ({match.oldTitle})
                           </span>
                           <MetadataDiffViewer
-                            match={match}
+                            track={match}
                             selectedFieldMap={selectedFieldMap}
                             userEditedValues={userEditedValues}
-                            onToggleField={onToggleField}
-                            onFieldChanged={onFieldChanged}
-                            onResetField={onResetField}
+                            onToggleField={(fieldId) => onToggleField(match.localSongId, fieldId)}
+                            onFieldChanged={(fieldId, val) => onFieldChanged(match.localSongId, fieldId, val)}
+                            onResetField={(fieldId) => onResetField(match.localSongId, fieldId)}
                           />
                         </div>
                       </td>

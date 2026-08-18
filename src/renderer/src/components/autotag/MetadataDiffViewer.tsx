@@ -2,7 +2,8 @@ import React from 'react';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
 
 export interface MetadataDiffViewerProps {
-  track: TrackMatchPreview;
+  track?: TrackMatchPreview;
+  match?: TrackMatchPreview;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
   onFieldChanged: (fieldId: MetadataFieldId, value: string | number) => void;
@@ -13,6 +14,7 @@ export interface MetadataDiffViewerProps {
 
 export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   track,
+  match,
   selectedFieldMap,
   userEditedValues,
   onFieldChanged,
@@ -20,6 +22,9 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   onResetField,
   onSelectProviderForField
 }) => {
+  const activeTrack = track ?? match;
+  if (!activeTrack) return null;
+
   const getBadgeStyle = (status: string) => {
     switch (status) {
       case 'changed':
@@ -49,12 +54,12 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#FFFFFF' }}>
       <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#CBD5E1' }}>
-        Field Differences for: <span style={{ color: '#38BDF8' }}>{track.oldTitle}</span>
+        Field Differences for: <span style={{ color: '#38BDF8' }}>{activeTrack.oldTitle}</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {track.fieldDiffs.map((diff) => {
-          const key = `${track.localSongId}::${diff.fieldId}`;
+        {activeTrack.fieldDiffs.map((diff) => {
+          const key = `${activeTrack.localSongId}::${diff.fieldId}`;
           const isSelected = selectedFieldMap.get(key) ?? diff.applyField;
           const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
           const badge = getBadgeStyle(diff.status);
