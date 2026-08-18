@@ -197,7 +197,7 @@ const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
   const isACurrentlyPlayingSong = data.songPath === currentSongPath;
   if (!isACurrentlyPlayingSong) return savePendingMetadataUpdates(currentSongPath, true);
 
-  return undefined;
+  return { deferred: true };
 };
 
 export const fetchArtworkBufferFromURL = async (url: string) => {
@@ -1138,7 +1138,7 @@ const updateSongId3Tags = async (
     };
 
     // Add to pending queue for file write
-    const updatedData = await addMetadataToPendingQueue({
+    const queueResult = await addMetadataToPendingQueue({
       songPath: song.path,
       tags: tagData,
       isKnownSource: true,
@@ -1156,8 +1156,8 @@ const updateSongId3Tags = async (
       });
     }
 
-    if (updatedData && 'modifiedDate' in updatedData) {
-      await updateSongModifiedAtByPath(song.path, new Date(updatedData.modifiedDate));
+    if (queueResult && 'modifiedDate' in queueResult) {
+      await updateSongModifiedAtByPath(song.path, new Date(queueResult.modifiedDate));
     }
 
     // Emit data update events
@@ -1168,6 +1168,9 @@ const updateSongId3Tags = async (
     dataUpdateEvent('genres');
 
     result.success = true;
+    if (queueResult && 'deferred' in queueResult && queueResult.deferred) {
+      result.deferred = true;
+    }
 
     if (sendUpdatedData) {
       // Fetch updated song data for response

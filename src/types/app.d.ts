@@ -1429,6 +1429,7 @@ declare global {
     success: boolean;
     reason?: string;
     updatedData?: AudioPlayerData;
+    deferred?: boolean;
   }
 
   // ? Song metadata results related types

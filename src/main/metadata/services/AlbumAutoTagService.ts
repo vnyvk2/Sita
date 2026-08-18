@@ -232,13 +232,18 @@ export class AlbumAutoTagService extends EventEmitter {
       const result: ApplyResult = {
         success: txResult.success,
         updatedCount: txResult.updatedCount,
+        deferredCount: txResult.deferredCount,
         failedCount: txResult.failedCount,
         errors: txResult.errors
       };
 
       if (result.success) {
-        this.operationManager.updateState(operationId, 'Completed', `Successfully updated ${result.updatedCount} songs.`, 100);
-        this.emitProgress('completed', `Successfully updated ${result.updatedCount} songs.`, 100, operationId);
+        const msg =
+          result.deferredCount && result.deferredCount > 0
+            ? `Successfully updated ${result.updatedCount} songs (${result.deferredCount} file writes pending playback change).`
+            : `Successfully updated ${result.updatedCount} songs.`;
+        this.operationManager.updateState(operationId, 'Completed', msg, 100);
+        this.emitProgress('completed', msg, 100, operationId);
       } else {
         this.operationManager.updateState(operationId, 'Failed', `Applied with errors: ${result.errors.join('; ')}`, 100);
         this.emitProgress('failed', `Applied with errors: ${result.errors.join('; ')}`, 100, operationId);

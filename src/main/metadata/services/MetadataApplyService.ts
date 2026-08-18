@@ -54,6 +54,7 @@ export type SongDbUpdater = (
 export interface ApplyResult {
   success: boolean;
   updatedCount: number;
+  deferredCount?: number;
   failedCount: number;
   errors: string[];
 }

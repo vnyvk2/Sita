@@ -96,15 +96,15 @@ export class DiscogsApiClient {
 
   private isCandidateMatching(discogsTitle: string, queryTitle?: string, queryArtist?: string): boolean {
     if (!discogsTitle) return false;
-    const normTop = discogsTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normTop = discogsTitle.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
     if (queryTitle) {
-      const normTitle = queryTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normTitle = queryTitle.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
       if (normTitle.length > 2 && !normTop.includes(normTitle)) return false;
     }
 
     if (queryArtist) {
-      const normArtist = queryArtist.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normArtist = queryArtist.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
       if (normArtist.length > 2 && !normTop.includes(normArtist)) return false;
     }
 

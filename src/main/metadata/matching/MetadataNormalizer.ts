@@ -109,9 +109,9 @@ export class MetadataNormalizer {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .normalize('NFC')
       .replace(/\b(feat\.?|ft\.?|featuring|with|vs\.?|and|\+|x|×|,)\b/gi, ' ')
-      .replace(/\./g, '') // Strips acronym dots: A.R. Rahman -> ar rahman
-      .replace(/[^a-z0-9]/g, ' ');
+      .replace(/\./g, ''); // Strips acronym dots: A.R. Rahman -> ar rahman
 
     return this.cleanWhitespace(cleaned);
   }
@@ -126,8 +126,8 @@ export class MetadataNormalizer {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(this.COSMETIC_NOISE_REGEX, '')
-      .replace(/[^a-z0-9]/g, ' ');
+      .normalize('NFC')
+      .replace(this.COSMETIC_NOISE_REGEX, '');
 
     return this.cleanWhitespace(cleaned);
   }
@@ -137,7 +137,8 @@ export class MetadataNormalizer {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, ' ')
+      .normalize('NFC')
+      .replace(/[^\p{L}\p{N}]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }

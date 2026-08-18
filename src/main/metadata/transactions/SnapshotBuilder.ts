@@ -21,7 +21,10 @@ export class SnapshotBuilder {
       title: (d.previousTags.title as string) ?? '',
       artist: d.previousTags.artist as string | undefined,
       album: d.previousTags.album as string | undefined,
-      year: d.previousTags.year as number | undefined
+      year: d.previousTags.year as number | undefined,
+      trackNumber: d.previousTags.trackNumber !== undefined ? Number(d.previousTags.trackNumber) : undefined,
+      discNumber: d.previousTags.discNumber !== undefined ? Number(d.previousTags.discNumber) : undefined,
+      genre: d.previousTags.genre as string | undefined
     }));
 
     const updatedSongs: SongMetadataSnapshot[] = drafts.map((d) => ({
@@ -30,7 +33,10 @@ export class SnapshotBuilder {
       title: (d.appliedTags.title as string) ?? '',
       artist: d.appliedTags.artist as string | undefined,
       album: d.appliedTags.album as string | undefined,
-      year: d.appliedTags.year as number | undefined
+      year: d.appliedTags.year as number | undefined,
+      trackNumber: d.appliedTags.trackNumber !== undefined ? Number(d.appliedTags.trackNumber) : undefined,
+      discNumber: d.appliedTags.discNumber !== undefined ? Number(d.appliedTags.discNumber) : undefined,
+      genre: d.appliedTags.genre as string | undefined
     }));
 
     return {

@@ -78,7 +78,7 @@ export class MetadataTransactionManager {
     signal?: AbortSignal
   ): Promise<TransactionResult> {
     if (!mutations || mutations.length === 0) {
-      return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
+      return { success: true, updatedCount: 0, deferredCount: 0, failedCount: 0, errors: [] };
     }
 
     let artworkBuffer: Buffer | undefined;
@@ -98,6 +98,7 @@ export class MetadataTransactionManager {
     };
 
     let updatedCount = 0;
+    let deferredCount = 0;
     let failedCount = 0;
     let isCancelled = false;
     const errors: string[] = [];
@@ -110,6 +111,7 @@ export class MetadataTransactionManager {
         errors.push('Transaction operation cancelled by user');
         await this.rollbackDraftSnapshots(draftSnapshots);
         updatedCount = 0;
+        deferredCount = 0;
         break;
       }
 
@@ -155,6 +157,9 @@ export class MetadataTransactionManager {
         });
 
         if (res.success) {
+          if (res.deferred) {
+            deferredCount++;
+          }
           draftSnapshots.push({
             songId: Number(mut.resourceId),
             filePath: mut.filePath,
@@ -174,6 +179,7 @@ export class MetadataTransactionManager {
       if (chunkFailed) {
         await this.rollbackDraftSnapshots(draftSnapshots);
         updatedCount = 0;
+        deferredCount = 0;
         break;
       }
     }
@@ -194,6 +200,7 @@ export class MetadataTransactionManager {
       success: errors.length === 0,
       cancelled: isCancelled || undefined,
       updatedCount,
+      deferredCount,
       failedCount,
       errors,
       undoToken: draftSnapshots.length > 0 ? undoToken : undefined
@@ -218,6 +225,9 @@ export class MetadataTransactionManager {
       if (song.artist !== undefined) revertTags.artist = song.artist;
       if (song.album !== undefined) revertTags.album = song.album;
       if (song.year !== undefined) revertTags.year = song.year;
+      if (song.trackNumber !== undefined) revertTags.trackNumber = song.trackNumber;
+      if (song.discNumber !== undefined) revertTags.discNumber = song.discNumber;
+      if (song.genre !== undefined) revertTags.genre = song.genre;
 
       const res = await this.mutationExecutor.executeSingleMutation({
         songId: song.songId,

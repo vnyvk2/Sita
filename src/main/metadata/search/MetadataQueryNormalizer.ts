@@ -66,8 +66,8 @@ export class MetadataQueryNormalizer {
 
     if (a === b) return 1.0;
 
-    const cleanA = a.replace(/[^a-z0-9]/g, '');
-    const cleanB = b.replace(/[^a-z0-9]/g, '');
+    const cleanA = a.replace(/[^\p{L}\p{N}]/gu, '');
+    const cleanB = b.replace(/[^\p{L}\p{N}]/gu, '');
     if (cleanA === cleanB) return 0.98;
 
     return this.jaroWinklerDistance(cleanA, cleanB);
