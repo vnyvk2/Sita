@@ -131,7 +131,13 @@ export class MetadataApplyService {
       }
 
       const chunkMatches = selectedMatches.slice(i, i + this.batchChunkSize);
-      const chunkResult = await this.applyMatchChunk(chunkMatches, preview.album.title, artworkBuffer, signal);
+      const chunkResult = await this.applyMatchChunk(
+        chunkMatches,
+        preview.album.title,
+        artworkBuffer,
+        signal,
+        preview.album.artist
+      );
 
       totalUpdated += chunkResult.updatedCount;
       totalFailed += chunkResult.failedCount;
@@ -199,7 +205,8 @@ export class MetadataApplyService {
     chunkMatches: TrackMatchPreview[],
     albumTitle: string,
     artworkBuffer?: Buffer,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    albumArtist?: string
   ): Promise<ApplyResult> {
     const previousSongs: SongMetadataSnapshot[] = [];
     const updatedSongs: SongMetadataSnapshot[] = [];
@@ -228,6 +235,10 @@ export class MetadataApplyService {
         artworkBuffer
       };
 
+      if (albumArtist !== undefined && albumArtist.trim() !== '') {
+        payloadTags.albumArtist = albumArtist;
+      }
+
       const updatedSnapshot: SongMetadataSnapshot = {
         ...previousSnapshot
       };
@@ -245,6 +256,10 @@ export class MetadataApplyService {
           case 'artist':
             payloadTags.artist = String(val);
             updatedSnapshot.artist = String(val);
+            break;
+          case 'albumArtist':
+            payloadTags.albumArtist = String(val);
+            updatedSnapshot.albumArtist = String(val);
             break;
           case 'album':
             payloadTags.album = String(val);

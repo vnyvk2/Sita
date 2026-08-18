@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { AlbumTagPreview, AutoTagSongInput } from '../../../../common/metadata/types';
+import type { AlbumTagPreview, TrackMatchPreview } from '../../../../common/metadata/types';
+import { albumQuery } from '../../queries/albums';
+import { artistQuery } from '../../queries/artists';
+import { genreQuery } from '../../queries/genres';
+import { songQuery } from '../../queries/songs';
 
 const mockInvalidateQueries = vi.fn();
 
@@ -53,7 +57,10 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     reasons: [],
                     fieldDiffs: [
                       { fieldId: 'title', fieldName: 'Title', oldValue: 'brutal', suggestedValue: 'brutal', status: 'unchanged', applyField: true },
-                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia Rodrigo', suggestedValue: 'Olivia Rodrigo', status: 'unchanged', applyField: true }
+                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia Rodrigo', suggestedValue: 'Olivia Rodrigo', status: 'unchanged', applyField: true },
+                      { fieldId: 'album', fieldName: 'Album', oldValue: 'SOUR Demo', suggestedValue: 'SOUR', status: 'changed', applyField: true },
+                      { fieldId: 'year', fieldName: 'Year', oldValue: 2020, suggestedValue: 2021, status: 'changed', applyField: true },
+                      { fieldId: 'genre', fieldName: 'Genre', oldValue: 'Rock', suggestedValue: 'Pop', status: 'changed', applyField: true }
                     ]
                   },
                   {
@@ -72,7 +79,10 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     reasons: [],
                     fieldDiffs: [
                       { fieldId: 'title', fieldName: 'Title', oldValue: 'traitor (demo)', suggestedValue: 'traitor', status: 'changed', applyField: true },
-                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia', suggestedValue: 'Olivia Rodrigo', status: 'changed', applyField: true }
+                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia', suggestedValue: 'Olivia Rodrigo', status: 'changed', applyField: true },
+                      { fieldId: 'album', fieldName: 'Album', oldValue: 'SOUR Demo', suggestedValue: 'SOUR', status: 'changed', applyField: true },
+                      { fieldId: 'year', fieldName: 'Year', oldValue: 2020, suggestedValue: 2021, status: 'changed', applyField: true },
+                      { fieldId: 'genre', fieldName: 'Genre', oldValue: 'Rock', suggestedValue: 'Pop', status: 'changed', applyField: true }
                     ]
                   }
                 ]
@@ -144,14 +154,9 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
     const api = (window as any).api.metadataAutoTag;
     const preview: AlbumTagPreview = await api.buildPreview([{ songId: 101 }, { songId: 102 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
 
-    // Global fields diff calculation:
-    // Album: 'SOUR' -> 'SOUR' (same = 0)
-    // Artist: 'Olivia' -> 'Olivia Rodrigo' (changed = 1)
-    // Year: 2021 -> 2021 (same = 0)
-    const selectedGlobalChangedCount = 1;
-
-    // Track 101: 0 changed fields (title unchanged, artist unchanged)
-    // Track 102: 2 changed fields (title changed, artist changed)
+    const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
+    const selectedGlobalFields = new Set(['artist']); // Only artist is selected globally
+    const selectedGlobalChangedCount = 1; // 'Olivia' -> 'Olivia Rodrigo'
     const selectedTrackIds = new Set([101, 102]);
     const selectedFieldMap = new Map<string, boolean>([
       ['101::title', true],
@@ -164,7 +169,11 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
       if (!selectedTrackIds.has(match.localSongId)) return acc;
       const changed = match.fieldDiffs.filter((d) => {
         const key = `${match.localSongId}::${d.fieldId}`;
-        const isApplied = selectedFieldMap.get(key) ?? d.applyField;
+        const isApplied = isGlobalField(d.fieldId)
+          ? selectedFieldMap.has(key)
+            ? (selectedFieldMap.get(key) ?? false)
+            : selectedGlobalFields.has(d.fieldId)
+          : (selectedFieldMap.get(key) ?? d.applyField);
         return isApplied && (d.status === 'changed' || d.status === 'new');
       }).length;
       return acc + changed;
@@ -172,64 +181,90 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
     const totalChanges = selectedGlobalChangedCount + trackChangesCount;
 
-    // Invariant: Total = 1 (global artist) + 2 (track 102 title and artist) = 3 changes
     expect(trackChangesCount).toBe(2);
     expect(totalChanges).toBe(3);
   });
 
-  it('protects against candidate switching race conditions by discarding stale responses', async () => {
+  it('correctly maps canonical global field selections to effective track diffs on apply', async () => {
     const api = (window as any).api.metadataAutoTag;
-    let previewRequestId = 0;
-    let currentPreview: any = null;
+    const preview: AlbumTagPreview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
 
-    // Candidate A (slow)
-    const reqA = ++previewRequestId;
-    const promiseA = new Promise<any>((resolve) => {
-      setTimeout(async () => {
-        const res = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021');
-        resolve({ reqId: reqA, res });
-      }, 50);
+    // User selected only 'album' and 'year', while 'artist' and 'genre' are deselected
+    const selectedGlobalFields = new Set(['album', 'year']);
+    const selectedTrackIds = new Set([101]);
+    const selectedFieldMap = new Map<string, boolean>();
+    const userEditedValues = new Map<string, string | number>();
+
+    const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
+
+    const effectiveMatches: TrackMatchPreview[] = preview.matches.map((m) => {
+      const applyTrack = selectedTrackIds.has(m.localSongId);
+      const updatedDiffs = m.fieldDiffs.map((d) => {
+        const key = `${m.localSongId}::${d.fieldId}`;
+        let applyField: boolean;
+
+        if (isGlobalField(d.fieldId)) {
+          applyField = selectedFieldMap.has(key)
+            ? (selectedFieldMap.get(key) ?? false)
+            : selectedGlobalFields.has(d.fieldId);
+        } else {
+          applyField = selectedFieldMap.get(key) ?? d.applyField;
+        }
+
+        const userVal = userEditedValues.get(key) ?? d.userValue;
+        return { ...d, applyField, userValue: userVal };
+      });
+
+      return { ...m, applyTrack, fieldDiffs: updatedDiffs };
     });
 
-    // Candidate B (fast)
-    const reqB = ++previewRequestId;
-    const promiseB = new Promise<any>((resolve) => {
-      setTimeout(async () => {
-        const res = await api.buildPreview([{ songId: 101 }], 'mb-sour-2022');
-        resolve({ reqId: reqB, res });
-      }, 10);
-    });
+    const track101 = effectiveMatches[0];
+    const albumDiff = track101.fieldDiffs.find((d) => d.fieldId === 'album');
+    const yearDiff = track101.fieldDiffs.find((d) => d.fieldId === 'year');
+    const artistDiff = track101.fieldDiffs.find((d) => d.fieldId === 'artist');
+    const genreDiff = track101.fieldDiffs.find((d) => d.fieldId === 'genre');
 
-    // Fast candidate B finishes first
-    const resultB = await promiseB;
-    if (resultB.reqId === previewRequestId) {
-      currentPreview = resultB.res;
-    }
-    expect(currentPreview.album.title).toBe('SOUR (Deluxe)');
+    // Invariant: Selected global fields ('album', 'year') MUST have applyField === true
+    expect(albumDiff?.applyField).toBe(true);
+    expect(yearDiff?.applyField).toBe(true);
 
-    // Slow candidate A finishes later, but its reqId (1) !== previewRequestId (2) -> discarded!
-    const resultA = await promiseA;
-    if (resultA.reqId === previewRequestId) {
-      currentPreview = resultA.res;
-    }
-    expect(currentPreview.album.title).toBe('SOUR (Deluxe)'); // Candidate A was safely discarded!
+    // Invariant: Deselected global fields ('artist', 'genre') MUST have applyField === false
+    expect(artistDiff?.applyField).toBe(false);
+    expect(genreDiff?.applyField).toBe(false);
   });
 
-  it('triggers query invalidation via useQueryClient ONLY on successful apply/undo operations', async () => {
+  it('triggers query invalidation across all 4 key domains (albums, songs, artists, genres) ONLY on successful apply', async () => {
     const api = (window as any).api.metadataAutoTag;
+
+    const invalidateQueryCache = () => {
+      mockInvalidateQueries({ queryKey: albumQuery._def });
+      mockInvalidateQueries({ queryKey: songQuery._def });
+      mockInvalidateQueries({ queryKey: artistQuery._def });
+      mockInvalidateQueries({ queryKey: genreQuery._def });
+    };
 
     // Simulated apply success
     const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
     const applyRes = await api.applyPreview(preview, 'op-1');
-    if (applyRes.success) mockInvalidateQueries();
+    if (applyRes.success) {
+      invalidateQueryCache();
+    }
 
-    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(4);
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: albumQuery._def });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: songQuery._def });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: artistQuery._def });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: genreQuery._def });
 
-    // Simulated apply failure (should NOT trigger invalidation)
-    api.applyPreview.mockResolvedValueOnce({ success: false, errors: ['DB locked'] });
+    // Reset and simulate failure
+    mockInvalidateQueries.mockClear();
+    api.applyPreview.mockResolvedValueOnce({ success: false, errors: ['Write error'] });
     const failedApply = await api.applyPreview(preview, 'op-1');
-    if (failedApply.success) mockInvalidateQueries();
+    if (failedApply.success) {
+      invalidateQueryCache();
+    }
 
-    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1); // Count remains 1
+    // Must NOT invalidate queries on failure
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
   });
 });

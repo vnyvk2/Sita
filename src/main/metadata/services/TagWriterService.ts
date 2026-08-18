@@ -1,13 +1,15 @@
 import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
 import sharp from 'sharp';
-import { withFileHandle } from '../../utils/withFileHandle';
+
 import { removeDefaultAppProtocolFromFilePath } from '../../fs/resolveFilePaths';
+import { withFileHandle } from '../../utils/withFileHandle';
 
 export interface TagWritePayload {
   filePath: string;
   title?: string;
   artist?: string;
   album?: string;
+  albumArtist?: string;
   year?: number;
   trackNumber?: number;
   discNumber?: number;
@@ -38,6 +40,9 @@ export class TagWriterService {
       await withFileHandle(realPath, async (file) => {
         if (payload.title) file.tag.title = payload.title;
         if (payload.artist) file.tag.performers = [payload.artist];
+        if (payload.albumArtist !== undefined) {
+          file.tag.albumArtists = payload.albumArtist ? [payload.albumArtist] : [];
+        }
         if (payload.album) file.tag.album = payload.album;
         if (payload.genre) file.tag.genres = [payload.genre];
         if (payload.trackNumber !== undefined) file.tag.track = payload.trackNumber;

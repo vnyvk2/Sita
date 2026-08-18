@@ -4,6 +4,7 @@ export interface SongMetadataSnapshot {
   title: string;
   artist?: string;
   album?: string;
+  albumArtist?: string;
   year?: number;
   trackNumber?: number;
   discNumber?: number;
