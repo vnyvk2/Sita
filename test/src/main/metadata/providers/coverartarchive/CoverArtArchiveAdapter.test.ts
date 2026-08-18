@@ -93,4 +93,31 @@ describe('CoverArtArchiveAdapter (BUG-19 Release Group Fallback)', () => {
     // Invariant: Only release endpoint was called
     expect(executedUrls).toEqual(['https://coverartarchive.org/release/rel-direct']);
   });
+
+  it('does NOT fallback to release-group on 5xx / network error / timeout (preserves error semantics)', async () => {
+    const executedUrls: string[] = [];
+
+    const mockPipeline: Partial<RequestPipeline> = {
+      execute: vi.fn().mockImplementation(async (url: string) => {
+        executedUrls.push(url);
+        if (url.includes('/release/rel-500')) {
+          // Server error 500
+          return { status: 500, data: null, headers: {} };
+        }
+        return { status: 404, data: null, headers: {} };
+      })
+    };
+
+    const apiClient = new CaaApiClient(mockPipeline as RequestPipeline);
+    const adapter = new CoverArtArchiveAdapter(apiClient);
+
+    const contribution = await adapter.fetchContribution({
+      mbid: 'rel-500',
+      releaseGroupId: 'rg-should-not-be-called'
+    });
+
+    // Invariant: 500 error does NOT silently trigger release group fallback
+    expect(contribution).toBeNull();
+    expect(executedUrls).toEqual(['https://coverartarchive.org/release/rel-500']);
+  });
 });

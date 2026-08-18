@@ -257,7 +257,8 @@ export class MetadataBootstrap {
       dbUpdater: async (songId, data) => {
         const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
         await updateSongId3Tags(songId, completeTags, true, true);
-      }
+      },
+      requestPipeline
     });
 
     const workflowService = new MetadataWorkflowService({
@@ -266,7 +267,7 @@ export class MetadataBootstrap {
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
     workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
-    workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter));
+    workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter, musicBrainzAdapter));
     workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter));
 
     const providerMergePolicy = new DefaultMetadataMergePolicy();

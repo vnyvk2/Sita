@@ -5,47 +5,91 @@ import { ArtworkWorkflow } from '@main/metadata/workflows/strategies/ArtworkWork
 import { CaaApiClient } from '@main/metadata/providers/coverartarchive/CaaApiClient';
 import { CoverArtArchiveAdapter } from '@main/metadata/providers/coverartarchive/CoverArtArchiveAdapter';
 import { DiscogsAdapter } from '@main/metadata/providers/discogs/DiscogsAdapter';
+import { MusicBrainzAdapter } from '@main/metadata/providers/musicbrainz/MusicBrainzAdapter';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
 import { syncAlbumArtworks } from '@main/db/queries/artworks';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 
 describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
-  describe('1. Artwork Workflow & Field ID Consistency (BUG-07)', () => {
-    it('produces artworkPath field diffs and suggestedMetadata rather than artworkUrl', async () => {
-      const mockCaaAdapter: Partial<CoverArtArchiveAdapter> = {
-        fetchContribution: vi.fn().mockResolvedValue({
-          contributions: [
-            {
-              fieldId: 'artworkPath',
-              providerId: 'coverartarchive',
-              value: 'https://coverartarchive.org/release/123/front.jpg',
-              confidenceScore: 0.95
-            }
-          ]
+  describe('1. Artwork Workflow & Field ID Consistency (BUG-07 & BUG-19 Wiring)', () => {
+    it('produces artworkPath field diffs and propagates releaseGroupId through ArtworkWorkflow -> CAA fallback', async () => {
+      const executedUrls: string[] = [];
+
+      const mockPipeline: Partial<RequestPipeline> = {
+        execute: vi.fn().mockImplementation(async (url: string) => {
+          executedUrls.push(url);
+          if (url.includes('/release/release-mbid-001')) {
+            // CAA has no artwork for this specific release (404)
+            return { status: 404, data: null, headers: {} };
+          }
+          if (url.includes('/release-group/rg-mbid-999')) {
+            // CAA has artwork for the release group!
+            return {
+              status: 200,
+              data: {
+                images: [
+                  {
+                    id: 777,
+                    image: 'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg',
+                    front: true,
+                    back: false
+                  }
+                ]
+              },
+              headers: {}
+            };
+          }
+          return { status: 404, data: null, headers: {} };
         })
       };
 
+      const caaClient = new CaaApiClient(mockPipeline as RequestPipeline);
+      const caaAdapter = new CoverArtArchiveAdapter(caaClient);
       const mockDiscogsAdapter: Partial<DiscogsAdapter> = {};
 
+      const mockMbAdapter: Partial<MusicBrainzAdapter> = {
+        resolveRelease: vi.fn().mockResolvedValue({
+          album: {
+            title: 'Album Title',
+            artist: 'Artist Name',
+            releaseId: 'release-mbid-001',
+            releaseGroupId: 'rg-mbid-999'
+          },
+          tracks: [],
+          provider: 'musicbrainz',
+          providerReleaseId: 'release-mbid-001',
+          releaseGroupId: 'rg-mbid-999'
+        })
+      };
+
       const workflow = new ArtworkWorkflow(
-        mockCaaAdapter as CoverArtArchiveAdapter,
-        mockDiscogsAdapter as DiscogsAdapter
+        caaAdapter,
+        mockDiscogsAdapter as DiscogsAdapter,
+        mockMbAdapter as MusicBrainzAdapter
       );
 
+      // Workflow builds preview for candidateId 'release-mbid-001' with provider 'coverartarchive'
       const preview = await workflow.buildPreview(
-        [{ songId: 101, title: 'Track 1', artist: 'Artist', album: 'Album' }],
-        '123',
+        [{ songId: 101, title: 'Track 1', artist: 'Artist', album: 'Album Title' }],
+        'release-mbid-001',
         'coverartarchive'
       );
 
       expect(preview.matches).toHaveLength(1);
       const match = preview.matches[0];
 
-      // Invariant: suggestedMetadata and fieldDiffs MUST use artworkPath
-      expect(match.suggestedMetadata.artworkPath).toBe('https://coverartarchive.org/release/123/front.jpg');
+      // Invariant BUG-07: suggestedMetadata and fieldDiffs MUST use artworkPath
+      expect(match.suggestedMetadata.artworkPath).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
       expect(match.fieldDiffs).toHaveLength(1);
       expect(match.fieldDiffs[0].fieldId).toBe('artworkPath');
-      expect(match.fieldDiffs[0].newVal).toBe('https://coverartarchive.org/release/123/front.jpg');
+      expect(match.fieldDiffs[0].newVal).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
+
+      // Invariant BUG-19: ArtworkWorkflow resolved release -> extracted releaseGroupId -> queried release first -> cascaded to release group on 404
+      expect(mockMbAdapter.resolveRelease).toHaveBeenCalledWith('release-mbid-001');
+      expect(executedUrls).toEqual([
+        'https://coverartarchive.org/release/release-mbid-001',
+        'https://coverartarchive.org/release-group/rg-mbid-999'
+      ]);
     });
   });
 
@@ -125,31 +169,15 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
     });
   });
 
-  describe('4. CAA Release MBID 404 Cascade to Release Group MBID (BUG-19)', () => {
-    it('queries Release MBID first, falling back to Release Group MBID on 404', async () => {
-      const requestedUrls: string[] = [];
+  describe('4. Error Handling and Cascade Boundaries', () => {
+    it('does NOT fallback to release group when release query fails with a 500 error', async () => {
+      const executedUrls: string[] = [];
 
       const mockPipeline: Partial<RequestPipeline> = {
         execute: vi.fn().mockImplementation(async (url: string) => {
-          requestedUrls.push(url);
-          if (url.includes('/release/release-mbid-001')) {
-            return { status: 404, data: null, headers: {} };
-          }
-          if (url.includes('/release-group/rg-mbid-999')) {
-            return {
-              status: 200,
-              data: {
-                images: [
-                  {
-                    id: 777,
-                    image: 'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg',
-                    front: true,
-                    back: false
-                  }
-                ]
-              },
-              headers: {}
-            };
+          executedUrls.push(url);
+          if (url.includes('/release/release-mbid-error')) {
+            return { status: 500, data: null, headers: {} };
           }
           return { status: 404, data: null, headers: {} };
         })
@@ -159,19 +187,13 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
       const adapter = new CoverArtArchiveAdapter(caaClient);
 
       const contribution = await adapter.fetchContribution({
-        mbid: 'release-mbid-001',
-        releaseGroupId: 'rg-mbid-999'
+        mbid: 'release-mbid-error',
+        releaseGroupId: 'rg-mbid-error'
       });
 
-      expect(contribution).not.toBeNull();
-      const artwork = contribution?.contributions.find((c) => c.fieldId === 'artworkUrl');
-      expect(artwork?.value).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
-
-      // Invariant: Release endpoint tried first, Release Group tried second
-      expect(requestedUrls).toEqual([
-        'https://coverartarchive.org/release/release-mbid-001',
-        'https://coverartarchive.org/release-group/rg-mbid-999'
-      ]);
+      expect(contribution).toBeNull();
+      // Invariant: 500 does NOT cascade to release group
+      expect(executedUrls).toEqual(['https://coverartarchive.org/release/release-mbid-error']);
     });
   });
 
