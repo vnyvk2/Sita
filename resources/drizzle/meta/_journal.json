@@ -120,6 +120,13 @@
       "when": 1786200000000,
       "tag": "0016_add_mbid_isrc_to_songs",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786300000000,
+      "tag": "0017_add_palette_unique_index",
+      "breakpoints": true
     }
   ]
 }

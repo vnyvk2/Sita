@@ -225,7 +225,6 @@ export const palettes = pgTable(
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
     artworkId: integer('artwork_id')
       .notNull()
-      .unique()
       .references(() => artworks.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade'
