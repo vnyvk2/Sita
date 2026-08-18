@@ -94,6 +94,7 @@ type PendingMetadataUpdates = {
 const pendingMetadataUpdates = new Map<string, PendingMetadataUpdates>();
 
 export const isMetadataUpdatesPending = (songPath: string) => pendingMetadataUpdates.has(songPath);
+export const clearPendingMetadataUpdates = () => pendingMetadataUpdates.clear();
 
 export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave = false) => {
   const { saveLyricsInLrcFilesForSupportedSongs } = await getUserSettings();

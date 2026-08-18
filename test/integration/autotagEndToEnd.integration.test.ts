@@ -538,40 +538,44 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     diskFile.dispose();
   });
 
-  // Stage 7: Physical Write Failure Injection -> Compensation and Error Reporting
+  // Stage 7: Deterministic Physical Write Failure Injection -> Compensation and Error Reporting
   it('7. handles physical write failures cleanly and reports transaction failure without false success', async () => {
-    // Make file read-only on disk so physical write fails
-    fs.chmodSync(tempTestFile, 0o444);
-
-    try {
-      const tagWriter = new TagWriterService();
-      const txManager = new MetadataTransactionManager({
-        dbUpdater: async (_songId, data) => {
-          const res = await tagWriter.writeTags({
-            filePath: tempTestFile,
-            title: data.title
-          });
-          if (!res.success) {
-            throw new Error(`Physical write failed: ${res.error}`);
-          }
-          return true;
-        }
-      });
-
-      const res = await txManager.executeTransaction('op-e2e-fail', [
-        {
-          resourceId: 9999,
+    const txManager = new MetadataTransactionManager({
+      dbUpdater: async (_songId, data) => {
+        const tagWriter = new TagWriterService();
+        const res = await tagWriter.writeTags({
           filePath: tempTestFile,
-          fieldMutations: [{ fieldId: 'title', oldValue: 'A', newValue: 'B' }]
+          title: data.title
+        });
+        if (!res.success) {
+          throw new Error(`Physical write failed: ${res.error}`);
         }
-      ]);
+        return true;
+      }
+    });
 
-      expect(res.success).toBe(false);
-      expect(res.errors.length).toBeGreaterThan(0);
-      expect(res.updatedCount).toBe(0);
-    } finally {
-      // Restore permissions for cleanup
-      fs.chmodSync(tempTestFile, 0o666);
-    }
+    // Deterministically simulate disk write error in TagWriterService
+    vi.spyOn(TagWriterService.prototype, 'writeTags').mockResolvedValueOnce({
+      success: false,
+      error: 'EACCES: permission denied, simulated deterministic disk failure'
+    });
+
+    const res = await txManager.executeTransaction('op-e2e-fail', [
+      {
+        resourceId: 9999,
+        filePath: tempTestFile,
+        fieldMutations: [{ fieldId: 'title', oldValue: 'Airbag (Demo)', newValue: 'Airbag Mutated' }]
+      }
+    ]);
+
+    expect(res.success).toBe(false);
+    expect(res.errors.length).toBeGreaterThan(0);
+    expect(res.errors[0]).toContain('simulated deterministic disk failure');
+    expect(res.updatedCount).toBe(0);
+
+    // Verify physical file was not mutated
+    const file = File.createFromPath(tempTestFile);
+    expect(file.tag.title).not.toBe('Airbag Mutated');
+    file.dispose();
   });
 });

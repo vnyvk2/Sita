@@ -4,6 +4,7 @@ import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { File } from 'node-taglib-sharp';
 import updateSongId3Tags, {
+  clearPendingMetadataUpdates,
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
 } from '@main/updateSong/updateSongId3Tags';
@@ -34,11 +35,13 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
   let tempSongPath: string;
 
   beforeEach(() => {
+    clearPendingMetadataUpdates();
     tempSongPath = path.join(os.tmpdir(), `update_id3_test_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
     fs.copyFileSync(fixtureSource, tempSongPath);
   });
 
   afterEach(() => {
+    clearPendingMetadataUpdates();
     if (fs.existsSync(tempSongPath)) {
       try {
         fs.unlinkSync(tempSongPath);
@@ -324,7 +327,7 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       fileOnDisk.dispose();
     });
 
-    it('handles physical disk write failure cleanly during pending update flush', async () => {
+    it('handles deterministic physical disk write failure cleanly during pending update flush', async () => {
       vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
 
       vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
@@ -348,16 +351,19 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
         false
       );
 
-      // Make file read-only on disk
-      fs.chmodSync(tempSongPath, 0o444);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
 
-      try {
-        // Attempt flush
-        vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');
-        await savePendingMetadataUpdates(tempSongPath, true);
-      } finally {
-        fs.chmodSync(tempSongPath, 0o666);
-      }
+      // Deterministically simulate disk IO throw during file write
+      vi.spyOn(File, 'createFromPath').mockImplementationOnce(() => {
+        throw new Error('EIO: Simulated disk hardware failure during write');
+      });
+
+      // Attempt flush
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');
+      await savePendingMetadataUpdates(tempSongPath, true);
+
+      // Verify pending entry was not falsely deleted on disk failure
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
     });
 
     it('handles true overlapping same-file concurrent update calls safely with field coalescing', async () => {
