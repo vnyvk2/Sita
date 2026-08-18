@@ -95,32 +95,24 @@ export const syncAlbumArtworks = async (
   artworksIds: number[],
   trx: DB | DBTransaction = db
 ) => {
-  // 1. Get current artwork links for the album joined with artworks table
+  // 1. Get current artwork links for the album
   const current = await trx
-    .select({
-      artworkId: albumsArtworks.artworkId,
-      source: artworks.source
-    })
+    .select({ artworkId: albumsArtworks.artworkId })
     .from(albumsArtworks)
-    .innerJoin(artworks, eq(albumsArtworks.artworkId, artworks.id))
     .where(eq(albumsArtworks.albumId, albumId));
 
   const currentIds = current.map((row) => row.artworkId);
-  // Invariant BUG-08: Only remove REMOTE artworks that are not in the new artworksIds list.
-  // Preserves LOCAL-sourced artwork from being overwritten or destroyed.
-  const remoteToRemove = current
-    .filter((row) => row.source === 'REMOTE' && !artworksIds.includes(row.artworkId))
-    .map((row) => row.artworkId);
+  const toAdd = artworksIds.filter((id) => !currentIds.includes(id));
+  const toRemove = currentIds.filter((id) => !artworksIds.includes(id));
 
-  // 2. Remove outdated remote artwork links
-  if (remoteToRemove.length > 0) {
+  // 2. Remove outdated artwork links
+  if (toRemove.length > 0) {
     await trx
       .delete(albumsArtworks)
-      .where(and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, remoteToRemove)));
+      .where(and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, toRemove)));
   }
 
   // 3. Add new links
-  const toAdd = artworksIds.filter((id) => !currentIds.includes(id));
   if (toAdd.length > 0) {
     await trx.insert(albumsArtworks).values(toAdd.map((artworkId) => ({ albumId, artworkId })));
   }

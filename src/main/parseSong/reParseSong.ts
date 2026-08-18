@@ -8,7 +8,7 @@ import type { songs } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
 import { File } from 'node-taglib-sharp';
 
-import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
+import { removeDefaultAppProtocolFromFilePath, resetArtworkCache } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
@@ -161,7 +161,11 @@ const reParseSong = async (filePath: string) => {
           data: { title: song.title }
         });
 
+        resetArtworkCache('albumArtworks');
+        resetArtworkCache('songArtworks');
+
         dataUpdateEvent('songs/updatedSong', [songId]);
+        dataUpdateEvent('songs/artworks');
         dataUpdateEvent('artists/updatedArtist');
         dataUpdateEvent('albums/updatedAlbum');
         dataUpdateEvent('genres/updatedGenre');

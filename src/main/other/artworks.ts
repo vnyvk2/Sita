@@ -213,6 +213,7 @@ export const sweepUnusedArtworks = async (trx: DB | DBTransaction = db) => {
   try {
     const unusedIds = await getUnusedArtworkIds(trx);
     if (unusedIds.length > 0) {
+      console.log('[ARTWORK GC] Sweeping unused artwork IDs:', unusedIds.map((a) => a.id));
       await removeArtworks(
         unusedIds.map((a) => a.id),
         trx
