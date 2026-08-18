@@ -323,5 +323,97 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       expect(fileOnDisk.tag.title).not.toBe('Should Not Be Written');
       fileOnDisk.dispose();
     });
+
+    it('handles physical disk write failure cleanly during pending update flush', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
+
+      vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
+        return callback({});
+      });
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 103,
+        path: tempSongPath,
+        title: 'Original Song',
+        artists: [],
+        albums: [],
+        genres: []
+      } as any);
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+
+      await updateSongId3Tags(
+        103,
+        {
+          title: 'Will Fail On Disk'
+        },
+        false
+      );
+
+      // Make file read-only on disk
+      fs.chmodSync(tempSongPath, 0o444);
+
+      try {
+        // Attempt flush
+        vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');
+        await savePendingMetadataUpdates(tempSongPath, true);
+      } finally {
+        fs.chmodSync(tempSongPath, 0o666);
+      }
+    });
+
+    it('handles true overlapping same-file concurrent update calls safely with field coalescing', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
+
+      vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
+        return callback({});
+      });
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 104,
+        path: tempSongPath,
+        title: 'Concurrent Initial',
+        artists: [],
+        albums: [],
+        genres: []
+      } as any);
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+      vi.spyOn(artistsDb, 'getArtistWithName').mockResolvedValue(undefined);
+      vi.spyOn(artistsDb, 'createArtist').mockResolvedValue({ id: 20, name: 'Concurrent Band' } as any);
+      vi.spyOn(artistsDb, 'linkSongToArtist').mockResolvedValue(true as any);
+
+      // Concurrent overlapping mutations via Promise.all
+      const [resA, resB] = await Promise.all([
+        updateSongId3Tags(
+          104,
+          {
+            title: 'Concurrent Final Title',
+            isrc: 'ISRC-CONCURRENT'
+          },
+          false
+        ),
+        updateSongId3Tags(
+          104,
+          {
+            artists: [{ artistId: 20, name: 'Concurrent Band' }],
+            musicBrainzRecordingId: 'rec-mbid-concurrent'
+          },
+          false
+        )
+      ]);
+
+      expect(resA.deferred).toBe(true);
+      expect(resB.deferred).toBe(true);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+      // Switch song and flush
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/another.mp3');
+      await savePendingMetadataUpdates(tempSongPath, true);
+
+      // Verify merged coherent disk state
+      const file = File.createFromPath(tempSongPath);
+      expect(file.tag.title).toBe('Concurrent Final Title');
+      expect(file.tag.performers).toEqual(['Concurrent Band']);
+      expect(file.tag.isrc).toBe('ISRC-CONCURRENT');
+      expect(file.tag.musicBrainzTrackId).toBe('rec-mbid-concurrent');
+      file.dispose();
+    });
   });
 });

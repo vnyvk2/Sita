@@ -2,13 +2,14 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { File } from 'node-taglib-sharp';
+import { ByteVector, File, Picture, PictureType } from 'node-taglib-sharp';
 import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
 import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
 import { TagWriterService } from '@main/metadata/services/TagWriterService';
 import { ArtworkCacheInvalidator } from '@main/metadata/transactions/ArtworkCacheInvalidator';
 import { getSongArtworkPath } from '@main/fs/resolveFilePaths';
+import reParseSong from '@main/parseSong/reParseSong';
 import updateSongId3Tags, {
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
@@ -18,6 +19,10 @@ import * as songsDb from '@main/db/queries/songs';
 import * as artistsDb from '@main/db/queries/artists';
 import * as albumsDb from '@main/db/queries/albums';
 import * as genresDb from '@main/db/queries/genres';
+import * as artworksDb from '@main/db/queries/artworks';
+import * as parseSongModule from '@main/parseSong/manageArtistsOfParsedSong';
+import * as parseAlbumModule from '@main/parseSong/manageAlbumsOfParsedSong';
+import * as parseGenreModule from '@main/parseSong/manageGenresOfParsedSong';
 import { db } from '@main/db/db';
 import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto/ReleaseDto';
 import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
@@ -154,29 +159,61 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     expect(mbidDiff?.suggestedValue).toBe('mb-rec-e2e-1');
   });
 
-  // Stage 2: Transaction -> Physical + Relational Persistence
+  // Stage 2: Transaction -> Real DB Relational Updates & Physical ID3 Write
   it('2. transaction executes mutations, persists physical tags and relational fields atomically', async () => {
-    const tagWriter = new TagWriterService();
-    const dbState: Record<string, any> = {};
+    vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');
+
+    let dbUpdatedFields: any;
+    const linkedArtistIds: number[] = [];
+    const linkedAlbumIds: number[] = [];
+    const linkedGenreIds: number[] = [];
+
+    vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
+      return callback({});
+    });
+    vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+      id: 1001,
+      path: tempTestFile,
+      title: 'Airbag (Demo)',
+      artists: [],
+      albums: [],
+      genres: []
+    } as any);
+    vi.spyOn(songsDb, 'updateSongBasicFields').mockImplementation(async (_id, fields) => {
+      dbUpdatedFields = fields;
+      return true as any;
+    });
+    vi.spyOn(artistsDb, 'linkSongToArtist').mockImplementation(async (artistId) => {
+      linkedArtistIds.push(artistId);
+      return true as any;
+    });
+    vi.spyOn(albumsDb, 'linkSongToAlbum').mockImplementation(async (albumId) => {
+      linkedAlbumIds.push(albumId);
+      return true as any;
+    });
+    vi.spyOn(genresDb, 'linkSongToGenre').mockImplementation(async (genreId) => {
+      linkedGenreIds.push(genreId);
+      return true as any;
+    });
 
     const txManager = new MetadataTransactionManager({
       dbUpdater: async (songId, data) => {
-        dbState.songId = songId;
-        dbState.data = data;
-        const res = await tagWriter.writeTags({
-          filePath: tempTestFile,
-          title: data.title,
-          artist: data.artist,
-          album: data.album,
-          genre: data.genre,
-          year: data.year,
-          trackNumber: data.trackNumber,
-          discNumber: data.discNumber,
-          musicBrainzRecordingId: data.musicBrainzRecordingId,
-          isrc: data.isrc
-        });
-        if (!res.success) throw new Error(res.error);
-        return true;
+        const updateResult = await updateSongId3Tags(
+          songId,
+          {
+            title: data.title,
+            artists: data.artist ? [{ artistId: 50, name: data.artist }] : undefined,
+            albums: data.album ? [{ albumId: 60, title: data.album }] : undefined,
+            genres: data.genre ? [{ genreId: 70, name: data.genre }] : undefined,
+            releasedYear: data.year,
+            trackNumber: data.trackNumber,
+            discNumber: data.discNumber,
+            musicBrainzRecordingId: data.musicBrainzRecordingId,
+            isrc: data.isrc
+          },
+          false
+        );
+        return updateResult.success;
       }
     });
 
@@ -202,15 +239,19 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     expect(txRes.success).toBe(true);
     expect(txRes.undoToken).toBeDefined();
 
-    // Verify DB state
-    expect(dbState.data.title).toBe('Airbag');
-    expect(dbState.data.album).toBe('OK Computer (Collector Edition)');
-    expect(dbState.data.musicBrainzRecordingId).toBe('mb-rec-e2e-1');
-    expect(dbState.data.isrc).toBe('GBAYE9700021');
+    // 1. Verify DB received direct columns and junction links
+    expect(dbUpdatedFields.title).toBe('Airbag');
+    expect(dbUpdatedFields.year).toBe(1997);
+    expect(dbUpdatedFields.musicBrainzRecordingId).toBe('mb-rec-e2e-1');
+    expect(dbUpdatedFields.isrc).toBe('GBAYE9700021');
+    expect(linkedArtistIds).toContain(50);
+    expect(linkedAlbumIds).toContain(60);
+    expect(linkedGenreIds).toContain(70);
 
-    // Verify physical file
+    // 2. Verify physical audio file on disk received tags
     const file = File.createFromPath(tempTestFile);
     expect(file.tag.title).toBe('Airbag');
+    expect(file.tag.performers).toEqual(['Radiohead']);
     expect(file.tag.album).toBe('OK Computer (Collector Edition)');
     expect(file.tag.genres).toEqual(['Alternative']);
     expect(file.tag.year).toBe(1997);
@@ -219,51 +260,124 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     file.dispose();
   });
 
-  // Stage 3: Physical -> Scanner (reParseSong) -> Relational Reconstruction
-  it('3. scanner reads physical ID3 tags and projects them deterministically into DB models', async () => {
-    // Write physical tags
-    const tagWriter = new TagWriterService();
-    await tagWriter.writeTags({
-      filePath: tempTestFile,
-      title: 'Scanner Verification Title',
-      artist: 'Scanner Artist',
-      album: 'Scanner Album',
-      genre: 'Post-Rock',
-      year: 2023,
-      trackNumber: 3,
-      discNumber: 1,
-      musicBrainzRecordingId: 'rec-scanner-uuid-999',
-      isrc: 'USRC20230003'
+  // Stage 3: Physical Write (All 10 Categories including APIC) -> Real reParseSong -> DB Relational Projection
+  it('3. scanner (reParseSong) reads all 10 mutable categories from physical ID3 and projects into DB models', async () => {
+    // 1. Embed real APIC picture frame alongside 9 metadata fields
+    const validPngBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+
+    const physicalFile = File.createFromPath(tempTestFile);
+    physicalFile.tag.title = 'ReParse Physical Title';
+    physicalFile.tag.performers = ['Scanner Lead Artist', 'Scanner Featured Artist'];
+    physicalFile.tag.albumArtists = ['Scanner Lead Artist'];
+    physicalFile.tag.album = 'Scanner Relational Album';
+    physicalFile.tag.genres = ['Post-Rock'];
+    physicalFile.tag.year = 2023;
+    physicalFile.tag.track = 4;
+    physicalFile.tag.disc = 2;
+    physicalFile.tag.musicBrainzTrackId = 'rec-scanner-uuid-999';
+    physicalFile.tag.isrc = 'USRC20230004';
+
+    const pic = Picture.fromData(ByteVector.fromByteArray(Array.from(validPngBytes)));
+    pic.type = PictureType.FrontCover;
+    pic.mimeType = 'image/png';
+    pic.description = 'Front Cover';
+    physicalFile.tag.pictures = [pic];
+    physicalFile.save();
+    physicalFile.dispose();
+
+    // 2. Mock database hooks for reParseSong
+    let reParsedSongRow: any;
+    const reParsedArtists: string[] = [];
+    let reParsedAlbum: string | undefined;
+    const reParsedGenres: string[] = [];
+    let reParsedArtworkLinked = false;
+
+    vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
+      return callback({});
     });
 
-    // Read back via node-taglib-sharp directly simulating parser read
-    const file = File.createFromPath(tempTestFile);
-    const parsedMetadata = {
-      title: file.tag.title,
-      performers: file.tag.performers,
-      album: file.tag.album,
-      genres: file.tag.genres,
-      year: file.tag.year,
-      trackNumber: file.tag.track,
-      discNumber: file.tag.disc,
-      musicBrainzRecordingId: file.tag.musicBrainzTrackId,
-      isrc: file.tag.isrc
-    };
-    file.dispose();
+    vi.spyOn(songsDb, 'getSongByPath').mockResolvedValue({
+      id: 2002,
+      path: tempTestFile,
+      title: 'Old Song',
+      year: 2000,
+      duration: '210.0',
+      artists: [],
+      albums: [],
+      genres: [],
+      artworks: []
+    } as any);
 
-    expect(parsedMetadata.title).toBe('Scanner Verification Title');
-    expect(parsedMetadata.performers).toEqual(['Scanner Artist']);
-    expect(parsedMetadata.album).toBe('Scanner Album');
-    expect(parsedMetadata.genres).toEqual(['Post-Rock']);
-    expect(parsedMetadata.year).toBe(2023);
-    expect(parsedMetadata.trackNumber).toBe(3);
-    expect(parsedMetadata.discNumber).toBe(1);
-    expect(parsedMetadata.musicBrainzRecordingId).toBe('rec-scanner-uuid-999');
-    expect(parsedMetadata.isrc).toBe('USRC20230003');
+    vi.spyOn(songsDb, 'updateSongByPath').mockImplementation(async (_path, updatedSong) => {
+      reParsedSongRow = updatedSong;
+      return true as any;
+    });
+
+    vi.spyOn(artistsDb, 'getArtistWithName').mockResolvedValue(undefined);
+    vi.spyOn(artistsDb, 'getLinkedAlbumArtist').mockResolvedValue(undefined);
+    vi.spyOn(artistsDb, 'createArtist').mockImplementation(async (data) => {
+      reParsedArtists.push(data.name);
+      return { id: 300, name: data.name } as any;
+    });
+    vi.spyOn(artistsDb, 'linkSongToArtist').mockResolvedValue(true as any);
+    vi.spyOn(artistsDb, 'unlinkSongFromArtist').mockResolvedValue(true as any);
+    vi.spyOn(artistsDb, 'getArtistSongIds').mockResolvedValue([]);
+    vi.spyOn(artistsDb, 'deleteArtist').mockResolvedValue(true as any);
+
+    vi.spyOn(albumsDb, 'getAlbumWithTitle').mockResolvedValue(undefined);
+    vi.spyOn(albumsDb, 'createAlbum').mockImplementation(async (data: any) => {
+      reParsedAlbum = typeof data === 'string' ? data : data.title;
+      return { id: 400, title: reParsedAlbum } as any;
+    });
+    vi.spyOn(albumsDb, 'linkSongToAlbum').mockResolvedValue(true as any);
+    vi.spyOn(albumsDb, 'linkArtistToAlbum').mockResolvedValue(true as any);
+    vi.spyOn(albumsDb, 'unlinkSongFromAlbum').mockResolvedValue(true as any);
+    vi.spyOn(albumsDb, 'getAlbumSongIds').mockResolvedValue([]);
+    vi.spyOn(albumsDb, 'deleteAlbum').mockResolvedValue(true as any);
+
+    vi.spyOn(genresDb, 'getGenreWithTitle').mockResolvedValue(undefined);
+    vi.spyOn(genresDb, 'createGenre').mockImplementation(async (data: any) => {
+      const name = typeof data === 'string' ? data : data.name;
+      reParsedGenres.push(name);
+      return { id: 500, name } as any;
+    });
+    vi.spyOn(genresDb, 'linkSongToGenre').mockResolvedValue(true as any);
+    vi.spyOn(genresDb, 'unlinkSongFromGenre').mockResolvedValue(true as any);
+    vi.spyOn(genresDb, 'getGenreSongIds').mockResolvedValue([]);
+    vi.spyOn(genresDb, 'deleteGenre').mockResolvedValue(true as any);
+
+    vi.spyOn(artworksDb, 'saveArtworks').mockResolvedValue([
+      { id: 900, hash: 'hash900', path: 'artworks/hash900.webp', width: 500, height: 500, source: 'embedded', generatorVersion: 1 } as any
+    ]);
+    vi.spyOn(artworksDb, 'syncSongArtworks').mockImplementation(async () => {
+      reParsedArtworkLinked = true;
+      return [] as any;
+    });
+    vi.spyOn(artworksDb, 'linkArtworksToAlbum').mockResolvedValue([] as any);
+    vi.spyOn(artworksDb, 'linkArtworksToArtist').mockResolvedValue([] as any);
+    vi.spyOn(artworksDb, 'linkArtworksToGenre').mockResolvedValue([] as any);
+
+    // 3. Execute actual reParseSong
+    await reParseSong(tempTestFile);
+
+    // 4. Assert all 10 categories were parsed from physical file and projected to DB
+    expect(reParsedSongRow.title).toBe('ReParse Physical Title');
+    expect(reParsedSongRow.year).toBe(2023);
+    expect(reParsedSongRow.trackNumber).toBe(4);
+    expect(reParsedSongRow.diskNumber).toBe(2);
+    expect(reParsedSongRow.musicBrainzRecordingId).toBe('rec-scanner-uuid-999');
+    expect(reParsedSongRow.isrc).toBe('USRC20230004');
+    expect(Array.from(new Set(reParsedArtists))).toEqual(['Scanner Lead Artist', 'Scanner Featured Artist']);
+    expect(reParsedAlbum).toBe('Scanner Relational Album');
+    expect(reParsedGenres).toEqual(['Post-Rock']);
+    expect(reParsedArtworkLinked).toBe(true);
   });
 
-  // Stage 4: Artwork Mutation -> Cache Timestamp Invalidation
-  it('4. artwork mutation invalidates cache timestamps ensuring fresh renderer URLs', async () => {
+  // Stage 4: Artwork Mutation -> Cache Timestamp Invalidation in Transaction Lifecycle
+  it('4. artwork transaction commits DB and invalidates cache timestamps for fresh renderer URLs', async () => {
     const initialPaths = getSongArtworkPath(999, true);
     const initialTs = Number(initialPaths.artworkPath?.split('?ts=')[1]);
 
@@ -278,16 +392,16 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     expect(updatedTs).toBeGreaterThan(initialTs);
   });
 
-  // Stage 5: Transaction Rollback -> Complete Physical + DB Restoration
+  // Stage 5: Transaction Rollback -> Complete Physical + Relational DB Restoration
   it('5. transaction rollback restores previous physical tags and database state completely', async () => {
-    const tagWriter = new TagWriterService();
-    let currentDbState: Record<string, any> = {
-      title: 'Original Title',
-      musicBrainzRecordingId: 'rec-orig',
-      isrc: 'ISRC-ORIG'
-    };
+    vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');
 
-    // Initial physical write
+    let currentDbTitle = 'Original Title';
+    let currentDbMbid = 'rec-orig';
+    let currentDbIsrc = 'ISRC-ORIG';
+
+    // Initial physical state
+    const tagWriter = new TagWriterService();
     await tagWriter.writeTags({
       filePath: tempTestFile,
       title: 'Original Title',
@@ -295,21 +409,41 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
       isrc: 'ISRC-ORIG'
     });
 
+    vi.spyOn(db, 'transaction').mockImplementation(async (callback: any) => {
+      return callback({});
+    });
+    vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+      id: 888,
+      path: tempTestFile,
+      title: currentDbTitle,
+      artists: [],
+      albums: [],
+      genres: []
+    } as any);
+    vi.spyOn(songsDb, 'updateSongBasicFields').mockImplementation(async (_id, fields) => {
+      if (fields.title !== undefined) currentDbTitle = fields.title;
+      if (fields.musicBrainzRecordingId !== undefined) currentDbMbid = fields.musicBrainzRecordingId;
+      if (fields.isrc !== undefined) currentDbIsrc = fields.isrc;
+      return true as any;
+    });
+
     const txManager = new MetadataTransactionManager({
-      dbUpdater: async (_songId, data) => {
-        currentDbState = { ...data };
-        await tagWriter.writeTags({
-          filePath: tempTestFile,
-          title: data.title,
-          musicBrainzRecordingId: data.musicBrainzRecordingId,
-          isrc: data.isrc
-        });
-        return true;
+      dbUpdater: async (songId, data) => {
+        const updateResult = await updateSongId3Tags(
+          songId,
+          {
+            title: data.title,
+            musicBrainzRecordingId: data.musicBrainzRecordingId,
+            isrc: data.isrc
+          },
+          false
+        );
+        return updateResult.success;
       }
     });
 
     // 1. Execute mutation
-    await txManager.executeTransaction('op-e2e-stage5', [
+    const txRes = await txManager.executeTransaction('op-e2e-stage5', [
       {
         resourceId: 888,
         filePath: tempTestFile,
@@ -320,8 +454,12 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
         ]
       }
     ]);
+    expect(txRes.success).toBe(true);
 
-    expect(currentDbState.title).toBe('Mutated Title');
+    // Verify DB & disk mutated
+    expect(currentDbTitle).toBe('Mutated Title');
+    expect(currentDbMbid).toBe('rec-mutated');
+    expect(currentDbIsrc).toBe('ISRC-MUTATED');
     const mutatedFile = File.createFromPath(tempTestFile);
     expect(mutatedFile.tag.title).toBe('Mutated Title');
     expect(mutatedFile.tag.musicBrainzTrackId).toBe('rec-mutated');
@@ -332,7 +470,10 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     const rollbackRes = await txManager.rollbackLastTransaction();
     expect(rollbackRes.success).toBe(true);
 
-    expect(currentDbState.title).toBe('Original Title');
+    // Verify DB & disk restored
+    expect(currentDbTitle).toBe('Original Title');
+    expect(currentDbMbid).toBe('rec-orig');
+    expect(currentDbIsrc).toBe('ISRC-ORIG');
     const restoredFile = File.createFromPath(tempTestFile);
     expect(restoredFile.tag.title).toBe('Original Title');
     expect(restoredFile.tag.musicBrainzTrackId).toBe('rec-orig');
@@ -340,7 +481,7 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     restoredFile.dispose();
   });
 
-  // Stage 6: Deferred Playing Write -> Song Change Flush (Latest-Write-Wins)
+  // Stage 6: Deferred Playing Write -> Song Change Flush (Latest-Write-Wins & Overlapping Concurrency)
   it('6. playing song defers physical writes, coalesces by field, and flushes on song transition', async () => {
     vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempTestFile);
 
@@ -397,26 +538,40 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     diskFile.dispose();
   });
 
-  // Stage 7: Physical Write Failure -> Compensation and Error Reporting
-  it('7. handles write errors cleanly and reports transaction failure without false success', async () => {
-    const invalidPath = path.join(os.tmpdir(), 'non_existent_folder_xyz', 'test.mp3');
+  // Stage 7: Physical Write Failure Injection -> Compensation and Error Reporting
+  it('7. handles physical write failures cleanly and reports transaction failure without false success', async () => {
+    // Make file read-only on disk so physical write fails
+    fs.chmodSync(tempTestFile, 0o444);
 
-    const txManager = new MetadataTransactionManager({
-      dbUpdater: async () => {
-        throw new Error('Disk permission denied');
-      }
-    });
+    try {
+      const tagWriter = new TagWriterService();
+      const txManager = new MetadataTransactionManager({
+        dbUpdater: async (_songId, data) => {
+          const res = await tagWriter.writeTags({
+            filePath: tempTestFile,
+            title: data.title
+          });
+          if (!res.success) {
+            throw new Error(`Physical write failed: ${res.error}`);
+          }
+          return true;
+        }
+      });
 
-    const res = await txManager.executeTransaction('op-e2e-fail', [
-      {
-        resourceId: 9999,
-        filePath: invalidPath,
-        fieldMutations: [{ fieldId: 'title', oldValue: 'A', newValue: 'B' }]
-      }
-    ]);
+      const res = await txManager.executeTransaction('op-e2e-fail', [
+        {
+          resourceId: 9999,
+          filePath: tempTestFile,
+          fieldMutations: [{ fieldId: 'title', oldValue: 'A', newValue: 'B' }]
+        }
+      ]);
 
-    expect(res.success).toBe(false);
-    expect(res.errors.length).toBeGreaterThan(0);
-    expect(res.updatedCount).toBe(0);
+      expect(res.success).toBe(false);
+      expect(res.errors.length).toBeGreaterThan(0);
+      expect(res.updatedCount).toBe(0);
+    } finally {
+      // Restore permissions for cleanup
+      fs.chmodSync(tempTestFile, 0o666);
+    }
   });
 });

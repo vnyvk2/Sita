@@ -207,20 +207,31 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
   return undefined;
 };
 
+const mergeTagData = (base: TagData, incoming: TagData): TagData => {
+  const merged: TagData = { ...base };
+  if (incoming.title !== undefined) merged.title = incoming.title;
+  if (incoming.artists !== undefined) merged.artists = incoming.artists;
+  if (incoming.album !== undefined) merged.album = incoming.album;
+  if (incoming.genres !== undefined) merged.genres = incoming.genres;
+  if (incoming.composer !== undefined) merged.composer = incoming.composer;
+  if (incoming.trackNumber !== undefined) merged.trackNumber = incoming.trackNumber;
+  if (incoming.discNumber !== undefined) merged.discNumber = incoming.discNumber;
+  if (incoming.year !== undefined) merged.year = incoming.year;
+  if (incoming.artwork !== undefined) merged.artwork = incoming.artwork;
+  if (incoming.lyrics !== undefined) merged.lyrics = incoming.lyrics;
+  if (incoming.musicBrainzRecordingId !== undefined) merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
+  if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
+  return merged;
+};
+
 const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
   // Coalesce field-by-field if a pending write already exists for this song
   const existing = pendingMetadataUpdates.get(data.songPath);
   if (existing) {
-    const mergedTags: TagData = { ...existing.tags };
-    for (const [key, value] of Object.entries(data.tags)) {
-      if (value !== undefined) {
-        (mergedTags as any)[key] = value;
-      }
-    }
     pendingMetadataUpdates.set(data.songPath, {
       ...existing,
       ...data,
-      tags: mergedTags
+      tags: mergeTagData(existing.tags, data.tags)
     });
   } else {
     pendingMetadataUpdates.set(data.songPath, data);
