@@ -457,15 +457,22 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
       const payload: AlbumTagPreview = { ...preview, album: payloadAlbum, matches: effectiveMatches };
       const effectiveReplaceArtwork = replaceArtwork && selectedGlobalFields.has('artwork');
+      const suggestedGenre =
+        preview.album.genre ||
+        preview.matches
+          .map((m) => m.fieldDiffs.find((d) => d.fieldId === 'genre')?.suggestedValue)
+          .find((g) => g !== undefined && g !== null && String(g).trim() !== '')?.toString() ||
+        undefined;
+
       const globalMutations: GlobalAlbumMutations = {
         albumTitle: preview.album.title,
         albumArtist: preview.album.artist,
         year: preview.album.year,
-        genre: 'Pop',
+        genre: suggestedGenre,
         applyAlbumTitle: selectedGlobalFields.has('album'),
         applyAlbumArtist: selectedGlobalFields.has('artist'),
         applyYear: selectedGlobalFields.has('year'),
-        applyGenre: selectedGlobalFields.has('genre')
+        applyGenre: selectedGlobalFields.has('genre') && Boolean(suggestedGenre)
       };
 
       const options: ApplyPreviewOptions = {
@@ -601,7 +608,13 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     const remoteArtist = preview.album.artist || '—';
     const remoteAlbum = preview.album.title || '—';
     const remoteYear = preview.album.year ? String(preview.album.year) : '—';
-    const remoteGenre = 'Pop'; // default preview genre
+    const suggestedGenre =
+      preview.album.genre ||
+      preview.matches
+        .map((m) => m.fieldDiffs.find((d) => d.fieldId === 'genre')?.suggestedValue)
+        .find((g) => g !== undefined && g !== null && String(g).trim() !== '')?.toString() ||
+      '';
+    const remoteGenre = suggestedGenre || '—';
     const remoteArtwork = preview.album.artwork ? 'Cover Art' : 'None';
 
     const makeDiff = (id: string, name: string, oldVal: string, newVal: string): GlobalFieldDiff => {

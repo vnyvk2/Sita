@@ -42,6 +42,7 @@ export interface AlbumMetadata {
   title: string;
   artist: string;
   year?: number;
+  genre?: string;
   label?: string;
   releaseType?: string;
   artwork?: ArtworkMetadata;

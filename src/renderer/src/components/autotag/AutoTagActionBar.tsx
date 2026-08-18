@@ -45,7 +45,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
         {totalTracksCount > 0 && (
           <>
             <span style={{ color: selectedTracksCount > 0 ? '#FFFFFF' : '#94A3B8', fontWeight: 600 }}>
-              ✓ {selectedTracksCount} / {totalTracksCount} tracks
+              ✓ {selectedTracksCount} / {totalTracksCount} tracks selected
             </span>
             <span style={{ color: '#64748B' }}>•</span>
             <span style={{ color: '#CBD5E1' }}>{activeFieldsCount} fields active</span>
@@ -53,6 +53,14 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             <span style={{ color: totalChanges > 0 ? '#38BDF8' : '#94A3B8', fontWeight: 700 }}>
               {totalChanges} changes
             </span>
+            {selectedTracksCount === 0 && totalChanges > 0 && (
+              <>
+                <span style={{ color: '#64748B' }}>•</span>
+                <span style={{ color: '#FBBF24', fontSize: '0.82rem', fontWeight: 500 }}>
+                  ({totalTracksCount} files affected by album metadata)
+                </span>
+              </>
+            )}
           </>
         )}
 

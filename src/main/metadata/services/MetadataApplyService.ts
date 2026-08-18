@@ -108,17 +108,19 @@ export class MetadataApplyService {
 
     const selectedMatches = preview.matches.filter((m) => m.applyTrack);
     const globalMutations = options?.globalMutations;
-    const hasGlobalMutations = Boolean(
+
+    const hasGlobalMetadataChanges = Boolean(
       globalMutations && (
         globalMutations.applyAlbumTitle ||
         globalMutations.applyAlbumArtist ||
         globalMutations.applyYear ||
-        globalMutations.applyGenre ||
-        options?.replaceArtwork
+        globalMutations.applyGenre
       )
     );
+    const hasArtworkChange = Boolean(options?.replaceArtwork);
+    const hasAlbumLevelChanges = hasGlobalMetadataChanges || hasArtworkChange;
 
-    if (selectedMatches.length === 0 && !hasGlobalMutations) {
+    if (selectedMatches.length === 0 && !hasAlbumLevelChanges) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
 
@@ -135,8 +137,8 @@ export class MetadataApplyService {
     let totalFailed = 0;
     const errors: string[] = [];
 
-    // Target matches: If global album mutations are active, all album tracks receive album tags; otherwise only selected tracks
-    const targetMatches = hasGlobalMutations ? preview.matches : selectedMatches;
+    // Target matches: If album-level mutations are active, all album tracks receive album tags; otherwise only selected tracks
+    const targetMatches = hasAlbumLevelChanges ? preview.matches : selectedMatches;
 
     // Split target matches into chunks of batchChunkSize (default 50)
     for (let i = 0; i < targetMatches.length; i += this.batchChunkSize) {

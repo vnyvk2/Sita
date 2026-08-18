@@ -458,7 +458,7 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       expect(writePayloads[0].artist).toBe('Olivia Rodrigo');
     });
 
-    it('applies both global album mutations and partial track selections in one atomic transaction', async () => {
+    it('applies global album mutations and partial track selections in one apply operation', async () => {
       const tagWriter = new TagWriterService();
       const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
         { filePath: '01.mp3', success: true },
