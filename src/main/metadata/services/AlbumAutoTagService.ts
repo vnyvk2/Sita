@@ -197,7 +197,7 @@ export class AlbumAutoTagService extends EventEmitter {
   }
 
   /**
-   * Apply preview changes via MetadataTransactionManager.
+   * Apply preview changes via MetadataApplyService.
    */
   public async applyPreview(
     preview: AlbumTagPreview,
@@ -210,32 +210,8 @@ export class AlbumAutoTagService extends EventEmitter {
     this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
 
     try {
-      // Build domain transaction mutations
-      const selectedMatches = preview.matches.filter((m) => m.applyTrack);
-      const mutations: ResourceMutationPayload[] = selectedMatches.map((m) => ({
-        resourceId: m.localSongId,
-        filePath: m.songPath,
-        fieldMutations: m.fieldDiffs
-          .filter((d) => d.applyField && d.status !== 'unchanged')
-          .map((d) => ({
-            fieldId: d.fieldId,
-            oldValue: d.oldValue,
-            newValue: d.userValue ?? d.suggestedValue,
-            providerId: preview.provider,
-            confidenceScore: m.confidence
-          }))
-      }));
-
-      const txResult = await this.transactionManager.executeTransaction(operationId, mutations, options);
+      const result = await this.applyService.applyPreview(preview, options, signal);
       this.checkCancelled(signal);
-
-      const result: ApplyResult = {
-        success: txResult.success,
-        updatedCount: txResult.updatedCount,
-        deferredCount: txResult.deferredCount,
-        failedCount: txResult.failedCount,
-        errors: txResult.errors
-      };
 
       if (result.success) {
         const msg =
@@ -266,16 +242,16 @@ export class AlbumAutoTagService extends EventEmitter {
   }
 
   /**
-   * Undoes the last AutoTag transaction via MetadataTransactionManager.
+   * Undoes the last AutoTag operation via MetadataApplyService.
    */
   public async undoLastAutoTag(operationId = 'default'): Promise<{ success: boolean; restoredCount: number }> {
     this.emitProgress('applying', 'Undoing last AutoTag operation...', 50, operationId);
     try {
-      const res = await this.transactionManager.rollbackLastTransaction();
-      if (res.success && res.revertedCount > 0) {
-        this.operationManager.updateState(operationId, 'Undone', `Restored original metadata for ${res.revertedCount} songs.`, 100);
-        this.emitProgress('completed', `Restored original metadata for ${res.revertedCount} songs.`, 100, operationId);
-        return { success: true, restoredCount: res.revertedCount };
+      const res = await this.applyService.undoLastAutoTag();
+      if (res.success && res.restoredCount > 0) {
+        this.operationManager.updateState(operationId, 'Undone', `Restored original metadata for ${res.restoredCount} songs.`, 100);
+        this.emitProgress('completed', `Restored original metadata for ${res.restoredCount} songs.`, 100, operationId);
+        return { success: true, restoredCount: res.revertedCount ?? res.restoredCount };
       } else {
         this.operationManager.updateState(operationId, 'Failed', 'No AutoTag operations available to undo.', 0);
         this.emitProgress('failed', 'No AutoTag operations available to undo.', 0, operationId);
