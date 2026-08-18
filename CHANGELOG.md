@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!TIP]
 > The latest version, **( v3.1.0-stable )** contains a lot of new features and improvements. As always expect some bugs in the app
 
+## [Unreleased]
+
+### Added
+
+- Canonical Unicode-aware normalization contract (`normalizeForMatching`) preserving CJK, Cyrillic, accented characters, and token boundaries across search and auto-tag matching.
+- Strongly-typed MusicBrainz Recording MBID and ISRC provider extraction and persistence across database schema and physical ID3 tags.
+- Cover Art Archive release-group lookup fallback when release-level artwork returns HTTP 404.
+- In-memory artwork cache invalidation with timestamp query parameter cache-busting for renderer image URLs.
+- Deferred write field-level coalescing (latest-write-wins) for currently playing tracks.
+
+### Changed
+
+- Consolidated AutoTag metadata physical write ownership to a single updater (`updateSongId3Tags`), eliminating duplicate disk writes and encoding conflicts.
+- Refactored `MetadataProviderRuntime` to support multi-provider registration, rate-limiting, and circuit-breaking.
+- Optimized `RateLimiter` with single-drain timer scheduling and batch token consumption under concurrent bursts.
+- Added proactive TTL pruning to `IdentityResolutionCache` on cache pressure.
+
+### Fixed
+
+- Fixed track title corruption where album titles were applied to track titles in auto-tag previews.
+- Fixed ASCII-only regex normalizers destroying non-Latin metadata.
+- Fixed undo snapshots omitting `discNumber`, `genre`, `musicBrainzRecordingId`, `isrc`, and artwork tags during rollback.
+- Fixed Discogs unauthenticated API requests and loose candidate matching heuristics.
+- Fixed unescaped Lucene special characters in MusicBrainz search queries.
+- Fixed multi-disc album track counts only counting the first medium.
+- Fixed library scanner taking arbitrary picture frames instead of prioritizing `PictureType.FrontCover`.
+
+### Removed
+
+- Removed obsolete Gen1 `MetadataMergeEngine` and unreferenced background job manager queues.
+
 ## [3.1.0-stable] - 2025-03-29
 
 ![Nora v3.1.0-stable version artwork](resources/other/release%20artworks/whats-new-v3.1.0-stable.webp)

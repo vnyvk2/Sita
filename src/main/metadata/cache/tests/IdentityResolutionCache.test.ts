@@ -36,4 +36,20 @@ describe('Metadata Cache — IdentityResolutionCache', () => {
     expect(cache.get('discogs', 'artist:456')).toBeUndefined();
     expect(cache.has('discogs', 'artist:456')).toBe(false);
   });
+
+  it('prunes expired entries proactively on cache pressure without evicting active entries', async () => {
+    const cache = new IdentityResolutionCache({ maxEntries: 2, ttlMs: 50 });
+
+    cache.set('provider1', 'expiredKey', 'oldValue');
+    await new Promise((res) => setTimeout(res, 60)); // Let expiredKey expire
+
+    cache.set('provider1', 'activeKey', 'activeValue');
+    // Adding 3rd key triggers pruneExpired() before evictOne()
+    cache.set('provider1', 'newKey', 'newValue');
+
+    expect(cache.size()).toBe(2);
+    expect(cache.has('provider1', 'expiredKey')).toBe(false);
+    expect(cache.has('provider1', 'activeKey')).toBe(true);
+    expect(cache.has('provider1', 'newKey')).toBe(true);
+  });
 });

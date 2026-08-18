@@ -40,7 +40,10 @@ export class IdentityResolutionCache {
     const seq = ++this.accessSequence;
 
     if (this.cache.size >= this.policy.maxEntries && !this.cache.has(key)) {
-      this.evictOne();
+      this.pruneExpired();
+      if (this.cache.size >= this.policy.maxEntries && !this.cache.has(key)) {
+        this.evictOne();
+      }
     }
 
     this.cache.set(key, {
@@ -66,6 +69,18 @@ export class IdentityResolutionCache {
 
   public size(): number {
     return this.cache.size;
+  }
+
+  public pruneExpired(): number {
+    const now = Date.now();
+    let prunedCount = 0;
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.createdAt > this.policy.ttlMs) {
+        this.cache.delete(key);
+        prunedCount++;
+      }
+    }
+    return prunedCount;
   }
 
   private buildKey(providerId: string, entityKey: string): string {

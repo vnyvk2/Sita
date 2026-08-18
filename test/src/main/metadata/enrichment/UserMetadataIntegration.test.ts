@@ -6,7 +6,7 @@ vi.mock('@db/db', () => ({
 
 import { MetadataCache } from '@main/metadata/cache/MetadataCache';
 import { MetadataEngine } from '@main/metadata/engine/MetadataEngine';
-import { MetadataMergeEngine } from '@main/metadata/engine/MetadataMergeEngine';
+import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { AlbumMapper } from '@main/metadata/mappers/AlbumMapper';
 import { ArtistMapper } from '@main/metadata/mappers/ArtistMapper';
@@ -171,9 +171,9 @@ describe('UserMetadataIntegration (Phase 10A Platform Verification)', () => {
     const executionStrategy = new DefaultProviderExecutionStrategy(eventBus);
     const mergePolicy = new DefaultMetadataMergePolicy();
 
-    const mergeEngine = new MetadataMergeEngine({
+    const executor = new MetadataProviderExecutor({
       registry: providerRegistry,
-      mergePolicy,
+      eventBus,
       selectionStrategy,
       executionStrategy
     });
@@ -203,8 +203,8 @@ describe('UserMetadataIntegration (Phase 10A Platform Verification)', () => {
     const planner = new MetadataQueryPlanner(dbRepository);
 
     engine = new MetadataEngine({
-      executor: null as any,
-      mergeEngine,
+      executor,
+      mergePolicy,
       planner,
       pipeline,
       cache,
