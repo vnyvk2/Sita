@@ -56,7 +56,8 @@ vi.mock('@main/removeSongsFromLibrary', () => ({
 
 vi.mock('@main/workers/jobScheduler', () => ({
   libraryScheduler: {
-    requestMaintenance: vi.fn()
+    requestMaintenance: vi.fn(),
+    enqueue: vi.fn()
   }
 }));
 

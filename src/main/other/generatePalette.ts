@@ -91,42 +91,56 @@ const generatePalette = async (artwork?: Buffer | string): Promise<PaletteData |
   return DEFAULT_SONG_PALETTE;
 };
 
+let isGeneratingPalettes = false;
+
 const generatePalettesForSongs = async () => {
-  const artworks = await getLowResArtworksWithoutPalettes();
-
-  if (artworks.length > 0) {
-    let x = 0;
-    const noOfNoPaletteArtworks = artworks.reduce(
-      (acc, artwork) => (!artwork.paletteId ? acc + 1 : acc),
-      0
+  if (isGeneratingPalettes) {
+    logger.debug(
+      '[generatePalettesForSongs] Bulk palette generation already in progress. Skipping redundant call.'
     );
+    return;
+  }
+  isGeneratingPalettes = true;
 
-    if (noOfNoPaletteArtworks > 0) {
-      const start = timeStart();
+  try {
+    const artworks = await getLowResArtworksWithoutPalettes();
 
-      await db.transaction(async (trx) => {
-        for (let i = 0; i < artworks.length; i += 1) {
-          const artwork = artworks[i];
+    if (artworks.length > 0) {
+      let x = 0;
+      const noOfNoPaletteArtworks = artworks.reduce(
+        (acc, artwork) => (!artwork.paletteId ? acc + 1 : acc),
+        0
+      );
 
-          if (!artwork.paletteId) {
-            const buffer = await generateCoverBuffer(artwork.path, false);
-            const palette = await generatePalette(buffer);
+      if (noOfNoPaletteArtworks > 0) {
+        const start = timeStart();
 
-            await savePalette(artwork.id, palette, trx);
-            x += 1;
+        await db.transaction(async (trx) => {
+          for (let i = 0; i < artworks.length; i += 1) {
+            const artwork = artworks[i];
 
-            sendMessageToRenderer({
-              messageCode: 'SONG_PALETTE_GENERATING_PROCESS_UPDATE',
-              data: { total: noOfNoPaletteArtworks, value: x }
-            });
+            if (!artwork.paletteId) {
+              const buffer = await generateCoverBuffer(artwork.path, false);
+              const palette = await generatePalette(buffer);
+
+              await savePalette(artwork.id, palette, trx);
+              x += 1;
+
+              sendMessageToRenderer({
+                messageCode: 'SONG_PALETTE_GENERATING_PROCESS_UPDATE',
+                data: { total: noOfNoPaletteArtworks, value: x }
+              });
+            }
           }
-        }
-      });
+        });
 
-      timeEnd(start, 'Time to finish generating palettes');
+        timeEnd(start, 'Time to finish generating palettes');
 
-      dataUpdateEvent('songs/palette');
-    } else sendMessageToRenderer({ messageCode: 'NO_MORE_SONG_PALETTES' });
+        dataUpdateEvent('songs/palette');
+      } else sendMessageToRenderer({ messageCode: 'NO_MORE_SONG_PALETTES' });
+    }
+  } finally {
+    isGeneratingPalettes = false;
   }
 };
 

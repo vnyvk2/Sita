@@ -29,11 +29,15 @@ vi.mock('@main/other/artworks', () => ({
 
 const mockDispose = vi.fn();
 vi.mock('node-taglib-sharp', () => ({
+  PictureType: {
+    FrontCover: 3
+  },
   File: {
     createFromPath: vi.fn(() => ({
       tag: {
         pictures: [
           {
+            pictureType: 3,
             data: {
               toByteArray: () => new Uint8Array([1, 2, 3])
             }

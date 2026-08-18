@@ -225,6 +225,7 @@ export const palettes = pgTable(
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
     artworkId: integer('artwork_id')
       .notNull()
+      .unique()
       .references(() => artworks.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade'
@@ -234,8 +235,8 @@ export const palettes = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
   },
   (t) => [
-    // Index for artwork-based palette lookups
-    index('idx_palettes_artwork_id').on(t.artworkId)
+    // Unique index for artwork-based palette lookups
+    uniqueIndex('idx_palettes_artwork_id').on(t.artworkId)
   ]
 );
 

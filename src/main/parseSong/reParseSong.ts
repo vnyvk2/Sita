@@ -13,8 +13,8 @@ import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
 import { libraryScheduler } from '../workers/jobScheduler';
+import { PaletteJob } from '../workers/jobs/paletteJob';
 // (GC job will be dispatched by Maintenance orchestrator)
-import { generatePalettes } from '../other/generatePalette';
 import {
   removeDeletedAlbumDataOfSong,
   removeDeletedArtistDataOfSong,
@@ -86,7 +86,7 @@ const reParseSong = async (filePath: string) => {
       if (updatedSong) {
         const processedArtwork = await processArtworkFiles('songs', rawPictureBytes);
 
-        await db.transaction(async (trx) => {
+        const reparseResult = await db.transaction(async (trx) => {
           await removeDeletedArtistDataOfSong(song, trx);
           await removeDeletedAlbumDataOfSong(song, trx);
           await removeDeletedGenreDataOfSong(song, trx);
@@ -139,6 +139,7 @@ const reParseSong = async (filePath: string) => {
 
           return {
             songData,
+            savedArtworkData: artworkData,
             linkedArtworks,
             relevantAlbum,
             newAlbum,
@@ -152,6 +153,15 @@ const reParseSong = async (filePath: string) => {
         });
         
         libraryScheduler.requestMaintenance();
+
+        if (reparseResult.savedArtworkData && reparseResult.savedArtworkData.length > 0) {
+          const targetArtwork =
+            reparseResult.savedArtworkData.find((a) => a.isOptimized) ||
+            reparseResult.savedArtworkData[0];
+          libraryScheduler.enqueue(
+            new PaletteJob(targetArtwork.id, targetArtwork.path, song.title || 'Song')
+          );
+        }
 
         logger.debug(`Song reparsed successfully.`, {
           songPath: song?.path
@@ -170,11 +180,6 @@ const reParseSong = async (filePath: string) => {
         dataUpdateEvent('albums/updatedAlbum');
         dataUpdateEvent('genres/updatedGenre');
 
-        setTimeout(() => {
-          generatePalettes().catch((error) => {
-            logger.error('Failed to generate palettes after song reparse', { error, songPath: song.path });
-          });
-        }, 1000);
         return song;
       }
     }
