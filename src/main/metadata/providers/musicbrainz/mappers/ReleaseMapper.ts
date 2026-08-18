@@ -23,6 +23,7 @@ export class MusicBrainzReleaseMapper {
       discCount: dto.media?.length ?? 1,
       trackCount,
       releaseId: dto.id,
+      releaseGroupId: dto['release-group']?.id,
       provider: 'musicbrainz'
     };
   }
@@ -51,7 +52,8 @@ export class MusicBrainzReleaseMapper {
               trackNumber: isNaN(trackNo) ? officialTracks.length + 1 : trackNo,
               discNumber,
               duration,
-              musicBrainzRecordingId: track.recording?.id
+              musicBrainzRecordingId: track.recording?.id,
+              isrc: track.recording?.isrcs?.[0] ?? track.isrc
             });
           }
         }
@@ -62,7 +64,8 @@ export class MusicBrainzReleaseMapper {
       album,
       tracks: officialTracks,
       provider: 'musicbrainz',
-      providerReleaseId: dto.id
+      providerReleaseId: dto.id,
+      releaseGroupId: dto['release-group']?.id
     };
   }
 

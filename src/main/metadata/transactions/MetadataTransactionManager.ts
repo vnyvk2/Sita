@@ -1,8 +1,9 @@
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { UndoToken } from '../domain/UndoToken';
-import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
-import { ArtworkDownloaderService } from './ArtworkDownloaderService';
+import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
+import { ArtworkDownloaderService } from './ArtworkDownloaderService';
+import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { MutationExecutor } from './MutationExecutor';
 import { SnapshotBuilder, type DraftSnapshot } from './SnapshotBuilder';
@@ -34,9 +35,13 @@ export class MetadataTransactionManager {
   constructor(options?: {
     dbUpdater?: SongDbUpdater;
     historyService?: MetadataHistoryService;
+    requestPipeline?: RequestPipeline;
+    artworkDownloader?: ArtworkDownloaderService;
   }) {
     this.relationalSync = new LibraryRelationalSyncService(options?.dbUpdater);
-    this.artworkDownloader = new ArtworkDownloaderService();
+    this.artworkDownloader =
+      options?.artworkDownloader ??
+      new ArtworkDownloaderService(options?.requestPipeline);
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.mutationExecutor = new MutationExecutor(this.relationalSync);
@@ -78,7 +83,7 @@ export class MetadataTransactionManager {
     signal?: AbortSignal
   ): Promise<TransactionResult> {
     if (!mutations || mutations.length === 0) {
-      return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
+      return { success: true, updatedCount: 0, deferredCount: 0, failedCount: 0, errors: [] };
     }
 
     let artworkBuffer: Buffer | undefined;
@@ -98,6 +103,7 @@ export class MetadataTransactionManager {
     };
 
     let updatedCount = 0;
+    let deferredCount = 0;
     let failedCount = 0;
     let isCancelled = false;
     const errors: string[] = [];
@@ -110,6 +116,7 @@ export class MetadataTransactionManager {
         errors.push('Transaction operation cancelled by user');
         await this.rollbackDraftSnapshots(draftSnapshots);
         updatedCount = 0;
+        deferredCount = 0;
         break;
       }
 
@@ -155,6 +162,9 @@ export class MetadataTransactionManager {
         });
 
         if (res.success) {
+          if (res.deferred) {
+            deferredCount++;
+          }
           draftSnapshots.push({
             songId: Number(mut.resourceId),
             filePath: mut.filePath,
@@ -174,6 +184,7 @@ export class MetadataTransactionManager {
       if (chunkFailed) {
         await this.rollbackDraftSnapshots(draftSnapshots);
         updatedCount = 0;
+        deferredCount = 0;
         break;
       }
     }
@@ -194,6 +205,7 @@ export class MetadataTransactionManager {
       success: errors.length === 0,
       cancelled: isCancelled || undefined,
       updatedCount,
+      deferredCount,
       failedCount,
       errors,
       undoToken: draftSnapshots.length > 0 ? undoToken : undefined
@@ -218,6 +230,11 @@ export class MetadataTransactionManager {
       if (song.artist !== undefined) revertTags.artist = song.artist;
       if (song.album !== undefined) revertTags.album = song.album;
       if (song.year !== undefined) revertTags.year = song.year;
+      if (song.trackNumber !== undefined) revertTags.trackNumber = song.trackNumber;
+      if (song.discNumber !== undefined) revertTags.discNumber = song.discNumber;
+      if (song.genre !== undefined) revertTags.genre = song.genre;
+      revertTags.isrc = song.isrc ?? '';
+      revertTags.musicBrainzRecordingId = song.musicBrainzRecordingId ?? '';
 
       const res = await this.mutationExecutor.executeSingleMutation({
         songId: song.songId,

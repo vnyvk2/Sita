@@ -20,6 +20,7 @@ import {
   removeDeletedArtistDataOfSong,
   removeDeletedGenreDataOfSong
 } from '../removeSongsFromLibrary';
+import { extractFrontCover } from '../utils/extractFrontCover';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -66,6 +67,8 @@ const reParseSong = async (filePath: string) => {
             noOfChannels: file.properties.audioChannels,
             diskNumber: metadata.disc ?? undefined,
             trackNumber: metadata.track ?? undefined,
+            musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
+            isrc: metadata.isrc || undefined,
             fileCreatedAt: stats ? stats.birthtime : new Date(),
             fileModifiedAt: stats ? stats.mtime : new Date()
           };
@@ -74,9 +77,7 @@ const reParseSong = async (filePath: string) => {
           albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
           albumData = getAlbumInfoFromSong(metadata.album);
           genresData = getGenreInfoFromSong(metadata.genres);
-          rawPictureBytes = metadata.pictures?.at(0)
-            ? metadata.pictures[0].data.toByteArray()
-            : undefined;
+          rawPictureBytes = extractFrontCover(metadata.pictures);
         }
       } finally {
         file.dispose?.();

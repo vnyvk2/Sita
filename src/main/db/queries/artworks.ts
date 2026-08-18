@@ -90,6 +90,48 @@ export const syncSongArtworks = async (
     .where(eq(artworksSongs.songId, songId));
 };
 
+export const syncAlbumArtworks = async (
+  albumId: number,
+  artworksIds: number[],
+  trx: DB | DBTransaction = db
+) => {
+  // 1. Get current artwork links for the album joined with artworks table
+  const current = await trx
+    .select({
+      artworkId: albumsArtworks.artworkId,
+      source: artworks.source
+    })
+    .from(albumsArtworks)
+    .innerJoin(artworks, eq(albumsArtworks.artworkId, artworks.id))
+    .where(eq(albumsArtworks.albumId, albumId));
+
+  const currentIds = current.map((row) => row.artworkId);
+  // Invariant BUG-08: Only remove REMOTE artworks that are not in the new artworksIds list.
+  // Preserves LOCAL-sourced artwork from being overwritten or destroyed.
+  const remoteToRemove = current
+    .filter((row) => row.source === 'REMOTE' && !artworksIds.includes(row.artworkId))
+    .map((row) => row.artworkId);
+
+  // 2. Remove outdated remote artwork links
+  if (remoteToRemove.length > 0) {
+    await trx
+      .delete(albumsArtworks)
+      .where(and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, remoteToRemove)));
+  }
+
+  // 3. Add new links
+  const toAdd = artworksIds.filter((id) => !currentIds.includes(id));
+  if (toAdd.length > 0) {
+    await trx.insert(albumsArtworks).values(toAdd.map((artworkId) => ({ albumId, artworkId })));
+  }
+
+  // 4. Return final set
+  return await trx
+    .select({ artworkId: albumsArtworks.artworkId })
+    .from(albumsArtworks)
+    .where(eq(albumsArtworks.albumId, albumId));
+};
+
 export const linkArtworksToAlbum = async (
   data: (typeof albumsArtworks.$inferInsert)[],
   trx: DB | DBTransaction = db

@@ -48,12 +48,15 @@ export type SongDbUpdater = (
     year?: number;
     trackNumber?: number;
     discNumber?: number;
+    isrc?: string;
+    musicBrainzRecordingId?: string;
   }
 ) => Promise<unknown>;
 
 export interface ApplyResult {
   success: boolean;
   updatedCount: number;
+  deferredCount?: number;
   failedCount: number;
   errors: string[];
 }

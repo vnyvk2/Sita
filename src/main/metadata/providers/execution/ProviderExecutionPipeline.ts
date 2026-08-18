@@ -20,18 +20,16 @@ export class ProviderExecutionPipeline {
   public async process<TDTO = unknown>(
     context: ProviderExecutionStageContext<TDTO>
   ): Promise<ProviderResult<TDTO>> {
-    let index = 0;
-
-    const executeStage = async (): Promise<ProviderResult<TDTO>> => {
-      if (index >= this.stages.length) {
+    const dispatch = async (i: number): Promise<ProviderResult<TDTO>> => {
+      if (i >= this.stages.length) {
         const res = await context.action(context.provider, context.identity, context.execContext);
         return res as ProviderResult<TDTO>;
       }
 
-      const stage = this.stages[index++];
-      return stage.execute(context, executeStage);
+      const stage = this.stages[i];
+      return stage.execute(context, () => dispatch(i + 1));
     };
 
-    return executeStage();
+    return dispatch(0);
   }
 }

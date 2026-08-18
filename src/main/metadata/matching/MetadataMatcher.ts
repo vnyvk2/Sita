@@ -4,6 +4,7 @@ import type {
   MetadataCandidate,
   MatchCriterion
 } from '@main/metadata/models/RecordingMetadata';
+import { normalizeForMatching } from './normalizeForMatching';
 
 export interface MatchTarget {
   title: string;
@@ -64,23 +65,30 @@ export class MetadataMatcher {
     const normTargetTitle = this.normalize(target.title);
     const normCandTitle = this.normalize(candidate.title);
 
-    // Title match (up to 45 points)
-    if (normTargetTitle === normCandTitle) {
-      score += 45;
-      matchedBy.push('title');
-      reasons.push('exact_title_match');
-    } else if (normTargetTitle.includes(normCandTitle) || normCandTitle.includes(normTargetTitle)) {
-      score += 30;
-      matchedBy.push('title_partial');
-      reasons.push('partial_title_match');
+    // Title match (up to 45 points) - Empty normalized string guard
+    if (normTargetTitle && normCandTitle) {
+      if (normTargetTitle === normCandTitle) {
+        score += 45;
+        matchedBy.push('title');
+        reasons.push('exact_title_match');
+      } else if (normTargetTitle.includes(normCandTitle) || normCandTitle.includes(normTargetTitle)) {
+        score += 30;
+        matchedBy.push('title_partial');
+        reasons.push('partial_title_match');
+      }
     }
 
-    // Artist match (up to 35 points)
+    // Artist match (up to 35 points) - Empty normalized string guard & Bidirectional
     if (target.artist && candidate.artists && candidate.artists.length > 0) {
       const normTargetArtist = this.normalize(target.artist);
       const candArtists = candidate.artists.map((a) => this.normalize(a)).filter(Boolean);
 
-      if (candArtists.some((ca) => ca === normTargetArtist || normTargetArtist.includes(ca))) {
+      if (
+        normTargetArtist &&
+        candArtists.some(
+          (ca) => ca === normTargetArtist || normTargetArtist.includes(ca) || ca.includes(normTargetArtist)
+        )
+      ) {
         score += 35;
         matchedBy.push('artist');
         reasons.push('artist_match');
@@ -118,13 +126,7 @@ export class MetadataMatcher {
     return { recording, provider };
   }
 
-  private normalize(str: string): string {
-    return str
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+  private normalize(str?: string): string {
+    return normalizeForMatching(str);
   }
 }

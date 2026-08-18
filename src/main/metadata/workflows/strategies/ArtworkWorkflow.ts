@@ -8,6 +8,7 @@ import type {
 import { BaseMetadataWorkflow } from '../MetadataWorkflow';
 import type { CoverArtArchiveAdapter } from '../../providers/coverartarchive/CoverArtArchiveAdapter';
 import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
+import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
 import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type { MetadataProviderId } from '../../models/RecordingMetadata';
 import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
@@ -17,18 +18,24 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
   public readonly displayName = 'Artwork Auto Tag';
 
   public readonly supportedFields: WorkflowSupportedField[] = [
-    { fieldId: 'artworkUrl', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
+    { fieldId: 'artworkPath', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
   ];
 
   public readonly preferredProviders: MetadataProviderId[] = ['coverartarchive', 'discogs'];
 
   private readonly caaAdapter: CoverArtArchiveAdapter;
   private readonly discogsAdapter: DiscogsAdapter;
+  private readonly musicBrainzAdapter?: MusicBrainzAdapter;
 
-  constructor(caaAdapter: CoverArtArchiveAdapter, discogsAdapter: DiscogsAdapter) {
+  constructor(
+    caaAdapter: CoverArtArchiveAdapter,
+    discogsAdapter: DiscogsAdapter,
+    musicBrainzAdapter?: MusicBrainzAdapter
+  ) {
     super();
     this.caaAdapter = caaAdapter;
     this.discogsAdapter = discogsAdapter;
+    this.musicBrainzAdapter = musicBrainzAdapter;
   }
 
   public async search(
@@ -39,6 +46,28 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
     if (!qStr) return [];
 
     const candidates: WorkflowCandidate[] = [];
+
+    // Search MusicBrainz releases to obtain release MBID and releaseGroupId for CoverArtArchive
+    if (this.musicBrainzAdapter) {
+      try {
+        const mbReleases = await this.musicBrainzAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
+        for (const rel of mbReleases) {
+          if (rel.releaseId) {
+            candidates.push({
+              id: rel.releaseId,
+              title: rel.title,
+              artist: rel.artist,
+              album: rel.title,
+              provider: 'coverartarchive',
+              confidenceScore: 0.9,
+              rawItem: { releaseGroupId: rel.releaseGroupId }
+            });
+          }
+        }
+      } catch {
+        // Fallback to Discogs on MusicBrainz error
+      }
+    }
 
     // Search Discogs for artwork candidates
     const discogsReleases = await this.discogsAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
@@ -69,8 +98,21 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
     let coverArtUrl: string | undefined;
 
     if (providerId === 'coverartarchive') {
-      const contrib = await this.caaAdapter.fetchContribution({ mbid: candidateId });
-      coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl')?.value as string;
+      let releaseGroupId: string | undefined;
+      if (this.musicBrainzAdapter) {
+        try {
+          const resolved = await this.musicBrainzAdapter.resolveRelease(candidateId);
+          releaseGroupId = resolved?.releaseGroupId ?? resolved?.album?.releaseGroupId;
+        } catch {
+          // If resolution fails, proceed with candidateId alone
+        }
+      }
+
+      const contrib = await this.caaAdapter.fetchContribution({
+        mbid: candidateId,
+        releaseGroupId
+      });
+      coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl' || c.fieldId === 'artworkPath')?.value as string;
     } else {
       const release = await this.discogsAdapter.resolveRelease(candidateId);
       coverArtUrl = release?.album.artwork?.primaryPath || release?.album.artwork?.onlineUrls?.[0];
@@ -84,12 +126,12 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
         title: local.title,
         artist: local.artist,
         album: local.album,
-        artworkUrl: coverArtUrl
+        artworkPath: coverArtUrl
       },
       confidence: 0.9,
       fieldDiffs: [
         MetadataDiffBuilder.createFieldDiff({
-          fieldId: 'artworkUrl',
+          fieldId: 'artworkPath',
           oldVal: undefined,
           newVal: coverArtUrl,
           providerId,

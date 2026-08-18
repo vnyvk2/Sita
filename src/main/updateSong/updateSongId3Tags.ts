@@ -30,6 +30,7 @@ import {
 } from '../db/queries/artists';
 import {
   saveArtworks,
+  syncAlbumArtworks,
   syncSongArtworks
 } from '@main/db/queries/artworks';
 import {
@@ -75,9 +76,12 @@ type TagData = {
   genres?: string[];
   composer?: string;
   trackNumber?: number;
+  discNumber?: number;
   year?: number;
   artwork?: Picture;
   lyrics?: string;
+  musicBrainzRecordingId?: string;
+  isrc?: string;
 };
 
 type PendingMetadataUpdates = {
@@ -90,6 +94,7 @@ type PendingMetadataUpdates = {
 const pendingMetadataUpdates = new Map<string, PendingMetadataUpdates>();
 
 export const isMetadataUpdatesPending = (songPath: string) => pendingMetadataUpdates.has(songPath);
+export const clearPendingMetadataUpdates = () => pendingMetadataUpdates.clear();
 
 export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave = false) => {
   const { saveLyricsInLrcFilesForSupportedSongs } = await getUserSettings();
@@ -119,7 +124,21 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (tags.genres) file.tag.genres = tags.genres;
           if (tags.composer) file.tag.composers = [tags.composer];
           if (tags.trackNumber !== undefined) file.tag.track = tags.trackNumber;
+          if (tags.discNumber !== undefined) file.tag.disc = tags.discNumber;
           if (tags.year !== undefined) file.tag.year = tags.year;
+          if (tags.musicBrainzRecordingId !== undefined) {
+            if (tags.musicBrainzRecordingId) {
+              if (file.tag.musicBrainzTrackId) {
+                file.tag.musicBrainzTrackId = undefined;
+              }
+              file.tag.musicBrainzTrackId = tags.musicBrainzRecordingId;
+            } else if (file.tag.musicBrainzTrackId) {
+              file.tag.musicBrainzTrackId = undefined;
+            }
+          }
+          if (tags.isrc !== undefined) {
+            file.tag.isrc = tags.isrc || undefined;
+          }
 
           // Handle artwork
           if (tags.artwork) {
@@ -189,15 +208,42 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
   return undefined;
 };
 
+const mergeTagData = (base: TagData, incoming: TagData): TagData => {
+  const merged: TagData = { ...base };
+  if (incoming.title !== undefined) merged.title = incoming.title;
+  if (incoming.artists !== undefined) merged.artists = incoming.artists;
+  if (incoming.album !== undefined) merged.album = incoming.album;
+  if (incoming.genres !== undefined) merged.genres = incoming.genres;
+  if (incoming.composer !== undefined) merged.composer = incoming.composer;
+  if (incoming.trackNumber !== undefined) merged.trackNumber = incoming.trackNumber;
+  if (incoming.discNumber !== undefined) merged.discNumber = incoming.discNumber;
+  if (incoming.year !== undefined) merged.year = incoming.year;
+  if (incoming.artwork !== undefined) merged.artwork = incoming.artwork;
+  if (incoming.lyrics !== undefined) merged.lyrics = incoming.lyrics;
+  if (incoming.musicBrainzRecordingId !== undefined) merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
+  if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
+  return merged;
+};
+
 const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
-  // Kept to be saved later
-  pendingMetadataUpdates.set(data.songPath, data);
+  // Coalesce field-by-field if a pending write already exists for this song
+  const existing = pendingMetadataUpdates.get(data.songPath);
+  if (existing) {
+    pendingMetadataUpdates.set(data.songPath, {
+      ...existing,
+      ...data,
+      tags: mergeTagData(existing.tags, data.tags)
+    });
+  } else {
+    pendingMetadataUpdates.set(data.songPath, data);
+  }
+
   const currentSongPath = getCurrentSongPath();
 
   const isACurrentlyPlayingSong = data.songPath === currentSongPath;
   if (!isACurrentlyPlayingSong) return savePendingMetadataUpdates(currentSongPath, true);
 
-  return undefined;
+  return { deferred: true };
 };
 
 export const fetchArtworkBufferFromURL = async (url: string) => {
@@ -919,25 +965,32 @@ const updateSongId3Tags = async (
         {
           title: tags.title,
           year: tags.releasedYear,
-          trackNumber: tags.trackNumber
+          trackNumber: tags.trackNumber,
+          discNumber: tags.discNumber,
+          musicBrainzRecordingId: tags.musicBrainzRecordingId,
+          isrc: tags.isrc
         },
         trx
       );
 
       // / / / / / SONG ARTWORK / / / / / / /
+      let artworkData: any;
       if (processedArtwork) {
-        let artworkData = processedArtwork.existing;
+        artworkData = processedArtwork.existing;
         if (!artworkData && processedArtwork.payloads) {
           artworkData = await saveArtworks(processedArtwork.payloads, trx);
         }
 
         if (artworkData && artworkData.length > 0) {
+          const artworkIds = artworkData.map((art: any) => art.id);
           // Link artwork to song
-          await syncSongArtworks(
-            songId,
-            artworkData.map((art: any) => art.id),
-            trx
-          );
+          await syncSongArtworks(songId, artworkIds, trx);
+
+          // Invariant BUG-08: Synchronize album artwork for song's current album
+          const songAlbumId = song.albums?.[0]?.album?.id;
+          if (songAlbumId) {
+            await syncAlbumArtworks(songAlbumId, artworkIds, trx);
+          }
         }
       }
 
@@ -1044,12 +1097,16 @@ const updateSongId3Tags = async (
           }
         }
 
-        // Relational Sync: Ensure all song artists are linked to the target album
+        // Relational Sync: Ensure all song artists and artworks are linked to the target album
         if (targetAlbumId) {
           const updatedSongState = await getSongById(songId, trx);
           const songArtistIds = updatedSongState?.artists?.map((a) => a.artist.id) ?? [];
           for (const artistId of songArtistIds) {
             await linkArtistToAlbum(targetAlbumId, artistId, trx);
+          }
+
+          if (processedArtwork && artworkData && artworkData.length > 0) {
+            await syncAlbumArtworks(targetAlbumId, artworkData.map((art: any) => art.id), trx);
           }
         }
       } else if (song.albums && song.albums.length > 0) {
@@ -1132,13 +1189,16 @@ const updateSongId3Tags = async (
       genres: tags.genres?.map((genre) => genre.name),
       composer: tags.composer,
       trackNumber: tags.trackNumber,
+      discNumber: tags.discNumber,
       year: tags.releasedYear,
       artwork,
-      lyrics: lyricsText
+      lyrics: lyricsText,
+      musicBrainzRecordingId: tags.musicBrainzRecordingId,
+      isrc: tags.isrc
     };
 
     // Add to pending queue for file write
-    const updatedData = await addMetadataToPendingQueue({
+    const queueResult = await addMetadataToPendingQueue({
       songPath: song.path,
       tags: tagData,
       isKnownSource: true,
@@ -1156,8 +1216,8 @@ const updateSongId3Tags = async (
       });
     }
 
-    if (updatedData && 'modifiedDate' in updatedData) {
-      await updateSongModifiedAtByPath(song.path, new Date(updatedData.modifiedDate));
+    if (queueResult && 'modifiedDate' in queueResult) {
+      await updateSongModifiedAtByPath(song.path, new Date(queueResult.modifiedDate));
     }
 
     // Emit data update events
@@ -1168,6 +1228,9 @@ const updateSongId3Tags = async (
     dataUpdateEvent('genres');
 
     result.success = true;
+    if (queueResult && 'deferred' in queueResult && queueResult.deferred) {
+      result.deferred = true;
+    }
 
     if (sendUpdatedData) {
       // Fetch updated song data for response

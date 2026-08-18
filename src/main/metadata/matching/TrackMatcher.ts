@@ -273,31 +273,39 @@ export class TrackMatcher {
 
     const variantPenalty = Math.min(TrackMatcher.MAX_VARIANT_PENALTY, rawVariantPenalty);
 
-    // Title match (up to 50 points)
-    if (normSongTitle === normTrackTitle) {
-      titleScore = 50;
-      matchedBy.push('title');
-      reasons.push('exact_title_match');
-    } else if (normSongTitle.includes(normTrackTitle) || normTrackTitle.includes(normSongTitle)) {
-      titleScore = 35;
-      matchedBy.push('title_partial');
-      reasons.push('partial_title_match');
+    // Title match (up to 50 points) - Empty normalized string guard
+    if (normSongTitle && normTrackTitle) {
+      if (normSongTitle === normTrackTitle) {
+        titleScore = 50;
+        matchedBy.push('title');
+        reasons.push('exact_title_match');
+      } else if (normSongTitle.includes(normTrackTitle) || normTrackTitle.includes(normSongTitle)) {
+        titleScore = 35;
+        matchedBy.push('title_partial');
+        reasons.push('partial_title_match');
+      }
     }
 
-    // Artist match (up to 20 points)
+    // Artist match (up to 20 points) - Empty normalized string guard & Bidirectional check (BUG-12)
     const rawSongArtist = extractStringValue(song.artist);
     const rawTrackArtist = extractStringValue(track.artist);
     if (rawSongArtist && rawTrackArtist) {
       const normSongArtist = MetadataNormalizer.normalizeArtist(rawSongArtist);
       const normTrackArtist = MetadataNormalizer.normalizeArtist(rawTrackArtist);
-      if (normSongArtist === normTrackArtist || normSongArtist.includes(normTrackArtist)) {
-        artistScore = 20;
-        matchedBy.push('artist');
-        reasons.push('artist_match');
+      if (normSongArtist && normTrackArtist) {
+        if (
+          normSongArtist === normTrackArtist ||
+          normSongArtist.includes(normTrackArtist) ||
+          normTrackArtist.includes(normSongArtist)
+        ) {
+          artistScore = 20;
+          matchedBy.push('artist');
+          reasons.push('artist_match');
+        }
       }
     }
 
-    // Album match (+10 points exact / +5 points partial — safer balance)
+    // Album match (+10 points exact / +5 points partial — safer balance) - Empty string guard
     const rawSongAlbum = extractStringValue(song.album);
     const rawTrackAlbum = extractStringValue(track.album);
     const effectiveAlbum = rawSongAlbum ?? releaseContext?.albumTitle;
@@ -305,14 +313,16 @@ export class TrackMatcher {
     if (effectiveAlbum && targetAlbum) {
       const normSongAlbum = MetadataNormalizer.normalizeAlbum(effectiveAlbum);
       const normTargetAlbum = MetadataNormalizer.normalizeAlbum(targetAlbum);
-      if (normSongAlbum === normTargetAlbum) {
-        albumScore = 10;
-        matchedBy.push('album');
-        reasons.push('exact_album_match');
-      } else if (normSongAlbum.includes(normTargetAlbum) || normTargetAlbum.includes(normSongAlbum)) {
-        albumScore = 5;
-        matchedBy.push('album');
-        reasons.push('partial_album_match');
+      if (normSongAlbum && normTargetAlbum) {
+        if (normSongAlbum === normTargetAlbum) {
+          albumScore = 10;
+          matchedBy.push('album');
+          reasons.push('exact_album_match');
+        } else if (normSongAlbum.includes(normTargetAlbum) || normTargetAlbum.includes(normSongAlbum)) {
+          albumScore = 5;
+          matchedBy.push('album');
+          reasons.push('partial_album_match');
+        }
       }
     }
 
@@ -351,7 +361,18 @@ export class TrackMatcher {
     }
 
     const unpenalizedScore = titleScore + artistScore + albumScore + yearScore + durationScore + mbidScore;
-    const totalScore = Math.max(0, unpenalizedScore - variantPenalty);
+    let totalScore = Math.max(0, unpenalizedScore - variantPenalty);
+
+    // Invariant BUG-14: Conflicting variant pair (e.g. Live vs Acoustic) must never reach MIN_MATCH_SCORE (50)
+    const hasConflictingVariants =
+      songVariants.size > 0 &&
+      trackVariants.size > 0 &&
+      ![...songVariants].some((v) => trackVariants.has(v));
+
+    if (hasConflictingVariants) {
+      totalScore = Math.min(totalScore, MIN_MATCH_SCORE - 1);
+      reasons.push('conflicting_variants_ceiling_applied');
+    }
 
     return {
       score: totalScore,

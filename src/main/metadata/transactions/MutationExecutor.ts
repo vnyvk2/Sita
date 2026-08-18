@@ -9,6 +9,7 @@ export interface ExecuteMutationOptions {
 
 export interface MutationExecutionResult {
   success: boolean;
+  deferred?: boolean;
   error?: string;
   warning?: string;
 }
@@ -39,6 +40,7 @@ export class MutationExecutor {
 
       return {
         success: syncResult.success,
+        deferred: syncResult.deferred,
         warning: syncResult.warning,
         error: syncResult.success ? undefined : syncResult.warning ?? 'Relational database sync failed'
       };

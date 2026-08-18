@@ -9,6 +9,14 @@ export interface RequestPipelineOptions {
   rateLimiter?: RateLimiterOptions | RateLimiter;
   retryPolicy?: RetryPolicyOptions | RetryPolicy;
   authCredentials?: AuthCredentials;
+  maxConcurrentRequests?: number;
+}
+
+interface ConcurrencyQueueItem {
+  resolve: () => void;
+  reject: (err: Error) => void;
+  signal?: AbortSignal;
+  onAbort?: () => void;
 }
 
 export class RequestPipeline {
@@ -16,9 +24,18 @@ export class RequestPipeline {
   private readonly rateLimiter?: RateLimiter;
   private readonly retryPolicy: RetryPolicy;
   private readonly authenticator: Authenticator;
+  private readonly maxConcurrentRequests: number;
+  private activeAttempts: number = 0;
+  private readonly concurrencyQueue: ConcurrencyQueueItem[] = [];
 
   constructor(options?: RequestPipelineOptions) {
     this.client = options?.client ?? new FetchHttpClient();
+
+    const maxConcurrentRequests = options?.maxConcurrentRequests ?? 6;
+    if (!Number.isInteger(maxConcurrentRequests) || maxConcurrentRequests < 1) {
+      throw new Error('maxConcurrentRequests must be a positive integer');
+    }
+    this.maxConcurrentRequests = maxConcurrentRequests;
 
     if (options?.rateLimiter) {
       this.rateLimiter =
@@ -54,11 +71,81 @@ export class RequestPipeline {
       if (this.rateLimiter) {
         await this.rateLimiter.acquire();
       }
-      return this.client.request<T>(authenticatedOptions);
+      await this.acquireSlot(authenticatedOptions.signal);
+      try {
+        return await this.client.request<T>(authenticatedOptions);
+      } finally {
+        this.releaseSlot();
+      }
     });
+  }
+
+  private async acquireSlot(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
+
+    if (this.activeAttempts < this.maxConcurrentRequests) {
+      this.activeAttempts++;
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const item: ConcurrencyQueueItem = {
+        resolve: () => {
+          if (item.onAbort && item.signal) {
+            item.signal.removeEventListener('abort', item.onAbort);
+          }
+          this.activeAttempts++;
+          resolve();
+        },
+        reject,
+        signal
+      };
+
+      if (signal) {
+        item.onAbort = () => {
+          const index = this.concurrencyQueue.indexOf(item);
+          if (index !== -1) {
+            this.concurrencyQueue.splice(index, 1);
+          }
+          const abortErr = new Error('The operation was aborted');
+          abortErr.name = 'AbortError';
+          reject(abortErr);
+        };
+        signal.addEventListener('abort', item.onAbort, { once: true });
+      }
+
+      this.concurrencyQueue.push(item);
+    });
+  }
+
+  private releaseSlot(): void {
+    this.activeAttempts = Math.max(0, this.activeAttempts - 1);
+    while (this.concurrencyQueue.length > 0 && this.activeAttempts < this.maxConcurrentRequests) {
+      const next = this.concurrencyQueue.shift();
+      if (next) {
+        next.resolve();
+        break;
+      }
+    }
   }
 
   public getRateLimiter(): RateLimiter | undefined {
     return this.rateLimiter;
+  }
+
+  public getActiveAttempts(): number {
+    return this.activeAttempts;
+  }
+
+  public getMaxConcurrentRequests(): number {
+    return this.maxConcurrentRequests;
+  }
+
+  public getQueueLength(): number {
+    return this.concurrencyQueue.length;
   }
 }

@@ -59,21 +59,26 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
     return null;
   }
 
-  /**
-   * Phase 14G — Cover Art Archive Contribution Adapter
-   * Directly returns specialized field contributions: artworkUrl, front, back, thumbnail.
-   */
-  public async fetchContribution(query: { mbid?: string; releaseId?: string; title?: string; artist?: string }): Promise<MetadataContribution | null> {
+  public async fetchContribution(query: {
+    mbid?: string;
+    releaseId?: string;
+    releaseGroupId?: string;
+    title?: string;
+    artist?: string;
+  }): Promise<MetadataContribution | null> {
     const targetMbid = query.mbid ?? query.releaseId;
-    if (!targetMbid) return null;
+    if (!targetMbid && !query.releaseGroupId) return null;
 
-    const cacheKey = `caa:mbid:${targetMbid}`;
+    const cacheKey = `caa:mbid:${targetMbid || 'none'}:rg:${query.releaseGroupId || 'none'}`;
     if (this.cache) {
       const cached = this.cache.get<MetadataContribution>(this.identity.id, cacheKey);
       if (cached) return cached;
     }
 
-    const data = await this.apiClient.fetchContributionData({ mbid: targetMbid });
+    const data = await this.apiClient.fetchContributionData({
+      mbid: targetMbid,
+      releaseGroupId: query.releaseGroupId
+    });
     if (!data) return null;
 
     const contributions: FieldContribution[] = [];

@@ -33,7 +33,6 @@ import { DefaultProviderExecutionStrategy } from './providers/strategies/Default
 import { DefaultProviderSelectionStrategy } from './providers/strategies/DefaultProviderSelectionStrategy';
 import { ProviderTimeoutPolicy } from './providers/timeout/ProviderTimeoutPolicy';
 
-import { MetadataMergeEngine } from './engine/MetadataMergeEngine';
 import { DefaultMetadataMergePolicy } from './providers/policies/DefaultMetadataMergePolicy';
 import { UserMetadataProvider } from './providers/UserMetadataProvider';
 import { MetadataFieldRegistry } from './registries/MetadataFieldRegistry';
@@ -257,7 +256,8 @@ export class MetadataBootstrap {
       dbUpdater: async (songId, data) => {
         const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
         await updateSongId3Tags(songId, completeTags, true, true);
-      }
+      },
+      requestPipeline
     });
 
     const workflowService = new MetadataWorkflowService({
@@ -266,18 +266,11 @@ export class MetadataBootstrap {
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
     workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
-    workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter));
+    workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter, musicBrainzAdapter));
     workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter));
 
     const providerMergePolicy = new DefaultMetadataMergePolicy();
     const planner = new MetadataQueryPlanner(repository);
-
-    const mergeEngine = new MetadataMergeEngine({
-      registry: providerRegistry,
-      mergePolicy: providerMergePolicy,
-      selectionStrategy,
-      executionStrategy
-    });
 
     const pipeline = new MetadataPipeline({
       mapperRegistry,
@@ -290,7 +283,6 @@ export class MetadataBootstrap {
     const engine = new MetadataEngine({
       executor,
       mergePolicy: providerMergePolicy,
-      mergeEngine,
       planner,
       pipeline,
       cache,
@@ -325,7 +317,6 @@ export class MetadataBootstrap {
     return {
       engine,
       searchGateway,
-      mergeEngine,
       repository,
       userRepository,
       userProvider,

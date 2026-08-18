@@ -14,18 +14,50 @@ export const saveSong = async (data: typeof songs.$inferInsert, trx: DB | DBTran
   return res[0];
 };
 
+export interface UpdateSongBasicFieldsData {
+  title?: string;
+  year?: number | null;
+  trackNumber?: number | null;
+  discNumber?: number | null;
+  diskNumber?: number | null;
+  musicBrainzRecordingId?: string | null;
+  isrc?: string | null;
+}
+
 export const updateSongBasicFields = async (
   songId: number,
-  data: Partial<Pick<typeof songs.$inferInsert, 'title' | 'year' | 'trackNumber'>>,
+  data: UpdateSongBasicFieldsData,
   trx: DB | DBTransaction = db
 ) => {
+  const updatePayload: Record<string, unknown> = {};
+
+  if (data.title !== undefined) {
+    updatePayload.title = data.title;
+  }
+  if (data.year !== undefined) {
+    updatePayload.year = data.year || null;
+  }
+  if (data.trackNumber !== undefined) {
+    updatePayload.trackNumber = data.trackNumber || null;
+  }
+  const discNo = data.discNumber ?? data.diskNumber;
+  if (discNo !== undefined) {
+    updatePayload.diskNumber = discNo || null;
+  }
+  if (data.musicBrainzRecordingId !== undefined) {
+    updatePayload.musicBrainzRecordingId = data.musicBrainzRecordingId || null;
+  }
+  if (data.isrc !== undefined) {
+    updatePayload.isrc = data.isrc || null;
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    return (await trx.query.songs.findFirst({ where: eq(songs.id, songId) })) as typeof songs.$inferSelect;
+  }
+
   const res = await trx
     .update(songs)
-    .set({
-      title: data.title,
-      year: data.year || null,
-      trackNumber: data.trackNumber || null
-    })
+    .set(updatePayload)
     .where(eq(songs.id, songId))
     .returning();
 

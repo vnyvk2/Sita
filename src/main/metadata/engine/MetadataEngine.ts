@@ -12,15 +12,12 @@ import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
 import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergePolicy';
 
-import type { MetadataMergeEngine } from './MetadataMergeEngine';
 import { DefaultMetadataMergePolicy } from '../providers/policies/DefaultMetadataMergePolicy';
 import { MetadataCapabilities } from '../common/types';
 
 export interface MetadataEngineOptions {
   executor: IMetadataProviderExecutor;
-  // TODO Phase 10: Remove executor+mergePolicy path once MergeEngine fully replaces legacy flow.
   mergePolicy?: IMetadataMergePolicy;
-  mergeEngine?: MetadataMergeEngine;
   planner: MetadataQueryPlanner;
   pipeline: MetadataPipeline;
   cache: MetadataCache;
@@ -29,10 +26,8 @@ export interface MetadataEngineOptions {
 }
 
 export class MetadataEngine implements IMetadataGateway {
-  // TODO Phase 10: Remove executor+mergePolicy path once MergeEngine fully replaces legacy flow.
   private readonly executor: IMetadataProviderExecutor;
   private readonly mergePolicy: IMetadataMergePolicy;
-  private readonly mergeEngine?: MetadataMergeEngine;
   private readonly planner: MetadataQueryPlanner;
   private readonly pipeline: MetadataPipeline;
   private readonly cache: MetadataCache;
@@ -42,7 +37,6 @@ export class MetadataEngine implements IMetadataGateway {
   constructor(options: MetadataEngineOptions) {
     this.executor = options.executor;
     this.mergePolicy = options.mergePolicy ?? new DefaultMetadataMergePolicy();
-    this.mergeEngine = options.mergeEngine;
     this.planner = options.planner;
     this.pipeline = options.pipeline;
     this.cache = options.cache;
@@ -66,21 +60,12 @@ export class MetadataEngine implements IMetadataGateway {
       return cached;
     }
 
-    let mergedPayload: unknown;
-    if (this.mergeEngine) {
-      mergedPayload = await this.mergeEngine.mergeEntity(
-        identity,
-        MetadataCapabilities.Tags,
-        execContext
-      );
-    } else {
-      const providerResults = await this.executor.execute(
-        identity,
-        MetadataCapabilities.Tags,
-        execContext
-      );
-      mergedPayload = this.mergePolicy.merge(providerResults);
-    }
+    const providerResults = await this.executor.execute(
+      identity,
+      MetadataCapabilities.Tags,
+      execContext
+    );
+    const mergedPayload = this.mergePolicy.merge(providerResults);
 
     if (!mergedPayload) {
       return null;
@@ -163,21 +148,12 @@ export class MetadataEngine implements IMetadataGateway {
     identity: MetadataIdentity,
     execContext?: ProviderExecutionContext
   ): Promise<MetadataEntity | null> {
-    let mergedPayload: unknown;
-    if (this.mergeEngine) {
-      mergedPayload = await this.mergeEngine.refreshAndMergeEntity(
-        identity,
-        MetadataCapabilities.Tags,
-        execContext
-      );
-    } else {
-      const providerResults = await this.executor.refresh(
-        identity,
-        MetadataCapabilities.Tags,
-        execContext
-      );
-      mergedPayload = this.mergePolicy.merge(providerResults);
-    }
+    const providerResults = await this.executor.refresh(
+      identity,
+      MetadataCapabilities.Tags,
+      execContext
+    );
+    const mergedPayload = this.mergePolicy.merge(providerResults);
 
     if (!mergedPayload) {
       return null;

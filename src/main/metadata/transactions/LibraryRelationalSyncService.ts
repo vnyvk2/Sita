@@ -11,12 +11,15 @@ export type SongDbUpdater = (
     year?: number;
     trackNumber?: number;
     discNumber?: number;
+    isrc?: string;
+    musicBrainzRecordingId?: string;
     artworkPath?: string;
   }
 ) => Promise<unknown>;
 
 export interface SyncResult {
   success: boolean;
+  deferred?: boolean;
   warning?: string;
   fallbackUsed: boolean;
 }
@@ -38,7 +41,7 @@ export class LibraryRelationalSyncService {
   ): Promise<SyncResult> {
     if (this.dbUpdater) {
       try {
-        await this.dbUpdater(songId, {
+        const updateRes = await this.dbUpdater(songId, {
           title: fieldMutations.title as string | undefined,
           artist: fieldMutations.artist as string | undefined,
           album: fieldMutations.album as string | undefined,
@@ -47,9 +50,15 @@ export class LibraryRelationalSyncService {
           year: fieldMutations.year as number | undefined,
           trackNumber: fieldMutations.trackNumber as number | undefined,
           discNumber: fieldMutations.discNumber as number | undefined,
+          isrc: fieldMutations.isrc as string | undefined,
+          musicBrainzRecordingId: fieldMutations.musicBrainzRecordingId as string | undefined,
           artworkPath: fieldMutations.artworkPath as string | undefined
         });
-        return { success: true, fallbackUsed: false };
+        const isDeferred =
+          typeof updateRes === 'object' && updateRes !== null && 'deferred' in updateRes
+            ? Boolean((updateRes as { deferred?: boolean }).deferred)
+            : false;
+        return { success: true, deferred: isDeferred, fallbackUsed: false };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return { success: false, warning: `DbUpdater failed (${msg})`, fallbackUsed: false };

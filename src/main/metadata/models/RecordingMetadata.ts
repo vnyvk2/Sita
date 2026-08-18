@@ -34,6 +34,8 @@ export interface RecordingMetadata {
   totalDiscs?: number;
   composer?: string;
   duration?: number;
+  isrc?: string;
+  musicBrainzRecordingId?: string;
 }
 
 /**

@@ -39,8 +39,8 @@ export class CaaApiClient {
     this.pipeline = pipeline;
   }
 
-  public async getReleaseCoverArt(mbid: string): Promise<CaaReleaseResponseDto | null> {
-    if (!mbid || mbid.trim().length === 0) return null;
+  public async getReleaseCoverArt(mbid: string): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
+    if (!mbid || mbid.trim().length === 0) return { data: null, isNotFound: false };
 
     const url = `${this.baseUrl}/release/${encodeURIComponent(mbid)}`;
 
@@ -48,17 +48,71 @@ export class CaaApiClient {
       const response = await this.pipeline.execute<CaaReleaseResponseDto>(url, {
         headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
       });
-      return response.data ?? null;
-    } catch {
-      return null;
+      if (response.status === 404) {
+        return { data: null, isNotFound: true };
+      }
+      if (response.status >= 200 && response.status < 300) {
+        const hasImages = Array.isArray(response.data?.images) && response.data.images.length > 0;
+        return { data: response.data ?? null, isNotFound: !hasImages };
+      }
+      return { data: null, isNotFound: false };
+    } catch (err: any) {
+      if (err?.status === 404 || err?.statusCode === 404 || err?.response?.status === 404) {
+        return { data: null, isNotFound: true };
+      }
+      return { data: null, isNotFound: false };
     }
   }
 
-  public async fetchContributionData(query: { mbid?: string; releaseId?: string }): Promise<CaaContributionData | null> {
-    const targetMbid = query.mbid ?? query.releaseId;
-    if (!targetMbid) return null;
+  public async getReleaseGroupCoverArt(mbid: string): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
+    if (!mbid || mbid.trim().length === 0) return { data: null, isNotFound: false };
 
-    const data = await this.getReleaseCoverArt(targetMbid);
+    const url = `${this.baseUrl}/release-group/${encodeURIComponent(mbid)}`;
+
+    try {
+      const response = await this.pipeline.execute<CaaReleaseResponseDto>(url, {
+        headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
+      });
+      if (response.status === 404) {
+        return { data: null, isNotFound: true };
+      }
+      if (response.status >= 200 && response.status < 300) {
+        const hasImages = Array.isArray(response.data?.images) && response.data.images.length > 0;
+        return { data: response.data ?? null, isNotFound: !hasImages };
+      }
+      return { data: null, isNotFound: false };
+    } catch (err: any) {
+      if (err?.status === 404 || err?.statusCode === 404 || err?.response?.status === 404) {
+        return { data: null, isNotFound: true };
+      }
+      return { data: null, isNotFound: false };
+    }
+  }
+
+  public async fetchContributionData(query: {
+    mbid?: string;
+    releaseId?: string;
+    releaseGroupId?: string;
+  }): Promise<CaaContributionData | null> {
+    const targetMbid = query.mbid ?? query.releaseId;
+    let data: CaaReleaseResponseDto | null = null;
+    let isNotFound = false;
+
+    if (targetMbid) {
+      const res = await this.getReleaseCoverArt(targetMbid);
+      data = res.data;
+      isNotFound = res.isNotFound;
+    } else {
+      isNotFound = true;
+    }
+
+    // Invariant: ONLY fallback to release group on genuine 404 / no-artwork condition.
+    // Network errors / timeouts / 5xx do NOT trigger release-group fallback.
+    if ((!data || !data.images || data.images.length === 0) && isNotFound && query.releaseGroupId) {
+      const rgRes = await this.getReleaseGroupCoverArt(query.releaseGroupId);
+      data = rgRes.data;
+    }
+
     if (!data || !data.images || data.images.length === 0) return null;
 
     const frontImg = data.images.find((img) => img.front) ?? data.images[0];
@@ -67,7 +121,11 @@ export class CaaApiClient {
     const mainArtwork = frontImg.image;
     const frontUrl = frontImg.image;
     const backUrl = backImg?.image;
-    const thumbUrl = frontImg.thumbnails?.['500'] ?? frontImg.thumbnails?.large ?? frontImg.thumbnails?.small ?? frontImg.image;
+    const thumbUrl =
+      frontImg.thumbnails?.['500'] ??
+      frontImg.thumbnails?.large ??
+      frontImg.thumbnails?.small ??
+      frontImg.image;
 
     return {
       artworkUrl: mainArtwork,

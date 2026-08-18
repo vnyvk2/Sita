@@ -51,15 +51,22 @@ export class MetadataDiffBuilder {
 
     const recTrackNo = pair?.remoteTrack?.recording?.trackNumber;
     const recDiscNo = pair?.remoteTrack?.recording?.discNumber;
+    const recIsrc = pair?.remoteTrack?.provider?.isrc ?? pair?.remoteTrack?.recording?.isrc ?? merged.isrc;
+    const recMbid =
+      pair?.remoteTrack?.provider?.providerRecordingId ??
+      pair?.remoteTrack?.recording?.musicBrainzRecordingId ??
+      merged.musicBrainzRecordingId;
 
     const fieldDiffs: MetadataFieldDiff[] = [
-      this.compareField('title', 'Title', song.title, merged.title, merged.fieldAttributions.title, mapAlternatives('title')),
+      this.compareField('title', 'Title', song.title, pair?.remoteTrack?.recording?.title ?? merged.title, merged.fieldAttributions.title, mapAlternatives('title')),
       this.compareField('artist', 'Artist', rawSongArtist, merged.artist, merged.fieldAttributions.artist, mapAlternatives('artist')),
       this.compareField('album', 'Album', rawSongAlbum, suggestedAlbum, merged.fieldAttributions.album, mapAlternatives('album')),
       this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre'))
+      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
+      this.compareField('isrc', 'ISRC', song.isrc, recIsrc, merged.fieldAttributions.isrc, mapAlternatives('isrc')),
+      this.compareField('musicBrainzRecordingId', 'MusicBrainz Recording ID', song.musicBrainzRecordingId, recMbid, merged.fieldAttributions.musicBrainzRecordingId, mapAlternatives('musicBrainzRecordingId'))
     ];
 
     const conf = pair?.confidence ?? 0.95;

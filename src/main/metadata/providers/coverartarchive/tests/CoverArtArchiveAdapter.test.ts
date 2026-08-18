@@ -16,24 +16,27 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
     const mbid = '76df3287-6cda-33eb-8e9a-044b5e15ffdd';
 
     vi.spyOn(apiClient, 'getReleaseCoverArt').mockResolvedValueOnce({
-      release: `https://musicbrainz.org/release/${mbid}`,
-      images: [
-        {
-          id: '123',
-          image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
-          front: true,
-          back: false,
-          thumbnails: {
-            500: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123-500.jpg'
+      data: {
+        release: `https://musicbrainz.org/release/${mbid}`,
+        images: [
+          {
+            id: '123',
+            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
+            front: true,
+            back: false,
+            thumbnails: {
+              500: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123-500.jpg'
+            }
+          },
+          {
+            id: '456',
+            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg',
+            front: false,
+            back: true
           }
-        },
-        {
-          id: '456',
-          image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg',
-          front: false,
-          back: true
-        }
-      ]
+        ]
+      },
+      isNotFound: false
     });
 
     const contribution = await adapter.fetchContribution({ mbid });
@@ -66,14 +69,17 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
     const mbid = '76df3287-6cda-33eb-8e9a-044b5e15ffdd';
 
     vi.spyOn(apiClient, 'getReleaseCoverArt').mockResolvedValueOnce({
-      images: [
-        {
-          id: '123',
-          image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
-          front: true,
-          back: false
-        }
-      ]
+      data: {
+        images: [
+          {
+            id: '123',
+            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
+            front: true,
+            back: false
+          }
+        ]
+      },
+      isNotFound: false
     });
 
     const result = await adapter.lookup({ entityId: mbid } as any);

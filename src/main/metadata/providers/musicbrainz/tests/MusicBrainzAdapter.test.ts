@@ -90,7 +90,7 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
 
     expect(result).not.toBeNull();
     expect(result.providerInfo.id).toBe('musicbrainz');
-    expect(result.confidence).toBeGreaterThan(0.5);
+    expect(result.confidence.score).toBeGreaterThan(0.5);
 
     const payload = result.payload as any;
     expect(payload.title).toBe('Bohemian Rhapsody');
@@ -116,7 +116,7 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     const result = await adapter.lookup(identity);
 
     expect(result).not.toBeNull();
-    expect(result.confidence).toBe(1.0);
+    expect(result.confidence.score).toBe(1.0);
     const payload = result.payload as any;
     expect(payload.mbid).toBe('b10bbbfc-cf9e-42e0-be17-e2c3e1d52000');
     expect(payload.title).toBe('Bohemian Rhapsody');

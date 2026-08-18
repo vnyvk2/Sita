@@ -12,6 +12,7 @@ export class RateLimiter {
   private tokens: number;
   private lastRefillTimestamp: number;
   private readonly queue: Array<() => void> = [];
+  private drainScheduled = false;
 
   constructor(options: RateLimiterOptions) {
     this.maxRequests = Math.max(1, options.maxRequests);
@@ -61,16 +62,22 @@ export class RateLimiter {
   }
 
   private scheduleNextDrain(): void {
+    if (this.drainScheduled || this.queue.length === 0) return;
+    this.drainScheduled = true;
+
     const timeToWait = this.perIntervalMs / this.maxRequests;
     setTimeout(() => {
+      this.drainScheduled = false;
       this.refillTokens();
-      if (this.queue.length > 0 && this.tokens >= 1) {
+
+      while (this.queue.length > 0 && this.tokens >= 1) {
         this.tokens -= 1;
         const next = this.queue.shift();
         if (next) {
           next();
         }
       }
+
       if (this.queue.length > 0) {
         this.scheduleNextDrain();
       }

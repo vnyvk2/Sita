@@ -10,6 +10,7 @@ import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
 import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
+import { extractFrontCover } from '../utils/extractFrontCover';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -156,14 +157,14 @@ export const parseSong = async (
           noOfChannels: file.properties.audioChannels,
           diskNumber: metadata.disc ?? undefined,
           trackNumber: metadata.track ?? undefined,
+          musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
+          isrc: metadata.isrc || undefined,
           fileCreatedAt: stats ? stats.birthtime : new Date(),
           fileModifiedAt: stats ? stats.mtime : new Date(),
           folderId
         };
 
-        rawPictureBytes = metadata.pictures?.at(0)
-          ? metadata.pictures[0].data.toByteArray()
-          : undefined;
+        rawPictureBytes = extractFrontCover(metadata.pictures);
       }
     } finally {
       file.dispose?.();
