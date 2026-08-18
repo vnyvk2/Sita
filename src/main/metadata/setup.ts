@@ -210,12 +210,7 @@ export class MetadataBootstrap {
     await providerRuntime.initialize();
 
     const albumMetadataService = new AlbumMetadataService(providerRuntime);
-    const applyService = new MetadataApplyService({
-      dbUpdater: async (songId, data) => {
-        const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
-        await updateSongId3Tags(songId, completeTags, true, true);
-      }
-    });
+    const applyService = new MetadataApplyService();
 
     const healthManager = new ProviderHealthManager(eventBus);
     const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);

@@ -342,6 +342,17 @@ export class MetadataApplyService {
     }
 
     // Step 1: Write Physical Disk Tags
+    for (const payload of tagWritePayloads) {
+      console.log(`[META APPLY] ${payload.filePath}`, {
+        filePath: payload.filePath,
+        album: payload.album,
+        albumArtist: payload.albumArtist,
+        artist: payload.artist,
+        genre: payload.genre,
+        year: payload.year
+      });
+    }
+
     const tagWriteResults = await this.tagWriter.writeBatch(tagWritePayloads);
     const failedWriteIndex = tagWriteResults.findIndex((r) => !r.success);
 
