@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@main/db/db';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import { sendMessageToRenderer } from '@main/main';
+import { processArtworkFiles } from '@main/other/artworks';
+import { libraryScheduler } from '@main/workers/jobScheduler';
 import reParseSong from '../reParseSong';
 
 vi.mock('fs/promises', () => ({
@@ -140,5 +142,46 @@ describe('reParseSong', () => {
       messageCode: 'SONG_REPARSE_FAILED',
       data: { path: '/music/failing.mp3' }
     });
+  });
+
+  it('enqueues targeted PaletteJob for newly created or updated artwork', async () => {
+    vi.mocked(getSongByPath).mockResolvedValue({
+      id: 42,
+      path: '/music/reparse.mp3',
+      title: 'Updated Title',
+      duration: '200',
+      artists: [],
+      albums: [],
+      genres: [],
+      artworks: []
+    } as any);
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    vi.mocked(processArtworkFiles).mockResolvedValue({
+      existing: [
+        { id: 76, path: '/artwork/full.webp', isOptimized: false },
+        { id: 77, path: '/artwork/thumb.webp', isOptimized: true }
+      ] as any,
+      payloads: null
+    });
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({} as any);
+    });
+
+    await reParseSong('/music/reparse.mp3');
+
+    expect(libraryScheduler.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'palette',
+        artworkId: 77,
+        artworkPath: '/artwork/thumb.webp',
+        id: 'palette_77'
+      })
+    );
   });
 });
