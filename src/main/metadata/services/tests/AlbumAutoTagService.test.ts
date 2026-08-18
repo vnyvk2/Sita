@@ -363,4 +363,154 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     // DB updater should NOT have been called (no DB writes should happen on batch failure)
     expect(dbUpdater).not.toHaveBeenCalled();
   });
+
+  describe('Independent Album-Level and Track-Level Mutation Contracts', () => {
+    it('applies global album mutations successfully even when 0 / 11 tracks are selected', async () => {
+      const tagWriter = new TagWriterService();
+      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
+        { filePath: '01.mp3', success: true },
+        { filePath: '02.mp3', success: true }
+      ]);
+      const dbUpdater = vi.fn().mockResolvedValue(undefined);
+      const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+      const preview: any = {
+        album: { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021 },
+        matches: [
+          {
+            localSongId: 101,
+            songPath: '01.mp3',
+            oldTitle: 'brutal',
+            oldArtist: 'Olivia Rodrigo',
+            oldAlbum: 'SOUR',
+            applyTrack: false, // 0 tracks selected!
+            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'brutal (remastered)' }]
+          },
+          {
+            localSongId: 102,
+            songPath: '02.mp3',
+            oldTitle: 'traitor',
+            oldArtist: 'Olivia Rodrigo',
+            oldAlbum: 'SOUR',
+            applyTrack: false, // 0 tracks selected!
+            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'traitor (remastered)' }]
+          }
+        ]
+      };
+
+      const options = {
+        globalMutations: {
+          albumArtist: 'Olivia Rodrigo',
+          genre: 'Pop',
+          applyAlbumArtist: true,
+          applyGenre: true
+        }
+      };
+
+      const result = await applyService.applyPreview(preview, options);
+
+      expect(result.success).toBe(true);
+      expect(result.updatedCount).toBe(2);
+      expect(writeBatchSpy).toHaveBeenCalledTimes(1);
+
+      const writePayloads = writeBatchSpy.mock.calls[0][0];
+      expect(writePayloads).toHaveLength(2);
+      // Album-level fields are applied
+      expect(writePayloads[0].albumArtist).toBe('Olivia Rodrigo');
+      expect(writePayloads[0].genre).toBe('Pop');
+      // Track-level fields remain UNTOUCHED because applyTrack was false
+      expect(writePayloads[0].title).toBeUndefined();
+    });
+
+    it('applies track-level mutations when tracks are selected and global mutations are empty', async () => {
+      const tagWriter = new TagWriterService();
+      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
+        { filePath: '01.mp3', success: true }
+      ]);
+      const dbUpdater = vi.fn().mockResolvedValue(undefined);
+      const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+      const preview: any = {
+        album: { title: 'SOUR' },
+        matches: [
+          {
+            localSongId: 101,
+            songPath: '01.mp3',
+            oldTitle: 'brutal (demo)',
+            oldArtist: 'Olivia',
+            applyTrack: true,
+            fieldDiffs: [
+              { fieldId: 'title', applyField: true, suggestedValue: 'brutal' },
+              { fieldId: 'artist', applyField: true, suggestedValue: 'Olivia Rodrigo' }
+            ]
+          }
+        ]
+      };
+
+      const result = await applyService.applyPreview(preview);
+
+      expect(result.success).toBe(true);
+      expect(result.updatedCount).toBe(1);
+      expect(writeBatchSpy).toHaveBeenCalledTimes(1);
+
+      const writePayloads = writeBatchSpy.mock.calls[0][0];
+      expect(writePayloads[0].title).toBe('brutal');
+      expect(writePayloads[0].artist).toBe('Olivia Rodrigo');
+    });
+
+    it('applies both global album mutations and partial track selections in one atomic transaction', async () => {
+      const tagWriter = new TagWriterService();
+      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
+        { filePath: '01.mp3', success: true },
+        { filePath: '02.mp3', success: true }
+      ]);
+      const dbUpdater = vi.fn().mockResolvedValue(undefined);
+      const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+
+      const preview: any = {
+        album: { title: 'SOUR', artist: 'Olivia Rodrigo' },
+        matches: [
+          {
+            localSongId: 101,
+            songPath: '01.mp3',
+            oldTitle: 'brutal (demo)',
+            applyTrack: true, // Selected for track mutation
+            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'brutal' }]
+          },
+          {
+            localSongId: 102,
+            songPath: '02.mp3',
+            oldTitle: 'traitor',
+            applyTrack: false, // NOT selected for track mutation
+            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'traitor (deluxe)' }]
+          }
+        ]
+      };
+
+      const options = {
+        globalMutations: {
+          albumArtist: 'Olivia Rodrigo',
+          genre: 'Pop',
+          applyAlbumArtist: true,
+          applyGenre: true
+        }
+      };
+
+      const result = await applyService.applyPreview(preview, options);
+
+      expect(result.success).toBe(true);
+      expect(result.updatedCount).toBe(2);
+
+      const writePayloads = writeBatchSpy.mock.calls[0][0];
+      // Track 101: received both global mutations AND track title mutation
+      expect(writePayloads[0].albumArtist).toBe('Olivia Rodrigo');
+      expect(writePayloads[0].genre).toBe('Pop');
+      expect(writePayloads[0].title).toBe('brutal');
+
+      // Track 102: received global mutations ONLY (title left untouched)
+      expect(writePayloads[1].albumArtist).toBe('Olivia Rodrigo');
+      expect(writePayloads[1].genre).toBe('Pop');
+      expect(writePayloads[1].title).toBeUndefined();
+    });
+  });
 });

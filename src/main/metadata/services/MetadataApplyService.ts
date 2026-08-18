@@ -1,4 +1,4 @@
-import type { AlbumTagPreview, ApplyPreviewOptions, TrackMatchPreview } from '../../../common/metadata/types';
+import type { AlbumTagPreview, ApplyPreviewOptions, GlobalAlbumMutations, TrackMatchPreview } from '../../../common/metadata/types';
 import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { TagWriterService, type TagWritePayload } from './TagWriterService';
@@ -107,7 +107,18 @@ export class MetadataApplyService {
     }
 
     const selectedMatches = preview.matches.filter((m) => m.applyTrack);
-    if (selectedMatches.length === 0) {
+    const globalMutations = options?.globalMutations;
+    const hasGlobalMutations = Boolean(
+      globalMutations && (
+        globalMutations.applyAlbumTitle ||
+        globalMutations.applyAlbumArtist ||
+        globalMutations.applyYear ||
+        globalMutations.applyGenre ||
+        options?.replaceArtwork
+      )
+    );
+
+    if (selectedMatches.length === 0 && !hasGlobalMutations) {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
 
@@ -124,19 +135,22 @@ export class MetadataApplyService {
     let totalFailed = 0;
     const errors: string[] = [];
 
-    // Split selected matches into chunks of batchChunkSize (default 50)
-    for (let i = 0; i < selectedMatches.length; i += this.batchChunkSize) {
+    // Target matches: If global album mutations are active, all album tracks receive album tags; otherwise only selected tracks
+    const targetMatches = hasGlobalMutations ? preview.matches : selectedMatches;
+
+    // Split target matches into chunks of batchChunkSize (default 50)
+    for (let i = 0; i < targetMatches.length; i += this.batchChunkSize) {
       if (signal?.aborted) {
         throw new CancelledError('Apply operation aborted by user.');
       }
 
-      const chunkMatches = selectedMatches.slice(i, i + this.batchChunkSize);
+      const chunkMatches = targetMatches.slice(i, i + this.batchChunkSize);
       const chunkResult = await this.applyMatchChunk(
         chunkMatches,
         preview.album.title,
         artworkBuffer,
         signal,
-        preview.album.artist
+        globalMutations
       );
 
       totalUpdated += chunkResult.updatedCount;
@@ -206,7 +220,7 @@ export class MetadataApplyService {
     albumTitle: string,
     artworkBuffer?: Buffer,
     signal?: AbortSignal,
-    albumArtist?: string
+    globalMutations?: GlobalAlbumMutations
   ): Promise<ApplyResult> {
     const previousSongs: SongMetadataSnapshot[] = [];
     const updatedSongs: SongMetadataSnapshot[] = [];
@@ -235,52 +249,71 @@ export class MetadataApplyService {
         artworkBuffer
       };
 
-      if (albumArtist !== undefined && albumArtist.trim() !== '') {
-        payloadTags.albumArtist = albumArtist;
+      // 1. Apply independent Album-Level / Global Mutations
+      if (globalMutations) {
+        if (globalMutations.applyAlbumTitle && globalMutations.albumTitle) {
+          payloadTags.album = globalMutations.albumTitle;
+        }
+        if (globalMutations.applyAlbumArtist && globalMutations.albumArtist) {
+          payloadTags.albumArtist = globalMutations.albumArtist;
+        }
+        if (globalMutations.applyYear && globalMutations.year !== undefined) {
+          payloadTags.year = globalMutations.year;
+        }
+        if (globalMutations.applyGenre && globalMutations.genre) {
+          payloadTags.genre = globalMutations.genre;
+        }
       }
 
       const updatedSnapshot: SongMetadataSnapshot = {
-        ...previousSnapshot
+        ...previousSnapshot,
+        ...(payloadTags.album !== undefined && { album: payloadTags.album }),
+        ...(payloadTags.albumArtist !== undefined && { albumArtist: payloadTags.albumArtist }),
+        ...(payloadTags.year !== undefined && { year: payloadTags.year }),
+        ...(payloadTags.genre !== undefined && { genre: payloadTags.genre })
       };
 
-      for (const diff of match.fieldDiffs) {
-        if (!diff.applyField) continue;
-        const val = diff.userValue !== undefined ? diff.userValue : diff.suggestedValue;
-        if (val === undefined || val === null || String(val).trim() === '') continue;
+      // 2. Apply Track-Level Mutations ONLY if this track is selected (match.applyTrack === true)
+      if (match.applyTrack) {
+        for (const diff of match.fieldDiffs) {
+          if (!diff.applyField) continue;
+          const val = diff.userValue !== undefined ? diff.userValue : diff.suggestedValue;
+          if (val === undefined || val === null || String(val).trim() === '') continue;
 
-        switch (diff.fieldId) {
-          case 'title':
-            payloadTags.title = String(val);
-            updatedSnapshot.title = String(val);
-            break;
-          case 'artist':
-            payloadTags.artist = String(val);
-            updatedSnapshot.artist = String(val);
-            break;
-          case 'albumArtist':
-            payloadTags.albumArtist = String(val);
-            updatedSnapshot.albumArtist = String(val);
-            break;
-          case 'album':
-            payloadTags.album = String(val);
-            updatedSnapshot.album = String(val);
-            break;
-          case 'year':
-            payloadTags.year = Number(val);
-            updatedSnapshot.year = Number(val);
-            break;
-          case 'trackNumber':
-            payloadTags.trackNumber = Number(val);
-            updatedSnapshot.trackNumber = Number(val);
-            break;
-          case 'discNumber':
-            payloadTags.discNumber = Number(val);
-            updatedSnapshot.discNumber = Number(val);
-            break;
-          case 'genre':
-            payloadTags.genre = String(val);
-            updatedSnapshot.genre = String(val);
-            break;
+          switch (diff.fieldId) {
+            case 'title':
+              payloadTags.title = String(val);
+              updatedSnapshot.title = String(val);
+              break;
+            case 'artist':
+              payloadTags.artist = String(val);
+              updatedSnapshot.artist = String(val);
+              break;
+            case 'albumArtist':
+              payloadTags.albumArtist = String(val);
+              updatedSnapshot.albumArtist = String(val);
+              break;
+            case 'album':
+              payloadTags.album = String(val);
+              updatedSnapshot.album = String(val);
+              break;
+            case 'year':
+              payloadTags.year = Number(val);
+              updatedSnapshot.year = Number(val);
+              break;
+            case 'trackNumber':
+              payloadTags.trackNumber = Number(val);
+              updatedSnapshot.trackNumber = Number(val);
+              break;
+            case 'discNumber':
+              payloadTags.discNumber = Number(val);
+              updatedSnapshot.discNumber = Number(val);
+              break;
+            case 'genre':
+              payloadTags.genre = String(val);
+              updatedSnapshot.genre = String(val);
+              break;
+          }
         }
       }
 

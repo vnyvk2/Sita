@@ -42,10 +42,22 @@ export interface TrackMatchPreview {
   warningCount: number;
 }
 
+export interface GlobalAlbumMutations {
+  albumTitle?: string;
+  albumArtist?: string;
+  year?: number;
+  genre?: string;
+  applyAlbumTitle?: boolean;
+  applyAlbumArtist?: boolean;
+  applyYear?: boolean;
+  applyGenre?: boolean;
+}
+
 export interface ApplyPreviewOptions {
   replaceArtwork?: boolean;
   artworkUrl?: string;
   operationId?: string;
+  globalMutations?: GlobalAlbumMutations;
 }
 
 export interface AlbumTagPreview {

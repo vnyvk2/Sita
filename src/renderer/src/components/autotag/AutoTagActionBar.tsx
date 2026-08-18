@@ -106,24 +106,24 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
           <button
             type="button"
             onClick={onApply}
-            disabled={selectedTracksCount === 0 || totalChanges === 0 || loading}
+            disabled={totalChanges === 0 || loading}
             style={{
               padding: '9px 24px',
               borderRadius: '7px',
               background:
-                selectedTracksCount === 0 || totalChanges === 0 || loading
+                totalChanges === 0 || loading
                   ? 'rgba(255, 255, 255, 0.08)'
                   : 'linear-gradient(135deg, #10B981, #059669)',
               border: 'none',
               color: '#FFFFFF',
               fontWeight: 700,
               fontSize: '0.88rem',
-              cursor: selectedTracksCount === 0 || totalChanges === 0 || loading ? 'not-allowed' : 'pointer',
-              opacity: selectedTracksCount === 0 || totalChanges === 0 || loading ? 0.4 : 1,
+              cursor: totalChanges === 0 || loading ? 'not-allowed' : 'pointer',
+              opacity: totalChanges === 0 || loading ? 0.4 : 1,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: selectedTracksCount === 0 || totalChanges === 0 || loading ? 'none' : '0 4px 14px rgba(16, 185, 129, 0.35)',
+              boxShadow: totalChanges === 0 || loading ? 'none' : '0 4px 14px rgba(16, 185, 129, 0.35)',
               transition: 'all 0.15s ease'
             }}
           >

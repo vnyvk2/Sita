@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import type {
   AlbumMetadata,
   AlbumTagPreview,
+  ApplyPreviewOptions,
   AutoTagSongInput,
   AutoTagStage,
+  GlobalAlbumMutations,
   MetadataFieldId,
   MetadataProviderId,
   ProgressEventPayload,
@@ -455,12 +457,24 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
       const payload: AlbumTagPreview = { ...preview, album: payloadAlbum, matches: effectiveMatches };
       const effectiveReplaceArtwork = replaceArtwork && selectedGlobalFields.has('artwork');
-      const options = {
+      const globalMutations: GlobalAlbumMutations = {
+        albumTitle: preview.album.title,
+        albumArtist: preview.album.artist,
+        year: preview.album.year,
+        genre: 'Pop',
+        applyAlbumTitle: selectedGlobalFields.has('album'),
+        applyAlbumArtist: selectedGlobalFields.has('artist'),
+        applyYear: selectedGlobalFields.has('year'),
+        applyGenre: selectedGlobalFields.has('genre')
+      };
+
+      const options: ApplyPreviewOptions = {
         replaceArtwork: effectiveReplaceArtwork,
         artworkUrl:
           !effectiveReplaceArtwork || artworkSource === 'local'
             ? undefined
-            : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0]
+            : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0],
+        globalMutations
       };
 
       const res = await metadataApi.applyPreview(payload, options, operationId);
