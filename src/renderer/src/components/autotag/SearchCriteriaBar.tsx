@@ -48,9 +48,9 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
   return (
     <div
       style={{
-        background: 'rgba(255, 255, 255, 0.03)',
+        background: 'rgba(15, 23, 42, 0.7)',
         borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         padding: searchExpanded ? '16px 20px' : '10px 18px',
         transition: 'all 0.2s ease',
         display: 'flex',
@@ -70,12 +70,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-color-dimmed)', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
             {searchExpanded ? '▼ Search Criteria' : '▶ Search Criteria'}
           </span>
           {!searchExpanded && (
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-color-white)', opacity: 0.9 }}>
-              {artist ? `${artist} — ` : ''}{album || 'No Album'} · <span style={{ textTransform: 'capitalize', color: 'var(--text-color-highlight)' }}>{selectedProvider}</span>
+            <span style={{ fontSize: '0.88rem', color: '#E2E8F0' }}>
+              {artist ? <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{artist} — </span> : ''}
+              <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{album || 'No Album'}</span> · <span style={{ textTransform: 'capitalize', color: '#38BDF8', fontWeight: 600 }}>{selectedProvider}</span>
             </span>
           )}
         </div>
@@ -87,11 +88,14 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
             onToggleExpanded();
           }}
           style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--text-color-dimmed)',
-            fontSize: '0.8rem',
-            cursor: 'pointer'
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '4px',
+            color: '#CBD5E1',
+            padding: '3px 10px',
+            fontSize: '0.78rem',
+            cursor: 'pointer',
+            fontWeight: 500
           }}
         >
           {searchExpanded ? 'Collapse' : 'Expand'}
@@ -101,10 +105,10 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
       {/* Expanded Search Inputs Form */}
       {searchExpanded && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '10px', alignItems: 'flex-end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '12px', alignItems: 'flex-end' }}>
             {/* Album Artist */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-color-dimmed)', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 ALBUM ARTIST
               </label>
               <input
@@ -113,20 +117,20 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 value={artist}
                 onChange={(e) => onArtistChange(e.target.value)}
                 style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: 'var(--text-color-white)',
+                  padding: '9px 12px',
+                  borderRadius: '7px',
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
                   outline: 'none',
-                  fontSize: '0.85rem'
+                  fontSize: '0.88rem'
                 }}
               />
             </div>
 
             {/* Album */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-color-dimmed)', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 ALBUM TITLE *
               </label>
               <input
@@ -136,20 +140,20 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 onChange={(e) => onAlbumChange(e.target.value)}
                 required
                 style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: 'var(--text-color-white)',
+                  padding: '9px 12px',
+                  borderRadius: '7px',
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
                   outline: 'none',
-                  fontSize: '0.85rem'
+                  fontSize: '0.88rem'
                 }}
               />
             </div>
 
             {/* Track # */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-color-dimmed)', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 TRACK #
               </label>
               <input
@@ -158,21 +162,21 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 value={trackNo}
                 onChange={(e) => onTrackNoChange(e.target.value)}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: 'var(--text-color-white)',
+                  padding: '9px 10px',
+                  borderRadius: '7px',
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
                   outline: 'none',
-                  fontSize: '0.85rem',
+                  fontSize: '0.88rem',
                   textAlign: 'center'
                 }}
               />
             </div>
 
             {/* Disc # */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-color-dimmed)', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 DISC #
               </label>
               <input
@@ -181,21 +185,21 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 value={discNo}
                 onChange={(e) => onDiscNoChange(e.target.value)}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: 'var(--text-color-white)',
+                  padding: '9px 10px',
+                  borderRadius: '7px',
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
                   outline: 'none',
-                  fontSize: '0.85rem',
+                  fontSize: '0.88rem',
                   textAlign: 'center'
                 }}
               />
             </div>
 
             {/* Total Tracks */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-color-dimmed)', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
                 TRACKS
               </label>
               <input
@@ -204,13 +208,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 value={totalTracks}
                 onChange={(e) => onTotalTracksChange(e.target.value)}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: 'var(--text-color-white)',
+                  padding: '9px 10px',
+                  borderRadius: '7px',
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
                   outline: 'none',
-                  fontSize: '0.85rem',
+                  fontSize: '0.88rem',
                   textAlign: 'center'
                 }}
               />
@@ -218,9 +222,9 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
           </div>
 
           {/* Provider Selection & Find Action */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color-dimmed)', marginRight: '4px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginRight: '4px' }}>
                 Provider:
               </span>
               {(['auto', 'musicbrainz', 'discogs'] as const).map((prov) => {
@@ -232,13 +236,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                     type="button"
                     onClick={() => onProviderChange(prov)}
                     style={{
-                      padding: '5px 12px',
+                      padding: '6px 14px',
                       borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: isActive ? 600 : 400,
-                      background: isActive ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                      border: isActive ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                      color: isActive ? 'var(--text-color-white)' : 'var(--text-color-dimmed)',
+                      fontSize: '0.82rem',
+                      fontWeight: isActive ? 600 : 500,
+                      background: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.06)',
+                      border: isActive ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.14)',
+                      color: isActive ? '#FFFFFF' : '#94A3B8',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
                     }}
@@ -253,18 +257,19 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
               type="submit"
               disabled={loading || !album.trim()}
               style={{
-                padding: '7px 20px',
-                borderRadius: '6px',
+                padding: '8px 22px',
+                borderRadius: '7px',
                 background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
                 border: 'none',
-                color: 'var(--text-color-white)',
+                color: '#FFFFFF',
                 fontWeight: 600,
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 cursor: loading || !album.trim() ? 'not-allowed' : 'pointer',
                 opacity: loading || !album.trim() ? 0.6 : 1,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
               }}
             >
               {loading ? 'Searching...' : '🔍 Search Releases'}

@@ -34,23 +34,23 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '14px 24px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(15, 15, 22, 0.95)',
-        backdropFilter: 'blur(10px)'
+        padding: '16px 24px',
+        borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(12px)'
       }}
     >
       {/* Metrics Summary & Undo Link */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.82rem', color: 'var(--text-color-dimmed)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem', color: '#94A3B8' }}>
         {totalTracksCount > 0 && (
           <>
-            <span style={{ color: selectedTracksCount > 0 ? 'var(--text-color-white)' : 'inherit', fontWeight: 500 }}>
+            <span style={{ color: selectedTracksCount > 0 ? '#FFFFFF' : '#94A3B8', fontWeight: 600 }}>
               ✓ {selectedTracksCount} / {totalTracksCount} tracks
             </span>
-            <span>•</span>
-            <span>{activeFieldsCount} fields active</span>
-            <span>•</span>
-            <span style={{ color: totalChanges > 0 ? '#60a5fa' : 'inherit', fontWeight: 600 }}>
+            <span style={{ color: '#64748B' }}>•</span>
+            <span style={{ color: '#CBD5E1' }}>{activeFieldsCount} fields active</span>
+            <span style={{ color: '#64748B' }}>•</span>
+            <span style={{ color: totalChanges > 0 ? '#38BDF8' : '#94A3B8', fontWeight: 700 }}>
               {totalChanges} changes
             </span>
           </>
@@ -58,15 +58,17 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
 
         {canUndo && (
           <>
-            <span>•</span>
+            <span style={{ color: '#64748B' }}>•</span>
             <button
               type="button"
               onClick={onUndo}
               disabled={loading}
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ef4444',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '4px',
+                padding: '2px 8px',
+                color: '#EF4444',
                 fontSize: '0.82rem',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -87,14 +89,14 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
           type="button"
           onClick={step === 'complete' ? onClose : onCancel}
           style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: 'var(--text-color-white)',
-            fontSize: '0.85rem',
+            padding: '9px 18px',
+            borderRadius: '7px',
+            background: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            color: '#F8FAFC',
+            fontSize: '0.88rem',
             cursor: 'pointer',
-            fontWeight: 500
+            fontWeight: 600
           }}
         >
           {step === 'complete' ? 'Close' : 'Cancel'}
@@ -106,21 +108,22 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             onClick={onApply}
             disabled={selectedTracksCount === 0 || totalChanges === 0 || loading}
             style={{
-              padding: '8px 22px',
-              borderRadius: '6px',
+              padding: '9px 24px',
+              borderRadius: '7px',
               background:
                 selectedTracksCount === 0 || totalChanges === 0 || loading
                   ? 'rgba(255, 255, 255, 0.08)'
-                  : 'linear-gradient(135deg, #10b981, #059669)',
+                  : 'linear-gradient(135deg, #10B981, #059669)',
               border: 'none',
-              color: 'var(--text-color-white)',
-              fontWeight: 600,
-              fontSize: '0.85rem',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '0.88rem',
               cursor: selectedTracksCount === 0 || totalChanges === 0 || loading ? 'not-allowed' : 'pointer',
               opacity: selectedTracksCount === 0 || totalChanges === 0 || loading ? 0.4 : 1,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              boxShadow: selectedTracksCount === 0 || totalChanges === 0 || loading ? 'none' : '0 4px 14px rgba(16, 185, 129, 0.35)',
               transition: 'all 0.15s ease'
             }}
           >

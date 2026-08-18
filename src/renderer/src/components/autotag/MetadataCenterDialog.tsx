@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { AutoTagSongInput } from '../../../../common/metadata/types';
 import { useAlbumAutoTag } from '../../hooks/useAlbumAutoTag';
 import { SearchCriteriaBar } from './SearchCriteriaBar';
 import { CandidateMatchesTable } from './CandidateMatchesTable';
@@ -39,18 +38,15 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
       previousFocusRef.current = document.activeElement;
       setShowErrorDetails(false);
 
-      // Seed search form with initial inputs
       if (initialAlbumName) actions.setSearchAlbum(initialAlbumName);
       if (initialArtistName) actions.setSearchArtist(initialArtistName);
 
-      // Trigger initial release search if album title is provided
       if (initialAlbumName) {
         actions.searchReleases(initialAlbumName, initialArtistName);
       }
     }
   }, [isOpen, initialAlbumName, initialArtistName]);
 
-  // Unified Close Handler with focus restoration
   const handleClose = () => {
     actions.reset();
     onClose();
@@ -63,7 +59,6 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     });
   };
 
-  // Keyboard Shortcuts (ESC to close, Ctrl+Enter to apply)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -98,24 +93,24 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(10px)'
+        background: 'rgba(4, 7, 13, 0.82)',
+        backdropFilter: 'blur(16px)'
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal container
+        onClick={(e) => e.stopPropagation()}
         style={{
-          width: '94%',
+          width: '95%',
           maxWidth: '1080px',
           maxHeight: '92vh',
-          background: 'rgba(18, 18, 24, 0.96)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          background: 'linear-gradient(145deg, #0F172A 0%, #0B0F19 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
           borderRadius: '16px',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+          boxShadow: '0 30px 70px rgba(0,0,0,0.8), 0 0 40px rgba(59, 130, 246, 0.1)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          color: 'var(--text-color)'
+          color: '#FFFFFF'
         }}
       >
         {/* Header Bar */}
@@ -125,17 +120,17 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '16px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            background: 'rgba(255, 255, 255, 0.02)'
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'rgba(15, 23, 42, 0.6)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '1.2rem' }}>✨</span>
+            <span style={{ fontSize: '1.3rem' }}>✨</span>
             <div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-color-white)' }}>
+              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
                 Metadata Center / AutoTag
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)' }}>
+              <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
                 Search, compare and apply verified metadata
               </div>
             </div>
@@ -148,12 +143,16 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             type="button"
             onClick={handleClose}
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-color-dimmed)',
-              fontSize: '1.2rem',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '6px',
+              color: '#CBD5E1',
+              fontSize: '1.1rem',
               cursor: 'pointer',
-              padding: '4px 8px'
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             ✕
@@ -187,9 +186,9 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
               style={{
                 padding: '12px 16px',
                 borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: 'var(--text-color-crimson)',
+                background: 'rgba(239, 68, 68, 0.18)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                color: '#FCA5A5',
                 fontSize: '0.85rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -197,18 +196,18 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600 }}>Couldn't update metadata.</span>
+                <span style={{ fontWeight: 700, color: '#FECACA' }}>Couldn't update metadata.</span>
                 <button
                   type="button"
                   onClick={() => setShowErrorDetails((prev) => !prev)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-color-highlight)', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 500 }}
+                  style={{ background: 'transparent', border: 'none', color: '#60A5FA', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
                 </button>
               </div>
 
               {showErrorDetails && (
-                <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', background: 'rgba(0, 0, 0, 0.4)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: 'var(--text-color-crimson)' }}>
+                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'rgba(0, 0, 0, 0.5)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: '#F87171' }}>
                   {state.error}
                 </div>
               )}
@@ -221,8 +220,8 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
               style={{
                 padding: '14px 18px',
                 borderRadius: '10px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
+                background: 'rgba(16, 185, 129, 0.18)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
@@ -231,17 +230,17 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.4rem' }}>🎉</span>
                 <div>
-                  <div style={{ fontWeight: 600, color: '#34d399', fontSize: '0.92rem' }}>
+                  <div style={{ fontWeight: 700, color: '#34D399', fontSize: '0.94rem' }}>
                     Metadata Applied Successfully!
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#CBD5E1' }}>
                     Updated {state.selectedTrackIds.size} songs with verified tags and artwork.
                   </div>
                 </div>
               </div>
 
               {state.lastRestoredCount > 0 && (
-                <span style={{ fontSize: '0.8rem', color: '#fbbf24' }}>
+                <span style={{ fontSize: '0.82rem', color: '#FBBF24', fontWeight: 600 }}>
                   Restored {state.lastRestoredCount} songs.
                 </span>
               )}

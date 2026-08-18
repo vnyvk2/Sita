@@ -50,15 +50,15 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+      return { label: '⚠ Warning', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.2)' };
     }
     if (isRename) {
-      return { label: '✓ Rename', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+      return { label: '✓ Rename', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)' };
     }
     if (isExact) {
-      return { label: '✓ Match', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
+      return { label: '✓ Match', color: '#10B981', bg: 'rgba(16, 185, 129, 0.2)' };
     }
-    return { label: '✓ Suggested', color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.15)' };
+    return { label: '✓ Suggested', color: '#60A5FA', bg: 'rgba(59, 130, 246, 0.2)' };
   };
 
   return (
@@ -66,22 +66,23 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       {/* Table Header & Controls Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-color-dimmed)', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
             Tracks ({selectedTrackIds.size} / {matches.length} Selected)
           </span>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               type="button"
               onClick={onSelectAll}
               style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'var(--text-color-dimmed)',
-                fontSize: '0.72rem',
-                cursor: 'pointer'
+                padding: '4px 10px',
+                borderRadius: '5px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+                color: '#CBD5E1',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                fontWeight: 600
               }}
             >
               Select All
@@ -90,13 +91,14 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               type="button"
               onClick={onSelectChanged}
               style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'var(--text-color-dimmed)',
-                fontSize: '0.72rem',
-                cursor: 'pointer'
+                padding: '4px 10px',
+                borderRadius: '5px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+                color: '#CBD5E1',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                fontWeight: 600
               }}
             >
               Changed Only
@@ -105,13 +107,14 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               type="button"
               onClick={onClearSelections}
               style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: 'var(--text-color-dimmed)',
-                fontSize: '0.72rem',
-                cursor: 'pointer'
+                padding: '4px 10px',
+                borderRadius: '5px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#94A3B8',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                fontWeight: 500
               }}
             >
               Deselect All
@@ -121,30 +124,30 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
 
         {/* Filter & Sort Selectors */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              style={{ background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '2px 6px', fontSize: '0.75rem' }}
+              style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
             >
-              <option value="all">All Tracks</option>
-              <option value="changed">Changed Only</option>
-              <option value="low_confidence">Low Confidence</option>
-              <option value="warnings">Warnings Only</option>
+              <option value="all" style={{ background: '#0F172A', color: '#FFFFFF' }}>All Tracks</option>
+              <option value="changed" style={{ background: '#0F172A', color: '#FFFFFF' }}>Changed Only</option>
+              <option value="low_confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Low Confidence</option>
+              <option value="warnings" style={{ background: '#0F172A', color: '#FFFFFF' }}>Warnings Only</option>
             </select>
           </label>
 
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              style={{ background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '2px 6px', fontSize: '0.75rem' }}
+              style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
             >
-              <option value="trackNumber">Track #</option>
-              <option value="confidence">Confidence</option>
-              <option value="title">Title</option>
+              <option value="trackNumber" style={{ background: '#0F172A', color: '#FFFFFF' }}>Track #</option>
+              <option value="confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Confidence</option>
+              <option value="title" style={{ background: '#0F172A', color: '#FFFFFF' }}>Title</option>
             </select>
           </label>
         </div>
@@ -153,23 +156,23 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       {/* Table Container */}
       <div
         style={{
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           overflow: 'hidden',
-          background: 'rgba(0, 0, 0, 0.2)'
+          background: 'rgba(15, 23, 42, 0.6)'
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-color-dimmed)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '8px 10px', textAlign: 'center' }}></th>
-              <th style={{ width: '36px', padding: '8px 8px', textAlign: 'center' }}>#</th>
-              <th style={{ padding: '8px 12px' }}>CURRENT TITLE</th>
-              <th style={{ width: '20px', padding: '8px 0', textAlign: 'center' }}></th>
-              <th style={{ padding: '8px 12px' }}>NEW TITLE</th>
-              <th style={{ padding: '8px 12px' }}>ARTIST</th>
-              <th style={{ width: '100px', padding: '8px 12px', textAlign: 'center' }}>STATUS</th>
-              <th style={{ width: '36px', padding: '8px 8px', textAlign: 'center' }}></th>
+            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <th style={{ width: '36px', padding: '10px 10px', textAlign: 'center' }}></th>
+              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}>#</th>
+              <th style={{ padding: '10px 12px' }}>CURRENT TITLE</th>
+              <th style={{ width: '20px', padding: '10px 0', textAlign: 'center' }}></th>
+              <th style={{ padding: '10px 12px' }}>NEW TITLE</th>
+              <th style={{ padding: '10px 12px' }}>ARTIST</th>
+              <th style={{ width: '105px', padding: '10px 12px', textAlign: 'center' }}>STATUS</th>
+              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}></th>
             </tr>
           </thead>
           <tbody>
@@ -188,14 +191,14 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                   <tr
                     onClick={() => toggleExpand(match.localSongId)}
                     style={{
-                      borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
-                      background: isExpanded ? 'rgba(255, 255, 255, 0.03)' : isSelected ? 'transparent' : 'rgba(0, 0, 0, 0.15)',
-                      opacity: isSelected ? 1 : 0.5,
+                      borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                      background: isExpanded ? 'rgba(255, 255, 255, 0.05)' : isSelected ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
+                      opacity: isSelected ? 1 : 0.6,
                       cursor: 'pointer'
                     }}
                   >
                     {/* Track Checkbox */}
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                    <td style={{ padding: '10px 10px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -208,38 +211,38 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Track Number */}
-                    <td style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text-color-dimmed)', fontFamily: 'monospace' }}>
+                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontFamily: 'monospace', fontWeight: 600 }}>
                       {trackNumFormatted}
                     </td>
 
                     {/* Current Local Title */}
-                    <td style={{ padding: '8px 12px', color: 'var(--text-color-dimmed)' }}>
+                    <td style={{ padding: '10px 12px', color: '#94A3B8', fontWeight: 500 }}>
                       {match.oldTitle}
                     </td>
 
                     {/* Arrow */}
-                    <td style={{ padding: '8px 0', textAlign: 'center', color: 'var(--text-color-dimmed)', opacity: 0.6 }}>
+                    <td style={{ padding: '10px 0', textAlign: 'center', color: '#94A3B8', fontWeight: 700 }}>
                       →
                     </td>
 
                     {/* New Suggested Title */}
-                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-color-white)' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#FFFFFF' }}>
                       {newTitle}
                     </td>
 
                     {/* Artist */}
-                    <td style={{ padding: '8px 12px', color: 'var(--text-color-dimmed)' }}>
+                    <td style={{ padding: '10px 12px', color: '#CBD5E1', fontWeight: 500 }}>
                       {newArtist}
                     </td>
 
                     {/* Status Badge */}
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       <span
                         style={{
-                          padding: '2px 8px',
+                          padding: '3px 9px',
                           borderRadius: '4px',
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
                           background: statusBadge.bg,
                           color: statusBadge.color,
                           border: `1px solid ${statusBadge.bg}`
@@ -250,17 +253,17 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Expand Chevron */}
-                    <td style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text-color-dimmed)', fontSize: '0.75rem' }}>
+                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontSize: '0.78rem' }}>
                       {isExpanded ? '▲' : '▼'}
                     </td>
                   </tr>
 
                   {/* Expanded Detailed Field Diff Drawer */}
                   {isExpanded && (
-                    <tr style={{ borderBottom: idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none', background: 'rgba(0, 0, 0, 0.35)' }}>
-                      <td colSpan={8} style={{ padding: '12px 18px 16px 48px' }}>
+                    <tr style={{ borderBottom: idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none', background: 'rgba(0, 0, 0, 0.4)' }}>
+                      <td colSpan={8} style={{ padding: '14px 20px 18px 48px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             Track-Level Fields ({match.oldTitle})
                           </span>
                           <MetadataDiffViewer

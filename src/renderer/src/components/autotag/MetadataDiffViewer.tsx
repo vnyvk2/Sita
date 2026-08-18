@@ -23,35 +23,33 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   const getBadgeStyle = (status: string) => {
     switch (status) {
       case 'changed':
-        return { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', text: '#fbbf24', label: 'Changed' };
+        return { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.45)', text: '#FBBF24', label: 'Changed' };
       case 'new':
-        return { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.4)', text: '#34d399', label: 'New' };
+        return { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.45)', text: '#34D399', label: 'New' };
       case 'missing':
-        return { bg: 'rgba(156, 163, 175, 0.2)', border: 'rgba(156, 163, 175, 0.4)', text: 'var(--text-color-dimmed)', label: 'Missing' };
+        return { bg: 'rgba(148, 163, 184, 0.2)', border: 'rgba(148, 163, 184, 0.4)', text: '#94A3B8', label: 'Missing' };
       default:
-        return { bg: 'transparent', border: 'transparent', text: 'rgba(255,255,255,0.4)', label: 'Unchanged' };
+        return { bg: 'rgba(255, 255, 255, 0.05)', border: 'transparent', text: '#94A3B8', label: 'Unchanged' };
     }
   };
 
   const getProviderColor = (providerId?: string) => {
     switch (providerId?.toLowerCase()) {
       case 'musicbrainz':
-        return { bg: 'rgba(186, 85, 211, 0.2)', text: '#e9d5ff', border: 'rgba(186, 85, 211, 0.4)' };
+        return { bg: 'rgba(186, 85, 211, 0.25)', text: '#E9D5FF', border: 'rgba(186, 85, 211, 0.45)' };
       case 'discogs':
-        return { bg: 'rgba(234, 88, 12, 0.2)', text: '#ffedd5', border: 'rgba(234, 88, 12, 0.4)' };
+        return { bg: 'rgba(234, 88, 12, 0.25)', text: '#FFEDD5', border: 'rgba(234, 88, 12, 0.45)' };
       case 'coverartarchive':
-        return { bg: 'rgba(14, 165, 233, 0.2)', text: '#e0f2fe', border: 'rgba(14, 165, 233, 0.4)' };
-      case 'spotify':
-        return { bg: 'rgba(34, 197, 94, 0.2)', text: '#dcfce7', border: 'rgba(34, 197, 94, 0.4)' };
+        return { bg: 'rgba(14, 165, 233, 0.25)', text: '#E0F2FE', border: 'rgba(14, 165, 233, 0.45)' };
       default:
-        return { bg: 'rgba(59, 130, 246, 0.2)', text: '#dbeafe', border: 'rgba(59, 130, 246, 0.4)' };
+        return { bg: 'rgba(59, 130, 246, 0.25)', text: '#DBEAFE', border: 'rgba(59, 130, 246, 0.45)' };
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--text-color)' }}>
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.9 }}>
-        Field Differences for: <span style={{ color: 'var(--text-color-highlight)' }}>{track.oldTitle}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#FFFFFF' }}>
+      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#CBD5E1' }}>
+        Field Differences for: <span style={{ color: '#38BDF8' }}>{track.oldTitle}</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -73,21 +71,21 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                 gap: '10px',
                 padding: '8px 12px',
                 borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.07)'
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
               }}
             >
               <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggleField(diff.fieldId)}
-                style={{ cursor: 'pointer', accentColor: 'var(--text-color-highlight-2)' }}
+                style={{ cursor: 'pointer' }}
               />
 
-              <span style={{ fontWeight: 600, fontSize: '0.82rem', opacity: 0.8 }}>{diff.fieldName}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#F8FAFC' }}>{diff.fieldName}</span>
 
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-color-dimmed)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em style={{ opacity: 0.5 }}>None</em>}
+              <div style={{ fontSize: '0.82rem', color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em style={{ opacity: 0.6 }}>None</em>}
               </div>
 
               <input
@@ -95,13 +93,14 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                 value={String(userVal)}
                 onChange={(e) => onFieldChanged(diff.fieldId, e.target.value)}
                 style={{
-                  padding: '4px 8px',
+                  padding: '5px 8px',
                   borderRadius: '6px',
                   background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: 'var(--text-color-white)',
+                  border: '1px solid rgba(255, 255, 255, 0.18)',
+                  color: '#FFFFFF',
                   fontSize: '0.82rem',
-                  outline: 'none'
+                  outline: 'none',
+                  fontWeight: 600
                 }}
               />
 
@@ -111,8 +110,8 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   value={diff.providerId ?? 'musicbrainz'}
                   onChange={(e) => onSelectProviderForField(diff.fieldId, e.target.value)}
                   style={{
-                    fontSize: '0.72rem',
-                    padding: '2px 4px',
+                    fontSize: '0.75rem',
+                    padding: '3px 6px',
                     borderRadius: '4px',
                     backgroundColor: provStyle.bg,
                     border: `1px solid ${provStyle.border}`,
@@ -123,7 +122,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   }}
                 >
                   {alternatives.map((alt) => (
-                    <option key={alt.providerId} value={alt.providerId} style={{ background: 'var(--background-color-2)', color: 'var(--text-color-white)' }}>
+                    <option key={alt.providerId} value={alt.providerId} style={{ background: '#0F172A', color: '#FFFFFF' }}>
                       {alt.providerName}
                     </option>
                   ))}
@@ -132,8 +131,8 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                 <div
                   title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
                   style={{
-                    fontSize: '0.70rem',
-                    padding: '2px 6px',
+                    fontSize: '0.72rem',
+                    padding: '3px 6px',
                     borderRadius: '4px',
                     textAlign: 'center',
                     fontWeight: 600,
@@ -152,10 +151,10 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
               <span
                 style={{
                   fontSize: '0.72rem',
-                  padding: '2px 6px',
+                  padding: '3px 6px',
                   borderRadius: '4px',
                   textAlign: 'center',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   backgroundColor: badge.bg,
                   border: `1px solid ${badge.border}`,
                   color: badge.text
@@ -165,14 +164,16 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
               </span>
 
               <button
+                type="button"
                 onClick={() => onResetField(diff.fieldId)}
                 title="Reset to suggested"
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: 'rgba(255,255,255,0.5)',
+                  color: '#94A3B8',
                   cursor: 'pointer',
-                  fontSize: '0.75rem'
+                  fontSize: '0.78rem',
+                  fontWeight: 600
                 }}
               >
                 Reset
