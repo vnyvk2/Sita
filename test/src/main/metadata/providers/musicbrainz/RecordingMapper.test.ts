@@ -67,4 +67,38 @@ describe('MusicBrainz Recording & Release Mappers (Phase 4 Identity)', () => {
     expect(track.musicBrainzRecordingId).toBe('rec-track-mbid-0001');
     expect(track.isrc).toBe('GBAYE9300001');
   });
+
+  it('MusicBrainzReleaseMapper falls back to track.isrc when track.recording.isrcs is not present', () => {
+    const mapper = new MusicBrainzReleaseMapper();
+    const dto: MusicBrainzReleaseDto = {
+      id: 'rel-mbid-666',
+      title: 'Pablo Honey',
+      date: '1993-02-22',
+      'release-group': { id: 'rg-mbid-777' },
+      'artist-credit': [{ name: 'Radiohead' }],
+      media: [
+        {
+          position: 1,
+          'track-count': 1,
+          tracks: [
+            {
+              id: 'trk-2',
+              position: 1,
+              title: 'Creep',
+              length: 238000,
+              isrc: 'GBAYE9300002',
+              recording: {
+                id: 'rec-track-mbid-0002',
+                title: 'Creep'
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const resolved = mapper.toResolvedAlbumRelease(dto);
+    expect(resolved.tracks[0].isrc).toBe('GBAYE9300002');
+    expect(resolved.tracks[0].musicBrainzRecordingId).toBe('rec-track-mbid-0002');
+  });
 });

@@ -84,4 +84,22 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     expect(result.musicBrainzRecordingId).toBe('');
     expect(result.isrc).toBe('');
   });
+
+  it('correctly maps discNumber when provided in metadata changes', async () => {
+    vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
+      id: 13,
+      title: 'Disc Test',
+      duration: '120.0',
+      diskNumber: 1,
+      artists: [],
+      albums: [],
+      genres: []
+    } as any);
+
+    const result = await SongMetadataBuilder.buildCompleteTags(13, {
+      discNumber: 3
+    });
+
+    expect(result.discNumber).toBe(3);
+  });
 });

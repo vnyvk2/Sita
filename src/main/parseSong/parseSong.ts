@@ -157,7 +157,7 @@ export const parseSong = async (
           noOfChannels: file.properties.audioChannels,
           diskNumber: metadata.disc ?? undefined,
           trackNumber: metadata.track ?? undefined,
-          musicBrainzRecordingId: metadata.musicBrainzRecordingId || undefined,
+          musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
           isrc: metadata.isrc || undefined,
           fileCreatedAt: stats ? stats.birthtime : new Date(),
           fileModifiedAt: stats ? stats.mtime : new Date(),

@@ -126,7 +126,14 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (tags.discNumber !== undefined) file.tag.disc = tags.discNumber;
           if (tags.year !== undefined) file.tag.year = tags.year;
           if (tags.musicBrainzRecordingId !== undefined) {
-            file.tag.musicBrainzRecordingId = tags.musicBrainzRecordingId || undefined;
+            if (tags.musicBrainzRecordingId) {
+              if (file.tag.musicBrainzTrackId) {
+                file.tag.musicBrainzTrackId = undefined;
+              }
+              file.tag.musicBrainzTrackId = tags.musicBrainzRecordingId;
+            } else if (file.tag.musicBrainzTrackId) {
+              file.tag.musicBrainzTrackId = undefined;
+            }
           }
           if (tags.isrc !== undefined) {
             file.tag.isrc = tags.isrc || undefined;

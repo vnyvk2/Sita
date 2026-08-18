@@ -53,7 +53,7 @@ export class MusicBrainzReleaseMapper {
               discNumber,
               duration,
               musicBrainzRecordingId: track.recording?.id,
-              isrc: track.recording?.isrcs?.[0]
+              isrc: track.recording?.isrcs?.[0] ?? track.isrc
             });
           }
         }

@@ -44,7 +44,14 @@ export class TagWriterService {
         if (payload.discNumber !== undefined) file.tag.disc = payload.discNumber;
         if (payload.year !== undefined) file.tag.year = payload.year;
         if (payload.musicBrainzRecordingId !== undefined) {
-          file.tag.musicBrainzRecordingId = payload.musicBrainzRecordingId || undefined;
+          if (payload.musicBrainzRecordingId) {
+            if (file.tag.musicBrainzTrackId) {
+              file.tag.musicBrainzTrackId = undefined;
+            }
+            file.tag.musicBrainzTrackId = payload.musicBrainzRecordingId;
+          } else if (file.tag.musicBrainzTrackId) {
+            file.tag.musicBrainzTrackId = undefined;
+          }
         }
         if (payload.isrc !== undefined) {
           file.tag.isrc = payload.isrc || undefined;

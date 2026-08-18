@@ -1,10 +1,15 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
+import { File } from 'node-taglib-sharp';
 import { MusicBrainzRecordingMapper } from '@main/metadata/providers/musicbrainz/mappers/RecordingMapper';
 import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
 import { SongMetadataBuilder } from '@main/metadata/transactions/SongMetadataBuilder';
 import { SnapshotBuilder } from '@main/metadata/transactions/SnapshotBuilder';
 import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import { TagWriterService } from '@main/metadata/services/TagWriterService';
 import { updateSongBasicFields } from '@main/db/queries/songs';
 import type { MusicBrainzRecordingDto } from '@main/metadata/providers/musicbrainz/dto/RecordingDto';
 import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
@@ -244,6 +249,108 @@ describe('AutoTag Identity Pipeline (Phase 4 Integration Gate)', () => {
       // ISRC belongs strictly to track.isrc
       expect(resolved.tracks[0].isrc).toBe(isrc);
       expect(resolved.tracks[0].isrc).not.toBe(mbRecordingMbid);
+    });
+  });
+
+  describe('5. Real Physical Audio ID3 Persistence, Clear & Rollback Verification (Phase 4-D, 4-E, 4-G)', () => {
+    const fixtureSource = path.join(process.cwd(), 'test', 'assets', 'test_song.mp3');
+    const tempTestFile = path.join(os.tmpdir(), `autotag_identity_test_${Date.now()}.mp3`);
+
+    it('writes Recording MBID and ISRC to real audio file, reads back, clears, and verifies rollback', async () => {
+      // Setup temporary real mp3 file
+      fs.copyFileSync(fixtureSource, tempTestFile);
+
+      try {
+        const tagWriter = new TagWriterService();
+
+        // 1. Write MBID and ISRC to physical audio file
+        const writeResult = await tagWriter.writeTags({
+          filePath: tempTestFile,
+          title: 'Physical Test Title',
+          musicBrainzRecordingId: 'rec-phys-uuid-12345',
+          isrc: 'GBAYE9700021'
+        });
+        expect(writeResult.success).toBe(true);
+
+        // 2. Read back using node-taglib-sharp (simulating scanner / parseSong)
+        const fileAfterWrite = File.createFromPath(tempTestFile);
+        expect(fileAfterWrite.tag.musicBrainzTrackId).toBe('rec-phys-uuid-12345');
+        expect(fileAfterWrite.tag.isrc).toBe('GBAYE9700021');
+        fileAfterWrite.dispose();
+
+        // 3. Clear MBID and ISRC (simulating clear / removal)
+        const clearResult = await tagWriter.writeTags({
+          filePath: tempTestFile,
+          musicBrainzRecordingId: '',
+          isrc: ''
+        });
+        expect(clearResult.success).toBe(true);
+
+        const fileAfterClear = File.createFromPath(tempTestFile);
+        expect(fileAfterClear.tag.musicBrainzTrackId || undefined).toBeUndefined();
+        expect(fileAfterClear.tag.isrc || undefined).toBeUndefined();
+        fileAfterClear.dispose();
+
+        // 4. Physical Transaction & Rollback Lifecycle
+        // Set initial state
+        await tagWriter.writeTags({
+          filePath: tempTestFile,
+          title: 'Initial Title',
+          musicBrainzRecordingId: 'rec-initial-state',
+          isrc: 'ISRC-INITIAL'
+        });
+
+        const txManager = new MetadataTransactionManager({
+          dbUpdater: async (_songId, data) => {
+            const res = await tagWriter.writeTags({
+              filePath: tempTestFile,
+              title: data.title,
+              musicBrainzRecordingId: data.musicBrainzRecordingId,
+              isrc: data.isrc
+            });
+            if (!res.success) {
+              throw new Error(`tagWriter failed: ${res.error}`);
+            }
+            return true;
+          }
+        });
+
+        // Execute transaction modifying identity
+        const mutations: ResourceMutationPayload[] = [
+          {
+            resourceId: 999,
+            filePath: tempTestFile,
+            fieldMutations: [
+              { fieldId: 'title', oldValue: 'Initial Title', newValue: 'Mutated Title' },
+              { fieldId: 'musicBrainzRecordingId', oldValue: 'rec-initial-state', newValue: 'rec-mutated-state' },
+              { fieldId: 'isrc', oldValue: 'ISRC-INITIAL', newValue: 'ISRC-MUTATED' }
+            ]
+          }
+        ];
+
+        const txRes = await txManager.executeTransaction('op-phys-1', mutations);
+        expect(txRes.success).toBe(true);
+
+        // Verify physical file has mutated values
+        const fileMutated = File.createFromPath(tempTestFile);
+        expect(fileMutated.tag.musicBrainzTrackId).toBe('rec-mutated-state');
+        expect(fileMutated.tag.isrc).toBe('ISRC-MUTATED');
+        fileMutated.dispose();
+
+        // Rollback transaction
+        const rollbackRes = await txManager.rollbackLastTransaction();
+        expect(rollbackRes.success).toBe(true);
+
+        // Verify physical file was restored to initial state
+        const fileRestored = File.createFromPath(tempTestFile);
+        expect(fileRestored.tag.musicBrainzTrackId).toBe('rec-initial-state');
+        expect(fileRestored.tag.isrc).toBe('ISRC-INITIAL');
+        fileRestored.dispose();
+      } finally {
+        if (fs.existsSync(tempTestFile)) {
+          fs.unlinkSync(tempTestFile);
+        }
+      }
     });
   });
 });
