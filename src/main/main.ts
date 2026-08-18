@@ -175,7 +175,15 @@ function launchExtensionBackgroundWorkers(session = electronSession.defaultSessi
     session.extensions.getAllExtensions().map(async (extension) => {
       const manifest = extension.manifest;
       if (manifest.manifest_version === 3 && manifest?.background?.service_worker) {
-        await session.serviceWorkers.startWorkerForScope(extension.url);
+        try {
+          await session.serviceWorkers.startWorkerForScope(extension.url);
+        } catch (workerError) {
+          logger.debug('Skipped background service worker startup for extension', {
+            name: extension.name,
+            id: extension.id,
+            error: workerError
+          });
+        }
       }
     })
   );
@@ -183,8 +191,25 @@ function launchExtensionBackgroundWorkers(session = electronSession.defaultSessi
 
 const installExtensions = async () => {
   try {
-    const { default: installExtension, REACT_DEVELOPER_TOOLS } =
-      await import('electron-devtools-installer');
+    const devtoolsModule = (await import('electron-devtools-installer')) as any;
+    const installExtension =
+      devtoolsModule.installExtension ??
+      devtoolsModule.default?.installExtension ??
+      devtoolsModule.default?.default ??
+      devtoolsModule.default;
+
+    if (typeof installExtension !== 'function') {
+      throw new TypeError('electron-devtools-installer does not expose installExtension');
+    }
+
+    const REACT_DEVELOPER_TOOLS =
+      devtoolsModule.REACT_DEVELOPER_TOOLS ??
+      devtoolsModule.default?.REACT_DEVELOPER_TOOLS;
+
+    if (!REACT_DEVELOPER_TOOLS) {
+      throw new TypeError('electron-devtools-installer does not expose REACT_DEVELOPER_TOOLS');
+    }
+
     const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
 
     const ext = await installExtension(REACT_DEVELOPER_TOOLS, {
