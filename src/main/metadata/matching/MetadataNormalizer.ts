@@ -1,3 +1,5 @@
+import { normalizeForMatching } from './normalizeForMatching';
+
 export type RecordingVariant =
   | 'live'
   | 'acoustic'
@@ -65,7 +67,7 @@ export class MetadataNormalizer {
       cleaned = cleaned.replace(regex, '');
     }
 
-    return this.cleanWhitespace(cleaned);
+    return normalizeForMatching(cleaned);
   }
 
   /**
@@ -106,14 +108,10 @@ export class MetadataNormalizer {
     if (!artist) return '';
 
     let cleaned = artist
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .normalize('NFC')
       .replace(/\b(feat\.?|ft\.?|featuring|with|vs\.?|and|\+|x|×|,)\b/gi, ' ')
       .replace(/\./g, ''); // Strips acronym dots: A.R. Rahman -> ar rahman
 
-    return this.cleanWhitespace(cleaned);
+    return normalizeForMatching(cleaned);
   }
 
   /**
@@ -122,24 +120,12 @@ export class MetadataNormalizer {
   public static normalizeAlbum(album: string): string {
     if (!album) return '';
 
-    let cleaned = album
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .normalize('NFC')
-      .replace(this.COSMETIC_NOISE_REGEX, '');
+    let cleaned = album.replace(this.COSMETIC_NOISE_REGEX, '');
 
-    return this.cleanWhitespace(cleaned);
+    return normalizeForMatching(cleaned);
   }
 
   private static cleanWhitespace(str: string): string {
-    return str
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .normalize('NFC')
-      .replace(/[^\p{L}\p{N}]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return str.replace(/\s+/g, ' ').trim();
   }
 }

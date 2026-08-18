@@ -166,7 +166,11 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       status: rel.status,
       primaryType: rel['release-group']?.['primary-type'],
       secondaryTypes: rel['release-group']?.['secondary-types'],
-      trackCount: rel.media?.[0]?.['track-count'],
+      trackCount:
+        rel['track-count'] ??
+        (rel.media && rel.media.length > 0
+          ? rel.media.reduce((sum, m) => sum + (m['track-count'] ?? 0), 0)
+          : undefined),
       baseScore: typeof rel.score === 'number' ? rel.score : Number(rel.score ?? 50),
       rawItem: rel
     }));

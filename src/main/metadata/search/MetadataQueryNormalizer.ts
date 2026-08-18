@@ -1,3 +1,5 @@
+import { normalizeForMatching } from '../matching/normalizeForMatching';
+
 export interface NormalizedQuery {
   rawTitle: string;
   cleanTitle: string;
@@ -61,14 +63,11 @@ export class MetadataQueryNormalizer {
 
   public static compareStringSimilarity(strA?: string, strB?: string): number {
     if (!strA || !strB) return 0;
-    const a = strA.toLowerCase().trim();
-    const b = strB.toLowerCase().trim();
+    const cleanA = normalizeForMatching(strA);
+    const cleanB = normalizeForMatching(strB);
 
-    if (a === b) return 1.0;
-
-    const cleanA = a.replace(/[^\p{L}\p{N}]/gu, '');
-    const cleanB = b.replace(/[^\p{L}\p{N}]/gu, '');
-    if (cleanA === cleanB) return 0.98;
+    if (!cleanA || !cleanB) return 0;
+    if (cleanA === cleanB) return 1.0;
 
     return this.jaroWinklerDistance(cleanA, cleanB);
   }

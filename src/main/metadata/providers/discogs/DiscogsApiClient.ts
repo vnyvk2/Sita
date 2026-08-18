@@ -1,3 +1,4 @@
+import { normalizeForMatching } from '../../matching/normalizeForMatching';
 import type { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 
 export interface DiscogsSearchReleaseDto {
@@ -96,19 +97,35 @@ export class DiscogsApiClient {
 
   private isCandidateMatching(discogsTitle: string, queryTitle?: string, queryArtist?: string): boolean {
     if (!discogsTitle) return false;
-    const normTop = discogsTitle.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const normDiscogs = normalizeForMatching(discogsTitle);
+    if (!normDiscogs) return false;
 
     if (queryTitle) {
-      const normTitle = queryTitle.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-      if (normTitle.length > 2 && !normTop.includes(normTitle)) return false;
+      const normTitle = normalizeForMatching(queryTitle);
+      if (normTitle && normTitle.length > 2) {
+        const titlePattern = new RegExp(`(^|\\s)${this.escapeRegex(normTitle)}(\\s|$)`, 'i');
+        const candidatePattern = new RegExp(`(^|\\s)${this.escapeRegex(normDiscogs)}(\\s|$)`, 'i');
+        if (!titlePattern.test(normDiscogs) && !candidatePattern.test(normTitle) && !normDiscogs.includes(normTitle)) {
+          return false;
+        }
+      }
     }
 
     if (queryArtist) {
-      const normArtist = queryArtist.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-      if (normArtist.length > 2 && !normTop.includes(normArtist)) return false;
+      const normArtist = normalizeForMatching(queryArtist);
+      if (normArtist && normArtist.length > 2) {
+        const artistPattern = new RegExp(`(^|\\s)${this.escapeRegex(normArtist)}(\\s|$)`, 'i');
+        if (!artistPattern.test(normDiscogs) && !normDiscogs.includes(normArtist)) {
+          return false;
+        }
+      }
     }
 
     return true;
+  }
+
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   public async fetchContributionData(query: { title?: string; artist?: string }): Promise<DiscogsContributionData | null> {
