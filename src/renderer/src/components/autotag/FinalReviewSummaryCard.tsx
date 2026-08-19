@@ -71,19 +71,19 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
 
         <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
           <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Years Updated</div>
-          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{yearsChanged}</div>
+          <div className="text-xl font-bold text-font-color-highlight dark:text-dark-font-color-highlight mt-1">{yearsChanged}</div>
         </div>
 
         <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
           <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Cover Artwork</div>
-          <div className={`text-sm font-semibold mt-1 ${replaceArtwork ? 'text-emerald-600 dark:text-emerald-400' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
+          <div className={`text-sm font-semibold mt-1 ${replaceArtwork ? 'text-font-color-highlight dark:text-dark-font-color-highlight' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
             {replaceArtwork ? 'Replace' : 'Keep Current'}
           </div>
         </div>
       </div>
 
       {totalWarnings > 0 && (
-        <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium">
+        <div className="p-2.5 rounded-lg bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson text-xs font-medium">
           ⚠️ {totalWarnings} track warning(s) detected. Please review highlighted differences before proceeding.
         </div>
       )}

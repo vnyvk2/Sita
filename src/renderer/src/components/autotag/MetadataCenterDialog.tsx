@@ -139,7 +139,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
   return createPortal(
     <div
       onClick={handleClose}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-xs"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -217,7 +217,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Expandable Error UX Drawer */}
           {state.error && (
-            <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-500/30 text-font-color-crimson text-sm flex flex-col gap-1.5">
+            <div className="p-3.5 rounded-xl bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson text-sm flex flex-col gap-1.5">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-font-color-crimson">Couldn't update metadata.</span>
                 <button
@@ -230,7 +230,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
               </div>
 
               {showErrorDetails && (
-                <div className="font-mono text-xs bg-background-color-1 dark:bg-dark-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-red-500/20">
+                <div className="font-mono text-xs bg-background-color-1 dark:bg-dark-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-font-color-crimson/20">
                   {state.error}
                 </div>
               )}

@@ -108,7 +108,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                           <span
                             className={`text-[0.7rem] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide border ${
                               idx === 0
-                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                ? 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight'
                                 : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed'
                             }`}
                           >

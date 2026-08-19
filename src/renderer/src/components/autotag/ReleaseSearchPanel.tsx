@@ -48,7 +48,7 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
         <button
           type="submit"
           disabled={loading || !album.trim()}
-          className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-black text-sm font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-white text-sm font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {loading ? 'Searching...' : 'Search'}
         </button>

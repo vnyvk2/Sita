@@ -20,7 +20,7 @@ export const FederationSummaryBar: React.FC<FederationSummaryBarProps> = ({
       case 'musicbrainz':
         return '🌐';
       case 'discogs':
-        return '💿';
+        return '📀';
       case 'coverartarchive':
         return '🎨';
       case 'lrclib':

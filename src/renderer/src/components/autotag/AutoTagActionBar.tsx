@@ -29,7 +29,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
   onClose
 }) => {
   return (
-    <div className="flex justify-between items-center px-6 py-4 border-t border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/80 dark:bg-dark-background-color-2/80 backdrop-blur-md">
+    <div className="flex justify-between items-center px-6 py-4 border-t border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2 dark:bg-dark-background-color-2">
       {/* Metrics Summary & Undo Link */}
       <div className="flex items-center gap-3 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
         {totalTracksCount > 0 && (
@@ -46,7 +46,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             {selectedTracksCount === 0 && totalChanges > 0 && (
               <>
                 <span>•</span>
-                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-medium">
                   ({totalTracksCount} files affected by album metadata)
                 </span>
               </>
@@ -61,7 +61,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
               type="button"
               onClick={onUndo}
               disabled={loading}
-              className="bg-red-500/15 border border-red-500/30 text-font-color-crimson rounded px-2 py-0.5 text-xs font-semibold hover:bg-red-500/25 transition-colors cursor-pointer flex items-center gap-1"
+              className="bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson rounded px-2 py-0.5 text-xs font-semibold hover:bg-font-color-crimson/25 transition-colors cursor-pointer flex items-center gap-1"
             >
               ↶ Undo available
             </button>
@@ -84,7 +84,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             type="button"
             onClick={onApply}
             disabled={totalChanges === 0 || loading}
-            className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-black text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             {loading
               ? 'Applying Changes...'

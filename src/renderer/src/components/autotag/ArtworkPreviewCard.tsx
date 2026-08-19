@@ -59,7 +59,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
             onClick={() => onToggleReplaceArtwork(false)}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
               !replaceArtwork
-                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black dark:text-font-color-black font-bold'
+                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black dark:text-font-color-white font-bold'
                 : 'bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
             }`}
           >
@@ -70,7 +70,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
             onClick={() => onToggleReplaceArtwork(true)}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
               replaceArtwork
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold'
+                ? 'bg-font-color-highlight/20 border border-font-color-highlight/40 text-font-color-highlight dark:text-dark-font-color-highlight font-bold'
                 : 'bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
             }`}
           >
@@ -105,10 +105,10 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
         {/* Suggested Artwork */}
         <div
           className={`flex flex-col items-center gap-2 p-3 bg-background-color-2/20 dark:bg-dark-background-color-2/30 rounded-lg border ${
-            replaceArtwork ? 'border-emerald-500/50' : 'border-background-color-2 dark:border-dark-background-color-2'
+            replaceArtwork ? 'border-font-color-highlight dark:border-dark-font-color-highlight' : 'border-background-color-2 dark:border-dark-background-color-2'
           }`}
         >
-          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Suggested Cover</span>
+          <span className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">Suggested Cover</span>
           <div className="w-[100px] h-[100px] rounded-lg overflow-hidden bg-background-color-2 dark:bg-dark-background-color-2 flex items-center justify-center">
             {suggestedArtworkUrl && !suggestedImgErr ? (
               <img
@@ -121,7 +121,7 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
               <span className="text-2xl opacity-40">🎨</span>
             )}
           </div>
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight">
             {dimensionsDisplay} ({providerDisplay})
           </span>
         </div>

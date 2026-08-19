@@ -84,7 +84,7 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
             MBID: <span className="font-mono text-font-color-black dark:text-font-color-white font-semibold">{mbid.slice(0, 18)}...</span>
           </div>
 
-          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded px-2.5 py-0.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+          <div className="bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 rounded px-2.5 py-0.5 text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
             Confidence: {confidencePercent}%
           </div>
         </div>
