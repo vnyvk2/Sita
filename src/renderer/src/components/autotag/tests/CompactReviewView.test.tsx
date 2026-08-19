@@ -511,7 +511,7 @@ describe('CompactReviewView Component', () => {
     );
 
     expect(screen.getByText('Lolo (Intro)')).toBeDefined();
-    expect(screen.getByText('Not in library')).toBeDefined();
+    expect(screen.getAllByText('Not in library').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Missing')).toBeDefined();
 
     // The missing track's checkbox should be disabled
