@@ -65,7 +65,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
       {/* Table Header & Controls Bar */}
       <div className="flex justify-between items-center px-1">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed uppercase">
+          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
             Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
@@ -73,21 +73,21 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
             <button
               type="button"
               onClick={onSelectAll}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={onSelectChanged}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Changed Only
             </button>
             <button
               type="button"
               onClick={onClearSelections}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Deselect All
             </button>
@@ -97,12 +97,12 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
         {/* Filter & Sort Controls */}
         <div className="flex gap-2.5 items-center">
           {onFilterChange && (
-            <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+            <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
               Filter:
               <select
                 value={filter}
                 onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-                className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+                className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
               >
                 <option value="all">All Tracks</option>
                 <option value="changed">Changed Only</option>
@@ -113,12 +113,12 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
           )}
 
           {onSortChange && (
-            <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+            <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
               Sort:
               <select
                 value={sort}
                 onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-                className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+                className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
               >
                 <option value="trackNumber">Track #</option>
                 <option value="confidence">Confidence</option>
@@ -130,10 +130,10 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
       </div>
 
       {/* Tracks Container */}
-      <div className="border border-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20">
+      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20 dark:bg-dark-background-color-2/30">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-background-color-2 border-b border-background-color-3/30 text-font-color-dimmed text-xs uppercase tracking-wider">
+            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
               <th className="w-9 px-2.5 py-2.5 text-center"></th>
               <th className="w-9 px-2 py-2.5 text-center">#</th>
               <th className="px-3 py-2.5">TITLE</th>
@@ -195,16 +195,16 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                 <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => onToggleExpand(match.localSongId)}
-                    className={`border-b border-background-color-2/40 transition-colors text-font-color ${
+                    className={`border-b border-background-color-2/40 dark:border-dark-background-color-2/40 transition-colors text-font-color-black dark:text-font-color-white ${
                       isMissing
-                        ? 'opacity-40 bg-background-color-2/10 cursor-default'
+                        ? 'opacity-40 bg-background-color-2/10 dark:bg-dark-background-color-2/10 cursor-default'
                         : isExpanded
-                        ? 'bg-background-color-2/40 border-b-0 cursor-pointer'
+                        ? 'bg-background-color-2/40 dark:bg-dark-background-color-2/50 border-b-0 cursor-pointer'
                         : isFocused
-                        ? 'bg-background-color-3/15 cursor-pointer'
+                        ? 'bg-background-color-3/15 dark:bg-dark-background-color-3/15 cursor-pointer'
                         : isSelected
-                        ? 'hover:bg-background-color-2/40 cursor-pointer'
-                        : 'opacity-60 hover:bg-background-color-2/30 cursor-pointer'
+                        ? 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50 cursor-pointer'
+                        : 'opacity-60 hover:bg-background-color-2/30 dark:hover:bg-dark-background-color-2/40 cursor-pointer'
                     }`}
                   >
                     {/* Track Checkbox (Isolated from row click) */}
@@ -226,17 +226,17 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     {/* Track Number Diff */}
                     <td className="px-2 py-3 text-center align-middle font-mono text-xs">
                       {isMissing ? (
-                        <span className="text-font-color-dimmed font-semibold">
+                        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-semibold">
                           {newTrackNum}
                         </span>
                       ) : showTrackDiff ? (
                         <div className="inline-flex items-center gap-1">
-                          <span className="text-font-color-dimmed line-through text-xs">{oldTrackNum}</span>
-                          <span className="text-font-color-dimmed text-xs">→</span>
-                          <span className="text-font-color-highlight font-bold text-xs">{newTrackNum}</span>
+                          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed line-through text-xs">{oldTrackNum}</span>
+                          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">→</span>
+                          <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold text-xs">{newTrackNum}</span>
                         </div>
                       ) : (
-                        <span className="text-font-color-dimmed font-semibold">
+                        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-semibold">
                           {oldTrackNum}
                         </span>
                       )}
@@ -248,7 +248,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
                             className={`font-semibold text-sm ${
-                              isMissing ? 'text-font-color-dimmed italic' : showTitleWas ? 'text-font-color-highlight font-bold' : 'text-font-color'
+                              isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : showTitleWas ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold' : 'text-font-color-black dark:text-font-color-white'
                             }`}
                           >
                             {String(displayTitle)}
@@ -256,11 +256,11 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                         </div>
 
                         {isMissing ? (
-                          <div className="text-xs text-font-color-dimmed">
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             Not in library
                           </div>
                         ) : showTitleWas ? (
-                          <div className="text-xs text-font-color-dimmed">
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             (was: {match.oldTitle})
                           </div>
                         ) : null}
@@ -277,14 +277,14 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                               return (
                                 <span
                                   key={diff.fieldId}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.7rem] bg-background-color-2 border border-background-color-3/30 text-font-color-dimmed"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.7rem] bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed"
                                 >
                                   <span>{icon}</span>
-                                  <span className="text-font-color-dimmed">{diff.fieldName}:</span>
+                                  <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">{diff.fieldName}:</span>
                                   {diff.status === 'new' ? (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{String(diff.suggestedValue)}</span>
                                   ) : (
-                                    <span className="text-font-color-highlight font-semibold">{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
+                                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
                                   )}
                                 </span>
                               );
@@ -299,13 +299,13 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                       <div className="flex flex-col gap-0.5">
                         <span
                           className={`text-xs font-medium ${
-                            isMissing ? 'text-font-color-dimmed italic' : showArtistWas ? 'text-font-color' : 'text-font-color-dimmed'
+                            isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : showArtistWas ? 'text-font-color-black dark:text-font-color-white' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'
                           }`}
                         >
                           {String(displayArtist)}
                         </span>
                         {!isMissing && showArtistWas && (
-                          <div className="text-xs text-font-color-dimmed">
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             (was: {match.oldArtist})
                           </div>
                         )}
@@ -315,7 +315,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     {/* Match Confidence Badge */}
                     <td className="px-3 py-2.5 text-center align-middle">
                       {isMissing ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 border border-background-color-3/30 text-font-color-dimmed">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
                           Missing
                         </span>
                       ) : (
@@ -328,7 +328,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     {/* Change Count Pill */}
                     <td className="px-3 py-2.5 text-center align-middle">
                       {isMissing ? (
-                        <span className="text-xs text-font-color-dimmed italic">
+                        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed italic">
                           Not in library
                         </span>
                       ) : activeChangeCount > 0 ? (
@@ -336,26 +336,26 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                           {activeChangeCount} {activeChangeCount === 1 ? 'change' : 'changes'}
                         </span>
                       ) : (
-                        <span className="text-xs text-font-color-dimmed italic">
+                        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed italic">
                           No changes
                         </span>
                       )}
                     </td>
 
                     {/* Expand Chevron */}
-                    <td className="px-2 py-2.5 text-center text-font-color-dimmed text-xs">
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                       {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 
                   {/* Expanded Changed-Fields Drawer */}
                   {isExpanded && (
-                    <tr className="border-b border-background-color-2 bg-background-color-2/30">
+                    <tr className="border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/30 dark:bg-dark-background-color-2/40">
                       <td colSpan={7} className="px-5 py-4 pl-12">
                         <div className="flex flex-col gap-2.5">
                           <div className="flex justify-between items-center">
-                            <span className="text-xs font-semibold text-font-color-dimmed uppercase tracking-wider">
-                              Modified Fields for: <span className="text-font-color-highlight font-bold">{match.oldTitle}</span>
+                            <span className="text-xs font-semibold text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase tracking-wider">
+                              Modified Fields for: <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold">{match.oldTitle}</span>
                             </span>
 
                             {/* Deep-link to Detailed Review Mode */}
@@ -365,7 +365,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                 e.stopPropagation();
                                 onOpenDetailed(match.localSongId);
                               }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-highlight text-xs font-medium transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-highlight dark:text-dark-font-color-highlight text-xs font-medium transition-colors cursor-pointer"
                             >
                               <span>🔍 Open in Detailed Mode</span>
                               <span>↗</span>
@@ -386,8 +386,8 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                     onClick={() => onToggleField?.(match.localSongId, diff.fieldId)}
                                     className={`grid grid-cols-[24px_130px_1fr_20px_1fr_120px] items-center gap-2.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
                                       isFieldSelected
-                                        ? 'bg-background-color-1 border-background-color-2 opacity-100'
-                                        : 'bg-background-color-2/40 border-background-color-2/40 opacity-50'
+                                        ? 'bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 opacity-100'
+                                        : 'bg-background-color-2/40 dark:bg-dark-background-color-2/30 border-background-color-2/40 dark:border-dark-background-color-2/30 opacity-50'
                                     }`}
                                   >
                                     <input
@@ -401,25 +401,25 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                       className="cursor-pointer"
                                     />
 
-                                    <span className={`font-semibold ${isFieldSelected ? 'text-font-color' : 'text-font-color-dimmed'}`}>
+                                    <span className={`font-semibold ${isFieldSelected ? 'text-font-color-black dark:text-font-color-white' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
                                       {diff.fieldName}
                                     </span>
 
-                                    <span className="text-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap">
+                                    <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap">
                                       {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em className="opacity-60">None</em>}
                                     </span>
 
-                                    <span className="text-center text-font-color-dimmed font-bold">
+                                    <span className="text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-bold">
                                       →
                                     </span>
 
                                     <span
                                       className={`font-semibold overflow-hidden text-ellipsis whitespace-nowrap ${
                                         !isFieldSelected
-                                          ? 'text-font-color-dimmed line-through'
+                                          ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed line-through'
                                           : isNew
                                           ? 'text-emerald-600 dark:text-emerald-400'
-                                          : 'text-font-color-highlight'
+                                          : 'text-font-color-highlight dark:text-dark-font-color-highlight'
                                       }`}
                                     >
                                       {String(displayVal)}
@@ -427,7 +427,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                                     <div className="text-right">
                                       {diff.providerName && (
-                                        <span className="px-2 py-0.5 rounded text-[0.7rem] font-medium bg-background-color-2 border border-background-color-3/30 text-font-color-dimmed">
+                                        <span className="px-2 py-0.5 rounded text-[0.7rem] font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
                                           {diff.providerName}
                                         </span>
                                       )}
@@ -437,7 +437,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                               })}
                             </div>
                           ) : (
-                            <div className="p-3 rounded-lg bg-background-color-2/20 text-font-color-dimmed text-xs italic">
+                            <div className="p-3 rounded-lg bg-background-color-2/20 dark:bg-dark-background-color-2/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs italic">
                               All metadata fields already match this track.
                             </div>
                           )}

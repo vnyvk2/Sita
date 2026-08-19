@@ -45,38 +45,38 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar Controls */}
-      <div className="flex justify-between items-center bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
+      <div className="flex justify-between items-center bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
         <div className="flex gap-2">
           <button
             type="button"
             onClick={onSelectAll}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
           >
             Select All
           </button>
           <button
             type="button"
             onClick={onSelectChanged}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
           >
             Select Changed Only
           </button>
           <button
             type="button"
             onClick={onClearSelections}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
           >
             Clear Selections
           </button>
         </div>
 
         <div className="flex gap-3 items-center">
-          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
@@ -85,12 +85,12 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
             </select>
           </label>
 
-          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
             >
               <option value="trackNumber">Track Number</option>
               <option value="confidence">Confidence</option>
@@ -115,13 +115,13 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
               key={itemKey}
               className={`rounded-lg border transition-colors overflow-hidden ${
                 isSelected
-                  ? 'border-background-color-3 bg-background-color-3/10'
-                  : 'border-background-color-2 bg-background-color-2/20'
+                  ? 'border-background-color-3 dark:border-dark-background-color-3 bg-background-color-3/10 dark:bg-dark-background-color-3/15'
+                  : 'border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/20 dark:bg-dark-background-color-2/30'
               } ${isMissing ? 'opacity-45' : isSelected ? 'opacity-100' : 'opacity-70'}`}
             >
               {/* Main Track Row */}
               <div
-                className={`flex items-center px-4 py-3 gap-3 ${isMissing ? 'cursor-default' : 'cursor-pointer hover:bg-background-color-2/40'}`}
+                className={`flex items-center px-4 py-3 gap-3 ${isMissing ? 'cursor-default' : 'cursor-pointer hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50'}`}
                 onClick={isMissing ? undefined : () => setExpandedTrackId(isExpanded ? null : track.localSongId)}
               >
                 <input
@@ -136,15 +136,15 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                   className="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
                 />
 
-                <span className="font-mono text-xs text-font-color-dimmed w-7 font-semibold">
+                <span className="font-mono text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed w-7 font-semibold">
                   {trackNum ? String(trackNum).padStart(2, '0') : '--'}
                 </span>
 
                 <div className="flex-1 flex flex-col">
-                  <span className={`text-sm font-semibold text-font-color ${isMissing ? 'italic text-font-color-dimmed' : ''}`}>
+                  <span className={`text-sm font-semibold text-font-color-black dark:text-font-color-white ${isMissing ? 'italic text-font-color-dimmed dark:text-dark-font-color-dimmed' : ''}`}>
                     {isMissing ? (track.remoteTitle ?? '—') : track.oldTitle}
                   </span>
-                  <span className={`text-xs text-font-color-dimmed ${isMissing ? 'italic' : ''}`}>
+                  <span className={`text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed ${isMissing ? 'italic' : ''}`}>
                     {isMissing ? 'Not in library' : track.oldArtist}
                   </span>
                 </div>
@@ -165,7 +165,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
 
                 <button
                   type="button"
-                  className="bg-transparent border-0 text-font-color-dimmed hover:text-font-color cursor-pointer text-xs p-1"
+                  className="bg-transparent border-0 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer text-xs p-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedTrackId(isExpanded ? null : track.localSongId);
@@ -177,7 +177,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
 
               {/* Expanded Granular Diff Viewer */}
               {isExpanded && (
-                <div className="border-t border-background-color-2 p-4 bg-background-color-2/30">
+                <div className="border-t border-background-color-2 dark:border-dark-background-color-2 p-4 bg-background-color-2/30 dark:bg-dark-background-color-2/40">
                   <MetadataDiffViewer
                     track={track}
                     selectedFieldMap={selectedFieldMap}

@@ -78,7 +78,7 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       {/* Table Header & Controls Bar */}
       <div className="flex justify-between items-center px-1">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed uppercase">
+          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
             Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
@@ -86,21 +86,21 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
             <button
               type="button"
               onClick={onSelectAll}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={onSelectChanged}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Changed Only
             </button>
             <button
               type="button"
               onClick={onClearSelections}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Deselect All
             </button>
@@ -110,14 +110,14 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
         {/* Filter & Sort & Changes Only Selectors */}
         <div className="flex gap-2.5 items-center">
           {/* Changes Only Toggle Pill */}
-          <div className="flex bg-background-color-2 rounded-md p-0.5 border border-background-color-3/40">
+          <div className="flex bg-background-color-2 dark:bg-dark-background-color-2 rounded-md p-0.5 border border-background-color-3/40 dark:border-dark-background-color-3/40">
             <button
               type="button"
               onClick={() => setShowChangesOnly(true)}
               className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
                 showChangesOnly
-                  ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
-                  : 'text-font-color-dimmed hover:text-font-color'
+                  ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
               }`}
             >
               Changes Only
@@ -127,20 +127,20 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               onClick={() => setShowChangesOnly(false)}
               className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
                 !showChangesOnly
-                  ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
-                  : 'text-font-color-dimmed hover:text-font-color'
+                  ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
               }`}
             >
               All Fields
             </button>
           </div>
 
-          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
@@ -149,12 +149,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
             </select>
           </label>
 
-          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
             >
               <option value="trackNumber">Track #</option>
               <option value="confidence">Confidence</option>
@@ -165,10 +165,10 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="border border-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20">
+      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20 dark:bg-dark-background-color-2/30">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-background-color-2 border-b border-background-color-3/30 text-font-color-dimmed text-xs uppercase tracking-wider">
+            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
               <th className="w-9 px-2.5 py-2.5 text-center"></th>
               <th className="w-9 px-2 py-2.5 text-center">#</th>
               <th className="px-3 py-2.5">CURRENT TITLE</th>
@@ -196,14 +196,14 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                 <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => toggleExpand(match.localSongId)}
-                    className={`border-b border-background-color-2/40 transition-colors text-font-color ${
+                    className={`border-b border-background-color-2/40 dark:border-dark-background-color-2/40 transition-colors text-font-color-black dark:text-font-color-white ${
                       isMissing
-                        ? 'opacity-40 bg-background-color-2/10 cursor-default'
+                        ? 'opacity-40 bg-background-color-2/10 dark:bg-dark-background-color-2/10 cursor-default'
                         : isExpanded
-                        ? 'bg-background-color-2/40 border-b-0 cursor-pointer'
+                        ? 'bg-background-color-2/40 dark:bg-dark-background-color-2/50 border-b-0 cursor-pointer'
                         : isSelected
-                        ? 'hover:bg-background-color-2/40 cursor-pointer'
-                        : 'opacity-60 hover:bg-background-color-2/30 cursor-pointer'
+                        ? 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50 cursor-pointer'
+                        : 'opacity-60 hover:bg-background-color-2/30 dark:hover:bg-dark-background-color-2/40 cursor-pointer'
                     }`}
                   >
                     {/* Track Checkbox */}
@@ -222,34 +222,34 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Track Number */}
-                    <td className="px-2 py-2.5 text-center text-font-color-dimmed font-mono text-xs font-semibold">
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-mono text-xs font-semibold">
                       {trackNumFormatted}
                     </td>
 
                     {/* Current Local Title */}
-                    <td className={`px-3 py-2.5 font-medium ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color-dimmed'}`}>
+                    <td className={`px-3 py-2.5 font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
                       {isMissing ? 'Not in library' : match.oldTitle}
                     </td>
 
                     {/* Arrow */}
-                    <td className="px-0 py-2.5 text-center text-font-color-dimmed font-bold">
+                    <td className="px-0 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-bold">
                       →
                     </td>
 
                     {/* New Suggested Title */}
-                    <td className={`px-3 py-2.5 font-semibold ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color-highlight font-bold'}`}>
+                    <td className={`px-3 py-2.5 font-semibold ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold'}`}>
                       {newTitle}
                     </td>
 
                     {/* Artist */}
-                    <td className={`px-3 py-2.5 text-xs font-medium ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color'}`}>
+                    <td className={`px-3 py-2.5 text-xs font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-black dark:text-font-color-white'}`}>
                       {newArtist}
                     </td>
 
                     {/* Status Badge */}
                     <td className="px-3 py-2.5 text-center">
                       {isMissing ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 border border-background-color-3/30 text-font-color-dimmed">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
                           Missing
                         </span>
                       ) : (
@@ -260,17 +260,17 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Expand Chevron */}
-                    <td className="px-2 py-2.5 text-center text-font-color-dimmed text-xs">
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                       {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 
                   {/* Expanded Detailed Field Diff Drawer */}
                   {isExpanded && (
-                    <tr className="border-b border-background-color-2 bg-background-color-2/30">
+                    <tr className="border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/30 dark:bg-dark-background-color-2/40">
                       <td colSpan={8} className="px-5 py-4 pl-12">
                         <div className="flex flex-col gap-2">
-                          <span className="text-xs font-semibold text-font-color-dimmed uppercase tracking-wider">
+                          <span className="text-xs font-semibold text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase tracking-wider">
                             Track-Level Fields ({match.oldTitle})
                           </span>
                           <MetadataDiffViewer

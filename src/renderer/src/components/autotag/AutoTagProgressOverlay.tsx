@@ -38,15 +38,15 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
   };
 
   return (
-    <div className="p-5 rounded-xl bg-background-color-1 border border-background-color-2 text-font-color flex flex-col gap-3 shadow-2xl backdrop-blur-md">
+    <div className="p-5 rounded-xl bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 text-font-color-black dark:text-font-color-white flex flex-col gap-3 shadow-2xl backdrop-blur-md">
       <div className="flex justify-between items-center">
-        <span className="font-semibold text-sm text-font-color">{getStageTitle()}</span>
-        <span className="text-xs text-font-color-dimmed">{Math.round(progressPercent)}%</span>
+        <span className="font-semibold text-sm text-font-color-black dark:text-font-color-white">{getStageTitle()}</span>
+        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">{Math.round(progressPercent)}%</span>
       </div>
 
-      <div className="w-full h-2 bg-background-color-2 rounded-full overflow-hidden relative">
+      <div className="w-full h-2 bg-background-color-2 dark:bg-dark-background-color-2 rounded-full overflow-hidden relative">
         <div
-          className="h-full bg-font-color-highlight rounded-full transition-all duration-300 ease-out"
+          className="h-full bg-font-color-highlight dark:bg-dark-font-color-highlight rounded-full transition-all duration-300 ease-out"
           style={{
             width: `${Math.min(100, Math.max(0, progressPercent))}%`
           }}
@@ -54,7 +54,7 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
       </div>
 
       <div className="flex justify-between items-center">
-        <span className="text-xs text-font-color-dimmed">{message}</span>
+        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">{message}</span>
         {onCancel && stage !== 'completed' && stage !== 'cancelled' && (
           <button
             type="button"

@@ -143,17 +143,17 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[95%] max-w-[1080px] max-h-[92vh] bg-background-color-1 border border-background-color-2 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-font-color"
+        className="w-[95%] max-w-[1080px] max-h-[92vh] bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-font-color-black dark:text-font-color-white"
       >
         {/* Header Bar */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-background-color-2 bg-background-color-2/40">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/40 dark:bg-dark-background-color-2/40">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-rounded-outlined text-font-color-highlight text-2xl">auto_awesome</span>
+            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-2xl">auto_awesome</span>
             <div>
-              <div className="text-lg font-bold text-font-color-highlight leading-snug">
+              <div className="text-lg font-bold text-font-color-highlight dark:text-dark-font-color-highlight leading-snug">
                 Metadata Center / AutoTag
               </div>
-              <div className="text-xs text-font-color-dimmed mt-0.5">
+              <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5">
                 Search, compare and apply verified metadata
               </div>
             </div>
@@ -165,14 +165,14 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           <div className="flex items-center gap-3">
             {/* View Mode Toggle Pill (Compact vs Detailed) */}
             {state.preview && (
-              <div className="flex bg-background-color-2 rounded-lg p-0.5 border border-background-color-3/40">
+              <div className="flex bg-background-color-2 dark:bg-dark-background-color-2 rounded-lg p-0.5 border border-background-color-3/40 dark:border-dark-background-color-3/40">
                 <button
                   type="button"
                   onClick={() => setViewMode('compact')}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
                     viewMode === 'compact'
-                      ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
-                      : 'text-font-color-dimmed hover:text-font-color'
+                      ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                      : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                   }`}
                 >
                   <span>⊞</span>
@@ -183,8 +183,8 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                   onClick={() => setViewMode('detailed')}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
                     viewMode === 'detailed'
-                      ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
-                      : 'text-font-color-dimmed hover:text-font-color'
+                      ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                      : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                   }`}
                 >
                   <span>☷</span>
@@ -196,7 +196,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 rounded-lg text-font-color-dimmed hover:text-font-color text-base cursor-pointer px-2.5 py-1 flex items-center justify-center transition-colors"
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 rounded-lg text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-base cursor-pointer px-2.5 py-1 flex items-center justify-center transition-colors"
             >
               ✕
             </button>
@@ -223,14 +223,14 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowErrorDetails((prev) => !prev)}
-                  className="bg-transparent border-0 text-font-color-highlight text-xs cursor-pointer font-semibold"
+                  className="bg-transparent border-0 text-font-color-highlight dark:text-dark-font-color-highlight text-xs cursor-pointer font-semibold"
                 >
                   {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
                 </button>
               </div>
 
               {showErrorDetails && (
-                <div className="font-mono text-xs bg-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-red-500/20">
+                <div className="font-mono text-xs bg-background-color-1 dark:bg-dark-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-red-500/20">
                   {state.error}
                 </div>
               )}
@@ -246,7 +246,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                   <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
                     Metadata Applied Successfully!
                   </div>
-                  <div className="text-xs text-font-color-dimmed">
+                  <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                     Updated {state.selectedTrackIds.size} songs with verified tags and artwork.
                   </div>
                 </div>

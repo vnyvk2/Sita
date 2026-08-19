@@ -32,51 +32,51 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
   const totalWarnings = selectedMatches.reduce((acc, m) => acc + (m.warningCount ?? 0), 0);
 
   return (
-    <div className="bg-background-color-2/40 border border-background-color-2 rounded-xl p-5 flex flex-col gap-3.5 text-font-color">
+    <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/50 border border-background-color-2 dark:border-dark-background-color-2 rounded-xl p-5 flex flex-col gap-3.5 text-font-color-black dark:text-font-color-white">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2.5">
-          <span className="text-base font-bold text-font-color">Pre-Apply Summary</span>
+          <span className="text-base font-bold text-font-color-black dark:text-font-color-white">Pre-Apply Summary</span>
           <ConfidenceBadge level={preview.confidenceLevel} confidence={preview.overallConfidence} />
         </div>
         <div className="flex items-center gap-2">
           {preview.contributingProviders && preview.contributingProviders.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-font-color-dimmed">Federated:</span>
+              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">Federated:</span>
               {preview.contributingProviders.map((pId) => (
                 <span
                   key={pId}
-                  className="px-2 py-0.5 rounded bg-background-color-2 border border-background-color-3/40 text-font-color-dimmed text-xs font-medium"
+                  className="px-2 py-0.5 rounded bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-medium"
                 >
                   {pId === 'musicbrainz' ? 'MusicBrainz' : pId === 'discogs' ? 'Discogs' : pId === 'coverartarchive' ? 'Cover Art Archive' : pId}
                 </span>
               ))}
             </div>
           )}
-          <div className="text-xs text-font-color-highlight font-semibold">
+          <div className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
             {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
-          <div className="text-xs text-font-color-dimmed font-medium">Titles Changed</div>
-          <div className="text-xl font-bold text-font-color-highlight mt-1">{titlesChanged}</div>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Titles Changed</div>
+          <div className="text-xl font-bold text-font-color-highlight dark:text-dark-font-color-highlight mt-1">{titlesChanged}</div>
         </div>
 
-        <div className="bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
-          <div className="text-xs text-font-color-dimmed font-medium">Artists Changed</div>
-          <div className="text-xl font-bold text-font-color mt-1">{artistsChanged}</div>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Artists Changed</div>
+          <div className="text-xl font-bold text-font-color-black dark:text-font-color-white mt-1">{artistsChanged}</div>
         </div>
 
-        <div className="bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
-          <div className="text-xs text-font-color-dimmed font-medium">Years Updated</div>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Years Updated</div>
           <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{yearsChanged}</div>
         </div>
 
-        <div className="bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
-          <div className="text-xs text-font-color-dimmed font-medium">Cover Artwork</div>
-          <div className={`text-sm font-semibold mt-1 ${replaceArtwork ? 'text-emerald-600 dark:text-emerald-400' : 'text-font-color-dimmed'}`}>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Cover Artwork</div>
+          <div className={`text-sm font-semibold mt-1 ${replaceArtwork ? 'text-emerald-600 dark:text-emerald-400' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
             {replaceArtwork ? 'Replace' : 'Keep Current'}
           </div>
         </div>

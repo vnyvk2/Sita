@@ -29,18 +29,18 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
   onClose
 }) => {
   return (
-    <div className="flex justify-between items-center px-6 py-4 border-t border-background-color-2 bg-background-color-2/80 backdrop-blur-md">
+    <div className="flex justify-between items-center px-6 py-4 border-t border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/80 dark:bg-dark-background-color-2/80 backdrop-blur-md">
       {/* Metrics Summary & Undo Link */}
-      <div className="flex items-center gap-3 text-xs text-font-color-dimmed">
+      <div className="flex items-center gap-3 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
         {totalTracksCount > 0 && (
           <>
-            <span className={selectedTracksCount > 0 ? 'text-font-color font-semibold' : 'text-font-color-dimmed'}>
+            <span className={selectedTracksCount > 0 ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}>
               ✓ {selectedTracksCount} / {totalTracksCount} tracks selected
             </span>
             <span>•</span>
-            <span className="text-font-color-dimmed font-medium">{activeFieldsCount} fields active</span>
+            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">{activeFieldsCount} fields active</span>
             <span>•</span>
-            <span className={`font-bold ${totalChanges > 0 ? 'text-font-color-highlight' : 'text-font-color-dimmed'}`}>
+            <span className={`font-bold ${totalChanges > 0 ? 'text-font-color-highlight dark:text-dark-font-color-highlight' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
               {totalChanges} changes
             </span>
             {selectedTracksCount === 0 && totalChanges > 0 && (
@@ -74,7 +74,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
         <button
           type="button"
           onClick={step === 'complete' ? onClose : onCancel}
-          className="px-4 py-2 rounded-lg bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-sm font-medium transition-colors cursor-pointer"
+          className="px-4 py-2 rounded-lg bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-sm font-medium transition-colors cursor-pointer"
         >
           {step === 'complete' ? 'Close' : 'Cancel'}
         </button>
@@ -84,7 +84,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             type="button"
             onClick={onApply}
             disabled={totalChanges === 0 || loading}
-            className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 text-font-color text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-black text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             {loading
               ? 'Applying Changes...'
