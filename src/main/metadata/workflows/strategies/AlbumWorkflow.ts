@@ -43,7 +43,7 @@ export class AlbumWorkflow extends BaseMetadataWorkflow {
     const albums = await this.albumMetadataService.searchAlbums(
       searchAlbum,
       query.artist,
-      query.limit ?? 10
+      { limit: query.limit ?? 10 }
     );
 
     return albums.map((alb: AlbumMetadata) => ({

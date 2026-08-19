@@ -64,7 +64,11 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     });
 
     // 1. Search Releases
-    const releases = await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, 11, undefined, 'op-search');
+    const releases = await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', {
+      limit: 10,
+      targetTrackCount: 11,
+      operationId: 'op-search'
+    });
     expect(releases).toHaveLength(1);
     expect(stages).toContain('searching');
     expect(stages).toContain('completed');
@@ -134,7 +138,14 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     // Cancel op-1
     autoTagService.cancel('op-1');
 
-    await expect(autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, undefined, signal1, 'op-1')).rejects.toThrow(/aborted/);
+    await expect(
+      autoTagService.searchReleases(
+        'SOUR',
+        'Olivia Rodrigo',
+        { limit: 10, operationId: 'op-1' },
+        signal1
+      )
+    ).rejects.toThrow(/aborted/);
   });
 
   it('forwards targetTrackCount to AlbumMetadataService.search', async () => {
@@ -147,9 +158,17 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     };
 
     const autoTagService = new AlbumAutoTagService({ albumMetadataService: mockMetadataService as any });
-    await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', 10, 11, undefined, 'op-track-count');
+    await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', {
+      limit: 10,
+      targetTrackCount: 11,
+      operationId: 'op-track-count'
+    });
 
-    expect(mockMetadataService.search).toHaveBeenCalledWith('SOUR', 'Olivia Rodrigo', 10, 11);
+    expect(mockMetadataService.search).toHaveBeenCalledWith(
+      'SOUR',
+      'Olivia Rodrigo',
+      expect.objectContaining({ limit: 10, targetTrackCount: 11, operationId: 'op-track-count' })
+    );
   });
 
   it('updates all 7 metadata fields in DB fallback when applyPreview is called', async () => {

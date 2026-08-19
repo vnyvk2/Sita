@@ -129,7 +129,7 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
   it('provides metadataAutoTag API integration methods and supports single listener count safety', async () => {
     const api = (window as any).api.metadataAutoTag;
-    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', 10, 11, 'op-1');
+    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11, operationId: 'op-1' });
     expect(candidates).toHaveLength(2);
     expect(candidates[0].title).toBe('SOUR');
     expect(candidates[0].rankingScore).toBe(185);

@@ -253,10 +253,13 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             artist={state.searchArtist}
             totalTracks={state.searchTotalTracks}
             searchExpanded={state.searchExpanded}
+            selectedSource={state.selectedSource}
+            availableProviders={state.availableProviders}
             loading={state.loadingCandidates}
             onAlbumChange={actions.setSearchAlbum}
             onArtistChange={actions.setSearchArtist}
             onTotalTracksChange={actions.setSearchTotalTracks}
+            onSourceChange={actions.setSelectedSource}
             onToggleExpanded={actions.toggleSearchExpanded}
             onSearch={() => actions.searchReleases()}
           />

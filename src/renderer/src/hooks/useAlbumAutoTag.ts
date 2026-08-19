@@ -6,6 +6,7 @@ import type {
   ApplyPreviewOptions,
   AutoTagSongInput,
   AutoTagStage,
+  AvailableSearchProviderInfo,
   GlobalAlbumMutations,
   MetadataFieldId,
   MetadataProviderId,
@@ -43,6 +44,8 @@ export interface UseAlbumAutoTagState {
   searchArtist: string;
   searchTotalTracks: string;
   searchExpanded: boolean;
+  selectedSource: string;
+  availableProviders: AvailableSearchProviderInfo[];
 
   // Candidate Matches
   searchCandidates: AlbumMetadata[];
@@ -85,6 +88,7 @@ export interface UseAlbumAutoTagActions {
   setSearchAlbum: (val: string) => void;
   setSearchArtist: (val: string) => void;
   setSearchTotalTracks: (val: string) => void;
+  setSelectedSource: (val: string) => void;
   setSearchExpanded: (expanded: boolean) => void;
   toggleSearchExpanded: () => void;
 
@@ -138,6 +142,19 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const [searchArtist, setSearchArtist] = useState('');
   const [searchTotalTracks, setSearchTotalTracks] = useState('');
   const [searchExpanded, setSearchExpanded] = useState(true);
+  const [selectedSource, setSelectedSource] = useState('auto');
+  const [availableProviders, setAvailableProviders] = useState<AvailableSearchProviderInfo[]>([
+    { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
+    { id: 'discogs', displayName: 'Discogs', isOnline: true }
+  ]);
+
+  useEffect(() => {
+    metadataApi.getAvailableSearchProviders().then((providers) => {
+      if (providers && providers.length > 0) {
+        setAvailableProviders(providers);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Candidate Matches & Selection
   const [searchCandidates, setSearchCandidates] = useState<AlbumMetadata[]>([]);
@@ -195,9 +212,10 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
   // Search releases action
   const searchReleases = useCallback(
-    async (albumParam?: string, artistParam?: string) => {
+    async (albumParam?: string, artistParam?: string, sourceParam?: string) => {
       const albumQuery = (albumParam !== undefined ? albumParam : searchAlbum).trim();
       const artistQuery = (artistParam !== undefined ? artistParam : searchArtist).trim();
+      const activeSource = sourceParam !== undefined ? sourceParam : selectedSource;
 
       if (!albumQuery) return;
 
@@ -209,7 +227,14 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       try {
         const parsedTracks = searchTotalTracks.trim() ? parseInt(searchTotalTracks.trim(), 10) : undefined;
         const targetTrackCount = Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
-        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, 10, targetTrackCount, operationId);
+        const source = activeSource === 'auto' ? undefined : (activeSource as MetadataProviderId);
+
+        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, {
+          limit: 10,
+          targetTrackCount,
+          source: source ?? 'auto',
+          operationId
+        });
         setSearchCandidates(results);
 
         // Auto-select best match candidate if available
@@ -226,7 +251,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
         setLoadingCandidates(false);
       }
     },
-    [searchAlbum, searchArtist, searchTotalTracks, operationId, initialSongs]
+    [searchAlbum, searchArtist, searchTotalTracks, selectedSource, operationId, initialSongs]
   );
 
   // Initialize preview state from response
@@ -660,6 +685,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       searchArtist,
       searchTotalTracks,
       searchExpanded,
+      selectedSource,
+      availableProviders,
       searchCandidates,
       selectedCandidateId,
       loadingCandidates,
@@ -689,6 +716,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       setSearchAlbum,
       setSearchArtist,
       setSearchTotalTracks,
+      setSelectedSource,
       setSearchExpanded,
       toggleSearchExpanded,
       searchReleases,

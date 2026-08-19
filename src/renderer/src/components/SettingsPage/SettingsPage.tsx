@@ -13,6 +13,7 @@ import EqualizerSettings from './Settings/EqualizerSettings';
 import LanguageSettings from './Settings/LanguageSettings';
 import LibrarySettings from './Settings/LibrarySettings';
 import LyricsSettings from './Settings/LyricsSettings';
+import MetadataSettings from './Settings/MetadataSettings';
 import PerformanceSettings from './Settings/PerformanceSettings';
 import PreferencesSettings from './Settings/PreferencesSettings';
 import StartupSettings from './Settings/StartupSettings';
@@ -63,6 +64,9 @@ const SettingsPage = () => {
 
           {/* LIBRARY SCANNING SETTINGS */}
           <LibrarySettings />
+
+          {/* METADATA & AUTOTAG SOURCES SETTINGS */}
+          <MetadataSettings />
 
           {/* STORAGE SETTINGS */}
           <StorageSettings />

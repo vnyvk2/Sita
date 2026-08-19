@@ -25,6 +25,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<MetadataProviderId, string> = {
   coverartarchive: 'Cover Art Archive',
   spotify: 'Spotify',
   lastfm: 'Last.fm',
+  lrclib: 'LRCLIB',
   local: 'Local File',
   user: 'User Override'
 };

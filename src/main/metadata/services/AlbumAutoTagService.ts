@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { MetadataSearchOptions } from '../../../common/metadata/api';
 import type { AlbumMetadata, MetadataProviderId } from '../models/RecordingMetadata';
 import type { AlbumTagPreview, ApplyPreviewOptions, AutoTagStage, ProgressEventPayload, TrackMatchPreview } from '../models/AlbumTagPreview';
 import type { LocalSongInput } from './AlbumMetadataService';
@@ -58,18 +59,17 @@ export class AlbumAutoTagService extends EventEmitter {
   public async searchReleases(
     albumName: string,
     artistName?: string,
-    limit = 10,
-    targetTrackCount?: number,
-    signal?: AbortSignal,
-    operationId = 'default'
+    options?: MetadataSearchOptions,
+    signal?: AbortSignal
   ): Promise<AlbumMetadata[]> {
+    const operationId = options?.operationId ?? 'default';
     this.checkCancelled(signal);
     this.operationManager.createOperation(operationId, 'AlbumResolution', [], 'Interactive');
     this.operationManager.updateState(operationId, 'Searching', `Searching album releases for "${albumName}"...`, 10);
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
-      const results = await this.metadataService.search(albumName, artistName, limit, targetTrackCount);
+      const results = await this.metadataService.search(albumName, artistName, options);
       this.checkCancelled(signal);
       this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);
       this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);

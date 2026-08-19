@@ -62,6 +62,7 @@ import { MetadataProviderRuntime } from './runtime/MetadataProviderRuntime';
 import { AlbumAutoTagService } from './services/AlbumAutoTagService';
 import { AlbumMetadataService } from './services/AlbumMetadataService';
 import { MetadataApplyService } from './services/MetadataApplyService';
+import { MetadataPreferencesService } from './services/MetadataPreferencesService';
 import { UserMetadataService } from './services/UserMetadataService';
 import { MetadataWorkflowService } from './services/MetadataWorkflowService';
 import { AlbumWorkflow } from './workflows/strategies/AlbumWorkflow';
@@ -113,6 +114,7 @@ export interface MetadataContainer {
     autoTagService: AlbumAutoTagService;
     workflowService: MetadataWorkflowService;
     applyService: MetadataApplyService;
+    preferencesService: MetadataPreferencesService;
   };
   resolution: {
     resolutionManager: MetadataResolutionManager;
@@ -205,8 +207,15 @@ export class MetadataBootstrap {
 
     const userService = new UserMetadataService(userRepository, eventBus);
 
+    const preferencesService = new MetadataPreferencesService();
+
     // AutoTag Application & Resolution Services construction inside MetadataBootstrap composition root
-    const providerRuntime = new MetadataProviderRuntime(musicBrainzAdapter);
+    const providerRuntime = new MetadataProviderRuntime(
+      [musicBrainzAdapter, discogsAdapter],
+      undefined,
+      undefined,
+      preferencesService
+    );
     await providerRuntime.initialize();
 
     const albumMetadataService = new AlbumMetadataService(providerRuntime);
@@ -344,7 +353,8 @@ export class MetadataBootstrap {
         albumMetadataService,
         autoTagService,
         workflowService,
-        applyService
+        applyService,
+        preferencesService
       },
       resolution: {
         resolutionManager,

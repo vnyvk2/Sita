@@ -77,6 +77,9 @@ describe('Phase 14F — Discogs Contribution Adapter Suite', () => {
     expect(results[0].title).toBe('Nevermind');
     expect(results[0].artist).toBe('Nirvana');
     expect(results[0].provider).toBe('discogs');
+    expect(results[0].rankingScore).toBeDefined();
+    expect(typeof results[0].rankingScore).toBe('number');
+    expect(results[0].rankingScore).toBeGreaterThan(150);
   });
 
   it('resolveRelease() converts Discogs tracklist to domain ResolvedAlbumRelease', async () => {

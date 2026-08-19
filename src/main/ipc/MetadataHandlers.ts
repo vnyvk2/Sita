@@ -1,6 +1,10 @@
 import { ipcMain, type BrowserWindow } from 'electron';
+import type { MetadataSearchOptions, AvailableSearchProviderInfo } from '../../common/metadata/api';
+import type { MetadataProviderPreferences } from '../../common/metadata/preferences';
+import { DEFAULT_METADATA_PREFERENCES } from '../../common/metadata/preferences';
 import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
 import type { MetadataWorkflowService } from '../metadata/services/MetadataWorkflowService';
+import type { MetadataPreferencesService } from '../metadata/services/MetadataPreferencesService';
 import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
 import type { AlbumTagPreview, ApplyPreviewOptions, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
@@ -11,6 +15,7 @@ const activeProgressListeners = new WeakSet<object>();
 export function registerMetadataHandlers(
   autoTagService: AlbumAutoTagService,
   workflowService?: MetadataWorkflowService,
+  preferencesService?: MetadataPreferencesService,
   mainWindow?: BrowserWindow
 ): void {
   // Listen for progress events from AlbumAutoTagService and send over IPC to renderer
@@ -32,14 +37,36 @@ export function registerMetadataHandlers(
     });
   }
 
-  // --- Legacy Album AutoTag IPC Endpoints ---
+  // --- Album AutoTag IPC Endpoints ---
   ipcMain.handle(
     'metadata/searchAlbums',
-    async (_, albumName: string, artistName?: string, limit?: number, targetTrackCount?: number, operationId = 'default') => {
+    async (_, albumName: string, artistName?: string, options?: MetadataSearchOptions) => {
+      const operationId = options?.operationId ?? 'default';
       const signal = autoTagService.createAbortSignal(operationId);
-      return autoTagService.searchReleases(albumName, artistName, limit, targetTrackCount, signal, operationId);
+      return autoTagService.searchReleases(albumName, artistName, options, signal);
     }
   );
+
+  ipcMain.handle('metadata/getPreferences', async () => {
+    if (!preferencesService) {
+      return DEFAULT_METADATA_PREFERENCES;
+    }
+    return preferencesService.getPreferences();
+  });
+
+  ipcMain.handle('metadata/savePreferences', async (_, prefs: Partial<MetadataProviderPreferences>) => {
+    if (!preferencesService) {
+      throw new Error('Preferences service not initialized');
+    }
+    return preferencesService.savePreferences(prefs, ['musicbrainz', 'discogs', 'spotify']);
+  });
+
+  ipcMain.handle('metadata/getAvailableSearchProviders', async (): Promise<AvailableSearchProviderInfo[]> => {
+    return [
+      { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
+      { id: 'discogs', displayName: 'Discogs', isOnline: true }
+    ];
+  });
 
   ipcMain.handle(
     'metadata/buildPreview',

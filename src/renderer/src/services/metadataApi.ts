@@ -1,10 +1,49 @@
-import type { AlbumMetadata, AlbumTagPreview, ApplyPreviewOptions, MetadataAutoTagApi, MetadataProviderId, ProgressEventPayload } from '../../../common/metadata/types';
+import type {
+  AlbumMetadata,
+  AlbumTagPreview,
+  ApplyPreviewOptions,
+  AvailableSearchProviderInfo,
+  MetadataAutoTagApi,
+  MetadataProviderId,
+  MetadataProviderPreferences,
+  MetadataSearchOptions,
+  ProgressEventPayload
+} from '../../../common/metadata/types';
 
 export const metadataApi = {
-  searchAlbums: async (albumName: string, artistName?: string, limit?: number, targetTrackCount?: number, operationId?: string): Promise<AlbumMetadata[]> => {
+  searchAlbums: async (
+    albumName: string,
+    artistName?: string,
+    options?: MetadataSearchOptions
+  ): Promise<AlbumMetadata[]> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api) return [];
-    return api.searchAlbums(albumName, artistName, limit, targetTrackCount, operationId);
+    return api.searchAlbums(albumName, artistName, options);
+  },
+
+  getMetadataPreferences: async (): Promise<MetadataProviderPreferences | null> => {
+    const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
+    if (!api || typeof api.getMetadataPreferences !== 'function') return null;
+    return api.getMetadataPreferences();
+  },
+
+  saveMetadataPreferences: async (
+    prefs: Partial<MetadataProviderPreferences>
+  ): Promise<MetadataProviderPreferences | null> => {
+    const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
+    if (!api || typeof api.saveMetadataPreferences !== 'function') return null;
+    return api.saveMetadataPreferences(prefs);
+  },
+
+  getAvailableSearchProviders: async (): Promise<AvailableSearchProviderInfo[]> => {
+    const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
+    if (!api || typeof api.getAvailableSearchProviders !== 'function') {
+      return [
+        { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
+        { id: 'discogs', displayName: 'Discogs', isOnline: true }
+      ];
+    }
+    return api.getAvailableSearchProviders();
   },
 
   buildPreview: async (localSongs: unknown[], releaseId: string, providerId?: MetadataProviderId, operationId?: string): Promise<AlbumTagPreview | null> => {

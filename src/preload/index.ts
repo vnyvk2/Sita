@@ -805,8 +805,8 @@ export const api = {
   membership,
   metadata,
   metadataAutoTag: {
-    searchAlbums: (albumName: string, artistName?: string, limit?: number, targetTrackCount?: number, operationId?: string) =>
-      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, limit, targetTrackCount, operationId),
+    searchAlbums: (albumName: string, artistName?: string, options?: unknown) =>
+      ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, options),
     buildPreview: (
       localSongs: unknown[],
       releaseId: string,
@@ -820,6 +820,12 @@ export const api = {
       ipcRenderer.invoke('metadata/undoLastAutoTag', operationId),
     cancelAutoTag: (operationId?: string) =>
       ipcRenderer.invoke('metadata/cancelAutoTag', operationId),
+    getMetadataPreferences: () =>
+      ipcRenderer.invoke('metadata/getPreferences'),
+    saveMetadataPreferences: (prefs: unknown) =>
+      ipcRenderer.invoke('metadata/savePreferences', prefs),
+    getAvailableSearchProviders: () =>
+      ipcRenderer.invoke('metadata/getAvailableSearchProviders'),
     onProgress: (callback: (payload: any) => void) => {
       const listener = (_: unknown, data: any) => callback(data);
       ipcRenderer.on('metadata/progress', listener);

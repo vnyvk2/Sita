@@ -1,14 +1,18 @@
 import React from 'react';
+import type { AvailableSearchProviderInfo } from '../../../../common/metadata/types';
 
 export interface SearchCriteriaBarProps {
   album: string;
   artist: string;
   totalTracks: string;
   searchExpanded: boolean;
+  selectedSource: string;
+  availableProviders: AvailableSearchProviderInfo[];
   loading: boolean;
   onAlbumChange: (val: string) => void;
   onArtistChange: (val: string) => void;
   onTotalTracksChange: (val: string) => void;
+  onSourceChange: (source: string) => void;
   onToggleExpanded: () => void;
   onSearch: () => void;
 }
@@ -18,10 +22,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
   artist,
   totalTracks,
   searchExpanded,
+  selectedSource,
+  availableProviders,
   loading,
   onAlbumChange,
   onArtistChange,
   onTotalTracksChange,
+  onSourceChange,
   onToggleExpanded,
   onSearch
 }) => {
@@ -73,6 +80,9 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
               {artist ? <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{artist} — </span> : ''}
               <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{album || 'No Album'}</span>
               {totalTracks ? <span style={{ color: '#94A3B8', fontWeight: 500 }}> · {totalTracks} tracks</span> : ''}
+              <span style={{ color: '#64748B', fontSize: '0.78rem' }}>
+                {' '}· Source: {selectedSource === 'auto' ? 'Best Match' : selectedSource}
+              </span>
             </span>
           )}
         </div>
@@ -101,7 +111,7 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
       {/* Expanded Search Inputs Form */}
       {searchExpanded && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '12px', alignItems: 'flex-end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 160px', gap: '12px', alignItems: 'flex-end' }}>
             {/* Album Artist */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <label htmlFor="autotag-artist-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
@@ -152,7 +162,7 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
             {/* Total Tracks */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <label htmlFor="autotag-tracks-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
-                TOTAL TRACKS
+                TRACKS
               </label>
               <input
                 id="autotag-tracks-input"
@@ -173,16 +183,45 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 }}
               />
             </div>
+
+            {/* Search Source Selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label htmlFor="autotag-source-select" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+                SEARCH SOURCE
+              </label>
+              <select
+                id="autotag-source-select"
+                value={selectedSource}
+                onChange={(e) => onSourceChange(e.target.value)}
+                style={{
+                  padding: '9px 10px',
+                  borderRadius: '7px',
+                  background: '#1E293B',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#F8FAFC',
+                  outline: 'none',
+                  fontSize: '0.84rem',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="auto">🌐 Best Match</option>
+                {availableProviders.map((prov) => (
+                  <option key={prov.id} value={prov.id}>
+                    • {prov.displayName} Only
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Provider Architecture Description & Find Action */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#94A3B8' }}>
-              <span style={{ fontWeight: 600, color: '#CBD5E1' }}>Release source:</span> MusicBrainz
+              <span style={{ fontWeight: 600, color: '#CBD5E1' }}>Discovery Strategy:</span>
+              <span>{selectedSource === 'auto' ? 'Settings-driven multi-source ranking' : `Direct ${selectedSource} query`}</span>
               <span style={{ opacity: 0.4 }}>•</span>
-              <span>Discogs genre/style enrichment</span>
-              <span style={{ opacity: 0.4 }}>•</span>
-              <span>Cover Art Archive artwork</span>
+              <span>Field Federation: Discogs Genres · CAA Artwork</span>
             </div>
 
             <button

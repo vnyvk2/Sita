@@ -25,6 +25,10 @@ import type {
   OrderDefinition,
   SmartPlaylistField
 } from '../collections/query/ast';
+import {
+  DEFAULT_METADATA_PREFERENCES,
+  type MetadataProviderPreferences
+} from '../../common/metadata/preferences';
 
 // ============================================================================
 // Data types
@@ -595,6 +599,12 @@ export const userSettings = pgTable(
       .notNull()
       .default('automatic'),
     lastScanTime: timestamp('last_scan_time', { withTimezone: false }),
+
+    // Metadata provider preferences (search sources, priorities, enrichment defaults)
+    metadataPreferences: json('metadata_preferences')
+      .$type<MetadataProviderPreferences>()
+      .notNull()
+      .default(DEFAULT_METADATA_PREFERENCES),
 
     createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()

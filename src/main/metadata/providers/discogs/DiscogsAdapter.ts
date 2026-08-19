@@ -12,6 +12,11 @@ import { ProviderCapabilities, ProviderCapability } from '../../contracts/Provid
 import { ProviderResult } from '../../models/ProviderResult';
 import { MetadataConfidence } from '../../models/MetadataConfidence';
 import { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
+import { MetadataQueryNormalizer } from '../../search/MetadataQueryNormalizer';
+import {
+  MetadataSearchRankingEngine,
+  type SearchCandidate
+} from '../../search/MetadataSearchRankingEngine';
 
 export interface DiscogsAdapterOptions {
   registry?: ProviderRegistry;
@@ -123,13 +128,60 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     return result;
   }
 
-  public async searchAlbums(album: string, artist?: string, limit = 10): Promise<AlbumMetadata[]> {
+  public async searchAlbums(
+    album: string,
+    artist?: string,
+    limit = 10,
+    targetTrackCount?: number
+  ): Promise<AlbumMetadata[]> {
+    if (!album) return [];
+
+    const cacheKey = `album_search:${album}:${artist ?? ''}:${limit}:${targetTrackCount ?? 0}`;
+    if (this.cache) {
+      const cached = this.cache.get<AlbumMetadata[]>(this.identity.id, cacheKey);
+      if (cached) return cached;
+    }
+
     const qStr = [album, artist].filter(Boolean).join(' ');
-    if (!qStr) return [];
+    const releases = await this.apiClient.searchReleases(qStr, Math.max(limit * 2, 20));
 
-    const releases = await this.apiClient.searchReleases(qStr, limit);
+    const normQuery = MetadataQueryNormalizer.normalize(album, artist);
 
-    return releases.map((rel) => {
+    const candidates: { candidate: SearchCandidate; raw: typeof releases[0] }[] = releases.map((rel) => {
+      const parts = rel.title.split(' - ');
+      const relArtist = parts.length > 1 ? parts[0].trim() : artist ?? 'Unknown Artist';
+      const relTitle = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rel.title;
+      const parsedYear = rel.year ? parseInt(rel.year, 10) : undefined;
+      const formats = rel.format ?? [];
+      const isAlbum = formats.some((f) => f.toLowerCase().includes('album') || f.toLowerCase().includes('lp') || f.toLowerCase().includes('cd'));
+      const isEP = formats.some((f) => f.toLowerCase().includes('ep') || f.toLowerCase().includes('mini-album'));
+
+      return {
+        candidate: {
+          id: String(rel.id),
+          title: relTitle,
+          artist: relArtist,
+          year: parsedYear,
+          status: 'Official',
+          primaryType: isAlbum ? 'Album' : isEP ? 'EP' : undefined,
+          baseScore: 80,
+          rawItem: rel
+        },
+        raw: rel
+      };
+    });
+
+    const ranked = MetadataSearchRankingEngine.rankCandidates(
+      candidates.map((c) => c.candidate),
+      normQuery,
+      targetTrackCount
+    );
+
+    const candidateMap = new Map<string, typeof releases[0]>();
+    candidates.forEach((c) => candidateMap.set(c.candidate.id, c.raw));
+
+    const results: AlbumMetadata[] = ranked.slice(0, limit).map((scored) => {
+      const rel = candidateMap.get(scored.candidate.id)!;
       const parts = rel.title.split(' - ');
       const relArtist = parts.length > 1 ? parts[0].trim() : artist ?? 'Unknown Artist';
       const relTitle = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rel.title;
@@ -140,9 +192,16 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
         artist: relArtist,
         year: rel.year ? parseInt(rel.year, 10) : undefined,
         provider: 'discogs',
+        rankingScore: Math.round(scored.totalScore),
         artwork: (rel.cover_image ?? rel.thumb) ? { onlineUrls: [rel.cover_image ?? rel.thumb!] } : undefined
       };
     });
+
+    if (this.cache) {
+      this.cache.set(this.identity.id, cacheKey, results);
+    }
+
+    return results;
   }
 
   public async resolveRelease(providerReleaseId: string): Promise<ResolvedAlbumRelease | null> {

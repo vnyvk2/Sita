@@ -56,6 +56,31 @@ export interface ScoredSearchCandidate {
   };
 }
 
+export enum MatchQualityBand {
+  Definitive = 'Definitive',
+  Probable = 'Probable',
+  Weak = 'Weak'
+}
+
+export function classifyQualityBand(scored: ScoredSearchCandidate): MatchQualityBand {
+  const hasExactArtist = scored.breakdown.artistScore >= 27;
+  const hasExactTitle = scored.breakdown.titleScore >= 27;
+  const hasTrackMatch = scored.breakdown.trackCountBonus > 0;
+  const isOfficialOrAlbum = scored.breakdown.statusScore > 0 || scored.breakdown.primaryTypeScore > 0;
+
+  // Definitive: High similarity on title + artist with track match or official studio release
+  if (hasExactArtist && hasExactTitle && (hasTrackMatch || isOfficialOrAlbum) && scored.totalScore >= 160) {
+    return MatchQualityBand.Definitive;
+  }
+
+  // Probable: Strong title/artist score without heavy penalties
+  if (scored.totalScore >= 120 && (hasExactArtist || hasExactTitle)) {
+    return MatchQualityBand.Probable;
+  }
+
+  return MatchQualityBand.Weak;
+}
+
 export class MetadataSearchRankingEngine {
   public static rankCandidates(
     candidates: SearchCandidate[],

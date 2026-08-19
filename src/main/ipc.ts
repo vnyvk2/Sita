@@ -179,6 +179,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       registerMetadataHandlers(
         metadataContainer.application.autoTagService,
         metadataContainer.application.workflowService,
+        metadataContainer.application.preferencesService,
         mainWindow
       );
       logger.info(
