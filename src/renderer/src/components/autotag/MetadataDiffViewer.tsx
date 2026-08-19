@@ -1,11 +1,13 @@
 import React from 'react';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
+import { isFieldChanged } from './utils/previewSummary';
 
 export interface MetadataDiffViewerProps {
   track?: TrackMatchPreview;
   match?: TrackMatchPreview;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
+  showChangesOnly?: boolean;
   onFieldChanged: (fieldId: MetadataFieldId, value: string | number) => void;
   onToggleField: (fieldId: MetadataFieldId) => void;
   onResetField: (fieldId: MetadataFieldId) => void;
@@ -17,6 +19,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   match,
   selectedFieldMap,
   userEditedValues,
+  showChangesOnly = false,
   onFieldChanged,
   onToggleField,
   onResetField,
@@ -24,6 +27,10 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
 }) => {
   const activeTrack = track ?? match;
   if (!activeTrack) return null;
+
+  const visibleDiffs = showChangesOnly
+    ? activeTrack.fieldDiffs.filter(isFieldChanged)
+    : activeTrack.fieldDiffs;
 
   const getBadgeStyle = (status: string) => {
     switch (status) {
@@ -58,7 +65,12 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {activeTrack.fieldDiffs.map((diff) => {
+        {visibleDiffs.length === 0 ? (
+          <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)', color: '#94A3B8', fontSize: '0.82rem', fontStyle: 'italic' }}>
+            No modified fields for this track. Toggle &quot;All Fields&quot; to inspect unmodified tags.
+          </div>
+        ) : (
+          visibleDiffs.map((diff) => {
           const key = `${activeTrack.localSongId}::${diff.fieldId}`;
           const isSelected = selectedFieldMap.get(key) ?? diff.applyField;
           const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
@@ -185,7 +197,8 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
               </button>
             </div>
           );
-        })}
+        })
+      )}
       </div>
     </div>
   );

@@ -8,10 +8,12 @@ export interface TrackComparisonTableProps {
   selectedTrackIds: Set<number>;
   selectedFieldMap: Map<string, boolean>;
   userEditedValues: Map<string, string | number>;
+  expandedTrackId?: number | null;
   filter: PreviewFilterOption;
   sort: PreviewSortOption;
   onToggleTrack: (songId: number) => void;
   onToggleField: (songId: number, fieldId: MetadataFieldId) => void;
+  onToggleExpand?: (songId: number) => void;
   onFieldChanged: (songId: number, fieldId: MetadataFieldId, value: string | number) => void;
   onResetField: (songId: number, fieldId: MetadataFieldId) => void;
   onSelectAll: () => void;
@@ -26,10 +28,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
   selectedTrackIds,
   selectedFieldMap,
   userEditedValues,
+  expandedTrackId,
   filter,
   sort,
   onToggleTrack,
   onToggleField,
+  onToggleExpand,
   onFieldChanged,
   onResetField,
   onSelectAll,
@@ -38,10 +42,17 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
   onFilterChange,
   onSortChange
 }) => {
-  const [expandedTrackId, setExpandedTrackId] = useState<number | null>(null);
+  const [internalExpandedTrackId, setInternalExpandedTrackId] = useState<number | null>(null);
+  const [showChangesOnly, setShowChangesOnly] = useState(true);
+
+  const effectiveExpandedId = expandedTrackId !== undefined ? expandedTrackId : internalExpandedTrackId;
 
   const toggleExpand = (songId: number) => {
-    setExpandedTrackId((prev) => (prev === songId ? null : songId));
+    if (onToggleExpand) {
+      onToggleExpand(songId);
+    } else {
+      setInternalExpandedTrackId((prev) => (prev === songId ? null : songId));
+    }
   };
 
   const getMatchStatusBadge = (match: TrackMatchPreview) => {
@@ -122,8 +133,44 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
           </div>
         </div>
 
-        {/* Filter & Sort Selectors */}
+        {/* Filter & Sort & Changes Only Selectors */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Changes Only Toggle Pill */}
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+            <button
+              type="button"
+              onClick={() => setShowChangesOnly(true)}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                background: showChangesOnly ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+                color: showChangesOnly ? '#60A5FA' : '#94A3B8',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Changes Only
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowChangesOnly(false)}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                background: !showChangesOnly ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+                color: !showChangesOnly ? '#60A5FA' : '#94A3B8',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              All Fields
+            </button>
+          </div>
+
           <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
             Filter:
             <select
@@ -178,7 +225,7 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
           <tbody>
             {matches.map((match, idx) => {
               const isSelected = selectedTrackIds.has(match.localSongId);
-              const isExpanded = expandedTrackId === match.localSongId;
+              const isExpanded = effectiveExpandedId === match.localSongId;
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
               const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
@@ -202,10 +249,8 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          onToggleTrack(match.localSongId);
-                        }}
+                        onChange={() => onToggleTrack(match.localSongId)}
+                        onClick={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer' }}
                       />
                     </td>
@@ -270,6 +315,7 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                             track={match}
                             selectedFieldMap={selectedFieldMap}
                             userEditedValues={userEditedValues}
+                            showChangesOnly={showChangesOnly}
                             onToggleField={(fieldId) => onToggleField(match.localSongId, fieldId)}
                             onFieldChanged={(fieldId, val) => onFieldChanged(match.localSongId, fieldId, val)}
                             onResetField={(fieldId) => onResetField(match.localSongId, fieldId)}

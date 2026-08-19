@@ -3,6 +3,7 @@ import type { AlbumTagPreview } from '../../../../common/metadata/types';
 import { getProviderDisplayName } from '../../../../common/metadata/displayNames';
 import type { ArtworkSourceOption } from '../../hooks/useAlbumAutoTag';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { FederationSummaryBar } from './FederationSummaryBar';
 
 export interface SelectedReleasePanelProps {
   preview: AlbumTagPreview;
@@ -112,6 +113,12 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
             Confidence: {confidencePercent}%
           </div>
         </div>
+
+        {/* Dynamic Federation Summary Bar */}
+        <FederationSummaryBar
+          preview={preview}
+          artworkSource={replaceArtwork && artworkSource !== 'local' ? getProviderDisplayName(artworkSource) : undefined}
+        />
 
         {/* Artwork Source Radio Group */}
         {replaceArtwork && (
