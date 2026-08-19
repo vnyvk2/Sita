@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly MAIN_VITE_GENIUS_API_KEY: string;
   readonly MAIN_VITE_SENTRY_DSN: string;
   readonly MAIN_VITE_DISCORD_CLIENT_ID: string;
+  readonly MAIN_VITE_SPOTIFY_CLIENT_ID?: string;
   // more env variables...
 }
 

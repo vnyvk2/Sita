@@ -115,6 +115,7 @@ import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImport
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 import saveLyricsToSong from './saveLyricsToSong';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
+import { setupSpotifyIpc } from './spotify/ipc/setupSpotifyIpc';
 import updateSongId3Tags, { isMetadataUpdatesPending } from './updateSong/updateSongId3Tags';
 import convertLyricsToPinyin from './utils/convertToPinyin';
 import convertLyricsToRomaja from './utils/convertToRomaja';
@@ -168,6 +169,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   setupPlaylistImportIpc(playlistImportWorkflow, importHistoryService);
 
   setupPlaylistExportIpc(playlistRepository);
+  setupSpotifyIpc();
   registerMembershipIPCHandlers();
 
   MetadataBootstrap.getInstance()
