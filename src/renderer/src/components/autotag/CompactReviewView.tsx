@@ -20,11 +20,13 @@ export interface CompactReviewViewProps {
   onClearSelections: () => void;
   onFilterChange?: (filter: PreviewFilterOption) => void;
   onSortChange?: (sort: PreviewSortOption) => void;
+  onToggleField?: (songId: number, fieldId: string) => void;
 }
 
 export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
   matches,
   selectedTrackIds,
+  selectedFieldMap,
   userEditedValues,
   expandedTrackId,
   focusedTrackIndex = -1,
@@ -37,7 +39,8 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
   onSelectChanged,
   onClearSelections,
   onFilterChange,
-  onSortChange
+  onSortChange,
+  onToggleField
 }) => {
   const getMatchStatusBadge = (match: TrackMatchPreview) => {
     const isExact = match.confidence >= 0.95 && !match.hasWarnings;
@@ -419,6 +422,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               {changedDiffs.map((diff) => {
                                 const key = `${match.localSongId}::${diff.fieldId}`;
+                                const isFieldSelected = selectedFieldMap.get(key) ?? diff.applyField;
                                 const displayVal = userEditedValues.get(key) ?? diff.suggestedValue ?? '';
                                 const prov = getProviderStyle(diff.providerId);
                                 const isNew = diff.status === 'new';
@@ -426,19 +430,34 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                 return (
                                   <div
                                     key={diff.fieldId}
+                                    onClick={() => onToggleField?.(match.localSongId, diff.fieldId)}
                                     style={{
                                       display: 'grid',
-                                      gridTemplateColumns: '140px 1fr 20px 1fr 130px',
+                                      gridTemplateColumns: '24px 130px 1fr 20px 1fr 120px',
                                       alignItems: 'center',
                                       gap: '10px',
                                       padding: '6px 12px',
                                       borderRadius: '6px',
-                                      background: 'rgba(255, 255, 255, 0.04)',
-                                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                                      fontSize: '0.82rem'
+                                      background: isFieldSelected ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.25)',
+                                      border: isFieldSelected ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.04)',
+                                      opacity: isFieldSelected ? 1 : 0.45,
+                                      fontSize: '0.82rem',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
                                     }}
                                   >
-                                    <span style={{ fontWeight: 700, color: '#E2E8F0' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isFieldSelected}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        onToggleField?.(match.localSongId, diff.fieldId);
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+
+                                    <span style={{ fontWeight: 700, color: isFieldSelected ? '#E2E8F0' : '#94A3B8' }}>
                                       {diff.fieldName}
                                     </span>
 
@@ -450,7 +469,16 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                       →
                                     </span>
 
-                                    <span style={{ fontWeight: 600, color: isNew ? '#34D399' : '#FBBF24', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <span
+                                      style={{
+                                        fontWeight: 600,
+                                        color: !isFieldSelected ? '#64748B' : isNew ? '#34D399' : '#FBBF24',
+                                        textDecoration: isFieldSelected ? 'none' : 'line-through',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
                                       {String(displayVal)}
                                     </span>
 

@@ -237,6 +237,38 @@ describe('CompactReviewView Component', () => {
     expect(screen.getByText('Hip Hop')).toBeDefined();
   });
 
+  it('allows selecting and deselecting individual fields in the expanded drawer', () => {
+    const onToggleField = vi.fn();
+    const selectedFieldMap = new Map<string, boolean>([
+      ['1::artist', false] // Artist field deselected
+    ]);
+
+    render(
+      <CompactReviewView
+        matches={mockMatches}
+        selectedTrackIds={new Set([1, 2])}
+        selectedFieldMap={selectedFieldMap}
+        userEditedValues={new Map()}
+        expandedTrackId={1} // Track 1 expanded
+        onToggleTrack={vi.fn()}
+        onToggleExpand={vi.fn()}
+        onOpenDetailed={vi.fn()}
+        onSelectAll={vi.fn()}
+        onSelectChanged={vi.fn()}
+        onClearSelections={vi.fn()}
+        onToggleField={onToggleField}
+      />
+    );
+
+    // Should render field checkboxes in the expanded drawer
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBeGreaterThanOrEqual(4);
+
+    // Clicking a field checkbox calls onToggleField with (localSongId, fieldId)
+    fireEvent.click(checkboxes[2]);
+    expect(onToggleField).toHaveBeenCalled();
+  });
+
   it('preserves user edited values in expanded drawer', () => {
     const userEditedValues = new Map<string, string | number>([
       ['1::title', 'brutal (custom edit)']

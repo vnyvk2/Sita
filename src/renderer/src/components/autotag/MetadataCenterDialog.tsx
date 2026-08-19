@@ -429,6 +429,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                 onClearSelections={actions.clearTrackSelections}
                 onFilterChange={actions.setFilter}
                 onSortChange={actions.setSort}
+                onToggleField={actions.toggleField}
               />
             ) : (
               <TrackComparisonTable
