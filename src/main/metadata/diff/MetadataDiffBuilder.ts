@@ -33,6 +33,7 @@ export class MetadataDiffBuilder {
 
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
+    const rawSongGenre = extractStringValue(song.genre);
 
     const suggestedAlbum = rawSongAlbum && merged.album
       ? AlbumSuffixPreserver.preserveAlbumSuffix(rawSongAlbum, merged.album)
@@ -64,7 +65,7 @@ export class MetadataDiffBuilder {
       this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
+      this.compareField('genre', 'Genre', rawSongGenre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
       this.compareField('isrc', 'ISRC', song.isrc, recIsrc, merged.fieldAttributions.isrc, mapAlternatives('isrc')),
       this.compareField('musicBrainzRecordingId', 'MusicBrainz Recording ID', song.musicBrainzRecordingId, recMbid, merged.fieldAttributions.musicBrainzRecordingId, mapAlternatives('musicBrainzRecordingId'))
     ];
@@ -84,7 +85,7 @@ export class MetadataDiffBuilder {
       oldYear: song.year,
       oldTrackNumber: song.trackNumber,
       oldDiscNumber: song.discNumber,
-      oldGenre: song.genre,
+      oldGenre: rawSongGenre,
       confidence: conf,
       confidenceLevel: pair?.confidenceLevel ?? 'Excellent',
       why: pair?.why ?? 'Multi-Provider Merged Resolution',
@@ -103,6 +104,7 @@ export class MetadataDiffBuilder {
     const song = pair.localSong;
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
+    const rawSongGenre = extractStringValue(song.genre);
 
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
@@ -126,7 +128,7 @@ export class MetadataDiffBuilder {
       this.compareField('year', 'Year', song.year, recording.year, makeAttribution('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, makeAttribution('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, makeAttribution('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0], makeAttribution('genre')),
+      this.compareField('genre', 'Genre', rawSongGenre, recording.genres?.[0], makeAttribution('genre')),
       this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, makeAttribution('isrc')),
       this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, makeAttribution('musicBrainzRecordingId'))
     ];
@@ -141,12 +143,12 @@ export class MetadataDiffBuilder {
       localSongId: song.songId,
       songPath: song.path,
       oldTitle: song.title,
-      oldArtist: song.artist,
-      oldAlbum: song.album,
+      oldArtist: rawSongArtist,
+      oldAlbum: rawSongAlbum,
       oldYear: song.year,
       oldTrackNumber: song.trackNumber,
       oldDiscNumber: song.discNumber,
-      oldGenre: song.genre,
+      oldGenre: rawSongGenre,
       oldIsrc: song.isrc,
       oldMbid: song.musicBrainzRecordingId,
       confidence: pair.confidence,

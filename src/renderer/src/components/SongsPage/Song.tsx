@@ -501,7 +501,7 @@ const Song = memo(
           handlerFunction: () => {
             if (openAutoTagDialog) {
               openAutoTagDialog(
-                [{ songId, title, artist: artists?.[0]?.name, album: album?.name, path }],
+                [{ songId, title, artists, album, genres, trackNo, discNo, year, path }],
                 title,
                 artists?.[0]?.name,
                 'track'
@@ -516,7 +516,7 @@ const Song = memo(
           handlerFunction: () => {
             if (openAutoTagDialog) {
               openAutoTagDialog(
-                [{ songId, title, artist: artists?.[0]?.name, album: album?.name, path }],
+                [{ songId, title, artists, album, genres, trackNo, discNo, year, path }],
                 album?.name ?? title,
                 artists?.[0]?.name,
                 'album'

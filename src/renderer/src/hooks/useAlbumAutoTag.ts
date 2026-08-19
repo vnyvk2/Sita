@@ -505,6 +505,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       if (res.success) {
         setStep('complete');
         setCanUndo(true);
+        previewCacheRef.current.clear();
         invalidateQueryCache();
         return true;
       } else {

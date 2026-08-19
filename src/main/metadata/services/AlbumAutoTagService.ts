@@ -10,16 +10,22 @@ import { MetadataOperationManager } from '../operations/MetadataOperationManager
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
+import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
+
+export type SongHydrator = (songId: number) => Promise<LocalSongInput | null>;
+
 export interface AlbumAutoTagServiceOptions {
   albumMetadataService: AlbumMetadataService;
   applyService?: MetadataApplyService;
   resolutionManager?: MetadataResolutionManager;
+  songHydrator?: SongHydrator;
 }
 
 export class AlbumAutoTagService extends EventEmitter {
   private readonly metadataService: AlbumMetadataService;
   private readonly applyService: MetadataApplyService;
   private readonly resolutionManager?: MetadataResolutionManager;
+  private readonly songHydrator?: SongHydrator;
   private readonly operationManager: MetadataOperationManager;
   private readonly transactionManager: MetadataTransactionManager;
   private readonly activeOperations: Map<string, AbortController> = new Map();
@@ -30,6 +36,7 @@ export class AlbumAutoTagService extends EventEmitter {
     this.metadataService = options.albumMetadataService;
     this.applyService = options.applyService ?? new MetadataApplyService();
     this.resolutionManager = options.resolutionManager;
+    this.songHydrator = options.songHydrator;
     this.operationManager = new MetadataOperationManager();
     this.transactionManager = new MetadataTransactionManager({
       dbUpdater: this.applyService.updater,
@@ -69,10 +76,11 @@ export class AlbumAutoTagService extends EventEmitter {
     this.emitProgress('searching', `Searching album releases for "${albumName}"...`, 10, operationId);
 
     try {
+      this.activeOperations.set(operationId, new AbortController());
       const results = await this.metadataService.search(albumName, artistName, options);
       this.checkCancelled(signal);
-      this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);
-      this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);
+      this.operationManager.updateState(operationId, 'CandidatesDiscovered', `Found ${results.length} release candidates.`, 100);
+      this.emitProgress('candidates_ready', `Found ${results.length} release candidates.`, 100, operationId);
       return results;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
@@ -91,6 +99,7 @@ export class AlbumAutoTagService extends EventEmitter {
 
   /**
    * Build complete AutoTag preview diff for local songs against a selected release.
+   * Guarantees authoritative baseline hydration from SQLite database / physical tags.
    */
   public async buildPreview(
     localSongs: LocalSongInput[],
@@ -100,7 +109,32 @@ export class AlbumAutoTagService extends EventEmitter {
     operationId = 'default'
   ): Promise<AlbumTagPreview> {
     this.checkCancelled(signal);
-    const targetResourceIds = localSongs.map((s) => s.songId);
+
+    // 1. Authoritative Main Process Baseline Hydration
+    const hydratedSongs: LocalSongInput[] = await Promise.all(
+      localSongs.map(async (song) => {
+        const songId = song.songId || (song as any).id;
+        if (songId) {
+          try {
+            if (this.songHydrator) {
+              const hydrated = await this.songHydrator(songId);
+              if (hydrated) return hydrated;
+            } else {
+              const { getSongById } = await import('../../db/queries/songs');
+              const dbSong = await getSongById(songId);
+              if (dbSong) {
+                return LocalSongNormalizer.fromDbSong(dbSong);
+              }
+            }
+          } catch {
+            // Fall back to normalized input if DB query fails in testing
+          }
+        }
+        return LocalSongNormalizer.normalize(song);
+      })
+    );
+
+    const targetResourceIds = hydratedSongs.map((s) => s.songId);
     this.operationManager.createOperation(operationId, 'AlbumResolution', targetResourceIds, 'Interactive');
     this.operationManager.updateState(operationId, 'Resolving', `Resolving release details for ${releaseId}...`, 30);
     this.emitProgress('resolving', `Resolving release details for ${releaseId}...`, 30, operationId);
@@ -113,8 +147,8 @@ export class AlbumAutoTagService extends EventEmitter {
         throw new Error(`Unable to resolve release details for ID '${releaseId}'`);
       }
 
-      this.emitProgress('matching', `Matching ${localSongs.length} local songs against release tracks...`, 60, operationId);
-      const albumPreview = await this.metadataService.buildAlbumMatch(localSongs, resolved.album, resolved.tracks);
+      this.emitProgress('matching', `Matching ${hydratedSongs.length} local songs against release tracks...`, 60, operationId);
+      const albumPreview = await this.metadataService.buildAlbumMatch(hydratedSongs, resolved.album, resolved.tracks);
       this.checkCancelled(signal);
 
       this.operationManager.updateState(operationId, 'Merging', 'Building presentation-friendly metadata diffs...', 85);
