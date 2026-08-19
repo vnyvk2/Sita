@@ -8,9 +8,8 @@ import { TrackMatcher } from '../../matching/TrackMatcher';
 describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () => {
   // Test mock candidate release
   const mockRelease: ResolvedAlbumRelease = {
-    releaseId: 'rel-sour-2021',
     provider: 'musicbrainz',
-    providerReleaseId: 'mb-sour-2021',
+    providerReleaseId: 'rel-sour-2021',
     album: {
       releaseId: 'rel-sour-2021',
       title: 'SOUR',

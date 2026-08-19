@@ -8,7 +8,6 @@ import { MetadataDiffBuilder } from '../diff/MetadataDiffBuilder';
 import { MetadataApplyService, type ApplyResult } from './MetadataApplyService';
 import { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
-import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
 
@@ -79,8 +78,8 @@ export class AlbumAutoTagService extends EventEmitter {
       this.activeOperations.set(operationId, new AbortController());
       const results = await this.metadataService.search(albumName, artistName, options);
       this.checkCancelled(signal);
-      this.operationManager.updateState(operationId, 'CandidatesDiscovered', `Found ${results.length} release candidates.`, 100);
-      this.emitProgress('candidates_ready', `Found ${results.length} release candidates.`, 100, operationId);
+      this.operationManager.updateState(operationId, 'Completed', `Found ${results.length} release candidates.`, 100);
+      this.emitProgress('completed', `Found ${results.length} release candidates.`, 100, operationId);
       return results;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
@@ -286,7 +285,7 @@ export class AlbumAutoTagService extends EventEmitter {
       if (res.success && res.restoredCount > 0) {
         this.operationManager.updateState(operationId, 'Undone', `Restored original metadata for ${res.restoredCount} songs.`, 100);
         this.emitProgress('completed', `Restored original metadata for ${res.restoredCount} songs.`, 100, operationId);
-        return { success: true, restoredCount: res.revertedCount ?? res.restoredCount };
+        return { success: true, restoredCount: res.restoredCount };
       } else {
         this.operationManager.updateState(operationId, 'Failed', 'No AutoTag operations available to undo.', 0);
         this.emitProgress('failed', 'No AutoTag operations available to undo.', 0, operationId);
