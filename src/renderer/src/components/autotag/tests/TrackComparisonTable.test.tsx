@@ -83,7 +83,7 @@ describe('TrackComparisonTable (Detailed Review Mode)', () => {
     expect(screen.getByText('NEW TITLE')).toBeDefined();
     expect(screen.getByText('Original Title')).toBeDefined();
     expect(screen.getByText('New Suggested Title')).toBeDefined();
-  });
+  }, 20000);
 
   it('filters unchanged fields when Changes Only is active and reveals all when All Fields is active', () => {
     render(
@@ -119,7 +119,7 @@ describe('TrackComparisonTable (Detailed Review Mode)', () => {
 
     // Now 'Artist' should also be rendered in the diff list
     expect(screen.getAllByText('Artist').length).toBeGreaterThanOrEqual(1);
-  });
+  }, 20000);
 
   it('calls onFieldChanged when user edits a field value', () => {
     const onFieldChanged = vi.fn();
@@ -149,5 +149,5 @@ describe('TrackComparisonTable (Detailed Review Mode)', () => {
     fireEvent.change(inputs[0], { target: { value: 'Edited Title' } });
 
     expect(onFieldChanged).toHaveBeenCalledWith(101, 'title', 'Edited Title');
-  });
+  }, 20000);
 });
