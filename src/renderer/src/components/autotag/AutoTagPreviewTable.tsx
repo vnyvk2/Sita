@@ -150,13 +150,13 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                 </div>
 
                 {changedCount > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold">
                     {changedCount} diff(s)
                   </span>
                 )}
 
                 {track.hasWarnings && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson font-semibold">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold">
                     ⚠️ Warning
                   </span>
                 )}

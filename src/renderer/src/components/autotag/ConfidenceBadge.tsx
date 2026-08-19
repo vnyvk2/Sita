@@ -11,11 +11,11 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
     switch (level) {
       case 'Excellent':
       case 'Very Good':
-        return 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight';
+        return 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
       case 'Good':
-        return 'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight';
+        return 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight';
       case 'Review':
-        return 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed';
+        return 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400';
       case 'Poor':
       default:
         return 'bg-font-color-crimson/15 border-font-color-crimson/30 text-font-color-crimson';
@@ -26,11 +26,11 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
     switch (level) {
       case 'Excellent':
       case 'Very Good':
-        return 'bg-font-color-highlight dark:bg-dark-font-color-highlight';
+        return 'bg-emerald-500';
       case 'Good':
         return 'bg-font-color-highlight dark:bg-dark-font-color-highlight';
       case 'Review':
-        return 'bg-font-color-dimmed dark:text-dark-font-color-dimmed';
+        return 'bg-amber-500';
       case 'Poor':
       default:
         return 'bg-font-color-crimson';

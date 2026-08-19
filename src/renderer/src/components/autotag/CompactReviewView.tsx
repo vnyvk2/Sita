@@ -49,13 +49,13 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', className: 'bg-font-color-crimson/15 border-font-color-crimson/30 text-font-color-crimson' };
+      return { label: '⚠ Warning', className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400' };
     }
     if (isRename) {
       return { label: '✓ Rename', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
     }
     if (isExact) {
-      return { label: '✓ Match', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
+      return { label: '✓ Match', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' };
     }
     return { label: '✓ Suggested', className: 'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight' };
   };
@@ -282,7 +282,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                   <span>{icon}</span>
                                   <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">{diff.fieldName}:</span>
                                   {diff.status === 'new' ? (
-                                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">{String(diff.suggestedValue)}</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{String(diff.suggestedValue)}</span>
                                   ) : (
                                     <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
                                   )}
@@ -332,7 +332,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                           Not in library
                         </span>
                       ) : activeChangeCount > 0 ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400">
                           {activeChangeCount} {activeChangeCount === 1 ? 'change' : 'changes'}
                         </span>
                       ) : (
@@ -418,7 +418,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                         !isFieldSelected
                                           ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed line-through'
                                           : isNew
-                                          ? 'text-font-color-highlight dark:text-dark-font-color-highlight'
+                                          ? 'text-emerald-600 dark:text-emerald-400'
                                           : 'text-font-color-highlight dark:text-dark-font-color-highlight'
                                       }`}
                                     >

@@ -83,7 +83,7 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
       </div>
 
       {totalWarnings > 0 && (
-        <div className="p-2.5 rounded-lg bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson text-xs font-medium">
+        <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium">
           ⚠️ {totalWarnings} track warning(s) detected. Please review highlighted differences before proceeding.
         </div>
       )}

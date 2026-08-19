@@ -62,13 +62,13 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', className: 'bg-font-color-crimson/15 border-font-color-crimson/30 text-font-color-crimson' };
+      return { label: '⚠ Warning', className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400' };
     }
     if (isRename) {
       return { label: '✓ Rename', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
     }
     if (isExact) {
-      return { label: '✓ Match', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
+      return { label: '✓ Match', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' };
     }
     return { label: '✓ Suggested', className: 'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight' };
   };

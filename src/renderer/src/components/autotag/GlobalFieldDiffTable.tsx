@@ -68,8 +68,10 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
             {diffs.map((diff, idx) => {
               const isSelected = selectedFields.has(diff.fieldId);
               const statusClass =
-                diff.status === 'changed' || diff.status === 'new'
-                  ? 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight'
+                diff.status === 'changed'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                  : diff.status === 'new'
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                   : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed';
 
               return (
