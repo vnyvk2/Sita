@@ -76,7 +76,10 @@ export class MetadataNormalizer {
   public static normalizeFilename(filename: string): string {
     if (!filename) return '';
 
-    const cleaned = filename
+    // Strip directory paths (both forward and backward slashes)
+    const baseName = filename.replace(/^.*[/\\]/, '');
+
+    const cleaned = baseName
       .replace(/\.(mp3|flac|m4a|wav|aac|ogg|wma)$/i, '')
       .replace(/^(cd\d+[-_.\s]*)?(\d{1,3}[-_.\s]+|track[_\s]*\d+[-_.\s]*)+/i, '')
       .replace(this.FILENAME_AUDIO_TAGS_REGEX, '');
