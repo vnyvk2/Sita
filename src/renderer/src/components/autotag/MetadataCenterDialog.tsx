@@ -157,8 +157,8 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '95%',
-          maxWidth: '1120px',
-          maxHeight: '95vh',
+          maxWidth: '1080px',
+          maxHeight: '92vh',
           background: 'linear-gradient(145deg, #0F172A 0%, #0B0F19 100%)',
           border: '1px solid rgba(255, 255, 255, 0.14)',
           borderRadius: '16px',
