@@ -1,69 +1,107 @@
-# 02. Dependency Rules & Ownership Graph
+# 02. System-Wide Dependency Rules & Ownership Graph
 
-This document details the dependency rules (allowed vs. forbidden calls) and structural ownership hierarchies within Nora's Metadata Platform.
+This document details the cross-layer dependency invariants (allowed vs. forbidden calls) and structural ownership hierarchies governing the entire Nora architecture.
 
 ---
 
-## 1. Allowed vs. Forbidden Dependency Hierarchy
+## 1. System-Wide Allowed vs. Forbidden Layer Matrix
 
 ```mermaid
 graph TD
     subgraph Layers ["Layer Hierarchy (Top to Bottom)"]
-        UI[Presentation / Renderer]
-        IPC[IPC Layer]
-        AppSvc[Application Services Layer]
-        ResPlatform[Resolution Platform Layer]
-        ProvInfra[Provider Infrastructure Layer]
-        StorageTx[Storage & Transaction Layer]
+        Pres[Presentation Tier / React Renderer]
+        Bridge[Preload Bridge / IPC Handlers]
+        Apps[Application Services / Coordinators]
+        Engines[Domain Engines / State Managers]
+        Infra[Infrastructure / Schedulers / Adapters]
+        Storage[Storage / Repositories / SQLite / File System]
     end
 
-    UI -->|allowed| IPC
-    IPC -->|allowed| AppSvc
-    AppSvc -->|allowed| ResPlatform
-    AppSvc -->|allowed| StorageTx
-    ResPlatform -->|allowed| ProvInfra
+    Pres -->|ALLOWED| Bridge
+    Bridge -->|ALLOWED| Apps
+    Bridge -->|ALLOWED| Engines
+    Apps -->|ALLOWED| Engines
+    Apps -->|ALLOWED| Infra
+    Engines -->|ALLOWED| Storage
+    Engines -->|ALLOWED| Infra
+    Infra -->|ALLOWED| Storage
 
-    UI x-- FORBIDDEN --x AppSvc
-    UI x-- FORBIDDEN --x StorageTx
-    ProvInfra x-- FORBIDDEN --x StorageTx
-    StorageTx x-- FORBIDDEN --x ResPlatform
+    Pres x-- FORBIDDEN --x Apps
+    Pres x-- FORBIDDEN --x Storage
+    Bridge x-- FORBIDDEN --x Storage
+    Infra x-- FORBIDDEN --x Apps
+    Storage x-- FORBIDDEN --x Engines
 
-    style UI fill:#f5f5f5,stroke:#d6b656
-    style AppSvc fill:#dae8fc,stroke:#6c8ebf
-    style ResPlatform fill:#d5e8d4,stroke:#82b366
-    style StorageTx fill:#fff2cc,stroke:#d6b656
+    style Pres fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style Bridge fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style Apps fill:#d5e8d4,stroke:#82b366,stroke-width:2px
+    style Engines fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style Infra fill:#f8cecc,stroke:#b85450,stroke-width:2px
+    style Storage fill:#fff8e1,stroke:#ffa000,stroke-width:2px
 ```
-
-### Forbidden Dependency Summary
-1. **Providers MUST NOT Access Storage**: Data provider adapters (`MusicBrainzAdapter`, `DiscogsAdapter`) must never call SQLite databases or Tag Writers directly.
-2. **Transactions MUST NOT Invoke Resolution**: `MetadataTransactionManager` coordinates writes; it never queries resolution managers.
-3. **Renderer MUST NOT Access Services**: The frontend renderer communicates exclusively through IPC channels.
 
 ---
 
-## 2. Ownership / Structural Composition Hierarchy
+## 2. Invariant Forbidden Rules Summary
 
-Ownership defines object lifetimes and composition parentage (which entity creates and holds references to child objects).
+| Source Subsystem | Forbidden Target | Architectural Rationale |
+|---|---|---|
+| **Presentation Tier (React UI)** | Any SQLite Repository or Node `fs` API | Presentation code runs in sandboxed Chromium renderer. Direct SQLite or disk access breaks security sandbox and introduces data race conditions. Calls must route through typed IPC channels. |
+| **Data Provider Adapters (`MusicBrainz`, `Discogs`, `CAA`)** | Storage Repositories or SQLite Database | Provider adapters are 100% read-only remote translators. Direct DB mutation from an adapter violates single metadata authority and makes transaction rollback impossible. |
+| **Transaction Coordinators (`MetadataTransactionManager`)** | Resolution Managers or Remote API Gateways | Transaction managers coordinate writes; they never perform search or candidate resolution queries. Query logic is strictly separated from mutation logic. |
+| **Repositories (`PlaylistRepository`, `DatabaseMetadataRepository`)** | Application Engines or Business Rules | Repositories execute raw SQL and map database records. They must remain stateless and free of domain calculations, undo logic, or AST evaluations. |
+| **Playback Queue Subsystem (`QueueEngine`)** | Operation Framework Journal (`operation_journal`) | Playback state (shuffle, cursor, upcoming tracks) is ephemeral and in-memory. Playback queues do not pollute the persistent collections undo journal. |
+| **Search Subsystem (`SearchCoordinator`)** | Direct SQLite Writes / Tag Mutation Services | Search is 100% read-only. Search engines discover references (`SearchMatchReference`) and hydrate DTOs without mutating domain state. |
+
+---
+
+## 3. Structural Ownership & Lifetime Hierarchies
+
+Ownership defines lifecycle parentage (which entity creates, initializes, and holds references to child objects):
 
 ```mermaid
 graph TD
-    Bootstrap[MetadataBootstrap] ==>|owns| Container[MetadataContainer]
+    subgraph MainRoot ["Main Composition Roots"]
+        InitIPC[initializeIPC]
+        MetaBoot[MetadataBootstrap]
+        CollBoot[collections/setup]
+    end
 
-    Container ==>|owns| ResMgr(MetadataResolutionManager)
-    Container ==>|owns| TxMgr(MetadataTransactionManager)
-    Container ==>|owns| AutoTagSvc(AlbumAutoTagService)
+    subgraph LibraryOwners ["Library Subsystem Ownership"]
+        InitIPC ==> Lifecycle(LibraryLifecycleController)
+        Lifecycle ==> Scanner(LibraryScanner)
+        Scanner ==> Reconciler(LibraryReconciler)
+        InitIPC ==> Scheduler[/JobScheduler/]
+        Scheduler ==> Workers[/Asset Workers/]
+    end
 
-    ResMgr ==>|owns| LookupGW(DefaultMetadataLookupGateway)
-    ResMgr ==>|owns| MergeEngine(MetadataMergeEngine)
+    subgraph MetadataOwners ["Metadata Subsystem Ownership"]
+        MetaBoot ==> MetaContainer[MetadataContainer]
+        MetaContainer ==> ResMgr(MetadataResolutionManager)
+        MetaContainer ==> TxMgr(MetadataTransactionManager)
+        ResMgr ==> LookupGW(DefaultMetadataLookupGateway)
+        LookupGW ==> ProvExec(MetadataProviderExecutor)
+        ProvExec ==> ResReg{ResolutionProviderRegistry}
+        TxMgr ==> MutExec(MutationExecutor)
+        MutExec ==> TagWriter(TagWriterService)
+        MutExec ==> DBSync[(LibraryRelationalSyncService)]
+    end
 
-    LookupGW ==>|owns| ProvExec(MetadataProviderExecutor)
-    ProvExec ==>|owns| ResReg{ResolutionProviderRegistry}
+    subgraph CollectionsOwners ["Collections Subsystem Ownership"]
+        CollBoot ==> PlEngine(PlaylistEngine)
+        CollBoot ==> UndoEng(UndoEngine)
+        PlEngine ==> OpExec(OperationExecutor)
+        PlEngine ==> Hierarchy(HierarchyService)
+        PlEngine ==> FolderStats(FolderStatisticsService)
+    end
 
-    TxMgr ==>|owns| MutExec(MutationExecutor)
-    MutExec ==>|owns| TagWriter(TagWriterService)
-    MutExec ==>|owns| DBSync[(LibraryRelationalSyncService)]
+    subgraph QueueOwners ["Queue Subsystem Ownership"]
+        InitIPC ==> QEngine(QueueEngine)
+    end
 
-    style Bootstrap fill:#f5f5f5,stroke:#d6b656
-    style ResMgr fill:#dae8fc,stroke:#6c8ebf
-    style TxMgr fill:#fff2cc,stroke:#d6b656
+    style MainRoot fill:#f5f5f5,stroke:#999999
+    style LibraryOwners fill:#dae8fc,stroke:#6c8ebf
+    style MetadataOwners fill:#ffe6cc,stroke:#d79b00
+    style CollectionsOwners fill:#e1d5e7,stroke:#9673a6
+    style QueueOwners fill:#d5e8d4,stroke:#82b366
 ```
