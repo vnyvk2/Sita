@@ -1,11 +1,11 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
-import type { TrackMatchPair, LocalSongInput } from '../services/AlbumMetadataService';
-import { extractStringValue } from '../matching/TrackMatcher';
-import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
-import { ProviderRegistry } from '../resolution/ProviderRegistry';
-import type { ProviderAttribution } from '../domain/ProviderAttribution';
-import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 import { getMetadataFieldDisplayName } from '../../../common/metadata/displayNames';
+import type { ProviderAttribution } from '../domain/ProviderAttribution';
+import { extractStringValue, type OfficialTrackInput } from '../matching/TrackMatcher';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
+import { ProviderRegistry } from '../resolution/ProviderRegistry';
+import type { LocalSongInput, TrackMatchPair } from '../services/AlbumMetadataService';
+import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 
 const globalProviderRegistry = new ProviderRegistry();
 
@@ -20,6 +20,43 @@ export interface CreateFieldDiffOptions {
 
 export class MetadataDiffBuilder {
   /**
+   * Constructs presentation-friendly TrackMatchPreview for a remote release track that is missing from the local library.
+   */
+  public static buildMissingTrackPreview(
+    remoteTrack: OfficialTrackInput,
+    releaseContext?: { albumTitle?: string; artist?: string; year?: number; provider?: string }
+  ): TrackMatchPreview {
+    const rawArtist = extractStringValue(remoteTrack.artist ?? releaseContext?.artist);
+    const trackNum = remoteTrack.trackNumber ?? 1;
+    const discNum = remoteTrack.discNumber ?? 1;
+
+    return {
+      localSongId: 0,
+      remoteTrackId: remoteTrack.trackId || remoteTrack.musicBrainzRecordingId,
+      discNumber: discNum,
+      trackNumber: trackNum,
+      remoteTitle: remoteTrack.title,
+      remoteArtist: rawArtist,
+      songPath: '',
+      oldTitle: '',
+      oldArtist: '',
+      oldAlbum: '',
+      oldYear: undefined,
+      oldTrackNumber: trackNum,
+      oldDiscNumber: discNum,
+      confidence: 0,
+      confidenceLevel: 'Low',
+      why: 'Not in local library',
+      reasons: ['missing_locally'],
+      fieldDiffs: [], // Semantically honest: no local audio file means no fabricated metadata diffs
+      applyTrack: false,
+      hasWarnings: false,
+      warningCount: 0,
+      isMissingLocally: true
+    };
+  }
+
+  /**
    * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with self-contained field-level alternatives.
    */
   public static buildTrackPreviewFromMergedResult(
@@ -33,6 +70,7 @@ export class MetadataDiffBuilder {
 
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
+    const rawSongGenre = extractStringValue(song.genre);
 
     const suggestedAlbum = rawSongAlbum && merged.album
       ? AlbumSuffixPreserver.preserveAlbumSuffix(rawSongAlbum, merged.album)
@@ -64,7 +102,7 @@ export class MetadataDiffBuilder {
       this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
+      this.compareField('genre', 'Genre', rawSongGenre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
       this.compareField('isrc', 'ISRC', song.isrc, recIsrc, merged.fieldAttributions.isrc, mapAlternatives('isrc')),
       this.compareField('musicBrainzRecordingId', 'MusicBrainz Recording ID', song.musicBrainzRecordingId, recMbid, merged.fieldAttributions.musicBrainzRecordingId, mapAlternatives('musicBrainzRecordingId'))
     ];
@@ -77,6 +115,11 @@ export class MetadataDiffBuilder {
 
     return {
       localSongId: song.songId,
+      remoteTrackId: recMbid,
+      discNumber: recDiscNo ?? song.discNumber ?? 1,
+      trackNumber: recTrackNo ?? song.trackNumber ?? 1,
+      remoteTitle: pair?.remoteTrack?.recording?.title ?? merged.title,
+      remoteArtist: merged.artist,
       songPath: song.path,
       oldTitle: song.title,
       oldArtist: rawSongArtist,
@@ -84,7 +127,7 @@ export class MetadataDiffBuilder {
       oldYear: song.year,
       oldTrackNumber: song.trackNumber,
       oldDiscNumber: song.discNumber,
-      oldGenre: song.genre,
+      oldGenre: rawSongGenre,
       confidence: conf,
       confidenceLevel: pair?.confidenceLevel ?? 'Excellent',
       why: pair?.why ?? 'Multi-Provider Merged Resolution',
@@ -103,6 +146,7 @@ export class MetadataDiffBuilder {
     const song = pair.localSong;
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
+    const rawSongGenre = extractStringValue(song.genre);
 
     const recording = pair.remoteTrack.recording;
     const provider = pair.remoteTrack.provider;
@@ -126,7 +170,7 @@ export class MetadataDiffBuilder {
       this.compareField('year', 'Year', song.year, recording.year, makeAttribution('year')),
       this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, makeAttribution('trackNumber')),
       this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, makeAttribution('discNumber')),
-      this.compareField('genre', 'Genre', song.genre, recording.genres?.[0], makeAttribution('genre')),
+      this.compareField('genre', 'Genre', rawSongGenre, recording.genres?.[0], makeAttribution('genre')),
       this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, makeAttribution('isrc')),
       this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, makeAttribution('musicBrainzRecordingId'))
     ];
@@ -139,14 +183,19 @@ export class MetadataDiffBuilder {
 
     return {
       localSongId: song.songId,
+      remoteTrackId: provider.providerRecordingId ?? recording.musicBrainzRecordingId,
+      discNumber: recording.discNumber ?? song.discNumber ?? 1,
+      trackNumber: recording.trackNumber ?? song.trackNumber ?? 1,
+      remoteTitle: recording.title,
+      remoteArtist: recording.artist,
       songPath: song.path,
       oldTitle: song.title,
-      oldArtist: song.artist,
-      oldAlbum: song.album,
+      oldArtist: rawSongArtist,
+      oldAlbum: rawSongAlbum,
       oldYear: song.year,
       oldTrackNumber: song.trackNumber,
       oldDiscNumber: song.discNumber,
-      oldGenre: song.genre,
+      oldGenre: rawSongGenre,
       oldIsrc: song.isrc,
       oldMbid: song.musicBrainzRecordingId,
       confidence: pair.confidence,

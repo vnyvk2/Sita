@@ -144,6 +144,9 @@ export class TrackMatcher {
       const recording: RecordingMetadata = {
         title: pair.track.title,
         artist: pair.track.artist ?? pair.localSong.artist,
+        album: pair.track.album ?? releaseContext?.albumTitle,
+        year: pair.track.year ?? releaseContext?.year,
+        genres: pair.track.genres,
         trackNumber: pair.track.trackNumber,
         discNumber: pair.track.discNumber,
         duration: pair.track.duration

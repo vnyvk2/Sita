@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProviderRegistry } from '../ProviderRegistry';
 import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
 import { MetadataResolutionManager } from '../MetadataResolutionManager';
-import type { MetadataLookupGateway } from '../MetadataLookupGateway';
+import { DefaultMetadataLookupGateway, type MetadataLookupGateway } from '../MetadataLookupGateway';
 import type { ProviderCandidate } from '../../domain/MetadataResolution';
 import type { MetadataContext } from '../../domain/MetadataContext';
 import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 
 describe('Provider Federation & Merge Engine Test Suite', () => {
   it('resolves provider descriptors and display names via ProviderRegistry', () => {
@@ -153,5 +154,159 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     const updated = mergeEngine.selectFieldProvider(initialMerged, 'genre', 'spotify');
     expect(updated.genre).toBe('Synth-Pop');
     expect(updated.fieldAttributions.genre.providerName).toBe('Spotify');
+  });
+
+  it('executes single-pass resolution calling fetchContribution exactly once per provider', async () => {
+    const registry = new ProviderRegistry();
+
+    const mbAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockResolvedValue({
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98,
+        contributions: [
+          { fieldId: 'title', providerId: 'musicbrainz', value: 'good 4 u', confidenceScore: 0.98 },
+          { fieldId: 'artist', providerId: 'musicbrainz', value: 'Olivia Rodrigo', confidenceScore: 0.98 }
+        ]
+      })
+    };
+
+    const discogsAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockResolvedValue({
+        providerId: 'discogs',
+        providerName: 'Discogs',
+        confidenceScore: 0.92,
+        contributions: [
+          { fieldId: 'genre', providerId: 'discogs', value: 'Pop Punk', confidenceScore: 0.92 }
+        ]
+      })
+    };
+
+    const caaAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockResolvedValue({
+        providerId: 'coverartarchive',
+        providerName: 'Cover Art Archive',
+        confidenceScore: 0.99,
+        contributions: [
+          { fieldId: 'artworkUrl', providerId: 'coverartarchive', value: 'https://coverartarchive.org/sour.jpg', confidenceScore: 0.99 }
+        ]
+      })
+    };
+
+    registry.registerInstance('musicbrainz', mbAdapter as any);
+    registry.registerInstance('discogs', discogsAdapter as any);
+    registry.registerInstance('coverartarchive', caaAdapter as any);
+
+    const gateway = new DefaultMetadataLookupGateway(undefined, registry);
+    const manager = new MetadataResolutionManager({ lookupGateway: gateway, providerRegistry: registry });
+
+    const resolution = await manager.resolve({
+      operationId: 'op-single-pass',
+      targetResourceIds: ['alb-1'],
+      albumTitle: 'SOUR',
+      artistName: 'Olivia Rodrigo',
+      mbid: 'mb-sour'
+    });
+
+    // Call count assertion: EXACTLY ONCE per provider (No duplicate searchCandidates pass)
+    expect(mbAdapter.fetchContribution).toHaveBeenCalledTimes(1);
+    expect(discogsAdapter.fetchContribution).toHaveBeenCalledTimes(1);
+    expect(caaAdapter.fetchContribution).toHaveBeenCalledTimes(1);
+
+    // Verify unified result
+    expect(resolution.candidates).toHaveLength(3);
+    expect(resolution.mergedResult?.title).toBe('good 4 u');
+    expect(resolution.mergedResult?.genre).toBe('Pop Punk');
+    expect(resolution.mergedResult?.artworkUrl).toBe('https://coverartarchive.org/sour.jpg');
+  });
+
+  it('runs providers concurrently and isolates individual provider failures via Promise.allSettled', async () => {
+    const registry = new ProviderRegistry();
+    let mbRunning = false;
+    let discogsRunning = false;
+    let maxConcurrent = 0;
+
+    const mbAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockImplementation(async () => {
+        mbRunning = true;
+        maxConcurrent = Math.max(maxConcurrent, (mbRunning ? 1 : 0) + (discogsRunning ? 1 : 0));
+        await new Promise((r) => setTimeout(r, 20));
+        mbRunning = false;
+        return {
+          providerId: 'musicbrainz',
+          providerName: 'MusicBrainz',
+          confidenceScore: 0.95,
+          contributions: [{ fieldId: 'title', providerId: 'musicbrainz', value: 'traitor', confidenceScore: 0.95 }]
+        };
+      })
+    };
+
+    const discogsAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockImplementation(async () => {
+        discogsRunning = true;
+        maxConcurrent = Math.max(maxConcurrent, (mbRunning ? 1 : 0) + (discogsRunning ? 1 : 0));
+        await new Promise((r) => setTimeout(r, 20));
+        discogsRunning = false;
+        // Provider failure: discogs throws or times out
+        throw new Error('Discogs API rate-limited');
+      })
+    };
+
+    registry.registerInstance('musicbrainz', mbAdapter as any);
+    registry.registerInstance('discogs', discogsAdapter as any);
+
+    const gateway = new DefaultMetadataLookupGateway(undefined, registry);
+    const result = await gateway.resolveFederated({
+      request: {
+        operationId: 'op-concurrency',
+        resourceId: 1,
+        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' }
+      }
+    });
+
+    // Concurrency verification: both were in-flight at the same time
+    expect(maxConcurrent).toBe(2);
+
+    // Failure isolation: MusicBrainz succeeded even though Discogs threw
+    expect(result.contributions).toHaveLength(1);
+    expect(result.contributions[0].fieldId).toBe('title');
+    expect(result.contributions[0].value).toBe('traitor');
+    expect(result.providerMetrics?.discogs.success).toBe(false);
+    expect(result.providerMetrics?.musicbrainz.success).toBe(true);
+  });
+
+  it('guarantees sequential legacy calls to searchContributions and searchCandidates share single in-flight resolution without duplicate fetches', async () => {
+    const registry = new ProviderRegistry();
+
+    const mbAdapter: Partial<IMetadataProviderAdapter> = {
+      fetchContribution: vi.fn().mockResolvedValue({
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98,
+        contributions: [{ fieldId: 'title', providerId: 'musicbrainz', value: '1 step forward, 3 steps back', confidenceScore: 0.98 }]
+      })
+    };
+
+    registry.registerInstance('musicbrainz', mbAdapter as any);
+    const gateway = new DefaultMetadataLookupGateway(undefined, registry);
+
+    const context: MetadataContext = {
+      request: {
+        operationId: 'op-legacy-dup-test',
+        resourceId: 1,
+        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' }
+      }
+    };
+
+    // Invoking both legacy methods concurrently in-flight
+    const [contributions, candidates] = await Promise.all([
+      gateway.searchContributions(context),
+      gateway.searchCandidates(context)
+    ]);
+
+    // Call count assertion: Still EXACTLY 1 because of in-flight deduplication
+    expect(mbAdapter.fetchContribution).toHaveBeenCalledTimes(1);
+    expect(contributions).toHaveLength(1);
+    expect(candidates).toHaveLength(1);
   });
 });

@@ -106,7 +106,16 @@ export class MetadataApplyService {
       return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
     }
 
-    const selectedMatches = preview.matches.filter((m) => m.applyTrack);
+    // Defensive boundary: Exclude missing / non-local tracks from all disk and database operations
+    const actionableMatches = preview.matches.filter(
+      (m) => !m.isMissingLocally && m.localSongId !== undefined && m.localSongId > 0
+    );
+
+    if (actionableMatches.length === 0) {
+      return { success: true, updatedCount: 0, failedCount: 0, errors: [] };
+    }
+
+    const selectedMatches = actionableMatches.filter((m) => m.applyTrack);
     const globalMutations = options?.globalMutations;
 
     const hasGlobalMetadataChanges = Boolean(
@@ -137,8 +146,8 @@ export class MetadataApplyService {
     let totalFailed = 0;
     const errors: string[] = [];
 
-    // Target matches: If album-level mutations are active, all album tracks receive album tags; otherwise only selected tracks
-    const targetMatches = hasAlbumLevelChanges ? preview.matches : selectedMatches;
+    // Target matches: If album-level mutations are active, all local album tracks receive album tags; otherwise only selected local tracks
+    const targetMatches = hasAlbumLevelChanges ? actionableMatches : selectedMatches;
 
     // Split target matches into chunks of batchChunkSize (default 50)
     for (let i = 0; i < targetMatches.length; i += this.batchChunkSize) {

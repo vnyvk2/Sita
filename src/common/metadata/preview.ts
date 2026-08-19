@@ -21,7 +21,10 @@ export interface ProgressEventPayload {
 }
 
 export interface TrackMatchPreview {
+  /** Local song ID in library (0 or undefined if missing locally) */
   localSongId: number;
+  /** Remote track ID from provider release (e.g. "rec-123", "t1") */
+  remoteTrackId?: string;
   songPath: string;
   oldTitle: string;
   oldArtist?: string;
@@ -32,6 +35,14 @@ export interface TrackMatchPreview {
   oldGenre?: string;
   oldIsrc?: string;
   oldMbid?: string;
+  /** Official disc number from release */
+  discNumber?: number;
+  /** Official track number / position from release */
+  trackNumber?: number;
+  /** Remote track title (for missing tracks or quick access without diff parsing) */
+  remoteTitle?: string;
+  /** Remote track artist */
+  remoteArtist?: string;
   confidence: number;
   confidenceLevel: ConfidenceLevel;
   why: string;
@@ -40,6 +51,17 @@ export interface TrackMatchPreview {
   applyTrack: boolean;
   hasWarnings: boolean;
   warningCount: number;
+  isMissingLocally?: boolean;
+}
+
+/**
+ * Returns a stable, collision-free React key for a TrackMatchPreview item across multi-disc releases.
+ */
+export function getTrackPreviewKey(match: TrackMatchPreview, idx?: number): string {
+  if (match.isMissingLocally || match.localSongId <= 0) {
+    return `missing-d${match.discNumber ?? 1}-t${match.trackNumber ?? idx ?? 0}-${match.remoteTrackId ?? 'unmatched'}`;
+  }
+  return `local-${match.localSongId}`;
 }
 
 export interface GlobalAlbumMutations {

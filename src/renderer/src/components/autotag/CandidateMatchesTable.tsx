@@ -5,6 +5,7 @@ import { getProviderDisplayName } from '../../../../common/metadata/displayNames
 export interface CandidateMatchesTableProps {
   candidates: AlbumMetadata[];
   selectedCandidateId: string | null;
+  loadingCandidateId?: string | null;
   loading: boolean;
   onSelectCandidate: (candidate: AlbumMetadata) => void;
 }
@@ -12,6 +13,7 @@ export interface CandidateMatchesTableProps {
 export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
   candidates,
   selectedCandidateId,
+  loadingCandidateId,
   loading,
   onSelectCandidate
 }) => {
@@ -42,29 +44,31 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
         </span>
       </div>
 
-      {/* Table Container */}
+      {/* Table Container (Scrollable up to max 4-5 compact rows) */}
       <div
         style={{
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
-          overflow: 'hidden',
+          overflowY: 'auto',
+          maxHeight: '250px',
           background: 'rgba(15, 23, 42, 0.6)'
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-          <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '10px 12px', textAlign: 'center' }}></th>
-              <th style={{ padding: '10px 14px' }}>RELEASE</th>
-              <th style={{ padding: '10px 14px' }}>ARTIST</th>
-              <th style={{ padding: '10px 14px', width: '80px' }}>YEAR</th>
-              <th style={{ padding: '10px 14px', width: '150px' }}>MATCH</th>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'rgb(15, 23, 42)' }}>
+            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <th style={{ width: '36px', padding: '8px 10px', textAlign: 'center' }}></th>
+              <th style={{ padding: '8px 12px' }}>RELEASE</th>
+              <th style={{ padding: '8px 12px' }}>ARTIST</th>
+              <th style={{ padding: '8px 12px', width: '80px' }}>YEAR</th>
+              <th style={{ padding: '8px 12px', width: '150px' }}>MATCH</th>
             </tr>
           </thead>
           <tbody>
             {candidates.map((cand, idx) => {
               const candidateKey = cand.releaseId ?? cand.title;
               const isSelected = selectedCandidateId === candidateKey;
+              const isLoadingThis = loadingCandidateId === candidateKey || loadingCandidateId === cand.releaseId;
               const providerLabel = getProviderDisplayName(cand.provider);
 
               return (
@@ -84,65 +88,94 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                     if (!isSelected) e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  {/* Radio Indicator */}
-                  <td style={{ padding: '12px', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: '14px',
-                        height: '14px',
-                        borderRadius: '50%',
-                        border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
-                        background: isSelected ? '#FFFFFF' : 'transparent',
-                        margin: '0 auto'
-                      }}
-                    />
+                  {/* Radio / Loading Indicator */}
+                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                    {isLoadingThis ? (
+                      <div
+                        className="animate-spin rounded-full border-2 border-blue-400 border-t-transparent"
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          margin: '0 auto'
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '13px',
+                          height: '13px',
+                          borderRadius: '50%',
+                          border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
+                          background: isSelected ? '#FFFFFF' : 'transparent',
+                          margin: '0 auto'
+                        }}
+                      />
+                    )}
                   </td>
 
                   {/* Release Title & Subtitle */}
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontWeight: isSelected ? 700 : 600, color: '#FFFFFF' }}>
+                  <td style={{ padding: '8px 12px' }}>
+                    <div style={{ fontWeight: isSelected ? 700 : 600, color: '#FFFFFF', fontSize: '0.84rem' }}>
                       {cand.title}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: isSelected ? '#93C5FD' : '#94A3B8', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.74rem', color: isSelected ? '#93C5FD' : '#94A3B8', marginTop: '1px' }}>
                       {cand.trackCount ? `${cand.trackCount} tracks` : 'Official Release'} {cand.releaseType ? `· ${cand.releaseType}` : ''}
                     </div>
                   </td>
 
                   {/* Artist */}
-                  <td style={{ padding: '12px 14px', color: '#E2E8F0', fontWeight: 500 }}>
+                  <td style={{ padding: '8px 12px', color: '#E2E8F0', fontWeight: 500, fontSize: '0.82rem' }}>
                     {cand.artist || '—'}
                   </td>
 
                   {/* Year */}
-                  <td style={{ padding: '12px 14px', color: '#CBD5E1' }}>
+                  <td style={{ padding: '8px 12px', color: '#CBD5E1', fontSize: '0.82rem' }}>
                     {cand.year ?? '—'}
                   </td>
 
                   {/* Match Rank & Provider */}
-                  <td style={{ padding: '12px 14px' }}>
+                  <td style={{ padding: '8px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                          color: idx === 0 ? '#34D399' : '#94A3B8',
-                          border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
-                        }}
-                      >
-                        {idx === 0 ? 'Best Match' : `#${idx + 1}`}
-                      </span>
-                      {cand.rankingScore !== undefined && (
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
-                          Score {cand.rankingScore}
+                      {isLoadingThis ? (
+                        <span
+                          style={{
+                            fontSize: '0.70rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(59, 130, 246, 0.25)',
+                            color: '#93C5FD',
+                            border: '1px solid rgba(59, 130, 246, 0.5)'
+                          }}
+                        >
+                          Resolving...
                         </span>
+                      ) : (
+                        <>
+                          <span
+                            style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 700,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                              background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                              color: idx === 0 ? '#34D399' : '#94A3B8',
+                              border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
+                            }}
+                          >
+                            {idx === 0 ? 'Best Match' : `#${idx + 1}`}
+                          </span>
+                          {cand.rankingScore !== undefined && (
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
+                              Score {cand.rankingScore}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px', fontWeight: 500 }}>
+                    <div style={{ fontSize: '0.70rem', color: '#94A3B8', marginTop: '2px', fontWeight: 500 }}>
                       {providerLabel}
                     </div>
                   </td>

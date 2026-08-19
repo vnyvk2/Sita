@@ -29,7 +29,7 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
     return acc + m.fieldDiffs.filter((d) => d.applyField && (d.status === 'changed' || d.status === 'new')).length;
   }, 0);
 
-  const totalWarnings = selectedMatches.reduce((acc, m) => acc + m.warningCount, 0);
+  const totalWarnings = selectedMatches.reduce((acc, m) => acc + (m.warningCount ?? 0), 0);
 
   return (
     <div
