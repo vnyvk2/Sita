@@ -222,12 +222,12 @@ export class AlbumAutoTagService extends EventEmitter {
         );
 
       const allTrackPreviews: TrackMatchPreview[] = [...trackPreviews, ...missingTrackPreviews].sort((a, b) => {
-        const discA = (a.fieldDiffs.find((d) => d.fieldId === 'discNumber')?.suggestedValue as number) ?? a.oldDiscNumber ?? 1;
-        const discB = (b.fieldDiffs.find((d) => d.fieldId === 'discNumber')?.suggestedValue as number) ?? b.oldDiscNumber ?? 1;
+        const discA = a.discNumber ?? a.oldDiscNumber ?? 1;
+        const discB = b.discNumber ?? b.oldDiscNumber ?? 1;
         if (discA !== discB) return discA - discB;
 
-        const numA = (a.fieldDiffs.find((d) => d.fieldId === 'trackNumber')?.suggestedValue as number) ?? a.oldTrackNumber ?? 999;
-        const numB = (b.fieldDiffs.find((d) => d.fieldId === 'trackNumber')?.suggestedValue as number) ?? b.oldTrackNumber ?? 999;
+        const numA = a.trackNumber ?? a.oldTrackNumber ?? 999;
+        const numB = b.trackNumber ?? b.oldTrackNumber ?? 999;
         return numA - numB;
       });
 

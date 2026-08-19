@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
+import { getTrackPreviewKey } from '../../../../common/metadata/preview';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
 
@@ -227,15 +228,16 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               const isMissing = Boolean(match.isMissingLocally || match.localSongId <= 0);
               const isSelected = !isMissing && selectedTrackIds.has(match.localSongId);
               const isExpanded = !isMissing && effectiveExpandedId === match.localSongId;
+              const itemKey = getTrackPreviewKey(match, idx);
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
-              const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
-              const newArtist = artistDiff?.suggestedValue ?? match.oldArtist ?? '—';
-              const trackNumFormatted = String(match.oldTrackNumber ?? idx + 1).padStart(2, '0');
+              const newTitle = isMissing ? (match.remoteTitle ?? '—') : (titleDiff?.suggestedValue ?? match.oldTitle);
+              const newArtist = isMissing ? (match.remoteArtist ?? '—') : (artistDiff?.suggestedValue ?? match.oldArtist ?? '—');
+              const trackNumFormatted = String(match.trackNumber ?? match.oldTrackNumber ?? idx + 1).padStart(2, '0');
               const statusBadge = getMatchStatusBadge(match);
 
               return (
-                <React.Fragment key={match.localSongId}>
+                <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => toggleExpand(match.localSongId)}
                     style={{

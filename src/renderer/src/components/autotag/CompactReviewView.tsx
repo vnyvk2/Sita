@@ -1,5 +1,6 @@
 import React from 'react';
 import type { TrackMatchPreview } from '../../../../common/metadata/types';
+import { getTrackPreviewKey } from '../../../../common/metadata/preview';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
 import { getChangedFieldDiffs, getTrackChangeCount } from './utils/previewSummary';
 
@@ -195,28 +196,30 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const isSelected = !isMissing && selectedTrackIds.has(match.localSongId);
               const isExpanded = !isMissing && expandedTrackId === match.localSongId;
               const isFocused = focusedTrackIndex === idx;
+              const itemKey = getTrackPreviewKey(match, idx);
+
               const trackDiff = match.fieldDiffs.find((d) => d.fieldId === 'trackNumber');
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
 
-              const isTrackFieldSelected = selectedFieldMap.get(`${match.localSongId}::trackNumber`) ?? trackDiff?.applyField ?? true;
-              const isTitleFieldSelected = selectedFieldMap.get(`${match.localSongId}::title`) ?? titleDiff?.applyField ?? true;
-              const isArtistFieldSelected = selectedFieldMap.get(`${match.localSongId}::artist`) ?? artistDiff?.applyField ?? true;
+              const isTrackFieldSelected = !isMissing && (selectedFieldMap.get(`${match.localSongId}::trackNumber`) ?? trackDiff?.applyField ?? true);
+              const isTitleFieldSelected = !isMissing && (selectedFieldMap.get(`${match.localSongId}::title`) ?? titleDiff?.applyField ?? true);
+              const isArtistFieldSelected = !isMissing && (selectedFieldMap.get(`${match.localSongId}::artist`) ?? artistDiff?.applyField ?? true);
 
               const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
               const newArtist = artistDiff?.suggestedValue ?? match.oldArtist ?? '—';
 
               const isTrackChanged = trackDiff && (trackDiff.status === 'changed' || trackDiff.status === 'new') && trackDiff.suggestedValue !== undefined && Number(trackDiff.suggestedValue) !== match.oldTrackNumber;
               const oldTrackNum = match.oldTrackNumber !== undefined ? String(match.oldTrackNumber).padStart(2, '0') : String(idx + 1).padStart(2, '0');
-              const newTrackNum = trackDiff?.suggestedValue !== undefined ? String(trackDiff.suggestedValue).padStart(2, '0') : oldTrackNum;
+              const newTrackNum = match.trackNumber !== undefined ? String(match.trackNumber).padStart(2, '0') : (trackDiff?.suggestedValue !== undefined ? String(trackDiff.suggestedValue).padStart(2, '0') : oldTrackNum);
 
               const showTrackDiff = !isMissing && isTrackChanged && isTrackFieldSelected;
 
               const showTitleWas = !isMissing && isTitleFieldSelected && match.oldTitle !== newTitle && Boolean(match.oldTitle);
-              const displayTitle = isMissing ? (titleDiff?.suggestedValue ?? match.oldTitle ?? '—') : (isTitleFieldSelected ? newTitle : match.oldTitle);
+              const displayTitle = isMissing ? (match.remoteTitle ?? match.oldTitle ?? '—') : (isTitleFieldSelected ? newTitle : match.oldTitle);
 
               const showArtistWas = !isMissing && isArtistFieldSelected && match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
-              const displayArtist = isMissing ? (artistDiff?.suggestedValue ?? match.oldArtist ?? '—') : (isArtistFieldSelected ? newArtist : (match.oldArtist ?? '—'));
+              const displayArtist = isMissing ? (match.remoteArtist ?? match.oldArtist ?? '—') : (isArtistFieldSelected ? newArtist : (match.oldArtist ?? '—'));
 
               const secondaryChangedDiffs = isMissing ? [] : match.fieldDiffs.filter((d) => {
                 if (d.fieldId === 'title' || d.fieldId === 'artist' || d.fieldId === 'trackNumber') return false;
@@ -236,7 +239,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const changedDiffs = getChangedFieldDiffs(match);
 
               return (
-                <React.Fragment key={match.localSongId}>
+                <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => onToggleExpand(match.localSongId)}
                     style={{

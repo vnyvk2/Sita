@@ -454,7 +454,12 @@ describe('CompactReviewView Component', () => {
 
     const matchesWithMissing: TrackMatchPreview[] = [
       {
-        localSongId: -1,
+        localSongId: 0,
+        remoteTrackId: 'rec-1',
+        discNumber: 1,
+        trackNumber: 1,
+        remoteTitle: 'Lolo (Intro)',
+        remoteArtist: 'Dr. Dre',
         songPath: '',
         oldTitle: '',
         oldArtist: '',
@@ -467,29 +472,7 @@ describe('CompactReviewView Component', () => {
         hasWarnings: false,
         warningCount: 0,
         isMissingLocally: true,
-        fieldDiffs: [
-          {
-            fieldId: 'title',
-            fieldName: 'Title',
-            suggestedValue: 'Lolo (Intro)',
-            status: 'new',
-            applyField: false
-          },
-          {
-            fieldId: 'artist',
-            fieldName: 'Artist',
-            suggestedValue: 'Dr. Dre',
-            status: 'new',
-            applyField: false
-          },
-          {
-            fieldId: 'trackNumber',
-            fieldName: 'Track Number',
-            suggestedValue: 1,
-            status: 'new',
-            applyField: false
-          }
-        ]
+        fieldDiffs: [] // No fabricated diffs!
       },
       ...mockMatches
     ];

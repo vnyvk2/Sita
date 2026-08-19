@@ -27,110 +27,28 @@ export class MetadataDiffBuilder {
     releaseContext?: { albumTitle?: string; artist?: string; year?: number; provider?: string }
   ): TrackMatchPreview {
     const rawArtist = extractStringValue(remoteTrack.artist ?? releaseContext?.artist);
-    const rawAlbum = extractStringValue(remoteTrack.album ?? releaseContext?.albumTitle);
-    const providerId = releaseContext?.provider ?? 'musicbrainz';
-    const providerName = globalProviderRegistry.getDisplayName(providerId);
-
-    const fieldDiffs: MetadataFieldDiff[] = [
-      {
-        fieldId: 'title',
-        fieldName: 'Title',
-        oldValue: undefined,
-        suggestedValue: remoteTrack.title,
-        userValue: remoteTrack.title,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      },
-      {
-        fieldId: 'artist',
-        fieldName: 'Artist',
-        oldValue: undefined,
-        suggestedValue: rawArtist,
-        userValue: rawArtist,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      },
-      {
-        fieldId: 'album',
-        fieldName: 'Album',
-        oldValue: undefined,
-        suggestedValue: rawAlbum,
-        userValue: rawAlbum,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      },
-      {
-        fieldId: 'trackNumber',
-        fieldName: 'Track Number',
-        oldValue: undefined,
-        suggestedValue: remoteTrack.trackNumber,
-        userValue: remoteTrack.trackNumber,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      },
-      {
-        fieldId: 'discNumber',
-        fieldName: 'Disc Number',
-        oldValue: undefined,
-        suggestedValue: remoteTrack.discNumber ?? 1,
-        userValue: remoteTrack.discNumber ?? 1,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      }
-    ];
-
-    if (remoteTrack.musicBrainzRecordingId || remoteTrack.trackId) {
-      fieldDiffs.push({
-        fieldId: 'musicBrainzRecordingId',
-        fieldName: 'MusicBrainz Recording ID',
-        oldValue: undefined,
-        suggestedValue: remoteTrack.musicBrainzRecordingId ?? remoteTrack.trackId,
-        userValue: remoteTrack.musicBrainzRecordingId ?? remoteTrack.trackId,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      });
-    }
-
-    if (remoteTrack.isrc) {
-      fieldDiffs.push({
-        fieldId: 'isrc',
-        fieldName: 'ISRC',
-        oldValue: undefined,
-        suggestedValue: remoteTrack.isrc,
-        userValue: remoteTrack.isrc,
-        status: 'new',
-        applyField: false,
-        providerId,
-        providerName
-      });
-    }
+    const trackNum = remoteTrack.trackNumber ?? 1;
+    const discNum = remoteTrack.discNumber ?? 1;
 
     return {
-      localSongId: -(remoteTrack.trackNumber ?? 1),
+      localSongId: 0,
+      remoteTrackId: remoteTrack.trackId || remoteTrack.musicBrainzRecordingId,
+      discNumber: discNum,
+      trackNumber: trackNum,
+      remoteTitle: remoteTrack.title,
+      remoteArtist: rawArtist,
       songPath: '',
       oldTitle: '',
       oldArtist: '',
       oldAlbum: '',
       oldYear: undefined,
-      oldTrackNumber: remoteTrack.trackNumber,
-      oldDiscNumber: remoteTrack.discNumber,
+      oldTrackNumber: trackNum,
+      oldDiscNumber: discNum,
       confidence: 0,
       confidenceLevel: 'Low',
       why: 'Not in local library',
       reasons: ['missing_locally'],
-      fieldDiffs,
+      fieldDiffs: [], // Semantically honest: no local audio file means no fabricated metadata diffs
       applyTrack: false,
       hasWarnings: false,
       warningCount: 0,
@@ -197,6 +115,11 @@ export class MetadataDiffBuilder {
 
     return {
       localSongId: song.songId,
+      remoteTrackId: recMbid,
+      discNumber: recDiscNo ?? song.discNumber ?? 1,
+      trackNumber: recTrackNo ?? song.trackNumber ?? 1,
+      remoteTitle: pair?.remoteTrack?.recording?.title ?? merged.title,
+      remoteArtist: merged.artist,
       songPath: song.path,
       oldTitle: song.title,
       oldArtist: rawSongArtist,
@@ -260,6 +183,11 @@ export class MetadataDiffBuilder {
 
     return {
       localSongId: song.songId,
+      remoteTrackId: provider.providerRecordingId ?? recording.musicBrainzRecordingId,
+      discNumber: recording.discNumber ?? song.discNumber ?? 1,
+      trackNumber: recording.trackNumber ?? song.trackNumber ?? 1,
+      remoteTitle: recording.title,
+      remoteArtist: recording.artist,
       songPath: song.path,
       oldTitle: song.title,
       oldArtist: rawSongArtist,

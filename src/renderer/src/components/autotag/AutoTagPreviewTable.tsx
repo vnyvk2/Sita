@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
+import { getTrackPreviewKey } from '../../../../common/metadata/preview';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
@@ -98,18 +99,22 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
 
       {/* Track Grid Table */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {matches.map((track) => {
-          const isSelected = selectedTrackIds.has(track.localSongId);
-          const isExpanded = expandedTrackId === track.localSongId;
+        {matches.map((track, idx) => {
+          const isMissing = Boolean(track.isMissingLocally || track.localSongId <= 0);
+          const isSelected = !isMissing && selectedTrackIds.has(track.localSongId);
+          const isExpanded = !isMissing && expandedTrackId === track.localSongId;
+          const itemKey = getTrackPreviewKey(track, idx);
           const changedCount = track.fieldDiffs.filter((d) => d.status === 'changed' || d.status === 'new').length;
+          const trackNum = track.trackNumber ?? track.oldTrackNumber;
 
           return (
             <div
-              key={track.localSongId}
+              key={itemKey}
               style={{
                 borderRadius: '8px',
                 border: isSelected ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
-                background: isSelected ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                background: isMissing ? 'rgba(0, 0, 0, 0.2)' : isSelected ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
                 overflow: 'hidden'
               }}
             >
@@ -120,27 +125,33 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                   alignItems: 'center',
                   padding: '12px 16px',
                   gap: '12px',
-                  cursor: 'pointer'
+                  cursor: isMissing ? 'default' : 'pointer'
                 }}
-                onClick={() => setExpandedTrackId(isExpanded ? null : track.localSongId)}
+                onClick={isMissing ? undefined : () => setExpandedTrackId(isExpanded ? null : track.localSongId)}
               >
                 <input
                   type="checkbox"
                   checked={isSelected}
+                  disabled={isMissing}
                   onChange={(e) => {
+                    if (isMissing) return;
                     e.stopPropagation();
                     onToggleTrack(track.localSongId);
                   }}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  style={{ width: '16px', height: '16px', cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
                 />
 
                 <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-color-dimmed)', width: '28px' }}>
-                  {track.oldTrackNumber ? String(track.oldTrackNumber).padStart(2, '0') : '--'}
+                  {trackNum ? String(trackNum).padStart(2, '0') : '--'}
                 </span>
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-color-white)' }}>{track.oldTitle}</span>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)' }}>{track.oldArtist}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-color-white)', fontStyle: isMissing ? 'italic' : 'normal' }}>
+                    {isMissing ? (track.remoteTitle ?? '—') : track.oldTitle}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)', fontStyle: isMissing ? 'italic' : 'normal' }}>
+                    {isMissing ? 'Not in library' : track.oldArtist}
+                  </span>
                 </div>
 
                 {changedCount > 0 && (

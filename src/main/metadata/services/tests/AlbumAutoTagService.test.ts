@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getTrackPreviewKey } from '../../../../common/metadata/preview';
 import { AlbumAutoTagService } from '../AlbumAutoTagService';
 import { AlbumMetadataService } from '../AlbumMetadataService';
 import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
@@ -548,7 +549,7 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       expect(writePayloads[1].title).toBeUndefined();
     });
 
-    it('builds full album tracklist with missing remote tracks and protects apply boundary', async () => {
+    it('builds full album tracklist with multi-disc release, eliminates fabricated diffs, and protects apply boundary', async () => {
       const pipeline = new RequestPipeline();
       const apiClient = new MusicBrainzApiClient(pipeline);
       const cache = new IdentityResolutionCache();
@@ -558,72 +559,105 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
       const metadataService = new AlbumMetadataService(runtime);
       const tagWriter = new TagWriterService();
-      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: '11_next_ep.mp3', success: true }]);
+      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
+        { filePath: 'd1_t2.mp3', success: true },
+        { filePath: 'd2_t2.mp3', success: true }
+      ]);
       const dbUpdater = vi.fn().mockResolvedValue(undefined);
       const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
       const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });
 
-      // Mock release with 5 tracks (1, 2, 3, 4, 5)
+      // Mock multi-disc release (2 discs, 2 tracks each: D1T1, D1T2, D2T1, D2T2)
       vi.spyOn(apiClient, 'getReleaseById').mockResolvedValue({
-        id: 'rel-2001',
-        title: '2001',
-        date: '1999-11-16',
+        id: 'mb-rel-multi',
+        title: 'Speakerboxxx / The Love Below',
+        date: '2003-09-23',
         status: 'Official',
-        'artist-credit': [{ name: 'Dr. Dre' }],
+        'artist-credit': [{ name: 'OutKast' }],
         media: [
           {
             position: 1,
             tracks: [
-              { id: 't1', title: 'Lolo (Intro)', length: 41000, position: 1, recording: { id: 'rec-1' } },
-              { id: 't2', title: 'The Watcher', length: 206000, position: 2, recording: { id: 'rec-2' } },
-              { id: 't3', title: 'Fuck You', length: 232000, position: 3, recording: { id: 'rec-3' } },
-              { id: 't4', title: 'Still D.R.E.', length: 270000, position: 4, recording: { id: 'rec-4' } },
-              { id: 't5', title: 'Big Ego\'s', length: 238000, position: 5, recording: { id: 'rec-5' } }
+              { id: 't101', title: 'Intro (Speakerboxxx)', length: 89000, position: 1, recording: { id: 'rec-101' } },
+              { id: 't102', title: 'GhettoMusick', length: 236000, position: 2, recording: { id: 'rec-102' } }
+            ]
+          },
+          {
+            position: 2,
+            tracks: [
+              { id: 't201', title: 'The Love Below (Intro)', length: 87000, position: 1, recording: { id: 'rec-201' } },
+              { id: 't202', title: 'Love Hater', length: 169000, position: 2, recording: { id: 'rec-202' } }
             ]
           }
         ]
       } as any);
 
-      // User has only 1 local song: Track 4 ("Still D.R.E.")
+      // User has only 2 local tracks: Disc 1 Track 2 (#102) and Disc 2 Track 2 (#202)
       const localSongs = [
-        { songId: 404, title: 'Still D.R.E.', artist: 'Dr. Dre', path: '11_next_ep.mp3', duration: 270, trackNumber: 1 }
+        { songId: 102, title: 'GhettoMusick', artist: 'OutKast', path: 'd1_t2.mp3', duration: 236, trackNumber: 2, discNumber: 1 },
+        { songId: 202, title: 'Love Hater', artist: 'OutKast', path: 'd2_t2.mp3', duration: 169, trackNumber: 2, discNumber: 2 }
       ];
 
-      const preview = await autoTagService.buildPreview(localSongs, 'rel-2001', 'musicbrainz');
+      const preview = await autoTagService.buildPreview(localSongs, 'mb-rel-multi', 'musicbrainz');
 
-      // Expect all 5 tracks of the release to be present in order!
-      expect(preview.matches).toHaveLength(5);
+      // 1. All 4 release tracks must be present in correct multi-disc order!
+      expect(preview.matches).toHaveLength(4);
 
-      // Tracks 1, 2, 3 should be missing locally
+      // 2. Multi-disc ordering invariant: (D1, T1), (D1, T2), (D2, T1), (D2, T2)
+      expect(preview.matches[0].discNumber).toBe(1);
+      expect(preview.matches[0].trackNumber).toBe(1);
       expect(preview.matches[0].isMissingLocally).toBe(true);
-      expect(preview.matches[0].applyTrack).toBe(false);
-      expect(preview.matches[0].localSongId).toBeLessThan(0);
-      expect(preview.matches[0].fieldDiffs.find((d) => d.fieldId === 'title')?.suggestedValue).toBe('Lolo (Intro)');
+      expect(preview.matches[0].remoteTitle).toBe('Intro (Speakerboxxx)');
+      expect(preview.matches[0].fieldDiffs).toHaveLength(0); // NO fabricated diffs!
 
-      expect(preview.matches[1].isMissingLocally).toBe(true);
+      expect(preview.matches[1].discNumber).toBe(1);
+      expect(preview.matches[1].trackNumber).toBe(2);
+      expect(preview.matches[1].localSongId).toBe(102);
+      expect(preview.matches[1].isMissingLocally).toBeUndefined();
+
+      expect(preview.matches[2].discNumber).toBe(2);
+      expect(preview.matches[2].trackNumber).toBe(1);
       expect(preview.matches[2].isMissingLocally).toBe(true);
+      expect(preview.matches[2].remoteTitle).toBe('The Love Below (Intro)');
+      expect(preview.matches[2].fieldDiffs).toHaveLength(0); // NO fabricated diffs!
 
-      // Track 4 (idx 3) should be matched locally
+      expect(preview.matches[3].discNumber).toBe(2);
+      expect(preview.matches[3].trackNumber).toBe(2);
+      expect(preview.matches[3].localSongId).toBe(202);
       expect(preview.matches[3].isMissingLocally).toBeUndefined();
-      expect(preview.matches[3].localSongId).toBe(404);
-      expect(preview.matches[3].applyTrack).toBe(true);
-      expect(preview.matches[3].fieldDiffs.find((d) => d.fieldId === 'title')?.suggestedValue).toBe('Still D.R.E.');
 
-      // Track 5 should be missing locally
-      expect(preview.matches[4].isMissingLocally).toBe(true);
+      // 3. Collision-free stable React keys across discs
+      const keys = preview.matches.map((m, idx) => getTrackPreviewKey(m, idx));
+      const uniqueKeys = new Set(keys);
+      expect(uniqueKeys.size).toBe(4);
+      expect(keys[0]).toContain('missing-d1-t1');
+      expect(keys[2]).toContain('missing-d2-t1');
 
-      // Test apply boundary: applyPreview must ONLY apply the 1 local track!
-      const applyResult = await autoTagService.applyPreview(preview);
+      // 4. Hard Apply Boundary Protection: Applying with global mutations must only mutate local files 102 and 202
+      const applyOptions = {
+        globalMutations: {
+          albumArtist: 'OutKast',
+          genre: 'Hip Hop',
+          applyAlbumArtist: true,
+          applyGenre: true
+        }
+      };
+
+      const applyResult = await autoTagService.applyPreview(preview, applyOptions);
       expect(applyResult.success).toBe(true);
-      expect(applyResult.updatedCount).toBe(1);
+      expect(applyResult.updatedCount).toBe(2);
 
+      // Verify physical disk writer was only dispatched for the 2 local files
       expect(writeBatchSpy).toHaveBeenCalledTimes(1);
-      const payloads = writeBatchSpy.mock.calls[0][0];
-      expect(payloads).toHaveLength(1);
-      expect(payloads[0].filePath).toBe('11_next_ep.mp3');
+      const writePayloads = writeBatchSpy.mock.calls[0][0];
+      expect(writePayloads).toHaveLength(2);
+      expect(writePayloads[0].filePath).toBe('d1_t2.mp3');
+      expect(writePayloads[1].filePath).toBe('d2_t2.mp3');
 
-      expect(dbUpdater).toHaveBeenCalledTimes(1);
-      expect(dbUpdater).toHaveBeenCalledWith(404, expect.any(Object));
+      // Verify DB updates were strictly called for 102 and 202 (never 0 or sentinels)
+      expect(dbUpdater).toHaveBeenCalledTimes(2);
+      expect(dbUpdater).toHaveBeenCalledWith(102, expect.any(Object));
+      expect(dbUpdater).toHaveBeenCalledWith(202, expect.any(Object));
     });
   });
 });

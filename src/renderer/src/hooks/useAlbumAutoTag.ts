@@ -20,7 +20,7 @@ import { genreQuery } from '../queries/genres';
 import { songQuery } from '../queries/songs';
 
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
-export type PreviewFilterOption = 'all' | 'changed' | 'low_confidence' | 'warnings';
+export type PreviewFilterOption = 'all' | 'changed' | 'matched' | 'low_confidence' | 'warnings';
 export type PreviewSortOption = 'trackNumber' | 'confidence' | 'title';
 export type ArtworkSourceOption = 'musicbrainz' | 'coverartarchive' | 'local';
 
@@ -603,18 +603,37 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     let result = [...preview.matches];
 
     if (filter === 'changed') {
-      result = result.filter((m) => m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new'));
+      result = result.filter(
+        (m) =>
+          !m.isMissingLocally &&
+          m.localSongId > 0 &&
+          m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new')
+      );
+    } else if (filter === 'matched') {
+      result = result.filter((m) => !m.isMissingLocally && m.localSongId > 0);
     } else if (filter === 'low_confidence') {
-      result = result.filter((m) => m.confidence < 0.8);
+      result = result.filter((m) => !m.isMissingLocally && m.confidence < 0.8);
     } else if (filter === 'warnings') {
-      result = result.filter((m) => m.hasWarnings);
+      result = result.filter((m) => !m.isMissingLocally && m.hasWarnings);
     }
 
     result.sort((a, b) => {
-      if (sort === 'confidence') return b.confidence - a.confidence;
-      if (sort === 'title') return a.oldTitle.localeCompare(b.oldTitle);
-      const trackA = a.oldTrackNumber ?? 999;
-      const trackB = b.oldTrackNumber ?? 999;
+      if (sort === 'confidence') {
+        const confA = a.isMissingLocally ? -1 : a.confidence;
+        const confB = b.isMissingLocally ? -1 : b.confidence;
+        return confB - confA;
+      }
+      if (sort === 'title') {
+        const titleA = a.isMissingLocally ? (a.remoteTitle ?? '') : (a.oldTitle ?? '');
+        const titleB = b.isMissingLocally ? (b.remoteTitle ?? '') : (b.oldTitle ?? '');
+        return titleA.localeCompare(titleB);
+      }
+      const discA = a.discNumber ?? a.oldDiscNumber ?? 1;
+      const discB = b.discNumber ?? b.oldDiscNumber ?? 1;
+      if (discA !== discB) return discA - discB;
+
+      const trackA = a.trackNumber ?? a.oldTrackNumber ?? 999;
+      const trackB = b.trackNumber ?? b.oldTrackNumber ?? 999;
       return trackA - trackB;
     });
 
