@@ -145,12 +145,96 @@ describe('CompactReviewView Component', () => {
 
     // Changed/new fields are rendered
     expect(screen.getByText('Modified Fields for:')).toBeDefined();
-    expect(screen.getByText('Pop, Alternative Rock')).toBeDefined();
+    expect(screen.getAllByText('Pop, Alternative Rock').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Discogs')).toBeDefined();
     expect(screen.getAllByText('MusicBrainz').length).toBeGreaterThanOrEqual(1);
 
     // Unchanged field 'Album' should NOT be rendered in compact accordion
     expect(screen.queryByText('Album')).toBeNull();
+  });
+
+  it('displays inline track number diff, title diff, artist diff, and secondary micro-chips on collapsed row', () => {
+    const trackWithTrackDiff: TrackMatchPreview[] = [
+      {
+        localSongId: 10,
+        songPath: '/path/10.mp3',
+        oldTitle: 'The Next Episode [Explicit]',
+        oldArtist: 'Dr. Dre, Snoop Dogg',
+        oldTrackNumber: 1,
+        confidence: 0.98,
+        confidenceLevel: 'High',
+        why: 'Matched',
+        reasons: [],
+        applyTrack: true,
+        hasWarnings: false,
+        warningCount: 0,
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'The Next Episode [Explicit]',
+            suggestedValue: 'The Next Episode',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'artist',
+            fieldName: 'Artist',
+            oldValue: 'Dr. Dre, Snoop Dogg',
+            suggestedValue: 'Dr. Dre',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'trackNumber',
+            fieldName: 'Track Number',
+            oldValue: 1,
+            suggestedValue: 11,
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'genre',
+            fieldName: 'Genre',
+            oldValue: undefined,
+            suggestedValue: 'Hip Hop',
+            status: 'new',
+            applyField: true
+          }
+        ]
+      }
+    ];
+
+    render(
+      <CompactReviewView
+        matches={trackWithTrackDiff}
+        selectedTrackIds={new Set([10])}
+        selectedFieldMap={new Map()}
+        userEditedValues={new Map()}
+        expandedTrackId={null} // Collapsed
+        onToggleTrack={vi.fn()}
+        onToggleExpand={vi.fn()}
+        onOpenDetailed={vi.fn()}
+        onSelectAll={vi.fn()}
+        onSelectChanged={vi.fn()}
+        onClearSelections={vi.fn()}
+      />
+    );
+
+    // Track number diff 01 → 11 is visible on collapsed row
+    expect(screen.getByText('01')).toBeDefined();
+    expect(screen.getByText('11')).toBeDefined();
+
+    // New title is shown with (was: ...) subtext
+    expect(screen.getByText('The Next Episode')).toBeDefined();
+    expect(screen.getByText('(was: The Next Episode [Explicit])')).toBeDefined();
+
+    // New artist is shown with (was: ...) subtext
+    expect(screen.getByText('Dr. Dre')).toBeDefined();
+    expect(screen.getByText('(was: Dr. Dre, Snoop Dogg)')).toBeDefined();
+
+    // Secondary micro-chip for Genre is visible without expanding
+    expect(screen.getByText('Hip Hop')).toBeDefined();
   });
 
   it('preserves user edited values in expanded drawer', () => {

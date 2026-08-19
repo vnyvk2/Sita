@@ -191,11 +191,28 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const isSelected = selectedTrackIds.has(match.localSongId);
               const isExpanded = expandedTrackId === match.localSongId;
               const isFocused = focusedTrackIndex === idx;
+              const trackDiff = match.fieldDiffs.find((d) => d.fieldId === 'trackNumber');
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
+
               const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
               const newArtist = artistDiff?.suggestedValue ?? match.oldArtist ?? '—';
-              const trackNumFormatted = String(match.oldTrackNumber ?? idx + 1).padStart(2, '0');
+
+              const isTrackChanged = trackDiff && (trackDiff.status === 'changed' || trackDiff.status === 'new') && trackDiff.suggestedValue !== undefined && Number(trackDiff.suggestedValue) !== match.oldTrackNumber;
+              const oldTrackNum = match.oldTrackNumber !== undefined ? String(match.oldTrackNumber).padStart(2, '0') : String(idx + 1).padStart(2, '0');
+              const newTrackNum = trackDiff?.suggestedValue !== undefined ? String(trackDiff.suggestedValue).padStart(2, '0') : oldTrackNum;
+
+              const isTitleChanged = match.oldTitle !== newTitle && Boolean(match.oldTitle);
+              const isArtistChanged = match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
+
+              const secondaryChangedDiffs = match.fieldDiffs.filter(
+                (d) =>
+                  d.fieldId !== 'title' &&
+                  d.fieldId !== 'artist' &&
+                  d.fieldId !== 'trackNumber' &&
+                  (d.status === 'changed' || d.status === 'new')
+              );
+
               const statusBadge = getMatchStatusBadge(match);
               const changeCount = getTrackChangeCount(match);
               const changedDiffs = getChangedFieldDiffs(match);
@@ -219,7 +236,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     }}
                   >
                     {/* Track Checkbox (Isolated from row click) */}
-                    <td style={{ padding: '10px 10px', textAlign: 'center' }}>
+                    <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -232,28 +249,92 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                       />
                     </td>
 
-                    {/* Track Number */}
-                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontFamily: 'monospace', fontWeight: 600 }}>
-                      {trackNumFormatted}
+                    {/* Track Number Diff */}
+                    <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      {isTrackChanged ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace' }}>
+                          <span style={{ color: '#64748B', textDecoration: 'line-through', fontSize: '0.74rem' }}>{oldTrackNum}</span>
+                          <span style={{ color: '#F59E0B', fontSize: '0.70rem' }}>→</span>
+                          <span style={{ color: '#38BDF8', fontWeight: 700, fontSize: '0.84rem' }}>{newTrackNum}</span>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94A3B8', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>
+                          {oldTrackNum}
+                        </span>
+                      )}
                     </td>
 
-                    {/* Title Summary (Old -> New) */}
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: 700, color: '#FFFFFF' }}>{String(newTitle)}</span>
-                        {match.oldTitle !== newTitle && (
-                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>(was: {match.oldTitle})</span>
+                    {/* Title Summary (Two-Tier Stack + Secondary Micro-Chips) */}
+                    <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, color: isTitleChanged ? '#38BDF8' : '#FFFFFF', fontSize: '0.88rem' }}>
+                            {String(newTitle)}
+                          </span>
+                        </div>
+
+                        {isTitleChanged && (
+                          <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                            (was: {match.oldTitle})
+                          </div>
+                        )}
+
+                        {/* Secondary Field Micro-Chips (Genre, Disc, Year, etc.) */}
+                        {secondaryChangedDiffs.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                            {secondaryChangedDiffs.map((diff) => {
+                              const icon =
+                                diff.fieldId === 'genre' ? '🏷️' :
+                                diff.fieldId === 'discNumber' ? '💿' :
+                                diff.fieldId === 'year' ? '📅' :
+                                diff.fieldId === 'album' ? '💽' : '⚡';
+                              return (
+                                <span
+                                  key={diff.fieldId}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.69rem',
+                                    background: 'rgba(255, 255, 255, 0.06)',
+                                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                                    color: '#CBD5E1',
+                                    lineHeight: '1.2'
+                                  }}
+                                >
+                                  <span>{icon}</span>
+                                  <span style={{ color: '#94A3B8' }}>{diff.fieldName}:</span>
+                                  {diff.status === 'new' ? (
+                                    <span style={{ color: '#34D399', fontWeight: 600 }}>{String(diff.suggestedValue)}</span>
+                                  ) : (
+                                    <span style={{ color: '#38BDF8', fontWeight: 600 }}>{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     </td>
 
-                    {/* Artist */}
-                    <td style={{ padding: '10px 12px', color: '#CBD5E1', fontWeight: 500 }}>
-                      {String(newArtist)}
+                    {/* Artist Summary (Two-Tier Stack) */}
+                    <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ color: '#E2E8F0', fontWeight: 600, fontSize: '0.84rem' }}>
+                          {String(newArtist)}
+                        </span>
+                        {isArtistChanged && (
+                          <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                            (was: {match.oldArtist})
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Match Confidence Badge */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
                       <span
                         style={{
                           padding: '3px 8px',
@@ -270,7 +351,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     </td>
 
                     {/* Change Count Pill */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
                       {changeCount > 0 ? (
                         <span
                           style={{
