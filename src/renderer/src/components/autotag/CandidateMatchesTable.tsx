@@ -42,13 +42,13 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
         </span>
       </div>
 
-      {/* Table Container (Scrollable up to max 3 compact rows) */}
+      {/* Table Container (Scrollable up to max 4-5 compact rows) */}
       <div
         style={{
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           overflowY: 'auto',
-          maxHeight: '170px',
+          maxHeight: '250px',
           background: 'rgba(15, 23, 42, 0.6)'
         }}
       >
