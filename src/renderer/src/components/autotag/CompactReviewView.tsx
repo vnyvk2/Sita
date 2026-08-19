@@ -198,6 +198,10 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
 
+              const isTrackFieldSelected = selectedFieldMap.get(`${match.localSongId}::trackNumber`) ?? trackDiff?.applyField ?? true;
+              const isTitleFieldSelected = selectedFieldMap.get(`${match.localSongId}::title`) ?? titleDiff?.applyField ?? true;
+              const isArtistFieldSelected = selectedFieldMap.get(`${match.localSongId}::artist`) ?? artistDiff?.applyField ?? true;
+
               const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
               const newArtist = artistDiff?.suggestedValue ?? match.oldArtist ?? '—';
 
@@ -205,19 +209,29 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const oldTrackNum = match.oldTrackNumber !== undefined ? String(match.oldTrackNumber).padStart(2, '0') : String(idx + 1).padStart(2, '0');
               const newTrackNum = trackDiff?.suggestedValue !== undefined ? String(trackDiff.suggestedValue).padStart(2, '0') : oldTrackNum;
 
-              const isTitleChanged = match.oldTitle !== newTitle && Boolean(match.oldTitle);
-              const isArtistChanged = match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
+              const showTrackDiff = isTrackChanged && isTrackFieldSelected;
 
-              const secondaryChangedDiffs = match.fieldDiffs.filter(
+              const showTitleWas = isTitleFieldSelected && match.oldTitle !== newTitle && Boolean(match.oldTitle);
+              const displayTitle = isTitleFieldSelected ? newTitle : match.oldTitle;
+
+              const showArtistWas = isArtistFieldSelected && match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
+              const displayArtist = isArtistFieldSelected ? newArtist : (match.oldArtist ?? '—');
+
+              const secondaryChangedDiffs = match.fieldDiffs.filter((d) => {
+                if (d.fieldId === 'title' || d.fieldId === 'artist' || d.fieldId === 'trackNumber') return false;
+                if (d.fieldId === 'musicBrainzRecordingId' || d.fieldId === 'isrc') return false; // Exclude raw UUID/ISRC hashes from top-level compact chips
+                if (d.status !== 'changed' && d.status !== 'new') return false;
+                const isFieldSelected = selectedFieldMap.get(`${match.localSongId}::${d.fieldId}`) ?? d.applyField;
+                return isFieldSelected;
+              });
+
+              const activeChangeCount = match.fieldDiffs.filter(
                 (d) =>
-                  d.fieldId !== 'title' &&
-                  d.fieldId !== 'artist' &&
-                  d.fieldId !== 'trackNumber' &&
-                  (d.status === 'changed' || d.status === 'new')
-              );
+                  (d.status === 'changed' || d.status === 'new') &&
+                  (selectedFieldMap.get(`${match.localSongId}::${d.fieldId}`) ?? d.applyField)
+              ).length;
 
               const statusBadge = getMatchStatusBadge(match);
-              const changeCount = getTrackChangeCount(match);
               const changedDiffs = getChangedFieldDiffs(match);
 
               return (
@@ -254,7 +268,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                     {/* Track Number Diff */}
                     <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      {isTrackChanged ? (
+                      {showTrackDiff ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace' }}>
                           <span style={{ color: '#64748B', textDecoration: 'line-through', fontSize: '0.74rem' }}>{oldTrackNum}</span>
                           <span style={{ color: '#F59E0B', fontSize: '0.70rem' }}>→</span>
@@ -271,18 +285,18 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 700, color: isTitleChanged ? '#38BDF8' : '#FFFFFF', fontSize: '0.88rem' }}>
-                            {String(newTitle)}
+                          <span style={{ fontWeight: 700, color: showTitleWas ? '#38BDF8' : '#FFFFFF', fontSize: '0.88rem' }}>
+                            {String(displayTitle)}
                           </span>
                         </div>
 
-                        {isTitleChanged && (
+                        {showTitleWas && (
                           <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
                             (was: {match.oldTitle})
                           </div>
                         )}
 
-                        {/* Secondary Field Micro-Chips (Genre, Disc, Year, etc.) */}
+                        {/* Secondary Field Micro-Chips (Genre, Disc, Year, etc. - excluding MBID/ISRC) */}
                         {secondaryChangedDiffs.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
                             {secondaryChangedDiffs.map((diff) => {
@@ -325,10 +339,10 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     {/* Artist Summary (Two-Tier Stack) */}
                     <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ color: '#E2E8F0', fontWeight: 600, fontSize: '0.84rem' }}>
-                          {String(newArtist)}
+                        <span style={{ color: showArtistWas ? '#E2E8F0' : '#CBD5E1', fontWeight: 600, fontSize: '0.84rem' }}>
+                          {String(displayArtist)}
                         </span>
-                        {isArtistChanged && (
+                        {showArtistWas && (
                           <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
                             (was: {match.oldArtist})
                           </div>
@@ -355,7 +369,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                     {/* Change Count Pill */}
                     <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      {changeCount > 0 ? (
+                      {activeChangeCount > 0 ? (
                         <span
                           style={{
                             padding: '3px 8px',
@@ -367,7 +381,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                             border: '1px solid rgba(245, 158, 11, 0.35)'
                           }}
                         >
-                          {changeCount} {changeCount === 1 ? 'change' : 'changes'}
+                          {activeChangeCount} {activeChangeCount === 1 ? 'change' : 'changes'}
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.75rem', color: '#64748B', fontStyle: 'italic' }}>

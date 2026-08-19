@@ -237,6 +237,107 @@ describe('CompactReviewView Component', () => {
     expect(screen.getByText('Hip Hop')).toBeDefined();
   });
 
+  it('reactively reverts collapsed row display to original values and hides chips when fields are deselected, and never shows MBID chip', () => {
+    const trackWithDiffs: TrackMatchPreview[] = [
+      {
+        localSongId: 10,
+        songPath: '/path/10.mp3',
+        oldTitle: 'The Next Episode [Explicit]',
+        oldArtist: 'Dr. Dre, Snoop Dogg',
+        oldTrackNumber: 1,
+        confidence: 0.98,
+        confidenceLevel: 'High',
+        why: 'Matched',
+        reasons: [],
+        applyTrack: true,
+        hasWarnings: false,
+        warningCount: 0,
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'The Next Episode [Explicit]',
+            suggestedValue: 'The Next Episode',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'artist',
+            fieldName: 'Artist',
+            oldValue: 'Dr. Dre, Snoop Dogg',
+            suggestedValue: 'Dr. Dre',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'trackNumber',
+            fieldName: 'Track Number',
+            oldValue: 1,
+            suggestedValue: 11,
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'genre',
+            fieldName: 'Genre',
+            oldValue: undefined,
+            suggestedValue: 'Hip Hop',
+            status: 'new',
+            applyField: true
+          },
+          {
+            fieldId: 'musicBrainzRecordingId',
+            fieldName: 'MusicBrainz Recording ID',
+            oldValue: undefined,
+            suggestedValue: 'e9e419f3-a36d-46e0-83d0-b97bea8957eb',
+            status: 'new',
+            applyField: true
+          }
+        ]
+      }
+    ];
+
+    // Artist and trackNumber are deselected
+    const selectedFieldMap = new Map<string, boolean>([
+      ['10::artist', false],
+      ['10::trackNumber', false]
+    ]);
+
+    render(
+      <CompactReviewView
+        matches={trackWithDiffs}
+        selectedTrackIds={new Set([10])}
+        selectedFieldMap={selectedFieldMap}
+        userEditedValues={new Map()}
+        expandedTrackId={null} // Collapsed
+        onToggleTrack={vi.fn()}
+        onToggleExpand={vi.fn()}
+        onOpenDetailed={vi.fn()}
+        onSelectAll={vi.fn()}
+        onSelectChanged={vi.fn()}
+        onClearSelections={vi.fn()}
+      />
+    );
+
+    // Track number shows original '01' without arrow diff
+    expect(screen.getByText('01')).toBeDefined();
+    expect(screen.queryByText('11')).toBeNull();
+
+    // Artist shows original 'Dr. Dre, Snoop Dogg' without '(was: ...)' subtext
+    expect(screen.getByText('Dr. Dre, Snoop Dogg')).toBeDefined();
+    expect(screen.queryByText('(was: Dr. Dre, Snoop Dogg)')).toBeNull();
+
+    // Title (which is still selected) shows 'The Next Episode' and '(was: ...)' subtext
+    expect(screen.getByText('The Next Episode')).toBeDefined();
+    expect(screen.getByText('(was: The Next Episode [Explicit])')).toBeDefined();
+
+    // Secondary micro-chip for Genre is visible
+    expect(screen.getByText('Hip Hop')).toBeDefined();
+
+    // MusicBrainz Recording ID hash is NEVER rendered on the top row
+    expect(screen.queryByText(/e9e419f3-a36d/)).toBeNull();
+  });
+
   it('allows selecting and deselecting individual fields in the expanded drawer', () => {
     const onToggleField = vi.fn();
     const selectedFieldMap = new Map<string, boolean>([
