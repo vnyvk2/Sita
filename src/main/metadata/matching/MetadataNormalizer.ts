@@ -17,7 +17,7 @@ export type RecordingVariant =
 
 export class MetadataNormalizer {
   private static readonly COSMETIC_NOISE_REGEX =
-    /\b(official\s+)?(music\s+)?(audio|video|lyric\s+video|lyrics?|visualizer|hd|hq)\b/gi;
+    /\b(official\s+)?(music\s+)?(audio|video|lyric\s+video|lyrics?|visualizer|hd|hq)\b|\b(\d{4}\s+)?re-?master(ed)?(\s*version)?\b|\b(deluxe\s+edition)\b/gi;
 
   private static readonly FILENAME_AUDIO_TAGS_REGEX =
     /\[(320kbps|flac|lossless|24bit|v0|v2|128kbps|256kbps|aac|wav|mp3)\]|\((remastered\s*\d*|re-mastered\s*\d*|deluxe\s*edition)\)/gi;
@@ -76,7 +76,7 @@ export class MetadataNormalizer {
   public static normalizeFilename(filename: string): string {
     if (!filename) return '';
 
-    let cleaned = filename
+    const cleaned = filename
       .replace(/\.(mp3|flac|m4a|wav|aac|ogg|wma)$/i, '')
       .replace(/^(cd\d+[-_.\s]*)?(\d{1,3}[-_.\s]+|track[_\s]*\d+[-_.\s]*)+/i, '')
       .replace(this.FILENAME_AUDIO_TAGS_REGEX, '');
@@ -107,7 +107,7 @@ export class MetadataNormalizer {
   public static normalizeArtist(artist: string): string {
     if (!artist) return '';
 
-    let cleaned = artist
+    const cleaned = artist
       .replace(/\b(feat\.?|ft\.?|featuring|with|vs\.?|and|\+|x|×|,)\b/gi, ' ')
       .replace(/\./g, ''); // Strips acronym dots: A.R. Rahman -> ar rahman
 
@@ -120,7 +120,7 @@ export class MetadataNormalizer {
   public static normalizeAlbum(album: string): string {
     if (!album) return '';
 
-    let cleaned = album.replace(this.COSMETIC_NOISE_REGEX, '');
+    const cleaned = album.replace(this.COSMETIC_NOISE_REGEX, '');
 
     return normalizeForMatching(cleaned);
   }

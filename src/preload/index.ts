@@ -873,7 +873,15 @@ export const api = {
       ),
     undo: (operationId?: string) => ipcRenderer.invoke('metadata/workflow/undo', operationId),
     cancel: (operationId?: string) => ipcRenderer.invoke('metadata/workflow/cancel', operationId)
+  },
+  spotify: {
+    connect: () => ipcRenderer.invoke('spotify/auth/connect'),
+    disconnect: () => ipcRenderer.invoke('spotify/auth/disconnect'),
+    getStatus: () => ipcRenderer.invoke('spotify/auth/getStatus'),
+    getPlaylists: (options?: { limit?: number; offset?: number }) =>
+      ipcRenderer.invoke('spotify/playlists/getPlaylists', options)
   }
 };
 
 contextBridge.exposeInMainWorld('api', api);
+

@@ -25,10 +25,17 @@ vi.mock('electron', () => ({
     handle: vi.fn(),
     on: vi.fn()
   },
+  safeStorage: {
+    isEncryptionAvailable: vi.fn(() => false),
+    encryptString: vi.fn((str: string) => Buffer.from(str)),
+    decryptString: vi.fn((buf: Buffer) => buf.toString())
+  },
   protocol: {
     registerSchemesAsPrivileged: vi.fn()
   }
 }));
+
+process.env.MAIN_VITE_ENCRYPTION_SECRET = 'nora_test_secret_key_1234567890123456';
 
 vi.mock('electron-updater', () => {
   const mockAutoUpdater = {

@@ -218,7 +218,7 @@ export class TrackMatcher {
     let albumScore = 0;
     let yearScore = 0;
     let durationScore = 0;
-    let mbidScore = 0;
+    const mbidScore = 0;
     const matchedBy: MatchCriterion[] = [];
     const reasons: string[] = [];
 
