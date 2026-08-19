@@ -41,16 +41,9 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
 
   return (
     <div
-      style={{
-        background: 'rgba(15, 23, 42, 0.7)',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        padding: searchExpanded ? '16px 20px' : '10px 18px',
-        transition: 'all 0.2s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-      }}
+      className={`bg-background-color-2/40 border border-background-color-2 rounded-xl transition-all flex flex-col gap-3 ${
+        searchExpanded ? 'p-4' : 'px-4 py-3'
+      }`}
     >
       {/* Collapsed Header Summary */}
       <div
@@ -63,24 +56,18 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
             onToggleExpanded();
           }
         }}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          cursor: 'pointer',
-          userSelect: 'none'
-        }}
+        className="flex justify-between items-center cursor-pointer select-none"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed uppercase">
             {searchExpanded ? '▼ Search Criteria' : '▶ Search Criteria'}
           </span>
           {!searchExpanded && (
-            <span style={{ fontSize: '0.88rem', color: '#E2E8F0' }}>
-              {artist ? <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{artist} — </span> : ''}
-              <span style={{ color: '#F8FAFC', fontWeight: 600 }}>{album || 'No Album'}</span>
-              {totalTracks ? <span style={{ color: '#94A3B8', fontWeight: 500 }}> · {totalTracks} tracks</span> : ''}
-              <span style={{ color: '#64748B', fontSize: '0.78rem' }}>
+            <span className="text-sm text-font-color-dimmed">
+              {artist ? <span className="text-font-color font-semibold">{artist} — </span> : ''}
+              <span className="text-font-color font-semibold">{album || 'No Album'}</span>
+              {totalTracks ? <span className="text-font-color-dimmed font-medium"> · {totalTracks} tracks</span> : ''}
+              <span className="text-font-color-dimmed text-xs">
                 {' '}· Source: {selectedSource === 'auto' ? 'Best Match' : selectedSource}
               </span>
             </span>
@@ -93,16 +80,7 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
             e.stopPropagation();
             onToggleExpanded();
           }}
-          style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '4px',
-            color: '#CBD5E1',
-            padding: '3px 10px',
-            fontSize: '0.78rem',
-            cursor: 'pointer',
-            fontWeight: 500
-          }}
+          className="bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color rounded px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer"
         >
           {searchExpanded ? 'Collapse' : 'Expand'}
         </button>
@@ -110,11 +88,11 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
 
       {/* Expanded Search Inputs Form */}
       {searchExpanded && (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 160px', gap: '12px', alignItems: 'flex-end' }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 pt-1">
+          <div className="grid grid-cols-[1fr_1fr_120px_160px] gap-3 items-end">
             {/* Album Artist */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label htmlFor="autotag-artist-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="autotag-artist-input" className="text-xs font-semibold text-font-color-dimmed tracking-wider uppercase">
                 ALBUM ARTIST
               </label>
               <input
@@ -123,21 +101,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 placeholder="e.g. Olivia Rodrigo"
                 value={artist}
                 onChange={(e) => onArtistChange(e.target.value)}
-                style={{
-                  padding: '9px 12px',
-                  borderRadius: '7px',
-                  background: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  outline: 'none',
-                  fontSize: '0.88rem'
-                }}
+                className="px-3 py-2 rounded-lg bg-background-color-1 border border-background-color-3/50 text-font-color text-sm outline-none focus:border-font-color-highlight transition-colors placeholder:text-font-color-dimmed/50"
               />
             </div>
 
             {/* Album */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label htmlFor="autotag-album-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="autotag-album-input" className="text-xs font-semibold text-font-color-dimmed tracking-wider uppercase">
                 ALBUM TITLE *
               </label>
               <input
@@ -147,21 +117,13 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 value={album}
                 onChange={(e) => onAlbumChange(e.target.value)}
                 required
-                style={{
-                  padding: '9px 12px',
-                  borderRadius: '7px',
-                  background: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  outline: 'none',
-                  fontSize: '0.88rem'
-                }}
+                className="px-3 py-2 rounded-lg bg-background-color-1 border border-background-color-3/50 text-font-color text-sm outline-none focus:border-font-color-highlight transition-colors placeholder:text-font-color-dimmed/50"
               />
             </div>
 
             {/* Total Tracks */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label htmlFor="autotag-tracks-input" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="autotag-tracks-input" className="text-xs font-semibold text-font-color-dimmed tracking-wider uppercase">
                 TRACKS
               </label>
               <input
@@ -171,39 +133,20 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
                 placeholder="e.g. 11"
                 value={totalTracks}
                 onChange={(e) => onTotalTracksChange(e.target.value)}
-                style={{
-                  padding: '9px 10px',
-                  borderRadius: '7px',
-                  background: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  outline: 'none',
-                  fontSize: '0.88rem',
-                  textAlign: 'center'
-                }}
+                className="px-3 py-2 rounded-lg bg-background-color-1 border border-background-color-3/50 text-font-color text-sm outline-none focus:border-font-color-highlight transition-colors text-center placeholder:text-font-color-dimmed/50"
               />
             </div>
 
             {/* Search Source Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label htmlFor="autotag-source-select" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.04em' }}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="autotag-source-select" className="text-xs font-semibold text-font-color-dimmed tracking-wider uppercase">
                 SEARCH SOURCE
               </label>
               <select
                 id="autotag-source-select"
                 value={selectedSource}
                 onChange={(e) => onSourceChange(e.target.value)}
-                style={{
-                  padding: '9px 10px',
-                  borderRadius: '7px',
-                  background: '#1E293B',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#F8FAFC',
-                  outline: 'none',
-                  fontSize: '0.84rem',
-                  fontWeight: 500,
-                  cursor: 'pointer'
-                }}
+                className="px-3 py-2 rounded-lg bg-background-color-1 border border-background-color-3/50 text-font-color text-sm font-medium outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
               >
                 <option value="auto">🌐 Best Match</option>
                 {availableProviders.map((prov) => (
@@ -216,32 +159,18 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
           </div>
 
           {/* Provider Architecture Description & Find Action */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#94A3B8' }}>
-              <span style={{ fontWeight: 600, color: '#CBD5E1' }}>Discovery Strategy:</span>
+          <div className="flex justify-between items-center border-t border-background-color-2 pt-3">
+            <div className="flex items-center gap-2 text-xs text-font-color-dimmed">
+              <span className="font-medium text-font-color">Discovery Strategy:</span>
               <span>{selectedSource === 'auto' ? 'Settings-driven multi-source ranking' : `Direct ${selectedSource} query`}</span>
-              <span style={{ opacity: 0.4 }}>•</span>
+              <span className="opacity-40">•</span>
               <span>Field Federation: Discogs Genres · CAA Artwork</span>
             </div>
 
             <button
               type="submit"
               disabled={loading || !album.trim()}
-              style={{
-                padding: '8px 22px',
-                borderRadius: '7px',
-                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                border: 'none',
-                color: '#FFFFFF',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: loading || !album.trim() ? 'not-allowed' : 'pointer',
-                opacity: loading || !album.trim() ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-              }}
+              className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 text-font-color font-semibold text-sm transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Searching...' : '🔍 Search Releases'}
             </button>
@@ -251,3 +180,4 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
     </div>
   );
 };
+

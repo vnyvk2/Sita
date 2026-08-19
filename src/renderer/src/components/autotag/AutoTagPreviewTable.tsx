@@ -43,37 +43,40 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
   const [expandedTrackId, setExpandedTrackId] = useState<number | null>(null);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="flex flex-col gap-4">
       {/* Toolbar Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="flex justify-between items-center bg-background-color-2/30 p-3 rounded-lg border border-background-color-2">
+        <div className="flex gap-2">
           <button
+            type="button"
             onClick={onSelectAll}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color-white)', fontSize: '0.8rem', cursor: 'pointer' }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Select All
           </button>
           <button
+            type="button"
             onClick={onSelectChanged}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color-white)', fontSize: '0.8rem', cursor: 'pointer' }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Select Changed Only
           </button>
           <button
+            type="button"
             onClick={onClearSelections}
-            style={{ padding: '6px 12px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-color-dimmed)', fontSize: '0.8rem', cursor: 'pointer' }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Clear Selections
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="flex gap-3 items-center">
+          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              style={{ background: 'var(--background-color-2)', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
+              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
@@ -82,12 +85,12 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
             </select>
           </label>
 
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-color-dimmed)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              style={{ background: 'var(--background-color-2)', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-color-white)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem' }}
+              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
             >
               <option value="trackNumber">Track Number</option>
               <option value="confidence">Confidence</option>
@@ -98,7 +101,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
       </div>
 
       {/* Track Grid Table */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="flex flex-col gap-2">
         {matches.map((track, idx) => {
           const isMissing = Boolean(track.isMissingLocally || track.localSongId <= 0);
           const isSelected = !isMissing && selectedTrackIds.has(track.localSongId);
@@ -110,23 +113,15 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
           return (
             <div
               key={itemKey}
-              style={{
-                borderRadius: '8px',
-                border: isSelected ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
-                background: isMissing ? 'rgba(0, 0, 0, 0.2)' : isSelected ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-                opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
-                overflow: 'hidden'
-              }}
+              className={`rounded-lg border transition-colors overflow-hidden ${
+                isSelected
+                  ? 'border-background-color-3 bg-background-color-3/10'
+                  : 'border-background-color-2 bg-background-color-2/20'
+              } ${isMissing ? 'opacity-45' : isSelected ? 'opacity-100' : 'opacity-70'}`}
             >
               {/* Main Track Row */}
               <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '12px 16px',
-                  gap: '12px',
-                  cursor: isMissing ? 'default' : 'pointer'
-                }}
+                className={`flex items-center px-4 py-3 gap-3 ${isMissing ? 'cursor-default' : 'cursor-pointer hover:bg-background-color-2/40'}`}
                 onClick={isMissing ? undefined : () => setExpandedTrackId(isExpanded ? null : track.localSongId)}
               >
                 <input
@@ -138,30 +133,30 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                     e.stopPropagation();
                     onToggleTrack(track.localSongId);
                   }}
-                  style={{ width: '16px', height: '16px', cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
+                  className="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
                 />
 
-                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-color-dimmed)', width: '28px' }}>
+                <span className="font-mono text-xs text-font-color-dimmed w-7 font-semibold">
                   {trackNum ? String(trackNum).padStart(2, '0') : '--'}
                 </span>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-color-white)', fontStyle: isMissing ? 'italic' : 'normal' }}>
+                <div className="flex-1 flex flex-col">
+                  <span className={`text-sm font-semibold text-font-color ${isMissing ? 'italic text-font-color-dimmed' : ''}`}>
                     {isMissing ? (track.remoteTitle ?? '—') : track.oldTitle}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)', fontStyle: isMissing ? 'italic' : 'normal' }}>
+                  <span className={`text-xs text-font-color-dimmed ${isMissing ? 'italic' : ''}`}>
                     {isMissing ? 'Not in library' : track.oldArtist}
                   </span>
                 </div>
 
                 {changedCount > 0 && (
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--text-color-highlight)', fontWeight: 500 }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold">
                     {changedCount} diff(s)
                   </span>
                 )}
 
                 {track.hasWarnings && (
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', fontWeight: 500 }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-font-color-crimson font-semibold">
                     ⚠️ Warning
                   </span>
                 )}
@@ -169,7 +164,8 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
                 <ConfidenceBadge level={track.confidenceLevel} confidence={track.confidence} />
 
                 <button
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-color-dimmed)', cursor: 'pointer' }}
+                  type="button"
+                  className="bg-transparent border-0 text-font-color-dimmed hover:text-font-color cursor-pointer text-xs p-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedTrackId(isExpanded ? null : track.localSongId);
@@ -181,7 +177,7 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
 
               {/* Expanded Granular Diff Viewer */}
               {isExpanded && (
-                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', background: 'rgba(0, 0, 0, 0.3)' }}>
+                <div className="border-t border-background-color-2 p-4 bg-background-color-2/30">
                   <MetadataDiffViewer
                     track={track}
                     selectedFieldMap={selectedFieldMap}
@@ -199,3 +195,4 @@ export const AutoTagPreviewTable: React.FC<AutoTagPreviewTableProps> = ({
     </div>
   );
 };
+

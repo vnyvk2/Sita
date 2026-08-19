@@ -7,70 +7,46 @@ export interface ConfidenceBadgeProps {
 }
 
 export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confidence }) => {
-  const getBadgeStyle = () => {
+  const getBadgeClass = () => {
     switch (level) {
       case 'Excellent':
       case 'Very Good':
-        return {
-          bg: 'rgba(16, 185, 129, 0.2)',
-          border: 'rgba(16, 185, 129, 0.45)',
-          text: '#34D399',
-          iconColor: '#10B981'
-        };
+        return 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
       case 'Good':
-        return {
-          bg: 'rgba(59, 130, 246, 0.2)',
-          border: 'rgba(59, 130, 246, 0.45)',
-          text: '#60A5FA',
-          iconColor: '#3B82F6'
-        };
+        return 'bg-background-color-3/30 border-background-color-3/60 text-font-color-highlight';
       case 'Review':
-        return {
-          bg: 'rgba(245, 158, 11, 0.2)',
-          border: 'rgba(245, 158, 11, 0.45)',
-          text: '#FBBF24',
-          iconColor: '#F59E0B'
-        };
+        return 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400';
       case 'Poor':
       default:
-        return {
-          bg: 'rgba(239, 68, 68, 0.2)',
-          border: 'rgba(239, 68, 68, 0.45)',
-          text: '#EF4444',
-          iconColor: '#DC2626'
-        };
+        return 'bg-red-500/15 border-red-500/30 text-font-color-crimson';
     }
   };
 
-  const style = getBadgeStyle();
+  const getDotClass = () => {
+    switch (level) {
+      case 'Excellent':
+      case 'Very Good':
+        return 'bg-emerald-500';
+      case 'Good':
+        return 'bg-font-color-highlight';
+      case 'Review':
+        return 'bg-amber-500';
+      case 'Poor':
+      default:
+        return 'bg-font-color-crimson';
+    }
+  };
+
   const percentText = confidence !== undefined ? ` (${Math.round(confidence * 100)}%)` : '';
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '3px 10px',
-        borderRadius: '12px',
-        fontSize: '0.78rem',
-        fontWeight: 700,
-        backgroundColor: style.bg,
-        border: `1px solid ${style.border}`,
-        color: style.text,
-        letterSpacing: '0.01em'
-      }}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border tracking-wide ${getBadgeClass()}`}
     >
-      <span
-        style={{
-          width: '6px',
-          height: '6px',
-          borderRadius: '50%',
-          backgroundColor: style.iconColor
-        }}
-      />
+      <span className={`w-1.5 h-1.5 rounded-full ${getDotClass()}`} />
       {level}
       {percentText}
     </span>
   );
 };
+

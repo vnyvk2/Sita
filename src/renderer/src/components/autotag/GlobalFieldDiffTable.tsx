@@ -19,59 +19,32 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
   onClear
 }) => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="flex flex-col gap-2">
       {/* Section Header & Bulk Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
+      <div className="flex justify-between items-center px-1">
+        <span className="text-xs font-semibold tracking-wider text-font-color-dimmed uppercase">
           Global / Album Metadata Changes
         </span>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onSelectAll}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '5px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.16)',
-              color: '#CBD5E1',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Select All
           </button>
           <button
             type="button"
             onClick={onSelectChanged}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '5px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.16)',
-              color: '#CBD5E1',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Select Changed
           </button>
           <button
             type="button"
             onClick={onClear}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '5px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#94A3B8',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              fontWeight: 500
-            }}
+            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
           >
             Deselect All
           </button>
@@ -79,53 +52,38 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
       </div>
 
       {/* Diff Table */}
-      <div
-        style={{
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '10px',
-          overflow: 'hidden',
-          background: 'rgba(15, 23, 42, 0.6)'
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+      <div className="border border-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '10px 12px', textAlign: 'center' }}></th>
-              <th style={{ width: '140px', padding: '10px 12px' }}>FIELD</th>
-              <th style={{ padding: '10px 12px' }}>CURRENT (LOCAL)</th>
-              <th style={{ width: '24px', padding: '10px 0', textAlign: 'center' }}></th>
-              <th style={{ padding: '10px 12px' }}>SUGGESTED (REMOTE)</th>
-              <th style={{ width: '100px', padding: '10px 12px', textAlign: 'right' }}>STATUS</th>
+            <tr className="bg-background-color-2 border-b border-background-color-3/30 text-font-color-dimmed text-xs uppercase tracking-wider">
+              <th className="w-9 px-3 py-2.5 text-center"></th>
+              <th className="w-36 px-3 py-2.5">FIELD</th>
+              <th className="px-3 py-2.5">CURRENT (LOCAL)</th>
+              <th className="w-6 px-0 py-2.5 text-center"></th>
+              <th className="px-3 py-2.5">SUGGESTED (REMOTE)</th>
+              <th className="w-28 px-3 py-2.5 text-right">STATUS</th>
             </tr>
           </thead>
           <tbody>
             {diffs.map((diff, idx) => {
               const isSelected = selectedFields.has(diff.fieldId);
-              const statusColor =
+              const statusClass =
                 diff.status === 'changed'
-                  ? '#F59E0B'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
                   : diff.status === 'new'
-                  ? '#10B981'
-                  : '#94A3B8';
-              const statusBg =
-                diff.status === 'changed'
-                  ? 'rgba(245, 158, 11, 0.2)'
-                  : diff.status === 'new'
-                  ? 'rgba(16, 185, 129, 0.2)'
-                  : 'rgba(255, 255, 255, 0.06)';
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-background-color-2 border-background-color-3/30 text-font-color-dimmed';
 
               return (
                 <tr
                   key={diff.fieldId}
                   onClick={() => onToggleField(diff.fieldId)}
-                  style={{
-                    borderBottom: idx < diffs.length - 1 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
-                    background: isSelected ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                    cursor: 'pointer'
-                  }}
+                  className={`border-b border-background-color-2/40 cursor-pointer transition-colors text-font-color ${
+                    isSelected ? 'bg-background-color-3/15' : 'hover:bg-background-color-2/40'
+                  }`}
                 >
                   {/* Checkbox */}
-                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  <td className="px-3 py-2.5 text-center">
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -133,44 +91,33 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
                         e.stopPropagation();
                         onToggleField(diff.fieldId);
                       }}
-                      style={{ cursor: 'pointer' }}
+                      className="cursor-pointer"
                     />
                   </td>
 
                   {/* Field Name */}
-                  <td style={{ padding: '10px 12px', fontWeight: 700, color: '#FFFFFF' }}>
+                  <td className="px-3 py-2.5 font-bold text-font-color">
                     {diff.fieldName}
                   </td>
 
                   {/* Current Local Value */}
-                  <td style={{ padding: '10px 12px', color: '#94A3B8', fontWeight: 500 }}>
+                  <td className="px-3 py-2.5 text-font-color-dimmed font-medium">
                     {diff.oldValue}
                   </td>
 
                   {/* Arrow */}
-                  <td style={{ padding: '10px 0', textAlign: 'center', color: '#94A3B8', fontWeight: 700 }}>
+                  <td className="px-0 py-2.5 text-center text-font-color-dimmed font-bold">
                     →
                   </td>
 
                   {/* Suggested Remote Value */}
-                  <td style={{ padding: '10px 12px', color: isSelected ? '#FFFFFF' : '#CBD5E1', fontWeight: diff.isChanged ? 700 : 500 }}>
+                  <td className={`px-3 py-2.5 ${diff.isChanged ? 'font-bold text-font-color-highlight' : 'font-medium text-font-color'}`}>
                     {diff.suggestedValue}
                   </td>
 
                   {/* Status Badge */}
-                  <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                    <span
-                      style={{
-                        padding: '3px 9px',
-                        borderRadius: '4px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        background: statusBg,
-                        color: statusColor,
-                        border: `1px solid ${statusBg}`
-                      }}
-                    >
+                  <td className="px-3 py-2.5 text-right">
+                    <span className={`px-2.5 py-0.5 rounded text-[0.72rem] font-bold uppercase tracking-wide border ${statusClass}`}>
                       {diff.status}
                     </span>
                   </td>
@@ -183,3 +130,4 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
     </div>
   );
 };
+

@@ -11,92 +11,62 @@ export interface FederationSummaryBarProps {
 export const FederationSummaryBar: React.FC<FederationSummaryBarProps> = ({
   preview,
   artworkSource,
-  className
+  className = ''
 }) => {
   const summary = computeFederationSummary(preview, artworkSource);
 
-  const getProviderColor = (providerId: string) => {
+  const getProviderIcon = (providerId: string) => {
     switch (providerId.toLowerCase()) {
       case 'musicbrainz':
-        return { bg: 'rgba(186, 85, 211, 0.16)', text: '#E9D5FF', border: 'rgba(186, 85, 211, 0.35)', icon: '🌐' };
+        return '🌐';
       case 'discogs':
-        return { bg: 'rgba(234, 88, 12, 0.16)', text: '#FFEDD5', border: 'rgba(234, 88, 12, 0.35)', icon: '📀' };
+        return '💿';
       case 'coverartarchive':
-        return { bg: 'rgba(14, 165, 233, 0.16)', text: '#E0F2FE', border: 'rgba(14, 165, 233, 0.35)', icon: '🎨' };
+        return '🎨';
       case 'lrclib':
-        return { bg: 'rgba(34, 197, 94, 0.16)', text: '#DCFCE7', border: 'rgba(34, 197, 94, 0.35)', icon: '📝' };
+        return '📝';
       default:
-        return { bg: 'rgba(59, 130, 246, 0.16)', text: '#DBEAFE', border: 'rgba(59, 130, 246, 0.35)', icon: '✨' };
+        return '🏷️';
     }
   };
 
   return (
     <div
-      className={className}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '8px',
-        padding: '8px 14px',
-        borderRadius: '8px',
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        fontSize: '0.78rem'
-      }}
+      className={`flex items-center flex-wrap gap-2 px-3.5 py-2 rounded-lg bg-background-color-2/40 border border-background-color-2 text-xs ${className}`}
     >
-      <span style={{ color: '#94A3B8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <span className="text-font-color-dimmed font-semibold flex items-center gap-1">
         <span>Sources:</span>
       </span>
 
       {summary.providerContributions.map((contrib) => {
-        const style = getProviderColor(contrib.providerId);
         return (
           <div
             key={contrib.providerId}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '3px 8px',
-              borderRadius: '5px',
-              background: style.bg,
-              color: style.text,
-              border: `1px solid ${style.border}`,
-              fontWeight: 600
-            }}
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-background-color-2 border border-background-color-3/40 text-font-color font-medium"
           >
-            <span>{style.icon}</span>
-            <span>{contrib.providerName}:</span>
-            <span style={{ fontWeight: 700 }}>{contrib.fieldCount} {contrib.fieldCount === 1 ? 'tag' : 'tags'}</span>
+            <span>{getProviderIcon(contrib.providerId)}</span>
+            <span className="text-font-color-dimmed">{contrib.providerName}:</span>
+            <span className="font-semibold text-font-color-highlight">{contrib.fieldCount} {contrib.fieldCount === 1 ? 'tag' : 'tags'}</span>
           </div>
         );
       })}
 
       {summary.artworkProvider && (
         <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '3px 8px',
-            borderRadius: '5px',
-            background: 'rgba(14, 165, 233, 0.16)',
-            color: '#E0F2FE',
-            border: '1px solid rgba(14, 165, 233, 0.35)',
-            fontWeight: 600
-          }}
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-background-color-2 border border-background-color-3/40 text-font-color font-medium"
         >
           <span>🎨</span>
-          <span>{summary.artworkProvider} (Artwork)</span>
+          <span className="text-font-color-dimmed">{summary.artworkProvider}</span>
+          <span className="font-semibold text-font-color-highlight">(Artwork)</span>
         </div>
       )}
 
       {summary.totalChangedFields === 0 && (
-        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>
+        <span className="text-font-color-dimmed italic">
           No field modifications detected
         </span>
       )}
     </div>
   );
 };
+

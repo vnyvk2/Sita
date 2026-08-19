@@ -42,140 +42,86 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
     artworkMetadata?.primaryPath ? 'Local Embedded' : 'Online Release';
 
   return (
-    <div
-      style={{
-        background: 'rgba(255, 255, 255, 0.04)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '12px',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px'
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-color)' }}>
+    <div className="bg-background-color-2/40 border border-background-color-2 rounded-xl p-4 flex flex-col gap-3.5">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-font-color">
             Cover Artwork Preview
           </span>
-          <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 500 }}>
+          <span className="text-xs px-2 py-0.5 rounded bg-background-color-2 border border-background-color-3/40 text-font-color-dimmed font-medium">
             {providerDisplay}
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => onToggleReplaceArtwork(false)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: replaceArtwork ? '1px solid rgba(255,255,255,0.15)' : '1px solid #3b82f6',
-              background: replaceArtwork ? 'transparent' : 'rgba(59, 130, 246, 0.2)',
-              color: replaceArtwork ? 'var(--text-color-dimmed)' : 'var(--text-color-highlight)',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+              !replaceArtwork
+                ? 'bg-background-color-3 text-font-color font-bold'
+                : 'bg-background-color-2 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color'
+            }`}
           >
             Keep Current
           </button>
           <button
+            type="button"
             onClick={() => onToggleReplaceArtwork(true)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: !replaceArtwork ? '1px solid rgba(255,255,255,0.15)' : '1px solid #10b981',
-              background: !replaceArtwork ? 'transparent' : 'rgba(16, 185, 129, 0.2)',
-              color: !replaceArtwork ? 'var(--text-color-dimmed)' : '#34d399',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+              replaceArtwork
+                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold'
+                : 'bg-background-color-2 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color'
+            }`}
           >
             Replace Artwork
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div className="grid grid-cols-2 gap-4">
         {/* Current Artwork */}
         <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '8px',
-            border: !replaceArtwork ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)'
-          }}
+          className={`flex flex-col items-center gap-2 p-3 bg-background-color-2/20 rounded-lg border ${
+            !replaceArtwork ? 'border-font-color-highlight' : 'border-background-color-2'
+          }`}
         >
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-color-dimmed)', fontWeight: 500 }}>Current Cover</span>
-          <div
-            style={{
-              width: '100px',
-              height: '100px',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              background: 'var(--background-color-2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
+          <span className="text-xs text-font-color-dimmed font-medium">Current Cover</span>
+          <div className="w-[100px] h-[100px] rounded-lg overflow-hidden bg-background-color-2 flex items-center justify-center">
             {currentArtworkUrl && !currentImgErr ? (
               <img
                 src={currentArtworkUrl}
                 alt="Current Cover"
                 onError={() => setCurrentImgErr(true)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover"
               />
             ) : (
-              <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎵</span>
+              <span className="text-2xl opacity-40">🎵</span>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Local Embedded File</span>
+          <span className="text-xs text-font-color-dimmed">Local Embedded File</span>
         </div>
 
         {/* Suggested Artwork */}
         <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '8px',
-            border: replaceArtwork ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.06)'
-          }}
+          className={`flex flex-col items-center gap-2 p-3 bg-background-color-2/20 rounded-lg border ${
+            replaceArtwork ? 'border-emerald-500/50' : 'border-background-color-2'
+          }`}
         >
-          <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 500 }}>Suggested Cover</span>
-          <div
-            style={{
-              width: '100px',
-              height: '100px',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              background: 'var(--background-color-2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
+          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Suggested Cover</span>
+          <div className="w-[100px] h-[100px] rounded-lg overflow-hidden bg-background-color-2 flex items-center justify-center">
             {suggestedArtworkUrl && !suggestedImgErr ? (
               <img
                 src={suggestedArtworkUrl}
                 alt="Suggested Cover"
                 onError={() => setSuggestedImgErr(true)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover"
               />
             ) : (
-              <span style={{ fontSize: '2rem', opacity: 0.4 }}>🎨</span>
+              <span className="text-2xl opacity-40">🎨</span>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#34d399' }}>
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">
             {dimensionsDisplay} ({providerDisplay})
           </span>
         </div>
@@ -183,3 +129,4 @@ export const ArtworkPreviewCard: React.FC<ArtworkPreviewCardProps> = ({
     </div>
   );
 };
+

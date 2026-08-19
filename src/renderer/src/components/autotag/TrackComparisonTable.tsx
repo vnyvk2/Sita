@@ -62,72 +62,45 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.2)' };
+      return { label: '⚠ Warning', className: 'bg-red-500/15 border-red-500/30 text-font-color-crimson' };
     }
     if (isRename) {
-      return { label: '✓ Rename', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)' };
+      return { label: '✓ Rename', className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400' };
     }
     if (isExact) {
-      return { label: '✓ Match', color: '#10B981', bg: 'rgba(16, 185, 129, 0.2)' };
+      return { label: '✓ Match', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' };
     }
-    return { label: '✓ Suggested', color: '#60A5FA', bg: 'rgba(59, 130, 246, 0.2)' };
+    return { label: '✓ Suggested', className: 'bg-background-color-3/30 border-background-color-3/60 text-font-color-highlight' };
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="flex flex-col gap-2">
       {/* Table Header & Controls Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
+      <div className="flex justify-between items-center px-1">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed uppercase">
             Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onSelectAll}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#CBD5E1',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={onSelectChanged}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#CBD5E1',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color text-xs font-medium transition-colors cursor-pointer"
             >
               Changed Only
             </button>
             <button
               type="button"
               onClick={onClearSelections}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#94A3B8',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 500
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color text-xs font-medium transition-colors cursor-pointer"
             >
               Deselect All
             </button>
@@ -135,92 +108,75 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
         </div>
 
         {/* Filter & Sort & Changes Only Selectors */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="flex gap-2.5 items-center">
           {/* Changes Only Toggle Pill */}
-          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+          <div className="flex bg-background-color-2 rounded-md p-0.5 border border-background-color-3/40">
             <button
               type="button"
               onClick={() => setShowChangesOnly(true)}
-              style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                border: 'none',
-                background: showChangesOnly ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-                color: showChangesOnly ? '#60A5FA' : '#94A3B8',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
+              className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+                showChangesOnly
+                  ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
+                  : 'text-font-color-dimmed hover:text-font-color'
+              }`}
             >
               Changes Only
             </button>
             <button
               type="button"
               onClick={() => setShowChangesOnly(false)}
-              style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                border: 'none',
-                background: !showChangesOnly ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-                color: !showChangesOnly ? '#60A5FA' : '#94A3B8',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
+              className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+                !showChangesOnly
+                  ? 'bg-background-color-1 text-font-color-highlight shadow-xs'
+                  : 'text-font-color-dimmed hover:text-font-color'
+              }`}
             >
               All Fields
             </button>
           </div>
 
-          <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
+              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
             >
-              <option value="all" style={{ background: '#0F172A', color: '#FFFFFF' }}>All Tracks</option>
-              <option value="changed" style={{ background: '#0F172A', color: '#FFFFFF' }}>Changed Only</option>
-              <option value="low_confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Low Confidence</option>
-              <option value="warnings" style={{ background: '#0F172A', color: '#FFFFFF' }}>Warnings Only</option>
+              <option value="all">All Tracks</option>
+              <option value="changed">Changed Only</option>
+              <option value="low_confidence">Low Confidence</option>
+              <option value="warnings">Warnings Only</option>
             </select>
           </label>
 
-          <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+          <label className="text-xs text-font-color-dimmed flex items-center gap-1.5 font-medium">
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
+              className="bg-background-color-1 border border-background-color-3/40 text-font-color rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight transition-colors"
             >
-              <option value="trackNumber" style={{ background: '#0F172A', color: '#FFFFFF' }}>Track #</option>
-              <option value="confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Confidence</option>
-              <option value="title" style={{ background: '#0F172A', color: '#FFFFFF' }}>Title</option>
+              <option value="trackNumber">Track #</option>
+              <option value="confidence">Confidence</option>
+              <option value="title">Title</option>
             </select>
           </label>
         </div>
       </div>
 
       {/* Table Container */}
-      <div
-        style={{
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '10px',
-          overflow: 'hidden',
-          background: 'rgba(15, 23, 42, 0.6)'
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+      <div className="border border-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '10px 10px', textAlign: 'center' }}></th>
-              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}>#</th>
-              <th style={{ padding: '10px 12px' }}>CURRENT TITLE</th>
-              <th style={{ width: '20px', padding: '10px 0', textAlign: 'center' }}></th>
-              <th style={{ padding: '10px 12px' }}>NEW TITLE</th>
-              <th style={{ padding: '10px 12px' }}>ARTIST</th>
-              <th style={{ width: '105px', padding: '10px 12px', textAlign: 'center' }}>STATUS</th>
-              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}></th>
+            <tr className="bg-background-color-2 border-b border-background-color-3/30 text-font-color-dimmed text-xs uppercase tracking-wider">
+              <th className="w-9 px-2.5 py-2.5 text-center"></th>
+              <th className="w-9 px-2 py-2.5 text-center">#</th>
+              <th className="px-3 py-2.5">CURRENT TITLE</th>
+              <th className="w-5 px-0 py-2.5 text-center"></th>
+              <th className="px-3 py-2.5">NEW TITLE</th>
+              <th className="px-3 py-2.5">ARTIST</th>
+              <th className="w-28 px-3 py-2.5 text-center">STATUS</th>
+              <th className="w-9 px-2 py-2.5 text-center"></th>
             </tr>
           </thead>
           <tbody>
@@ -240,15 +196,18 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                 <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => toggleExpand(match.localSongId)}
-                    style={{
-                      borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                      background: isMissing ? 'rgba(0, 0, 0, 0.15)' : isExpanded ? 'rgba(255, 255, 255, 0.05)' : isSelected ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
-                      opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
-                      cursor: isMissing ? 'default' : 'pointer'
-                    }}
+                    className={`border-b border-background-color-2/40 transition-colors text-font-color ${
+                      isMissing
+                        ? 'opacity-40 bg-background-color-2/10 cursor-default'
+                        : isExpanded
+                        ? 'bg-background-color-2/40 border-b-0 cursor-pointer'
+                        : isSelected
+                        ? 'hover:bg-background-color-2/40 cursor-pointer'
+                        : 'opacity-60 hover:bg-background-color-2/30 cursor-pointer'
+                    }`}
                   >
                     {/* Track Checkbox */}
-                    <td style={{ padding: '10px 10px', textAlign: 'center' }}>
+                    <td className="px-2.5 py-2.5 text-center">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -258,80 +217,60 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                           onToggleTrack(match.localSongId);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
+                        className="cursor-pointer disabled:cursor-not-allowed"
                       />
                     </td>
 
                     {/* Track Number */}
-                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontFamily: 'monospace', fontWeight: 600 }}>
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed font-mono text-xs font-semibold">
                       {trackNumFormatted}
                     </td>
 
                     {/* Current Local Title */}
-                    <td style={{ padding: '10px 12px', color: isMissing ? '#64748B' : '#94A3B8', fontWeight: 500, fontStyle: isMissing ? 'italic' : 'normal' }}>
+                    <td className={`px-3 py-2.5 font-medium ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color-dimmed'}`}>
                       {isMissing ? 'Not in library' : match.oldTitle}
                     </td>
 
                     {/* Arrow */}
-                    <td style={{ padding: '10px 0', textAlign: 'center', color: '#94A3B8', fontWeight: 700 }}>
+                    <td className="px-0 py-2.5 text-center text-font-color-dimmed font-bold">
                       →
                     </td>
 
                     {/* New Suggested Title */}
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: isMissing ? '#94A3B8' : '#FFFFFF', fontStyle: isMissing ? 'italic' : 'normal' }}>
+                    <td className={`px-3 py-2.5 font-semibold ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color-highlight font-bold'}`}>
                       {newTitle}
                     </td>
 
                     {/* Artist */}
-                    <td style={{ padding: '10px 12px', color: isMissing ? '#64748B' : '#CBD5E1', fontWeight: 500, fontStyle: isMissing ? 'italic' : 'normal' }}>
+                    <td className={`px-3 py-2.5 text-xs font-medium ${isMissing ? 'text-font-color-dimmed italic' : 'text-font-color'}`}>
                       {newArtist}
                     </td>
 
                     {/* Status Badge */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <td className="px-3 py-2.5 text-center">
                       {isMissing ? (
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.70rem',
-                            fontWeight: 600,
-                            background: 'rgba(100, 116, 139, 0.15)',
-                            color: '#94A3B8',
-                            border: '1px solid rgba(100, 116, 139, 0.25)'
-                          }}
-                        >
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 border border-background-color-3/30 text-font-color-dimmed">
                           Missing
                         </span>
                       ) : (
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            background: statusBadge.bg,
-                            color: statusBadge.color,
-                            border: `1px solid ${statusBadge.bg}`
-                          }}
-                        >
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${statusBadge.className}`}>
                           {statusBadge.label}
                         </span>
                       )}
                     </td>
 
                     {/* Expand Chevron */}
-                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontSize: '0.78rem' }}>
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed text-xs">
                       {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 
                   {/* Expanded Detailed Field Diff Drawer */}
                   {isExpanded && (
-                    <tr style={{ borderBottom: idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none', background: 'rgba(0, 0, 0, 0.4)' }}>
-                      <td colSpan={8} style={{ padding: '14px 20px 18px 48px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <tr className="border-b border-background-color-2 bg-background-color-2/30">
+                      <td colSpan={8} className="px-5 py-4 pl-12">
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-semibold text-font-color-dimmed uppercase tracking-wider">
                             Track-Level Fields ({match.oldTitle})
                           </span>
                           <MetadataDiffViewer
@@ -356,3 +295,4 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
     </div>
   );
 };
+
