@@ -5,9 +5,11 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { SpotifyPlaylistSummary } from '../../../../../main/spotify/api/types';
 import LastFMIcon from '../../../assets/images/webp/last-fm-logo.webp';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
+import { SpotifyPlaylistImportModal } from './SpotifyPlaylistImportModal';
 
 const AccountsSettings = () => {
   const { data: userSettings } = useQuery(settingsQuery.all);
@@ -20,6 +22,8 @@ const AccountsSettings = () => {
   });
 
   const [isConnectingSpotify, setIsConnectingSpotify] = useState(false);
+  const [selectedPlaylistForImport, setSelectedPlaylistForImport] =
+    useState<SpotifyPlaylistSummary | null>(null);
   const { t } = useTranslation();
 
   const isLastFmConnected = useMemo(
@@ -28,35 +32,8 @@ const AccountsSettings = () => {
   );
 
   const { mutate: updateDiscordRpcState } = useMutation({
-    mutationFn: (enableDiscordRpc: boolean) =>
-      window.api.settings.updateDiscordRpcState(enableDiscordRpc),
-    onSettled: () => {
-      queryClient.invalidateQueries(settingsQuery.all);
-    }
-  });
-
-  const { mutate: updateSongScrobblingToLastFMState } = useMutation({
-    mutationFn: (enableScrobbling: boolean) =>
-      window.api.settings.updateSongScrobblingToLastFMState(enableScrobbling),
-    onSettled: () => {
-      queryClient.invalidateQueries(settingsQuery.all);
-    }
-  });
-
-  const { mutate: updateSongFavoritesToLastFMState } = useMutation({
-    mutationFn: (enableFavorites: boolean) =>
-      window.api.settings.updateSongFavoritesToLastFMState(enableFavorites),
-    onSettled: () => {
-      queryClient.invalidateQueries(settingsQuery.all);
-    }
-  });
-
-  const { mutate: updateSendNowPlayingSongDataToLastFMState } = useMutation({
-    mutationFn: (enableNowPlaying: boolean) =>
-      window.api.settings.updateNowPlayingSongDataToLastFMState(enableNowPlaying),
-    onSettled: () => {
-      queryClient.invalidateQueries(settingsQuery.all);
-    }
+    mutationFn: (state: boolean) => window.api.settings.setUserData('enableDiscordRPC', state),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey })
   });
 
   const { mutate: connectSpotify } = useMutation({
@@ -66,16 +43,25 @@ const AccountsSettings = () => {
     },
     onSettled: () => {
       setIsConnectingSpotify(false);
-      queryClient.invalidateQueries(spotifyQuery.status);
-      queryClient.invalidateQueries(spotifyQuery.playlists);
+      void queryClient.invalidateQueries({ queryKey: spotifyQuery.status.queryKey });
+      void queryClient.invalidateQueries({ queryKey: spotifyQuery.playlists.queryKey });
     }
   });
 
   const { mutate: disconnectSpotify, isPending: isDisconnectingSpotify } = useMutation({
-    mutationFn: () => window.api.spotify.disconnect(),
-    onSettled: () => {
-      queryClient.invalidateQueries(spotifyQuery.status);
-      queryClient.invalidateQueries(spotifyQuery.playlists);
+    mutationFn: async () => {
+      return await window.api.spotify.disconnect();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: spotifyQuery.status.queryKey });
+      void queryClient.invalidateQueries({ queryKey: spotifyQuery.playlists.queryKey });
+    }
+  });
+
+  const { mutate: disconnectLastFM } = useMutation({
+    mutationFn: () => window.api.lastFm.disconnect(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
     }
   });
 
@@ -145,16 +131,29 @@ const AccountsSettings = () => {
                     </span>
                   </div>
                   {spotifyPlaylists && spotifyPlaylists.items.length > 0 && (
-                    <ul className="text-font-color-dim dark:text-dark-font-color-dim mt-2 max-h-40 space-y-1 overflow-y-auto text-xs">
+                    <ul className="text-font-color-dim dark:text-dark-font-color-dim mt-2 max-h-48 space-y-1.5 overflow-y-auto text-xs">
                       {spotifyPlaylists.items.slice(0, 10).map((pl) => (
                         <li
                           key={pl.id}
-                          className="border-background-color-3/20 flex items-center justify-between border-b py-1"
+                          className="border-background-color-3/20 flex items-center justify-between border-b py-1.5"
                         >
-                          <span className="text-font-color-black dark:text-font-color-white font-medium">
-                            {pl.name}
-                          </span>
-                          <span>{pl.tracksTotal} tracks</span>
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="material-icons-round text-sm text-[#1DB954]">
+                              playlist_play
+                            </span>
+                            <span className="text-font-color-black dark:text-font-color-white truncate font-medium">
+                              {pl.name}
+                            </span>
+                            <span className="text-[11px] opacity-70">({pl.tracksTotal} tracks)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlaylistForImport(pl)}
+                            className="flex shrink-0 items-center gap-1 rounded bg-[#1DB954]/15 px-2.5 py-1 text-[11px] font-semibold text-[#1DB954] transition hover:bg-[#1DB954]/25"
+                          >
+                            <span className="material-icons-round text-xs">download</span>
+                            Import
+                          </button>
                         </li>
                       ))}
                       {spotifyPlaylists.items.length > 10 && (
@@ -166,6 +165,13 @@ const AccountsSettings = () => {
                   )}
                 </div>
               )}
+
+              {/* Spotify Playlist Import Modal */}
+              <SpotifyPlaylistImportModal
+                playlist={selectedPlaylistForImport}
+                isOpen={Boolean(selectedPlaylistForImport)}
+                onClose={() => setSelectedPlaylistForImport(null)}
+              />
             </div>
           </div>
         </li>
@@ -181,100 +187,47 @@ const AccountsSettings = () => {
           />
         </li>
 
-        {/* LastFM Integration */}
+        {/* Last.fm Integration */}
         <li className="last-fm-integration mb-4">
-          <div className="description">{t('settingsPage.integrateLastFm')}</div>
-          <div className="flex p-4 pb-0">
-            <img
-              src={LastFMIcon}
-              alt={t('settingsPage.lastFmLogo')}
-              className={`mr-4 h-16 w-16 rounded-md ${
-                !isLastFmConnected && 'brightness-90 grayscale'
-              }`}
-            />
-            <div className="grow-0">
+          <div className="description">{t('settingsPage.lastFmDescription')}</div>
+          <div className="flex items-start p-4 pb-0">
+            <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[#ba0000]/10 text-[#ba0000]">
+              <img src={LastFMIcon} alt="Last.fm Logo" className="h-10 w-10 object-contain" />
+            </div>
+            <div className="grow">
               <p
                 className={`flex items-center font-semibold uppercase ${
                   isLastFmConnected ? 'text-green-500' : 'text-red-500'
-                } `}
+                }`}
               >
-                {t(
-                  isLastFmConnected
-                    ? 'settingsPage.lastFmConnected'
-                    : 'settingsPage.lastFmNotConnected'
-                )}{' '}
-                {isLastFmConnected &&
-                  userSettings?.lastFmSessionName &&
-                  `(${t('settingsPage.loggedInAs')} ${userSettings.lastFmSessionName})`}
+                {isLastFmConnected
+                  ? `${t('settingsPage.connectedToLastFM')} (${userSettings?.lastFmUsername})`
+                  : t('settingsPage.notConnectedToLastFM')}
               </p>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('settingsPage.lastFmDescription1')}</li>
-                <li>{t('settingsPage.lastFmDescription2')}</li>
-                <li>{t('settingsPage.lastFmDescription3')}</li>
-                <li>{t('settingsPage.lastFmDescription4')}</li>
-              </ul>
-              <Button
-                label={
-                  isLastFmConnected
-                    ? t('settingsPage.authenticateAgain')
-                    : t('settingsPage.loginInBrowser')
-                }
-                iconName="open_in_new"
-                className="mt-2"
-                clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
-              />
+              <p className="text-font-color-dim dark:text-dark-font-color-dim mt-1 text-sm">
+                {isLastFmConnected
+                  ? t('settingsPage.lastFMConnectedDesc')
+                  : t('settingsPage.lastFMDisconnectedDesc')}
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                {isLastFmConnected ? (
+                  <Button
+                    label={t('settingsPage.disconnectFromLastFM')}
+                    iconName="link_off"
+                    className="border-red-500 text-red-500 hover:bg-red-500/10"
+                    clickHandler={() => disconnectLastFM()}
+                  />
+                ) : (
+                  <Button
+                    label={t('settingsPage.connectToLastFM')}
+                    iconName="open_in_new"
+                    className="bg-[#ba0000]! text-white!"
+                    clickHandler={() => window.api.lastFm.authorize()}
+                  />
+                )}
+              </div>
             </div>
           </div>
-          <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">{t('settingsPage.scrobblingDescription')}</div>
-              <Checkbox
-                id="sendSongScrobblingDataToLastFM"
-                isChecked={!!userSettings?.sendSongScrobblingDataToLastFM}
-                checkedStateUpdateFunction={(state) => updateSongScrobblingToLastFMState(state)}
-                labelContent={t('settingsPage.enableScrobbling')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendFavoritesToLastFmDescription')}
-              </div>
-              <Checkbox
-                id="sendSongFavoritesDataToLastFM"
-                isChecked={!!userSettings?.sendSongFavoritesDataToLastFM}
-                checkedStateUpdateFunction={(state) => updateSongFavoritesToLastFMState(state)}
-                labelContent={t('settingsPage.sendFavoritesToLastFm')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendNowPlayingToLastFmDescription')}
-              </div>
-              <Checkbox
-                id="sendNowPlayingSongDataToLastFM"
-                isChecked={!!userSettings?.sendNowPlayingSongDataToLastFM}
-                checkedStateUpdateFunction={(state) =>
-                  updateSendNowPlayingSongDataToLastFMState(state)
-                }
-                labelContent={t('settingsPage.sendNowPlayingToLastFm')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-          </ul>
         </li>
       </ul>
     </li>
