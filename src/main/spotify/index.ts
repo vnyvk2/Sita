@@ -4,4 +4,7 @@ export * from './auth/SpotifyLoopbackServer';
 export * from './auth/SpotifyTokenStore';
 export * from './api/types';
 export * from './api/SpotifyApiClient';
+export * from './import/SpotifyPlaylistImportPlanner';
+export * from './import/SpotifyPlaylistImportService';
+export * from './ipc/SpotifyImportValidator';
 export * from './ipc/setupSpotifyIpc';

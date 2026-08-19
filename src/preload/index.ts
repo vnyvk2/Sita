@@ -879,7 +879,13 @@ export const api = {
     disconnect: () => ipcRenderer.invoke('spotify/auth/disconnect'),
     getStatus: () => ipcRenderer.invoke('spotify/auth/getStatus'),
     getPlaylists: (options?: { limit?: number; offset?: number }) =>
-      ipcRenderer.invoke('spotify/playlists/getPlaylists', options)
+      ipcRenderer.invoke('spotify/playlists/getPlaylists', options),
+    generateImportPlan: (playlistId: string) =>
+      ipcRenderer.invoke('spotify/playlists/generateImportPlan', playlistId),
+    executeImportPlan: (
+      plan: unknown,
+      options?: { targetPlaylistId?: number; mode?: 'create' | 'merge' | 'replace' }
+    ) => ipcRenderer.invoke('spotify/playlists/executeImportPlan', plan, options)
   }
 };
 
