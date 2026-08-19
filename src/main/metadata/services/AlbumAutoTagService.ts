@@ -116,7 +116,8 @@ export class AlbumAutoTagService extends EventEmitter {
     const validSongIds: number[] = [];
 
     for (const song of localSongs) {
-      const id = song.songId || (song as any).id;
+      const raw = song as LocalSongInput & { id?: number };
+      const id = raw.songId || raw.id;
       if (id && typeof id === 'number') {
         validSongIds.push(id);
       }
@@ -152,7 +153,8 @@ export class AlbumAutoTagService extends EventEmitter {
     }
 
     const hydratedSongs: LocalSongInput[] = localSongs.map((song) => {
-      const id = song.songId || (song as any).id;
+      const raw = song as LocalSongInput & { id?: number };
+      const id = raw.songId || raw.id;
       if (id && songIdMap.has(id)) {
         return songIdMap.get(id)!;
       }
