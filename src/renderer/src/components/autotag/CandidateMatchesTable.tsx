@@ -5,6 +5,7 @@ import { getProviderDisplayName } from '../../../../common/metadata/displayNames
 export interface CandidateMatchesTableProps {
   candidates: AlbumMetadata[];
   selectedCandidateId: string | null;
+  loadingCandidateId?: string | null;
   loading: boolean;
   onSelectCandidate: (candidate: AlbumMetadata) => void;
 }
@@ -12,6 +13,7 @@ export interface CandidateMatchesTableProps {
 export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
   candidates,
   selectedCandidateId,
+  loadingCandidateId,
   loading,
   onSelectCandidate
 }) => {
@@ -66,6 +68,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
             {candidates.map((cand, idx) => {
               const candidateKey = cand.releaseId ?? cand.title;
               const isSelected = selectedCandidateId === candidateKey;
+              const isLoadingThis = loadingCandidateId === candidateKey || loadingCandidateId === cand.releaseId;
               const providerLabel = getProviderDisplayName(cand.provider);
 
               return (
@@ -85,18 +88,29 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                     if (!isSelected) e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  {/* Radio Indicator */}
+                  {/* Radio / Loading Indicator */}
                   <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: '13px',
-                        height: '13px',
-                        borderRadius: '50%',
-                        border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
-                        background: isSelected ? '#FFFFFF' : 'transparent',
-                        margin: '0 auto'
-                      }}
-                    />
+                    {isLoadingThis ? (
+                      <div
+                        className="animate-spin rounded-full border-2 border-blue-400 border-t-transparent"
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          margin: '0 auto'
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '13px',
+                          height: '13px',
+                          borderRadius: '50%',
+                          border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
+                          background: isSelected ? '#FFFFFF' : 'transparent',
+                          margin: '0 auto'
+                        }}
+                      />
+                    )}
                   </td>
 
                   {/* Release Title & Subtitle */}
@@ -122,25 +136,43 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                   {/* Match Rank & Provider */}
                   <td style={{ padding: '8px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span
-                        style={{
-                          fontSize: '0.70rem',
-                          fontWeight: 700,
-                          padding: '1px 5px',
-                          borderRadius: '4px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                          color: idx === 0 ? '#34D399' : '#94A3B8',
-                          border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
-                        }}
-                      >
-                        {idx === 0 ? 'Best Match' : `#${idx + 1}`}
-                      </span>
-                      {cand.rankingScore !== undefined && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
-                          Score {cand.rankingScore}
+                      {isLoadingThis ? (
+                        <span
+                          style={{
+                            fontSize: '0.70rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(59, 130, 246, 0.25)',
+                            color: '#93C5FD',
+                            border: '1px solid rgba(59, 130, 246, 0.5)'
+                          }}
+                        >
+                          Resolving...
                         </span>
+                      ) : (
+                        <>
+                          <span
+                            style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 700,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                              background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                              color: idx === 0 ? '#34D399' : '#94A3B8',
+                              border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
+                            }}
+                          >
+                            {idx === 0 ? 'Best Match' : `#${idx + 1}`}
+                          </span>
+                          {cand.rankingScore !== undefined && (
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
+                              Score {cand.rankingScore}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                     <div style={{ fontSize: '0.70rem', color: '#94A3B8', marginTop: '2px', fontWeight: 500 }}>

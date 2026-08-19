@@ -50,6 +50,7 @@ export interface UseAlbumAutoTagState {
   // Candidate Matches
   searchCandidates: AlbumMetadata[];
   selectedCandidateId: string | null;
+  loadingCandidateId: string | null;
   loadingCandidates: boolean;
   loadingPreview: boolean;
 
@@ -159,6 +160,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   // Candidate Matches & Selection
   const [searchCandidates, setSearchCandidates] = useState<AlbumMetadata[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [loadingCandidateId, setLoadingCandidateId] = useState<string | null>(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
@@ -303,6 +305,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
       setLoading(true);
       setLoadingPreview(true);
+      setLoadingCandidateId(releaseId);
       setError(null);
 
       try {
@@ -326,6 +329,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
         if (requestId === previewRequestIdRef.current) {
           setLoading(false);
           setLoadingPreview(false);
+          setLoadingCandidateId(null);
         }
       }
     },
@@ -718,6 +722,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       availableProviders,
       searchCandidates,
       selectedCandidateId,
+      loadingCandidateId,
       loadingCandidates,
       loadingPreview,
       preview,

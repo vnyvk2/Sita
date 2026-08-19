@@ -382,19 +382,22 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           <CandidateMatchesTable
             candidates={state.searchCandidates}
             selectedCandidateId={state.selectedCandidateId}
+            loadingCandidateId={state.loadingCandidateId}
             loading={state.loadingCandidates}
             onSelectCandidate={(cand) => actions.selectCandidate(localSongs, cand)}
           />
 
           {/* 3. Selected Release Panel & Artwork */}
           {state.preview && (
-            <SelectedReleasePanel
-              preview={state.preview}
-              artworkSource={state.artworkSource}
-              replaceArtwork={state.replaceArtwork}
-              onArtworkSourceChange={actions.setArtworkSource}
-              onToggleReplaceArtwork={actions.setReplaceArtwork}
-            />
+            <div style={{ opacity: state.loadingPreview ? 0.6 : 1, transition: 'opacity 0.2s ease', pointerEvents: state.loadingPreview ? 'none' : 'auto' }}>
+              <SelectedReleasePanel
+                preview={state.preview}
+                artworkSource={state.artworkSource}
+                replaceArtwork={state.replaceArtwork}
+                onArtworkSourceChange={actions.setArtworkSource}
+                onToggleReplaceArtwork={actions.setReplaceArtwork}
+              />
+            </div>
           )}
 
           {/* 4. Global Field Diff Table */}

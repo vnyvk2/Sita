@@ -65,10 +65,10 @@ export class MetadataResolutionManager {
     if (typeof request === 'string') {
       const context = legacyContext!;
       const candidates = await this.lookupGateway.searchCandidates(context);
-      const mergedResult = this.mergeEngine.mergeCandidates(candidates, context.policy);
+      const mergedResult = this.mergeEngine.mergeCandidates(candidates, context?.policy);
       return {
         operationId: request,
-        resourceId: context.resources.targetResources[0]?.id ?? 0,
+        resourceId: context?.resources?.targetResources?.[0]?.id ?? 0,
         candidates,
         mergedResult,
         resolvedAt: Date.now()
@@ -100,11 +100,16 @@ export class MetadataResolutionManager {
     let fieldContributions: FieldContribution[] = [];
     let candidates: ProviderCandidate[] = [];
 
-    if (this.lookupGateway.searchContributions) {
-      fieldContributions = await this.lookupGateway.searchContributions(context);
+    if (typeof this.lookupGateway.resolveFederated === 'function') {
+      const fedResult = await this.lookupGateway.resolveFederated(context);
+      fieldContributions = fedResult.contributions;
+      candidates = fedResult.candidates;
+    } else {
+      if (this.lookupGateway.searchContributions) {
+        fieldContributions = await this.lookupGateway.searchContributions(context);
+      }
+      candidates = await this.lookupGateway.searchCandidates(context);
     }
-
-    candidates = await this.lookupGateway.searchCandidates(context);
 
     const mergedResult: MergedCandidateResult = fieldContributions.length > 0
       ? this.mergeEngine.mergeFieldContributions(fieldContributions, request.policy)

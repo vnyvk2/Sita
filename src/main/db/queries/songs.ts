@@ -482,6 +482,67 @@ export const getSongById = async (songId: number, trx: DB | DBTransaction = db) 
   return song;
 };
 
+export const getSongsByIds = async (songIds: number[], trx: DB | DBTransaction = db) => {
+  if (!songIds || songIds.length === 0) return [];
+  const results = await trx.query.songs.findMany({
+    where: inArray(songs.id, songIds),
+    with: {
+      artists: {
+        with: {
+          artist: {
+            columns: { id: true, name: true }
+          }
+        }
+      },
+      albums: {
+        with: {
+          album: {
+            columns: { id: true, title: true, isFavorite: true },
+            with: {
+              artists: {
+                with: {
+                  artist: {
+                    columns: { id: true, name: true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      genres: {
+        with: {
+          genre: {
+            columns: { id: true, name: true }
+          }
+        }
+      },
+      artworks: {
+        with: {
+          artwork: {
+            with: {
+              palette: {
+                columns: { id: true },
+                with: {
+                  swatches: {}
+                }
+              }
+            }
+          }
+        }
+      },
+      playlists: {
+        with: {
+          playlist: {
+            columns: { id: true, name: true }
+          }
+        }
+      }
+    }
+  });
+  return results;
+};
+
 export const getSongByPath = async (path: string, trx: DB | DBTransaction = db) => {
   const song = await trx.query.songs.findFirst({
     where: eq(songs.path, path),

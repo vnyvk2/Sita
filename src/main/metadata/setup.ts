@@ -123,6 +123,9 @@ export interface MetadataContainer {
   };
   infrastructure: {
     requestPipeline: RequestPipeline;
+    mbPipeline?: RequestPipeline;
+    discogsPipeline?: RequestPipeline;
+    caaPipeline?: RequestPipeline;
   };
 }
 
@@ -149,20 +152,31 @@ export class MetadataBootstrap {
     const identityCache = new IdentityResolutionCache();
     const providerDiscovery = new MetadataProviderDiscovery(runtimeProviderRegistry);
 
-    // Single shared networking pipeline for remote providers
+    // Dedicated isolated networking pipelines per provider domain
     const platform = PlatformBootstrap.getInstance();
-    const requestPipeline = platform.createRequestPipeline({
+
+    // 1. MusicBrainz: strict 1 req / 1000ms token bucket with 3 retries
+    const mbPipeline = platform.createRequestPipeline({
       rateLimiter: new RateLimiter({ maxRequests: 1, perIntervalMs: 1000 }),
       retryPolicy: new RetryPolicy({ maxRetries: 3, initialDelayMs: 1000 })
     });
-
-    const mbApiClient = new MusicBrainzApiClient(requestPipeline);
+    const mbApiClient = new MusicBrainzApiClient(mbPipeline);
     const musicBrainzAdapter = new MusicBrainzAdapter(mbApiClient, { cache: identityCache });
 
-    const discogsApiClient = new DiscogsApiClient(requestPipeline);
+    // 2. Discogs: isolated pipeline with 5 req / 1000ms capacity with 2 retries
+    const discogsPipeline = platform.createRequestPipeline({
+      rateLimiter: new RateLimiter({ maxRequests: 5, perIntervalMs: 1000 }),
+      retryPolicy: new RetryPolicy({ maxRetries: 2, initialDelayMs: 500 })
+    });
+    const discogsApiClient = new DiscogsApiClient(discogsPipeline);
     const discogsAdapter = new DiscogsAdapter(discogsApiClient, { cache: identityCache });
 
-    const caaApiClient = new CaaApiClient(requestPipeline);
+    // 3. CoverArtArchive: isolated CDN pipeline with high concurrency
+    const caaPipeline = platform.createRequestPipeline({
+      maxConcurrentRequests: 6,
+      retryPolicy: new RetryPolicy({ maxRetries: 2, initialDelayMs: 400 })
+    });
+    const caaApiClient = new CaaApiClient(caaPipeline);
     const coverArtArchiveAdapter = new CoverArtArchiveAdapter(caaApiClient, { cache: identityCache });
 
     const resolutionProviderRegistry = new ResolutionProviderRegistry();
@@ -266,7 +280,7 @@ export class MetadataBootstrap {
         const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
         await updateSongId3Tags(songId, completeTags, true, true);
       },
-      requestPipeline
+      requestPipeline: caaPipeline
     });
 
     const workflowService = new MetadataWorkflowService({
@@ -367,7 +381,10 @@ export class MetadataBootstrap {
         lookupGateway
       },
       infrastructure: {
-        requestPipeline
+        requestPipeline: mbPipeline,
+        mbPipeline,
+        discogsPipeline,
+        caaPipeline
       }
     };
   }

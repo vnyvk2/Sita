@@ -5,24 +5,34 @@ import { ProviderRegistry } from './ProviderRegistry';
 import type { FieldContribution } from './MetadataMergeEngine';
 import type { IMetadataProviderAdapter } from '../contracts/IMetadataProviderAdapter';
 
+export interface ProviderResolutionResult {
+  contributions: FieldContribution[];
+  candidates: ProviderCandidate[];
+  providerMetrics?: Record<string, { durationMs: number; success: boolean }>;
+}
+
 export interface MetadataLookupGateway {
   searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]>;
   searchContributions?(context: MetadataContext): Promise<FieldContribution[]>;
+  resolveFederated?(context: MetadataContext): Promise<ProviderResolutionResult>;
 }
 
 export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
   private readonly providerRegistry: ProviderRegistry;
+  private readonly inFlightResolutions = new Map<string, Promise<ProviderResolutionResult>>();
 
   constructor(_executor?: MetadataProviderExecutor, providerRegistry?: ProviderRegistry) {
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();
   }
 
   /**
-   * Directly fetches specialized FieldContribution[] across registered active providers, bypassing intermediate full candidate objects.
+   * Single-pass parallel provider resolution executing fetchContribution across all active providers concurrently (Promise.allSettled).
+   * Derives both specialized FieldContribution[] and ProviderCandidate[] in a single network pass.
+   * Includes in-flight memoization to prevent duplicate federation passes.
    */
-  public async searchContributions(context: MetadataContext): Promise<FieldContribution[]> {
+  public async resolveFederated(context: MetadataContext): Promise<ProviderResolutionResult> {
     const requestQuery = context.request?.query;
-    if (!requestQuery) return [];
+    if (!requestQuery) return { contributions: [], candidates: [] };
 
     let title: string | undefined;
     let artist: string | undefined;
@@ -43,131 +53,100 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
       releaseId = q.releaseId;
     }
 
-    if (!title && !mbid && !releaseId) return [];
+    if (!title && !mbid && !releaseId) return { contributions: [], candidates: [] };
 
-    const fieldContributions: FieldContribution[] = [];
-    const activeInstances = this.providerRegistry.getActiveInstances();
-
-    console.log('[MetadataLookupGateway] Incoming requestQuery:', requestQuery);
-    console.log('[MetadataLookupGateway] Extracted query for adapters:', { title, artist, mbid, releaseId });
-    console.log('[MetadataLookupGateway] Active Registered Provider Instances:', Array.from(activeInstances.keys()));
-
-    for (const [providerId, instance] of activeInstances.entries()) {
-      const adapter = instance as unknown as IMetadataProviderAdapter;
-      if (adapter && typeof adapter.fetchContribution === 'function') {
-        try {
-          console.log(`[MetadataLookupGateway] Calling fetchContribution on '${providerId}' with:`, { title, artist, mbid, releaseId });
-          const contrib = await adapter.fetchContribution({ title, artist, mbid, releaseId });
-          console.log(`[MetadataLookupGateway] fetchContribution result from '${providerId}':`, contrib);
-          if (contrib && contrib.contributions) {
-            fieldContributions.push(...contrib.contributions);
-          }
-        } catch (err: unknown) {
-          console.warn(`[MetadataLookupGateway] fetchContribution error from '${providerId}':`, err);
-        }
-      }
+    const cacheKey = JSON.stringify({
+      title: title ?? '',
+      artist: artist ?? '',
+      mbid: mbid ?? '',
+      releaseId: releaseId ?? ''
+    });
+    const existing = this.inFlightResolutions.get(cacheKey);
+    if (existing) {
+      return existing;
     }
 
-    return fieldContributions;
+    const resolutionPromise = (async (): Promise<ProviderResolutionResult> => {
+      const activeInstances = this.providerRegistry.getActiveInstances();
+      const query = { title, artist, mbid, releaseId };
+
+      // Parallel execution across all active providers with failure isolation
+      const providerEntries = Array.from(activeInstances.entries());
+      const tasks = providerEntries.map(async ([providerId, instance]) => {
+        const adapter = instance as unknown as IMetadataProviderAdapter;
+        const t0 = performance.now();
+        if (adapter && typeof adapter.fetchContribution === 'function') {
+          try {
+            const contrib = await adapter.fetchContribution(query);
+            const durationMs = Math.round(performance.now() - t0);
+            return { providerId, contrib, durationMs, success: Boolean(contrib) };
+          } catch (_err: unknown) {
+            const durationMs = Math.round(performance.now() - t0);
+            return { providerId, contrib: null, durationMs, success: false };
+          }
+        }
+        return { providerId, contrib: null, durationMs: 0, success: false };
+      });
+
+      const settled = await Promise.allSettled(tasks);
+      const contributions: FieldContribution[] = [];
+      const candidates: ProviderCandidate[] = [];
+      const providerMetrics: Record<string, { durationMs: number; success: boolean }> = {};
+
+      for (const res of settled) {
+        if (res.status === 'fulfilled' && res.value) {
+          const { providerId, contrib, durationMs, success } = res.value;
+          providerMetrics[providerId] = { durationMs, success };
+
+          if (contrib && contrib.contributions && contrib.contributions.length > 0) {
+            contributions.push(...contrib.contributions);
+
+            const titleContrib = contrib.contributions.find((c) => c.fieldId === 'title')?.value;
+            const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;
+            const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
+            const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
+            const artworkUrlContrib = contrib.contributions.find((c) => c.fieldId === 'artworkUrl')?.value;
+            const mbidContrib = contrib.contributions.find((c) => c.fieldId === 'mbid')?.value;
+
+            candidates.push({
+              providerId,
+              providerName: this.providerRegistry.getDisplayName(providerId),
+              externalId: mbidContrib ? String(mbidContrib) : providerId,
+              title: String(titleContrib ?? title),
+              artist: String(artistContrib ?? artist ?? ''),
+              score: contrib.confidenceScore,
+              matchedAttributes: {
+                title: String(titleContrib ?? ''),
+                artist: String(artistContrib ?? ''),
+                album: String(albumContrib ?? ''),
+                genre: String(genreContrib ?? ''),
+                artworkUrl: String(artworkUrlContrib ?? ''),
+                mbid: String(mbidContrib ?? '')
+              }
+            });
+          }
+        }
+      }
+
+      return { contributions, candidates, providerMetrics };
+    })();
+
+    this.inFlightResolutions.set(cacheKey, resolutionPromise);
+    try {
+      return await resolutionPromise;
+    } finally {
+      this.inFlightResolutions.delete(cacheKey);
+    }
+  }
+
+  public async searchContributions(context: MetadataContext): Promise<FieldContribution[]> {
+    const result = await this.resolveFederated(context);
+    return result.contributions;
   }
 
   public async searchCandidates(context: MetadataContext): Promise<ProviderCandidate[]> {
-    const requestQuery = context.request?.query;
-    if (!requestQuery) return [];
-
-    let title: string | undefined;
-    let artist: string | undefined;
-    let mbid: string | undefined;
-    let releaseId: string | undefined;
-
-    if ('albumTitle' in requestQuery) {
-      const q = requestQuery as AlbumLookupQuery & { mbid?: string; releaseId?: string };
-      title = q.albumTitle;
-      artist = q.artistName;
-      mbid = q.mbid;
-      releaseId = q.releaseId;
-    } else if ('trackTitle' in requestQuery) {
-      const q = requestQuery as TrackLookupQuery & { mbid?: string; releaseId?: string };
-      title = q.trackTitle;
-      artist = q.artistName;
-      mbid = q.mbid;
-      releaseId = q.releaseId;
-    }
-
-    if (!title && !mbid && !releaseId) return [];
-
-    const candidates: ProviderCandidate[] = [];
-
-    // 1. Check registry-driven active provider instances first
-    const activeInstances = this.providerRegistry.getActiveInstances();
-    if (activeInstances.size > 0) {
-      for (const [providerId, provider] of activeInstances.entries()) {
-        const adapter = provider as unknown as IMetadataProviderAdapter;
-        // Direct specialized contribution check
-        if (adapter && typeof adapter.fetchContribution === 'function') {
-          try {
-            const contrib = await adapter.fetchContribution({ title, artist, mbid, releaseId });
-            if (contrib && contrib.contributions.length > 0) {
-              const titleContrib = contrib.contributions.find((c) => c.fieldId === 'title')?.value;
-              const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;
-              const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
-              const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
-              const artworkUrlContrib = contrib.contributions.find((c) => c.fieldId === 'artworkUrl')?.value;
-              const mbidContrib = contrib.contributions.find((c) => c.fieldId === 'mbid')?.value;
-
-              candidates.push({
-                providerId,
-                providerName: this.providerRegistry.getDisplayName(providerId),
-                externalId: mbidContrib ? String(mbidContrib) : providerId,
-                title: String(titleContrib ?? title),
-                artist: String(artistContrib ?? artist ?? ''),
-                score: contrib.confidenceScore,
-                matchedAttributes: {
-                  title: String(titleContrib ?? ''),
-                  artist: String(artistContrib ?? ''),
-                  album: String(albumContrib ?? ''),
-                  genre: String(genreContrib ?? ''),
-                  artworkUrl: String(artworkUrlContrib ?? ''),
-                  mbid: String(mbidContrib ?? '')
-                }
-              });
-              continue;
-            }
-          } catch (_err) {
-            // Fall back to legacy fetchMetadata if contribution lookup fails
-          }
-        }
-
-        if (adapter && typeof adapter.searchAlbums === 'function' && title) {
-          try {
-            const albums = await adapter.searchAlbums(title, artist, 5);
-            for (const alb of albums) {
-              candidates.push({
-                providerId,
-                providerName: this.providerRegistry.getDisplayName(providerId),
-                externalId: alb.releaseId || providerId,
-                title: alb.title,
-                artist: alb.artist,
-                score: 0.85,
-                matchedAttributes: {
-                  title: alb.title,
-                  artist: alb.artist,
-                  album: alb.title,
-                  artworkUrl: alb.artwork?.primaryPath || alb.artwork?.onlineUrls?.[0] || ''
-                }
-              });
-            }
-          } catch (_err) {
-            // Ignore individual provider album search errors gracefully
-          }
-        }
-      }
-      if (candidates.length > 0) {
-        return candidates;
-      }
-    }
-
-    return candidates;
+    const result = await this.resolveFederated(context);
+    return result.candidates;
   }
 
   public get registry(): ProviderRegistry {
