@@ -42,24 +42,24 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
         </span>
       </div>
 
-      {/* Table Container (Scrollable up to max 3 rows) */}
+      {/* Table Container (Scrollable up to max 3 compact rows) */}
       <div
         style={{
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           overflowY: 'auto',
-          maxHeight: '210px',
+          maxHeight: '170px',
           background: 'rgba(15, 23, 42, 0.6)'
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
           <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'rgb(15, 23, 42)' }}>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '10px 12px', textAlign: 'center' }}></th>
-              <th style={{ padding: '10px 14px' }}>RELEASE</th>
-              <th style={{ padding: '10px 14px' }}>ARTIST</th>
-              <th style={{ padding: '10px 14px', width: '80px' }}>YEAR</th>
-              <th style={{ padding: '10px 14px', width: '150px' }}>MATCH</th>
+            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <th style={{ width: '36px', padding: '8px 10px', textAlign: 'center' }}></th>
+              <th style={{ padding: '8px 12px' }}>RELEASE</th>
+              <th style={{ padding: '8px 12px' }}>ARTIST</th>
+              <th style={{ padding: '8px 12px', width: '80px' }}>YEAR</th>
+              <th style={{ padding: '8px 12px', width: '150px' }}>MATCH</th>
             </tr>
           </thead>
           <tbody>
@@ -86,11 +86,11 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                   }}
                 >
                   {/* Radio Indicator */}
-                  <td style={{ padding: '12px', textAlign: 'center' }}>
+                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                     <div
                       style={{
-                        width: '14px',
-                        height: '14px',
+                        width: '13px',
+                        height: '13px',
                         borderRadius: '50%',
                         border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
                         background: isSelected ? '#FFFFFF' : 'transparent',
@@ -100,33 +100,33 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                   </td>
 
                   {/* Release Title & Subtitle */}
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontWeight: isSelected ? 700 : 600, color: '#FFFFFF' }}>
+                  <td style={{ padding: '8px 12px' }}>
+                    <div style={{ fontWeight: isSelected ? 700 : 600, color: '#FFFFFF', fontSize: '0.84rem' }}>
                       {cand.title}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: isSelected ? '#93C5FD' : '#94A3B8', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.74rem', color: isSelected ? '#93C5FD' : '#94A3B8', marginTop: '1px' }}>
                       {cand.trackCount ? `${cand.trackCount} tracks` : 'Official Release'} {cand.releaseType ? `· ${cand.releaseType}` : ''}
                     </div>
                   </td>
 
                   {/* Artist */}
-                  <td style={{ padding: '12px 14px', color: '#E2E8F0', fontWeight: 500 }}>
+                  <td style={{ padding: '8px 12px', color: '#E2E8F0', fontWeight: 500, fontSize: '0.82rem' }}>
                     {cand.artist || '—'}
                   </td>
 
                   {/* Year */}
-                  <td style={{ padding: '12px 14px', color: '#CBD5E1' }}>
+                  <td style={{ padding: '8px 12px', color: '#CBD5E1', fontSize: '0.82rem' }}>
                     {cand.year ?? '—'}
                   </td>
 
                   {/* Match Rank & Provider */}
-                  <td style={{ padding: '12px 14px' }}>
+                  <td style={{ padding: '8px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span
                         style={{
-                          fontSize: '0.72rem',
+                          fontSize: '0.70rem',
                           fontWeight: 700,
-                          padding: '2px 6px',
+                          padding: '1px 5px',
                           borderRadius: '4px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
@@ -138,12 +138,12 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                         {idx === 0 ? 'Best Match' : `#${idx + 1}`}
                       </span>
                       {cand.rankingScore !== undefined && (
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
                           Score {cand.rankingScore}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px', fontWeight: 500 }}>
+                    <div style={{ fontSize: '0.70rem', color: '#94A3B8', marginTop: '2px', fontWeight: 500 }}>
                       {providerLabel}
                     </div>
                   </td>
