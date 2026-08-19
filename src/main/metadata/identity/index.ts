@@ -17,5 +17,6 @@ export {
 } from './adapters/MusicBrainzToCanonicalIdentity';
 export {
   toCanonicalFromDiscogs,
-  type DiscogsTrackInput
+  type DiscogsTrackInput,
+  type DiscogsReleaseContext
 } from './adapters/DiscogsToCanonicalIdentity';

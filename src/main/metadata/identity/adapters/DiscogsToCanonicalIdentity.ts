@@ -8,6 +8,12 @@ export interface DiscogsTrackInput {
   duration?: string | number;
   position?: string;
   year?: number;
+  extraartists?: Array<{ name: string; role?: string }>;
+}
+
+export interface DiscogsReleaseContext {
+  title?: string;
+  year?: number;
 }
 
 function parseDiscogsDuration(duration?: string | number): number | undefined {
@@ -26,7 +32,10 @@ function parseDiscogsDuration(duration?: string | number): number | undefined {
   return undefined;
 }
 
-export function toCanonicalFromDiscogs(track: DiscogsTrackInput): CanonicalTrackIdentity {
+export function toCanonicalFromDiscogs(
+  track: DiscogsTrackInput,
+  releaseContext?: DiscogsReleaseContext
+): CanonicalTrackIdentity {
   const artists: string[] = [];
   if (Array.isArray(track.artists)) {
     for (const a of track.artists) {
@@ -49,13 +58,16 @@ export function toCanonicalFromDiscogs(track: DiscogsTrackInput): CanonicalTrack
     if (!isNaN(parsed)) trackNumber = parsed;
   }
 
+  const album = (track.album ?? releaseContext?.title)?.trim() || undefined;
+  const releaseYear = track.year ?? releaseContext?.year;
+
   return {
     id: track.id,
     title: track.title,
     artists,
-    album: track.album?.trim() || undefined,
+    album,
     durationSecs: parseDiscogsDuration(track.duration),
-    releaseYear: track.year,
+    releaseYear,
     trackNumber
   };
 }

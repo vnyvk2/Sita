@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { safeStorage } from 'electron';
 
 import { db } from '../../db/db';
@@ -168,25 +168,29 @@ export class SpotifyTokenStore {
           ? this.encryptToken(refreshToken)
           : row.encryptedRefreshToken;
 
-        void db
-          .update(spotifyIntegrations)
-          .set({
-            encryptedAccessToken: modernEncryptedAccess,
-            encryptedRefreshToken: modernEncryptedRefresh,
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyIntegrations.id, row.id))
-          .then(() => {
-            logger.info('Migrated legacy Spotify tokens to modern authenticated ciphertext', {
-              userId: row.spotifyUserId
-            });
-          })
-          .catch((err) => {
-            logger.warn(
-              'Failed to asynchronously upgrade legacy Spotify token ciphertext in DB',
-              { err }
+        try {
+          // Await synchronous migration with optimistic concurrency check
+          await db
+            .update(spotifyIntegrations)
+            .set({
+              encryptedAccessToken: modernEncryptedAccess,
+              encryptedRefreshToken: modernEncryptedRefresh,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(spotifyIntegrations.id, row.id),
+                eq(spotifyIntegrations.encryptedAccessToken, row.encryptedAccessToken),
+                eq(spotifyIntegrations.encryptedRefreshToken, row.encryptedRefreshToken)
+              )
             );
+
+          logger.info('Migrated legacy Spotify tokens to modern authenticated ciphertext', {
+            userId: row.spotifyUserId
           });
+        } catch (err) {
+          logger.warn('Failed to upgrade legacy Spotify token ciphertext in DB', { err });
+        }
       }
 
       return {

@@ -1367,21 +1367,17 @@ export const collectionContexts = pgTable(
 // ============================================================================
 // Spotify Integration Tables (Phase 1)
 // ============================================================================
-export const spotifyIntegrations = pgTable(
-  'spotify_integrations',
-  {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    spotifyUserId: varchar('spotify_user_id', { length: 255 }).notNull().unique(),
-    displayName: varchar('display_name', { length: 255 }),
-    email: varchar('email', { length: 255 }),
-    product: varchar('product', { length: 50 }),
-    encryptedAccessToken: text('encrypted_access_token').notNull(),
-    encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
-    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: false }).notNull(),
-    scopes: json('scopes').$type<string[]>().notNull().default([]),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
-  },
-  (t) => [index('idx_spotify_integrations_user_id').on(t.spotifyUserId)]
-);
+export const spotifyIntegrations = pgTable('spotify_integrations', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  spotifyUserId: varchar('spotify_user_id', { length: 255 }).notNull().unique(),
+  displayName: varchar('display_name', { length: 255 }),
+  email: varchar('email', { length: 255 }),
+  product: varchar('product', { length: 50 }),
+  encryptedAccessToken: text('encrypted_access_token').notNull(),
+  encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }).notNull(),
+  scopes: json('scopes').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+});
 
