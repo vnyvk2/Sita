@@ -170,7 +170,7 @@ export class SpotifyTokenStore {
 
         try {
           // Await synchronous migration with optimistic concurrency check
-          await db
+          const updated = await db
             .update(spotifyIntegrations)
             .set({
               encryptedAccessToken: modernEncryptedAccess,
@@ -183,11 +183,19 @@ export class SpotifyTokenStore {
                 eq(spotifyIntegrations.encryptedAccessToken, row.encryptedAccessToken),
                 eq(spotifyIntegrations.encryptedRefreshToken, row.encryptedRefreshToken)
               )
-            );
+            )
+            .returning({ id: spotifyIntegrations.id });
 
-          logger.info('Migrated legacy Spotify tokens to modern authenticated ciphertext', {
-            userId: row.spotifyUserId
-          });
+          if (updated.length > 0) {
+            logger.info('Migrated legacy Spotify tokens to modern authenticated ciphertext', {
+              userId: row.spotifyUserId
+            });
+          } else {
+            logger.debug(
+              'Skipped legacy Spotify token migration because the row changed concurrently',
+              { userId: row.spotifyUserId }
+            );
+          }
         } catch (err) {
           logger.warn('Failed to upgrade legacy Spotify token ciphertext in DB', { err });
         }
