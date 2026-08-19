@@ -42,17 +42,18 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
         </span>
       </div>
 
-      {/* Table Container */}
+      {/* Table Container (Scrollable up to max 3 rows) */}
       <div
         style={{
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
-          overflow: 'hidden',
+          overflowY: 'auto',
+          maxHeight: '210px',
           background: 'rgba(15, 23, 42, 0.6)'
         }}
       >
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'rgb(15, 23, 42)' }}>
             <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <th style={{ width: '36px', padding: '10px 12px', textAlign: 'center' }}></th>
               <th style={{ padding: '10px 14px' }}>RELEASE</th>
