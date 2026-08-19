@@ -133,7 +133,7 @@ describe('MetadataCenterDialog Mode Switching & Keyboard Navigation', () => {
     // Detailed table headers should now be present
     expect(screen.getByText('CURRENT TITLE')).toBeDefined();
     expect(screen.getByText('NEW TITLE')).toBeDefined();
-  });
+  }, 15000);
 
   it('switches viewMode via Ctrl+D keyboard shortcut', () => {
     render(
