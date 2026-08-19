@@ -52,7 +52,7 @@ const mockPreview: AlbumTagPreview = {
   ]
 };
 
-vi.mock('../../hooks/useAlbumAutoTag', () => ({
+vi.mock('../../../hooks/useAlbumAutoTag', () => ({
   useAlbumAutoTag: () => ({
     state: {
       step: 'review',
