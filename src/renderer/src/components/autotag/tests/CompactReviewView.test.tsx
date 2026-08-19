@@ -447,4 +447,79 @@ describe('CompactReviewView Component', () => {
     expect(onOpenDetailed).toHaveBeenCalledWith(1);
     expect(onToggleExpand).not.toHaveBeenCalled();
   });
+
+  it('renders missing tracks with disabled checkbox, Missing badge, and Not in library subtext', () => {
+    const onToggleTrack = vi.fn();
+    const onToggleExpand = vi.fn();
+
+    const matchesWithMissing: TrackMatchPreview[] = [
+      {
+        localSongId: -1,
+        songPath: '',
+        oldTitle: '',
+        oldArtist: '',
+        oldTrackNumber: 1,
+        confidence: 0,
+        confidenceLevel: 'Low',
+        why: 'Not in local library',
+        reasons: ['missing_locally'],
+        applyTrack: false,
+        hasWarnings: false,
+        warningCount: 0,
+        isMissingLocally: true,
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            suggestedValue: 'Lolo (Intro)',
+            status: 'new',
+            applyField: false
+          },
+          {
+            fieldId: 'artist',
+            fieldName: 'Artist',
+            suggestedValue: 'Dr. Dre',
+            status: 'new',
+            applyField: false
+          },
+          {
+            fieldId: 'trackNumber',
+            fieldName: 'Track Number',
+            suggestedValue: 1,
+            status: 'new',
+            applyField: false
+          }
+        ]
+      },
+      ...mockMatches
+    ];
+
+    render(
+      <CompactReviewView
+        matches={matchesWithMissing}
+        selectedTrackIds={new Set([1])}
+        selectedFieldMap={new Map()}
+        userEditedValues={new Map()}
+        expandedTrackId={null}
+        onToggleTrack={onToggleTrack}
+        onToggleExpand={onToggleExpand}
+        onOpenDetailed={vi.fn()}
+        onSelectAll={vi.fn()}
+        onSelectChanged={vi.fn()}
+        onClearSelections={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Lolo (Intro)')).toBeDefined();
+    expect(screen.getByText('Not in library')).toBeDefined();
+    expect(screen.getByText('Missing')).toBeDefined();
+
+    // The missing track's checkbox should be disabled
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes[0]).toHaveProperty('disabled', true);
+
+    // Clicking row of missing track should NOT toggle expand
+    fireEvent.click(screen.getByText('Lolo (Intro)'));
+    expect(onToggleExpand).not.toHaveBeenCalled();
+  });
 });

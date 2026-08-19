@@ -40,6 +40,7 @@ export interface TrackMatchPreview {
   applyTrack: boolean;
   hasWarnings: boolean;
   warningCount: number;
+  isMissingLocally?: boolean;
 }
 
 export interface GlobalAlbumMutations {

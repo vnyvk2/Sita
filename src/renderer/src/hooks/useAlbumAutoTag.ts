@@ -264,14 +264,16 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     const newEdits = new Map<string, string | number>();
 
     for (const match of res.matches) {
-      if (match.applyTrack) {
+      if (!match.isMissingLocally && match.localSongId > 0 && match.applyTrack) {
         newTrackIds.add(match.localSongId);
       }
-      for (const diff of match.fieldDiffs) {
-        const key = `${match.localSongId}::${diff.fieldId}`;
-        newFieldMap.set(key, diff.applyField);
-        if (diff.userValue !== undefined) {
-          newEdits.set(key, diff.userValue);
+      if (!match.isMissingLocally && match.localSongId > 0) {
+        for (const diff of match.fieldDiffs) {
+          const key = `${match.localSongId}::${diff.fieldId}`;
+          newFieldMap.set(key, diff.applyField);
+          if (diff.userValue !== undefined) {
+            newEdits.set(key, diff.userValue);
+          }
         }
       }
     }
@@ -368,6 +370,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
   // Track & Field Toggles
   const toggleTrack = useCallback((songId: number) => {
+    if (songId <= 0) return; // Do not toggle missing tracks
     setSelectedTrackIds((prev) => {
       const next = new Set(prev);
       if (next.has(songId)) next.delete(songId);
@@ -377,6 +380,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   }, []);
 
   const toggleField = useCallback((songId: number, fieldId: MetadataFieldId) => {
+    if (songId <= 0) return;
     const key = `${songId}::${fieldId}`;
     setSelectedFieldMap((prev) => {
       const next = new Map(prev);
@@ -386,6 +390,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   }, []);
 
   const setFieldValue = useCallback((songId: number, fieldId: MetadataFieldId, value: string | number) => {
+    if (songId <= 0) return;
     const key = `${songId}::${fieldId}`;
     setUserEditedValues((prev) => {
       const next = new Map(prev);
@@ -396,7 +401,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
   const resetFieldValue = useCallback(
     (songId: number, fieldId: MetadataFieldId) => {
-      if (!preview) return;
+      if (!preview || songId <= 0) return;
       const key = `${songId}::${fieldId}`;
       const match = preview.matches.find((m) => m.localSongId === songId);
       const diff = match?.fieldDiffs.find((d) => d.fieldId === fieldId);
@@ -415,14 +420,16 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
 
   const selectAllTracks = useCallback(() => {
     if (!preview) return;
-    setSelectedTrackIds(new Set(preview.matches.map((m) => m.localSongId)));
+    setSelectedTrackIds(
+      new Set(preview.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).map((m) => m.localSongId))
+    );
   }, [preview]);
 
   const selectChangedTracks = useCallback(() => {
     if (!preview) return;
     const changed = new Set(
       preview.matches
-        .filter((m) => m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new'))
+        .filter((m) => !m.isMissingLocally && m.localSongId > 0 && m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new'))
         .map((m) => m.localSongId)
     );
     setSelectedTrackIds(changed);
@@ -442,11 +449,13 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     try {
       const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
 
-      const effectiveMatches: TrackMatchPreview[] = preview.matches.map((m) => {
-        const applyTrack = selectedTrackIds.has(m.localSongId);
-        const updatedDiffs = m.fieldDiffs.map((d) => {
-          const key = `${m.localSongId}::${d.fieldId}`;
-          let applyField: boolean;
+      const effectiveMatches: TrackMatchPreview[] = preview.matches
+        .filter((m) => !m.isMissingLocally && m.localSongId > 0)
+        .map((m) => {
+          const applyTrack = selectedTrackIds.has(m.localSongId);
+          const updatedDiffs = m.fieldDiffs.map((d) => {
+            const key = `${m.localSongId}::${d.fieldId}`;
+            let applyField: boolean;
 
           if (isGlobalField(d.fieldId)) {
             // Global fields are governed by selectedGlobalFields, with granular override if explicitly set in selectedFieldMap
@@ -616,11 +625,11 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const globalFieldDiffs = useMemo((): GlobalFieldDiff[] => {
     if (!preview) return [];
 
-    const firstMatch = preview.matches[0];
-    const localArtist = firstMatch?.oldArtist ?? '—';
-    const localAlbum = firstMatch?.oldAlbum ?? '—';
-    const localYear = firstMatch?.oldYear ? String(firstMatch.oldYear) : '—';
-    const localGenre = firstMatch?.oldGenre ?? '—';
+    const firstLocalMatch = preview.matches.find((m) => !m.isMissingLocally && m.localSongId > 0) ?? preview.matches[0];
+    const localArtist = firstLocalMatch?.oldArtist ?? '—';
+    const localAlbum = firstLocalMatch?.oldAlbum ?? '—';
+    const localYear = firstLocalMatch?.oldYear ? String(firstLocalMatch.oldYear) : '—';
+    const localGenre = firstLocalMatch?.oldGenre ?? '—';
 
     const remoteArtist = preview.album.artist || '—';
     const remoteAlbum = preview.album.title || '—';
@@ -658,7 +667,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     const globalCount = globalFieldDiffs.filter((g) => selectedGlobalFields.has(g.fieldId) && g.isChanged).length;
 
     const trackChangesCount = filteredMatches.reduce((acc, match) => {
-      if (!selectedTrackIds.has(match.localSongId)) return acc;
+      if (match.isMissingLocally || match.localSongId <= 0 || !selectedTrackIds.has(match.localSongId)) return acc;
 
       const changedTrackFields = match.fieldDiffs.filter((d) => {
         const key = `${match.localSongId}::${d.fieldId}`;
@@ -701,9 +710,9 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       userEditedValues,
       artworkSource,
       replaceArtwork,
-      totalChanges,
       selectedTracksCount: selectedTrackIds.size,
-      totalTracksCount: preview?.matches.length ?? 0,
+      totalTracksCount: preview?.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ?? 0,
+      albumTracksCount: preview?.matches.length ?? 0,
       activeFieldsCount: selectedGlobalFields.size,
       filter,
       sort,

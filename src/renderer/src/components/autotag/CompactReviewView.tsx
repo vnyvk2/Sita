@@ -78,7 +78,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
-            Tracks ({selectedTrackIds.size} / {matches.length} Selected)
+            Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -145,7 +145,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               >
                 <option value="all" style={{ background: '#0F172A', color: '#FFFFFF' }}>All Tracks</option>
                 <option value="changed" style={{ background: '#0F172A', color: '#FFFFFF' }}>Changed Only</option>
-                <option value="low_confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Low Confidence</option>
+                <option value="matched" style={{ background: '#0F172A', color: '#FFFFFF' }}>Matched Only</option>
                 <option value="warnings" style={{ background: '#0F172A', color: '#FFFFFF' }}>Warnings Only</option>
               </select>
             </label>
@@ -191,8 +191,9 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
           </thead>
           <tbody>
             {matches.map((match, idx) => {
-              const isSelected = selectedTrackIds.has(match.localSongId);
-              const isExpanded = expandedTrackId === match.localSongId;
+              const isMissing = Boolean(match.isMissingLocally || match.localSongId <= 0);
+              const isSelected = !isMissing && selectedTrackIds.has(match.localSongId);
+              const isExpanded = !isMissing && expandedTrackId === match.localSongId;
               const isFocused = focusedTrackIndex === idx;
               const trackDiff = match.fieldDiffs.find((d) => d.fieldId === 'trackNumber');
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
@@ -209,15 +210,15 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const oldTrackNum = match.oldTrackNumber !== undefined ? String(match.oldTrackNumber).padStart(2, '0') : String(idx + 1).padStart(2, '0');
               const newTrackNum = trackDiff?.suggestedValue !== undefined ? String(trackDiff.suggestedValue).padStart(2, '0') : oldTrackNum;
 
-              const showTrackDiff = isTrackChanged && isTrackFieldSelected;
+              const showTrackDiff = !isMissing && isTrackChanged && isTrackFieldSelected;
 
-              const showTitleWas = isTitleFieldSelected && match.oldTitle !== newTitle && Boolean(match.oldTitle);
-              const displayTitle = isTitleFieldSelected ? newTitle : match.oldTitle;
+              const showTitleWas = !isMissing && isTitleFieldSelected && match.oldTitle !== newTitle && Boolean(match.oldTitle);
+              const displayTitle = isMissing ? (titleDiff?.suggestedValue ?? match.oldTitle ?? '—') : (isTitleFieldSelected ? newTitle : match.oldTitle);
 
-              const showArtistWas = isArtistFieldSelected && match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
-              const displayArtist = isArtistFieldSelected ? newArtist : (match.oldArtist ?? '—');
+              const showArtistWas = !isMissing && isArtistFieldSelected && match.oldArtist && match.oldArtist !== newArtist && newArtist !== '—';
+              const displayArtist = isMissing ? (artistDiff?.suggestedValue ?? match.oldArtist ?? '—') : (isArtistFieldSelected ? newArtist : (match.oldArtist ?? '—'));
 
-              const secondaryChangedDiffs = match.fieldDiffs.filter((d) => {
+              const secondaryChangedDiffs = isMissing ? [] : match.fieldDiffs.filter((d) => {
                 if (d.fieldId === 'title' || d.fieldId === 'artist' || d.fieldId === 'trackNumber') return false;
                 if (d.fieldId === 'musicBrainzRecordingId' || d.fieldId === 'isrc') return false; // Exclude raw UUID/ISRC hashes from top-level compact chips
                 if (d.status !== 'changed' && d.status !== 'new') return false;
@@ -225,7 +226,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                 return isFieldSelected;
               });
 
-              const activeChangeCount = match.fieldDiffs.filter(
+              const activeChangeCount = isMissing ? 0 : match.fieldDiffs.filter(
                 (d) =>
                   (d.status === 'changed' || d.status === 'new') &&
                   (selectedFieldMap.get(`${match.localSongId}::${d.fieldId}`) ?? d.applyField)
@@ -237,18 +238,20 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               return (
                 <React.Fragment key={match.localSongId}>
                   <tr
-                    onClick={() => onToggleExpand(match.localSongId)}
+                    onClick={isMissing ? undefined : () => onToggleExpand(match.localSongId)}
                     style={{
                       borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                      background: isExpanded
+                      background: isMissing
+                        ? 'rgba(0, 0, 0, 0.15)'
+                        : isExpanded
                         ? 'rgba(59, 130, 246, 0.12)'
                         : isFocused
                         ? 'rgba(255, 255, 255, 0.08)'
                         : isSelected
                         ? 'transparent'
                         : 'rgba(0, 0, 0, 0.25)',
-                      opacity: isSelected ? 1 : 0.6,
-                      cursor: 'pointer',
+                      opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
+                      cursor: isMissing ? 'default' : 'pointer',
                       transition: 'background 0.15s ease'
                     }}
                   >
@@ -257,18 +260,24 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                       <input
                         type="checkbox"
                         checked={isSelected}
+                        disabled={isMissing}
                         onChange={(e) => {
+                          if (isMissing) return;
                           e.stopPropagation();
                           onToggleTrack(match.localSongId);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
                       />
                     </td>
 
                     {/* Track Number Diff */}
                     <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      {showTrackDiff ? (
+                      {isMissing ? (
+                        <span style={{ color: '#64748B', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>
+                          {newTrackNum}
+                        </span>
+                      ) : showTrackDiff ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace' }}>
                           <span style={{ color: '#64748B', textDecoration: 'line-through', fontSize: '0.74rem' }}>{oldTrackNum}</span>
                           <span style={{ color: '#F59E0B', fontSize: '0.70rem' }}>→</span>
@@ -283,18 +292,29 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                     {/* Title Summary (Two-Tier Stack + Secondary Micro-Chips) */}
                     <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 700, color: showTitleWas ? '#38BDF8' : '#FFFFFF', fontSize: '0.88rem' }}>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: isMissing ? '#94A3B8' : showTitleWas ? '#38BDF8' : '#FFFFFF',
+                              fontStyle: isMissing ? 'italic' : 'normal',
+                              fontSize: '0.88rem'
+                            }}
+                          >
                             {String(displayTitle)}
                           </span>
                         </div>
 
-                        {showTitleWas && (
+                        {isMissing ? (
+                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                            Not in library
+                          </div>
+                        ) : showTitleWas ? (
                           <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
                             (was: {match.oldTitle})
                           </div>
-                        )}
+                        ) : null}
 
                         {/* Secondary Field Micro-Chips (Genre, Disc, Year, etc. - excluding MBID/ISRC) */}
                         {secondaryChangedDiffs.length > 0 && (
@@ -339,10 +359,17 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     {/* Artist Summary (Two-Tier Stack) */}
                     <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ color: showArtistWas ? '#E2E8F0' : '#CBD5E1', fontWeight: 600, fontSize: '0.84rem' }}>
+                        <span
+                          style={{
+                            color: isMissing ? '#64748B' : showArtistWas ? '#E2E8F0' : '#CBD5E1',
+                            fontWeight: isMissing ? 400 : 600,
+                            fontStyle: isMissing ? 'italic' : 'normal',
+                            fontSize: '0.84rem'
+                          }}
+                        >
                           {String(displayArtist)}
                         </span>
-                        {showArtistWas && (
+                        {!isMissing && showArtistWas && (
                           <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
                             (was: {match.oldArtist})
                           </div>
@@ -352,24 +379,44 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                     {/* Match Confidence Badge */}
                     <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <span
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: statusBadge.bg,
-                          color: statusBadge.color,
-                          border: `1px solid ${statusBadge.bg}`
-                        }}
-                      >
-                        {statusBadge.label}
-                      </span>
+                      {isMissing ? (
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.70rem',
+                            fontWeight: 600,
+                            background: 'rgba(100, 116, 139, 0.15)',
+                            color: '#94A3B8',
+                            border: '1px solid rgba(100, 116, 139, 0.25)'
+                          }}
+                        >
+                          Missing
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: statusBadge.bg,
+                            color: statusBadge.color,
+                            border: `1px solid ${statusBadge.bg}`
+                          }}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      )}
                     </td>
 
                     {/* Change Count Pill */}
                     <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      {activeChangeCount > 0 ? (
+                      {isMissing ? (
+                        <span style={{ fontSize: '0.74rem', color: '#64748B', fontStyle: 'italic' }}>
+                          Not in library
+                        </span>
+                      ) : activeChangeCount > 0 ? (
                         <span
                           style={{
                             padding: '3px 8px',
@@ -392,7 +439,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
 
                     {/* Expand Chevron */}
                     <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontSize: '0.78rem' }}>
-                      {isExpanded ? '▲' : '▶'}
+                      {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 

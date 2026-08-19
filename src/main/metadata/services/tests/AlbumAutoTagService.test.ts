@@ -547,5 +547,83 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       expect(writePayloads[1].genre).toBe('Pop');
       expect(writePayloads[1].title).toBeUndefined();
     });
+
+    it('builds full album tracklist with missing remote tracks and protects apply boundary', async () => {
+      const pipeline = new RequestPipeline();
+      const apiClient = new MusicBrainzApiClient(pipeline);
+      const cache = new IdentityResolutionCache();
+      const adapter = new MusicBrainzAdapter(apiClient, { cache });
+      const runtime = new MetadataProviderRuntime(adapter);
+      await runtime.initialize();
+
+      const metadataService = new AlbumMetadataService(runtime);
+      const tagWriter = new TagWriterService();
+      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: '11_next_ep.mp3', success: true }]);
+      const dbUpdater = vi.fn().mockResolvedValue(undefined);
+      const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
+      const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });
+
+      // Mock release with 5 tracks (1, 2, 3, 4, 5)
+      vi.spyOn(apiClient, 'getReleaseById').mockResolvedValue({
+        id: 'rel-2001',
+        title: '2001',
+        date: '1999-11-16',
+        status: 'Official',
+        'artist-credit': [{ name: 'Dr. Dre' }],
+        media: [
+          {
+            position: 1,
+            tracks: [
+              { id: 't1', title: 'Lolo (Intro)', length: 41000, position: 1, recording: { id: 'rec-1' } },
+              { id: 't2', title: 'The Watcher', length: 206000, position: 2, recording: { id: 'rec-2' } },
+              { id: 't3', title: 'Fuck You', length: 232000, position: 3, recording: { id: 'rec-3' } },
+              { id: 't4', title: 'Still D.R.E.', length: 270000, position: 4, recording: { id: 'rec-4' } },
+              { id: 't5', title: 'Big Ego\'s', length: 238000, position: 5, recording: { id: 'rec-5' } }
+            ]
+          }
+        ]
+      } as any);
+
+      // User has only 1 local song: Track 4 ("Still D.R.E.")
+      const localSongs = [
+        { songId: 404, title: 'Still D.R.E.', artist: 'Dr. Dre', path: '11_next_ep.mp3', duration: 270, trackNumber: 1 }
+      ];
+
+      const preview = await autoTagService.buildPreview(localSongs, 'rel-2001', 'musicbrainz');
+
+      // Expect all 5 tracks of the release to be present in order!
+      expect(preview.matches).toHaveLength(5);
+
+      // Tracks 1, 2, 3 should be missing locally
+      expect(preview.matches[0].isMissingLocally).toBe(true);
+      expect(preview.matches[0].applyTrack).toBe(false);
+      expect(preview.matches[0].localSongId).toBeLessThan(0);
+      expect(preview.matches[0].fieldDiffs.find((d) => d.fieldId === 'title')?.suggestedValue).toBe('Lolo (Intro)');
+
+      expect(preview.matches[1].isMissingLocally).toBe(true);
+      expect(preview.matches[2].isMissingLocally).toBe(true);
+
+      // Track 4 (idx 3) should be matched locally
+      expect(preview.matches[3].isMissingLocally).toBeUndefined();
+      expect(preview.matches[3].localSongId).toBe(404);
+      expect(preview.matches[3].applyTrack).toBe(true);
+      expect(preview.matches[3].fieldDiffs.find((d) => d.fieldId === 'title')?.suggestedValue).toBe('Still D.R.E.');
+
+      // Track 5 should be missing locally
+      expect(preview.matches[4].isMissingLocally).toBe(true);
+
+      // Test apply boundary: applyPreview must ONLY apply the 1 local track!
+      const applyResult = await autoTagService.applyPreview(preview);
+      expect(applyResult.success).toBe(true);
+      expect(applyResult.updatedCount).toBe(1);
+
+      expect(writeBatchSpy).toHaveBeenCalledTimes(1);
+      const payloads = writeBatchSpy.mock.calls[0][0];
+      expect(payloads).toHaveLength(1);
+      expect(payloads[0].filePath).toBe('11_next_ep.mp3');
+
+      expect(dbUpdater).toHaveBeenCalledTimes(1);
+      expect(dbUpdater).toHaveBeenCalledWith(404, expect.any(Object));
+    });
   });
 });

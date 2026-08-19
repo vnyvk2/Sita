@@ -78,7 +78,7 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
-            Tracks ({selectedTrackIds.size} / {matches.length} Selected)
+            Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -224,8 +224,9 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
           </thead>
           <tbody>
             {matches.map((match, idx) => {
-              const isSelected = selectedTrackIds.has(match.localSongId);
-              const isExpanded = effectiveExpandedId === match.localSongId;
+              const isMissing = Boolean(match.isMissingLocally || match.localSongId <= 0);
+              const isSelected = !isMissing && selectedTrackIds.has(match.localSongId);
+              const isExpanded = !isMissing && effectiveExpandedId === match.localSongId;
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
               const newTitle = titleDiff?.suggestedValue ?? match.oldTitle;
@@ -236,12 +237,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               return (
                 <React.Fragment key={match.localSongId}>
                   <tr
-                    onClick={() => toggleExpand(match.localSongId)}
+                    onClick={isMissing ? undefined : () => toggleExpand(match.localSongId)}
                     style={{
                       borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                      background: isExpanded ? 'rgba(255, 255, 255, 0.05)' : isSelected ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
-                      opacity: isSelected ? 1 : 0.6,
-                      cursor: 'pointer'
+                      background: isMissing ? 'rgba(0, 0, 0, 0.15)' : isExpanded ? 'rgba(255, 255, 255, 0.05)' : isSelected ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
+                      opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
+                      cursor: isMissing ? 'default' : 'pointer'
                     }}
                   >
                     {/* Track Checkbox */}
@@ -249,9 +250,13 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => onToggleTrack(match.localSongId)}
+                        disabled={isMissing}
+                        onChange={() => {
+                          if (isMissing) return;
+                          onToggleTrack(match.localSongId);
+                        }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
                       />
                     </td>
 
@@ -261,8 +266,8 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Current Local Title */}
-                    <td style={{ padding: '10px 12px', color: '#94A3B8', fontWeight: 500 }}>
-                      {match.oldTitle}
+                    <td style={{ padding: '10px 12px', color: isMissing ? '#64748B' : '#94A3B8', fontWeight: 500, fontStyle: isMissing ? 'italic' : 'normal' }}>
+                      {isMissing ? 'Not in library' : match.oldTitle}
                     </td>
 
                     {/* Arrow */}
@@ -271,35 +276,51 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* New Suggested Title */}
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#FFFFFF' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: isMissing ? '#94A3B8' : '#FFFFFF', fontStyle: isMissing ? 'italic' : 'normal' }}>
                       {newTitle}
                     </td>
 
                     {/* Artist */}
-                    <td style={{ padding: '10px 12px', color: '#CBD5E1', fontWeight: 500 }}>
+                    <td style={{ padding: '10px 12px', color: isMissing ? '#64748B' : '#CBD5E1', fontWeight: 500, fontStyle: isMissing ? 'italic' : 'normal' }}>
                       {newArtist}
                     </td>
 
                     {/* Status Badge */}
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      <span
-                        style={{
-                          padding: '3px 9px',
-                          borderRadius: '4px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: statusBadge.bg,
-                          color: statusBadge.color,
-                          border: `1px solid ${statusBadge.bg}`
-                        }}
-                      >
-                        {statusBadge.label}
-                      </span>
+                      {isMissing ? (
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.70rem',
+                            fontWeight: 600,
+                            background: 'rgba(100, 116, 139, 0.15)',
+                            color: '#94A3B8',
+                            border: '1px solid rgba(100, 116, 139, 0.25)'
+                          }}
+                        >
+                          Missing
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: statusBadge.bg,
+                            color: statusBadge.color,
+                            border: `1px solid ${statusBadge.bg}`
+                          }}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      )}
                     </td>
 
                     {/* Expand Chevron */}
                     <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontSize: '0.78rem' }}>
-                      {isExpanded ? '▲' : '▼'}
+                      {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 

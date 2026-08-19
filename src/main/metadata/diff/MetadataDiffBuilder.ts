@@ -1,11 +1,11 @@
 import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
-import type { TrackMatchPair, LocalSongInput } from '../services/AlbumMetadataService';
-import { extractStringValue } from '../matching/TrackMatcher';
-import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
-import { ProviderRegistry } from '../resolution/ProviderRegistry';
-import type { ProviderAttribution } from '../domain/ProviderAttribution';
-import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 import { getMetadataFieldDisplayName } from '../../../common/metadata/displayNames';
+import type { ProviderAttribution } from '../domain/ProviderAttribution';
+import { extractStringValue, type OfficialTrackInput } from '../matching/TrackMatcher';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
+import { ProviderRegistry } from '../resolution/ProviderRegistry';
+import type { LocalSongInput, TrackMatchPair } from '../services/AlbumMetadataService';
+import { AlbumSuffixPreserver } from './AlbumSuffixPreserver';
 
 const globalProviderRegistry = new ProviderRegistry();
 
@@ -19,6 +19,125 @@ export interface CreateFieldDiffOptions {
 }
 
 export class MetadataDiffBuilder {
+  /**
+   * Constructs presentation-friendly TrackMatchPreview for a remote release track that is missing from the local library.
+   */
+  public static buildMissingTrackPreview(
+    remoteTrack: OfficialTrackInput,
+    releaseContext?: { albumTitle?: string; artist?: string; year?: number; provider?: string }
+  ): TrackMatchPreview {
+    const rawArtist = extractStringValue(remoteTrack.artist ?? releaseContext?.artist);
+    const rawAlbum = extractStringValue(remoteTrack.album ?? releaseContext?.albumTitle);
+    const providerId = releaseContext?.provider ?? 'musicbrainz';
+    const providerName = globalProviderRegistry.getDisplayName(providerId);
+
+    const fieldDiffs: MetadataFieldDiff[] = [
+      {
+        fieldId: 'title',
+        fieldName: 'Title',
+        oldValue: undefined,
+        suggestedValue: remoteTrack.title,
+        userValue: remoteTrack.title,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      },
+      {
+        fieldId: 'artist',
+        fieldName: 'Artist',
+        oldValue: undefined,
+        suggestedValue: rawArtist,
+        userValue: rawArtist,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      },
+      {
+        fieldId: 'album',
+        fieldName: 'Album',
+        oldValue: undefined,
+        suggestedValue: rawAlbum,
+        userValue: rawAlbum,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      },
+      {
+        fieldId: 'trackNumber',
+        fieldName: 'Track Number',
+        oldValue: undefined,
+        suggestedValue: remoteTrack.trackNumber,
+        userValue: remoteTrack.trackNumber,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      },
+      {
+        fieldId: 'discNumber',
+        fieldName: 'Disc Number',
+        oldValue: undefined,
+        suggestedValue: remoteTrack.discNumber ?? 1,
+        userValue: remoteTrack.discNumber ?? 1,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      }
+    ];
+
+    if (remoteTrack.musicBrainzRecordingId || remoteTrack.trackId) {
+      fieldDiffs.push({
+        fieldId: 'musicBrainzRecordingId',
+        fieldName: 'MusicBrainz Recording ID',
+        oldValue: undefined,
+        suggestedValue: remoteTrack.musicBrainzRecordingId ?? remoteTrack.trackId,
+        userValue: remoteTrack.musicBrainzRecordingId ?? remoteTrack.trackId,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      });
+    }
+
+    if (remoteTrack.isrc) {
+      fieldDiffs.push({
+        fieldId: 'isrc',
+        fieldName: 'ISRC',
+        oldValue: undefined,
+        suggestedValue: remoteTrack.isrc,
+        userValue: remoteTrack.isrc,
+        status: 'new',
+        applyField: false,
+        providerId,
+        providerName
+      });
+    }
+
+    return {
+      localSongId: -(remoteTrack.trackNumber ?? 1),
+      songPath: '',
+      oldTitle: '',
+      oldArtist: '',
+      oldAlbum: '',
+      oldYear: undefined,
+      oldTrackNumber: remoteTrack.trackNumber,
+      oldDiscNumber: remoteTrack.discNumber,
+      confidence: 0,
+      confidenceLevel: 'Low',
+      why: 'Not in local library',
+      reasons: ['missing_locally'],
+      fieldDiffs,
+      applyTrack: false,
+      hasWarnings: false,
+      warningCount: 0,
+      isMissingLocally: true
+    };
+  }
+
   /**
    * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with self-contained field-level alternatives.
    */

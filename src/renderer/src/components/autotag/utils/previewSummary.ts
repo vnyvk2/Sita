@@ -45,6 +45,7 @@ export function computeFederationSummary(
   let totalChangedFields = 0;
 
   for (const match of preview.matches) {
+    if (match.isMissingLocally || match.localSongId <= 0) continue;
     for (const diff of match.fieldDiffs) {
       if (isFieldChanged(diff)) {
         totalChangedFields++;

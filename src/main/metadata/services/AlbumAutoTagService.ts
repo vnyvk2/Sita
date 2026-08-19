@@ -198,11 +198,44 @@ export class AlbumAutoTagService extends EventEmitter {
         trackPreviews = albumPreview.trackList.map((pair) => MetadataDiffBuilder.buildTrackPreview(pair));
       }
 
+      // Generate missing track previews for release tracks not matched to any local song
+      const matchedTrackNumbers = new Set(
+        albumPreview.trackList.map((p) => p.remoteTrack.recording?.trackNumber).filter((n): n is number => n !== undefined)
+      );
+      const matchedTrackIds = new Set(
+        albumPreview.trackList.map((p) => p.remoteTrack.provider?.providerRecordingId).filter((id): id is string => Boolean(id))
+      );
+
+      const missingTrackPreviews: TrackMatchPreview[] = resolved.tracks
+        .filter((t) => {
+          const isMatchedByNo = t.trackNumber !== undefined && matchedTrackNumbers.has(t.trackNumber);
+          const isMatchedById = Boolean(t.trackId && matchedTrackIds.has(t.trackId));
+          return !isMatchedByNo && !isMatchedById;
+        })
+        .map((t) =>
+          MetadataDiffBuilder.buildMissingTrackPreview(t, {
+            albumTitle: resolved.album.title,
+            artist: resolved.album.artist,
+            year: resolved.album.year,
+            provider: resolved.provider
+          })
+        );
+
+      const allTrackPreviews: TrackMatchPreview[] = [...trackPreviews, ...missingTrackPreviews].sort((a, b) => {
+        const discA = (a.fieldDiffs.find((d) => d.fieldId === 'discNumber')?.suggestedValue as number) ?? a.oldDiscNumber ?? 1;
+        const discB = (b.fieldDiffs.find((d) => d.fieldId === 'discNumber')?.suggestedValue as number) ?? b.oldDiscNumber ?? 1;
+        if (discA !== discB) return discA - discB;
+
+        const numA = (a.fieldDiffs.find((d) => d.fieldId === 'trackNumber')?.suggestedValue as number) ?? a.oldTrackNumber ?? 999;
+        const numB = (b.fieldDiffs.find((d) => d.fieldId === 'trackNumber')?.suggestedValue as number) ?? b.oldTrackNumber ?? 999;
+        return numA - numB;
+      });
+
       const overallConfidenceLevel = getConfidenceLevel(albumPreview.confidence);
 
       const preview: AlbumTagPreview = {
         album: albumPreview.album,
-        matches: trackPreviews,
+        matches: allTrackPreviews,
         warnings: albumPreview.warnings,
         overallConfidence: albumPreview.confidence,
         confidenceLevel: overallConfidenceLevel,
@@ -244,7 +277,14 @@ export class AlbumAutoTagService extends EventEmitter {
     this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
 
     try {
-      const result = await this.applyService.applyPreview(preview, options, signal);
+      // Defensive sanitization: Pass only local, non-missing tracks to applyService
+      const sanitizedPreview: AlbumTagPreview = {
+        ...preview,
+        matches: preview.matches.filter(
+          (m) => !m.isMissingLocally && m.localSongId !== undefined && m.localSongId > 0
+        )
+      };
+      const result = await this.applyService.applyPreview(sanitizedPreview, options, signal);
       this.checkCancelled(signal);
 
       if (result.success) {
