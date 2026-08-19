@@ -49,7 +49,8 @@ export class MusicBrainzApiClient {
 
   public async searchReleases(
     query: string,
-    limit = 10
+    limit = 10,
+    signal?: AbortSignal
   ): Promise<MusicBrainzReleaseDto[]> {
     const url = `${this.baseUrl}/release`;
     const response = await this.pipeline.execute<MusicBrainzReleaseSearchResultDto>({
@@ -63,7 +64,8 @@ export class MusicBrainzApiClient {
         query,
         limit,
         fmt: 'json'
-      }
+      },
+      signal
     });
 
     return response.data.releases ?? [];

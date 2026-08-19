@@ -46,7 +46,11 @@ export class DiscogsApiClient {
     this.pipeline = pipeline;
   }
 
-  public async searchReleases(query: string, limit = 10): Promise<DiscogsSearchReleaseDto[]> {
+  public async searchReleases(
+    query: string,
+    limit = 10,
+    signal?: AbortSignal
+  ): Promise<DiscogsSearchReleaseDto[]> {
     if (!query || query.trim().length === 0) return [];
 
     const url = `${this.baseUrl}/database/search?q=${encodeURIComponent(query)}&type=release&per_page=${limit}`;
@@ -54,12 +58,16 @@ export class DiscogsApiClient {
     try {
       console.log(`[DiscogsApiClient] GET ${url}`);
       const response = await this.pipeline.execute<{ results?: DiscogsSearchReleaseDto[] }>(url, {
-        headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
+        headers: { 'User-Agent': 'NoraMusicPlayer/1.0' },
+        signal
       });
       const results = response.data?.results ?? [];
       console.log(`[DiscogsApiClient] GET ${url} SUCCESS - Status: ${response.status}, Results count: ${results.length}`);
       return results;
     } catch (err: any) {
+      if (err?.name === 'AbortError' || signal?.aborted) {
+        throw err;
+      }
       console.error(`[DiscogsApiClient] GET ${url} FAILED - Error:`, {
         name: err?.name,
         message: err?.message,

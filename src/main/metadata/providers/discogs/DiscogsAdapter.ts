@@ -1,3 +1,4 @@
+import type { MetadataSearchOptions } from '../../../../common/metadata/api';
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 import type { ProviderIdentity } from '../../contracts/ProviderIdentity';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
@@ -131,10 +132,27 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
   public async searchAlbums(
     album: string,
     artist?: string,
-    limit = 10,
-    targetTrackCount?: number
+    options?: MetadataSearchOptions | number,
+    targetTrackCountOrSignal?: number | AbortSignal,
+    signalParam?: AbortSignal
   ): Promise<AlbumMetadata[]> {
     if (!album) return [];
+
+    let limit = 10;
+    let targetTrackCount: number | undefined;
+    let signal: AbortSignal | undefined;
+
+    if (typeof options === 'object' && options !== null) {
+      limit = options.limit ?? 10;
+      targetTrackCount = options.targetTrackCount;
+      signal = targetTrackCountOrSignal instanceof AbortSignal ? targetTrackCountOrSignal : signalParam;
+    } else if (typeof options === 'number') {
+      limit = options;
+      if (typeof targetTrackCountOrSignal === 'number') {
+        targetTrackCount = targetTrackCountOrSignal;
+      }
+      signal = signalParam;
+    }
 
     const cacheKey = `album_search:${album}:${artist ?? ''}:${limit}:${targetTrackCount ?? 0}`;
     if (this.cache) {
@@ -143,7 +161,7 @@ export class DiscogsAdapter implements IMetadataProviderAdapter {
     }
 
     const qStr = [album, artist].filter(Boolean).join(' ');
-    const releases = await this.apiClient.searchReleases(qStr, Math.max(limit * 2, 20));
+    const releases = await this.apiClient.searchReleases(qStr, Math.max(limit * 2, 20), signal);
 
     const normQuery = MetadataQueryNormalizer.normalize(album, artist);
 

@@ -115,6 +115,7 @@ export interface MetadataContainer {
     workflowService: MetadataWorkflowService;
     applyService: MetadataApplyService;
     preferencesService: MetadataPreferencesService;
+    providerRuntime: MetadataProviderRuntime;
   };
   resolution: {
     resolutionManager: MetadataResolutionManager;
@@ -207,10 +208,14 @@ export class MetadataBootstrap {
 
     const userService = new UserMetadataService(userRepository, eventBus);
 
-    const preferencesService = new MetadataPreferencesService();
+    let providerRuntime: MetadataProviderRuntime;
+    const preferencesService = new MetadataPreferencesService({
+      getRegisteredSearchProviders: () =>
+        providerRuntime ? providerRuntime.getAvailableSearchProviders().map((p) => p.id) : ['musicbrainz', 'discogs']
+    });
 
     // AutoTag Application & Resolution Services construction inside MetadataBootstrap composition root
-    const providerRuntime = new MetadataProviderRuntime(
+    providerRuntime = new MetadataProviderRuntime(
       [musicBrainzAdapter, discogsAdapter],
       undefined,
       undefined,
@@ -354,7 +359,8 @@ export class MetadataBootstrap {
         autoTagService,
         workflowService,
         applyService,
-        preferencesService
+        preferencesService,
+        providerRuntime
       },
       resolution: {
         resolutionManager,

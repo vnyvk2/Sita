@@ -5,41 +5,57 @@ import {
 } from '../../../common/metadata/preferences';
 import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
 
+export interface MetadataPreferencesServiceOptions {
+  getRegisteredSearchProviders?: () => MetadataProviderId[];
+}
+
 export class MetadataPreferencesService {
   private cachedPreferences: MetadataProviderPreferences | null = null;
+  private readonly getRegisteredSearchProviders?: () => MetadataProviderId[];
+
+  constructor(options?: MetadataPreferencesServiceOptions) {
+    this.getRegisteredSearchProviders = options?.getRegisteredSearchProviders;
+  }
 
   public async getPreferences(): Promise<MetadataProviderPreferences> {
     if (this.cachedPreferences) {
       return this.cachedPreferences;
     }
 
+    const registered = this.getRegisteredSearchProviders ? this.getRegisteredSearchProviders() : undefined;
+
     try {
       const settings = await getUserSettings();
       if (settings?.metadataPreferences) {
-        this.cachedPreferences = this.sanitizePreferences(settings.metadataPreferences);
+        this.cachedPreferences = this.sanitizeAndValidate(settings.metadataPreferences, registered);
         return this.cachedPreferences;
       }
     } catch {
       // Fallback to default if settings table is not yet seeded or query fails
     }
 
-    return { ...DEFAULT_METADATA_PREFERENCES };
+    this.cachedPreferences = this.sanitizeAndValidate(DEFAULT_METADATA_PREFERENCES, registered);
+    return this.cachedPreferences;
   }
 
   public async savePreferences(
     updates: Partial<MetadataProviderPreferences>,
     availableSearchProviders?: string[]
   ): Promise<MetadataProviderPreferences> {
+    const registered =
+      availableSearchProviders ??
+      (this.getRegisteredSearchProviders ? this.getRegisteredSearchProviders() : undefined);
+
     const current = await this.getPreferences();
     const merged: MetadataProviderPreferences = {
       ...current,
       ...updates
     };
 
-    // Validation Guardrails
-    this.validatePreferences(merged, availableSearchProviders);
+    // Strict validation on save: throws if user passes an invalid configuration
+    this.validatePreferences(merged, registered);
 
-    const sanitized = this.sanitizePreferences(merged);
+    const sanitized = this.sanitizeAndValidate(merged, registered);
 
     try {
       await saveUserSettings({ metadataPreferences: sanitized } as any);
@@ -88,16 +104,39 @@ export class MetadataPreferencesService {
     }
   }
 
-  private sanitizePreferences(raw: Partial<MetadataProviderPreferences>): MetadataProviderPreferences {
+  public sanitizeAndValidate(
+    raw: Partial<MetadataProviderPreferences>,
+    availableSearchProviders?: string[]
+  ): MetadataProviderPreferences {
+    let enabled = Array.isArray(raw.enabledSearchProviders) && raw.enabledSearchProviders.length > 0
+      ? (Array.from(new Set(raw.enabledSearchProviders)) as MetadataProviderId[])
+      : [...DEFAULT_METADATA_PREFERENCES.enabledSearchProviders];
+
+    // Filter against registered providers if provided
+    if (availableSearchProviders && availableSearchProviders.length > 0) {
+      const registeredSet = new Set(availableSearchProviders.map((s) => s.toLowerCase()));
+      enabled = enabled.filter((p) => registeredSet.has(p.toLowerCase()));
+      if (enabled.length === 0) {
+        // Fallback to first registered provider or musicbrainz
+        const fallback = (availableSearchProviders[0] as MetadataProviderId) ?? 'musicbrainz';
+        enabled = [fallback];
+      }
+    }
+
+    const enabledSet = new Set(enabled);
+    let priority = Array.isArray(raw.searchProviderPriority) && raw.searchProviderPriority.length > 0
+      ? (Array.from(new Set(raw.searchProviderPriority)) as MetadataProviderId[])
+      : [...enabled];
+
+    // Filter priority to be a subset of enabled
+    priority = priority.filter((p) => enabledSet.has(p));
+    if (priority.length === 0) {
+      priority = [...enabled];
+    }
+
     return {
-      enabledSearchProviders:
-        Array.isArray(raw.enabledSearchProviders) && raw.enabledSearchProviders.length > 0
-          ? (Array.from(new Set(raw.enabledSearchProviders)) as MetadataProviderId[])
-          : [...DEFAULT_METADATA_PREFERENCES.enabledSearchProviders],
-      searchProviderPriority:
-        Array.isArray(raw.searchProviderPriority) && raw.searchProviderPriority.length > 0
-          ? (Array.from(new Set(raw.searchProviderPriority)) as MetadataProviderId[])
-          : [...DEFAULT_METADATA_PREFERENCES.searchProviderPriority],
+      enabledSearchProviders: enabled,
+      searchProviderPriority: priority,
       defaultArtworkProvider: raw.defaultArtworkProvider ?? DEFAULT_METADATA_PREFERENCES.defaultArtworkProvider,
       defaultGenreProvider: raw.defaultGenreProvider ?? DEFAULT_METADATA_PREFERENCES.defaultGenreProvider,
       defaultLyricsProvider: raw.defaultLyricsProvider ?? DEFAULT_METADATA_PREFERENCES.defaultLyricsProvider

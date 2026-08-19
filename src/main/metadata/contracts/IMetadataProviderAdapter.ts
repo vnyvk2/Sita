@@ -1,3 +1,4 @@
+import type { MetadataSearchOptions } from '../../../common/metadata/api';
 import type { AlbumMetadata, ResolvedAlbumRelease } from '../models/RecordingMetadata';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
 import type { ProviderResult } from '../models/ProviderResult';
@@ -24,7 +25,12 @@ export interface IMetadataProviderAdapter {
   /**
    * Structured album search returning domain AlbumMetadata[].
    */
-  searchAlbums?(album: string, artist?: string, limit?: number, targetTrackCount?: number): Promise<AlbumMetadata[]>;
+  searchAlbums?(
+    album: string,
+    artist?: string,
+    options?: MetadataSearchOptions,
+    signal?: AbortSignal
+  ): Promise<AlbumMetadata[]>;
 
   /**
    * Resolves release details and official track listing into ResolvedAlbumRelease domain model.

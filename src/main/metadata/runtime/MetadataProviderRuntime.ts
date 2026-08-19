@@ -1,13 +1,15 @@
+import type { AvailableSearchProviderInfo, MetadataSearchOptions } from '../../../common/metadata/api';
+import { getProviderDisplayName } from '../../../common/metadata/displayNames';
 import type { IMetadataProviderAdapter, IProviderLifecycle } from '../contracts/IMetadataProviderAdapter';
+import { ProviderCapability } from '../contracts/ProviderCapabilities';
 import type { ProviderConfiguration } from '../contracts/ProviderConfiguration';
 import { ProviderState, type ProviderStatus } from '../contracts/ProviderStatus';
-import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from '../models/RecordingMetadata';
-import type { MetadataSearchOptions } from '../../../common/metadata/api';
 import { MetadataNormalizer } from '../matching/MetadataNormalizer';
-import { MetadataPreferencesService } from '../services/MetadataPreferencesService';
+import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from '../models/RecordingMetadata';
 import { DiscoveryCandidateSorter } from '../search/DiscoveryCandidateSorter';
-import { MetadataSearchRankingEngine, type SearchCandidate } from '../search/MetadataSearchRankingEngine';
 import { MetadataQueryNormalizer } from '../search/MetadataQueryNormalizer';
+import { MetadataSearchRankingEngine, type SearchCandidate } from '../search/MetadataSearchRankingEngine';
+import { MetadataPreferencesService } from '../services/MetadataPreferencesService';
 
 export interface ProviderRuntimeOptions {
   failureThresholdBeforeDegraded?: number;
@@ -28,38 +30,38 @@ export class MetadataProviderRuntime {
     options?: ProviderRuntimeOptions,
     preferencesService?: MetadataPreferencesService
   ) {
-    this.preferencesService = preferencesService;
-    const adapterList = adapters ? (Array.isArray(adapters) ? adapters : [adapters]) : [];
-    for (const adapter of adapterList) {
-      if (adapter && adapter.identity) {
-        this.registerProviderInternal(adapter, true);
-      }
-    }
-
     this.config = {
       enabled: config?.enabled ?? true,
-      priority: config?.priority ?? 500,
-      ...config
+      priority: config?.priority ?? 100,
+      rateLimit: config?.rateLimit,
+      retryPolicy: config?.retryPolicy,
+      authCredentials: config?.authCredentials
     };
+
     this.options = {
       failureThresholdBeforeDegraded: options?.failureThresholdBeforeDegraded ?? 3,
       failureThresholdBeforeOffline: options?.failureThresholdBeforeOffline ?? 5,
       healthRecoveryTimeoutMs: options?.healthRecoveryTimeoutMs ?? 60000
     };
+
+    this.preferencesService = preferencesService;
+
+    if (adapters) {
+      const adapterList = Array.isArray(adapters) ? adapters : [adapters];
+      for (const adapter of adapterList) {
+        this.registerProvider(adapter);
+      }
+    }
   }
 
   public registerProvider(adapter: IMetadataProviderAdapter, overwrite = false): void {
-    this.registerProviderInternal(adapter, overwrite);
-  }
-
-  private registerProviderInternal(adapter: IMetadataProviderAdapter, overwrite: boolean): void {
-    const key = adapter.identity.id.toLowerCase();
-    if (this.providers.has(key) && !overwrite) {
-      throw new Error(`Metadata provider '${adapter.identity.id}' is already registered. Set overwrite=true to replace.`);
+    const id = adapter.identity.id.toLowerCase();
+    if (this.providers.has(id) && !overwrite) {
+      throw new Error(`MetadataProviderAdapter with ID '${id}' is already registered in runtime.`);
     }
 
-    this.providers.set(key, adapter);
-    this.providerStatuses.set(key, {
+    this.providers.set(id, adapter);
+    this.providerStatuses.set(id, {
       state: ProviderState.Uninitialized,
       consecutiveFailures: 0
     });
@@ -99,6 +101,24 @@ export class MetadataProviderRuntime {
     return new Map(this.providerStatuses);
   }
 
+  public getAvailableSearchProviders(): AvailableSearchProviderInfo[] {
+    return this.getSortedAdapters()
+      .filter(
+        (adapter) =>
+          adapter.supports?.(ProviderCapability.Search) ||
+          adapter.capabilities?.has(ProviderCapability.Search) ||
+          typeof adapter.searchAlbums === 'function'
+      )
+      .map((adapter) => {
+        const id = adapter.identity.id as MetadataProviderId;
+        return {
+          id,
+          displayName: getProviderDisplayName(id) || adapter.identity.name,
+          isOnline: adapter.identity.providerType === 'online'
+        };
+      });
+  }
+
   public get status(): ProviderStatus {
     const statuses = Array.from(this.providerStatuses.values());
     if (statuses.length === 0) return { state: ProviderState.Uninitialized, consecutiveFailures: 0 };
@@ -125,6 +145,14 @@ export class MetadataProviderRuntime {
       }
     }
     return false;
+  }
+
+  public isHealthy(providerId?: string): boolean {
+    if (providerId) {
+      const status = this.getProviderStatus(providerId);
+      return status?.state === ProviderState.Healthy || status?.state === ProviderState.Degraded;
+    }
+    return this.isAvailable();
   }
 
   public async initialize(): Promise<void> {
@@ -161,9 +189,10 @@ export class MetadataProviderRuntime {
   public async searchAlbums(
     album: string,
     artist?: string,
-    options?: MetadataSearchOptions
+    options?: MetadataSearchOptions,
+    callerSignal?: AbortSignal
   ): Promise<AlbumMetadata[]> {
-    if (!this.isAvailable() || this.providers.size === 0 || !album) return [];
+    if (!album || this.providers.size === 0) return [];
 
     const limit = options?.limit ?? 10;
     const targetTrackCount = options?.targetTrackCount;
@@ -174,13 +203,13 @@ export class MetadataProviderRuntime {
 
     if (sourceOverride && sourceOverride !== 'auto') {
       const explicitAdapter = this.providers.get(sourceOverride.toLowerCase());
-      if (explicitAdapter) {
-        targetAdapters = [explicitAdapter];
-        providerPriority = [sourceOverride];
-      } else {
-        return [];
-      }
+      if (!explicitAdapter) return [];
+      const status = this.getProviderStatus(sourceOverride);
+      if (status && status.state === ProviderState.Offline) return [];
+      targetAdapters = [explicitAdapter];
+      providerPriority = [sourceOverride];
     } else {
+      if (!this.isAvailable()) return [];
       const prefs = this.preferencesService ? await this.preferencesService.getPreferences() : undefined;
       if (prefs) {
         const enabledSet = new Set((prefs.enabledSearchProviders ?? ['musicbrainz']).map((s) => s.toLowerCase()));
@@ -204,14 +233,33 @@ export class MetadataProviderRuntime {
       if (typeof adapter.searchAlbums === 'function') {
         const startTime = Date.now();
         const timeoutMs = 4000;
+        const controller = new AbortController();
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
-        const timeoutPromise = new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error(`Search timeout (${timeoutMs}ms) for provider '${providerId}'`)), timeoutMs)
-        );
+        const onParentAbort = () => controller.abort();
+        if (callerSignal) {
+          if (callerSignal.aborted) {
+            controller.abort();
+          } else {
+            callerSignal.addEventListener('abort', onParentAbort);
+          }
+        }
+
+        const timeoutPromise = new Promise<never>((_resolve, reject) => {
+          timeoutHandle = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`Search timeout (${timeoutMs}ms) for provider '${providerId}'`));
+          }, timeoutMs);
+        });
 
         try {
           const results = await Promise.race([
-            adapter.searchAlbums(album, artist, limit, targetTrackCount),
+            adapter.searchAlbums(
+              album,
+              artist,
+              { limit, targetTrackCount, source: sourceOverride, operationId: options?.operationId },
+              controller.signal
+            ),
             timeoutPromise
           ]);
           this.recordSuccess(providerId, Date.now() - startTime);
@@ -220,6 +268,9 @@ export class MetadataProviderRuntime {
           const msg = err instanceof Error ? err.message : String(err);
           this.recordFailure(providerId, msg);
           return [];
+        } finally {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          if (callerSignal) callerSignal.removeEventListener('abort', onParentAbort);
         }
       }
       return [];
@@ -229,30 +280,16 @@ export class MetadataProviderRuntime {
     const rawAlbums: AlbumMetadata[] = [];
 
     for (const res of results) {
-      if (res.status === 'fulfilled') {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
         rawAlbums.push(...res.value);
       }
     }
 
     if (rawAlbums.length === 0) return [];
 
-    // Deduplicate on (title::artist::year)
-    const seen = new Set<string>();
-    const deduplicatedAlbums: AlbumMetadata[] = [];
-    for (const alb of rawAlbums) {
-      const normTitle = MetadataNormalizer.normalizeAlbum(alb.title);
-      const normArtist = MetadataNormalizer.normalizeArtist(alb.artist);
-      const yearKey = alb.year ?? 'unknown';
-      const key = `${normTitle}::${normArtist}::${yearKey}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        deduplicatedAlbums.push(alb);
-      }
-    }
-
-    // Score and Rank through DiscoveryCandidateSorter
+    // 1. Score ALL candidates intrinsically via MetadataSearchRankingEngine
     const normQuery = MetadataQueryNormalizer.normalize(album, artist);
-    const scoredCandidates = deduplicatedAlbums.map((alb) => {
+    const scoredCandidates = rawAlbums.map((alb) => {
       const candidate: SearchCandidate = {
         id: alb.releaseId || alb.title,
         title: alb.title,
@@ -267,11 +304,30 @@ export class MetadataProviderRuntime {
       return { album: alb, scored };
     });
 
+    // 2. Sort candidates using DiscoveryCandidateSorter with user provider priority
     const sorted = DiscoveryCandidateSorter.sortCandidates(scoredCandidates, providerPriority);
-    return sorted.slice(0, limit).map((r) => ({
-      ...r.album,
-      rankingScore: Math.round(r.scored.totalScore)
-    }));
+
+    // 3. Cluster/Deduplicate along the sorted list on canonical identity (normTitle::normArtist::yearKey)
+    const seenClusters = new Set<string>();
+    const finalRanked: AlbumMetadata[] = [];
+
+    for (const item of sorted) {
+      const alb = item.album;
+      const normTitle = MetadataNormalizer.normalizeAlbum(alb.title);
+      const normArtist = MetadataNormalizer.normalizeArtist(alb.artist);
+      const yearKey = alb.year ?? 'unknown';
+      const clusterKey = `${normTitle}::${normArtist}::${yearKey}`;
+
+      if (!seenClusters.has(clusterKey)) {
+        seenClusters.add(clusterKey);
+        finalRanked.push({
+          ...alb,
+          rankingScore: Math.round(item.scored.totalScore)
+        });
+      }
+    }
+
+    return finalRanked.slice(0, limit);
   }
 
   /**
@@ -281,7 +337,7 @@ export class MetadataProviderRuntime {
     providerReleaseId: string,
     providerId?: MetadataProviderId
   ): Promise<ResolvedAlbumRelease | null> {
-    if (!this.isAvailable() || !providerReleaseId) return null;
+    if (!providerReleaseId) return null;
 
     const targetProviderId = providerId?.toLowerCase() ?? 'musicbrainz';
     const adapter = this.providers.get(targetProviderId) ?? this.getSortedAdapters()[0];
@@ -323,40 +379,36 @@ export class MetadataProviderRuntime {
 
   public recordFailure(providerIdOrMsg: string, errorMessage?: string): void {
     let targetProviderId: string;
-    let msg: string;
+    let error: string;
 
     if (errorMessage !== undefined) {
       targetProviderId = providerIdOrMsg;
-      msg = errorMessage;
+      error = errorMessage;
     } else {
       targetProviderId = this.getSortedAdapters()[0]?.identity.id ?? 'musicbrainz';
-      msg = providerIdOrMsg;
+      error = providerIdOrMsg;
     }
 
     const key = targetProviderId.toLowerCase();
-    const current = this.providerStatuses.get(key);
-    const failures = (current?.consecutiveFailures ?? 0) + 1;
-    let nextState = current?.state ?? ProviderState.Healthy;
+    const current = this.providerStatuses.get(key) ?? { state: ProviderState.Healthy, consecutiveFailures: 0 };
+    const consecutive = current.consecutiveFailures + 1;
 
-    if (failures >= (this.options.failureThresholdBeforeOffline ?? 5)) {
-      nextState = ProviderState.Offline;
-    } else if (failures >= (this.options.failureThresholdBeforeDegraded ?? 3)) {
-      nextState = ProviderState.Degraded;
+    let newState = ProviderState.Healthy;
+    if (consecutive >= (this.options.failureThresholdBeforeOffline ?? 5)) {
+      newState = ProviderState.Offline;
+    } else if (consecutive >= (this.options.failureThresholdBeforeDegraded ?? 3)) {
+      newState = ProviderState.Degraded;
     }
 
     this.providerStatuses.set(key, {
-      state: nextState,
-      consecutiveFailures: failures,
-      lastErrorMessage: msg,
-      lastHealthCheck: Date.now()
+      state: newState,
+      consecutiveFailures: consecutive,
+      lastHealthCheck: Date.now(),
+      lastError: error
     });
   }
 
   private getSortedAdapters(): IMetadataProviderAdapter[] {
-    return Array.from(this.providers.values()).sort((a, b) => {
-      const prioA = a.priority ?? 500;
-      const prioB = b.priority ?? 500;
-      return prioA - prioB;
-    });
+    return Array.from(this.providers.values()).sort((a, b) => (b.priority ?? 100) - (a.priority ?? 100));
   }
 }

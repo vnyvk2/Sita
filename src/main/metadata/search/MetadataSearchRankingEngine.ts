@@ -62,18 +62,31 @@ export enum MatchQualityBand {
   Weak = 'Weak'
 }
 
+/**
+ * Classifies candidate into intrinsic MatchQualityBands:
+ * - Definitive (Score >= 160): Exact title and artist, with track match confirmation or official studio release, without track count mismatch penalty.
+ * - Probable (120 <= Score < 160): Strong title or artist match above quality floor.
+ * - Weak (Score < 120): Ambiguous or low-similarity matches.
+ */
 export function classifyQualityBand(scored: ScoredSearchCandidate): MatchQualityBand {
   const hasExactArtist = scored.breakdown.artistScore >= 27;
   const hasExactTitle = scored.breakdown.titleScore >= 27;
   const hasTrackMatch = scored.breakdown.trackCountBonus > 0;
+  const hasTrackMismatchPenalty = scored.breakdown.trackCountBonus < 0;
   const isOfficialOrAlbum = scored.breakdown.statusScore > 0 || scored.breakdown.primaryTypeScore > 0;
 
-  // Definitive: High similarity on title + artist with track match or official studio release
-  if (hasExactArtist && hasExactTitle && (hasTrackMatch || isOfficialOrAlbum) && scored.totalScore >= 160) {
+  // Definitive: High similarity on title + artist without severe track mismatch, with track confirmation or official studio status
+  if (
+    hasExactArtist &&
+    hasExactTitle &&
+    !hasTrackMismatchPenalty &&
+    (hasTrackMatch || isOfficialOrAlbum) &&
+    scored.totalScore >= 160
+  ) {
     return MatchQualityBand.Definitive;
   }
 
-  // Probable: Strong title/artist score without heavy penalties
+  // Probable: Strong title/artist score without falling below threshold
   if (scored.totalScore >= 120 && (hasExactArtist || hasExactTitle)) {
     return MatchQualityBand.Probable;
   }

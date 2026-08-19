@@ -5,6 +5,7 @@ import { DEFAULT_METADATA_PREFERENCES } from '../../common/metadata/preferences'
 import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
 import type { MetadataWorkflowService } from '../metadata/services/MetadataWorkflowService';
 import type { MetadataPreferencesService } from '../metadata/services/MetadataPreferencesService';
+import type { MetadataProviderRuntime } from '../metadata/runtime/MetadataProviderRuntime';
 import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
 import type { AlbumTagPreview, ApplyPreviewOptions, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
@@ -16,7 +17,8 @@ export function registerMetadataHandlers(
   autoTagService: AlbumAutoTagService,
   workflowService?: MetadataWorkflowService,
   preferencesService?: MetadataPreferencesService,
-  mainWindow?: BrowserWindow
+  mainWindow?: BrowserWindow,
+  providerRuntime?: MetadataProviderRuntime
 ): void {
   // Listen for progress events from AlbumAutoTagService and send over IPC to renderer
   if (!activeProgressListeners.has(autoTagService)) {
@@ -58,10 +60,14 @@ export function registerMetadataHandlers(
     if (!preferencesService) {
       throw new Error('Preferences service not initialized');
     }
-    return preferencesService.savePreferences(prefs, ['musicbrainz', 'discogs', 'spotify']);
+    const registered = providerRuntime ? providerRuntime.getAvailableSearchProviders().map((p) => p.id) : undefined;
+    return preferencesService.savePreferences(prefs, registered);
   });
 
   ipcMain.handle('metadata/getAvailableSearchProviders', async (): Promise<AvailableSearchProviderInfo[]> => {
+    if (providerRuntime) {
+      return providerRuntime.getAvailableSearchProviders();
+    }
     return [
       { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
       { id: 'discogs', displayName: 'Discogs', isOnline: true }

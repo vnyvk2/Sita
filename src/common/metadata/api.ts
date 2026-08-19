@@ -23,7 +23,7 @@ export interface MetadataAutoTagApi {
   undoLastAutoTag: (operationId?: string) => Promise<{ success: boolean; restoredCount: number; errors?: string[] }>;
   cancelAutoTag: (operationId?: string) => void;
   onProgress: (callback: (payload: ProgressEventPayload) => void) => () => void;
-  getMetadataPreferences?: () => Promise<MetadataProviderPreferences>;
-  saveMetadataPreferences?: (prefs: Partial<MetadataProviderPreferences>) => Promise<MetadataProviderPreferences>;
-  getAvailableSearchProviders?: () => Promise<AvailableSearchProviderInfo[]>;
+  getMetadataPreferences: () => Promise<MetadataProviderPreferences>;
+  saveMetadataPreferences: (prefs: Partial<MetadataProviderPreferences>) => Promise<MetadataProviderPreferences>;
+  getAvailableSearchProviders: () => Promise<AvailableSearchProviderInfo[]>;
 }

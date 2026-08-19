@@ -1,3 +1,4 @@
+import type { MetadataSearchOptions } from '../../../../common/metadata/api';
 import type { IMetadataProviderAdapter } from '@main/metadata/contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '@main/metadata/contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '@main/metadata/contracts/ProviderIdentity';
@@ -123,10 +124,27 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   public async searchAlbums(
     album: string,
     artist?: string,
-    limit = 10,
-    targetTrackCount?: number
+    options?: MetadataSearchOptions | number,
+    targetTrackCountOrSignal?: number | AbortSignal,
+    signalParam?: AbortSignal
   ): Promise<AlbumMetadata[]> {
     if (!album) return [];
+
+    let limit = 10;
+    let targetTrackCount: number | undefined;
+    let signal: AbortSignal | undefined;
+
+    if (typeof options === 'object' && options !== null) {
+      limit = options.limit ?? 10;
+      targetTrackCount = options.targetTrackCount;
+      signal = targetTrackCountOrSignal instanceof AbortSignal ? targetTrackCountOrSignal : signalParam;
+    } else if (typeof options === 'number') {
+      limit = options;
+      if (typeof targetTrackCountOrSignal === 'number') {
+        targetTrackCount = targetTrackCountOrSignal;
+      }
+      signal = signalParam;
+    }
 
     const cacheKey = `album_search:${album}:${artist ?? ''}:${limit}:${targetTrackCount ?? 0}`;
     if (this.cache) {
@@ -146,7 +164,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       queryParts.push(`artist:"${normQuery.cleanArtist}"`);
     }
 
-    let rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER);
+    let rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER, signal);
 
     // Fallback: if clean title search returned nothing and we stripped edition info,
     // retry with the original raw title
@@ -155,7 +173,7 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       if (normQuery.cleanArtist) {
         fallbackParts.push(`artist:"${normQuery.cleanArtist}"`);
       }
-      rawReleases = await this.apiClient.searchReleases(fallbackParts.join(' AND '), SEARCH_BUFFER);
+      rawReleases = await this.apiClient.searchReleases(fallbackParts.join(' AND '), SEARCH_BUFFER, signal);
     }
 
     const searchCandidates = rawReleases.map((rel) => ({

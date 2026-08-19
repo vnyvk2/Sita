@@ -99,19 +99,21 @@ describe('MetadataPreferencesService', () => {
     ).rejects.toThrow(/must be one of the enabled search providers/);
   });
 
-  it('throws error when enabled provider is not registered with search capability', async () => {
-    vi.mocked(getUserSettings).mockResolvedValue({
-      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+  it('sanitizes and repairs corrupted or stale persisted preferences on read', async () => {
+    const dynamicService = new MetadataPreferencesService({
+      getRegisteredSearchProviders: () => ['musicbrainz', 'discogs']
+    });
+
+    vi.mocked(getUserSettings).mockResolvedValueOnce({
+      metadataPreferences: {
+        enabledSearchProviders: ['stale_removed_provider'],
+        searchProviderPriority: ['stale_removed_provider']
+      }
     } as any);
 
-    await expect(
-      service.savePreferences(
-        {
-          enabledSearchProviders: ['unknown_provider' as any],
-          searchProviderPriority: ['unknown_provider' as any]
-        },
-        ['musicbrainz', 'discogs']
-      )
-    ).rejects.toThrow(/not registered with search capability/);
+    const prefs = await dynamicService.getPreferences();
+    // Non-existent provider filtered out; fallback to registered musicbrainz
+    expect(prefs.enabledSearchProviders).toEqual(['musicbrainz']);
+    expect(prefs.searchProviderPriority).toEqual(['musicbrainz']);
   });
 });

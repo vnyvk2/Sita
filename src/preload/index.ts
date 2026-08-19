@@ -33,6 +33,7 @@ import type {
 import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
+import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -805,7 +806,7 @@ export const api = {
   membership,
   metadata,
   metadataAutoTag: {
-    searchAlbums: (albumName: string, artistName?: string, options?: unknown) =>
+    searchAlbums: (albumName: string, artistName?: string, options?: MetadataSearchOptions) =>
       ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, options),
     buildPreview: (
       localSongs: unknown[],
@@ -822,7 +823,7 @@ export const api = {
       ipcRenderer.invoke('metadata/cancelAutoTag', operationId),
     getMetadataPreferences: () =>
       ipcRenderer.invoke('metadata/getPreferences'),
-    saveMetadataPreferences: (prefs: unknown) =>
+    saveMetadataPreferences: (prefs: Partial<MetadataProviderPreferences>) =>
       ipcRenderer.invoke('metadata/savePreferences', prefs),
     getAvailableSearchProviders: () =>
       ipcRenderer.invoke('metadata/getAvailableSearchProviders'),

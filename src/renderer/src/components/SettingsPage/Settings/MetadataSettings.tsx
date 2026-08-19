@@ -90,21 +90,32 @@ const MetadataSettings: React.FC = () => {
     await savePreferencesUpdate(updated);
   };
 
+  const saveSequenceRef = useRef(0);
+
   const savePreferencesUpdate = async (newPrefs: MetadataProviderPreferences) => {
+    const currentSeq = ++saveSequenceRef.current;
     setSaving(true);
     setSaveMessage(null);
     try {
       const saved = await metadataApi.saveMetadataPreferences(newPrefs);
-      if (saved) {
+      if (saved && currentSeq === saveSequenceRef.current) {
         setPreferences(saved);
         setSaveMessage('Preferences saved.');
-        setTimeout(() => setSaveMessage(null), 2500);
+        setTimeout(() => {
+          if (currentSeq === saveSequenceRef.current) {
+            setSaveMessage(null);
+          }
+        }, 2500);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setSaveMessage(`Error: ${msg}`);
+      if (currentSeq === saveSequenceRef.current) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setSaveMessage(`Error: ${msg}`);
+      }
     } finally {
-      setSaving(false);
+      if (currentSeq === saveSequenceRef.current) {
+        setSaving(false);
+      }
     }
   };
 

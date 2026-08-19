@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MetadataQueryNormalizer } from '../MetadataQueryNormalizer';
-import { MetadataSearchRankingEngine, type SearchCandidate } from '../MetadataSearchRankingEngine';
+import {
+  classifyQualityBand,
+  MatchQualityBand,
+  MetadataSearchRankingEngine,
+  type SearchCandidate
+} from '../MetadataSearchRankingEngine';
 
 describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
   it('normalizes query strings by stripping noise suffixes like Remastered while preserving raw title', () => {
@@ -104,5 +109,55 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
     expect(rankedWithoutTarget[0].breakdown.trackCountBonus).toBe(0);
     expect(rankedWithoutTarget[1].breakdown.trackCountBonus).toBe(0);
     expect(rankedWithoutTarget[0].totalScore).toBe(rankedWithoutTarget[1].totalScore);
+  });
+
+  it('classifies candidates into Definitive, Probable, and Weak bands with exact threshold boundaries', () => {
+    // Case 1: Exact Title + Exact Artist + Official Studio Album with score >= 160 -> Definitive
+    const definitiveCandidate = {
+      candidate: { id: 'c-def', title: 'SOUR', artist: 'Olivia Rodrigo', status: 'Official', primaryType: 'Album' },
+      totalScore: 160,
+      breakdown: {
+        baseScore: 80,
+        artistScore: 30,
+        titleScore: 30,
+        statusScore: 10,
+        primaryTypeScore: 10,
+        secondaryTypePenalty: 0,
+        trackCountBonus: 0,
+        editionBoost: 0
+      }
+    };
+    expect(classifyQualityBand(definitiveCandidate)).toBe(MatchQualityBand.Definitive);
+
+    // Case 2: Score 159 (just below 160) falls back to Probable
+    const score159Candidate = {
+      ...definitiveCandidate,
+      totalScore: 159
+    };
+    expect(classifyQualityBand(score159Candidate)).toBe(MatchQualityBand.Probable);
+
+    // Case 3: Score 120 with exact title/artist -> Probable
+    const score120Candidate = {
+      ...definitiveCandidate,
+      totalScore: 120
+    };
+    expect(classifyQualityBand(score120Candidate)).toBe(MatchQualityBand.Probable);
+
+    // Case 4: Score 119 (just below 120) falls back to Weak
+    const score119Candidate = {
+      ...definitiveCandidate,
+      totalScore: 119
+    };
+    expect(classifyQualityBand(score119Candidate)).toBe(MatchQualityBand.Weak);
+
+    // Case 5: Track count mismatch penalty prevents Definitive even if score >= 160
+    const trackMismatchCandidate = {
+      ...definitiveCandidate,
+      breakdown: {
+        ...definitiveCandidate.breakdown,
+        trackCountBonus: -10
+      }
+    };
+    expect(classifyQualityBand(trackMismatchCandidate)).toBe(MatchQualityBand.Probable);
   });
 });

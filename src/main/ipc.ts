@@ -180,7 +180,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         metadataContainer.application.autoTagService,
         metadataContainer.application.workflowService,
         metadataContainer.application.preferencesService,
-        mainWindow
+        mainWindow,
+        metadataContainer.application.providerRuntime
       );
       logger.info(
         'AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root'

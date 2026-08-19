@@ -51,7 +51,13 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
     return this.registry?.getFieldConfidence(this.identity.id, fieldId, fallback) ?? fallback;
   }
 
-  public async searchAlbums(_album: string, _artist?: string, _limit = 10): Promise<AlbumMetadata[]> {
+  public async searchAlbums(
+    _album: string,
+    _artist?: string,
+    _options?: unknown,
+    _targetTrackCountOrSignal?: unknown,
+    _signal?: AbortSignal
+  ): Promise<AlbumMetadata[]> {
     return [];
   }
 
