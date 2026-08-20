@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { settingsQuery } from '@renderer/queries/settings';
@@ -6,11 +6,13 @@ import { spotifyQuery } from '@renderer/queries/spotify';
 import { queryClient } from '@renderer/queryClient';
 import type { SpotifyPlaylistSummary } from '../../../../../main/spotify/api/types';
 import LastFMIcon from '../../../assets/images/webp/last-fm-logo.webp';
+import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
 import { SpotifyPlaylistImportModal } from './SpotifyPlaylistImportModal';
 
 const AccountsSettings = () => {
+  const { addNewNotifications } = useContext(AppUpdateContext);
   const { data: userSettings } = useQuery(settingsQuery.all);
   const { data: spotifyStatus, isLoading: isSpotifyStatusLoading } = useQuery(spotifyQuery.status);
   const isSpotifyConnected = !!spotifyStatus?.isConnected;
@@ -66,6 +68,17 @@ const AccountsSettings = () => {
     mutationFn: async () => {
       setIsConnectingSpotify(true);
       return await window.api.spotify.connect();
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      addNewNotifications([
+        {
+          id: `spotify-connect-error-${Date.now()}`,
+          content: `Spotify Connection Failed: ${message}`,
+          iconName: 'error',
+          duration: 8000
+        }
+      ]);
     },
     onSettled: () => {
       setIsConnectingSpotify(false);
