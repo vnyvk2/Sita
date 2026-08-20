@@ -14,7 +14,10 @@ vi.mock('electron', () => ({
     on: vi.fn(),
     whenReady: vi.fn(() => Promise.resolve())
   },
-  BrowserWindow: vi.fn(),
+  BrowserWindow: Object.assign(vi.fn(), {
+    getAllWindows: vi.fn(() => []),
+    fromWebContents: vi.fn()
+  }),
   nativeImage: {
     createFromPath: vi.fn(() => ({
       isEmpty: vi.fn(() => false),

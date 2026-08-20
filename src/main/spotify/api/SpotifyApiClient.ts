@@ -151,6 +151,9 @@ export class SpotifyApiClient {
       );
 
       isFirstPage = false;
+      if (!page.playlists || page.playlists.length === 0) {
+        break;
+      }
       allPlaylists.push(...page.playlists);
       nextUrl = page.next;
       hasMore = Boolean(nextUrl) && allPlaylists.length < page.total;
