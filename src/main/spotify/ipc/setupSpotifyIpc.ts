@@ -4,12 +4,14 @@ import logger from '../../logger';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import { importExecutor } from '../../playlistImport/setup';
 import { SpotifyApiClient } from '../api/SpotifyApiClient';
+import type { SyncStrategy } from '../api/types';
 import { SpotifyLoopbackServer } from '../auth/SpotifyLoopbackServer';
 import { SpotifyPkceService } from '../auth/SpotifyPkceService';
 import { SpotifyTokenStore } from '../auth/SpotifyTokenStore';
 import type { SpotifyAuthStatus } from '../auth/types';
 import { SpotifyPlaylistExportService } from '../export/SpotifyPlaylistExportService';
 import { SpotifyPlaylistImportService } from '../import/SpotifyPlaylistImportService';
+import { SpotifyPlaylistSyncService } from '../sync/SpotifyPlaylistSyncService';
 import { SpotifyExportValidator } from './SpotifyExportValidator';
 import { SpotifyImportValidator } from './SpotifyImportValidator';
 
@@ -31,7 +33,8 @@ export function getSpotifyClientId(): string {
 export function setupSpotifyIpc(
   apiClient = new SpotifyApiClient(),
   importService = new SpotifyPlaylistImportService(apiClient),
-  exportService = new SpotifyPlaylistExportService(apiClient)
+  exportService = new SpotifyPlaylistExportService(apiClient),
+  syncService = new SpotifyPlaylistSyncService(apiClient)
 ): void {
   // Connect handler
   ipcMain.handle('spotify/auth/connect', async () => {
@@ -101,6 +104,7 @@ export function setupSpotifyIpc(
   ipcMain.handle('spotify/auth/disconnect', async () => {
     try {
       await SpotifyTokenStore.clearIntegration();
+      logger.info('Disconnected Spotify account');
       return { success: true };
     } catch (error) {
       logger.error('Spotify disconnect failed', { error });
@@ -108,41 +112,44 @@ export function setupSpotifyIpc(
     }
   });
 
-  // Status handler
+  // Get Auth Status handler
   ipcMain.handle('spotify/auth/getStatus', async (): Promise<SpotifyAuthStatus> => {
-    const active = await SpotifyTokenStore.getActiveIntegration();
-    if (!active) {
-      return {
-        isConnected: false,
-        user: null
-      };
-    }
-
-    return {
-      isConnected: true,
-      user: {
-        spotifyUserId: active.spotifyUserId,
-        displayName: active.displayName,
-        email: active.email,
-        product: active.product
+    try {
+      const integration = await SpotifyTokenStore.getActiveIntegration();
+      if (!integration) {
+        return { isConnected: false, user: null };
       }
-    };
+
+      return {
+        isConnected: true,
+        user: {
+          spotifyUserId: integration.spotifyUserId,
+          displayName: integration.displayName,
+          email: integration.email || null,
+          product: integration.product || null
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get Spotify auth status', { error });
+      return { isConnected: false, user: null };
+    }
   });
 
-  // Playlists handler
-  ipcMain.handle(
-    'spotify/playlists/getPlaylists',
-    async (_, options?: { limit?: number; offset?: number }) => {
+  // Get User Playlists handler
+  ipcMain.handle('spotify/playlists/getUserPlaylists', async () => {
+    try {
       const clientId = getSpotifyClientId();
       const accessToken = await SpotifyTokenStore.getValidAccessToken(clientId);
-
       if (!accessToken) {
-        throw new Error('Spotify is not connected or access token cannot be obtained.');
+        throw new Error('Spotify not authenticated. Please connect your account.');
       }
 
-      return await apiClient.getUserPlaylists(accessToken, options);
+      return await apiClient.getAllUserPlaylists(accessToken);
+    } catch (error) {
+      logger.error('Failed to fetch user Spotify playlists', { error });
+      throw error;
     }
-  );
+  });
 
   // Generate Import Plan handler
   ipcMain.handle('spotify/playlists/generateImportPlan', async (_, playlistId: string) => {
@@ -218,4 +225,51 @@ export function setupSpotifyIpc(
       throw error;
     }
   });
+
+  // ==========================================
+  // Phase 3B Two-Way Sync Handlers
+  // ==========================================
+
+  // Get playlist link info
+  ipcMain.handle('spotify/sync/getLink', async (_, playlistId: number) => {
+    return await syncService.getLinkedPlaylist(playlistId);
+  });
+
+  // Link local playlist to Spotify
+  ipcMain.handle(
+    'spotify/sync/linkPlaylist',
+    async (_, playlistId: number, spotifyPlaylistId: string, strategy?: SyncStrategy) => {
+      const clientId = getSpotifyClientId();
+      return await syncService.linkPlaylist(playlistId, spotifyPlaylistId, strategy, clientId);
+    }
+  );
+
+  // Unlink playlist from Spotify
+  ipcMain.handle('spotify/sync/unlinkPlaylist', async (_, playlistId: number) => {
+    return await syncService.unlinkPlaylist(playlistId);
+  });
+
+  // Detect sync drift
+  ipcMain.handle('spotify/sync/detectDrift', async (_, playlistId: number) => {
+    const clientId = getSpotifyClientId();
+    return await syncService.detectSyncDrift(playlistId, clientId);
+  });
+
+  // Generate 3-way sync preview plan
+  ipcMain.handle(
+    'spotify/sync/generatePlan',
+    async (_, playlistId: number, strategy?: SyncStrategy) => {
+      const clientId = getSpotifyClientId();
+      return await syncService.generateSyncPlan(playlistId, strategy, clientId);
+    }
+  );
+
+  // Execute 2-way sync
+  ipcMain.handle(
+    'spotify/sync/executeSync',
+    async (_, playlistId: number, strategy?: SyncStrategy) => {
+      const clientId = getSpotifyClientId();
+      return await syncService.executeSync(playlistId, strategy, clientId);
+    }
+  );
 }

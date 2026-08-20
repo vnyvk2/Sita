@@ -7,6 +7,8 @@ import type {
   SpotifyPlaylistItemsResponse,
   SpotifyPlaylistPaging,
   SpotifyPlaylistSummary,
+  SpotifyRemoveItemsResponse,
+  SpotifyRemovePlaylistItem,
   SpotifySearchResponse,
   SpotifyTrackInput,
   SpotifyUserProfile
@@ -40,132 +42,97 @@ export class SpotifyApiClient {
     });
 
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify user profile: HTTP ${response.status}`);
+      throw new Error(`Failed to fetch current Spotify user: HTTP ${response.status}`);
     }
-
-    const data = response.data;
-    return {
-      id: data.id,
-      displayName: data.display_name,
-      email: data.email,
-      product: data.product,
-      imageUrl: data.images?.[0]?.url
-    };
-  }
-
-  /** Fetches metadata details for a specific Spotify playlist. */
-  public async getPlaylist(
-    accessToken: string,
-    playlistId: string
-  ): Promise<SpotifyPlaylistDetails> {
-    const response = await this.pipeline.execute<{
-      id: string;
-      name: string;
-      description: string | null;
-      uri: string;
-      snapshot_id: string;
-      images?: Array<{ url: string }>;
-      owner?: { id: string; display_name?: string };
-      tracks?: { total: number };
-      items?: { total: number };
-    }>({
-      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}`,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlist details: HTTP ${response.status}`);
-    }
-
-    const data = response.data;
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      uri: data.uri,
-      snapshotId: data.snapshot_id,
-      imageUrl: data.images?.[0]?.url,
-      owner: data.owner,
-      tracksTotal: data.items?.total ?? data.tracks?.total ?? 0
-    };
-  }
-
-  /** Fetches the current user's Spotify playlists (paginated). */
-  public async getUserPlaylists(
-    accessToken: string,
-    options?: { limit?: number; offset?: number; nextUrl?: string }
-  ): Promise<{ playlists: SpotifyPlaylistSummary[]; total: number; next: string | null }> {
-    let targetUrl: string;
-    if (options?.nextUrl) {
-      targetUrl = options.nextUrl;
-    } else {
-      const limit = options?.limit ?? 50;
-      const offset = options?.offset ?? 0;
-      const url = new URL(`${SPOTIFY_API_BASE_URL}/me/playlists`);
-      url.searchParams.set('limit', limit.toString());
-      url.searchParams.set('offset', offset.toString());
-      targetUrl = url.toString();
-    }
-
-    const response = await this.pipeline.execute<SpotifyPlaylistPaging>({
-      url: targetUrl,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlists: HTTP ${response.status}`);
-    }
-
-    const paging = response.data;
-    const playlists: SpotifyPlaylistSummary[] = (paging.items || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      uri: item.uri,
-      snapshotId: item.snapshot_id,
-      imageUrl: item.images?.[0]?.url,
-      owner: item.owner,
-      tracksTotal: item.tracks?.total ?? 0
-    }));
 
     return {
-      playlists,
-      total: paging.total,
-      next: paging.next
+      id: response.data.id,
+      displayName: response.data.display_name,
+      email: response.data.email,
+      product: response.data.product,
+      images: response.data.images
     };
   }
 
   /**
-   * Fetches all user playlists across all pages following pure page.next authority.
+   * Fetches a paginated list of playlists owned or followed by the current user.
+   */
+  public async getUserPlaylists(
+    accessToken: string,
+    options?: { limit?: number; offset?: number; nextUrl?: string }
+  ): Promise<SpotifyPlaylistsResponse> {
+    let url: string;
+
+    if (options?.nextUrl) {
+      const parsed = new URL(options.nextUrl);
+      if (parsed.protocol !== 'https:' || parsed.hostname !== 'api.spotify.com') {
+        throw new Error(`Untrusted pagination URL: ${options.nextUrl}`);
+      }
+      url = options.nextUrl;
+    } else {
+      const limit = options?.limit ?? 50;
+      const offset = options?.offset ?? 0;
+      url = `${SPOTIFY_API_BASE_URL}/me/playlists?limit=${limit}&offset=${offset}`;
+    }
+
+    const response = await this.pipeline.execute<SpotifyPlaylistPaging>({
+      url,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to fetch user playlists: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Recursively / iteratively fetches ALL playlists owned or followed by the current user.
+   * Purely governed by page.next URL authority with circular loop protection.
    */
   public async getAllUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
     const allPlaylists: SpotifyPlaylistSummary[] = [];
     const seenNextUrls = new Set<string>();
-    const MAX_PAGES = 200;
+    const MAX_PAGES = 100;
     let pageCount = 0;
     let nextUrl: string | null = null;
 
     while (pageCount < MAX_PAGES) {
       pageCount++;
-      const page = await this.getUserPlaylists(
+      const page: SpotifyPlaylistsResponse = await this.getUserPlaylists(
         accessToken,
-        nextUrl ? { nextUrl } : { limit: 50, offset: 0 }
+        nextUrl ? { nextUrl } : { limit: 50, offset: allPlaylists.length }
       );
 
-      if (!page.playlists || page.playlists.length === 0) {
-        break;
+      if (page.items && Array.isArray(page.items)) {
+        for (const item of page.items) {
+          if (!item) continue;
+          allPlaylists.push({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            imageUrl: item.images?.[0]?.url,
+            tracksTotal: item.tracks?.total ?? item.items?.total ?? item.tracksTotal ?? 0,
+            snapshotId: item.snapshot_id || item.snapshotId,
+            uri: item.uri,
+            owner: item.owner,
+            ownerName: item.owner?.display_name
+          });
+        }
       }
-      allPlaylists.push(...page.playlists);
 
-      if (!page.next || seenNextUrls.has(page.next)) {
+      if (!page.next || page.items.length === 0) {
         break;
       }
+
+      if (seenNextUrls.has(page.next)) {
+        break;
+      }
+
       seenNextUrls.add(page.next);
       nextUrl = page.next;
     }
@@ -174,31 +141,14 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Fetches items (tracks, episodes) of a Spotify playlist using the active GET /v1/playlists/{id}/items endpoint.
-   * Explicitly requests additional_types=track,episode
+   * Fetches metadata details for a specific playlist by ID.
    */
-  public async getPlaylistItems(
+  public async getPlaylistDetails(
     accessToken: string,
-    playlistId: string,
-    options?: { limit?: number; offset?: number; nextUrl?: string }
-  ): Promise<SpotifyPlaylistItemsResponse> {
-    let targetUrl: string;
-    if (options?.nextUrl) {
-      targetUrl = options.nextUrl;
-    } else {
-      const limit = options?.limit ?? 50;
-      const offset = options?.offset ?? 0;
-      const url = new URL(
-        `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`
-      );
-      url.searchParams.set('limit', limit.toString());
-      url.searchParams.set('offset', offset.toString());
-      url.searchParams.set('additional_types', 'track,episode');
-      targetUrl = url.toString();
-    }
-
-    const response = await this.pipeline.execute<SpotifyPlaylistItemsResponse>({
-      url: targetUrl,
+    playlistId: string
+  ): Promise<SpotifyPlaylistDetails> {
+    const response = await this.pipeline.execute<SpotifyPlaylistDetails>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}`,
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -206,14 +156,52 @@ export class SpotifyApiClient {
     });
 
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlist items: HTTP ${response.status}`);
+      throw new Error(`Failed to fetch playlist details: HTTP ${response.status}`);
     }
 
     return response.data;
   }
 
   /**
-   * Fetches all items in a Spotify playlist following pure page.next authority with MAX_PAGES safety guard.
+   * Fetches a paginated slice of items (tracks) from a playlist.
+   * Supports active 2026 /playlists/{id}/items endpoint.
+   */
+  public async getPlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    options?: { limit?: number; offset?: number; nextUrl?: string }
+  ): Promise<SpotifyPlaylistItemsResponse> {
+    let url: string;
+
+    if (options?.nextUrl) {
+      const parsed = new URL(options.nextUrl);
+      if (parsed.protocol !== 'https:' || parsed.hostname !== 'api.spotify.com') {
+        throw new Error(`Untrusted pagination URL: ${options.nextUrl}`);
+      }
+      url = options.nextUrl;
+    } else {
+      const limit = options?.limit ?? 50;
+      const offset = options?.offset ?? 0;
+      url = `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items?limit=${limit}&offset=${offset}`;
+    }
+
+    const response = await this.pipeline.execute<SpotifyPlaylistItemsResponse>({
+      url,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to fetch playlist items: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Fetches ALL track items from a Spotify playlist by auto-traversing page.next.
    */
   public async getAllPlaylistItems(
     accessToken: string,
@@ -269,7 +257,7 @@ export class SpotifyApiClient {
     const url = new URL(`${SPOTIFY_API_BASE_URL}/search`);
     url.searchParams.set('q', query.trim());
     url.searchParams.set('type', 'track');
-    url.searchParams.set('limit', safeLimit.toString());
+    url.searchParams.set('limit', String(safeLimit));
 
     const response = await this.pipeline.execute<SpotifySearchResponse>({
       url: url.toString(),
@@ -280,22 +268,22 @@ export class SpotifyApiClient {
     });
 
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to search Spotify track catalog: HTTP ${response.status}`);
+      throw new Error(`Failed to search Spotify tracks: HTTP ${response.status}`);
     }
 
-    return response.data.tracks?.items ?? [];
+    return response.data.tracks?.items || [];
   }
 
   /**
-   * Creates a playlist for the current authenticated user using POST /v1/me/playlists.
-   * Explicitly sets public visibility (defaulting to false).
+   * Creates a new playlist for the authenticated user using POST /v1/me/playlists.
+   * Complies with the active Spotify 2026 API contract.
    */
   public async createPlaylist(
     accessToken: string,
     details: {
       name: string;
       description?: string;
-      isPublic: boolean;
+      isPublic?: boolean;
     }
   ): Promise<SpotifyPlaylistDetails> {
     const payload: SpotifyCreatePlaylistRequest = {
@@ -354,6 +342,84 @@ export class SpotifyApiClient {
 
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`Failed to add items to Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Removes items from a Spotify playlist using DELETE /v1/playlists/{id}/items.
+   * Expects up to 100 items with optional snapshot_id concurrency guard.
+   */
+  public async removePlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    items: SpotifyRemovePlaylistItem[],
+    snapshotId?: string
+  ): Promise<SpotifyRemoveItemsResponse> {
+    if (!items || items.length === 0) {
+      return { snapshot_id: snapshotId || '' };
+    }
+
+    if (items.length > 100) {
+      throw new Error(
+        `Spotify removePlaylistItems batch cannot exceed 100 items (received ${items.length})`
+      );
+    }
+
+    const payload: { items: SpotifyRemovePlaylistItem[]; snapshot_id?: string } = {
+      items
+    };
+    if (snapshotId) {
+      payload.snapshot_id = snapshotId;
+    }
+
+    const response = await this.pipeline.execute<SpotifyRemoveItemsResponse>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`,
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: payload
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to remove items from Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Replaces all items in a Spotify playlist using PUT /v1/playlists/{id}/items.
+   * Strictly clamped to <= 100 items per Spotify Web API contract.
+   */
+  public async replacePlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    uris: string[]
+  ): Promise<SpotifyAddItemsResponse> {
+    if (uris.length > 100) {
+      throw new Error(
+        `Spotify replacePlaylistItems cannot exceed 100 URIs in a single request (received ${uris.length})`
+      );
+    }
+
+    const response = await this.pipeline.execute<SpotifyAddItemsResponse>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`,
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: {
+        uris
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to replace items in Spotify playlist: HTTP ${response.status}`);
     }
 
     return response.data;
