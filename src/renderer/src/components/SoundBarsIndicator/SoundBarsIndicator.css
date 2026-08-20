@@ -1,0 +1,284 @@
+﻿/* ==========================================================================
+   SoundBarsIndicator — Segmented Dot-Matrix & Sound Bars Equalizer
+   True discrete LED matrix animation with deterministic idle states.
+   ========================================================================== */
+
+.sound-bars-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.sound-bars-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Background ghost LED matrix grid */
+.sound-bars-ghost-dot {
+  opacity: 0.18;
+}
+
+/* Base active dot styles */
+.sound-bars-dot {
+  opacity: 0;
+}
+
+.sound-bars-dot-base {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Dot-Matrix Animations (Playing State)
+   Staggered stepped opacities simulating discrete LED frequency meters.
+   ========================================================================== */
+
+/* Column 1 (Bass / Low End) - Period: 0.64s */
+.sound-bars--playing .sound-bars-dot-c1-r2 {
+  animation: dotCol1R2 0.64s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c1-r3 {
+  animation: dotCol1R3 0.64s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c1-r4 {
+  animation: dotCol1R4 0.64s ease-in-out infinite alternate;
+}
+
+@keyframes dotCol1R2 {
+  0%,
+  15% {
+    opacity: 0;
+  }
+  35%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol1R3 {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  60%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol1R4 {
+  0%,
+  75% {
+    opacity: 0;
+  }
+  85%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Column 2 (Low-Mids) - Period: 0.48s */
+.sound-bars--playing .sound-bars-dot-c2-r2 {
+  animation: dotCol2R2 0.48s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c2-r3 {
+  animation: dotCol2R3 0.48s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c2-r4 {
+  animation: dotCol2R4 0.48s ease-in-out infinite alternate;
+}
+
+@keyframes dotCol2R2 {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  40%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol2R3 {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  65%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol2R4 {
+  0%,
+  80% {
+    opacity: 0;
+  }
+  90%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Column 3 (High-Mids) - Period: 0.76s */
+.sound-bars--playing .sound-bars-dot-c3-r2 {
+  animation: dotCol3R2 0.76s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c3-r3 {
+  animation: dotCol3R3 0.76s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c3-r4 {
+  animation: dotCol3R4 0.76s ease-in-out infinite alternate;
+}
+
+@keyframes dotCol3R2 {
+  0%,
+  25% {
+    opacity: 0;
+  }
+  45%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol3R3 {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  70%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol3R4 {
+  0%,
+  70% {
+    opacity: 0;
+  }
+  85%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Column 4 (Treble) - Period: 0.56s */
+.sound-bars--playing .sound-bars-dot-c4-r2 {
+  animation: dotCol4R2 0.56s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c4-r3 {
+  animation: dotCol4R3 0.56s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-dot-c4-r4 {
+  animation: dotCol4R4 0.56s ease-in-out infinite alternate;
+}
+
+@keyframes dotCol4R2 {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  50%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol4R3 {
+  0%,
+  55% {
+    opacity: 0;
+  }
+  75%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes dotCol4R4 {
+  0%,
+  82% {
+    opacity: 0;
+  }
+  92%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Smooth Sound Bars Variant Animations
+   ========================================================================== */
+
+.sound-bars-col {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.sound-bars--playing .sound-bars-col-1 {
+  animation: barBounce1 0.64s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-col-2 {
+  animation: barBounce2 0.48s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-col-3 {
+  animation: barBounce3 0.76s ease-in-out infinite alternate;
+}
+.sound-bars--playing .sound-bars-col-4 {
+  animation: barBounce4 0.56s ease-in-out infinite alternate;
+}
+
+@keyframes barBounce1 {
+  0% {
+    transform: scaleY(0.25);
+  }
+  100% {
+    transform: scaleY(0.9);
+  }
+}
+@keyframes barBounce2 {
+  0% {
+    transform: scaleY(0.85);
+  }
+  100% {
+    transform: scaleY(0.3);
+  }
+}
+@keyframes barBounce3 {
+  0% {
+    transform: scaleY(0.35);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes barBounce4 {
+  0% {
+    transform: scaleY(0.7);
+  }
+  100% {
+    transform: scaleY(0.25);
+  }
+}
+
+/* ==========================================================================
+   Deterministic Paused / Idle State & Reduced Motion
+   Only the bottom baseline row is lit. Upper rows remain 0% opacity.
+   ========================================================================== */
+
+.sound-bars--paused .sound-bars-dot,
+@media (prefers-reduced-motion: reduce) {
+  .sound-bars-dot {
+    opacity: 0 !important;
+    animation: none !important;
+  }
+  .sound-bars-dot-base {
+    opacity: 1 !important;
+  }
+  .sound-bars-col {
+    animation: none !important;
+    transform: scaleY(0.25) !important;
+  }
+}
+
+.sound-bars--paused .sound-bars-col {
+  animation: none !important;
+  transform: scaleY(0.25) !important;
+}

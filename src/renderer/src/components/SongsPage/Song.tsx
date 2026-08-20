@@ -28,6 +28,7 @@ import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
+import SoundBarsIndicator from '../SoundBarsIndicator';
 import SongArtist from './SongArtist';
 import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
 
@@ -57,6 +58,8 @@ interface SongProp {
   isDraggable?: boolean;
   provided?: DraggableProvided;
   selectAllHandler?: (_upToId?: number) => void;
+  genres?: { genreId: string; name: string }[];
+  discNo?: number;
   /** When provided, highlights the matching portion of the title in search results */
   highlightText?: string;
 }
@@ -75,6 +78,8 @@ const Song = memo(
       additionalContextMenuItems,
       artists,
       album,
+      genres,
+      discNo,
       style,
       year,
       trackNo,
@@ -111,6 +116,18 @@ const Song = memo(
     );
     const showTrackNumberAsSongIndex = useStore(store, (state) =>
       Boolean(state.localStorage?.preferences?.showTrackNumberAsSongIndex)
+    );
+    const showEqualizerOnTracklist = useStore(
+      store,
+      (state) => state.localStorage?.preferences?.showEqualizerOnTracklist ?? true
+    );
+    const isAnimationDisabled = useStore(
+      store,
+      (state) =>
+        Boolean(state.localStorage?.preferences?.isReducedMotion) ||
+        Boolean(
+          state.isOnBatteryPower && state.localStorage?.preferences?.removeAnimationsOnBatteryPower
+        )
     );
     const doNotShowBlacklistSongConfirm = useStore(store, (state) =>
       Boolean(state.localStorage?.preferences?.doNotShowBlacklistSongConfirm)
@@ -614,7 +631,11 @@ const Song = memo(
       path,
       isBlacklisted,
       doNotShowBlacklistSongConfirm,
-      toggleSingleSongFavorite
+      toggleSingleSongFavorite,
+      genres,
+      year,
+      discNo,
+      trackNo
     ]);
 
     return (
@@ -678,7 +699,10 @@ const Song = memo(
       >
         <div
           className={`song-cover-and-play-btn-container flex w-[clamp(6rem,15%,9rem)] shrink-0 items-center justify-center ${
-            !isIndexingSongs && !showTrackNumberAsSongIndex && 'w-[clamp(4rem,10%,6rem)]!'
+            !isIndexingSongs &&
+            !showTrackNumberAsSongIndex &&
+            !(isCurrentSong && showEqualizerOnTracklist) &&
+            'w-[clamp(4rem,10%,6rem)]!'
           }`}
         >
           {isMultipleSelectionEnabled ? (
@@ -706,7 +730,9 @@ const Song = memo(
                 block
               </span>
             </div>
-          ) : isIndexingSongs || showTrackNumberAsSongIndex ? (
+          ) : isIndexingSongs ||
+            showTrackNumberAsSongIndex ||
+            (isCurrentSong && showEqualizerOnTracklist) ? (
             <div
               className={`bg-background-color-1 text-font-color-highlight group-even:bg-background-color-2/75 group-hover:bg-background-color-1 dark:bg-dark-background-color-1 dark:text-dark-background-color-3 dark:group-even:bg-dark-background-color-2/50 dark:group-hover:bg-dark-background-color-1 relative mx-1 flex items-center justify-center rounded-2xl px-3 py-1 text-center ${
                 index < 10
@@ -718,9 +744,19 @@ const Song = memo(
                       : 'min-w-15'
               }`}
             >
-              <span className="min-w-2 text-sm leading-tight font-medium">
-                {trackNo ?? (isIndexingSongs ? index + 1 : '--')}
-              </span>
+              {isCurrentSong && showEqualizerOnTracklist ? (
+                <span className="flex items-center justify-center transition-opacity duration-200">
+                  <SoundBarsIndicator
+                    isPlaying={isSongPlaying && !isAnimationDisabled}
+                    variant="dots"
+                    size="xs"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-2 text-sm leading-tight font-medium transition-opacity duration-200">
+                  {trackNo ?? (isIndexingSongs ? index + 1 : '--')}
+                </span>
+              )}
             </div>
           ) : (
             ''

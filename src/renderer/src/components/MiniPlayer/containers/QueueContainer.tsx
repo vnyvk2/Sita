@@ -13,6 +13,7 @@ import { type VirtuosoHandle } from 'react-virtuoso';
 import DefaultSongCover from '../../../assets/images/webp/song_cover_default.webp';
 import calculateTime from '../../../utils/calculateTime';
 import Img from '../../Img';
+import SoundBarsIndicator from '../../SoundBarsIndicator';
 import VirtualizedList from '../../VirtualizedList';
 
 type MiniQueueRowProps = {
@@ -68,7 +69,7 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
 
   if (!song) {
     return (
-      <div className="queue-song-item flex h-[52px] min-h-[52px] max-h-[52px] w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 opacity-50">
+      <div className="queue-song-item flex h-[52px] max-h-[52px] min-h-[52px] w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 opacity-50">
         <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
         <div className="min-w-0 flex-1">
           <div className="h-3.5 w-24 rounded bg-white/10" />
@@ -84,7 +85,7 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
   return (
     <button
       type="button"
-      className={`queue-song-item group/songItem flex h-[52px] min-h-[52px] max-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
+      className={`queue-song-item group/songItem flex h-[52px] max-h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
         isActivePosition
           ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
           : 'hover:bg-font-color-white/10'
@@ -102,9 +103,12 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
         />
         {isActivePosition && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
-              {isCurrentSongPlaying ? 'equalizer' : 'pause'}
-            </span>
+            <SoundBarsIndicator
+              isPlaying={isCurrentSongPlaying}
+              variant="dots"
+              size="xs"
+              className="text-font-color-highlight dark:text-dark-font-color-highlight"
+            />
           </div>
         )}
       </div>
@@ -134,7 +138,7 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
           role="button"
           tabIndex={0}
           aria-label={isAFavorite ? unlikeText : likeText}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-font-color-white/40 hover:text-font-color-highlight hover:bg-white/10 transition-colors"
+          className="text-font-color-white/40 hover:text-font-color-highlight flex h-7 w-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/10"
           title={isAFavorite ? unlikeText : likeText}
           onClick={handleFavoriteClick}
           onKeyDown={handleFavoriteKeyDown}
@@ -143,14 +147,14 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
             className={`material-icons-round text-base transition-colors ${
               isAFavorite
                 ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
-                : 'opacity-0 group-hover/songItem:opacity-60 hover:opacity-100! hover:text-font-color-highlight'
+                : 'hover:text-font-color-highlight opacity-0 group-hover/songItem:opacity-60 hover:opacity-100!'
             }`}
           >
             {isAFavorite ? 'favorite' : 'favorite_border'}
           </span>
         </span>
 
-        <div className="text-font-color-white/50 text-xs tabular-nums min-w-[30px] text-right">
+        <div className="text-font-color-white/50 min-w-[30px] text-right text-xs tabular-nums">
           {formattedDuration}
         </div>
       </div>
@@ -168,6 +172,14 @@ const QueueContainer = (props: Props) => {
   const currentSongId = useStore(store, (state) => state.currentSongData.songId);
   const queue = useStore(store, (state) => state.localStorage.queue);
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
+  const isAnimationDisabled = useStore(
+    store,
+    (state) =>
+      Boolean(state.localStorage?.preferences?.isReducedMotion) ||
+      Boolean(
+        state.isOnBatteryPower && state.localStorage?.preferences?.removeAnimationsOnBatteryPower
+      )
+  );
 
   const { changeQueueCurrentSongIndex, toggleIsFavorite } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -284,7 +296,7 @@ const QueueContainer = (props: Props) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 cursor-pointer [-webkit-app-region:no-drag] focus-visible:outline-none disabled:opacity-30"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev > 0 ? prev - 1 : queue.queues.length - 1))
@@ -301,7 +313,7 @@ const QueueContainer = (props: Props) => {
                     : `Queue ${viewingQueueIndex + 1}`)}
             </span>
             <button
-              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 focus-visible:outline-none disabled:opacity-30 [-webkit-app-region:no-drag] cursor-pointer"
+              className="text-font-color-white/60 hover:text-font-color-white disabled:hover:text-font-color-white/60 cursor-pointer [-webkit-app-region:no-drag] focus-visible:outline-none disabled:opacity-30"
               disabled={queue.queues.length <= 1}
               onClick={() =>
                 setViewingQueueIndex((prev) => (prev < queue.queues.length - 1 ? prev + 1 : 0))
@@ -312,7 +324,7 @@ const QueueContainer = (props: Props) => {
             {viewingQueueIndex !== queue.currentQueueIndex &&
               (queue.queues[viewingQueueIndex]?.songIds?.length ?? 0) > 0 && (
                 <button
-                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 items-center justify-center rounded-full transition-colors focus-visible:outline-none [-webkit-app-region:no-drag] cursor-pointer"
+                  className="bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight hover:bg-font-color-highlight hover:text-font-color-white ml-2 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full transition-colors [-webkit-app-region:no-drag] focus-visible:outline-none"
                   title={t('common.play', 'Play')}
                   onClick={() => {
                     if (manager) {
@@ -345,7 +357,7 @@ const QueueContainer = (props: Props) => {
                 songId={id}
                 song={queuedSongsMap.get(id)}
                 isActivePosition={isViewingActiveQueue && index === activePosition}
-                isCurrentSongPlaying={isCurrentSongPlaying}
+                isCurrentSongPlaying={isCurrentSongPlaying && !isAnimationDisabled}
                 onSongClick={handleSongClick}
                 onToggleFavorite={handleToggleFavorite}
                 unknownArtistText={t('common.unknownArtist')}

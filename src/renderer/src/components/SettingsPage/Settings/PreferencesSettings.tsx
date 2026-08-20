@@ -50,6 +50,22 @@ const PreferencesSettings = () => {
         </li>
 
         <li className="checkbox-container">
+          <div className="secondary-container toggle-show-equalizer mb-4">
+            <div className="description">
+              {t('settingsPage.showEqualizerOnTracklistDescription')}
+            </div>
+            <Checkbox
+              id="showEqualizerOnTracklist"
+              isChecked={preferences?.showEqualizerOnTracklist ?? true}
+              checkedStateUpdateFunction={(state) =>
+                storage.preferences.setPreferences('showEqualizerOnTracklist', state)
+              }
+              labelContent={t('settingsPage.showEqualizerOnTracklist')}
+            />
+          </div>
+        </li>
+
+        <li className="checkbox-container">
           <div className="secondary-container show-artists-artwork-near-song-controls mb-4">
             <div className="description">
               {t('settingsPage.showArtistArtworkNearSongControlsDescription')}
