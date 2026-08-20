@@ -1,10 +1,15 @@
 import type { CanonicalTrackIdentity } from '../CanonicalTrackIdentity';
 
+export type SongArtistRecord =
+  | string
+  | { name?: string; [key: string]: unknown }
+  | { artist?: { name?: string; [key: string]: unknown }; [key: string]: unknown };
+
 export interface MinimalSongRecord {
   id?: number;
   songId?: number;
   title: string;
-  artists?: Array<{ name: string } | string> | string;
+  artists?: SongArtistRecord[] | string;
   album?: { name?: string; title?: string } | string;
   albumArtist?: string;
   duration?: number;
@@ -15,8 +20,27 @@ export interface MinimalSongRecord {
   isrc?: string;
   musicBrainzRecordingId?: string;
   genre?: string;
-  genres?: Array<{ name: string } | string>;
+  genres?: Array<{ name?: string } | string>;
   path?: string;
+}
+
+function extractArtistName(record: SongArtistRecord | null | undefined): string | undefined {
+  if (!record) return undefined;
+  if (typeof record === 'string') {
+    const trimmed = record.trim();
+    return trimmed || undefined;
+  }
+  if (typeof record === 'object') {
+    if ('name' in record && typeof record.name === 'string') {
+      const trimmed = record.name.trim();
+      if (trimmed) return trimmed;
+    }
+    if ('artist' in record && record.artist && typeof record.artist === 'object' && typeof record.artist.name === 'string') {
+      const trimmed = record.artist.name.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return undefined;
 }
 
 export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIdentity {
@@ -24,20 +48,8 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
 
   if (Array.isArray(song.artists)) {
     for (const a of song.artists) {
-      if (typeof a === 'string') {
-        const trimmed = a.trim();
-        if (trimmed) artists.push(trimmed);
-      } else if (a && typeof (a as any).name === 'string') {
-        const trimmed = (a as any).name.trim();
-        if (trimmed) artists.push(trimmed);
-      } else if (
-        a &&
-        typeof (a as any).artist === 'object' &&
-        typeof (a as any).artist?.name === 'string'
-      ) {
-        const trimmed = (a as any).artist.name.trim();
-        if (trimmed) artists.push(trimmed);
-      }
+      const name = extractArtistName(a);
+      if (name) artists.push(name);
     }
   } else if (typeof song.artists === 'string') {
     const trimmed = song.artists.trim();
@@ -65,12 +77,12 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
     artists,
     album,
     albumArtist: song.albumArtist?.trim() || undefined,
-    durationSecs: song.duration !== undefined ? Number(song.duration) : undefined,
-    isrc: song.isrc?.trim() || undefined,
-    musicBrainzRecordingId: song.musicBrainzRecordingId?.trim() || undefined,
-    releaseYear: song.year,
+    durationSecs: song.duration ? Number(song.duration) : undefined,
+    year: song.year || undefined,
     trackNumber: song.trackNumber ?? song.trackNo,
     discNumber: song.discNumber,
+    isrc: song.isrc?.trim() || undefined,
+    musicBrainzRecordingId: song.musicBrainzRecordingId?.trim() || undefined,
     genre,
     pathOrUri: song.path
   };
