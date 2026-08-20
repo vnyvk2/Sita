@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { db } from '../../../../src/main/db/db';
+import * as songsQuery from '../../../../src/main/db/queries/songs';
 import { SpotifyApiClient } from '../../../../src/main/spotify/api/SpotifyApiClient';
 import type {
   CatalogResolution,
@@ -9,7 +11,7 @@ import { SpotifyTokenStore } from '../../../../src/main/spotify/auth/SpotifyToke
 import { SpotifyPlaylistExportService } from '../../../../src/main/spotify/export/SpotifyPlaylistExportService';
 import type { ValidatedExportRequest } from '../../../../src/main/spotify/ipc/SpotifyExportValidator';
 
-describe('SpotifyPlaylistExportService (Batch Boundaries & Partial Failure)', () => {
+describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Positional Integrity)', () => {
   let apiClient: SpotifyApiClient;
   let exportService: SpotifyPlaylistExportService;
 
@@ -295,5 +297,147 @@ describe('SpotifyPlaylistExportService (Batch Boundaries & Partial Failure)', ()
     expect(result.completedBatches).toBe(1);
     expect(result.failedBatchIndex).toBe(1);
     expect(result.error).toContain('429 Too Many Requests');
+  });
+
+  it('should reject execution if playlist revision changed between preview and execution, without calling createPlaylist', async () => {
+    // Preview plan was generated at revision 'rev-initial'
+    // But fresh plan generated during execution reflects database mutation 'rev-mutated'
+    vi.spyOn(exportService, 'generateExportPlan').mockResolvedValue({
+      playlistId: 10,
+      playlistName: 'Mutated Playlist',
+      revision: 'rev-mutated',
+      entries: [
+        {
+          position: 1,
+          songId: 1,
+          title: 'Track',
+          artists: ['Artist'],
+          durationSecs: 200,
+          decision: 'EXPORT',
+          resolution: {
+            songId: 1,
+            status: 'MATCHED',
+            spotifyUri: 'spotify:track:123',
+            diagnostics: []
+          },
+          notes: []
+        }
+      ],
+      statistics: {
+        totalEntries: 1,
+        exportableEntries: 1,
+        unmatchedEntries: 0,
+        variantConflictEntries: 0,
+        searchFailedEntries: 0,
+        plannedExportPercentage: 100
+      },
+      sourceFormat: 'nora',
+      targetProvider: 'spotify'
+    });
+
+    const createSpy = vi.spyOn(apiClient, 'createPlaylist');
+
+    const validated: ValidatedExportRequest = {
+      playlistId: 10,
+      playlistName: 'Mutated Playlist',
+      isPublic: false,
+      revision: 'rev-initial' // Stale revision
+    };
+
+    await expect(exportService.executeExport(validated, 'test-client')).rejects.toThrow(
+      'Playlist changed while export was being prepared. Please refresh the preview.'
+    );
+
+    // Invariant: createPlaylist must never have been called
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('should strictly preserve 1..N positions when a playlist entry has a missing local song record in the DB', async () => {
+    // Playlist in DB has 3 entries: Entry 1 (Song 101), Entry 2 (Dangling Song 999), Entry 3 (Song 103)
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
+      id: 25,
+      name: 'Playlist With Dangling Record',
+      description: 'Test playlist',
+      updatedAt: new Date('2026-08-20T12:00:00.000Z'),
+      entries: [
+        { id: 1, playlistId: 25, songId: 101, position: 0 },
+        { id: 2, playlistId: 25, songId: 999, position: 1 },
+        { id: 3, playlistId: 25, songId: 103, position: 2 }
+      ]
+    } as any);
+
+    // getAllSongs returns records only for 101 and 103 (999 is missing from songs table)
+    vi.spyOn(songsQuery, 'getAllSongs').mockResolvedValue([
+      {
+        id: 101,
+        title: 'Song 101',
+        duration: 200,
+        artists: [{ artist: { name: 'Artist 101' } }]
+      },
+      {
+        id: 103,
+        title: 'Song 103',
+        duration: 220,
+        artists: [{ artist: { name: 'Artist 103' } }]
+      }
+    ] as any);
+
+    vi.spyOn(apiClient, 'searchTracks').mockImplementation(async (_token, query) => {
+      if (query.includes('song 101')) {
+        return [
+          {
+            id: 'sp_101',
+            uri: 'spotify:track:sp_101',
+            name: 'Song 101',
+            artists: [{ name: 'Artist 101' }],
+            duration_ms: 200000,
+            type: 'track'
+          }
+        ];
+      }
+      if (query.includes('song 103')) {
+        return [
+          {
+            id: 'sp_103',
+            uri: 'spotify:track:sp_103',
+            name: 'Song 103',
+            artists: [{ name: 'Artist 103' }],
+            duration_ms: 220000,
+            type: 'track'
+          }
+        ];
+      }
+      return [];
+    });
+
+    const plan = await exportService.generateExportPlan(25, 'test-client');
+
+    // Invariant: Exact positional preservation 1..3 without collapsing or shifting
+    expect(plan.entries).toHaveLength(3);
+
+    // Position 1: Song 101 -> EXPORT
+    expect(plan.entries[0].position).toBe(1);
+    expect(plan.entries[0].songId).toBe(101);
+    expect(plan.entries[0].decision).toBe('EXPORT');
+    expect(plan.entries[0].resolution.spotifyUri).toBe('spotify:track:sp_101');
+
+    // Position 2: Dangling Song 999 -> SKIP_NOT_IN_CATALOG with LOCAL_SONG_NOT_FOUND
+    expect(plan.entries[1].position).toBe(2);
+    expect(plan.entries[1].songId).toBe(999);
+    expect(plan.entries[1].decision).toBe('SKIP_NOT_IN_CATALOG');
+    expect(plan.entries[1].resolution.status).toBe('NOT_IN_CATALOG');
+    expect(plan.entries[1].resolution.diagnostics).toContain('LOCAL_SONG_NOT_FOUND');
+
+    // Position 3: Song 103 -> EXPORT (maintained position 3)
+    expect(plan.entries[2].position).toBe(3);
+    expect(plan.entries[2].songId).toBe(103);
+    expect(plan.entries[2].decision).toBe('EXPORT');
+    expect(plan.entries[2].resolution.spotifyUri).toBe('spotify:track:sp_103');
+
+    // Statistics accuracy
+    expect(plan.statistics.totalEntries).toBe(3);
+    expect(plan.statistics.exportableEntries).toBe(2);
+    expect(plan.statistics.unmatchedEntries).toBe(1);
+    expect(plan.statistics.plannedExportPercentage).toBe(67);
   });
 });

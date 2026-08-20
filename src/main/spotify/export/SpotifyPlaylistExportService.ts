@@ -29,6 +29,7 @@ export class SpotifyPlaylistExportService {
   /**
    * Generates a preview export plan by loading the local Nora playlist, resolving its tracks
    * against the Spotify catalog, and planning decisions deterministically.
+   * Strictly preserves 1..N positions even if individual local song records are missing.
    */
   public async generateExportPlan(
     playlistId: number,
@@ -73,21 +74,38 @@ export class SpotifyPlaylistExportService {
     }
 
     const canonicalTracks: CanonicalTrackIdentity[] = [];
-    const orderedSongRecords = playlist.entries
-      .map((entry) => songMap.get(entry.songId))
-      .filter((s): s is NonNullable<typeof s> => Boolean(s));
-
-    for (const record of orderedSongRecords) {
-      canonicalTracks.push(toCanonicalFromSong(record));
-    }
-
-    // Resolve catalog items sequentially (or bounded) to respect rate limits
     const resolutions = new Map<number, CatalogResolution>();
-    for (let i = 0; i < canonicalTracks.length; i++) {
+
+    // Process every playlist entry 1..N without filtering out missing DB records
+    for (let i = 0; i < playlist.entries.length; i++) {
+      const entry = playlist.entries[i];
       const position = i + 1;
-      const track = canonicalTracks[i];
-      const entryId = playlist.entries[i]?.id;
-      const resolution = await this.catalogSearcher.resolveTrack(accessToken, track, entryId);
+      const record = songMap.get(entry.songId);
+
+      if (!record) {
+        // Preserve position for missing local song records
+        canonicalTracks.push({
+          id: entry.songId,
+          title: 'Unknown Song',
+          artists: []
+        });
+        resolutions.set(position, {
+          entryId: entry.id,
+          songId: entry.songId,
+          status: 'NOT_IN_CATALOG',
+          diagnostics: ['LOCAL_SONG_NOT_FOUND']
+        });
+        continue;
+      }
+
+      const canonicalTrack = toCanonicalFromSong(record);
+      canonicalTracks.push(canonicalTrack);
+
+      const resolution = await this.catalogSearcher.resolveTrack(
+        accessToken,
+        canonicalTrack,
+        entry.id
+      );
       resolutions.set(position, resolution);
     }
 
@@ -103,7 +121,8 @@ export class SpotifyPlaylistExportService {
 
   /**
    * Executes remote Spotify playlist creation and batched sequential item additions.
-   * Performs server-side re-resolution to prevent renderer tampering and captures snapshots.
+   * Performs server-side re-resolution to prevent renderer tampering, guards against
+   * revision races, and captures snapshots sequentially.
    */
   public async executeExport(
     validated: ValidatedExportRequest,
@@ -117,6 +136,14 @@ export class SpotifyPlaylistExportService {
 
     // Regenerate fresh authoritative plan server-side
     const freshPlan = await this.generateExportPlan(validated.playlistId, activeClientId);
+
+    // Invariant: Verify playlist was not mutated during preparation
+    if (freshPlan.revision !== validated.revision) {
+      throw new Error(
+        'Playlist changed while export was being prepared. Please refresh the preview.'
+      );
+    }
+
     if (freshPlan.statistics.exportableEntries === 0) {
       throw new Error('Cannot export playlist: no matching tracks found in Spotify catalog.');
     }
