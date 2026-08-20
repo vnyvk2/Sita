@@ -528,3 +528,4 @@ export const Playlist = (props: PlaylistProp) => {
   </>
   );
 };
+export default Playlist;

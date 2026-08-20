@@ -1379,7 +1379,7 @@ export const spotifyIntegrations = pgTable('spotify_integrations', {
   scopes: json('scopes').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
-});
+ });
 
 // ============================================================================
 // Spotify Playlist Link Tables (Phase 3B)
