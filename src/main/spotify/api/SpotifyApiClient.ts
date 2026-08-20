@@ -7,6 +7,8 @@ import type {
   SpotifyPlaylistItemsResponse,
   SpotifyPlaylistPaging,
   SpotifyPlaylistSummary,
+  SpotifyRemoveItemsResponse,
+  SpotifyRemovePlaylistItem,
   SpotifySearchResponse,
   SpotifyTrackInput,
   SpotifyUserProfile
@@ -358,4 +360,83 @@ export class SpotifyApiClient {
 
     return response.data;
   }
+
+  /**
+   * Removes items from a Spotify playlist using DELETE /v1/playlists/{id}/items.
+   * Expects up to 100 items with optional snapshot_id concurrency guard.
+   */
+  public async removePlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    items: SpotifyRemovePlaylistItem[],
+    snapshotId?: string
+  ): Promise<SpotifyRemoveItemsResponse> {
+    if (!items || items.length === 0) {
+      return { snapshot_id: snapshotId || '' };
+    }
+
+    if (items.length > 100) {
+      throw new Error(
+        `Spotify removePlaylistItems batch cannot exceed 100 items (received ${items.length})`
+      );
+    }
+
+    const payload: { items: SpotifyRemovePlaylistItem[]; snapshot_id?: string } = {
+      items
+    };
+    if (snapshotId) {
+      payload.snapshot_id = snapshotId;
+    }
+
+    const response = await this.pipeline.execute<SpotifyRemoveItemsResponse>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`,
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: payload
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to remove items from Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Replaces all items in a Spotify playlist using PUT /v1/playlists/{id}/items.
+   * Strictly clamped to <= 100 items per Spotify Web API contract.
+   */
+  public async replacePlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    uris: string[]
+  ): Promise<SpotifyAddItemsResponse> {
+    if (uris.length > 100) {
+      throw new Error(
+        `Spotify replacePlaylistItems cannot exceed 100 URIs in a single request (received ${uris.length})`
+      );
+    }
+
+    const response = await this.pipeline.execute<SpotifyAddItemsResponse>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`,
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: {
+        uris
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to replace items in Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
 }
+

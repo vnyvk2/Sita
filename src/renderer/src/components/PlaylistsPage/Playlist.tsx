@@ -3,7 +3,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import type { PlaylistDto } from '@common/collections/dtos';
@@ -15,6 +15,8 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import { usePinCollection, useUnpinCollection } from '../../hooks/collections/useCollectionMutations';
 import NavLink from '../NavLink';
 import PlaylistCover from './PlaylistCover';
+import { SpotifyPlaylistExportModal } from './SpotifyPlaylistExportModal';
+import { SpotifyPlaylistSyncModal } from './SpotifyPlaylistSyncModal';
 
 const ConfirmDeletePlaylistsPrompt = lazy(() => import('./ConfirmDeletePlaylistsPrompt'));
 const RenamePlaylistPrompt = lazy(() => import('./RenamePlaylistPrompt'));
@@ -51,6 +53,9 @@ export const Playlist = (props: PlaylistProp) => {
   const navigate = useNavigate();
   const pinMutation = usePinCollection();
   const unpinMutation = useUnpinCollection();
+
+  const [isSpotifyExportModalOpen, setIsSpotifyExportModalOpen] = useState(false);
+  const [isSpotifySyncModalOpen, setIsSpotifySyncModalOpen] = useState(false);
 
   const openPlaylistInfoPage = useCallback(
     () =>
@@ -324,6 +329,18 @@ export const Playlist = (props: PlaylistProp) => {
           handlerFunction: () => window.api.collections.import({ targetPlaylistId: props.id }),
           isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
         },
+        {
+          label: 'Export to Spotify',
+          iconName: 'ios_share',
+          handlerFunction: () => setIsSpotifyExportModalOpen(true),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: 'Sync with Spotify',
+          iconName: 'sync_alt',
+          handlerFunction: () => setIsSpotifySyncModalOpen(true),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
       {
         label: t('common.info'),
         iconName: 'info',
@@ -405,7 +422,8 @@ export const Playlist = (props: PlaylistProp) => {
   );
 
   return (
-    <NavLink
+    <>
+      <NavLink
       to={'/main-player/playlists/$playlistId'}
       params={{ playlistId: String(props.id) }}
       preload={isMultipleSelectionEnabled ? false : undefined}
@@ -493,5 +511,20 @@ export const Playlist = (props: PlaylistProp) => {
         </div>
       </div>
     </NavLink>
+
+    <SpotifyPlaylistExportModal
+      playlistId={props.id}
+      playlistName={props.name}
+      isOpen={isSpotifyExportModalOpen}
+      onClose={() => setIsSpotifyExportModalOpen(false)}
+    />
+
+    <SpotifyPlaylistSyncModal
+      playlistId={props.id}
+      playlistName={props.name}
+      isOpen={isSpotifySyncModalOpen}
+      onClose={() => setIsSpotifySyncModalOpen(false)}
+    />
+  </>
   );
 };

@@ -1381,3 +1381,36 @@ export const spotifyIntegrations = pgTable('spotify_integrations', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 });
 
+// ============================================================================
+// Spotify Playlist Link Tables (Phase 3B)
+// ============================================================================
+export const spotifyPlaylistLinks = pgTable('spotify_playlist_links', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  spotifyUserId: varchar('spotify_user_id', { length: 255 }).notNull(),
+  playlistId: integer('playlist_id')
+    .notNull()
+    .unique()
+    .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+  spotifyPlaylistId: varchar('spotify_playlist_id', { length: 255 }).notNull(),
+  spotifyPlaylistName: varchar('spotify_playlist_name', { length: 255 }),
+  lastSyncedSnapshotId: text('last_synced_snapshot_id'),
+  lastSyncedEntriesHash: text('last_synced_entries_hash'),
+  syncStrategy: varchar('sync_strategy', { length: 50 })
+    .$type<'UNION_MERGE' | 'LOCAL_WINS' | 'REMOTE_WINS'>()
+    .notNull()
+    .default('UNION_MERGE'),
+  syncState: varchar('sync_state', { length: 50 })
+    .$type<'SYNCED' | 'SYNCING' | 'PARTIAL_FAILURE' | 'CONFLICT' | 'ERROR'>()
+    .notNull()
+    .default('SYNCED'),
+  failureStage: varchar('failure_stage', { length: 50 })
+    .$type<'REMOTE' | 'LOCAL' | 'FINALIZATION'>(),
+  completedRemoteBatches: integer('completed_remote_batches').default(0),
+  failedBatchIndex: integer('failed_batch_index'),
+  lastError: text('last_error'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+

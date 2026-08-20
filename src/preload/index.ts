@@ -896,7 +896,18 @@ export const api = {
       description?: string;
       isPublic: boolean;
       revision: string;
-    }) => ipcRenderer.invoke('spotify/export/executeExport', request)
+    }) => ipcRenderer.invoke('spotify/export/executeExport', request),
+    getLink: (playlistId: number) => ipcRenderer.invoke('spotify/sync/getLink', playlistId),
+    linkPlaylist: (playlistId: number, spotifyPlaylistId: string, strategy?: string) =>
+      ipcRenderer.invoke('spotify/sync/linkPlaylist', playlistId, spotifyPlaylistId, strategy),
+    unlinkPlaylist: (playlistId: number) =>
+      ipcRenderer.invoke('spotify/sync/unlinkPlaylist', playlistId),
+    detectDrift: (playlistId: number) =>
+      ipcRenderer.invoke('spotify/sync/detectDrift', playlistId),
+    generateSyncPlan: (playlistId: number, strategy?: string) =>
+      ipcRenderer.invoke('spotify/sync/generatePlan', playlistId, strategy),
+    executeSync: (playlistId: number, strategy?: string) =>
+      ipcRenderer.invoke('spotify/sync/executeSync', playlistId, strategy)
   }
 };
 
