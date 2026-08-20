@@ -1,3 +1,8 @@
+---
+name: implementation-planning
+description: Process for creating repository-grounded, technically sound implementation plans before making code changes.
+---
+
 # Implementation Planning Skill — Nora
 
 ## The most important rule

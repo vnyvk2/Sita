@@ -1,3 +1,8 @@
+---
+name: code-review
+description: Rigorous adversarial code review methodology for auditing correctness, architecture, concurrency, and reliability.
+---
+
 # Code Review Skill — Nora
 
 # 0. Most Important Rule

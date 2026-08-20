@@ -1,4 +1,6 @@
-
+---
+name: design-discussion-planning-conventions
+description: Guidelines and principles for exploring, evaluating, and discussing system design, architecture, and feature planning before implementation.
 ---
 
 # Design Discussion Mode

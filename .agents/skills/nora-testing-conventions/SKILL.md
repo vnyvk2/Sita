@@ -1,3 +1,8 @@
+---
+name: nora-testing-conventions
+description: Conventions and guidelines for test file organization, structure, and naming in the Nora project.
+---
+
 # Nora Testing Conventions
 
 > **Establishing consistent test file organization and structure for the Nora Music Player project.**
