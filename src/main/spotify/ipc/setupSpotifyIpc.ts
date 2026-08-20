@@ -136,7 +136,7 @@ export function setupSpotifyIpc(
   });
 
   // Get User Playlists handler
-  ipcMain.handle('spotify/playlists/getUserPlaylists', async () => {
+  ipcMain.handle('spotify/playlists/getPlaylists', async () => {
     try {
       const clientId = getSpotifyClientId();
       const accessToken = await SpotifyTokenStore.getValidAccessToken(clientId);
@@ -252,7 +252,7 @@ export function setupSpotifyIpc(
   // Detect sync drift
   ipcMain.handle('spotify/sync/detectDrift', async (_, playlistId: number) => {
     const clientId = getSpotifyClientId();
-    return await syncService.detectSyncDrift(playlistId, clientId);
+    return await syncService.detectDrift(playlistId, clientId);
   });
 
   // Generate 3-way sync preview plan

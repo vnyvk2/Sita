@@ -572,7 +572,7 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
     expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
   });
 
-  it('Test 9 (Unresolved Remote Tracks do NOT advance baseline): Baseline fields remain uncorrupted on PARTIAL_FAILURE', async () => {
+  it('Test 9 (Resumable Partial Baseline on Unresolved Remote Tracks): Records materialized baseline and sets PARTIAL_FAILURE', async () => {
     const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
 
     vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
@@ -624,10 +624,11 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
 
     expect(result.status).toBe('PARTIAL_FAILURE');
     expect(result.failureStage).toBe('FINALIZATION');
-    // Ensure lastSyncedSnapshotId and lastSyncedEntriesHash were NOT overwritten
-    expect(updatedPayload.lastSyncedSnapshotId).toBeUndefined();
-    expect(updatedPayload.lastSyncedEntriesHash).toBeUndefined();
+    expect(result.unresolvedRemoteCount).toBe(1);
+    // Verifies baseline is recorded with materialized state
+    expect(updatedPayload.lastSyncedSnapshotId).toBe('snap_mutated_101');
     expect(updatedPayload.syncState).toBe('PARTIAL_FAILURE');
+    expect(updatedPayload.failureStage).toBe('FINALIZATION');
   });
 
   it('Test 10 (Remote Snapshot Changed During Preparation): Abort with CONFLICT before destructive writes', async () => {
@@ -677,5 +678,28 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
     expect(result.error).toContain('Remote Spotify playlist was modified');
     expect(mockApiClient.replacePlaylistItems).not.toHaveBeenCalled();
     expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
+  });
+
+  it('Test 11 (Account Isolation): Rejects operations when link belongs to a different Spotify user', async () => {
+    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
+      id: 1,
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      spotifyUserId: 'user_account_A',
+      lastSyncedSnapshotId: 'snap_base_100',
+      lastSyncedEntriesHash: 'hash_base_100',
+      syncStrategy: 'UNION_MERGE',
+      syncState: 'SYNCED'
+    });
+
+    // Active session belongs to user_account_B
+    vi.spyOn(mockApiClient, 'getCurrentUser').mockResolvedValue({
+      id: 'user_account_B',
+      displayName: 'User B'
+    });
+
+    await expect(service.detectDrift(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
+    await expect(service.generateSyncPlan(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
+    await expect(service.executeSync(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
   });
 });

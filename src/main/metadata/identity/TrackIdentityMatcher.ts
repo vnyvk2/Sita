@@ -52,6 +52,8 @@ export const VARIANT_PENALTY_TABLE: Record<RecordingVariant, number> = {
   'piano version': 30
 };
 
+export const HARD_VARIANT_CONFLICT_PENALTY = 30;
+
 export class TrackIdentityMatcher {
   /**
    * Scores a pair of CanonicalTrackIdentities and determines if they represent the same recording.

@@ -46,7 +46,65 @@ export interface SpotifyItemPayload {
 export interface SpotifyPlaylistItemDTO {
   added_at?: string;
   is_local?: boolean;
-  item: SpotifyItemPayload | null;
+  item?: SpotifyTrackInput | SpotifyItemPayload | Record<string, unknown> | null;
+  track?: SpotifyTrackInput | null;
+}
+
+function isValidTrackObject(candidate: unknown): candidate is SpotifyTrackInput {
+  if (!candidate || typeof candidate !== 'object') {
+    return false;
+  }
+  const t = candidate as Record<string, unknown>;
+  if (typeof t.name !== 'string' || t.name.trim().length === 0) {
+    return false;
+  }
+  const hasId = typeof t.id === 'string' && t.id.trim().length > 0;
+  const hasUri = typeof t.uri === 'string' && t.uri.trim().length > 0;
+  const hasArtists = Array.isArray(t.artists) && t.artists.length > 0;
+  const hasDuration = typeof t.duration_ms === 'number' && t.duration_ms >= 0;
+  const hasExternalIds =
+    typeof t.external_ids === 'object' &&
+    t.external_ids !== null &&
+    Object.values(t.external_ids as Record<string, unknown>).some(
+      (v) => typeof v === 'string' && v.trim().length > 0
+    );
+
+  return hasId || hasUri || hasArtists || hasDuration || hasExternalIds;
+}
+
+/**
+ * Strictly unwraps and validates a Spotify track payload from varying Spotify API response shapes.
+ * Returns null if the item is missing, malformed, lacks a valid track name, or lacks track attributes/identifiers.
+ */
+export function unwrapSpotifyTrack(rawItem: unknown): SpotifyTrackInput | null {
+  if (!rawItem || typeof rawItem !== 'object') {
+    return null;
+  }
+
+  const obj = rawItem as Record<string, unknown>;
+
+  // Shape 1: Wrapped under `track` property (e.g. { track: { name: '...', ... } })
+  if (isValidTrackObject(obj.track)) {
+    return obj.track;
+  }
+
+  // Shape 2: Wrapped under `item` property (e.g. { item: { name: '...', ... } } or { item: { track: { ... } } })
+  if (obj.item && typeof obj.item === 'object') {
+    const itemObj = obj.item as Record<string, unknown>;
+    if (isValidTrackObject(itemObj.track)) {
+      return itemObj.track;
+    }
+    if (isValidTrackObject(itemObj)) {
+      return itemObj;
+    }
+  }
+
+  // Shape 3: Direct track object with valid name and track attributes
+  if (isValidTrackObject(obj)) {
+    return obj;
+  }
+
+  return null;
 }
 
 export interface SpotifyPlaylistItemsResponse {
@@ -182,10 +240,13 @@ export interface SpotifyPlaylistExportPlan {
 }
 
 export interface SpotifyExportResult {
-  status: 'SUCCESS' | 'PARTIAL_FAILURE';
-  playlistId: string;
-  playlistUrl: string;
-  snapshotId: string;
+  status: 'SUCCESS' | 'PARTIAL_FAILURE' | 'ERROR';
+  playlistId: number;
+  spotifyPlaylistId?: string;
+  spotifyPlaylistUrl?: string;
+  playlistUrl?: string;
+  snapshotId?: string;
+  exportedTrackCount: number;
   totalBatches: number;
   completedBatches: number;
   failedBatchIndex?: number;
@@ -211,6 +272,7 @@ export type SyncState = 'SYNCED' | 'SYNCING' | 'PARTIAL_FAILURE' | 'CONFLICT' | 
 
 export type DriftState =
   | 'IN_SYNC'
+  | 'IN_SYNC_WITH_UNRESOLVED'
   | 'LOCAL_AHEAD'
   | 'REMOTE_AHEAD'
   | 'CONFLICT_DIVERGED'
@@ -236,7 +298,7 @@ export interface SpotifyPlaylistLinkDTO {
   lastSyncedEntriesHash?: string | null;
   syncStrategy: SyncStrategy;
   syncState: SyncState;
-  failureStage?: 'REMOTE' | 'LOCAL' | 'FINALIZATION' | null;
+  failureStage?: 'REMOTE' | 'REMOTE_VERIFICATION' | 'LOCAL' | 'LOCAL_VERIFICATION' | 'FINALIZATION' | null;
   completedRemoteBatches?: number | null;
   failedBatchIndex?: number | null;
   lastError?: string | null;

@@ -290,8 +290,9 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
     const result = await exportService.executeExport(validated, 'test-client');
 
     expect(result.status).toBe('PARTIAL_FAILURE');
-    expect(result.playlistId).toBe('sp_pl_fail');
-    expect(result.playlistUrl).toBe('https://open.spotify.com/playlist/sp_pl_fail');
+    expect(result.playlistId).toBe(4);
+    expect(result.spotifyPlaylistId).toBe('sp_pl_fail');
+    expect(result.spotifyPlaylistUrl).toBe('https://open.spotify.com/playlist/sp_pl_fail');
     expect(result.snapshotId).toBe('snap_batch_1_success');
     expect(result.totalBatches).toBe(2);
     expect(result.completedBatches).toBe(1);
@@ -439,5 +440,155 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
     expect(plan.statistics.exportableEntries).toBe(2);
     expect(plan.statistics.unmatchedEntries).toBe(1);
     expect(plan.statistics.plannedExportPercentage).toBe(67);
+  });
+
+  describe('Revision-Aware Export Cache & Memoization', () => {
+    it('1. Same playlist + same revision -> reuses cache without new search requests', async () => {
+      vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
+        id: 10,
+        name: 'Cache Test Playlist',
+        updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+        entries: [{ id: 1, playlistId: 10, songId: 50, position: 0 }]
+      } as any);
+
+      vi.spyOn(songsQuery, 'getAllSongs').mockResolvedValue([
+        { id: 50, title: 'Cache Song', duration: 180, artists: [{ artist: { name: 'Cache Artist' } }] }
+      ] as any);
+
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        { id: 'sp_50', uri: 'spotify:track:sp_50', name: 'Cache Song', artists: [{ name: 'Cache Artist' }], duration_ms: 180000, type: 'track' }
+      ]);
+
+      const sessionCache: any = {};
+      await exportService.generateExportPlan(10, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+
+      // Call again with same playlist and same revision
+      searchSpy.mockClear();
+      await exportService.generateExportPlan(10, 'test-client', sessionCache);
+      expect(searchSpy).not.toHaveBeenCalled();
+    });
+
+    it('2. Same playlist + different revision -> re-resolves and ignores stale cache', async () => {
+      let currentUpdatedAt = new Date('2026-08-20T10:00:00.000Z');
+      vi.spyOn(db.query.playlists, 'findFirst').mockImplementation(async () => ({
+        id: 10,
+        name: 'Cache Test Playlist',
+        updatedAt: currentUpdatedAt,
+        entries: [{ id: 1, playlistId: 10, songId: 50, position: 0 }]
+      }) as any);
+
+      vi.spyOn(songsQuery, 'getAllSongs').mockResolvedValue([
+        { id: 50, title: 'Cache Song', duration: 180, artists: [{ artist: { name: 'Cache Artist' } }] }
+      ] as any);
+
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        { id: 'sp_50', uri: 'spotify:track:sp_50', name: 'Cache Song', artists: [{ name: 'Cache Artist' }], duration_ms: 180000, type: 'track' }
+      ]);
+
+      const sessionCache: any = {};
+      await exportService.generateExportPlan(10, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+
+      // Mutate playlist revision (updatedAt changes)
+      currentUpdatedAt = new Date('2026-08-20T11:00:00.000Z');
+      searchSpy.mockClear();
+      await exportService.generateExportPlan(10, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('3. Different playlist + same revision string -> does not reuse other playlist cache', async () => {
+      vi.spyOn(db.query.playlists, 'findFirst').mockImplementation(async (opts: any) => {
+        const id = opts?.where?.id ?? 11;
+        return {
+          id,
+          name: `Playlist ${id}`,
+          updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+          entries: [{ id: 1, playlistId: id, songId: 50, position: 0 }]
+        } as any;
+      });
+
+      vi.spyOn(songsQuery, 'getAllSongs').mockResolvedValue([
+        { id: 50, title: 'Cache Song', duration: 180, artists: [{ artist: { name: 'Cache Artist' } }] }
+      ] as any);
+
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        { id: 'sp_50', uri: 'spotify:track:sp_50', name: 'Cache Song', artists: [{ name: 'Cache Artist' }], duration_ms: 180000, type: 'track' }
+      ]);
+
+      const sessionCache: any = {};
+      await exportService.generateExportPlan(10, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+
+      searchSpy.mockClear();
+      // Query playlist 11 with same sessionCache
+      await exportService.generateExportPlan(11, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('4. Duplicate entries in same playlist -> resolves track only once', async () => {
+      vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
+        id: 12,
+        name: 'Duplicate Playlist',
+        updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+        entries: [
+          { id: 1, playlistId: 12, songId: 50, position: 0 },
+          { id: 2, playlistId: 12, songId: 50, position: 1 },
+          { id: 3, playlistId: 12, songId: 50, position: 2 }
+        ]
+      } as any);
+
+      vi.spyOn(songsQuery, 'getAllSongs').mockResolvedValue([
+        { id: 50, title: 'Duplicate Song', duration: 180, artists: [{ artist: { name: 'Cache Artist' } }] }
+      ] as any);
+
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        { id: 'sp_50', uri: 'spotify:track:sp_50', name: 'Duplicate Song', artists: [{ name: 'Cache Artist' }], duration_ms: 180000, type: 'track' }
+      ]);
+
+      const plan = await exportService.generateExportPlan(12, 'test-client');
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+      expect(plan.entries).toHaveLength(3);
+      expect(plan.entries[0].resolution.spotifyUri).toBe('spotify:track:sp_50');
+      expect(plan.entries[1].resolution.spotifyUri).toBe('spotify:track:sp_50');
+      expect(plan.entries[2].resolution.spotifyUri).toBe('spotify:track:sp_50');
+    });
+
+    it('5. Same playlist + same updatedAt timestamp + entries added/removed -> changes revision and invalidates cache', async () => {
+      let currentEntries = [{ id: 1, playlistId: 13, songId: 50, position: 0 }];
+      vi.spyOn(db.query.playlists, 'findFirst').mockImplementation(async () => ({
+        id: 13,
+        name: 'Entry Mutation Playlist',
+        updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+        entries: currentEntries
+      }) as any);
+
+      vi.spyOn(songsQuery, 'getAllSongs').mockImplementation(async (opts: any) => {
+        const ids = opts?.songIds || [];
+        return ids.map((id: number) => ({
+          id,
+          title: `Song ${id}`,
+          duration: 180,
+          artists: [{ artist: { name: 'Cache Artist' } }]
+        })) as any;
+      });
+
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockImplementation(async (_token, query) => [
+        { id: `sp_${query}`, uri: `spotify:track:sp_${query}`, name: query, artists: [{ name: 'Cache Artist' }], duration_ms: 180000, type: 'track' }
+      ]);
+
+      const sessionCache: any = {};
+      await exportService.generateExportPlan(13, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+
+      // Mutate entries count while updatedAt remains constant
+      currentEntries = [
+        { id: 1, playlistId: 13, songId: 50, position: 0 },
+        { id: 2, playlistId: 13, songId: 51, position: 1 }
+      ];
+      searchSpy.mockClear();
+      await exportService.generateExportPlan(13, 'test-client', sessionCache);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });

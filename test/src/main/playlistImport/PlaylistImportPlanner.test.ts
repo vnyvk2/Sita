@@ -73,6 +73,7 @@ describe('PlaylistImportPlanner', () => {
     expect(plan.statistics).toEqual({
       totalEntries: 4,
       importedEntries: 1,
+      repairedEntries: 0,
       skippedEntries: 3,
       missingEntries: 1,
       notInLibraryEntries: 1,

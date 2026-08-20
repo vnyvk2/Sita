@@ -1,15 +1,14 @@
 import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
-import { TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
+import { HARD_VARIANT_CONFLICT_PENALTY, TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
 import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
 import { MetadataNormalizer } from '../../metadata/matching/MetadataNormalizer';
-import type { ImportDecision } from '../../playlistImport/models/ImportDecision';
 import type { ImportStatistics } from '../../playlistImport/models/ImportStatistics';
 import type { LibraryMatch } from '../../playlistImport/models/LibraryMatch';
 import type { LibraryResolvedPlaylistEntry } from '../../playlistImport/models/LibraryResolvedPlaylistEntry';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import type { PlaylistImportPlanEntry } from '../../playlistImport/models/PlaylistImportPlanEntry';
 import type { ResolvedTrackReference } from '../../playlistImport/models/ResolvedTrackReference';
-import type { SpotifyPlaylistItemDTO, SpotifyTrackInput } from '../api/types';
+import { type SpotifyPlaylistItemDTO, unwrapSpotifyTrack } from '../api/types';
 
 export interface RemotePlaylistMetadata {
   id?: string;
@@ -28,45 +27,41 @@ export class SpotifyPlaylistImportPlanner {
     items: SpotifyPlaylistItemDTO[],
     localSongs: CanonicalTrackIdentity[]
   ): PlaylistImportPlan {
-    // 1. Pre-index local library songs for candidate bucket retrieval
+    // 1. Pre-index local library songs across 4 candidate buckets (ISRC ∪ MBID ∪ Title+Artist ∪ Title)
     const isrcMap = new Map<string, CanonicalTrackIdentity[]>();
     const mbidMap = new Map<string, CanonicalTrackIdentity[]>();
     const titleArtistMap = new Map<string, CanonicalTrackIdentity[]>();
     const titleMap = new Map<string, CanonicalTrackIdentity[]>();
 
     for (const song of localSongs) {
-      if (song.isrc) {
+      if (song.isrc && song.isrc.trim()) {
         const key = song.isrc.trim().toUpperCase();
         const existing = isrcMap.get(key) ?? [];
         existing.push(song);
         isrcMap.set(key, existing);
       }
 
-      if (song.musicBrainzRecordingId) {
+      if (song.musicBrainzRecordingId && song.musicBrainzRecordingId.trim()) {
         const key = song.musicBrainzRecordingId.trim().toLowerCase();
         const existing = mbidMap.get(key) ?? [];
         existing.push(song);
         mbidMap.set(key, existing);
       }
 
-      const primaryArtist = song.artists[0]
-        ? MetadataNormalizer.normalizeArtist(song.artists[0])
-        : '';
-
-      // Index both raw metadata title and effective filename title (for useless title fallback)
       const titlesToIndex = new Set<string>();
       const effectiveTitle = MetadataNormalizer.getEffectiveTitle(song);
       if (effectiveTitle) titlesToIndex.add(effectiveTitle);
-
       const rawNormTitle = MetadataNormalizer.normalizeTitle(song.title);
       if (rawNormTitle) titlesToIndex.add(rawNormTitle);
 
+      const primaryArtist = song.artists[0] ? MetadataNormalizer.normalizeArtist(song.artists[0]) : '';
+
       for (const normTitle of titlesToIndex) {
         if (primaryArtist) {
-          const key = `${normTitle}::${primaryArtist}`;
-          const existing = titleArtistMap.get(key) ?? [];
+          const taKey = `${normTitle}::${primaryArtist}`;
+          const existing = titleArtistMap.get(taKey) ?? [];
           existing.push(song);
-          titleArtistMap.set(key, existing);
+          titleArtistMap.set(taKey, existing);
         }
 
         const existing = titleMap.get(normTitle) ?? [];
@@ -76,8 +71,8 @@ export class SpotifyPlaylistImportPlanner {
     }
 
     const entries: PlaylistImportPlanEntry[] = [];
-    let matchedCount = 0;
-    let unmatchedCount = 0;
+    let importedCount = 0;
+    let notInLibraryCount = 0;
     let missingCount = 0;
     let invalidCount = 0;
     let repairedCount = 0;
@@ -88,8 +83,96 @@ export class SpotifyPlaylistImportPlanner {
       const playlistItem = items[i];
       const rawItem = playlistItem?.item;
 
-      // Case A: Item is null, deleted, or regionally unavailable on Spotify
-      if (!rawItem) {
+      // Case B: Item is marked as a local Spotify file (is_local: true)
+      if (playlistItem?.is_local || (rawItem as any)?.is_local) {
+        invalidCount++;
+        const trackTitle = (rawItem as { name?: string })?.name || 'Local File';
+        const libraryMatch: LibraryMatch = {
+          status: 'INVALID_URI',
+          confidence: 0,
+          diagnostics: ['SPOTIFY_LOCAL_FILE']
+        };
+
+        const resolvedTrack: ResolvedTrackReference = {
+          track: {
+            originalLocation: '',
+            title: trackTitle,
+            duration: (rawItem as { duration_ms?: number })?.duration_ms
+              ? Math.round((rawItem as { duration_ms?: number }).duration_ms! / 1000)
+              : 0
+          },
+          resolution: {
+            originalReference: '',
+            resolutionStatus: 'UNRESOLVED',
+            verificationStatus: 'MISSING'
+          }
+        };
+
+        const source: LibraryResolvedPlaylistEntry = {
+          position,
+          trackReference: { resolvedTrack, libraryMatch },
+          dateAdded: playlistItem?.added_at ? new Date(playlistItem.added_at) : undefined
+        };
+
+        entries.push({
+          source,
+          decision: 'SKIP_INVALID',
+          notes: ['Local Spotify track (not in Spotify global catalogue)']
+        });
+        continue;
+      }
+
+      const spotifyTrack = unwrapSpotifyTrack(playlistItem);
+
+      // Case A: Item is null, deleted, or missing from Spotify payload
+      if (!spotifyTrack) {
+        // Check if item is a podcast episode or non-track media
+        const itemType = (rawItem as { type?: string })?.type;
+        if (itemType && itemType !== 'track') {
+          invalidCount++;
+          const itemName = (rawItem as { name?: string })?.name || 'Unknown Media';
+          const itemDuration = (rawItem as { duration_ms?: number })?.duration_ms
+            ? Math.round((rawItem as { duration_ms?: number }).duration_ms! / 1000)
+            : 0;
+
+          const libraryMatch: LibraryMatch = {
+            status: 'INVALID_URI',
+            confidence: 0,
+            diagnostics: [itemType === 'episode' ? 'PODCAST_EPISODE' : `UNSUPPORTED_TYPE_${itemType.toUpperCase()}`]
+          };
+
+          const resolvedTrack: ResolvedTrackReference = {
+            track: {
+              originalLocation: '',
+              title: itemName,
+              duration: itemDuration
+            },
+            resolution: {
+              originalReference: '',
+              resolutionStatus: 'UNRESOLVED',
+              verificationStatus: 'MISSING'
+            }
+          };
+
+          const source: LibraryResolvedPlaylistEntry = {
+            position,
+            trackReference: { resolvedTrack, libraryMatch },
+            dateAdded: playlistItem?.added_at ? new Date(playlistItem.added_at) : undefined
+          };
+
+          const note =
+            itemType === 'episode'
+              ? 'Podcast episode not supported in music playlist'
+              : `Unsupported Spotify media type: ${itemType}`;
+
+          entries.push({
+            source,
+            decision: 'SKIP_INVALID',
+            notes: [note]
+          });
+          continue;
+        }
+
         missingCount++;
         const libraryMatch: LibraryMatch = {
           status: 'MISSING',
@@ -124,58 +207,18 @@ export class SpotifyPlaylistImportPlanner {
         continue;
       }
 
-      // Case B: Item is a local Spotify file (is_local: true)
-      if (playlistItem.is_local || (rawItem as SpotifyTrackInput).is_local) {
+      // Case C: Explicit non-track media type inside track object
+      if (spotifyTrack.type && spotifyTrack.type !== 'track') {
         invalidCount++;
-        const trackTitle = (rawItem as { name?: string }).name || 'Local File';
-        const libraryMatch: LibraryMatch = {
-          status: 'INVALID_URI',
-          confidence: 0,
-          diagnostics: ['SPOTIFY_LOCAL_FILE']
-        };
-
-        const resolvedTrack: ResolvedTrackReference = {
-          track: {
-            originalLocation: '',
-            title: trackTitle,
-            duration: (rawItem as { duration_ms?: number }).duration_ms
-              ? Math.round((rawItem as { duration_ms?: number }).duration_ms! / 1000)
-              : 0
-          },
-          resolution: {
-            originalReference: '',
-            resolutionStatus: 'UNRESOLVED',
-            verificationStatus: 'MISSING'
-          }
-        };
-
-        const source: LibraryResolvedPlaylistEntry = {
-          position,
-          trackReference: { resolvedTrack, libraryMatch },
-          dateAdded: playlistItem.added_at ? new Date(playlistItem.added_at) : undefined
-        };
-
-        entries.push({
-          source,
-          decision: 'SKIP_INVALID',
-          notes: ['Local Spotify track (not in Spotify global catalogue)']
-        });
-        continue;
-      }
-
-      // Case C: Item is an episode or unknown non-track media type
-      const itemType = (rawItem as { type?: string }).type;
-      if (itemType && itemType !== 'track') {
-        invalidCount++;
-        const itemName = (rawItem as { name?: string }).name || 'Unknown Media';
-        const itemDuration = (rawItem as { duration_ms?: number }).duration_ms
-          ? Math.round((rawItem as { duration_ms?: number }).duration_ms! / 1000)
+        const itemName = spotifyTrack.name || 'Unknown Media';
+        const itemDuration = spotifyTrack.duration_ms
+          ? Math.round(spotifyTrack.duration_ms / 1000)
           : 0;
 
         const libraryMatch: LibraryMatch = {
           status: 'INVALID_URI',
           confidence: 0,
-          diagnostics: [itemType === 'episode' ? 'PODCAST_EPISODE' : `UNSUPPORTED_TYPE_${itemType.toUpperCase()}`]
+          diagnostics: [spotifyTrack.type === 'episode' ? 'PODCAST_EPISODE' : `UNSUPPORTED_TYPE_${spotifyTrack.type.toUpperCase()}`]
         };
 
         const resolvedTrack: ResolvedTrackReference = {
@@ -194,13 +237,13 @@ export class SpotifyPlaylistImportPlanner {
         const source: LibraryResolvedPlaylistEntry = {
           position,
           trackReference: { resolvedTrack, libraryMatch },
-          dateAdded: playlistItem.added_at ? new Date(playlistItem.added_at) : undefined
+          dateAdded: playlistItem?.added_at ? new Date(playlistItem.added_at) : undefined
         };
 
         const note =
-          itemType === 'episode'
+          spotifyTrack.type === 'episode'
             ? 'Podcast episode not supported in music playlist'
-            : `Unsupported Spotify media type: ${itemType}`;
+            : `Unsupported Spotify media type: ${spotifyTrack.type}`;
 
         entries.push({
           source,
@@ -211,18 +254,17 @@ export class SpotifyPlaylistImportPlanner {
       }
 
       // Case D: Standard Music Track
-      const spotifyTrack = rawItem as SpotifyTrackInput;
       const canonicalSpotify = toCanonicalFromSpotifyTrack(spotifyTrack);
 
       // Candidate Pool Union: ISRC ∪ MBID ∪ Title+Artist ∪ Title
       const candidateSet = new Set<CanonicalTrackIdentity>();
 
-      if (canonicalSpotify.isrc) {
+      if (canonicalSpotify.isrc && canonicalSpotify.isrc.trim()) {
         const isrcList = isrcMap.get(canonicalSpotify.isrc.trim().toUpperCase());
         if (isrcList) isrcList.forEach((c) => candidateSet.add(c));
       }
 
-      if (canonicalSpotify.musicBrainzRecordingId) {
+      if (canonicalSpotify.musicBrainzRecordingId && canonicalSpotify.musicBrainzRecordingId.trim()) {
         const mbidList = mbidMap.get(canonicalSpotify.musicBrainzRecordingId.trim().toLowerCase());
         if (mbidList) mbidList.forEach((c) => candidateSet.add(c));
       }
@@ -248,126 +290,139 @@ export class SpotifyPlaylistImportPlanner {
       }
 
       // Score all candidates in the union using pure TrackIdentityMatcher
-      let bestCandidate: CanonicalTrackIdentity | null = null;
       let bestMatchResult: ReturnType<typeof TrackIdentityMatcher.scorePair> | null = null;
+      let bestCandidate: CanonicalTrackIdentity | null = null;
       let hadVariantConflict = false;
 
       for (const candidate of candidateSet) {
-        const result = TrackIdentityMatcher.scorePair(canonicalSpotify, candidate);
+        const matchResult = TrackIdentityMatcher.scorePair(candidate, canonicalSpotify);
+        if (matchResult.isMatch) {
+          if (!bestMatchResult || matchResult.score > bestMatchResult.score) {
+            bestMatchResult = matchResult;
+            bestCandidate = candidate;
+          }
+        }
 
-        // Precise variant conflict check: candidate matched artist+title identity but had variant penalty >= 30
+        // Check if candidate matched artist+title identity but suffered hard variant conflict penalty >= 30
         const candNormTitle = MetadataNormalizer.getEffectiveTitle(candidate);
         const candArtist = candidate.artists[0] ? MetadataNormalizer.normalizeArtist(candidate.artists[0]) : '';
         const isTitleArtistCompatible =
           effectiveSpotifyTitle === candNormTitle &&
           (!primaryArtist || !candArtist || primaryArtist === candArtist);
 
-        if (isTitleArtistCompatible && result.breakdown.variantPenalty >= 30) {
+        if (isTitleArtistCompatible && matchResult.breakdown.variantPenalty >= HARD_VARIANT_CONFLICT_PENALTY) {
           hadVariantConflict = true;
-        }
-
-        if (result.isMatch) {
-          if (!bestMatchResult || result.score > bestMatchResult.score) {
-            bestCandidate = candidate;
-            bestMatchResult = result;
-          }
         }
       }
 
-      const resolvedTrack: ResolvedTrackReference = {
-        track: {
-          originalLocation: canonicalSpotify.pathOrUri || '',
-          title: canonicalSpotify.title,
-          artist: canonicalSpotify.artists.join(', '),
-          duration: canonicalSpotify.durationSecs || 0
-        },
-        resolution: {
-          originalReference: canonicalSpotify.pathOrUri || '',
-          resolutionStatus: bestCandidate ? 'RESOLVED' : 'UNRESOLVED',
-          verificationStatus: bestCandidate ? 'FOUND' : 'MISSING',
-          resolvedPath: bestCandidate?.pathOrUri
-        }
-      };
-
-      if (bestCandidate && bestMatchResult && bestCandidate.id !== undefined) {
-        matchedCount++;
-        if (!bestMatchResult.isAuthoritative) {
+      if (bestMatchResult && bestCandidate) {
+        const isExactMatch = bestMatchResult.isAuthoritative || bestMatchResult.score >= 0.95;
+        if (!isExactMatch) {
           repairedCount++;
         }
+        importedCount++;
 
-        const songId = Number(bestCandidate.id);
         const libraryMatch: LibraryMatch = {
-          matchedSongId: songId,
           status: 'MATCHED',
-          matchType: bestMatchResult.matchType,
           confidence: bestMatchResult.confidence,
-          diagnostics: [
-            bestMatchResult.matchType,
-            `score_${bestMatchResult.score}`,
-            ...bestMatchResult.reasons
-          ]
+          matchedSongId: typeof bestCandidate.id === 'number' ? bestCandidate.id : undefined,
+          matchType: bestMatchResult.matchType,
+          diagnostics: bestMatchResult.reasons
+        };
+
+        const resolvedTrack: ResolvedTrackReference = {
+          track: {
+            originalLocation: bestCandidate.pathOrUri || '',
+            title: bestCandidate.title,
+            artist: bestCandidate.artists.join(', '),
+            album: bestCandidate.album,
+            duration: bestCandidate.durationSecs ?? 0
+          },
+          resolution: {
+            originalReference: canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
+            resolvedPath: bestCandidate.pathOrUri,
+            resolutionStatus: 'RESOLVED',
+            verificationStatus: 'FOUND'
+          }
         };
 
         const source: LibraryResolvedPlaylistEntry = {
           position,
           trackReference: { resolvedTrack, libraryMatch },
-          dateAdded: playlistItem.added_at ? new Date(playlistItem.added_at) : undefined
+          dateAdded: playlistItem?.added_at ? new Date(playlistItem.added_at) : undefined
         };
 
-        const decision: ImportDecision = 'IMPORT';
         entries.push({
           source,
-          decision,
-          notes: [`Matched local track (${bestMatchResult.matchType}) with score ${bestMatchResult.score}`]
+          decision: 'IMPORT',
+          notes: [
+            isExactMatch
+              ? `Matched via ${bestMatchResult.matchType}`
+              : `Repaired match (${Math.round(bestMatchResult.score * 100)}% confidence)`
+          ]
         });
       } else {
-        unmatchedCount++;
-        const diagnostics: string[] = hadVariantConflict ? ['VARIANT_CONFLICT'] : ['NO_MATCH'];
-        const note = hadVariantConflict
-          ? 'Local variant version exists (e.g. Live/Acoustic), but conflicts with Spotify Studio version'
-          : 'Not found in local library';
-
+        notInLibraryCount++;
         const libraryMatch: LibraryMatch = {
           status: 'NOT_IN_LIBRARY',
           confidence: 0,
-          diagnostics
+          diagnostics: hadVariantConflict ? ['VARIANT_CONFLICT'] : ['NO_ACCEPTABLE_CANDIDATE_FOUND']
+        };
+
+        const resolvedTrack: ResolvedTrackReference = {
+          track: {
+            originalLocation: '',
+            title: canonicalSpotify.title,
+            artist: canonicalSpotify.artists.join(', '),
+            album: canonicalSpotify.album,
+            duration: canonicalSpotify.durationSecs ?? 0
+          },
+          resolution: {
+            originalReference: canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
+            resolutionStatus: 'UNRESOLVED',
+            verificationStatus: 'MISSING'
+          }
         };
 
         const source: LibraryResolvedPlaylistEntry = {
           position,
           trackReference: { resolvedTrack, libraryMatch },
-          dateAdded: playlistItem.added_at ? new Date(playlistItem.added_at) : undefined
+          dateAdded: playlistItem?.added_at ? new Date(playlistItem.added_at) : undefined
         };
 
-        const decision: ImportDecision = 'SKIP_NOT_IN_LIBRARY';
         entries.push({
           source,
-          decision,
-          notes: [note]
+          decision: 'SKIP_NOT_IN_LIBRARY',
+          notes: [
+            hadVariantConflict
+              ? 'Variant conflict detected: only Live/Acoustic version exists locally'
+              : 'Track not found in local library'
+          ]
         });
       }
     }
 
     const statistics: ImportStatistics = {
       totalEntries: items.length,
-      importedEntries: matchedCount,
+      importedEntries: importedCount,
       repairedEntries: repairedCount,
-      skippedEntries: unmatchedCount + missingCount + invalidCount,
+      skippedEntries: notInLibraryCount + missingCount + invalidCount,
       missingEntries: missingCount,
-      notInLibraryEntries: unmatchedCount,
+      notInLibraryEntries: notInLibraryCount,
       invalidEntries: invalidCount,
-      warningCount: 0,
-      plannedImportPercentage: items.length > 0 ? Math.round((matchedCount / items.length) * 100) : 0
+      warningCount: repairedCount + invalidCount + missingCount,
+      plannedImportPercentage:
+        items.length > 0 ? Math.round((importedCount / items.length) * 100) : 0
     };
 
     return {
       playlistName: remoteMetadata.name,
       description: remoteMetadata.description || undefined,
+      sourceFormat: 'spotify',
       entries,
       statistics,
       warnings: [],
-      sourceFormat: 'spotify',
-      createdByImporter: 'spotify'
+      createdByImporter: 'SpotifyPlaylistImportPlanner'
     };
   }
 }

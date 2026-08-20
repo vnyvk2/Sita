@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  TrackIdentityMatcher,
-  type CanonicalTrackIdentity
-} from '@main/metadata/identity';
+
+import type { CanonicalTrackIdentity } from '../../../../../src/main/metadata/identity/CanonicalTrackIdentity';
+import { TrackIdentityMatcher } from '../../../../../src/main/metadata/identity/TrackIdentityMatcher';
 
 describe('TrackIdentityMatcher', () => {
   describe('Authoritative Matching', () => {
@@ -179,6 +178,190 @@ describe('TrackIdentityMatcher', () => {
       expect(() => TrackIdentityMatcher.scorePair(emptyTrack, validTrack)).not.toThrow();
       const result = TrackIdentityMatcher.scorePair(emptyTrack, validTrack);
       expect(result.isMatch).toBe(false);
+    });
+  });
+
+  describe('Targeted Candidate Indexing & Matching Regressions', () => {
+    it('1. Same title, different artists: does not match', () => {
+      const candidateA: CanonicalTrackIdentity = {
+        title: 'Hello',
+        artists: ['Adele'],
+        durationSecs: 295
+      };
+      const remoteB: CanonicalTrackIdentity = {
+        title: 'Hello',
+        artists: ['Lionel Richie'],
+        durationSecs: 250
+      };
+
+      const score = TrackIdentityMatcher.scorePair(candidateA, remoteB);
+      expect(score.isMatch).toBe(false);
+      expect(score.matchType).toBe('NONE');
+    });
+
+    it('2. Same title, same artist, different albums: matches with high confidence', () => {
+      const candidateA: CanonicalTrackIdentity = {
+        title: 'Dreams',
+        artists: ['Fleetwood Mac'],
+        album: 'Rumours',
+        durationSecs: 257
+      };
+      const remoteB: CanonicalTrackIdentity = {
+        title: 'Dreams',
+        artists: ['Fleetwood Mac'],
+        album: 'Greatest Hits',
+        durationSecs: 257
+      };
+
+      const score = TrackIdentityMatcher.scorePair(candidateA, remoteB);
+      expect(score.isMatch).toBe(true);
+      expect(score.score).toBeGreaterThanOrEqual(85);
+    });
+
+    it('3. ISRC match vs competing title candidate: ISRC candidate is authoritative', () => {
+      const isrcCandidate: CanonicalTrackIdentity = {
+        id: 101,
+        title: 'Song Title (Radio Edit)',
+        artists: ['Artist Name'],
+        isrc: 'GBAYE0601477'
+      };
+      const titleCandidate: CanonicalTrackIdentity = {
+        id: 102,
+        title: 'Song Title',
+        artists: ['Different Artist']
+      };
+      const remoteTrack: CanonicalTrackIdentity = {
+        title: 'Song Title',
+        artists: ['Artist Name'],
+        isrc: 'GBAYE0601477'
+      };
+
+      const isrcScore = TrackIdentityMatcher.scorePair(isrcCandidate, remoteTrack);
+      const titleScore = TrackIdentityMatcher.scorePair(titleCandidate, remoteTrack);
+
+      expect(isrcScore.isAuthoritative).toBe(true);
+      expect(isrcScore.score).toBe(100);
+      expect(titleScore.isMatch).toBe(false);
+      expect(isrcScore.score).toBeGreaterThan(titleScore.score);
+    });
+
+    it('4. Multiple local versions of same track: prefers exact version over live recording', () => {
+      const studioCandidate: CanonicalTrackIdentity = {
+        id: 1,
+        title: 'Comfortably Numb',
+        artists: ['Pink Floyd'],
+        album: 'The Wall',
+        durationSecs: 382
+      };
+      const liveCandidate: CanonicalTrackIdentity = {
+        id: 2,
+        title: 'Comfortably Numb (Live)',
+        artists: ['Pink Floyd'],
+        album: 'Pulse',
+        durationSecs: 570
+      };
+      const targetRemote: CanonicalTrackIdentity = {
+        title: 'Comfortably Numb',
+        artists: ['Pink Floyd'],
+        album: 'The Wall',
+        durationSecs: 382
+      };
+
+      const studioScore = TrackIdentityMatcher.scorePair(studioCandidate, targetRemote);
+      const liveScore = TrackIdentityMatcher.scorePair(liveCandidate, targetRemote);
+
+      expect(studioScore.score).toBeGreaterThan(liveScore.score);
+    });
+
+    it('5. Common / generic titles ("Intro", "Hold On"): requires matching artist and duration', () => {
+      const candidateIntro: CanonicalTrackIdentity = {
+        title: 'Intro',
+        artists: ['The xx'],
+        durationSecs: 127
+      };
+      const remoteIntroOther: CanonicalTrackIdentity = {
+        title: 'Intro',
+        artists: ['M83'],
+        durationSecs: 322
+      };
+
+      const score = TrackIdentityMatcher.scorePair(candidateIntro, remoteIntroOther);
+      expect(score.isMatch).toBe(false);
+    });
+  });
+
+  describe('Bidirectional Semantic Symmetry (scorePair(a, b) === scorePair(b, a))', () => {
+    function assertSymmetric(a: CanonicalTrackIdentity, b: CanonicalTrackIdentity) {
+      const resAB = TrackIdentityMatcher.scorePair(a, b);
+      const resBA = TrackIdentityMatcher.scorePair(b, a);
+
+      expect(resAB.score).toBe(resBA.score);
+      expect(resAB.confidence).toBe(resBA.confidence);
+      expect(resAB.matchType).toBe(resBA.matchType);
+      expect(resAB.isMatch).toBe(resBA.isMatch);
+      expect(resAB.isAuthoritative).toBe(resBA.isAuthoritative);
+      expect(resAB.breakdown.title).toBe(resBA.breakdown.title);
+      expect(resAB.breakdown.artist).toBe(resBA.breakdown.artist);
+      expect(resAB.breakdown.album).toBe(resBA.breakdown.album);
+      expect(resAB.breakdown.year).toBe(resBA.breakdown.year);
+      expect(resAB.breakdown.duration).toBe(resBA.breakdown.duration);
+      expect(resAB.breakdown.isrcOrMbid).toBe(resBA.breakdown.isrcOrMbid);
+      expect(resAB.breakdown.variantPenalty).toBe(resBA.breakdown.variantPenalty);
+      expect(resAB.breakdown.total).toBe(resBA.breakdown.total);
+    }
+
+    it('should be perfectly symmetric for MBID matches', () => {
+      assertSymmetric(
+        { title: 'Song A', artists: ['Artist A'], musicBrainzRecordingId: 'mbid-123' },
+        { title: 'Song B', artists: ['Artist B'], musicBrainzRecordingId: 'mbid-123' }
+      );
+    });
+
+    it('should be perfectly symmetric for ISRC matches', () => {
+      assertSymmetric(
+        { title: 'Song A', artists: ['Artist A'], isrc: 'GBAYE0601477' },
+        { title: 'Song B', artists: ['Artist B'], isrc: 'GBAYE0601477' }
+      );
+    });
+
+    it('should be perfectly symmetric for High Confidence metadata matches', () => {
+      assertSymmetric(
+        {
+          title: 'Bohemian Rhapsody',
+          artists: ['Queen'],
+          album: 'A Night at the Opera',
+          releaseYear: 1975,
+          durationSecs: 354
+        },
+        {
+          title: 'Bohemian Rhapsody',
+          artists: ['Queen'],
+          album: 'A Night at the Opera',
+          releaseYear: 1975,
+          durationSecs: 354
+        }
+      );
+    });
+
+    it('should be perfectly symmetric for Variant Mismatches (Live vs Studio)', () => {
+      assertSymmetric(
+        { title: 'Hotel California (Live)', artists: ['Eagles'], durationSecs: 420 },
+        { title: 'Hotel California', artists: ['Eagles'], durationSecs: 390 }
+      );
+    });
+
+    it('should be perfectly symmetric for Partial / Fuzzy matches', () => {
+      assertSymmetric(
+        { title: 'Super Massive Black Hole', artists: ['Muse'], durationSecs: 209 },
+        { title: 'Supermassive Black Hole', artists: ['Muse'], durationSecs: 210 }
+      );
+    });
+
+    it('should be perfectly symmetric for completely unrelated tracks', () => {
+      assertSymmetric(
+        { title: 'Track X', artists: ['Artist X'], durationSecs: 180 },
+        { title: 'Track Y', artists: ['Artist Y'], durationSecs: 240 }
+      );
     });
   });
 });

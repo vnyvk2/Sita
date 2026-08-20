@@ -10,13 +10,14 @@ import { toCanonicalFromSong } from '../../metadata/identity/adapters/SongToCano
 import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
 import { MetadataNormalizer } from '../../metadata/matching/MetadataNormalizer';
 import { SpotifyApiClient } from '../api/SpotifyApiClient';
-import type {
-  SpotifyPlaylistDetails,
-  SpotifyPlaylistLinkDTO,
-  SpotifyPlaylistSyncPlan,
-  SpotifySyncDriftStatus,
-  SpotifySyncResult,
-  SyncStrategy
+import {
+  type SpotifyPlaylistDetails,
+  type SpotifyPlaylistLinkDTO,
+  type SpotifyPlaylistSyncPlan,
+  type SpotifySyncDriftStatus,
+  type SpotifySyncResult,
+  type SyncStrategy,
+  unwrapSpotifyTrack
 } from '../api/types';
 import { SpotifyTokenStore } from '../auth/SpotifyTokenStore';
 import { SpotifyTrackCatalogSearcher } from '../export/SpotifyTrackCatalogSearcher';
@@ -31,6 +32,17 @@ export class SpotifyPlaylistSyncService {
   constructor(apiClient?: SpotifyApiClient) {
     this.apiClient = apiClient ?? new SpotifyApiClient();
     this.catalogSearcher = new SpotifyTrackCatalogSearcher(this.apiClient);
+  }
+
+  /**
+   * Asserts that a persistent link belongs to the currently connected Spotify account.
+   */
+  private assertLinkBelongsToCurrentUser(link: SpotifyPlaylistLinkDTO, currentUserId: string): void {
+    if (link.spotifyUserId !== currentUserId) {
+      throw new Error(
+        `Linked Spotify playlist belongs to user "${link.spotifyUserId}", but active account is "${currentUserId}". Please re-link with the active account.`
+      );
+    }
   }
 
   /**
@@ -193,6 +205,9 @@ export class SpotifyPlaylistSyncService {
       throw new Error('Spotify account not connected or failed to retrieve valid access token.');
     }
 
+    const currentUser = await this.apiClient.getCurrentUser(accessToken);
+    this.assertLinkBelongsToCurrentUser(link, currentUser.id);
+
     // 1. Fetch current remote snapshot
     const remotePlaylist = await this.apiClient.getPlaylistDetails(
       accessToken,
@@ -247,13 +262,18 @@ export class SpotifyPlaylistSyncService {
       throw new Error('Spotify account not connected or failed to retrieve valid access token.');
     }
 
+    const currentUser = await this.apiClient.getCurrentUser(accessToken);
+    this.assertLinkBelongsToCurrentUser(link, currentUser.id);
+
     // 1. Load local Nora entries and canonicalize
     const localEntries = await this.loadPlaylistEntries(playlistId);
     const songIds = localEntries.map((e) => e.songId);
-    const songsData = await db.query.songs.findMany({
-      where: (songs, { inArray }) => (songIds.length > 0 ? inArray(songs.id, songIds) : undefined)
-    });
-    const songMap = new Map(songsData.map((s) => [s.id, s]));
+    const songsResult = songIds.length > 0 ? await getAllSongs({ songIds, preserveIdOrder: true }) : [];
+    const songsData = Array.isArray(songsResult) ? songsResult : songsResult.data;
+    const songMap = new Map<number, (typeof songsData)[0]>();
+    for (const s of songsData) {
+      songMap.set(s.id, s);
+    }
 
     const localTracks: CanonicalTrackIdentity[] = [];
     for (const e of localEntries) {
@@ -269,15 +289,16 @@ export class SpotifyPlaylistSyncService {
       }
     }
 
-    // 2. Load remote Spotify items
+    // 2. Load remote Spotify items using unified unwrap helper
     const remoteItems = await this.apiClient.getAllPlaylistItems(
       accessToken,
       link.spotifyPlaylistId
     );
     const remoteTracks: CanonicalTrackIdentity[] = [];
     for (const item of remoteItems) {
-      if (item.item?.track) {
-        remoteTracks.push(toCanonicalFromSpotifyTrack(item.item.track));
+      const track = unwrapSpotifyTrack(item);
+      if (track) {
+        remoteTracks.push(toCanonicalFromSpotifyTrack(track));
       }
     }
 
@@ -291,7 +312,7 @@ export class SpotifyPlaylistSyncService {
       }
     }
 
-    // 4. Resolve remote tracks against Nora local library with fast indexed candidate filtering
+    // 4. Resolve remote tracks against Nora local library with candidate indexes
     const remoteToLocalSongMap = new Map<number, number>();
     const allLocalSongsResult = await getAllSongs();
     const allLocalSongs = Array.isArray(allLocalSongsResult)
@@ -299,8 +320,10 @@ export class SpotifyPlaylistSyncService {
       : allLocalSongsResult.data || [];
     const allLocalCanonicals = allLocalSongs.map((s) => toCanonicalFromSong(s));
 
-    // Build in-memory candidate indexes (candidate prune buckets)
+    // Build in-memory candidate indexes across 4 prune buckets
     const isrcIndex = new Map<string, CanonicalTrackIdentity[]>();
+    const mbidIndex = new Map<string, CanonicalTrackIdentity[]>();
+    const titleArtistIndex = new Map<string, CanonicalTrackIdentity[]>();
     const titleIndex = new Map<string, CanonicalTrackIdentity[]>();
 
     for (const lSong of allLocalCanonicals) {
@@ -309,10 +332,29 @@ export class SpotifyPlaylistSyncService {
         if (!isrcIndex.has(isrcKey)) isrcIndex.set(isrcKey, []);
         isrcIndex.get(isrcKey)!.push(lSong);
       }
-      const cleanTitle = MetadataNormalizer.normalizeTitle(lSong.title || '');
-      if (cleanTitle) {
-        if (!titleIndex.has(cleanTitle)) titleIndex.set(cleanTitle, []);
-        titleIndex.get(cleanTitle)!.push(lSong);
+      if (lSong.musicBrainzRecordingId && lSong.musicBrainzRecordingId.trim()) {
+        const mbidKey = lSong.musicBrainzRecordingId.trim().toLowerCase();
+        if (!mbidIndex.has(mbidKey)) mbidIndex.set(mbidKey, []);
+        mbidIndex.get(mbidKey)!.push(lSong);
+      }
+
+      const titlesToIndex = new Set<string>();
+      const effectiveTitle = MetadataNormalizer.getEffectiveTitle(lSong);
+      if (effectiveTitle) titlesToIndex.add(effectiveTitle);
+      const rawNormTitle = MetadataNormalizer.normalizeTitle(lSong.title || '');
+      if (rawNormTitle) titlesToIndex.add(rawNormTitle);
+
+      const primaryArtist = lSong.artists[0] ? MetadataNormalizer.normalizeArtist(lSong.artists[0]) : '';
+
+      for (const normTitle of titlesToIndex) {
+        if (primaryArtist) {
+          const taKey = `${normTitle}::${primaryArtist}`;
+          if (!titleArtistIndex.has(taKey)) titleArtistIndex.set(taKey, []);
+          titleArtistIndex.get(taKey)!.push(lSong);
+        }
+
+        if (!titleIndex.has(normTitle)) titleIndex.set(normTitle, []);
+        titleIndex.get(normTitle)!.push(lSong);
       }
     }
 
@@ -322,19 +364,32 @@ export class SpotifyPlaylistSyncService {
       let bestMatch: CanonicalTrackIdentity | null = null;
       let highestScore = 0;
 
-      // Candidate gathering (O(1) bucket lookups)
+      // Candidate gathering across buckets (ISRC ∪ MBID ∪ Title+Artist ∪ Title)
       const candidateSet = new Set<CanonicalTrackIdentity>();
 
       if (rTrack.isrc && rTrack.isrc.trim()) {
         const isrcKey = rTrack.isrc.trim().toUpperCase();
-        const isrcCandidates = isrcIndex.get(isrcKey) || [];
-        for (const c of isrcCandidates) candidateSet.add(c);
+        for (const c of isrcIndex.get(isrcKey) || []) candidateSet.add(c);
       }
 
-      const cleanTitle = MetadataNormalizer.normalizeTitle(rTrack.title || '');
-      if (cleanTitle) {
-        const titleCandidates = titleIndex.get(cleanTitle) || [];
-        for (const c of titleCandidates) candidateSet.add(c);
+      if (rTrack.musicBrainzRecordingId && rTrack.musicBrainzRecordingId.trim()) {
+        const mbidKey = rTrack.musicBrainzRecordingId.trim().toLowerCase();
+        for (const c of mbidIndex.get(mbidKey) || []) candidateSet.add(c);
+      }
+
+      const primaryArtist = rTrack.artists[0] ? MetadataNormalizer.normalizeArtist(rTrack.artists[0]) : '';
+      const titlesToQuery = new Set<string>();
+      const effectiveTitle = MetadataNormalizer.getEffectiveTitle(rTrack);
+      if (effectiveTitle) titlesToQuery.add(effectiveTitle);
+      const rawNormTitle = MetadataNormalizer.normalizeTitle(rTrack.title || '');
+      if (rawNormTitle) titlesToQuery.add(rawNormTitle);
+
+      for (const normTitle of titlesToQuery) {
+        if (primaryArtist) {
+          const taKey = `${normTitle}::${primaryArtist}`;
+          for (const c of titleArtistIndex.get(taKey) || []) candidateSet.add(c);
+        }
+        for (const c of titleIndex.get(normTitle) || []) candidateSet.add(c);
       }
 
       // TrackIdentityMatcher remains the single semantic authority for scoring all candidates
@@ -406,6 +461,9 @@ export class SpotifyPlaylistSyncService {
       if (!accessToken) {
         throw new Error('Spotify account not connected or failed to retrieve valid access token.');
       }
+
+      const currentUser = await this.apiClient.getCurrentUser(accessToken);
+      this.assertLinkBelongsToCurrentUser(link, currentUser.id);
 
       // Mark link as SYNCING
       await db
@@ -567,7 +625,10 @@ export class SpotifyPlaylistSyncService {
           link.spotifyPlaylistId
         );
         const verifiedRemoteUris = verifiedRemoteItems
-          .map((item) => item.item?.track?.uri || item.item?.uri)
+          .map((item) => {
+            const track = unwrapSpotifyTrack(item);
+            return track?.uri || (item as any)?.item?.track?.uri || (item as any)?.item?.uri;
+          })
           .filter((u): u is string => Boolean(u));
 
         let isRemoteMatching = verifiedRemoteUris.length === targetUris.length;
@@ -717,7 +778,7 @@ export class SpotifyPlaylistSyncService {
 
       // ==========================================
       // Phase 3: Finalize Link Baseline & Invariants
-      // Baseline fields (lastSyncedSnapshotId, lastSyncedEntriesHash) are advanced ONLY on SUCCESS
+      // Mutations succeeded locally & remotely. Advance baseline to materialized state.
       // ==========================================
       const finalEntries = await this.loadPlaylistEntries(playlistId);
       const finalEntriesHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
@@ -736,11 +797,14 @@ export class SpotifyPlaylistSyncService {
         await db
           .update(spotifyPlaylistLinks)
           .set({
+            lastSyncedSnapshotId: currentSnapshotId,
+            lastSyncedEntriesHash: finalEntriesHash,
             syncState: 'PARTIAL_FAILURE',
             failureStage: 'FINALIZATION',
             completedRemoteBatches: 0,
             failedBatchIndex: null,
             lastError: unresolvedMessage,
+            lastSyncedAt: now,
             updatedAt: now
           })
           .where(eq(spotifyPlaylistLinks.id, link.id));
@@ -749,6 +813,8 @@ export class SpotifyPlaylistSyncService {
           status: 'PARTIAL_FAILURE',
           playlistId,
           spotifyPlaylistId: link.spotifyPlaylistId,
+          finalSnapshotId: currentSnapshotId,
+          finalEntriesHash,
           strategy,
           syncState: 'PARTIAL_FAILURE',
           failureStage: 'FINALIZATION',
@@ -759,7 +825,7 @@ export class SpotifyPlaylistSyncService {
         };
       }
 
-      // Successful synchronization: advance persistent baseline
+      // Fully synchronized: advance persistent baseline
       await db
         .update(spotifyPlaylistLinks)
         .set({
