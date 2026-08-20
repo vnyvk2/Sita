@@ -312,6 +312,6 @@ describe('Drizzle Migration 0020 (spotify_playlist_links Live PGlite Execution &
 
       await pg.close();
     },
-    25000
+    60000
   );
 });

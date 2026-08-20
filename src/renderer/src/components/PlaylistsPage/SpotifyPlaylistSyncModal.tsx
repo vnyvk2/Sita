@@ -29,7 +29,6 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
   const [plan, setPlan] = useState<SpotifyPlaylistSyncPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SpotifySyncResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'local' | 'remote' | 'unresolved'>('summary');
 
   useEffect(() => {
     let isCancelled = false;
@@ -40,7 +39,6 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
       setPlan(null);
       setSyncResult(null);
       setDriftStatus(null);
-      setActiveTab('summary');
 
       // 1. Detect drift status
       window.api.spotify
@@ -332,17 +330,17 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
         <div className="flex items-center justify-between border-t border-white/10 px-6 py-4 bg-[#1a1b2a]">
           <Button
             label={syncResult ? 'Done' : 'Cancel'}
-            variant="ghost"
-            onClick={onClose}
-            disabled={isSyncing}
+            className="hover:bg-white/10"
+            clickHandler={onClose}
+            isDisabled={isSyncing}
           />
 
           {!syncResult && plan && (
             <Button
               label={isSyncing ? 'Synchronizing...' : 'Synchronize Now'}
-              variant="primary"
-              onClick={handleExecuteSync}
-              disabled={isSyncing || isLoading}
+              className="bg-[#1DB954] text-white hover:bg-[#1ed760]"
+              clickHandler={handleExecuteSync}
+              isDisabled={isSyncing || isLoading}
             />
           )}
         </div>

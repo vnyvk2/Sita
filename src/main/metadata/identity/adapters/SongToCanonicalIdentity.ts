@@ -12,7 +12,7 @@ export interface MinimalSongRecord {
   artists?: SongArtistRecord[] | string;
   album?: { name?: string; title?: string } | string;
   albumArtist?: string;
-  duration?: number;
+  duration?: number | string;
   year?: number;
   trackNumber?: number;
   trackNo?: number;

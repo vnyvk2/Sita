@@ -64,8 +64,8 @@ export class SpotifyPlaylistSyncService {
       lastSyncedSnapshotId: link.lastSyncedSnapshotId,
       lastSyncedEntriesHash: link.lastSyncedEntriesHash,
       syncStrategy: link.syncStrategy as SyncStrategy,
-      syncState: link.syncState as any,
-      failureStage: link.failureStage as any,
+      syncState: link.syncState as SpotifyPlaylistLinkRecord['syncState'],
+      failureStage: link.failureStage as SpotifyPlaylistLinkRecord['failureStage'],
       completedRemoteBatches: link.completedRemoteBatches,
       failedBatchIndex: link.failedBatchIndex,
       lastError: link.lastError,
@@ -627,7 +627,22 @@ export class SpotifyPlaylistSyncService {
         const verifiedRemoteUris = verifiedRemoteItems
           .map((item) => {
             const track = unwrapSpotifyTrack(item);
-            return track?.uri || (item as any)?.item?.track?.uri || (item as any)?.item?.uri;
+            if (track?.uri) return track.uri;
+            if (item && typeof item === 'object') {
+              const rec = item as Record<string, unknown>;
+              if (typeof rec.uri === 'string') return rec.uri;
+              if (rec.track && typeof rec.track === 'object' && typeof (rec.track as Record<string, unknown>).uri === 'string') {
+                return (rec.track as Record<string, unknown>).uri as string;
+              }
+              if (rec.item && typeof rec.item === 'object') {
+                const it = rec.item as Record<string, unknown>;
+                if (typeof it.uri === 'string') return it.uri;
+                if (it.track && typeof it.track === 'object' && typeof (it.track as Record<string, unknown>).uri === 'string') {
+                  return (it.track as Record<string, unknown>).uri as string;
+                }
+              }
+            }
+            return undefined;
           })
           .filter((u): u is string => Boolean(u));
 
@@ -702,7 +717,7 @@ export class SpotifyPlaylistSyncService {
             inTrxEntries.map((e, idx) => ({
               position: idx + 1,
               songId: e.songId,
-              isrc: (e as any).song?.isrc
+              isrc: (e as { songId: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
             }))
           );
 
@@ -881,7 +896,7 @@ export class SpotifyPlaylistSyncService {
     return playlist.entries.map((e) => ({
       songId: e.songId,
       position: e.position,
-      isrc: (e as any).song?.isrc
+      isrc: (e as { songId: number; position: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
     }));
   }
 }
