@@ -32,89 +32,62 @@ export const FinalReviewSummaryCard: React.FC<FinalReviewSummaryCardProps> = ({
   const totalWarnings = selectedMatches.reduce((acc, m) => acc + (m.warningCount ?? 0), 0);
 
   return (
-    <div
-      style={{
-        background: 'rgba(59, 130, 246, 0.08)',
-        border: '1px solid rgba(59, 130, 246, 0.25)',
-        borderRadius: '12px',
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px',
-        color: 'var(--text-color)'
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>Pre-Apply Summary</span>
+    <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/50 border border-background-color-2 dark:border-dark-background-color-2 rounded-xl p-5 flex flex-col gap-3.5 text-font-color-black dark:text-font-color-white">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2.5">
+          <span className="text-base font-bold text-font-color-black dark:text-font-color-white">Pre-Apply Summary</span>
           <ConfidenceBadge level={preview.confidenceLevel} confidence={preview.overallConfidence} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex items-center gap-2">
           {preview.contributingProviders && preview.contributingProviders.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-              <span style={{ color: 'var(--text-color-dimmed)' }}>Federated:</span>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">Federated:</span>
               {preview.contributingProviders.map((pId) => (
                 <span
                   key={pId}
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    background:
-                      pId === 'discogs'
-                        ? 'rgba(234, 88, 12, 0.25)'
-                        : pId === 'coverartarchive'
-                          ? 'rgba(14, 165, 233, 0.25)'
-                          : 'rgba(186, 85, 211, 0.25)',
-                    color:
-                      pId === 'discogs'
-                        ? '#ffedd5'
-                        : pId === 'coverartarchive'
-                          ? '#e0f2fe'
-                          : '#e9d5ff',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-                  }}
+                  className="px-2 py-0.5 rounded bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-medium"
                 >
                   {pId === 'musicbrainz' ? 'MusicBrainz' : pId === 'discogs' ? 'Discogs' : pId === 'coverartarchive' ? 'Cover Art Archive' : pId}
                 </span>
               ))}
             </div>
           )}
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-color-highlight)', fontWeight: 600 }}>
+          <div className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
             {selectedMatches.length} Tracks ({totalFieldChanges} Field Changes)
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Titles Changed</div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-color-highlight)' }}>{titlesChanged}</div>
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Titles Changed</div>
+          <div className="text-xl font-bold text-font-color-highlight dark:text-dark-font-color-highlight mt-1">{titlesChanged}</div>
         </div>
 
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Artists Changed</div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#a78bfa' }}>{artistsChanged}</div>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Artists Changed</div>
+          <div className="text-xl font-bold text-font-color-black dark:text-font-color-white mt-1">{artistsChanged}</div>
         </div>
 
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Years Updated</div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fbbf24' }}>{yearsChanged}</div>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Years Updated</div>
+          <div className="text-xl font-bold text-font-color-highlight dark:text-dark-font-color-highlight mt-1">{yearsChanged}</div>
         </div>
 
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-color-dimmed)' }}>Cover Artwork</div>
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: replaceArtwork ? '#34d399' : 'var(--text-color-dimmed)', marginTop: '4px' }}>
+        <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/40 p-3 rounded-lg border border-background-color-2 dark:border-dark-background-color-2">
+          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">Cover Artwork</div>
+          <div className={`text-sm font-semibold mt-1 ${replaceArtwork ? 'text-font-color-highlight dark:text-dark-font-color-highlight' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
             {replaceArtwork ? 'Replace' : 'Keep Current'}
           </div>
         </div>
       </div>
 
       {totalWarnings > 0 && (
-        <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', fontSize: '0.82rem', fontWeight: 500 }}>
+        <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium">
           ⚠️ {totalWarnings} track warning(s) detected. Please review highlighted differences before proceeding.
         </div>
       )}
     </div>
   );
 };
+

@@ -35,171 +35,102 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   const getBadgeStyle = (status: string) => {
     switch (status) {
       case 'changed':
-        return { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.45)', text: '#FBBF24', label: 'Changed' };
+        return { className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400', label: 'Changed' };
       case 'new':
-        return { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.45)', text: '#34D399', label: 'New' };
+        return { className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400', label: 'New' };
       case 'missing':
-        return { bg: 'rgba(148, 163, 184, 0.2)', border: 'rgba(148, 163, 184, 0.4)', text: '#94A3B8', label: 'Missing' };
+        return { className: 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed', label: 'Missing' };
       default:
-        return { bg: 'rgba(255, 255, 255, 0.05)', border: 'transparent', text: '#94A3B8', label: 'Unchanged' };
-    }
-  };
-
-  const getProviderColor = (providerId?: string) => {
-    switch (providerId?.toLowerCase()) {
-      case 'musicbrainz':
-        return { bg: 'rgba(186, 85, 211, 0.25)', text: '#E9D5FF', border: 'rgba(186, 85, 211, 0.45)' };
-      case 'discogs':
-        return { bg: 'rgba(234, 88, 12, 0.25)', text: '#FFEDD5', border: 'rgba(234, 88, 12, 0.45)' };
-      case 'coverartarchive':
-        return { bg: 'rgba(14, 165, 233, 0.25)', text: '#E0F2FE', border: 'rgba(14, 165, 233, 0.45)' };
-      default:
-        return { bg: 'rgba(59, 130, 246, 0.25)', text: '#DBEAFE', border: 'rgba(59, 130, 246, 0.45)' };
+        return { className: 'bg-background-color-2/40 dark:bg-dark-background-color-2/40 border-transparent text-font-color-dimmed dark:text-dark-font-color-dimmed', label: 'Unchanged' };
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#FFFFFF' }}>
-      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#CBD5E1' }}>
-        Field Differences for: <span style={{ color: '#38BDF8' }}>{activeTrack.oldTitle}</span>
+    <div className="flex flex-col gap-3 text-font-color-black dark:text-font-color-white">
+      <div className="text-xs font-semibold text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase tracking-wider">
+        Field Differences for: <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold">{activeTrack.oldTitle}</span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="flex flex-col gap-2">
         {visibleDiffs.length === 0 ? (
-          <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)', color: '#94A3B8', fontSize: '0.82rem', fontStyle: 'italic' }}>
+          <div className="p-3 rounded-lg bg-background-color-2/20 dark:bg-dark-background-color-2/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs italic">
             No modified fields for this track. Toggle &quot;All Fields&quot; to inspect unmodified tags.
           </div>
         ) : (
           visibleDiffs.map((diff) => {
-          const key = `${activeTrack.localSongId}::${diff.fieldId}`;
-          const isSelected = selectedFieldMap.get(key) ?? diff.applyField;
-          const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
-          const badge = getBadgeStyle(diff.status);
-          const provStyle = getProviderColor(diff.providerId);
-          const alternatives = diff.alternatives;
+            const key = `${activeTrack.localSongId}::${diff.fieldId}`;
+            const isSelected = selectedFieldMap.get(key) ?? diff.applyField;
+            const userVal = userEditedValues.get(key) ?? diff.userValue ?? diff.suggestedValue ?? '';
+            const badge = getBadgeStyle(diff.status);
+            const alternatives = diff.alternatives;
 
-          return (
-            <div
-              key={diff.fieldId}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '30px 120px 1fr 1fr 120px 100px 50px',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => onToggleField(diff.fieldId)}
-                style={{ cursor: 'pointer' }}
-              />
+            return (
+              <div
+                key={diff.fieldId}
+                className="grid grid-cols-[30px_120px_1fr_1fr_120px_100px_50px] items-center gap-2.5 px-3 py-2 rounded-lg bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 text-xs"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleField(diff.fieldId)}
+                  className="cursor-pointer"
+                />
 
-              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#F8FAFC' }}>{diff.fieldName}</span>
+                <span className="font-semibold text-font-color-black dark:text-font-color-white">{diff.fieldName}</span>
 
-              <div style={{ fontSize: '0.82rem', color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
-                {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em style={{ opacity: 0.6 }}>None</em>}
-              </div>
-
-              <input
-                type="text"
-                value={String(userVal)}
-                onChange={(e) => onFieldChanged(diff.fieldId, e.target.value)}
-                style={{
-                  padding: '5px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  color: '#FFFFFF',
-                  fontSize: '0.82rem',
-                  outline: 'none',
-                  fontWeight: 600
-                }}
-              />
-
-              {/* Provider Selector / Badge */}
-              {alternatives && alternatives.length > 1 && onSelectProviderForField ? (
-                <select
-                  value={diff.providerId ?? 'musicbrainz'}
-                  onChange={(e) => onSelectProviderForField(diff.fieldId, e.target.value)}
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '3px 6px',
-                    borderRadius: '4px',
-                    backgroundColor: provStyle.bg,
-                    border: `1px solid ${provStyle.border}`,
-                    color: provStyle.text,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  {alternatives.map((alt) => (
-                    <option key={alt.providerId} value={alt.providerId} style={{ background: '#0F172A', color: '#FFFFFF' }}>
-                      {alt.providerName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div
-                  title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '3px 6px',
-                    borderRadius: '4px',
-                    textAlign: 'center',
-                    fontWeight: 600,
-                    backgroundColor: provStyle.bg,
-                    border: `1px solid ${provStyle.border}`,
-                    color: provStyle.text,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {diff.providerName ?? 'MusicBrainz'}
+                <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+                  {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em className="opacity-60">None</em>}
                 </div>
-              )}
 
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '3px 6px',
-                  borderRadius: '4px',
-                  textAlign: 'center',
-                  fontWeight: 700,
-                  backgroundColor: badge.bg,
-                  border: `1px solid ${badge.border}`,
-                  color: badge.text
-                }}
-              >
-                {badge.label}
-              </span>
+                <input
+                  type="text"
+                  value={String(userVal)}
+                  onChange={(e) => onFieldChanged(diff.fieldId, e.target.value)}
+                  className="px-2 py-1 rounded-md bg-background-color-2/50 dark:bg-dark-background-color-2 border border-background-color-3/50 dark:border-dark-background-color-3/50 text-font-color-black dark:text-font-color-white text-xs outline-none focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight font-semibold"
+                />
 
-              <button
-                type="button"
-                onClick={() => onResetField(diff.fieldId)}
-                title="Reset to suggested"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#94A3B8',
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: 600
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          );
-        })
-      )}
+                {/* Provider Selector / Badge */}
+                {alternatives && alternatives.length > 1 && onSelectProviderForField ? (
+                  <select
+                    value={diff.providerId ?? 'musicbrainz'}
+                    onChange={(e) => onSelectProviderForField(diff.fieldId, e.target.value)}
+                    className="text-[0.7rem] px-2 py-0.5 rounded bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed outline-none cursor-pointer font-medium"
+                  >
+                    {alternatives.map((alt) => (
+                      <option key={alt.providerId} value={alt.providerId} className="bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white">
+                        {alt.providerName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div
+                    title={`Source: ${diff.providerName ?? 'MusicBrainz'}`}
+                    className="text-[0.7rem] px-2 py-0.5 rounded text-center font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap"
+                  >
+                    {diff.providerName ?? 'MusicBrainz'}
+                  </div>
+                )}
+
+                <span
+                  className={`text-[0.7rem] px-2 py-0.5 rounded text-center font-semibold border ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onResetField(diff.fieldId)}
+                  title="Reset to suggested"
+                  className="bg-transparent border-none text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer text-xs font-semibold"
+                >
+                  Reset
+                </button>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 };
+

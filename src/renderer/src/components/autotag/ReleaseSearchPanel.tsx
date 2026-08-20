@@ -29,61 +29,34 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-color)' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
+    <div className="flex flex-col gap-4 text-font-color-black dark:text-font-color-white">
+      <form onSubmit={handleSubmit} className="flex gap-2.5">
         <input
           type="text"
           placeholder="Album name..."
           value={album}
           onChange={(e) => setAlbum(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.07)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: 'var(--text-color-white)',
-            outline: 'none',
-            fontSize: '0.9rem'
-          }}
+          className="flex-1 px-3.5 py-2 rounded-lg bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/50 dark:border-dark-background-color-3/50 text-font-color-black dark:text-font-color-white placeholder:text-font-color-dimmed/60 dark:placeholder:text-dark-font-color-dimmed/60 outline-none text-sm focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
         />
         <input
           type="text"
           placeholder="Artist name (optional)..."
           value={artist}
           onChange={(e) => setArtist(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.07)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: 'var(--text-color-white)',
-            outline: 'none',
-            fontSize: '0.9rem'
-          }}
+          className="flex-1 px-3.5 py-2 rounded-lg bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/50 dark:border-dark-background-color-3/50 text-font-color-black dark:text-font-color-white placeholder:text-font-color-dimmed/60 dark:placeholder:text-dark-font-color-dimmed/60 outline-none text-sm focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
         />
         <button
           type="submit"
           disabled={loading || !album.trim()}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-            border: 'none',
-            color: 'var(--text-color-white)',
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1
-          }}
+          className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-white text-sm font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {loading ? 'Searching...' : 'Search'}
         </button>
       </form>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
+      <div className="flex flex-col gap-2.5 max-h-[420px] overflow-y-auto">
         {candidates.length === 0 && !loading && (
-          <div style={{ padding: '30px', textAlign: 'center', opacity: 0.6, fontSize: '0.9rem' }}>
+          <div className="p-7 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed text-sm">
             No release candidates found. Search by album title and artist above.
           </div>
         )}
@@ -91,58 +64,30 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
         {candidates.map((cand) => (
           <div
             key={cand.releaseId ?? cand.title}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '14px 18px',
-              borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              transition: 'background 0.2s ease'
-            }}
+            className="flex justify-between items-center px-4 py-3.5 rounded-xl bg-background-color-2/30 dark:bg-dark-background-color-2/40 border border-background-color-2 dark:border-dark-background-color-2 hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/60 transition-colors"
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-color-white)' }}>{cand.title}</span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-base text-font-color-black dark:text-font-color-white">{cand.title}</span>
                 {cand.year && (
-                  <span style={{ fontSize: '0.82rem', opacity: 0.7 }}>({cand.year})</span>
+                  <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">({cand.year})</span>
                 )}
               </div>
-              <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+              <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                 {cand.artist} • {cand.trackCount ? `${cand.trackCount} Tracks` : 'Album'}
                 {cand.releaseType && ` • ${cand.releaseType}`}
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(139, 92, 246, 0.2)',
-                  color: '#a78bfa',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  textTransform: 'uppercase',
-                  fontWeight: 600
-                }}
-              >
+            <div className="flex items-center gap-3">
+              <span className="text-[0.7rem] px-2 py-0.5 rounded bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase font-semibold">
                 {cand.provider ?? 'musicbrainz'}
               </span>
 
               <button
+                type="button"
                 onClick={() => cand.releaseId && onSelectRelease(cand.releaseId, cand.provider ?? 'musicbrainz')}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  background: 'rgba(59, 130, 246, 0.2)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  color: 'var(--text-color-highlight)',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer'
-                }}
+                className="px-4 py-2 rounded-lg bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-semibold cursor-pointer transition-colors"
               >
                 Select Release
               </button>
@@ -153,3 +98,4 @@ export const ReleaseSearchPanel: React.FC<ReleaseSearchPanelProps> = ({
     </div>
   );
 };
+

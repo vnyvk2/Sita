@@ -649,8 +649,10 @@ html {
 }
 
 /* ? MATERIAL SYMBOLS STYLES */
-.material-icons-round {
-  font-family: 'Material Symbols Rounded';
+.material-icons-round,
+.material-symbols-rounded,
+.material-icons {
+  font-family: 'Material Symbols Rounded' !important;
   font-weight: normal;
   font-style: normal;
   display: inline-block;
@@ -668,14 +670,16 @@ html {
   transition: font-variation-settings 0.15s ease-in-out;
 }
 
-.material-icons-round {
-  font-family: 'Material Symbols Rounded';
+.material-icons-round,
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded' !important;
   font-variation-settings: 'FILL' 1;
 }
 
 .material-icons-round-outlined,
-.material-icons-round.material-icons-round-outlined {
-  font-family: 'Material Symbols Rounded';
+.material-icons-round.material-icons-round-outlined,
+.material-symbols-rounded-outlined {
+  font-family: 'Material Symbols Rounded' !important;
   font-variation-settings: 'FILL' 0;
 }
 
@@ -708,6 +712,9 @@ body,
 }
 
 /* ? APP DARK THEME STYLES */
+html.dark,
+body.dark,
+.dark,
 .App.dark,
 .full-screen-player.dark,
 .mini-player.dark {

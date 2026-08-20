@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAlbumAutoTag } from '../../hooks/useAlbumAutoTag';
+import { useEffectiveAppearance } from '../../hooks/useEffectiveAppearance';
 import { AutoTagActionBar } from './AutoTagActionBar';
 import { AutoTagProgressOverlay } from './AutoTagProgressOverlay';
 import { CandidateMatchesTable } from './CandidateMatchesTable';
@@ -32,6 +33,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
   operationId,
   onClose
 }) => {
+  const { isDark } = useEffectiveAppearance();
   const { state, actions } = useAlbumAutoTag(operationId, localSongs);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ReviewViewMode>('compact');
@@ -139,54 +141,23 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
   return createPortal(
     <div
       onClick={handleClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(4, 7, 13, 0.82)',
-        backdropFilter: 'blur(16px)'
-      }}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm ${isDark ? 'dark' : ''}`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '95%',
-          maxWidth: '1080px',
-          maxHeight: '92vh',
-          background: 'linear-gradient(145deg, #0F172A 0%, #0B0F19 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: '16px',
-          boxShadow: '0 30px 70px rgba(0,0,0,0.8), 0 0 40px rgba(59, 130, 246, 0.1)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          color: '#FFFFFF'
-        }}
+        className="w-[95%] max-w-[1080px] max-h-[92vh] bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-font-color-black dark:text-font-color-white"
       >
         {/* Header Bar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            background: 'rgba(15, 23, 42, 0.6)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '1.3rem' }}>✨</span>
+        <div className="flex justify-between items-center px-6 py-4 border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/50 dark:bg-dark-background-color-2/50">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-rounded material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-2xl select-none leading-none">
+              auto_awesome
+            </span>
             <div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+              <div className="text-lg font-bold text-font-color-highlight dark:text-dark-font-color-highlight leading-snug">
                 Metadata Center / AutoTag
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+              <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5">
                 Search, compare and apply verified metadata
               </div>
             </div>
@@ -195,35 +166,18 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="flex items-center gap-3">
             {/* View Mode Toggle Pill (Compact vs Detailed) */}
             {state.preview && (
-              <div
-                style={{
-                  display: 'flex',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: '8px',
-                  padding: '3px',
-                  border: '1px solid rgba(255, 255, 255, 0.14)'
-                }}
-              >
+              <div className="flex bg-background-color-2 dark:bg-dark-background-color-2 rounded-lg p-0.5 border border-background-color-3/40 dark:border-dark-background-color-3/40">
                 <button
                   type="button"
                   onClick={() => setViewMode('compact')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '4px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: viewMode === 'compact' ? 'rgba(59, 130, 246, 0.35)' : 'transparent',
-                    color: viewMode === 'compact' ? '#FFFFFF' : '#94A3B8',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                    viewMode === 'compact'
+                      ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                      : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                  }`}
                 >
                   <span>⊞</span>
                   <span>Compact</span>
@@ -231,20 +185,11 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => setViewMode('detailed')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '4px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: viewMode === 'detailed' ? 'rgba(59, 130, 246, 0.35)' : 'transparent',
-                    color: viewMode === 'detailed' ? '#FFFFFF' : '#94A3B8',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                    viewMode === 'detailed'
+                      ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
+                      : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                  }`}
                 >
                   <span>☷</span>
                   <span>Detailed</span>
@@ -255,18 +200,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                color: '#CBD5E1',
-                fontSize: '1.1rem',
-                cursor: 'pointer',
-                padding: '4px 10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 rounded-lg text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-base cursor-pointer px-2.5 py-1 flex items-center justify-center transition-colors"
             >
               ✕
             </button>
@@ -274,16 +208,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
         </div>
 
         {/* Scrollable Single-Page Workspace */}
-        <div
-          style={{
-            padding: '20px 24px',
-            flex: 1,
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}
-        >
+        <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
           {/* Progress Overlay during active apply operations */}
           {state.loading && state.step === 'applying' && (
             <AutoTagProgressOverlay
@@ -296,32 +221,20 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Expandable Error UX Drawer */}
           {state.error && (
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.18)',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                color: '#FCA5A5',
-                fontSize: '0.85rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, color: '#FECACA' }}>Couldn't update metadata.</span>
+            <div className="p-3.5 rounded-xl bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson text-sm flex flex-col gap-1.5">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-font-color-crimson">Couldn't update metadata.</span>
                 <button
                   type="button"
                   onClick={() => setShowErrorDetails((prev) => !prev)}
-                  style={{ background: 'transparent', border: 'none', color: '#60A5FA', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                  className="bg-transparent border-0 text-font-color-highlight dark:text-dark-font-color-highlight text-xs cursor-pointer font-semibold"
                 >
                   {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
                 </button>
               </div>
 
               {showErrorDetails && (
-                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'rgba(0, 0, 0, 0.5)', padding: '8px 12px', borderRadius: '6px', overflowX: 'auto', color: '#F87171' }}>
+                <div className="font-mono text-xs bg-background-color-1 dark:bg-dark-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-font-color-crimson/20">
                   {state.error}
                 </div>
               )}
@@ -330,31 +243,21 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Success Banner */}
           {state.step === 'complete' && (
-            <div
-              style={{
-                padding: '14px 18px',
-                borderRadius: '10px',
-                background: 'rgba(16, 185, 129, 0.18)',
-                border: '1px solid rgba(16, 185, 129, 0.35)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.4rem' }}>🎉</span>
+            <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🎉</span>
                 <div>
-                  <div style={{ fontWeight: 700, color: '#34D399', fontSize: '0.94rem' }}>
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
                     Metadata Applied Successfully!
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#CBD5E1' }}>
+                  <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                     Updated {state.selectedTrackIds.size} songs with verified tags and artwork.
                   </div>
                 </div>
               </div>
 
               {state.lastRestoredCount > 0 && (
-                <span style={{ fontSize: '0.82rem', color: '#FBBF24', fontWeight: 600 }}>
+                <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
                   Restored {state.lastRestoredCount} songs.
                 </span>
               )}
@@ -389,7 +292,11 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* 3. Selected Release Panel & Artwork */}
           {state.preview && (
-            <div style={{ opacity: state.loadingPreview ? 0.6 : 1, transition: 'opacity 0.2s ease', pointerEvents: state.loadingPreview ? 'none' : 'auto' }}>
+            <div
+              className={`transition-opacity duration-200 ${
+                state.loadingPreview ? 'opacity-60 pointer-events-none' : 'opacity-100 pointer-events-auto'
+              }`}
+            >
               <SelectedReleasePanel
                 preview={state.preview}
                 artworkSource={state.artworkSource}

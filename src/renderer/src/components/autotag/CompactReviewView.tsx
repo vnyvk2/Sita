@@ -49,85 +49,45 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.2)' };
+      return { label: '⚠ Warning', className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400' };
     }
     if (isRename) {
-      return { label: '✓ Rename', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)' };
+      return { label: '✓ Rename', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
     }
     if (isExact) {
-      return { label: '✓ Match', color: '#10B981', bg: 'rgba(16, 185, 129, 0.2)' };
+      return { label: '✓ Match', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' };
     }
-    return { label: '✓ Suggested', color: '#60A5FA', bg: 'rgba(59, 130, 246, 0.2)' };
-  };
-
-  const getProviderStyle = (providerId?: string) => {
-    switch (providerId?.toLowerCase()) {
-      case 'musicbrainz':
-        return { bg: 'rgba(186, 85, 211, 0.2)', text: '#E9D5FF', border: 'rgba(186, 85, 211, 0.4)' };
-      case 'discogs':
-        return { bg: 'rgba(234, 88, 12, 0.2)', text: '#FFEDD5', border: 'rgba(234, 88, 12, 0.4)' };
-      case 'coverartarchive':
-        return { bg: 'rgba(14, 165, 233, 0.2)', text: '#E0F2FE', border: 'rgba(14, 165, 233, 0.4)' };
-      default:
-        return { bg: 'rgba(59, 130, 246, 0.2)', text: '#DBEAFE', border: 'rgba(59, 130, 246, 0.4)' };
-    }
+    return { label: '✓ Suggested', className: 'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight' };
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="flex flex-col gap-2">
       {/* Table Header & Controls Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
+      <div className="flex justify-between items-center px-1">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
             Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
           </span>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onSelectAll}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#CBD5E1',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={onSelectChanged}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#CBD5E1',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Changed Only
             </button>
             <button
               type="button"
               onClick={onClearSelections}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '5px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#94A3B8',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: 500
-              }}
+              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
             >
               Deselect All
             </button>
@@ -135,34 +95,34 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
         </div>
 
         {/* Filter & Sort Controls */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="flex gap-2.5 items-center">
           {onFilterChange && (
-            <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+            <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
               Filter:
               <select
                 value={filter}
                 onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-                style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
+                className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
               >
-                <option value="all" style={{ background: '#0F172A', color: '#FFFFFF' }}>All Tracks</option>
-                <option value="changed" style={{ background: '#0F172A', color: '#FFFFFF' }}>Changed Only</option>
-                <option value="matched" style={{ background: '#0F172A', color: '#FFFFFF' }}>Matched Only</option>
-                <option value="warnings" style={{ background: '#0F172A', color: '#FFFFFF' }}>Warnings Only</option>
+                <option value="all">All Tracks</option>
+                <option value="changed">Changed Only</option>
+                <option value="matched">Matched Only</option>
+                <option value="warnings">Warnings Only</option>
               </select>
             </label>
           )}
 
           {onSortChange && (
-            <label style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+            <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
               Sort:
               <select
                 value={sort}
                 onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-                style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', borderRadius: '4px', padding: '3px 8px', fontSize: '0.78rem' }}
+                className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
               >
-                <option value="trackNumber" style={{ background: '#0F172A', color: '#FFFFFF' }}>Track #</option>
-                <option value="confidence" style={{ background: '#0F172A', color: '#FFFFFF' }}>Confidence</option>
-                <option value="title" style={{ background: '#0F172A', color: '#FFFFFF' }}>Title</option>
+                <option value="trackNumber">Track #</option>
+                <option value="confidence">Confidence</option>
+                <option value="title">Title</option>
               </select>
             </label>
           )}
@@ -170,24 +130,17 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
       </div>
 
       {/* Tracks Container */}
-      <div
-        style={{
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '10px',
-          overflow: 'hidden',
-          background: 'rgba(15, 23, 42, 0.6)'
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20 dark:bg-dark-background-color-2/30">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '10px 10px', textAlign: 'center' }}></th>
-              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}>#</th>
-              <th style={{ padding: '10px 12px' }}>TITLE</th>
-              <th style={{ padding: '10px 12px' }}>ARTIST</th>
-              <th style={{ width: '110px', padding: '10px 12px', textAlign: 'center' }}>MATCH</th>
-              <th style={{ width: '110px', padding: '10px 12px', textAlign: 'center' }}>CHANGES</th>
-              <th style={{ width: '36px', padding: '10px 8px', textAlign: 'center' }}></th>
+            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
+              <th className="w-9 px-2.5 py-2.5 text-center"></th>
+              <th className="w-9 px-2 py-2.5 text-center">#</th>
+              <th className="px-3 py-2.5">TITLE</th>
+              <th className="px-3 py-2.5">ARTIST</th>
+              <th className="w-28 px-3 py-2.5 text-center">MATCH</th>
+              <th className="w-28 px-3 py-2.5 text-center">CHANGES</th>
+              <th className="w-9 px-2 py-2.5 text-center"></th>
             </tr>
           </thead>
           <tbody>
@@ -242,24 +195,20 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                 <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => onToggleExpand(match.localSongId)}
-                    style={{
-                      borderBottom: isExpanded ? 'none' : idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                      background: isMissing
-                        ? 'rgba(0, 0, 0, 0.15)'
+                    className={`border-b border-background-color-2/40 dark:border-dark-background-color-2/40 transition-colors text-font-color-black dark:text-font-color-white ${
+                      isMissing
+                        ? 'opacity-40 bg-background-color-2/10 dark:bg-dark-background-color-2/10 cursor-default'
                         : isExpanded
-                        ? 'rgba(59, 130, 246, 0.12)'
+                        ? 'bg-background-color-2/40 dark:bg-dark-background-color-2/50 border-b-0 cursor-pointer'
                         : isFocused
-                        ? 'rgba(255, 255, 255, 0.08)'
+                        ? 'bg-background-color-3/15 dark:bg-dark-background-color-3/15 cursor-pointer'
                         : isSelected
-                        ? 'transparent'
-                        : 'rgba(0, 0, 0, 0.25)',
-                      opacity: isMissing ? 0.45 : isSelected ? 1 : 0.6,
-                      cursor: isMissing ? 'default' : 'pointer',
-                      transition: 'background 0.15s ease'
-                    }}
+                        ? 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50 cursor-pointer'
+                        : 'opacity-60 hover:bg-background-color-2/30 dark:hover:bg-dark-background-color-2/40 cursor-pointer'
+                    }`}
                   >
                     {/* Track Checkbox (Isolated from row click) */}
-                    <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <td className="px-2.5 py-3 text-center align-middle">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -270,58 +219,55 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                           onToggleTrack(match.localSongId);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ cursor: isMissing ? 'not-allowed' : 'pointer', opacity: isMissing ? 0.25 : 1 }}
+                        className="cursor-pointer disabled:cursor-not-allowed"
                       />
                     </td>
 
                     {/* Track Number Diff */}
-                    <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <td className="px-2 py-3 text-center align-middle font-mono text-xs">
                       {isMissing ? (
-                        <span style={{ color: '#64748B', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>
+                        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-semibold">
                           {newTrackNum}
                         </span>
                       ) : showTrackDiff ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace' }}>
-                          <span style={{ color: '#64748B', textDecoration: 'line-through', fontSize: '0.74rem' }}>{oldTrackNum}</span>
-                          <span style={{ color: '#F59E0B', fontSize: '0.70rem' }}>→</span>
-                          <span style={{ color: '#38BDF8', fontWeight: 700, fontSize: '0.84rem' }}>{newTrackNum}</span>
+                        <div className="inline-flex items-center gap-1">
+                          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed line-through text-xs">{oldTrackNum}</span>
+                          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">→</span>
+                          <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold text-xs">{newTrackNum}</span>
                         </div>
                       ) : (
-                        <span style={{ color: '#94A3B8', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>
+                        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-semibold">
                           {oldTrackNum}
                         </span>
                       )}
                     </td>
 
                     {/* Title Summary (Two-Tier Stack + Secondary Micro-Chips) */}
-                    <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span
-                            style={{
-                              fontWeight: 600,
-                              color: isMissing ? '#94A3B8' : showTitleWas ? '#38BDF8' : '#FFFFFF',
-                              fontStyle: isMissing ? 'italic' : 'normal',
-                              fontSize: '0.88rem'
-                            }}
+                            className={`font-semibold text-sm ${
+                              isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : showTitleWas ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold' : 'text-font-color-black dark:text-font-color-white'
+                            }`}
                           >
                             {String(displayTitle)}
                           </span>
                         </div>
 
                         {isMissing ? (
-                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             Not in library
                           </div>
                         ) : showTitleWas ? (
-                          <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             (was: {match.oldTitle})
                           </div>
                         ) : null}
 
                         {/* Secondary Field Micro-Chips (Genre, Disc, Year, etc. - excluding MBID/ISRC) */}
                         {secondaryChangedDiffs.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                          <div className="flex flex-wrap gap-1 mt-1">
                             {secondaryChangedDiffs.map((diff) => {
                               const icon =
                                 diff.fieldId === 'genre' ? '🏷️' :
@@ -331,25 +277,14 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                               return (
                                 <span
                                   key={diff.fieldId}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    padding: '1px 5px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.69rem',
-                                    background: 'rgba(255, 255, 255, 0.06)',
-                                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                                    color: '#CBD5E1',
-                                    lineHeight: '1.2'
-                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.7rem] bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed"
                                 >
                                   <span>{icon}</span>
-                                  <span style={{ color: '#94A3B8' }}>{diff.fieldName}:</span>
+                                  <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">{diff.fieldName}:</span>
                                   {diff.status === 'new' ? (
-                                    <span style={{ color: '#34D399', fontWeight: 600 }}>{String(diff.suggestedValue)}</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{String(diff.suggestedValue)}</span>
                                   ) : (
-                                    <span style={{ color: '#38BDF8', fontWeight: 600 }}>{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
+                                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">{String(diff.oldValue ?? '')} → {String(diff.suggestedValue)}</span>
                                   )}
                                 </span>
                               );
@@ -360,20 +295,17 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     </td>
 
                     {/* Artist Summary (Two-Tier Stack) */}
-                    <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="flex flex-col gap-0.5">
                         <span
-                          style={{
-                            color: isMissing ? '#64748B' : showArtistWas ? '#E2E8F0' : '#CBD5E1',
-                            fontWeight: isMissing ? 400 : 600,
-                            fontStyle: isMissing ? 'italic' : 'normal',
-                            fontSize: '0.84rem'
-                          }}
+                          className={`text-xs font-medium ${
+                            isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : showArtistWas ? 'text-font-color-black dark:text-font-color-white' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'
+                          }`}
                         >
                           {String(displayArtist)}
                         </span>
                         {!isMissing && showArtistWas && (
-                          <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                          <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
                             (was: {match.oldArtist})
                           </div>
                         )}
@@ -381,79 +313,49 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                     </td>
 
                     {/* Match Confidence Badge */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <td className="px-3 py-2.5 text-center align-middle">
                       {isMissing ? (
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.70rem',
-                            fontWeight: 600,
-                            background: 'rgba(100, 116, 139, 0.15)',
-                            color: '#94A3B8',
-                            border: '1px solid rgba(100, 116, 139, 0.25)'
-                          }}
-                        >
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
                           Missing
                         </span>
                       ) : (
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            background: statusBadge.bg,
-                            color: statusBadge.color,
-                            border: `1px solid ${statusBadge.bg}`
-                          }}
-                        >
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${statusBadge.className}`}>
                           {statusBadge.label}
                         </span>
                       )}
                     </td>
 
                     {/* Change Count Pill */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <td className="px-3 py-2.5 text-center align-middle">
                       {isMissing ? (
-                        <span style={{ fontSize: '0.74rem', color: '#64748B', fontStyle: 'italic' }}>
+                        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed italic">
                           Not in library
                         </span>
                       ) : activeChangeCount > 0 ? (
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            background: 'rgba(245, 158, 11, 0.18)',
-                            color: '#FBBF24',
-                            border: '1px solid rgba(245, 158, 11, 0.35)'
-                          }}
-                        >
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400">
                           {activeChangeCount} {activeChangeCount === 1 ? 'change' : 'changes'}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#64748B', fontStyle: 'italic' }}>
+                        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed italic">
                           No changes
                         </span>
                       )}
                     </td>
 
                     {/* Expand Chevron */}
-                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94A3B8', fontSize: '0.78rem' }}>
+                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                       {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 
                   {/* Expanded Changed-Fields Drawer */}
                   {isExpanded && (
-                    <tr style={{ borderBottom: idx < matches.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none', background: 'rgba(0, 0, 0, 0.4)' }}>
-                      <td colSpan={7} style={{ padding: '14px 20px 18px 48px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Modified Fields for: <span style={{ color: '#38BDF8' }}>{match.oldTitle}</span>
+                    <tr className="border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/30 dark:bg-dark-background-color-2/40">
+                      <td colSpan={7} className="px-5 py-4 pl-12">
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-semibold text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase tracking-wider">
+                              Modified Fields for: <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold">{match.oldTitle}</span>
                             </span>
 
                             {/* Deep-link to Detailed Review Mode */}
@@ -463,19 +365,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                 e.stopPropagation();
                                 onOpenDetailed(match.localSongId);
                               }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '4px 10px',
-                                borderRadius: '5px',
-                                background: 'rgba(59, 130, 246, 0.18)',
-                                border: '1px solid rgba(59, 130, 246, 0.35)',
-                                color: '#60A5FA',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-highlight dark:text-dark-font-color-highlight text-xs font-medium transition-colors cursor-pointer"
                             >
                               <span>🔍 Open in Detailed Mode</span>
                               <span>↗</span>
@@ -483,32 +373,22 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                           </div>
 
                           {changedDiffs.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div className="flex flex-col gap-1.5">
                               {changedDiffs.map((diff) => {
                                 const key = `${match.localSongId}::${diff.fieldId}`;
                                 const isFieldSelected = selectedFieldMap.get(key) ?? diff.applyField;
                                 const displayVal = userEditedValues.get(key) ?? diff.suggestedValue ?? '';
-                                const prov = getProviderStyle(diff.providerId);
                                 const isNew = diff.status === 'new';
 
                                 return (
                                   <div
                                     key={diff.fieldId}
                                     onClick={() => onToggleField?.(match.localSongId, diff.fieldId)}
-                                    style={{
-                                      display: 'grid',
-                                      gridTemplateColumns: '24px 130px 1fr 20px 1fr 120px',
-                                      alignItems: 'center',
-                                      gap: '10px',
-                                      padding: '6px 12px',
-                                      borderRadius: '6px',
-                                      background: isFieldSelected ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.25)',
-                                      border: isFieldSelected ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.04)',
-                                      opacity: isFieldSelected ? 1 : 0.45,
-                                      fontSize: '0.82rem',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease'
-                                    }}
+                                    className={`grid grid-cols-[24px_130px_1fr_20px_1fr_120px] items-center gap-2.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                      isFieldSelected
+                                        ? 'bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 opacity-100'
+                                        : 'bg-background-color-2/40 dark:bg-dark-background-color-2/30 border-background-color-2/40 dark:border-dark-background-color-2/30 opacity-50'
+                                    }`}
                                   >
                                     <input
                                       type="checkbox"
@@ -518,47 +398,36 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                                         onToggleField?.(match.localSongId, diff.fieldId);
                                       }}
                                       onClick={(e) => e.stopPropagation()}
-                                      style={{ cursor: 'pointer' }}
+                                      className="cursor-pointer"
                                     />
 
-                                    <span style={{ fontWeight: 700, color: isFieldSelected ? '#E2E8F0' : '#94A3B8' }}>
+                                    <span className={`font-semibold ${isFieldSelected ? 'text-font-color-black dark:text-font-color-white' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
                                       {diff.fieldName}
                                     </span>
 
-                                    <span style={{ color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em style={{ opacity: 0.6 }}>None</em>}
+                                    <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap">
+                                      {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em className="opacity-60">None</em>}
                                     </span>
 
-                                    <span style={{ textAlign: 'center', color: '#64748B', fontWeight: 700 }}>
+                                    <span className="text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-bold">
                                       →
                                     </span>
 
                                     <span
-                                      style={{
-                                        fontWeight: 600,
-                                        color: !isFieldSelected ? '#64748B' : isNew ? '#34D399' : '#FBBF24',
-                                        textDecoration: isFieldSelected ? 'none' : 'line-through',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                      }}
+                                      className={`font-semibold overflow-hidden text-ellipsis whitespace-nowrap ${
+                                        !isFieldSelected
+                                          ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed line-through'
+                                          : isNew
+                                          ? 'text-emerald-600 dark:text-emerald-400'
+                                          : 'text-font-color-highlight dark:text-dark-font-color-highlight'
+                                      }`}
                                     >
                                       {String(displayVal)}
                                     </span>
 
-                                    <div style={{ textAlign: 'right' }}>
+                                    <div className="text-right">
                                       {diff.providerName && (
-                                        <span
-                                          style={{
-                                            padding: '2px 7px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.7rem',
-                                            fontWeight: 600,
-                                            background: prov.bg,
-                                            color: prov.text,
-                                            border: `1px solid ${prov.border}`
-                                          }}
-                                        >
+                                        <span className="px-2 py-0.5 rounded text-[0.7rem] font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
                                           {diff.providerName}
                                         </span>
                                       )}
@@ -568,7 +437,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                               })}
                             </div>
                           ) : (
-                            <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.02)', color: '#94A3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                            <div className="p-3 rounded-lg bg-background-color-2/20 dark:bg-dark-background-color-2/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs italic">
                               All metadata fields already match this track.
                             </div>
                           )}
@@ -585,3 +454,4 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
     </div>
   );
 };
+

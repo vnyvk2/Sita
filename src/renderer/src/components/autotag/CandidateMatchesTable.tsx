@@ -19,49 +19,31 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
 }) => {
   if (candidates.length === 0 && !loading) {
     return (
-      <div
-        style={{
-          padding: '24px',
-          textAlign: 'center',
-          background: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: '10px',
-          border: '1px dashed rgba(255, 255, 255, 0.16)',
-          color: '#94A3B8',
-          fontSize: '0.88rem'
-        }}
-      >
+      <div className="p-6 text-center bg-background-color-2/20 dark:bg-dark-background-color-2/30 rounded-xl border border-dashed border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed text-sm">
         No candidate releases found. Enter album and artist above and click Search.
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="flex flex-col gap-2">
       {/* Section Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', color: '#94A3B8', textTransform: 'uppercase' }}>
+      <div className="flex justify-between items-center px-1">
+        <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
           Candidate Releases ({candidates.length})
         </span>
       </div>
 
       {/* Table Container (Scrollable up to max 4-5 compact rows) */}
-      <div
-        style={{
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '10px',
-          overflowY: 'auto',
-          maxHeight: '250px',
-          background: 'rgba(15, 23, 42, 0.6)'
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
-          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'rgb(15, 23, 42)' }}>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94A3B8', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <th style={{ width: '36px', padding: '8px 10px', textAlign: 'center' }}></th>
-              <th style={{ padding: '8px 12px' }}>RELEASE</th>
-              <th style={{ padding: '8px 12px' }}>ARTIST</th>
-              <th style={{ padding: '8px 12px', width: '80px' }}>YEAR</th>
-              <th style={{ padding: '8px 12px', width: '150px' }}>MATCH</th>
+      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-y-auto max-h-[250px] bg-background-color-2/20 dark:bg-dark-background-color-2/30">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead className="sticky top-0 z-[2] bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
+            <tr>
+              <th className="w-9 px-2.5 py-2 text-center"></th>
+              <th className="px-3 py-2">RELEASE</th>
+              <th className="px-3 py-2">ARTIST</th>
+              <th className="px-3 py-2 w-20">YEAR</th>
+              <th className="px-3 py-2 w-40">MATCH</th>
             </tr>
           </thead>
           <tbody>
@@ -75,107 +57,72 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                 <tr
                   key={candidateKey}
                   onClick={() => onSelectCandidate(cand)}
-                  style={{
-                    borderBottom: idx < candidates.length - 1 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
-                    background: isSelected ? 'rgba(59, 130, 246, 0.22)' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) e.currentTarget.style.background = 'transparent';
-                  }}
+                  className={`border-b border-background-color-2/50 dark:border-dark-background-color-2/50 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-background-color-3/20 dark:bg-dark-background-color-3/20' : 'hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/60'
+                  }`}
                 >
                   {/* Radio / Loading Indicator */}
-                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                  <td className="px-2.5 py-2 text-center">
                     {isLoadingThis ? (
-                      <div
-                        className="animate-spin rounded-full border-2 border-blue-400 border-t-transparent"
-                        style={{
-                          width: '12px',
-                          height: '12px',
-                          margin: '0 auto'
-                        }}
-                      />
+                      <div className="w-3 h-3 rounded-full border-2 border-font-color-highlight dark:border-dark-font-color-highlight border-t-transparent animate-spin mx-auto" />
                     ) : (
                       <div
-                        style={{
-                          width: '13px',
-                          height: '13px',
-                          borderRadius: '50%',
-                          border: isSelected ? '4px solid #38BDF8' : '1.5px solid rgba(255, 255, 255, 0.4)',
-                          background: isSelected ? '#FFFFFF' : 'transparent',
-                          margin: '0 auto'
-                        }}
+                        className={`w-3.5 h-3.5 rounded-full border-2 mx-auto transition-all ${
+                          isSelected
+                            ? 'border-font-color-highlight dark:border-dark-font-color-highlight bg-font-color-highlight dark:bg-dark-font-color-highlight'
+                            : 'border-font-color-dimmed/60 dark:border-dark-font-color-dimmed/60 bg-transparent'
+                        }`}
                       />
                     )}
                   </td>
 
                   {/* Release Title & Subtitle */}
-                  <td style={{ padding: '8px 12px' }}>
-                    <div style={{ fontWeight: isSelected ? 700 : 600, color: '#FFFFFF', fontSize: '0.84rem' }}>
+                  <td className="px-3 py-2">
+                    <div className={`text-sm ${isSelected ? 'font-bold text-font-color-highlight dark:text-dark-font-color-highlight' : 'font-semibold text-font-color-black dark:text-font-color-white'}`}>
                       {cand.title}
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: isSelected ? '#93C5FD' : '#94A3B8', marginTop: '1px' }}>
+                    <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5">
                       {cand.trackCount ? `${cand.trackCount} tracks` : 'Official Release'} {cand.releaseType ? `· ${cand.releaseType}` : ''}
                     </div>
                   </td>
 
                   {/* Artist */}
-                  <td style={{ padding: '8px 12px', color: '#E2E8F0', fontWeight: 500, fontSize: '0.82rem' }}>
+                  <td className="px-3 py-2 text-font-color-black dark:text-font-color-white text-xs font-medium">
                     {cand.artist || '—'}
                   </td>
 
                   {/* Year */}
-                  <td style={{ padding: '8px 12px', color: '#CBD5E1', fontSize: '0.82rem' }}>
+                  <td className="px-3 py-2 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                     {cand.year ?? '—'}
                   </td>
 
                   {/* Match Rank & Provider */}
-                  <td style={{ padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
                       {isLoadingThis ? (
-                        <span
-                          style={{
-                            fontSize: '0.70rem',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            background: 'rgba(59, 130, 246, 0.25)',
-                            color: '#93C5FD',
-                            border: '1px solid rgba(59, 130, 246, 0.5)'
-                          }}
-                        >
+                        <span className="text-[0.7rem] font-semibold px-1.5 py-0.5 rounded bg-background-color-3/30 dark:bg-dark-background-color-3/30 text-font-color-highlight dark:text-dark-font-color-highlight border border-background-color-3/50 dark:border-dark-background-color-3/50">
                           Resolving...
                         </span>
                       ) : (
                         <>
                           <span
-                            style={{
-                              fontSize: '0.70rem',
-                              fontWeight: 700,
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.04em',
-                              background: idx === 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                              color: idx === 0 ? '#34D399' : '#94A3B8',
-                              border: idx === 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)'
-                            }}
+                            className={`text-[0.7rem] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide border ${
+                              idx === 0
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed'
+                            }`}
                           >
                             {idx === 0 ? 'Best Match' : `#${idx + 1}`}
                           </span>
                           {cand.rankingScore !== undefined && (
-                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected ? '#93C5FD' : '#CBD5E1' }}>
+                            <span className="text-[0.72rem] font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed">
                               Score {cand.rankingScore}
                             </span>
                           )}
                         </>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.70rem', color: '#94A3B8', marginTop: '2px', fontWeight: 500 }}>
+                    <div className="text-[0.7rem] text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 font-medium">
                       {providerLabel}
                     </div>
                   </td>
@@ -188,3 +135,4 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
     </div>
   );
 };
+

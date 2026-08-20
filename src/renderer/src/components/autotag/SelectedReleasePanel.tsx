@@ -25,73 +25,48 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
   const confidencePercent = Math.round(preview.overallConfidence * 100);
 
   return (
-    <div
-      style={{
-        background: 'rgba(15, 23, 42, 0.7)',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        padding: '18px 20px',
-        display: 'grid',
-        gridTemplateColumns: '130px 1fr',
-        gap: '20px',
-        alignItems: 'center'
-      }}
-    >
+    <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/50 rounded-xl border border-background-color-2 dark:border-dark-background-color-2 p-5 grid grid-cols-[130px_1fr] gap-5 items-center">
       {/* Left: Artwork & Source Selector */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-        <div
-          style={{
-            width: '110px',
-            height: '110px',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            background: 'rgba(0, 0, 0, 0.5)',
-            border: '1px solid rgba(255, 255, 255, 0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)'
-          }}
-        >
+      <div className="flex flex-col gap-2 items-center">
+        <div className="w-[110px] h-[110px] rounded-lg overflow-hidden bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 flex items-center justify-center relative shadow-sm">
           {artworkUrl && artworkSource !== 'local' ? (
             <img
               src={artworkUrl}
               alt="Cover Art"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              className="w-full h-full object-cover"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
-              <span style={{ fontSize: '1.8rem' }}>🎵</span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>No Cover</span>
+            <div className="flex flex-col items-center gap-1 text-font-color-dimmed dark:text-dark-font-color-dimmed">
+              <span className="text-2xl">🎵</span>
+              <span className="text-xs font-medium">No Cover</span>
             </div>
           )}
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#F8FAFC', cursor: 'pointer', fontWeight: 600 }}>
+        <label className="flex items-center gap-1.5 text-xs text-font-color-black dark:text-font-color-white font-medium cursor-pointer">
           <input
             type="checkbox"
             checked={replaceArtwork}
             onChange={(e) => onToggleReplaceArtwork(e.target.checked)}
-            style={{ cursor: 'pointer' }}
+            className="cursor-pointer"
           />
           <span>Update Cover</span>
         </label>
       </div>
 
       {/* Right: Release Information, Confidence, MBID/ISRC & Artwork Source */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="flex flex-col gap-2.5">
         {/* Release Title & Artist */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="flex justify-between items-start">
           <div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 }}>
+            <div className="text-xl font-bold text-font-color-highlight dark:text-dark-font-color-highlight leading-tight">
               {preview.album.title}
             </div>
-            <div style={{ fontSize: '0.92rem', color: '#CBD5E1', marginTop: '4px', fontWeight: 500 }}>
-              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{preview.album.artist}</span> {preview.album.year ? `· ${preview.album.year}` : ''} · {preview.matches.length} tracks
+            <div className="text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 font-medium">
+              <span className="text-font-color-black dark:text-font-color-white font-semibold">{preview.album.artist}</span> {preview.album.year ? `· ${preview.album.year}` : ''} · {preview.matches.length} tracks
             </div>
           </div>
 
@@ -100,16 +75,16 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
         </div>
 
         {/* Identity & Metadata Attributes */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem' }}>
-          <div style={{ background: 'rgba(59, 130, 246, 0.25)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '4px', padding: '3px 10px', color: '#93C5FD', fontWeight: 600 }}>
-            Provider: {getProviderDisplayName(preview.provider)}
+        <div className="flex flex-wrap gap-2 items-center text-xs">
+          <div className="bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 rounded px-2.5 py-0.5 text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">
+            Provider: <span className="text-font-color-black dark:text-font-color-white font-semibold">{getProviderDisplayName(preview.provider)}</span>
           </div>
 
-          <div style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '4px', padding: '3px 10px', color: '#CBD5E1' }}>
-            MBID: <span style={{ fontFamily: 'monospace', color: '#FFFFFF', fontWeight: 600 }}>{mbid.slice(0, 18)}...</span>
+          <div className="bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 rounded px-2.5 py-0.5 text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">
+            MBID: <span className="font-mono text-font-color-black dark:text-font-color-white font-semibold">{mbid.slice(0, 18)}...</span>
           </div>
 
-          <div style={{ background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '4px', padding: '3px 10px', color: '#34D399', fontWeight: 600 }}>
+          <div className="bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 rounded px-2.5 py-0.5 text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
             Confidence: {confidencePercent}%
           </div>
         </div>
@@ -122,9 +97,9 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
 
         {/* Artwork Source Radio Group */}
         {replaceArtwork && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '2px', fontSize: '0.82rem', color: '#CBD5E1' }}>
-            <span style={{ fontWeight: 700, color: '#94A3B8' }}>Artwork Source:</span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: artworkSource === 'musicbrainz' ? '#FFFFFF' : '#94A3B8', fontWeight: artworkSource === 'musicbrainz' ? 600 : 400 }}>
+          <div className="flex items-center gap-3.5 mt-0.5 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+            <span className="font-semibold text-font-color-black dark:text-font-color-white">Artwork Source:</span>
+            <label className={`flex items-center gap-1.5 cursor-pointer ${artworkSource === 'musicbrainz' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
               <input
                 type="radio"
                 name="artworkSource"
@@ -134,7 +109,7 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
               />
               MusicBrainz
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: artworkSource === 'coverartarchive' ? '#FFFFFF' : '#94A3B8', fontWeight: artworkSource === 'coverartarchive' ? 600 : 400 }}>
+            <label className={`flex items-center gap-1.5 cursor-pointer ${artworkSource === 'coverartarchive' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
               <input
                 type="radio"
                 name="artworkSource"
@@ -144,7 +119,7 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
               />
               Cover Art Archive
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: artworkSource === 'local' ? '#FFFFFF' : '#94A3B8', fontWeight: artworkSource === 'local' ? 600 : 400 }}>
+            <label className={`flex items-center gap-1.5 cursor-pointer ${artworkSource === 'local' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
               <input
                 type="radio"
                 name="artworkSource"
@@ -160,3 +135,4 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
     </div>
   );
 };
+
