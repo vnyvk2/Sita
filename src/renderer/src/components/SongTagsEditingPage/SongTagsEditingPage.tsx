@@ -1,4 +1,5 @@
 import { store } from '@renderer/store/store';
+import { useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 /* eslint-disable promise/catch-or-return */
 import { lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -62,6 +63,7 @@ interface SongTagsEditingPageProps {
 }
 
 function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
+  const { history } = useRouter();
   const currentlyActivePage = useStore(store, (state) => state.currentlyActivePage);
   const currentSongData = useStore(store, (state) => state.currentSongData);
 
@@ -752,9 +754,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
               label={t('common.goBack')}
               iconName="arrow_back"
               className="mt-4"
-              clickHandler={() => {
-                // TODO: Implement page history back navigation.
-              }}
+              clickHandler={() => history.back()}
             />
           </div>
         )}

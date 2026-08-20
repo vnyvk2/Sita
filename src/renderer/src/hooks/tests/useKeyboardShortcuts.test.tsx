@@ -7,10 +7,13 @@ import i18n from '../../i18n';
 import storage from '../../utils/localStorage';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 
+const mockHistoryBack = vi.fn();
+const mockHistoryForward = vi.fn();
+
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/main-player/home' }),
-  useRouter: () => ({ history: { back: vi.fn() } })
+  useRouter: () => ({ history: { back: mockHistoryBack, forward: mockHistoryForward } })
 }));
 
 vi.mock('../useOverlayNavigation', () => ({
@@ -148,5 +151,37 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
       window.dispatchEvent(event);
     });
     expect(mockResyncSongsLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it('should trigger history.back when goBack shortcut is pressed (Alt+ArrowLeft)', () => {
+    mockHistoryBack.mockClear();
+    renderHook(() => useKeyboardShortcuts(defaultProps));
+
+    act(() => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowLeft',
+        altKey: true,
+        bubbles: true
+      });
+      window.dispatchEvent(event);
+    });
+
+    expect(mockHistoryBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('should trigger history.forward when goForward shortcut is pressed (Alt+ArrowRight)', () => {
+    mockHistoryForward.mockClear();
+    renderHook(() => useKeyboardShortcuts(defaultProps));
+
+    act(() => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        altKey: true,
+        bubbles: true
+      });
+      window.dispatchEvent(event);
+    });
+
+    expect(mockHistoryForward).toHaveBeenCalledTimes(1);
   });
 });
