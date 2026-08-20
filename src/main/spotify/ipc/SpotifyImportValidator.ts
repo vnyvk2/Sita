@@ -1,14 +1,22 @@
 import { inArray } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
+import type { ImportDecision } from '../../playlistImport/models/ImportDecision';
 import type { ImportStatistics } from '../../playlistImport/models/ImportStatistics';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
+
+const VALID_DECISIONS = new Set<ImportDecision>([
+  'IMPORT',
+  'SKIP_NOT_IN_LIBRARY',
+  'SKIP_MISSING',
+  'SKIP_INVALID'
+]);
 
 export class SpotifyImportValidator {
   /**
    * Deeply validates an untrusted PlaylistImportPlan from the renderer before persistence.
-   * Enforces structural integrity, strictly sequential 1..N ordering, decision consistency,
-   * database referential integrity, and recomputes all statistics on the backend.
+   * Enforces structural integrity, strictly sequential 1..N ordering, exhaustive decision validation,
+   * decision <-> libraryMatch status consistency, database referential integrity, and recomputes all statistics on the backend.
    */
   public static async validateAndSanitizePlan(untrustedPlan: PlaylistImportPlan): Promise<PlaylistImportPlan> {
     if (!untrustedPlan || typeof untrustedPlan !== 'object') {
@@ -33,7 +41,7 @@ export class SpotifyImportValidator {
     let invalidCount = 0;
     let repairedCount = 0;
 
-    // 1. Structural, Sequential Ordering, and Decision Consistency Checks
+    // 1. Structural, Sequential Ordering, Exhaustive Decisions, and Status Consistency Checks
     for (let i = 0; i < untrustedPlan.entries.length; i++) {
       const entry = untrustedPlan.entries[i];
       const expectedPosition = i + 1;
@@ -48,12 +56,24 @@ export class SpotifyImportValidator {
         );
       }
 
+      if (!VALID_DECISIONS.has(entry.decision)) {
+        throw new Error(
+          `Invalid playlist entry at position ${expectedPosition}: unrecognized decision '${entry.decision}'.`
+        );
+      }
+
       const match = entry.source.trackReference?.libraryMatch;
       if (!match) {
         throw new Error(`Invalid playlist entry at position ${expectedPosition}: missing libraryMatch object.`);
       }
 
       if (entry.decision === 'IMPORT') {
+        if (match.status !== 'MATCHED') {
+          throw new Error(
+            `Inconsistent decision at position ${expectedPosition}: decision is IMPORT but libraryMatch.status is '${match.status}' (expected 'MATCHED').`
+          );
+        }
+
         const songId = match.matchedSongId;
         if (
           typeof songId !== 'number' ||
@@ -79,10 +99,25 @@ export class SpotifyImportValidator {
         }
 
         if (entry.decision === 'SKIP_NOT_IN_LIBRARY') {
+          if (match.status !== 'NOT_IN_LIBRARY') {
+            throw new Error(
+              `Inconsistent decision at position ${expectedPosition}: decision is SKIP_NOT_IN_LIBRARY but libraryMatch.status is '${match.status}'.`
+            );
+          }
           unmatchedCount++;
         } else if (entry.decision === 'SKIP_MISSING') {
+          if (match.status !== 'MISSING') {
+            throw new Error(
+              `Inconsistent decision at position ${expectedPosition}: decision is SKIP_MISSING but libraryMatch.status is '${match.status}'.`
+            );
+          }
           missingCount++;
         } else if (entry.decision === 'SKIP_INVALID') {
+          if (match.status !== 'INVALID_URI') {
+            throw new Error(
+              `Inconsistent decision at position ${expectedPosition}: decision is SKIP_INVALID but libraryMatch.status is '${match.status}'.`
+            );
+          }
           invalidCount++;
         }
       }

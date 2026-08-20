@@ -24,28 +24,41 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
   const [filter, setFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
 
   useEffect(() => {
+    let isCancelled = false;
+
     if (isOpen && playlist) {
       setIsLoading(true);
       setError(null);
       setPlan(null);
       setImportSuccess(false);
+      setFilter('all');
 
       window.api.spotify
         .generateImportPlan(playlist.id)
         .then((generatedPlan) => {
-          setPlan(generatedPlan as PlaylistImportPlan);
+          if (!isCancelled) {
+            setPlan(generatedPlan as PlaylistImportPlan);
+          }
         })
         .catch((err: unknown) => {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Failed to generate playlist import plan from Spotify.'
-          );
+          if (!isCancelled) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : 'Failed to generate playlist import plan from Spotify.'
+            );
+          }
         })
         .finally(() => {
-          setIsLoading(false);
+          if (!isCancelled) {
+            setIsLoading(false);
+          }
         });
     }
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, playlist]);
 
   if (!isOpen || !playlist) return null;
@@ -78,7 +91,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
   const matchRate = plan?.statistics?.plannedImportPercentage ?? 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-3/30 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border shadow-2xl">
         {/* Header */}
         <div className="border-background-color-3/20 flex items-center justify-between border-b p-5">
@@ -95,9 +108,20 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
               </div>
             )}
             <div>
-              <h2 className="text-font-color-black dark:text-font-color-white text-xl font-bold">
-                {playlist.name}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-font-color-black dark:text-font-color-white text-xl font-bold">
+                  {playlist.name}
+                </h2>
+                <a
+                  href={`https://open.spotify.com/playlist/${encodeURIComponent(playlist.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#1DB954] hover:underline text-xs flex items-center gap-0.5"
+                  title="Open in Spotify"
+                >
+                  <span className="material-icons-round text-xs">open_in_new</span>
+                </a>
+              </div>
               <p className="text-font-color-dim dark:text-dark-font-color-dim text-xs">
                 Spotify Playlist • {playlist.tracksTotal} total items
               </p>
@@ -182,7 +206,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                     </p>
                     <p className="text-font-color-dim dark:text-dark-font-color-dim text-xs">
                       {plan.statistics.notInLibraryEntries} missing locally
-                      {plan.statistics.invalidEntries > 0 ? ` • ${plan.statistics.invalidEntries} unsupported episodes` : ''}
+                      {plan.statistics.invalidEntries > 0 ? ` • ${plan.statistics.invalidEntries} unsupported media` : ''}
                       {plan.statistics.missingEntries > 0 ? ` • ${plan.statistics.missingEntries} unavailable` : ''}
                     </p>
                   </div>
@@ -242,6 +266,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                       const isMatched = entry.decision === 'IMPORT';
                       const isVariantConflict =
                         match.diagnostics?.includes('VARIANT_CONFLICT');
+                      const isLocalFile = match.diagnostics?.includes('SPOTIFY_LOCAL_FILE');
                       const isInvalid = entry.decision === 'SKIP_INVALID';
                       const isMissing = entry.decision === 'SKIP_MISSING';
 
@@ -262,6 +287,9 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                       } else if (isVariantConflict) {
                         badgeText = 'Variant Conflict';
                         badgeColor = 'bg-orange-500/10 text-orange-500 border-orange-500/30';
+                      } else if (isLocalFile) {
+                        badgeText = 'Local File';
+                        badgeColor = 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30';
                       } else if (isInvalid) {
                         badgeText = 'Unsupported Media';
                         badgeColor = 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30';

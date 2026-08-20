@@ -1,49 +1,41 @@
-import type { SpotifyTrackInput } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
-
-export interface SpotifyUserProfile {
+export interface SpotifyUserDTO {
   id: string;
-  displayName: string | null;
-  email?: string;
-  product?: string;
+  display_name: string | null;
   images?: Array<{ url: string; height?: number; width?: number }>;
+  email?: string;
+  country?: string;
+  product?: string;
 }
 
-export interface SpotifyPlaylistSummary {
-  id: string;
+export interface SpotifyTrackInput {
+  id?: string;
   name: string;
-  description: string | null;
-  uri: string;
-  snapshotId: string;
-  collaborative: boolean;
-  isPublic: boolean | null;
-  imageUrl?: string;
-  tracksTotal: number;
-}
-
-export interface SpotifyPlaylistPaging {
-  items: SpotifyPlaylistSummary[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasNext: boolean;
+  duration_ms?: number;
+  external_ids?: { isrc?: string };
+  artists?: Array<{ name: string }>;
+  album?: {
+    name?: string;
+    release_date?: string;
+    images?: Array<{ url: string; height?: number; width?: number }>;
+  };
+  recordingVariant?: 'STUDIO' | 'LIVE' | 'ACOUSTIC' | 'REMIX' | 'INSTRUMENTAL' | 'DELUXE' | 'RADIO_EDIT' | 'DEMO' | 'EXTENDED';
+  type?: 'track';
+  is_local?: boolean;
 }
 
 export interface SpotifyEpisodeInput {
-  id: string;
+  id?: string;
   name: string;
+  duration_ms?: number;
+  type: 'episode';
   description?: string;
-  duration_ms: number;
-  type: 'episode' | string;
-  uri?: string;
+  release_date?: string;
 }
 
-export type SpotifyItemPayload =
-  | SpotifyTrackInput
-  | SpotifyEpisodeInput
-  | ({ type?: string; [key: string]: unknown } & { id?: string; name?: string });
+export type SpotifyItemPayload = SpotifyTrackInput | SpotifyEpisodeInput | { id?: string; name?: string; type?: string; [key: string]: unknown };
 
 export interface SpotifyPlaylistItemDTO {
-  added_at?: string;
+  added_at?: string | null;
   is_local?: boolean;
   item: SpotifyItemPayload | null;
 }
@@ -61,10 +53,31 @@ export interface SpotifyPlaylistItemsResponse {
 export interface SpotifyPlaylistDetails {
   id: string;
   name: string;
-  description: string | null;
-  uri: string;
-  snapshotId: string;
-  imageUrl?: string;
+  description?: string | null;
+  images?: Array<{ url: string; height?: number; width?: number }>;
+  tracks?: { total: number };
+  items?: { total: number };
+  snapshot_id?: string;
+  uri?: string;
   owner?: { id: string; display_name?: string };
+}
+
+export interface SpotifyPlaylistSummary {
+  id: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string;
   tracksTotal: number;
+  snapshotId?: string;
+  uri?: string;
+  ownerName?: string;
+}
+
+export interface SpotifyPlaylistsResponse {
+  items: SpotifyPlaylistDetails[];
+  total: number;
+  limit: number;
+  offset: number;
+  next: string | null;
+  previous: string | null;
 }

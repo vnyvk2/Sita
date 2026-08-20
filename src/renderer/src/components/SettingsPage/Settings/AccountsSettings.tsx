@@ -1,10 +1,9 @@
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { settingsQuery } from '@renderer/queries/settings';
 import { spotifyQuery } from '@renderer/queries/spotify';
 import { queryClient } from '@renderer/queryClient';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-
 import type { SpotifyPlaylistSummary } from '../../../../../main/spotify/api/types';
 import LastFMIcon from '../../../assets/images/webp/last-fm-logo.webp';
 import Button from '../../Button';
@@ -32,8 +31,35 @@ const AccountsSettings = () => {
   );
 
   const { mutate: updateDiscordRpcState } = useMutation({
-    mutationFn: (state: boolean) => window.api.settings.setUserData('enableDiscordRPC', state),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey })
+    mutationFn: (enableDiscordRpc: boolean) =>
+      window.api.settings.updateDiscordRpcState(enableDiscordRpc),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSongScrobblingToLastFMState } = useMutation({
+    mutationFn: (enableScrobbling: boolean) =>
+      window.api.settings.updateSongScrobblingToLastFMState(enableScrobbling),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSongFavoritesToLastFMState } = useMutation({
+    mutationFn: (enableFavorites: boolean) =>
+      window.api.settings.updateSongFavoritesToLastFMState(enableFavorites),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSendNowPlayingSongDataToLastFMState } = useMutation({
+    mutationFn: (enableNowPlaying: boolean) =>
+      window.api.settings.updateNowPlayingSongDataToLastFMState(enableNowPlaying),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
   });
 
   const { mutate: connectSpotify } = useMutation({
@@ -55,13 +81,6 @@ const AccountsSettings = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: spotifyQuery.status.queryKey });
       void queryClient.invalidateQueries({ queryKey: spotifyQuery.playlists.queryKey });
-    }
-  });
-
-  const { mutate: disconnectLastFM } = useMutation({
-    mutationFn: () => window.api.lastFm.disconnect(),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
     }
   });
 
@@ -189,45 +208,98 @@ const AccountsSettings = () => {
 
         {/* Last.fm Integration */}
         <li className="last-fm-integration mb-4">
-          <div className="description">{t('settingsPage.lastFmDescription')}</div>
-          <div className="flex items-start p-4 pb-0">
-            <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[#ba0000]/10 text-[#ba0000]">
-              <img src={LastFMIcon} alt="Last.fm Logo" className="h-10 w-10 object-contain" />
-            </div>
-            <div className="grow">
+          <div className="description">{t('settingsPage.integrateLastFm')}</div>
+          <div className="flex p-4 pb-0">
+            <img
+              src={LastFMIcon}
+              alt={t('settingsPage.lastFmLogo')}
+              className={`mr-4 h-16 w-16 rounded-md ${
+                !isLastFmConnected && 'brightness-90 grayscale'
+              }`}
+            />
+            <div className="grow-0">
               <p
                 className={`flex items-center font-semibold uppercase ${
                   isLastFmConnected ? 'text-green-500' : 'text-red-500'
-                }`}
+                } `}
               >
-                {isLastFmConnected
-                  ? `${t('settingsPage.connectedToLastFM')} (${userSettings?.lastFmUsername})`
-                  : t('settingsPage.notConnectedToLastFM')}
+                {t(
+                  isLastFmConnected
+                    ? 'settingsPage.lastFmConnected'
+                    : 'settingsPage.lastFmNotConnected'
+                )}{' '}
+                {isLastFmConnected &&
+                  userSettings?.lastFmSessionName &&
+                  `(${t('settingsPage.loggedInAs')} ${userSettings.lastFmSessionName})`}
               </p>
-              <p className="text-font-color-dim dark:text-dark-font-color-dim mt-1 text-sm">
-                {isLastFmConnected
-                  ? t('settingsPage.lastFMConnectedDesc')
-                  : t('settingsPage.lastFMDisconnectedDesc')}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                {isLastFmConnected ? (
-                  <Button
-                    label={t('settingsPage.disconnectFromLastFM')}
-                    iconName="link_off"
-                    className="border-red-500 text-red-500 hover:bg-red-500/10"
-                    clickHandler={() => disconnectLastFM()}
-                  />
-                ) : (
-                  <Button
-                    label={t('settingsPage.connectToLastFM')}
-                    iconName="open_in_new"
-                    className="bg-[#ba0000]! text-white!"
-                    clickHandler={() => window.api.lastFm.authorize()}
-                  />
-                )}
-              </div>
+              <ul className="list-inside list-disc text-sm">
+                <li>{t('settingsPage.lastFmDescription1')}</li>
+                <li>{t('settingsPage.lastFmDescription2')}</li>
+                <li>{t('settingsPage.lastFmDescription3')}</li>
+                <li>{t('settingsPage.lastFmDescription4')}</li>
+              </ul>
+              <Button
+                label={
+                  isLastFmConnected
+                    ? t('settingsPage.authenticateAgain')
+                    : t('settingsPage.loginInBrowser')
+                }
+                iconName="open_in_new"
+                className="mt-2"
+                clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
+              />
             </div>
           </div>
+          <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
+            <li
+              className={`last-fm-integration mb-4 transition-opacity ${
+                !isLastFmConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">{t('settingsPage.scrobblingDescription')}</div>
+              <Checkbox
+                id="sendSongScrobblingDataToLastFM"
+                isChecked={!!userSettings?.sendSongScrobblingDataToLastFM}
+                checkedStateUpdateFunction={(state) => updateSongScrobblingToLastFMState(state)}
+                labelContent={t('settingsPage.enableScrobbling')}
+                isDisabled={!isLastFmConnected}
+              />
+            </li>
+            <li
+              className={`last-fm-integration mb-4 transition-opacity ${
+                !isLastFmConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">
+                {t('settingsPage.sendFavoritesToLastFmDescription')}
+              </div>
+              <Checkbox
+                id="sendSongFavoritesDataToLastFM"
+                isChecked={!!userSettings?.sendSongFavoritesDataToLastFM}
+                checkedStateUpdateFunction={(state) => updateSongFavoritesToLastFMState(state)}
+                labelContent={t('settingsPage.sendFavoritesToLastFm')}
+                isDisabled={!isLastFmConnected}
+              />
+            </li>
+            <li
+              className={`last-fm-integration mb-4 transition-opacity ${
+                !isLastFmConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">
+                {t('settingsPage.sendNowPlayingToLastFmDescription')}
+              </div>
+              <Checkbox
+                id="sendNowPlayingSongDataToLastFM"
+                isChecked={!!userSettings?.sendNowPlayingSongDataToLastFM}
+                checkedStateUpdateFunction={(state) =>
+                  updateSendNowPlayingSongDataToLastFMState(state)
+                }
+                labelContent={t('settingsPage.sendNowPlayingToLastFm')}
+                isDisabled={!isLastFmConnected}
+              />
+            </li>
+          </ul>
         </li>
       </ul>
     </li>

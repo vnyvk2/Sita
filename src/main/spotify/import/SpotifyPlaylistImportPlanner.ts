@@ -28,7 +28,7 @@ export class SpotifyPlaylistImportPlanner {
     items: SpotifyPlaylistItemDTO[],
     localSongs: CanonicalTrackIdentity[]
   ): PlaylistImportPlan {
-    // 1. Pre-index local library songs for O(1)-average candidate bucket retrieval
+    // 1. Pre-index local library songs for candidate bucket retrieval
     const isrcMap = new Map<string, CanonicalTrackIdentity[]>();
     const mbidMap = new Map<string, CanonicalTrackIdentity[]>();
     const titleArtistMap = new Map<string, CanonicalTrackIdentity[]>();
@@ -117,7 +117,46 @@ export class SpotifyPlaylistImportPlanner {
         continue;
       }
 
-      // Case B: Item is an episode or unknown future non-track type
+      // Case B: Item is a local Spotify file (is_local: true)
+      if (playlistItem.is_local || (rawItem as SpotifyTrackInput).is_local) {
+        invalidCount++;
+        const trackTitle = (rawItem as { name?: string }).name || 'Local File';
+        const libraryMatch: LibraryMatch = {
+          status: 'INVALID_URI',
+          confidence: 0,
+          diagnostics: ['SPOTIFY_LOCAL_FILE']
+        };
+
+        const resolvedTrack: ResolvedTrackReference = {
+          track: {
+            originalLocation: '',
+            title: trackTitle,
+            duration: (rawItem as { duration_ms?: number }).duration_ms
+              ? Math.round((rawItem as { duration_ms?: number }).duration_ms! / 1000)
+              : 0
+          },
+          resolution: {
+            originalReference: '',
+            resolutionStatus: 'UNRESOLVED',
+            verificationStatus: 'MISSING'
+          }
+        };
+
+        const source: LibraryResolvedPlaylistEntry = {
+          position,
+          trackReference: { resolvedTrack, libraryMatch },
+          dateAdded: playlistItem.added_at ? new Date(playlistItem.added_at) : undefined
+        };
+
+        entries.push({
+          source,
+          decision: 'SKIP_INVALID',
+          notes: ['Local Spotify track (not in Spotify global catalogue)']
+        });
+        continue;
+      }
+
+      // Case C: Item is an episode or unknown non-track media type
       const itemType = (rawItem as { type?: string }).type;
       if (itemType && itemType !== 'track') {
         invalidCount++;
@@ -164,7 +203,7 @@ export class SpotifyPlaylistImportPlanner {
         continue;
       }
 
-      // Case C: Standard Music Track
+      // Case D: Standard Music Track
       const spotifyTrack = rawItem as SpotifyTrackInput;
       const canonicalSpotify = toCanonicalFromSpotifyTrack(spotifyTrack);
 
@@ -204,7 +243,12 @@ export class SpotifyPlaylistImportPlanner {
       for (const candidate of candidateSet) {
         const result = TrackIdentityMatcher.scorePair(canonicalSpotify, candidate);
 
-        if (result.breakdown.variantPenalty >= 30) {
+        // Precise variant conflict check: candidate matched artist+title identity but had variant penalty >= 30
+        const candNormTitle = MetadataNormalizer.normalizeTitle(candidate.title);
+        const candArtist = candidate.artists[0] ? MetadataNormalizer.normalizeArtist(candidate.artists[0]) : '';
+        const isTitleArtistCompatible = normTitle === candNormTitle && (!primaryArtist || !candArtist || primaryArtist === candArtist);
+
+        if (isTitleArtistCompatible && result.breakdown.variantPenalty >= 30) {
           hadVariantConflict = true;
         }
 

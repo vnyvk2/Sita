@@ -1,251 +1,193 @@
-import { RequestPipeline } from '../../platform/networking/RequestPipeline';
+import axios, { type AxiosInstance } from 'axios';
+import logger from '../../logger';
 import type {
-  SpotifyPlaylistDetails,
-  SpotifyPlaylistItemsResponse,
   SpotifyPlaylistItemDTO,
-  SpotifyPlaylistPaging,
+  SpotifyPlaylistItemsResponse,
   SpotifyPlaylistSummary,
-  SpotifyUserProfile
+  SpotifyPlaylistsResponse,
+  SpotifyUserDTO
 } from './types';
 
 export const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 
 export class SpotifyApiClient {
-  private readonly pipeline: RequestPipeline;
+  private httpClient: AxiosInstance;
 
-  constructor(pipeline?: RequestPipeline) {
-    this.pipeline =
-      pipeline ??
-      new RequestPipeline({
-        maxConcurrentRequests: 4,
-        rateLimiter: {
-          maxRequests: 10,
-          perIntervalMs: 1000
-        },
-        retryPolicy: {
-          maxRetries: 3,
-          initialDelayMs: 500,
-          maxDelayMs: 5000,
-          retryableStatusCodes: [429, 500, 502, 503, 504]
-        }
+  constructor(httpClient?: AxiosInstance) {
+    this.httpClient =
+      httpClient ||
+      axios.create({
+        baseURL: SPOTIFY_API_BASE_URL,
+        timeout: 10000
       });
   }
 
-  /** Fetches the current authenticated user's Spotify profile. */
-  public async getCurrentUser(accessToken: string): Promise<SpotifyUserProfile> {
-    const response = await this.pipeline.execute<{
-      id: string;
-      display_name: string | null;
-      email?: string;
-      product?: string;
-      images?: Array<{ url: string; height?: number; width?: number }>;
-    }>({
-      url: `${SPOTIFY_API_BASE_URL}/me`,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify user profile: HTTP ${response.status}`);
+  /**
+   * Fetches the current user profile from Spotify Web API
+   */
+  public async getCurrentUser(accessToken: string): Promise<SpotifyUserDTO> {
+    try {
+      const response = await this.httpClient.get<SpotifyUserDTO>('/me', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to fetch Spotify user profile', { error });
+      throw error;
     }
-
-    const data = response.data;
-    return {
-      id: data.id,
-      displayName: data.display_name,
-      email: data.email,
-      product: data.product,
-      images: data.images
-    };
   }
 
-  /** Fetches metadata details for a specific Spotify playlist. */
+  /**
+   * Fetches the user's saved/followed playlists with pagination
+   */
+  public async getUserPlaylists(
+    accessToken: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<{ items: SpotifyPlaylistSummary[]; total: number }> {
+    const { limit = 50, offset = 0 } = options;
+    try {
+      const response = await this.httpClient.get<SpotifyPlaylistsResponse>('/me/playlists', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        params: {
+          limit,
+          offset
+        }
+      });
+
+      const items: SpotifyPlaylistSummary[] = response.data.items.map((pl) => ({
+        id: pl.id,
+        name: pl.name,
+        description: pl.description,
+        imageUrl: pl.images?.[0]?.url,
+        tracksTotal: pl.items?.total ?? pl.tracks?.total ?? 0,
+        snapshotId: pl.snapshot_id,
+        uri: pl.uri,
+        ownerName: pl.owner?.display_name || pl.owner?.id
+      }));
+
+      return {
+        items,
+        total: response.data.total
+      };
+    } catch (error) {
+      logger.error('Failed to fetch Spotify playlists', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches metadata for a single playlist by ID
+   */
   public async getPlaylist(
     accessToken: string,
     playlistId: string
-  ): Promise<SpotifyPlaylistDetails> {
-    const response = await this.pipeline.execute<{
-      id: string;
-      name: string;
-      description: string | null;
-      uri: string;
-      snapshot_id: string;
-      images?: Array<{ url: string }>;
-      owner?: { id: string; display_name?: string };
-      tracks?: { total: number };
-    }>({
-      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}`,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+  ): Promise<SpotifyPlaylistSummary> {
+    try {
+      const response = await this.httpClient.get(`/playlists/${encodeURIComponent(playlistId)}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
 
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlist details: HTTP ${response.status}`);
+      const data = response.data;
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        imageUrl: data.images?.[0]?.url,
+        tracksTotal: data.items?.total ?? data.tracks?.total ?? 0,
+        snapshotId: data.snapshot_id,
+        uri: data.uri,
+        ownerName: data.owner?.display_name || data.owner?.id
+      };
+    } catch (error) {
+      logger.error('Failed to fetch Spotify playlist details', { playlistId, error });
+      throw error;
     }
-
-    const data = response.data;
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      uri: data.uri,
-      snapshotId: data.snapshot_id,
-      imageUrl: data.images?.[0]?.url,
-      owner: data.owner,
-      tracksTotal: data.tracks?.total ?? 0
-    };
-  }
-
-  /** Fetches the current user's Spotify playlists (paginated). */
-  public async getUserPlaylists(
-    accessToken: string,
-    options?: { limit?: number; offset?: number }
-  ): Promise<SpotifyPlaylistPaging> {
-    const limit = options?.limit ?? 50;
-    const offset = options?.offset ?? 0;
-
-    const url = new URL(`${SPOTIFY_API_BASE_URL}/me/playlists`);
-    url.searchParams.set('limit', limit.toString());
-    url.searchParams.set('offset', offset.toString());
-
-    const response = await this.pipeline.execute<{
-      items: Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        uri: string;
-        snapshot_id: string;
-        collaborative: boolean;
-        public: boolean | null;
-        images?: Array<{ url: string }>;
-        tracks?: { total: number };
-      }>;
-      total: number;
-      limit: number;
-      offset: number;
-      next: string | null;
-    }>({
-      url: url.toString(),
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlists: HTTP ${response.status}`);
-    }
-
-    const data = response.data;
-    const items: SpotifyPlaylistSummary[] = data.items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      uri: item.uri,
-      snapshotId: item.snapshot_id,
-      collaborative: item.collaborative,
-      isPublic: item.public,
-      imageUrl: item.images?.[0]?.url,
-      tracksTotal: item.tracks?.total ?? 0
-    }));
-
-    return {
-      items,
-      total: data.total,
-      limit: data.limit,
-      offset: data.offset,
-      hasNext: data.next !== null
-    };
   }
 
   /**
-   * Fetches all user playlists across all pages by auto-paginating through the Spotify Web API.
-   */
-  public async getAllUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
-    const allPlaylists: SpotifyPlaylistSummary[] = [];
-    let offset = 0;
-    const limit = 50;
-    let hasMore = true;
-
-    while (hasMore) {
-      const page = await this.getUserPlaylists(accessToken, { limit, offset });
-      allPlaylists.push(...page.items);
-
-      offset += page.items.length;
-      hasMore = page.hasNext && page.items.length > 0 && offset < page.total;
-    }
-
-    return allPlaylists;
-  }
-
-  /**
-   * Fetches items (tracks, episodes) of a Spotify playlist using the active GET /v1/playlists/{id}/items endpoint.
+   * Fetches a single page of items from a Spotify playlist (using the active GET /v1/playlists/{id}/items endpoint)
+   * explicitly requesting additional_types=track,episode
    */
   public async getPlaylistItems(
     accessToken: string,
     playlistId: string,
-    options?: { limit?: number; offset?: number; nextUrl?: string }
+    options: { limit?: number; offset?: number } = {}
   ): Promise<SpotifyPlaylistItemsResponse> {
-    let targetUrl: string;
-    if (options?.nextUrl) {
-      targetUrl = options.nextUrl;
-    } else {
-      const limit = options?.limit ?? 50;
-      const offset = options?.offset ?? 0;
-      const url = new URL(
-        `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`
+    const { limit = 50, offset = 0 } = options;
+    try {
+      const response = await this.httpClient.get<SpotifyPlaylistItemsResponse>(
+        `/playlists/${encodeURIComponent(playlistId)}/items`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          },
+          params: {
+            limit,
+            offset,
+            additional_types: 'track,episode'
+          }
+        }
       );
-      url.searchParams.set('limit', limit.toString());
-      url.searchParams.set('offset', offset.toString());
-      targetUrl = url.toString();
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to fetch Spotify playlist items page', { playlistId, options, error });
+      throw error;
     }
-
-    const response = await this.pipeline.execute<SpotifyPlaylistItemsResponse>({
-      url: targetUrl,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Failed to fetch Spotify playlist items: HTTP ${response.status}`);
-    }
-
-    return response.data;
   }
 
   /**
-   * Fetches all items in a Spotify playlist across all pages.
+   * Auto-paginates and fetches all items from a Spotify playlist following pure page.next authority,
+   * bounded by a MAX_PAGES guard and duplicate next safety.
    */
   public async getAllPlaylistItems(
     accessToken: string,
     playlistId: string
   ): Promise<SpotifyPlaylistItemDTO[]> {
     const allItems: SpotifyPlaylistItemDTO[] = [];
+    const MAX_PAGES = 200; // Safeguard: max 10,000 items
+    let pageCount = 0;
     let nextUrl: string | null = null;
-    let isFirstPage = true;
-    let hasMore = true;
+    let previousNextUrl: string | null = null;
 
-    while (hasMore) {
-      const page: SpotifyPlaylistItemsResponse = await this.getPlaylistItems(
-        accessToken,
-        playlistId,
-        isFirstPage ? { limit: 50, offset: 0 } : { nextUrl: nextUrl! }
-      );
+    while (pageCount < MAX_PAGES) {
+      pageCount++;
+      let page: SpotifyPlaylistItemsResponse;
 
-      isFirstPage = false;
-      if (!page.items || page.items.length === 0) {
+      if (!nextUrl) {
+        page = await this.getPlaylistItems(accessToken, playlistId, {
+          limit: 50,
+          offset: allItems.length
+        });
+      } else {
+        const response = await this.httpClient.get<SpotifyPlaylistItemsResponse>(nextUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
+        page = response.data;
+      }
+
+      if (page.items && Array.isArray(page.items)) {
+        allItems.push(...page.items);
+      }
+
+      if (!page.next || page.items.length === 0) {
         break;
       }
 
-      allItems.push(...page.items);
+      if (page.next === previousNextUrl) {
+        logger.warn('Detected duplicate pagination next URL loop from Spotify API', { nextUrl: page.next });
+        break;
+      }
+
+      previousNextUrl = nextUrl;
       nextUrl = page.next;
-      hasMore = Boolean(nextUrl) && allItems.length < page.total;
     }
 
     return allItems;
