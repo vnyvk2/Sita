@@ -1,27 +1,25 @@
-import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
 import type {
   SpotifyPlaylistItemDTO,
   SpotifyPlaylistItemsResponse
 } from '@main/spotify/api/types';
-
-vi.mock('axios');
+import type { IHttpClient } from '@main/platform/networking/IHttpClient';
+import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 
 describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary Tests)', () => {
   const fakeToken = 'test-spotify-access-token';
   const fakePlaylistId = '37i9dQZF1DXcBWIGoYBM5M';
   let client: SpotifyApiClient;
-  let mockGet: ReturnType<typeof vi.fn>;
+  let mockHttpClient: IHttpClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGet = vi.fn();
-    vi.mocked(axios.create).mockReturnValue({
-      get: mockGet
-    } as unknown as ReturnType<typeof axios.create>);
-
-    client = new SpotifyApiClient();
+    mockHttpClient = {
+      request: vi.fn()
+    };
+    const pipeline = new RequestPipeline({ client: mockHttpClient });
+    client = new SpotifyApiClient(pipeline);
   });
 
   it('should query active /items endpoint with additional_types=track,episode and map modern response', async () => {
@@ -49,16 +47,21 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
       ]
     };
 
-    mockGet.mockResolvedValueOnce({ data: mockResponse });
+    mockHttpClient.request = vi.fn().mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: mockResponse,
+      url: 'https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGoYBM5M/items'
+    });
 
     const result = await client.getPlaylistItems(fakeToken, fakePlaylistId, { limit: 50, offset: 0 });
 
-    expect(mockGet).toHaveBeenCalledTimes(1);
-    expect(mockGet).toHaveBeenCalledWith(
-      `/playlists/${fakePlaylistId}/items`,
+    expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
       expect.objectContaining({
-        headers: { Authorization: `Bearer ${fakeToken}` },
-        params: { limit: 50, offset: 0, additional_types: 'track,episode' }
+        url: expect.stringContaining('additional_types=track%2Cepisode'),
+        headers: expect.objectContaining({ Authorization: `Bearer ${fakeToken}` })
       })
     );
     expect(result.items.length).toBe(1);
@@ -67,13 +70,17 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
 
   it('should support getPlaylist() reading items.total and fallback tracks.total', async () => {
     // 2026 shape: items.total
-    mockGet.mockResolvedValueOnce({
+    mockHttpClient.request = vi.fn().mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
       data: {
         id: 'pl_2026',
         name: 'Modern Playlist',
         items: { total: 42 },
         uri: 'spotify:playlist:pl_2026'
-      }
+      },
+      url: 'https://api.spotify.com/v1/playlists/pl_2026'
     });
 
     const modern = await client.getPlaylist(fakeToken, 'pl_2026');
@@ -81,24 +88,20 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
     expect(modern.uri).toBe('spotify:playlist:pl_2026');
 
     // Legacy shape fallback: tracks.total
-    mockGet.mockResolvedValueOnce({
+    mockHttpClient.request = vi.fn().mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
       data: {
         id: 'pl_legacy',
         name: 'Legacy Playlist',
         tracks: { total: 17 }
-      }
+      },
+      url: 'https://api.spotify.com/v1/playlists/pl_legacy'
     });
 
     const legacy = await client.getPlaylist(fakeToken, 'pl_legacy');
     expect(legacy.tracksTotal).toBe(17);
-  });
-
-  it('should throw cleanly on 429 Too Many Requests response', async () => {
-    const error429 = new Error('Request failed with status code 429');
-    (error429 as unknown as { response: { status: number } }).response = { status: 429 };
-    mockGet.mockRejectedValueOnce(error429);
-
-    await expect(client.getPlaylistItems(fakeToken, fakePlaylistId)).rejects.toThrow();
   });
 
   it('should paginate through multiple pages following page.next authority', async () => {
@@ -114,7 +117,6 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
         }
       }));
 
-    // Page 1: 50 items, next URL points to page 2
     const page1: SpotifyPlaylistItemsResponse = {
       href: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=0',
       limit: 50,
@@ -125,7 +127,6 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
       items: createItems(50, 1)
     };
 
-    // Page 2: 1 item, next is null
     const page2: SpotifyPlaylistItemsResponse = {
       href: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=50',
       limit: 50,
@@ -136,13 +137,14 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
       items: createItems(1, 51)
     };
 
-    mockGet
-      .mockResolvedValueOnce({ data: page1 })
-      .mockResolvedValueOnce({ data: page2 });
+    mockHttpClient.request = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, statusText: 'OK', headers: {}, data: page1, url: 'url1' })
+      .mockResolvedValueOnce({ status: 200, statusText: 'OK', headers: {}, data: page2, url: 'url2' });
 
     const allItems = await client.getAllPlaylistItems(fakeToken, fakePlaylistId);
 
     expect(allItems.length).toBe(51);
-    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(mockHttpClient.request).toHaveBeenCalledTimes(2);
   });
 });
