@@ -351,13 +351,13 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                   isImporting
                     ? 'Importing...'
                     : matchedCount === 0
-                      ? 'Import Empty Playlist'
+                      ? 'No Tracks Matched'
                       : `Import ${matchedCount} Tracks`
                 }
                 iconName="download"
                 className="bg-[#1DB954]! text-white!"
                 clickHandler={handleExecuteImport}
-                isDisabled={isImporting}
+                isDisabled={isImporting || matchedCount === 0}
               />
             </div>
           </div>

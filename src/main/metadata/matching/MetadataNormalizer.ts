@@ -88,6 +88,16 @@ export class MetadataNormalizer {
   }
 
   /**
+   * Resolves the effective normalized track title, falling back to normalized filename if the title is useless.
+   */
+  public static getEffectiveTitle(identity: { title?: string; pathOrUri?: string }): string {
+    if (this.isUselessTitle(identity?.title) && identity?.pathOrUri) {
+      return this.normalizeFilename(identity.pathOrUri);
+    }
+    return identity?.title ? this.normalizeTitle(identity.title) : '';
+  }
+
+  /**
    * Detects recording variants (Live, Acoustic, Demo, Remix, etc.) present in a string using word boundaries.
    */
   public static extractVariants(str: string): Set<RecordingVariant> {

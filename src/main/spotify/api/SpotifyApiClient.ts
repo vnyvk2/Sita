@@ -142,23 +142,29 @@ export class SpotifyApiClient {
    */
   public async getAllUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
     const allPlaylists: SpotifyPlaylistSummary[] = [];
+    const seenNextUrls = new Set<string>();
+    const MAX_PAGES = 200;
+    let pageCount = 0;
     let nextUrl: string | null = null;
-    let isFirstPage = true;
     let hasMore = true;
 
-    while (hasMore) {
+    while (hasMore && pageCount < MAX_PAGES) {
+      pageCount++;
       const page = await this.getUserPlaylists(
         accessToken,
-        isFirstPage ? { limit: 50, offset: 0 } : { nextUrl: nextUrl! }
+        nextUrl ? { nextUrl } : { limit: 50, offset: 0 }
       );
 
-      isFirstPage = false;
       if (!page.playlists || page.playlists.length === 0) {
         break;
       }
       allPlaylists.push(...page.playlists);
       nextUrl = page.next;
-      hasMore = Boolean(nextUrl) && allPlaylists.length < page.total;
+      if (!nextUrl || seenNextUrls.has(nextUrl)) {
+        break;
+      }
+      seenNextUrls.add(nextUrl);
+      hasMore = allPlaylists.length < page.total;
     }
 
     return allPlaylists;
@@ -211,10 +217,10 @@ export class SpotifyApiClient {
     playlistId: string
   ): Promise<SpotifyPlaylistItemDTO[]> {
     const allItems: SpotifyPlaylistItemDTO[] = [];
+    const seenNextUrls = new Set<string>();
     const MAX_PAGES = 200;
     let pageCount = 0;
     let nextUrl: string | null = null;
-    let previousNextUrl: string | null = null;
 
     while (pageCount < MAX_PAGES) {
       pageCount++;
@@ -232,11 +238,11 @@ export class SpotifyApiClient {
         break;
       }
 
-      if (page.next === previousNextUrl) {
+      if (seenNextUrls.has(page.next)) {
         break;
       }
 
-      previousNextUrl = nextUrl;
+      seenNextUrls.add(page.next);
       nextUrl = page.next;
     }
 

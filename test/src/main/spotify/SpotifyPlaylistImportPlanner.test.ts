@@ -299,4 +299,38 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('MISSING');
     expect(plan.statistics.missingEntries).toBe(1);
   });
+
+  it('should match local track with useless title (e.g. "Track 01") using filename fallback candidate indexing', () => {
+    const libraryWithUselessTitle: CanonicalTrackIdentity[] = [
+      {
+        id: 301,
+        title: 'Track 01',
+        artists: ['Queen'],
+        durationSecs: 354,
+        pathOrUri: '/music/Queen/01 - Bohemian Rhapsody.flac'
+      }
+    ];
+
+    const items: SpotifyPlaylistItemDTO[] = [
+      {
+        item: {
+          id: 'sp_queen_bohemian',
+          name: 'Bohemian Rhapsody',
+          artists: [{ name: 'Queen' }],
+          duration_ms: 354000,
+          type: 'track'
+        }
+      }
+    ];
+
+    const plan = SpotifyPlaylistImportPlanner.generatePlan(
+      { name: 'Queen Playlist' },
+      items,
+      libraryWithUselessTitle
+    );
+
+    expect(plan.entries[0].decision).toBe('IMPORT');
+    expect(plan.entries[0].source.trackReference.libraryMatch.matchedSongId).toBe(301);
+    expect(plan.statistics.importedEntries).toBe(1);
+  });
 });
