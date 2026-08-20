@@ -40,16 +40,6 @@ export const SpotifyPlaylistExportModal: React.FC<SpotifyPlaylistExportModalProp
       setExportName(playlistName);
       setFilter('all');
 
-      // Check scopes first
-      window.api.spotify
-        .hasExportPermissions(false)
-        .then((permitted) => {
-          if (!isCancelled) setHasPermission(Boolean(permitted));
-        })
-        .catch(() => {
-          if (!isCancelled) setHasPermission(false);
-        });
-
       // Generate preview plan
       window.api.spotify
         .generateExportPlan(playlistId)
@@ -81,6 +71,23 @@ export const SpotifyPlaylistExportModal: React.FC<SpotifyPlaylistExportModalProp
       isCancelled = true;
     };
   }, [isOpen, playlistId, playlistName]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    if (isOpen) {
+      window.api.spotify
+        .hasExportPermissions(isPublic)
+        .then((permitted) => {
+          if (!isCancelled) setHasPermission(Boolean(permitted));
+        })
+        .catch(() => {
+          if (!isCancelled) setHasPermission(false);
+        });
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, isPublic]);
 
   if (!isOpen) return null;
 

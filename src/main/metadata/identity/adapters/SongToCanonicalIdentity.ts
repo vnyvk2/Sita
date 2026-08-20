@@ -27,8 +27,15 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
       if (typeof a === 'string') {
         const trimmed = a.trim();
         if (trimmed) artists.push(trimmed);
-      } else if (a && typeof a.name === 'string') {
-        const trimmed = a.name.trim();
+      } else if (a && typeof (a as any).name === 'string') {
+        const trimmed = (a as any).name.trim();
+        if (trimmed) artists.push(trimmed);
+      } else if (
+        a &&
+        typeof (a as any).artist === 'object' &&
+        typeof (a as any).artist?.name === 'string'
+      ) {
+        const trimmed = (a as any).artist.name.trim();
         if (trimmed) artists.push(trimmed);
       }
     }
