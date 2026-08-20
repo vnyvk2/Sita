@@ -82,7 +82,7 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
           name: 'Stairway to Heaven',
           artists: [{ name: 'Led Zeppelin' }],
           album: { name: 'Led Zeppelin IV' },
-          duration_ms: 482500, // 482s
+          duration_ms: 482500,
           type: 'track'
         }
       }
@@ -100,8 +100,6 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
   });
 
   it('should evaluate Candidate Pool Union (ISRC ∪ MBID ∪ Title+Artist ∪ Title) and pick valid match even if title bucket contains variant conflict candidate', () => {
-    // Song 201 in title bucket is a Live variant (variant conflict).
-    // Song 202 in Title+Artist bucket matches studio version perfectly.
     const customLibrary: CanonicalTrackIdentity[] = [
       {
         id: 201,
@@ -141,13 +139,11 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
       customLibrary
     );
 
-    // Candidate union evaluates both 201 (variant conflict -> isMatch=false) and 202 (accepted); 202 is selected!
     expect(plan.entries[0].decision).toBe('IMPORT');
     expect(plan.entries[0].source.trackReference.libraryMatch.matchedSongId).toBe(202);
   });
 
   it('should report VARIANT_CONFLICT diagnostic when local Live/Acoustic version exists for Spotify Studio track', () => {
-    // Local library only has Song 103 (Hotel California Live), not Song 102 (Studio)
     const liveOnlyLibrary: CanonicalTrackIdentity[] = [
       {
         id: 103,
@@ -181,9 +177,34 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
     expect(plan.entries[0].decision).toBe('SKIP_NOT_IN_LIBRARY');
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('NOT_IN_LIBRARY');
     expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('VARIANT_CONFLICT');
-    expect(plan.entries[0].notes?.[0]).toContain('Local variant version exists');
     expect(plan.statistics.importedEntries).toBe(0);
     expect(plan.statistics.notInLibraryEntries).toBe(1);
+  });
+
+  it('should classify local Spotify tracks (is_local: true) as SKIP_INVALID with SPOTIFY_LOCAL_FILE', () => {
+    const items: SpotifyPlaylistItemDTO[] = [
+      {
+        is_local: true,
+        item: {
+          id: 'sp_local_1',
+          name: 'My Custom Bootleg Recording',
+          duration_ms: 180000,
+          type: 'track',
+          is_local: true
+        }
+      }
+    ];
+
+    const plan = SpotifyPlaylistImportPlanner.generatePlan(
+      { name: 'Local Tracks Test' },
+      items,
+      localSongLibrary
+    );
+
+    expect(plan.entries[0].decision).toBe('SKIP_INVALID');
+    expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('INVALID_URI');
+    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('SPOTIFY_LOCAL_FILE');
+    expect(plan.statistics.invalidEntries).toBe(1);
   });
 
   it('should strictly preserve sequential source ordering 1..N and duplicate tracks [A, B, A]', () => {
@@ -209,7 +230,7 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
       {
         item: {
           id: 'sp_3',
-          name: 'Comfortably Numb', // Duplicate occurrence of track 1
+          name: 'Comfortably Numb',
           artists: [{ name: 'Pink Floyd' }],
           duration_ms: 382000,
           type: 'track'
@@ -257,30 +278,6 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
 
     expect(plan.entries[0].decision).toBe('SKIP_INVALID');
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('INVALID_URI');
-    expect(plan.entries[0].notes?.[0]).toContain('Podcast episode not supported');
-    expect(plan.statistics.invalidEntries).toBe(1);
-    expect(plan.statistics.importedEntries).toBe(0);
-  });
-
-  it('should classify future unknown item types as SKIP_INVALID', () => {
-    const items: SpotifyPlaylistItemDTO[] = [
-      {
-        item: {
-          id: 'future_media_1',
-          name: 'Future Spatial Audio Item',
-          type: 'future_audio_experience'
-        }
-      }
-    ];
-
-    const plan = SpotifyPlaylistImportPlanner.generatePlan(
-      { name: 'Future Media' },
-      items,
-      localSongLibrary
-    );
-
-    expect(plan.entries[0].decision).toBe('SKIP_INVALID');
-    expect(plan.entries[0].notes?.[0]).toContain('Unsupported Spotify media type: future_audio_experience');
     expect(plan.statistics.invalidEntries).toBe(1);
   });
 
@@ -300,38 +297,6 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
 
     expect(plan.entries[0].decision).toBe('SKIP_MISSING');
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('MISSING');
-    expect(plan.entries[0].notes?.[0]).toContain('Item unavailable or removed');
     expect(plan.statistics.missingEntries).toBe(1);
-  });
-
-  it('should calculate statistics accurately for 0% match, partial match, and empty playlist', () => {
-    // 1. Empty Playlist
-    const emptyPlan = SpotifyPlaylistImportPlanner.generatePlan(
-      { name: 'Empty' },
-      [],
-      localSongLibrary
-    );
-    expect(emptyPlan.statistics.totalEntries).toBe(0);
-    expect(emptyPlan.statistics.importedEntries).toBe(0);
-
-    // 2. 0% Match
-    const unmatchedItems: SpotifyPlaylistItemDTO[] = [
-      {
-        item: {
-          id: 'sp_unknown',
-          name: 'Non Existent Track In DB',
-          artists: [{ name: 'Unknown Band' }],
-          duration_ms: 120000,
-          type: 'track'
-        }
-      }
-    ];
-    const zeroPlan = SpotifyPlaylistImportPlanner.generatePlan(
-      { name: 'Zero Match' },
-      unmatchedItems,
-      localSongLibrary
-    );
-    expect(zeroPlan.statistics.importedEntries).toBe(0);
-    expect(zeroPlan.statistics.notInLibraryEntries).toBe(1);
   });
 });

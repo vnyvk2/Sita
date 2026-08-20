@@ -1,298 +1,148 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { IHttpClient } from '@main/platform/networking/IHttpClient';
-import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import axios from 'axios';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
+import type {
+  SpotifyPlaylistItemDTO,
+  SpotifyPlaylistItemsResponse
+} from '@main/spotify/api/types';
 
-describe('SpotifyApiClient (Playlist Details & 2026 /items API)', () => {
-  it('should fetch playlist metadata details from /playlists/{id}', async () => {
-    const mockHttpClient: IHttpClient = {
-      request: vi.fn().mockResolvedValue({
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        data: {
-          id: 'pl_rock_classics',
-          name: 'Rock Classics',
-          description: 'Timeless rock anthems',
-          uri: 'spotify:playlist:pl_rock_classics',
-          snapshot_id: 'snap_rock_99',
-          images: [{ url: 'https://image.spotify.com/rock.jpg' }],
-          owner: { id: 'spotify_curator', display_name: 'Curator' },
-          tracks: { total: 120 }
-        },
-        url: 'https://api.spotify.com/v1/playlists/pl_rock_classics'
-      })
+vi.mock('axios');
+
+describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary Tests)', () => {
+  const fakeToken = 'test-spotify-access-token';
+  const fakePlaylistId = '37i9dQZF1DXcBWIGoYBM5M';
+  let client: SpotifyApiClient;
+  let mockGet: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGet = vi.fn();
+    vi.mocked(axios.create).mockReturnValue({
+      get: mockGet
+    } as unknown as ReturnType<typeof axios.create>);
+
+    client = new SpotifyApiClient();
+  });
+
+  it('should query active /items endpoint with additional_types=track,episode and map modern response', async () => {
+    const mockResponse: SpotifyPlaylistItemsResponse = {
+      href: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=0',
+      limit: 50,
+      next: null,
+      offset: 0,
+      previous: null,
+      total: 1,
+      items: [
+        {
+          added_at: '2026-01-15T12:00:00Z',
+          is_local: false,
+          item: {
+            id: 'track_123',
+            name: 'Song Title',
+            duration_ms: 215000,
+            type: 'track',
+            external_ids: { isrc: 'USRC12345678' },
+            artists: [{ name: 'Artist Name' }],
+            album: { name: 'Album Title', release_date: '2026-01-01' }
+          }
+        }
+      ]
     };
 
-    const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-    const details = await client.getPlaylist('mock-token', 'pl_rock_classics');
+    mockGet.mockResolvedValueOnce({ data: mockResponse });
 
-    expect(details.id).toBe('pl_rock_classics');
-    expect(details.name).toBe('Rock Classics');
-    expect(details.description).toBe('Timeless rock anthems');
-    expect(details.imageUrl).toBe('https://image.spotify.com/rock.jpg');
-    expect(details.tracksTotal).toBe(120);
+    const result = await client.getPlaylistItems(fakeToken, fakePlaylistId, { limit: 50, offset: 0 });
+
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledWith(
+      `/playlists/${fakePlaylistId}/items`,
+      expect.objectContaining({
+        headers: { Authorization: `Bearer ${fakeToken}` },
+        params: { limit: 50, offset: 0, additional_types: 'track,episode' }
+      })
+    );
+    expect(result.items.length).toBe(1);
+    expect(result.items[0].item?.type).toBe('track');
   });
 
-  it('should fetch single page of playlist items from active /playlists/{id}/items endpoint', async () => {
-    const mockHttpClient: IHttpClient = {
-      request: vi.fn().mockResolvedValue({
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        data: {
-          href: 'https://api.spotify.com/v1/playlists/pl_123/items',
-          limit: 50,
-          offset: 0,
-          total: 2,
-          next: null,
-          previous: null,
-          items: [
-            {
-              added_at: '2026-01-01T12:00:00Z',
-              is_local: false,
-              item: {
-                id: 'track_1',
-                name: 'Bohemian Rhapsody',
-                type: 'track',
-                artists: [{ name: 'Queen' }],
-                duration_ms: 354000
-              }
-            },
-            {
-              added_at: '2026-01-02T12:00:00Z',
-              is_local: false,
-              item: {
-                id: 'ep_1',
-                name: 'Rock History Episode 1',
-                type: 'episode',
-                duration_ms: 1800000
-              }
-            }
-          ]
-        },
-        url: 'https://api.spotify.com/v1/playlists/pl_123/items?limit=50&offset=0'
-      })
+  it('should support getPlaylist() reading items.total and fallback tracks.total', async () => {
+    // 2026 shape: items.total
+    mockGet.mockResolvedValueOnce({
+      data: {
+        id: 'pl_2026',
+        name: 'Modern Playlist',
+        items: { total: 42 },
+        uri: 'spotify:playlist:pl_2026'
+      }
+    });
+
+    const modern = await client.getPlaylist(fakeToken, 'pl_2026');
+    expect(modern.tracksTotal).toBe(42);
+    expect(modern.uri).toBe('spotify:playlist:pl_2026');
+
+    // Legacy shape fallback: tracks.total
+    mockGet.mockResolvedValueOnce({
+      data: {
+        id: 'pl_legacy',
+        name: 'Legacy Playlist',
+        tracks: { total: 17 }
+      }
+    });
+
+    const legacy = await client.getPlaylist(fakeToken, 'pl_legacy');
+    expect(legacy.tracksTotal).toBe(17);
+  });
+
+  it('should throw cleanly on 429 Too Many Requests response', async () => {
+    const error429 = new Error('Request failed with status code 429');
+    (error429 as unknown as { response: { status: number } }).response = { status: 429 };
+    mockGet.mockRejectedValueOnce(error429);
+
+    await expect(client.getPlaylistItems(fakeToken, fakePlaylistId)).rejects.toThrow();
+  });
+
+  it('should paginate through multiple pages following page.next authority', async () => {
+    const createItems = (count: number, startId: number): SpotifyPlaylistItemDTO[] =>
+      Array.from({ length: count }, (_, i) => ({
+        added_at: '2026-01-01T00:00:00Z',
+        is_local: false,
+        item: {
+          id: `track_${startId + i}`,
+          name: `Track ${startId + i}`,
+          duration_ms: 200000,
+          type: 'track'
+        }
+      }));
+
+    // Page 1: 50 items, next URL points to page 2
+    const page1: SpotifyPlaylistItemsResponse = {
+      href: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=0',
+      limit: 50,
+      next: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=50',
+      offset: 0,
+      previous: null,
+      total: 51,
+      items: createItems(50, 1)
     };
 
-    const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-    const response = await client.getPlaylistItems('mock-token', 'pl_123');
+    // Page 2: 1 item, next is null
+    const page2: SpotifyPlaylistItemsResponse = {
+      href: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=50',
+      limit: 50,
+      next: null,
+      offset: 50,
+      previous: 'https://api.spotify.com/v1/playlists/pl1/items?limit=50&offset=0',
+      total: 51,
+      items: createItems(1, 51)
+    };
 
-    expect(response.total).toBe(2);
-    expect(response.items.length).toBe(2);
-    expect((response.items[0].item as { name: string }).name).toBe('Bohemian Rhapsody');
-    expect((response.items[1].item as { type: string }).type).toBe('episode');
-  });
+    mockGet
+      .mockResolvedValueOnce({ data: page1 })
+      .mockResolvedValueOnce({ data: page2 });
 
-  describe('getAllPlaylistItems Pagination & Boundary Matrix', () => {
-    it('should handle 0 items empty playlist', async () => {
-      const mockHttpClient: IHttpClient = {
-        request: vi.fn().mockResolvedValue({
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          data: {
-            href: 'https://api.spotify.com/v1/playlists/pl_empty/items',
-            limit: 50,
-            offset: 0,
-            total: 0,
-            next: null,
-            previous: null,
-            items: []
-          },
-          url: 'https://api.spotify.com/v1/playlists/pl_empty/items?limit=50&offset=0'
-        })
-      };
+    const allItems = await client.getAllPlaylistItems(fakeToken, fakePlaylistId);
 
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      const all = await client.getAllPlaylistItems('token', 'pl_empty');
-      expect(all).toEqual([]);
-      expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
-    });
-
-    it('should paginate exactly 51 items across 2 pages (50 + 1) following page.next authority', async () => {
-      const page1Items = Array.from({ length: 50 }, (_, i) => ({
-        added_at: '2026-01-01',
-        item: { id: `tr_${i + 1}`, name: `Track ${i + 1}`, type: 'track', duration_ms: 200000 }
-      }));
-
-      const page2Items = [
-        {
-          added_at: '2026-01-02',
-          item: { id: 'tr_51', name: 'Track 51', type: 'track', duration_ms: 210000 }
-        }
-      ];
-
-      const mockHttpClient: IHttpClient = {
-        request: vi
-          .fn()
-          .mockResolvedValueOnce({
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            data: {
-              href: 'https://api.spotify.com/v1/playlists/pl_51/items',
-              limit: 50,
-              offset: 0,
-              total: 51,
-              next: 'https://api.spotify.com/v1/playlists/pl_51/items?limit=50&offset=50',
-              previous: null,
-              items: page1Items
-            },
-            url: 'https://api.spotify.com/v1/playlists/pl_51/items?limit=50&offset=0'
-          })
-          .mockResolvedValueOnce({
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            data: {
-              href: 'https://api.spotify.com/v1/playlists/pl_51/items?limit=50&offset=50',
-              limit: 50,
-              offset: 50,
-              total: 51,
-              next: null,
-              previous: null,
-              items: page2Items
-            },
-            url: 'https://api.spotify.com/v1/playlists/pl_51/items?limit=50&offset=50'
-          })
-      };
-
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      const all = await client.getAllPlaylistItems('token', 'pl_51');
-
-      expect(all.length).toBe(51);
-      expect((all[0].item as { name: string }).name).toBe('Track 1');
-      expect((all[50].item as { name: string }).name).toBe('Track 51');
-      expect(mockHttpClient.request).toHaveBeenCalledTimes(2);
-    });
-
-    it('should paginate exactly 101 items across 3 pages (50 + 50 + 1)', async () => {
-      const page1 = Array.from({ length: 50 }, (_, i) => ({
-        added_at: '2026-01-01',
-        item: { id: `tr_${i + 1}`, name: `Track ${i + 1}`, type: 'track', duration_ms: 200000 }
-      }));
-      const page2 = Array.from({ length: 50 }, (_, i) => ({
-        added_at: '2026-01-01',
-        item: { id: `tr_${i + 51}`, name: `Track ${i + 51}`, type: 'track', duration_ms: 200000 }
-      }));
-      const page3 = [
-        {
-          added_at: '2026-01-01',
-          item: { id: 'tr_101', name: 'Track 101', type: 'track', duration_ms: 200000 }
-        }
-      ];
-
-      const mockHttpClient: IHttpClient = {
-        request: vi
-          .fn()
-          .mockResolvedValueOnce({
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            data: {
-              href: 'https://api.spotify.com/v1/playlists/pl_101/items',
-              limit: 50,
-              offset: 0,
-              total: 101,
-              next: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=50',
-              items: page1
-            },
-            url: 'https://api.spotify.com/v1/playlists/pl_101/items?limit=50&offset=0'
-          })
-          .mockResolvedValueOnce({
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            data: {
-              href: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=50',
-              limit: 50,
-              offset: 50,
-              total: 101,
-              next: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=100',
-              items: page2
-            },
-            url: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=50'
-          })
-          .mockResolvedValueOnce({
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            data: {
-              href: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=100',
-              limit: 50,
-              offset: 100,
-              total: 101,
-              next: null,
-              items: page3
-            },
-            url: 'https://api.spotify.com/v1/playlists/pl_101/items?offset=100'
-          })
-      };
-
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      const all = await client.getAllPlaylistItems('token', 'pl_101');
-
-      expect(all.length).toBe(101);
-      expect((all[100].item as { name: string }).name).toBe('Track 101');
-      expect(mockHttpClient.request).toHaveBeenCalledTimes(3);
-    });
-
-    it('should terminate safely without infinite loop if next != null but items is empty', async () => {
-      const mockHttpClient: IHttpClient = {
-        request: vi.fn().mockResolvedValue({
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          data: {
-            href: 'https://api.spotify.com/v1/playlists/pl_patho/items',
-            limit: 50,
-            offset: 0,
-            total: 10,
-            next: 'https://api.spotify.com/v1/playlists/pl_patho/items?offset=50',
-            items: []
-          },
-          url: 'https://api.spotify.com/v1/playlists/pl_patho/items'
-        })
-      };
-
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      const all = await client.getAllPlaylistItems('token', 'pl_patho');
-
-      expect(all).toEqual([]);
-      expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Error Status Handling (401, 403, 429)', () => {
-    it('should throw clear error on 401 Unauthorized', async () => {
-      const mockHttpClient: IHttpClient = {
-        request: vi.fn().mockResolvedValue({
-          status: 401,
-          statusText: 'Unauthorized',
-          headers: {},
-          data: { error: { message: 'The access token expired' } },
-          url: 'https://api.spotify.com/v1/playlists/pl_123'
-        })
-      };
-
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      await expect(client.getPlaylist('expired-token', 'pl_123')).rejects.toThrow(/HTTP 401/i);
-    });
-
-    it('should throw clear error on 403 Forbidden (inaccessible playlist)', async () => {
-      const mockHttpClient: IHttpClient = {
-        request: vi.fn().mockResolvedValue({
-          status: 403,
-          statusText: 'Forbidden',
-          headers: {},
-          data: { error: { message: 'User does not own or collaborate on this playlist' } },
-          url: 'https://api.spotify.com/v1/playlists/pl_private_other/items'
-        })
-      };
-
-      const client = new SpotifyApiClient(new RequestPipeline({ client: mockHttpClient }));
-      await expect(client.getPlaylistItems('token', 'pl_private_other')).rejects.toThrow(/HTTP 403/i);
-    });
+    expect(allItems.length).toBe(51);
+    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });

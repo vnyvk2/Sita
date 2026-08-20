@@ -166,7 +166,7 @@ export function setupSpotifyIpc(
         const validatedPlan = await SpotifyImportValidator.validateAndSanitizePlan(untrustedPlan);
         logger.info(`Executing Spotify import plan for '${validatedPlan.playlistName}'...`, {
           entriesCount: validatedPlan.entries.length,
-          matchedCount: validatedPlan.statistics.matched
+          matchedCount: validatedPlan.statistics.importedEntries
         });
 
         return await importExecutor.execute(validatedPlan, options);

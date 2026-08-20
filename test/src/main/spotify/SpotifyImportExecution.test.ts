@@ -68,6 +68,55 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
       ).rejects.toThrow(/playlistName must be a non-empty string/i);
     });
 
+    it('should reject unrecognized decisions', async () => {
+      const badDecisionPlan = {
+        playlistName: 'Bad Decision',
+        entries: [
+          {
+            source: {
+              position: 1,
+              trackReference: {
+                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
+              }
+            },
+            decision: 'UNKNOWN_DECISION_TYPE'
+          }
+        ],
+        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        warnings: []
+      };
+
+      await expect(
+        SpotifyImportValidator.validateAndSanitizePlan(badDecisionPlan as unknown as PlaylistImportPlan)
+      ).rejects.toThrow(/unrecognized decision/i);
+    });
+
+    it('should reject decision vs libraryMatch status mismatches', async () => {
+      // Decision is IMPORT but status is NOT_IN_LIBRARY
+      const mismatchPlan: PlaylistImportPlan = {
+        playlistName: 'Mismatch',
+        entries: [
+          {
+            source: {
+              position: 1,
+              trackReference: {
+                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'UNRESOLVED', verificationStatus: 'MISSING' } },
+                libraryMatch: { status: 'NOT_IN_LIBRARY', matchedSongId: testSongId1, confidence: 0 }
+              }
+            },
+            decision: 'IMPORT'
+          }
+        ],
+        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        warnings: []
+      };
+
+      await expect(SpotifyImportValidator.validateAndSanitizePlan(mismatchPlan)).rejects.toThrow(
+        /inconsistent decision/i
+      );
+    });
+
     it('should reject non-sequential or out-of-order entry positions', async () => {
       const invalidOrderPlan: PlaylistImportPlan = {
         playlistName: 'Bad Order',
@@ -200,7 +249,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             decision: 'SKIP_NOT_IN_LIBRARY'
           }
         ],
-        statistics: { totalEntries: 999, importedEntries: 999, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 999, repairedEntries: 0 }, // Client tampered
+        statistics: { totalEntries: 999, importedEntries: 999, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 999, repairedEntries: 0 },
         warnings: []
       };
 
@@ -213,7 +262,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
   });
 
   describe('PlaylistImportExecutor End-to-End Execution & Transaction Safety', () => {
-    it('should create playlist and insert matched entries preserving duplicate multiplicity and order', async () => {
+    it('should create playlist and insert matched entries preserving duplicate multiplicity and exact order in database', async () => {
       const validPlan: PlaylistImportPlan = {
         playlistName: 'Test Spotify Imported Playlist',
         description: 'Imported from Spotify bridge',
@@ -275,6 +324,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         .where(eq(playlistEntries.playlistId, createdPlaylistId));
 
       expect(entries.length).toBe(3);
+      expect(entries.map((e) => e.songId)).toEqual([testSongId1, testSongId2, testSongId1]);
 
       // Clean up created playlist
       await db.delete(playlists).where(eq(playlists.id, createdPlaylistId));
