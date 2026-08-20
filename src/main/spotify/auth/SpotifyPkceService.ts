@@ -3,11 +3,14 @@ import crypto from 'crypto';
 import type { PkceCredentials, SpotifyAuthTokens } from './types';
 
 export const SPOTIFY_ACCOUNTS_BASE_URL = 'https://accounts.spotify.com';
-export const DEFAULT_SPOTIFY_READ_SCOPES = [
+export const DEFAULT_SPOTIFY_SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
+  'playlist-modify-public',
+  'playlist-modify-private',
   'user-read-private'
 ];
+export const DEFAULT_SPOTIFY_READ_SCOPES = DEFAULT_SPOTIFY_SCOPES;
 
 export class SpotifyPkceService {
   /** Generates cryptographically secure PKCE credentials (verifier, S256 challenge, and CSRF state). */

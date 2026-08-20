@@ -885,9 +885,21 @@ export const api = {
     executeImportPlan: (
       plan: unknown,
       options?: { targetPlaylistId?: number; mode?: 'create' | 'merge' | 'replace' }
-    ) => ipcRenderer.invoke('spotify/playlists/executeImportPlan', plan, options)
+    ) => ipcRenderer.invoke('spotify/playlists/executeImportPlan', plan, options),
+    hasExportPermissions: (isPublic = false) =>
+      ipcRenderer.invoke('spotify/export/hasPermissions', isPublic),
+    generateExportPlan: (playlistId: number) =>
+      ipcRenderer.invoke('spotify/export/generatePlan', playlistId),
+    executeExport: (request: {
+      playlistId: number;
+      name: string;
+      description?: string;
+      isPublic: boolean;
+      revision: string;
+    }) => ipcRenderer.invoke('spotify/export/executeExport', request)
   }
 };
 
 contextBridge.exposeInMainWorld('api', api);
+
 

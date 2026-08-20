@@ -8,7 +8,9 @@ import { SpotifyLoopbackServer } from '../auth/SpotifyLoopbackServer';
 import { SpotifyPkceService } from '../auth/SpotifyPkceService';
 import { SpotifyTokenStore } from '../auth/SpotifyTokenStore';
 import type { SpotifyAuthStatus } from '../auth/types';
+import { SpotifyPlaylistExportService } from '../export/SpotifyPlaylistExportService';
 import { SpotifyPlaylistImportService } from '../import/SpotifyPlaylistImportService';
+import { SpotifyExportValidator } from './SpotifyExportValidator';
 import { SpotifyImportValidator } from './SpotifyImportValidator';
 
 export function getSpotifyClientId(): string {
@@ -28,7 +30,8 @@ export function getSpotifyClientId(): string {
 
 export function setupSpotifyIpc(
   apiClient = new SpotifyApiClient(),
-  importService = new SpotifyPlaylistImportService(apiClient)
+  importService = new SpotifyPlaylistImportService(apiClient),
+  exportService = new SpotifyPlaylistExportService(apiClient)
 ): void {
   // Connect handler
   ipcMain.handle('spotify/auth/connect', async () => {
@@ -176,4 +179,43 @@ export function setupSpotifyIpc(
       }
     }
   );
+
+  // ==========================================
+  // Phase 3A Export Handlers
+  // ==========================================
+
+  // Check export permissions
+  ipcMain.handle('spotify/export/hasPermissions', async (_, isPublic = false) => {
+    const requiredScopes = SpotifyExportValidator.getRequiredExportScopes(Boolean(isPublic));
+    return await SpotifyTokenStore.hasRequiredScopes(requiredScopes);
+  });
+
+  // Generate Export Plan preview handler
+  ipcMain.handle('spotify/export/generatePlan', async (_, playlistId: number) => {
+    try {
+      if (!Number.isInteger(playlistId) || playlistId <= 0) {
+        throw new Error('Valid playlist ID is required to generate export plan.');
+      }
+      return await exportService.generateExportPlan(playlistId);
+    } catch (error) {
+      logger.error('Failed to generate Spotify playlist export plan', { playlistId, error });
+      throw error;
+    }
+  });
+
+  // Execute Export Plan handler
+  ipcMain.handle('spotify/export/executeExport', async (_, untrustedRequest: unknown) => {
+    try {
+      const validated = await SpotifyExportValidator.validateExportRequest(untrustedRequest);
+      logger.info(`Executing Spotify export for playlist '${validated.playlistName}'...`, {
+        playlistId: validated.playlistId,
+        isPublic: validated.isPublic
+      });
+
+      return await exportService.executeExport(validated);
+    } catch (error) {
+      logger.error('Failed to execute Spotify playlist export', { error });
+      throw error;
+    }
+  });
 }
