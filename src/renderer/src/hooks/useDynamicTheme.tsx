@@ -155,14 +155,16 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
     dynamicThemeIntensity
   ]);
 
-  // Monitor dark mode setting and apply/remove 'dark' class on document.body
+  // Monitor dark mode setting and apply/remove 'dark' class on document.body and documentElement
   const { isDark } = useEffectiveAppearance();
 
   useEffect(() => {
     if (isDark) {
       document.body.classList.add('dark');
+      document.documentElement.classList.add('dark');
     } else {
       document.body.classList.remove('dark');
+      document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
 
