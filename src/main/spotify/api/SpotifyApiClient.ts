@@ -7,6 +7,7 @@ import type {
   SpotifyPlaylistItemsResponse,
   SpotifyPlaylistPaging,
   SpotifyPlaylistSummary,
+  SpotifyPlaylistsResponse,
   SpotifyRemoveItemsResponse,
   SpotifyRemovePlaylistItem,
   SpotifySearchResponse,

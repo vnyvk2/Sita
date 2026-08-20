@@ -52,7 +52,7 @@ describe('SpotifyPlaylistSyncPlanner', () => {
       expect(occurrences[0].occurrenceId).toBe('isrc:ISRC_A#0');
       expect(occurrences[1].occurrenceId).toBe('isrc:ISRC_B#0');
       expect(occurrences[2].occurrenceId).toBe('isrc:ISRC_A#1');
-      expect(occurrences[2].position).toBe(3);
+      expect(occurrences[2].position).toBe(2);
     });
 
     it('should detect when remote is missing a second duplicate occurrence of a track', () => {
@@ -69,23 +69,20 @@ describe('SpotifyPlaylistSyncPlanner', () => {
       });
 
       expect(plan.statistics.inSyncOccurrences).toBe(2);
-      expect(plan.remoteOperations).toHaveLength(1);
-      expect(plan.remoteOperations[0]).toEqual({
-        action: 'ADD',
-        spotifyUri: 'spotify:track:A',
-        occurrenceId: 'isrc:ISRC_A#1',
-        title: 'Track A',
-        artists: ['Artist 1']
-      });
-      expect(plan.localOperations).toHaveLength(0);
+      expect(plan.remoteTarget).toHaveLength(3);
+      expect(plan.remoteTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_B#0',
+        'isrc:ISRC_A#1'
+      ]);
     });
   });
 
   describe('UNION_MERGE Strategy (Deterministic Ordering)', () => {
-    it('should preserve local order for shared tracks and append remote additions in remote relative order', () => {
+    it('should preserve local order for shared tracks and insert remote additions in remote relative order', () => {
       // Base/Local: [A, B, C, D]
       // Remote: [A, C, E]
-      // Result: Local keeps [A, B, C, D], adds resolved E locally; Remote gets B, D added.
+      // Result: Local target contains [A, B, C, D, E] (resolved E inserted after C); Remote target contains [A, B, C, D, E]
       const localTracks = [trackA, trackB, trackC, trackD];
       const remoteTracks = [trackA, trackC, trackE];
 
@@ -101,20 +98,15 @@ describe('SpotifyPlaylistSyncPlanner', () => {
       });
 
       expect(plan.statistics.inSyncOccurrences).toBe(2); // A#0, C#0
-      expect(plan.remoteOperations).toHaveLength(2); // B#0, D#0
-      expect(plan.remoteOperations.map((o) => o.occurrenceId)).toEqual([
+      expect(plan.localTarget).toHaveLength(5);
+      expect(plan.remoteTarget).toHaveLength(5);
+      expect(plan.localTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
         'isrc:ISRC_B#0',
+        'isrc:ISRC_C#0',
+        'isrc:ISRC_E#0',
         'isrc:ISRC_D#0'
       ]);
-
-      expect(plan.localOperations).toHaveLength(1); // E#0
-      expect(plan.localOperations[0]).toEqual({
-        action: 'ADD',
-        songId: 5,
-        occurrenceId: 'isrc:ISRC_E#0',
-        title: 'Track E (Remote Only)',
-        artists: ['Artist 5']
-      });
     });
 
     it('should isolate unresolved remote tracks without generating invalid local DB insertions', () => {
@@ -130,7 +122,7 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         remoteTracks
       });
 
-      expect(plan.localOperations).toHaveLength(0);
+      expect(plan.localTarget).toHaveLength(1); // Only track A
       expect(plan.unresolvedRemoteOccurrences).toHaveLength(1);
       expect(plan.unresolvedRemoteOccurrences[0].occurrenceId).toBe('isrc:ISRC_E#0');
       expect(plan.statistics.unresolvedRemoteCount).toBe(1);
@@ -151,15 +143,12 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         remoteTracks
       });
 
-      expect(plan.localOperations).toHaveLength(0); // Local is authoritative
-      expect(plan.remoteOperations).toHaveLength(2);
-
-      const removeOp = plan.remoteOperations.find((o) => o.action === 'REMOVE');
-      const addOp = plan.remoteOperations.find((o) => o.action === 'ADD');
-
-      expect(removeOp?.occurrenceId).toBe('isrc:ISRC_C#0');
-      expect(removeOp?.position).toBe(1); // 0-indexed position 1 for track C
-      expect(addOp?.occurrenceId).toBe('isrc:ISRC_B#0');
+      expect(plan.localTarget).toHaveLength(2);
+      expect(plan.remoteTarget).toHaveLength(2);
+      expect(plan.remoteTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_B#0'
+      ]);
     });
   });
 
@@ -179,16 +168,12 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         remoteToLocalSongMap: remoteToLocalMap
       });
 
-      expect(plan.remoteOperations).toHaveLength(0); // Remote is authoritative
-      expect(plan.localOperations).toHaveLength(2);
-
-      const removeOp = plan.localOperations.find((o) => o.action === 'REMOVE');
-      const addOp = plan.localOperations.find((o) => o.action === 'ADD');
-
-      expect(removeOp?.occurrenceId).toBe('isrc:ISRC_B#0');
-      expect(removeOp?.songId).toBe(2);
-      expect(addOp?.occurrenceId).toBe('isrc:ISRC_C#0');
-      expect(addOp?.songId).toBe(3);
+      expect(plan.remoteTarget).toHaveLength(2);
+      expect(plan.localTarget).toHaveLength(2);
+      expect(plan.localTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_C#0'
+      ]);
     });
   });
 });
