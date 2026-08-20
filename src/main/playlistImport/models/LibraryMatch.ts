@@ -1,3 +1,4 @@
+import type { IdentityMatchType } from '../../metadata/identity/TrackIdentityMatcher';
 import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
 import type { RepairDiagnostic } from './RepairDiagnostic';
 
@@ -9,7 +10,7 @@ export type LibraryMatchStatus =
   | 'MISSING'
   | 'INVALID_URI';
 
-export type LibraryMatchType = 'EXACT' | 'REPAIRED';
+export type LibraryMatchType = 'EXACT' | 'REPAIRED' | IdentityMatchType;
 
 export interface LibraryMatch {
   matchedSongId?: number;
