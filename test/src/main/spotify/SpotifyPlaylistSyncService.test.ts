@@ -194,6 +194,16 @@ describe('SpotifyPlaylistSyncService', () => {
 
       vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
         return await cb({
+          query: {
+            playlistEntries: {
+              findMany: vi.fn()
+                .mockResolvedValueOnce(localEntries)
+                .mockResolvedValueOnce([
+                  { songId: 101, position: 0 },
+                  { songId: 102, position: 1 }
+                ])
+            }
+          },
           delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
           insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
         });

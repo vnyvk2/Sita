@@ -7,7 +7,7 @@ import { SpotifyTokenStore } from '../../../../src/main/spotify/auth/SpotifyToke
 import { SpotifyPlaylistSyncDriftDetector } from '../../../../src/main/spotify/sync/SpotifyPlaylistSyncDriftDetector';
 import { SpotifyPlaylistSyncService } from '../../../../src/main/spotify/sync/SpotifyPlaylistSyncService';
 
-describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verification)', () => {
+describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verification)', () => {
   let mockApiClient: SpotifyApiClient;
   let service: SpotifyPlaylistSyncService;
 
@@ -87,7 +87,6 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
       plannedAt: new Date().toISOString()
     });
 
-    // Remote verification mock
     vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([
       { item: { track: { uri: 'spotify:track:A' } } },
       { item: { track: { uri: 'spotify:track:C' } } },
@@ -99,6 +98,17 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
 
     vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
       return await cb({
+        query: {
+          playlistEntries: {
+            findMany: vi.fn()
+              .mockResolvedValueOnce(localEntries)
+              .mockResolvedValueOnce([
+                { songId: 101, position: 0 },
+                { songId: 103, position: 1 },
+                { songId: 104, position: 2 }
+              ])
+          }
+        },
         delete: vi.fn().mockImplementation(() => {
           deletedAll = true;
           return { where: vi.fn().mockResolvedValue({}) };
@@ -183,6 +193,17 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
 
     vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
       return await cb({
+        query: {
+          playlistEntries: {
+            findMany: vi.fn()
+              .mockResolvedValueOnce(localEntries)
+              .mockResolvedValueOnce([
+                { songId: 101, position: 0 },
+                { songId: 102, position: 1 },
+                { songId: 103, position: 2 }
+              ])
+          }
+        },
         delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
         insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
       });
@@ -202,15 +223,189 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
     );
   });
 
-  it('Test 5 (>100 tracks staged replacement): 250 items -> PUT(0..99) + POST(100..199) + POST(200..249)', async () => {
-    const localEntries: any[] = [];
+  it('Test 3 (Lock Concurrency Protection): 2 simultaneous executeSync calls reject the second call', async () => {
     const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
 
     vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
       id: 10,
-      entries: localEntries
+      entries: []
     } as any);
 
+    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
+      id: 1,
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      spotifyUserId: 'sp_user_1',
+      lastSyncedSnapshotId: 'snap_base_100',
+      lastSyncedEntriesHash: baseHash,
+      syncStrategy: 'LOCAL_WINS',
+      syncState: 'SYNCED'
+    });
+
+    let resolveFirstPlan: (val: any) => void;
+    const planPromise = new Promise((resolve) => {
+      resolveFirstPlan = resolve;
+    });
+
+    vi.spyOn(service, 'generateSyncPlan').mockImplementationOnce(() => planPromise as any);
+
+    const firstCallPromise = service.executeSync(10, 'LOCAL_WINS');
+
+    // Second call starts while first call is awaiting generateSyncPlan
+    await expect(service.executeSync(10, 'LOCAL_WINS')).rejects.toThrow(
+      'Playlist synchronization is already in progress.'
+    );
+
+    // Resolve first call
+    resolveFirstPlan!({
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      strategy: 'LOCAL_WINS',
+      base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
+      localTarget: [],
+      remoteTarget: [],
+      localOperations: [],
+      remoteOperations: [],
+      unresolvedRemoteOccurrences: [],
+      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      plannedAt: new Date().toISOString()
+    });
+
+    vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([]);
+    vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
+      return await cb({
+        query: { playlistEntries: { findMany: vi.fn().mockResolvedValue([]) } },
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
+        insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
+      });
+    });
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+
+    await firstCallPromise;
+    expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
+  });
+
+  it('Test 4 (In-Transaction Local Concurrency Conflict): In-transaction hash mismatch aborts safely', async () => {
+    const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
+
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
+      id: 10,
+      entries: []
+    } as any);
+
+    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
+      id: 1,
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      spotifyUserId: 'sp_user_1',
+      lastSyncedSnapshotId: 'snap_base_100',
+      lastSyncedEntriesHash: baseHash,
+      syncStrategy: 'LOCAL_WINS',
+      syncState: 'SYNCED'
+    });
+
+    vi.spyOn(service, 'generateSyncPlan').mockResolvedValue({
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      strategy: 'LOCAL_WINS',
+      base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
+      localTarget: [{ occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: [] }, localSongId: 101 }],
+      remoteTarget: [],
+      localOperations: [],
+      remoteOperations: [],
+      unresolvedRemoteOccurrences: [],
+      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      plannedAt: new Date().toISOString()
+    });
+
+    vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([]);
+
+    // Inside transaction, query returns song 999 (hash diverged from baseHash)
+    let deleteWasCalled = false;
+    vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
+      return await cb({
+        query: {
+          playlistEntries: {
+            findMany: vi.fn().mockResolvedValue([{ songId: 999, position: 0, song: { id: 999, isrc: 'NEW_ISRC' } }])
+          }
+        },
+        delete: vi.fn().mockImplementation(() => {
+          deleteWasCalled = true;
+          return { where: vi.fn().mockResolvedValue({}) };
+        }),
+        insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
+      });
+    });
+
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+
+    const result = await service.executeSync(10, 'LOCAL_WINS');
+
+    expect(result.status).toBe('PARTIAL_FAILURE');
+    expect(result.failureStage).toBe('LOCAL');
+    expect(result.error).toContain('Local playlist modified concurrently');
+    expect(deleteWasCalled).toBe(false);
+  });
+
+  it('Test 5 (Local DB Positional Verification Mismatch): Mismatched rows after insert fails with LOCAL stage', async () => {
+    const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
+
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
+    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
+      id: 1,
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      spotifyUserId: 'sp_user_1',
+      lastSyncedSnapshotId: 'snap_base_100',
+      lastSyncedEntriesHash: baseHash,
+      syncStrategy: 'LOCAL_WINS',
+      syncState: 'SYNCED'
+    });
+
+    vi.spyOn(service, 'generateSyncPlan').mockResolvedValue({
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      strategy: 'LOCAL_WINS',
+      base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
+      localTarget: [{ occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: [] }, localSongId: 101 }],
+      remoteTarget: [],
+      localOperations: [],
+      remoteOperations: [],
+      unresolvedRemoteOccurrences: [],
+      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      plannedAt: new Date().toISOString()
+    });
+
+    vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([]);
+
+    // DB transaction returns empty array after insert
+    vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
+      return await cb({
+        query: {
+          playlistEntries: {
+            findMany: vi.fn()
+              .mockResolvedValueOnce([]) // before check
+              .mockResolvedValueOnce([]) // after check returns 0 rows (mismatch!)
+          }
+        },
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
+        insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
+      });
+    });
+
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+
+    const result = await service.executeSync(10, 'LOCAL_WINS');
+
+    expect(result.status).toBe('PARTIAL_FAILURE');
+    expect(result.failureStage).toBe('LOCAL');
+    expect(result.error).toContain('Local DB verification failed');
+  });
+
+  it('Test 6 (>100 tracks staged replacement with exact positional verification): PUT(0..99) + POST(100..199) + POST(200..249)', async () => {
+    const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
+
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
     vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
       id: 1,
       playlistId: 10,
@@ -252,48 +447,27 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
 
     vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
       return await cb({
+        query: { playlistEntries: { findMany: vi.fn().mockResolvedValue([]) } },
         delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
         insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
       });
     });
 
-    vi.spyOn(db, 'update').mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
-    } as any);
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
     expect(result.status).toBe('SUCCESS');
-    expect(result.completedRemoteBatches).toBe(3); // 1 PUT + 2 POSTs
-    expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledTimes(1);
-    expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith(
-      'mock_access_token',
-      'sp_pl_1',
-      target250Uris.slice(0, 100)
-    );
-    expect(mockApiClient.addPlaylistItems).toHaveBeenCalledTimes(2);
-    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
-      1,
-      'mock_access_token',
-      'sp_pl_1',
-      target250Uris.slice(100, 200)
-    );
-    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
-      2,
-      'mock_access_token',
-      'sp_pl_1',
-      target250Uris.slice(200, 250)
-    );
+    expect(result.completedRemoteBatches).toBe(3);
+    expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith('mock_access_token', 'sp_pl_1', target250Uris.slice(0, 100));
+    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(1, 'mock_access_token', 'sp_pl_1', target250Uris.slice(100, 200));
+    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(2, 'mock_access_token', 'sp_pl_1', target250Uris.slice(200, 250));
   });
 
-  it('Test 6 (Remote batch failure): batch 2 fails -> PARTIAL_FAILURE with failedBatchIndex = 1 and lock released', async () => {
+  it('Test 7 (Staged Remote Batch Failure on POST #2): PUT succeeds, POST #1 succeeds, POST #2 throws', async () => {
     const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
 
-    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
-      id: 10,
-      entries: []
-    } as any);
-
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
     vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
       id: 1,
       playlistId: 10,
@@ -329,31 +503,31 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
       plannedAt: new Date().toISOString()
     });
 
-    // First chunk PUT succeeds, second chunk POST fails
     vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({ snapshot_id: 'snap_put_1' });
-    vi.spyOn(mockApiClient, 'addPlaylistItems').mockRejectedValue(new Error('Spotify HTTP 429 Too Many Requests'));
+    let postCallCount = 0;
+    vi.spyOn(mockApiClient, 'addPlaylistItems').mockImplementation(async () => {
+      postCallCount++;
+      if (postCallCount === 2) {
+        throw new Error('Spotify HTTP 429 Rate Limit on POST batch 2');
+      }
+      return { snapshot_id: `snap_post_${postCallCount}` };
+    });
 
-    vi.spyOn(db, 'update').mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
-    } as any);
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
     expect(result.status).toBe('PARTIAL_FAILURE');
     expect(result.failureStage).toBe('REMOTE');
-    expect(result.completedRemoteBatches).toBe(1);
-    expect(result.failedBatchIndex).toBe(1);
-    expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false); // Lock released!
+    expect(result.completedRemoteBatches).toBe(2); // 1 PUT + 1 POST succeeded
+    expect(result.failedBatchIndex).toBe(2); // Failed at 0-based batch index 2
+    expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
   });
 
-  it('Test 7 (Remote post-write verification mismatch): PUT succeeds but GET returns wrong items -> PARTIAL_FAILURE', async () => {
+  it('Test 8 (Remote Post-Write Verification Mismatch): Sets failureStage to REMOTE_VERIFICATION and undefined failedBatchIndex', async () => {
     const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
 
-    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
-      id: 10,
-      entries: []
-    } as any);
-
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
     vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
       id: 1,
       playlistId: 10,
@@ -383,32 +557,83 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
     });
 
     vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({ snapshot_id: 'snap_put_1' });
-
-    // Mock GET returning only 1 track instead of 2
     vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([
       { item: { track: { uri: 'spotify:track:A' } } }
     ] as any);
 
-    vi.spyOn(db, 'update').mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
-    } as any);
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
     expect(result.status).toBe('PARTIAL_FAILURE');
-    expect(result.failureStage).toBe('REMOTE');
+    expect(result.failureStage).toBe('REMOTE_VERIFICATION');
+    expect(result.failedBatchIndex).toBeUndefined();
     expect(result.error).toContain('Remote Spotify verification failed');
     expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
   });
 
-  it('Test 8 (Concurrent remote modification): Remote snapshot changed during sync -> Abort with CONFLICT', async () => {
+  it('Test 9 (Unresolved Remote Tracks do NOT advance baseline): Baseline fields remain uncorrupted on PARTIAL_FAILURE', async () => {
     const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
 
-    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
-      id: 10,
-      entries: []
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
+    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
+      id: 1,
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      spotifyUserId: 'sp_user_1',
+      lastSyncedSnapshotId: 'snap_original_baseline',
+      lastSyncedEntriesHash: 'hash_original_baseline',
+      syncStrategy: 'UNION_MERGE',
+      syncState: 'SYNCED'
+    });
+
+    vi.spyOn(service, 'generateSyncPlan').mockResolvedValue({
+      playlistId: 10,
+      spotifyPlaylistId: 'sp_pl_1',
+      strategy: 'UNION_MERGE',
+      base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
+      localTarget: [],
+      remoteTarget: [],
+      localOperations: [],
+      remoteOperations: [],
+      unresolvedRemoteOccurrences: [
+        { occurrenceId: 'X#0', identityKey: 'X', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'X', artists: [] } }
+      ],
+      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 1 },
+      plannedAt: new Date().toISOString()
+    });
+
+    vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([]);
+    vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => {
+      return await cb({
+        query: { playlistEntries: { findMany: vi.fn().mockResolvedValue([]) } },
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
+        insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
+      });
+    });
+
+    let updatedPayload: any = null;
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockImplementation((val) => {
+        updatedPayload = val;
+        return { where: vi.fn().mockResolvedValue({}) };
+      })
     } as any);
 
+    const result = await service.executeSync(10, 'UNION_MERGE');
+
+    expect(result.status).toBe('PARTIAL_FAILURE');
+    expect(result.failureStage).toBe('FINALIZATION');
+    // Ensure lastSyncedSnapshotId and lastSyncedEntriesHash were NOT overwritten
+    expect(updatedPayload.lastSyncedSnapshotId).toBeUndefined();
+    expect(updatedPayload.lastSyncedEntriesHash).toBeUndefined();
+    expect(updatedPayload.syncState).toBe('PARTIAL_FAILURE');
+  });
+
+  it('Test 10 (Remote Snapshot Changed During Preparation): Abort with CONFLICT before destructive writes', async () => {
+    const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
+
+    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({ id: 10, entries: [] } as any);
     vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
       id: 1,
       playlistId: 10,
@@ -443,62 +668,13 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & E2E Verificati
       owner: { id: 'sp_user_1' }
     } as any);
 
-    vi.spyOn(db, 'update').mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
-    } as any);
+    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
     expect(result.status).toBe('ERROR');
     expect(result.syncState).toBe('CONFLICT');
     expect(result.error).toContain('Remote Spotify playlist was modified');
-    expect(mockApiClient.replacePlaylistItems).not.toHaveBeenCalled();
-    expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
-  });
-
-  it('Test 9 (Concurrent local modification): Local entries hash changed during sync -> Abort with CONFLICT', async () => {
-    const baseHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash([]);
-
-    vi.spyOn(service, 'getLinkedPlaylist').mockResolvedValue({
-      id: 1,
-      playlistId: 10,
-      spotifyPlaylistId: 'sp_pl_1',
-      spotifyUserId: 'sp_user_1',
-      lastSyncedSnapshotId: 'snap_base_100',
-      lastSyncedEntriesHash: baseHash,
-      syncStrategy: 'LOCAL_WINS',
-      syncState: 'SYNCED'
-    });
-
-    vi.spyOn(service, 'generateSyncPlan').mockResolvedValue({
-      playlistId: 10,
-      spotifyPlaylistId: 'sp_pl_1',
-      strategy: 'LOCAL_WINS',
-      base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
-      localTarget: [],
-      remoteTarget: [],
-      localOperations: [],
-      remoteOperations: [],
-      unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
-      plannedAt: new Date().toISOString()
-    });
-
-    // Local playlist changed so entries hash does not match baseHash
-    vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
-      id: 10,
-      entries: [{ songId: 999, position: 0, song: { id: 999, isrc: 'NEW_ISRC' } }]
-    } as any);
-
-    vi.spyOn(db, 'update').mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
-    } as any);
-
-    const result = await service.executeSync(10, 'LOCAL_WINS');
-
-    expect(result.status).toBe('ERROR');
-    expect(result.syncState).toBe('CONFLICT');
-    expect(result.error).toContain('Local playlist was modified');
     expect(mockApiClient.replacePlaylistItems).not.toHaveBeenCalled();
     expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
   });

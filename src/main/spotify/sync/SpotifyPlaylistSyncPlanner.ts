@@ -75,8 +75,10 @@ export class SpotifyPlaylistSyncPlanner {
     remoteTracks: CanonicalTrackIdentity[];
     localToSpotifyUriMap?: Map<number, string>;
     remoteToLocalSongMap?: Map<number, number>;
-    baseSnapshotId?: string;
-    baseEntriesHash?: string;
+    base: {
+      localEntriesHash: string;
+      remoteSnapshotId: string;
+    };
   }): SpotifyPlaylistSyncPlan {
     const {
       playlistId,
@@ -86,8 +88,7 @@ export class SpotifyPlaylistSyncPlanner {
       remoteTracks,
       localToSpotifyUriMap,
       remoteToLocalSongMap,
-      baseSnapshotId,
-      baseEntriesHash
+      base
     } = params;
 
     const localOccurrences = this.toOccurrences(localTracks, localToSpotifyUriMap);
@@ -107,7 +108,15 @@ export class SpotifyPlaylistSyncPlanner {
     let localTarget: PlaylistOccurrence[] = [];
     let remoteTarget: PlaylistOccurrence[] = [];
     const unresolvedRemoteOccurrences: PlaylistOccurrence[] = [];
+
+    // Position-aware in-sync counter: counts occurrences at the exact same sequence position
     let inSyncCount = 0;
+    const minLen = Math.min(localOccurrences.length, remoteOccurrences.length);
+    for (let i = 0; i < minLen; i++) {
+      if (localOccurrences[i].occurrenceId === remoteOccurrences[i].occurrenceId) {
+        inSyncCount++;
+      }
+    }
 
     if (strategy === 'LOCAL_WINS') {
       // Local Nora state is authoritative
@@ -118,12 +127,6 @@ export class SpotifyPlaylistSyncPlanner {
           ...occ,
           position: idx
         }));
-
-      for (const rOcc of remoteOccurrences) {
-        if (localOccurrenceMap.has(rOcc.occurrenceId)) {
-          inSyncCount++;
-        }
-      }
     } else if (strategy === 'REMOTE_WINS') {
       // Remote Spotify playlist is authoritative
       remoteTarget = remoteOccurrences.map((occ, idx) => ({ ...occ, position: idx }));
@@ -136,9 +139,6 @@ export class SpotifyPlaylistSyncPlanner {
             ...rOcc,
             position: resolvedLocal.length
           });
-          if (localOccurrenceMap.has(rOcc.occurrenceId)) {
-            inSyncCount++;
-          }
         } else {
           unresolvedRemoteOccurrences.push(rOcc);
         }
@@ -149,12 +149,6 @@ export class SpotifyPlaylistSyncPlanner {
       // 1. Start with local occurrences as the ordered base
       const mergedList: PlaylistOccurrence[] = [...localOccurrences];
       const insertedOccurrenceIds = new Set<string>(localOccurrences.map((o) => o.occurrenceId));
-
-      for (const lOcc of localOccurrences) {
-        if (remoteOccurrenceMap.has(lOcc.occurrenceId)) {
-          inSyncCount++;
-        }
-      }
 
       // 2. Splicing remote-only occurrences into mergedList following relative remote ordering
       for (let rIdx = 0; rIdx < remoteOccurrences.length; rIdx++) {
@@ -290,11 +284,9 @@ export class SpotifyPlaylistSyncPlanner {
       spotifyPlaylistId,
       strategy,
       base: {
-        localEntriesHash: baseEntriesHash,
-        remoteSnapshotId: baseSnapshotId
+        localEntriesHash: base.localEntriesHash,
+        remoteSnapshotId: base.remoteSnapshotId
       },
-      baseSnapshotId,
-      baseEntriesHash,
       localTarget,
       remoteTarget,
       localOperations,
