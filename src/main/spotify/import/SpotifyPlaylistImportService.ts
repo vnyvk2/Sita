@@ -1,4 +1,4 @@
-import { getAllSongs } from '../../core/getAllSongs';
+import getAllSongs from '../../core/getAllSongs';
 import { toCanonicalFromSong } from '../../metadata/identity/adapters/SongToCanonicalIdentity';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import { SpotifyApiClient } from '../api/SpotifyApiClient';
@@ -38,7 +38,8 @@ export class SpotifyPlaylistImportService {
 
     // 2. Fetch local library songs & adapt to CanonicalTrackIdentity
     const localSongsResult = await getAllSongs();
-    const canonicalLocalSongs = localSongsResult.songs.map((s) => toCanonicalFromSong(s));
+    const songsList = localSongsResult?.data || [];
+    const canonicalLocalSongs = songsList.map((s: unknown) => toCanonicalFromSong(s as never));
 
     // 3. Delegate to pure planner
     return SpotifyPlaylistImportPlanner.generatePlan(

@@ -24,6 +24,7 @@ export class SpotifyApiClient {
     const response = await this.pipeline.execute<{
       id: string;
       display_name: string | null;
+      email?: string;
       product?: string;
       images?: Array<{ url: string }>;
     }>({
@@ -42,6 +43,7 @@ export class SpotifyApiClient {
     return {
       id: data.id,
       displayName: data.display_name,
+      email: data.email,
       product: data.product,
       imageUrl: data.images?.[0]?.url
     };
@@ -151,6 +153,9 @@ export class SpotifyApiClient {
       );
 
       isFirstPage = false;
+      if (!page.playlists || page.playlists.length === 0) {
+        break;
+      }
       allPlaylists.push(...page.playlists);
       nextUrl = page.next;
       hasMore = Boolean(nextUrl) && allPlaylists.length < page.total;

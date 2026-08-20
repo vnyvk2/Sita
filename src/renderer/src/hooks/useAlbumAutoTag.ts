@@ -738,6 +738,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       totalTracksCount: preview?.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ?? 0,
       albumTracksCount: preview?.matches.length ?? 0,
       activeFieldsCount: selectedGlobalFields.size,
+      totalChanges,
       filter,
       sort,
       loading,

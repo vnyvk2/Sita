@@ -72,9 +72,9 @@ describe('SpotifyApiClient', () => {
 
     const playlists = await client.getUserPlaylists('mock-access-token', { limit: 50 });
     expect(playlists.total).toBe(1);
-    expect(playlists.items[0].name).toBe('My Road Trip Mix');
-    expect(playlists.items[0].tracksTotal).toBe(42);
-    expect(playlists.items[0].snapshotId).toBe('snap_abc123');
+    expect(playlists.playlists[0].name).toBe('My Road Trip Mix');
+    expect(playlists.playlists[0].tracksTotal).toBe(42);
+    expect(playlists.playlists[0].snapshotId).toBe('snap_abc123');
   });
 
   describe('getAllUserPlaylists Pagination Boundary Cases', () => {

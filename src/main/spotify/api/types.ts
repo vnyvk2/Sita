@@ -7,6 +7,14 @@ export interface SpotifyUserDTO {
   product?: string;
 }
 
+export interface SpotifyUserProfile {
+  id: string;
+  displayName: string | null;
+  email?: string;
+  product?: string;
+  imageUrl?: string;
+}
+
 export interface SpotifyTrackInput {
   id?: string;
   name: string;
@@ -58,8 +66,11 @@ export interface SpotifyPlaylistDetails {
   tracks?: { total: number };
   items?: { total: number };
   snapshot_id?: string;
+  snapshotId?: string;
   uri?: string;
+  imageUrl?: string;
   owner?: { id: string; display_name?: string };
+  tracksTotal?: number;
 }
 
 export interface SpotifyPlaylistSummary {
@@ -70,10 +81,11 @@ export interface SpotifyPlaylistSummary {
   tracksTotal: number;
   snapshotId?: string;
   uri?: string;
+  owner?: { id: string; display_name?: string };
   ownerName?: string;
 }
 
-export interface SpotifyPlaylistsResponse {
+export interface SpotifyPlaylistPaging {
   items: SpotifyPlaylistDetails[];
   total: number;
   limit: number;
@@ -81,3 +93,5 @@ export interface SpotifyPlaylistsResponse {
   next: string | null;
   previous: string | null;
 }
+
+export type SpotifyPlaylistsResponse = SpotifyPlaylistPaging;
