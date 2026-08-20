@@ -1,7 +1,7 @@
 import type { CanonicalTrackIdentity } from '../CanonicalTrackIdentity';
 
 export interface SpotifyTrackInput {
-  id: string;
+  id?: string;
   uri?: string;
   name: string;
   artists?: Array<{ name: string; id?: string }>;
