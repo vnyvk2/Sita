@@ -90,6 +90,7 @@ export interface SpotifyPlaylistSummary {
 
 export interface SpotifyPlaylistPaging {
   items: SpotifyPlaylistDetails[];
+  playlists?: SpotifyPlaylistDetails[];
   total: number;
   limit: number;
   offset: number;

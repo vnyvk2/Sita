@@ -87,7 +87,22 @@ export class SpotifyApiClient {
       throw new Error(`Failed to fetch user playlists: HTTP ${response.status}`);
     }
 
-    return response.data;
+    const items = response.data.items || [];
+    const playlists = items.map((item) => ({
+      ...item,
+      tracksTotal: item.tracks?.total ?? item.items?.total ?? item.tracksTotal ?? 0,
+      snapshotId: item.snapshot_id || item.snapshotId
+    }));
+
+    return {
+      items,
+      playlists,
+      total: response.data.total ?? playlists.length,
+      limit: response.data.limit ?? options?.limit ?? 50,
+      offset: response.data.offset ?? options?.offset ?? 0,
+      next: response.data.next ?? null,
+      previous: response.data.previous ?? null
+    };
   }
 
   /**
@@ -159,12 +174,27 @@ export class SpotifyApiClient {
       throw new Error(`Failed to fetch playlist details: HTTP ${response.status}`);
     }
 
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      tracksTotal: data.tracks?.total ?? data.items?.total ?? data.tracksTotal ?? 0,
+      snapshotId: data.snapshot_id || data.snapshotId
+    };
+  }
+
+  /**
+   * Alias for getPlaylistDetails.
+   */
+  public async getPlaylist(
+    accessToken: string,
+    playlistId: string
+  ): Promise<SpotifyPlaylistDetails> {
+    return this.getPlaylistDetails(accessToken, playlistId);
   }
 
   /**
    * Fetches a paginated slice of items (tracks) from a playlist.
-   * Supports active 2026 /playlists/{id}/items endpoint.
+   * Supports active 2026 /playlists/{id}/items endpoint with additional_types=track,episode.
    */
   public async getPlaylistItems(
     accessToken: string,
@@ -182,7 +212,7 @@ export class SpotifyApiClient {
     } else {
       const limit = options?.limit ?? 50;
       const offset = options?.offset ?? 0;
-      url = `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items?limit=${limit}&offset=${offset}`;
+      url = `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items?limit=${limit}&offset=${offset}&additional_types=track%2Cepisode`;
     }
 
     const response = await this.pipeline.execute<SpotifyPlaylistItemsResponse>({
