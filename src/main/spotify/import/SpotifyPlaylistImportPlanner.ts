@@ -299,7 +299,7 @@ export class SpotifyPlaylistImportPlanner {
         const libraryMatch: LibraryMatch = {
           matchedSongId: songId,
           status: 'MATCHED',
-          matchType: bestMatchResult.matchType,
+          matchType: bestMatchResult.isAuthoritative ? 'EXACT' : 'REPAIRED',
           confidence: bestMatchResult.confidence,
           diagnostics: [
             bestMatchResult.matchType,

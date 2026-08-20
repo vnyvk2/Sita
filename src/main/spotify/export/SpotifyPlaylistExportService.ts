@@ -67,7 +67,8 @@ export class SpotifyPlaylistExportService {
     }
 
     // Load full song records with artists and album relations
-    const songsData = await getAllSongs({ songIds, preserveIdOrder: true });
+    const songsResult = await getAllSongs({ songIds, preserveIdOrder: true });
+    const songsData = Array.isArray(songsResult) ? songsResult : songsResult.data || [];
     const songMap = new Map<number, (typeof songsData)[0]>();
     for (const s of songsData) {
       songMap.set(s.id, s);

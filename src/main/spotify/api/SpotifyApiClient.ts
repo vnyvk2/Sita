@@ -1,10 +1,14 @@
 import { RequestPipeline } from '../../platform/networking/RequestPipeline';
 import type {
+  SpotifyAddItemsResponse,
+  SpotifyCreatePlaylistRequest,
   SpotifyPlaylistDetails,
-  SpotifyPlaylistItemsResponse,
   SpotifyPlaylistItemDTO,
+  SpotifyPlaylistItemsResponse,
   SpotifyPlaylistPaging,
   SpotifyPlaylistSummary,
+  SpotifySearchResponse,
+  SpotifyTrackInput,
   SpotifyUserProfile
 } from './types';
 
