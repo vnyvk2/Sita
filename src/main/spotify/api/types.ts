@@ -289,11 +289,9 @@ export interface SpotifyPlaylistSyncPlan {
   spotifyPlaylistId: string;
   strategy: SyncStrategy;
   base: {
-    localEntriesHash?: string;
-    remoteSnapshotId?: string;
+    localEntriesHash: string;
+    remoteSnapshotId: string;
   };
-  baseSnapshotId?: string;
-  baseEntriesHash?: string;
   localTarget: PlaylistOccurrence[];
   remoteTarget: PlaylistOccurrence[];
   localOperations: SpotifySyncLocalOperation[];
@@ -311,7 +309,7 @@ export interface SpotifySyncResult {
   finalEntriesHash?: string;
   strategy: SyncStrategy;
   syncState: SyncState;
-  failureStage?: 'REMOTE' | 'LOCAL' | 'FINALIZATION';
+  failureStage?: 'REMOTE' | 'REMOTE_VERIFICATION' | 'LOCAL' | 'LOCAL_VERIFICATION' | 'FINALIZATION';
   completedRemoteBatches: number;
   totalRemoteBatches: number;
   failedBatchIndex?: number;

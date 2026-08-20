@@ -43,6 +43,11 @@ describe('SpotifyPlaylistSyncPlanner', () => {
     pathOrUri: 'spotify:track:E'
   };
 
+  const defaultBase = {
+    localEntriesHash: 'hash_base',
+    remoteSnapshotId: 'snap_base'
+  };
+
   describe('Duplicate Multiplicity & Occurrence Alignment', () => {
     it('should distinguish multiple occurrences of the same track [A, B, A] as distinct occurrences', () => {
       const tracks = [trackA, trackB, trackA];
@@ -55,8 +60,7 @@ describe('SpotifyPlaylistSyncPlanner', () => {
       expect(occurrences[2].position).toBe(2);
     });
 
-    it('should detect when remote is missing a second duplicate occurrence of a track', () => {
-      // Local: [A, B, A], Remote: [A, B]
+    it('should detect when remote is missing a second duplicate occurrence of a track [A, B, A] vs [A, B]', () => {
       const localTracks = [trackA, trackB, trackA];
       const remoteTracks = [trackA, trackB];
 
@@ -65,7 +69,8 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         spotifyPlaylistId: 'sp_10',
         strategy: 'UNION_MERGE',
         localTracks,
-        remoteTracks
+        remoteTracks,
+        base: defaultBase
       });
 
       expect(plan.statistics.inSyncOccurrences).toBe(2);
@@ -75,6 +80,70 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         'isrc:ISRC_B#0',
         'isrc:ISRC_A#1'
       ]);
+    });
+
+    it('should preserve duplicate structures [A, A, B], [A, B, A, A], and [A, A, A] across UNION_MERGE, LOCAL_WINS, and REMOTE_WINS', () => {
+      // 1. [A, A, B] vs [A, B]
+      const planAAB = SpotifyPlaylistSyncPlanner.planSync({
+        playlistId: 10,
+        spotifyPlaylistId: 'sp_10',
+        strategy: 'UNION_MERGE',
+        localTracks: [trackA, trackA, trackB],
+        remoteTracks: [trackA, trackB],
+        base: defaultBase
+      });
+      expect(planAAB.localTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_A#1',
+        'isrc:ISRC_B#0'
+      ]);
+
+      // 2. [A, B, A, A] vs [A, A, A]
+      const planABAA = SpotifyPlaylistSyncPlanner.planSync({
+        playlistId: 10,
+        spotifyPlaylistId: 'sp_10',
+        strategy: 'LOCAL_WINS',
+        localTracks: [trackA, trackB, trackA, trackA],
+        remoteTracks: [trackA, trackA, trackA],
+        base: defaultBase
+      });
+      expect(planABAA.remoteTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_B#0',
+        'isrc:ISRC_A#1',
+        'isrc:ISRC_A#2'
+      ]);
+
+      // 3. REMOTE_WINS on [A, A, A]
+      const remoteToLocalMap = new Map<number, number>([[1, 1], [2, 1], [3, 1]]);
+      const planAAA = SpotifyPlaylistSyncPlanner.planSync({
+        playlistId: 10,
+        spotifyPlaylistId: 'sp_10',
+        strategy: 'REMOTE_WINS',
+        localTracks: [trackA, trackB],
+        remoteTracks: [trackA, trackA, trackA],
+        remoteToLocalSongMap: remoteToLocalMap,
+        base: defaultBase
+      });
+      expect(planAAA.localTarget.map((o) => o.occurrenceId)).toEqual([
+        'isrc:ISRC_A#0',
+        'isrc:ISRC_A#1',
+        'isrc:ISRC_A#2'
+      ]);
+    });
+
+    it('should be strictly position-aware when counting inSyncOccurrences', () => {
+      // Local: [A, B], Remote: [B, A] -> Same tracks but reversed positions = 0 in-sync occurrences
+      const plan = SpotifyPlaylistSyncPlanner.planSync({
+        playlistId: 10,
+        spotifyPlaylistId: 'sp_10',
+        strategy: 'UNION_MERGE',
+        localTracks: [trackA, trackB],
+        remoteTracks: [trackB, trackA],
+        base: defaultBase
+      });
+
+      expect(plan.statistics.inSyncOccurrences).toBe(0);
     });
   });
 
@@ -94,10 +163,11 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         strategy: 'UNION_MERGE',
         localTracks,
         remoteTracks,
-        remoteToLocalSongMap: remoteToLocalMap
+        remoteToLocalSongMap: remoteToLocalMap,
+        base: defaultBase
       });
 
-      expect(plan.statistics.inSyncOccurrences).toBe(2); // A#0, C#0
+      expect(plan.statistics.inSyncOccurrences).toBe(1); // Only A#0 is at index 0 on both sides
       expect(plan.localTarget).toHaveLength(5);
       expect(plan.remoteTarget).toHaveLength(5);
       expect(plan.localTarget.map((o) => o.occurrenceId)).toEqual([
@@ -119,7 +189,8 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         spotifyPlaylistId: 'sp_10',
         strategy: 'UNION_MERGE',
         localTracks,
-        remoteTracks
+        remoteTracks,
+        base: defaultBase
       });
 
       expect(plan.localTarget).toHaveLength(1); // Only track A
@@ -140,7 +211,8 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         spotifyPlaylistId: 'sp_10',
         strategy: 'LOCAL_WINS',
         localTracks,
-        remoteTracks
+        remoteTracks,
+        base: defaultBase
       });
 
       expect(plan.localTarget).toHaveLength(2);
@@ -165,7 +237,8 @@ describe('SpotifyPlaylistSyncPlanner', () => {
         strategy: 'REMOTE_WINS',
         localTracks,
         remoteTracks,
-        remoteToLocalSongMap: remoteToLocalMap
+        remoteToLocalSongMap: remoteToLocalMap,
+        base: defaultBase
       });
 
       expect(plan.remoteTarget).toHaveLength(2);

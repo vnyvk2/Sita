@@ -291,7 +291,7 @@ export class SpotifyPlaylistSyncService {
       }
     }
 
-    // 4. Resolve remote tracks against Nora local library with fast indexed matching
+    // 4. Resolve remote tracks against Nora local library with fast indexed candidate filtering
     const remoteToLocalSongMap = new Map<number, number>();
     const allLocalSongsResult = await getAllSongs();
     const allLocalSongs = Array.isArray(allLocalSongsResult)
@@ -299,9 +299,8 @@ export class SpotifyPlaylistSyncService {
       : allLocalSongsResult.data || [];
     const allLocalCanonicals = allLocalSongs.map((s) => toCanonicalFromSong(s));
 
-    // Build in-memory candidate indexes
+    // Build in-memory candidate indexes (candidate prune buckets)
     const isrcIndex = new Map<string, CanonicalTrackIdentity[]>();
-    const exactIdentityIndex = new Map<string, CanonicalTrackIdentity[]>();
     const titleIndex = new Map<string, CanonicalTrackIdentity[]>();
 
     for (const lSong of allLocalCanonicals) {
@@ -311,14 +310,9 @@ export class SpotifyPlaylistSyncService {
         isrcIndex.get(isrcKey)!.push(lSong);
       }
       const cleanTitle = MetadataNormalizer.normalizeTitle(lSong.title || '');
-      const cleanArtist = lSong.artists[0] ? MetadataNormalizer.normalizeArtist(lSong.artists[0]) : '';
       if (cleanTitle) {
         if (!titleIndex.has(cleanTitle)) titleIndex.set(cleanTitle, []);
         titleIndex.get(cleanTitle)!.push(lSong);
-
-        const exactKey = `${cleanTitle}::${cleanArtist}`;
-        if (!exactIdentityIndex.has(exactKey)) exactIdentityIndex.set(exactKey, []);
-        exactIdentityIndex.get(exactKey)!.push(lSong);
       }
     }
 
@@ -328,38 +322,27 @@ export class SpotifyPlaylistSyncService {
       let bestMatch: CanonicalTrackIdentity | null = null;
       let highestScore = 0;
 
-      // 1. Try ISRC index
+      // Candidate gathering (O(1) bucket lookups)
+      const candidateSet = new Set<CanonicalTrackIdentity>();
+
       if (rTrack.isrc && rTrack.isrc.trim()) {
         const isrcKey = rTrack.isrc.trim().toUpperCase();
-        const isrcCandidates = isrcIndex.get(isrcKey);
-        if (isrcCandidates && isrcCandidates.length > 0) {
-          bestMatch = isrcCandidates[0];
-          highestScore = 1.0;
-        }
+        const isrcCandidates = isrcIndex.get(isrcKey) || [];
+        for (const c of isrcCandidates) candidateSet.add(c);
       }
 
-      // 2. Try exact identity index
-      if (!bestMatch) {
-        const cleanTitle = MetadataNormalizer.normalizeTitle(rTrack.title || '');
-        const cleanArtist = rTrack.artists[0] ? MetadataNormalizer.normalizeArtist(rTrack.artists[0]) : '';
-        const exactKey = `${cleanTitle}::${cleanArtist}`;
-        const exactCandidates = exactIdentityIndex.get(exactKey);
-        if (exactCandidates && exactCandidates.length > 0) {
-          bestMatch = exactCandidates[0];
-          highestScore = 0.95;
-        }
-      }
-
-      // 3. Try title candidate fuzzy matching
-      if (!bestMatch) {
-        const cleanTitle = MetadataNormalizer.normalizeTitle(rTrack.title || '');
+      const cleanTitle = MetadataNormalizer.normalizeTitle(rTrack.title || '');
+      if (cleanTitle) {
         const titleCandidates = titleIndex.get(cleanTitle) || [];
-        for (const candidate of titleCandidates) {
-          const scoreResult = TrackIdentityMatcher.scorePair(candidate, rTrack);
-          if (scoreResult.isMatch && scoreResult.score > highestScore) {
-            highestScore = scoreResult.score;
-            bestMatch = candidate;
-          }
+        for (const c of titleCandidates) candidateSet.add(c);
+      }
+
+      // TrackIdentityMatcher remains the single semantic authority for scoring all candidates
+      for (const candidate of candidateSet) {
+        const scoreResult = TrackIdentityMatcher.scorePair(candidate, rTrack);
+        if (scoreResult.isMatch && scoreResult.score > highestScore) {
+          highestScore = scoreResult.score;
+          bestMatch = candidate;
         }
       }
 
@@ -391,8 +374,10 @@ export class SpotifyPlaylistSyncService {
       remoteTracks,
       localToSpotifyUriMap,
       remoteToLocalSongMap,
-      baseSnapshotId: currentSnapshotId,
-      baseEntriesHash: currentEntriesHash
+      base: {
+        localEntriesHash: currentEntriesHash,
+        remoteSnapshotId: currentSnapshotId
+      }
     });
   }
 
@@ -500,6 +485,8 @@ export class SpotifyPlaylistSyncService {
 
       // ==========================================
       // Phase 1: Staged Remote Target Replacement
+      // Note: Spotify's PUT replacement API does not take a conditional snapshot parameter.
+      // Preflight check + immediate post-write verification establish the authoritative boundary.
       // ==========================================
       try {
         if (targetUris.length <= 100) {
@@ -539,31 +526,6 @@ export class SpotifyPlaylistSyncService {
             completedRemoteBatches++;
           }
         }
-
-        // Post-write remote verification
-        const verifiedRemoteItems = await this.apiClient.getAllPlaylistItems(
-          accessToken,
-          link.spotifyPlaylistId
-        );
-        const verifiedRemoteUris = verifiedRemoteItems
-          .map((item) => item.item?.track?.uri || item.item?.uri)
-          .filter((u): u is string => Boolean(u));
-
-        let isRemoteMatching = verifiedRemoteUris.length === targetUris.length;
-        if (isRemoteMatching) {
-          for (let i = 0; i < targetUris.length; i++) {
-            if (verifiedRemoteUris[i] !== targetUris[i]) {
-              isRemoteMatching = false;
-              break;
-            }
-          }
-        }
-
-        if (!isRemoteMatching) {
-          throw new Error(
-            `Remote Spotify verification failed: expected ${targetUris.length} items, observed ${verifiedRemoteUris.length}.`
-          );
-        }
       } catch (err) {
         logger.error('Remote Spotify mutation failed during sync', {
           playlistId,
@@ -597,10 +559,97 @@ export class SpotifyPlaylistSyncService {
       }
 
       // ==========================================
+      // Phase 1.5: Post-Write Remote Verification
+      // ==========================================
+      try {
+        const verifiedRemoteItems = await this.apiClient.getAllPlaylistItems(
+          accessToken,
+          link.spotifyPlaylistId
+        );
+        const verifiedRemoteUris = verifiedRemoteItems
+          .map((item) => item.item?.track?.uri || item.item?.uri)
+          .filter((u): u is string => Boolean(u));
+
+        let isRemoteMatching = verifiedRemoteUris.length === targetUris.length;
+        if (isRemoteMatching) {
+          for (let i = 0; i < targetUris.length; i++) {
+            if (verifiedRemoteUris[i] !== targetUris[i]) {
+              isRemoteMatching = false;
+              break;
+            }
+          }
+        }
+
+        if (!isRemoteMatching) {
+          throw new Error(
+            `Remote Spotify verification failed: expected ${targetUris.length} items, observed ${verifiedRemoteUris.length}.`
+          );
+        }
+      } catch (err) {
+        logger.error('Remote Spotify post-write verification failed', {
+          playlistId,
+          error: (err as Error).message
+        });
+
+        await db
+          .update(spotifyPlaylistLinks)
+          .set({
+            syncState: 'PARTIAL_FAILURE',
+            failureStage: 'REMOTE_VERIFICATION',
+            completedRemoteBatches,
+            failedBatchIndex: null,
+            lastError: (err as Error).message,
+            updatedAt: new Date()
+          })
+          .where(eq(spotifyPlaylistLinks.id, link.id));
+
+        return {
+          status: 'PARTIAL_FAILURE',
+          playlistId,
+          spotifyPlaylistId: link.spotifyPlaylistId,
+          strategy,
+          syncState: 'PARTIAL_FAILURE',
+          failureStage: 'REMOTE_VERIFICATION',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          failedBatchIndex: undefined,
+          error: (err as Error).message
+        };
+      }
+
+      // ==========================================
       // Phase 2: Atomic Local DB Target Replacement
+      // Guarded by in-transaction concurrency check and post-write assertion
       // ==========================================
       try {
         await db.transaction(async (trx) => {
+          // In-transaction optimistic concurrency verification
+          const inTrxEntries = await trx.query.playlistEntries.findMany({
+            where: eq(playlistEntries.playlistId, playlistId),
+            orderBy: asc(playlistEntries.position),
+            with: {
+              song: {
+                columns: {
+                  id: true,
+                  isrc: true
+                }
+              }
+            }
+          });
+
+          const inTrxHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
+            inTrxEntries.map((e, idx) => ({
+              position: idx + 1,
+              songId: e.songId,
+              isrc: (e as any).song?.isrc
+            }))
+          );
+
+          if (plan.base.localEntriesHash && inTrxHash !== plan.base.localEntriesHash) {
+            throw new Error('Local playlist modified concurrently inside transaction boundary.');
+          }
+
+          // Atomic wipe and staged insertion
           await trx.delete(playlistEntries).where(eq(playlistEntries.playlistId, playlistId));
 
           for (let i = 0; i < plan.localTarget.length; i++) {
@@ -612,6 +661,26 @@ export class SpotifyPlaylistSyncService {
                 position: i,
                 source: 'spotify_sync'
               });
+            }
+          }
+
+          // Post-write local verification inside transaction
+          const insertedEntries = await trx.query.playlistEntries.findMany({
+            where: eq(playlistEntries.playlistId, playlistId),
+            orderBy: asc(playlistEntries.position)
+          });
+
+          if (insertedEntries.length !== plan.localTarget.length) {
+            throw new Error(
+              `Local DB verification failed: expected ${plan.localTarget.length} rows, found ${insertedEntries.length}.`
+            );
+          }
+
+          for (let i = 0; i < plan.localTarget.length; i++) {
+            if (insertedEntries[i].songId !== plan.localTarget[i].localSongId || insertedEntries[i].position !== i) {
+              throw new Error(
+                `Local DB positional verification failed at index ${i}: expected song ${plan.localTarget[i].localSongId}, found ${insertedEntries[i].songId}.`
+              );
             }
           }
         });
@@ -627,7 +696,7 @@ export class SpotifyPlaylistSyncService {
             syncState: 'PARTIAL_FAILURE',
             failureStage: 'LOCAL',
             completedRemoteBatches,
-            failedBatchIndex: completedRemoteBatches,
+            failedBatchIndex: null,
             lastError: (err as Error).message,
             updatedAt: new Date()
           })
@@ -648,6 +717,7 @@ export class SpotifyPlaylistSyncService {
 
       // ==========================================
       // Phase 3: Finalize Link Baseline & Invariants
+      // Baseline fields (lastSyncedSnapshotId, lastSyncedEntriesHash) are advanced ONLY on SUCCESS
       // ==========================================
       const finalEntries = await this.loadPlaylistEntries(playlistId);
       const finalEntriesHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
@@ -659,39 +729,63 @@ export class SpotifyPlaylistSyncService {
       );
 
       const hasUnresolved = plan.unresolvedRemoteOccurrences.length > 0;
-      const finalSyncState = hasUnresolved ? 'PARTIAL_FAILURE' : 'SYNCED';
-      const finalErrorMessage = hasUnresolved
-        ? `Sync incomplete: ${plan.unresolvedRemoteOccurrences.length} remote track(s) could not be resolved to local audio files.`
-        : null;
-
       const now = new Date();
+
+      if (hasUnresolved) {
+        const unresolvedMessage = `Sync incomplete: ${plan.unresolvedRemoteOccurrences.length} remote track(s) could not be resolved to local audio files.`;
+        await db
+          .update(spotifyPlaylistLinks)
+          .set({
+            syncState: 'PARTIAL_FAILURE',
+            failureStage: 'FINALIZATION',
+            completedRemoteBatches: 0,
+            failedBatchIndex: null,
+            lastError: unresolvedMessage,
+            updatedAt: now
+          })
+          .where(eq(spotifyPlaylistLinks.id, link.id));
+
+        return {
+          status: 'PARTIAL_FAILURE',
+          playlistId,
+          spotifyPlaylistId: link.spotifyPlaylistId,
+          strategy,
+          syncState: 'PARTIAL_FAILURE',
+          failureStage: 'FINALIZATION',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          unresolvedRemoteCount: plan.unresolvedRemoteOccurrences.length,
+          error: unresolvedMessage
+        };
+      }
+
+      // Successful synchronization: advance persistent baseline
       await db
         .update(spotifyPlaylistLinks)
         .set({
           lastSyncedSnapshotId: currentSnapshotId,
           lastSyncedEntriesHash: finalEntriesHash,
-          syncState: finalSyncState,
-          failureStage: hasUnresolved ? 'FINALIZATION' : null,
+          syncState: 'SYNCED',
+          failureStage: null,
           completedRemoteBatches: 0,
           failedBatchIndex: null,
-          lastError: finalErrorMessage,
+          lastError: null,
           lastSyncedAt: now,
           updatedAt: now
         })
         .where(eq(spotifyPlaylistLinks.id, link.id));
 
       return {
-        status: hasUnresolved ? 'PARTIAL_FAILURE' : 'SUCCESS',
+        status: 'SUCCESS',
         playlistId,
         spotifyPlaylistId: link.spotifyPlaylistId,
         finalSnapshotId: currentSnapshotId,
         finalEntriesHash,
         strategy,
-        syncState: finalSyncState,
+        syncState: 'SYNCED',
         completedRemoteBatches,
         totalRemoteBatches,
-        unresolvedRemoteCount: plan.unresolvedRemoteOccurrences.length,
-        error: finalErrorMessage || undefined
+        unresolvedRemoteCount: 0
       };
     } finally {
       SpotifyPlaylistSyncService.activeSyncLocks.delete(playlistId);
