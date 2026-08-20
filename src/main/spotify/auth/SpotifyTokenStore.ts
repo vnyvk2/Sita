@@ -276,6 +276,19 @@ export class SpotifyTokenStore {
   }
 
   /**
+   * Checks if the active Spotify integration has been granted the required OAuth scopes.
+   */
+  public static async hasRequiredScopes(requiredScopes: string[]): Promise<boolean> {
+    const integration = await this.getActiveIntegration();
+    if (!integration || !Array.isArray(integration.scopes)) {
+      return false;
+    }
+
+    const grantedSet = new Set(integration.scopes);
+    return requiredScopes.every((scope) => grantedSet.has(scope));
+  }
+
+  /**
    * Clears the stored Spotify integration upon user disconnect.
    */
   public static async clearIntegration(): Promise<void> {

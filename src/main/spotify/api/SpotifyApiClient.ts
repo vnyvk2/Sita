@@ -247,4 +247,111 @@ export class SpotifyApiClient {
 
     return allItems;
   }
+
+  /**
+   * Searches the Spotify track catalog using GET /v1/search?type=track.
+   * Capped to limit 1..10 in compliance with the February 2026 Spotify Search API update.
+   */
+  public async searchTracks(
+    accessToken: string,
+    query: string,
+    limit?: number
+  ): Promise<SpotifyTrackInput[]> {
+    if (!query || !query.trim()) {
+      return [];
+    }
+
+    const safeLimit = Math.min(Math.max(limit ?? 10, 1), 10);
+    const url = new URL(`${SPOTIFY_API_BASE_URL}/search`);
+    url.searchParams.set('q', query.trim());
+    url.searchParams.set('type', 'track');
+    url.searchParams.set('limit', safeLimit.toString());
+
+    const response = await this.pipeline.execute<SpotifySearchResponse>({
+      url: url.toString(),
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to search Spotify track catalog: HTTP ${response.status}`);
+    }
+
+    return response.data.tracks?.items ?? [];
+  }
+
+  /**
+   * Creates a playlist for the current authenticated user using POST /v1/me/playlists.
+   * Explicitly sets public visibility (defaulting to false).
+   */
+  public async createPlaylist(
+    accessToken: string,
+    details: {
+      name: string;
+      description?: string;
+      isPublic: boolean;
+    }
+  ): Promise<SpotifyPlaylistDetails> {
+    const payload: SpotifyCreatePlaylistRequest = {
+      name: details.name.trim(),
+      description: details.description?.trim() || undefined,
+      public: Boolean(details.isPublic)
+    };
+
+    const response = await this.pipeline.execute<SpotifyPlaylistDetails>({
+      url: `${SPOTIFY_API_BASE_URL}/me/playlists`,
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: payload
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to create Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Adds items to a Spotify playlist using POST /v1/playlists/{id}/items.
+   * Expects a single batch of 1..100 track URIs. Chunking is handled by caller.
+   */
+  public async addPlaylistItems(
+    accessToken: string,
+    playlistId: string,
+    uris: string[]
+  ): Promise<SpotifyAddItemsResponse> {
+    if (!uris || uris.length === 0) {
+      return { snapshot_id: '' };
+    }
+
+    if (uris.length > 100) {
+      throw new Error(
+        `Spotify addPlaylistItems batch cannot exceed 100 URIs (received ${uris.length})`
+      );
+    }
+
+    const response = await this.pipeline.execute<SpotifyAddItemsResponse>({
+      url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}/items`,
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: {
+        uris
+      }
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Failed to add items to Spotify playlist: HTTP ${response.status}`);
+    }
+
+    return response.data;
+  }
 }
