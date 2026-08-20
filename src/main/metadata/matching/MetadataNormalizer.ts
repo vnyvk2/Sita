@@ -19,6 +19,9 @@ export class MetadataNormalizer {
   private static readonly COSMETIC_NOISE_REGEX =
     /\b(official\s+)?(music\s+)?(audio|video|lyric\s+video|lyrics?|visualizer|hd|hq)\b|\b(\d{4}\s+)?re-?master(ed)?(\s*version)?\b|\b(deluxe\s+edition)\b/gi;
 
+  private static readonly PARENTHETICAL_VARIANT_REGEX =
+    /\s*[\(\[](live|acoustic|demo|instrumental|remix|radio edit|extended mix|unplugged|session|orchestral|piano version)(\s+(at|in|from|on)\s+[^)\]]+|\s+\d{4})?[\)\]]/gi;
+
   private static readonly FILENAME_AUDIO_TAGS_REGEX =
     /\[(320kbps|flac|lossless|24bit|v0|v2|128kbps|256kbps|aac|wav|mp3)\]|\((remastered\s*\d*|re-mastered\s*\d*|deluxe\s*edition)\)/gi;
 
@@ -50,7 +53,7 @@ export class MetadataNormalizer {
 
   /**
    * Normalizes track title by stripping cosmetic noise (Official Video, Lyrics, etc.)
-   * while preserving meaningful tokens without deleting variants.
+   * and parenthetical variant markers while preserving meaningful tokens.
    */
   public static normalizeTitle(title: string): string {
     if (!title) return '';
@@ -58,6 +61,7 @@ export class MetadataNormalizer {
     let cleaned = title
       .replace(/[’']/g, '') // Smart quotes/apostrophes: don't -> dont, it's -> its
       .replace(this.COSMETIC_NOISE_REGEX, '')
+      .replace(this.PARENTHETICAL_VARIANT_REGEX, '')
       .replace(/\b(pt\.?|part)\b/gi, 'part')
       .replace(/\b(vol\.?|volume)\b/gi, 'volume')
       .replace(/\b(no\.?|number)\b/gi, 'number');

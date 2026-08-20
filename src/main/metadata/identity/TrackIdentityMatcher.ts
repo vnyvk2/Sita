@@ -245,8 +245,25 @@ export class TrackIdentityMatcher {
 
     // Variant Penalty Calculation
     let variantPenalty = 0;
-    const sourceVariants = MetadataNormalizer.extractVariants(sourceTitle);
-    const targetVariants = MetadataNormalizer.extractVariants(targetTitle);
+    const sourceVariants = MetadataNormalizer.extractVariants(
+      `${sourceTitle} ${source.pathOrUri || ''}`
+    );
+    if (source.recordingVariant) {
+      const v = source.recordingVariant.toLowerCase().replace(/_/g, ' ') as RecordingVariant;
+      if (v in VARIANT_PENALTY_TABLE) {
+        sourceVariants.add(v);
+      }
+    }
+
+    const targetVariants = MetadataNormalizer.extractVariants(
+      `${targetTitle} ${target.pathOrUri || ''}`
+    );
+    if (target.recordingVariant) {
+      const v = target.recordingVariant.toLowerCase().replace(/_/g, ' ') as RecordingVariant;
+      if (v in VARIANT_PENALTY_TABLE) {
+        targetVariants.add(v);
+      }
+    }
 
     for (const variant of Object.keys(VARIANT_PENALTY_TABLE) as RecordingVariant[]) {
       const hasSource = sourceVariants.has(variant);

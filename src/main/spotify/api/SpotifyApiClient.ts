@@ -138,7 +138,7 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Fetches all user playlists across all pages.
+   * Fetches all user playlists across all pages following pure page.next authority.
    */
   public async getAllUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
     const allPlaylists: SpotifyPlaylistSummary[] = [];
@@ -146,9 +146,8 @@ export class SpotifyApiClient {
     const MAX_PAGES = 200;
     let pageCount = 0;
     let nextUrl: string | null = null;
-    let hasMore = true;
 
-    while (hasMore && pageCount < MAX_PAGES) {
+    while (pageCount < MAX_PAGES) {
       pageCount++;
       const page = await this.getUserPlaylists(
         accessToken,
@@ -159,12 +158,12 @@ export class SpotifyApiClient {
         break;
       }
       allPlaylists.push(...page.playlists);
-      nextUrl = page.next;
-      if (!nextUrl || seenNextUrls.has(nextUrl)) {
+
+      if (!page.next || seenNextUrls.has(page.next)) {
         break;
       }
-      seenNextUrls.add(nextUrl);
-      hasMore = allPlaylists.length < page.total;
+      seenNextUrls.add(page.next);
+      nextUrl = page.next;
     }
 
     return allPlaylists;

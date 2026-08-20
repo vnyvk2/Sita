@@ -176,4 +176,39 @@ describe('SpotifyTokenStore (Security, Legacy Migration & Account Mutex)', () =>
     active = await SpotifyTokenStore.getActiveIntegration();
     expect(active).toBeNull();
   });
+
+  it('should safely handle clearIntegration during an active refresh operation without deadlock', async () => {
+    await SpotifyTokenStore.saveTokens({
+      user: { spotifyUserId: 'user-race-disconnect' },
+      tokens: {
+        accessToken: 'expired-access-token',
+        refreshToken: 'refresh-token-active',
+        expiresIn: -100,
+        tokenType: 'Bearer',
+        scope: 'playlist-read-private',
+        receivedAt: Date.now() - 7200000
+      }
+    });
+
+    vi.spyOn(SpotifyPkceService, 'refreshAccessToken').mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return {
+        accessToken: 'fresh-token',
+        refreshToken: 'fresh-refresh-token',
+        expiresIn: 3600,
+        tokenType: 'Bearer',
+        scope: 'playlist-read-private',
+        receivedAt: Date.now()
+      };
+    });
+
+    // Start refresh and disconnect concurrently
+    const refreshPromise = SpotifyTokenStore.getValidAccessToken('client-id');
+    const disconnectPromise = SpotifyTokenStore.clearIntegration();
+
+    await Promise.all([refreshPromise, disconnectPromise]);
+
+    const active = await SpotifyTokenStore.getActiveIntegration();
+    expect(active).toBeNull();
+  });
 });
