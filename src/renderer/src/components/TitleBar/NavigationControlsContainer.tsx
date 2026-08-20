@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router';
+import { useCanGoBack, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useTranslation } from 'react-i18next';
 
@@ -9,14 +9,9 @@ type Props = { disableHomeButton?: boolean; className?: string };
 
 const NavigationControlsContainer = (props: Props) => {
   const { history, navigate } = useRouter();
-  // const canGoBack = useCanGoBack();
-  const canGoBack = history.length > 0;
-
-  // const canGoForward = history.index < history.entries.length - 1;
+  const canGoBack = useCanGoBack();
 
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
-  // const pageHistoryIndex = useStore(store, (state) => state.navigationHistory.pageHistoryIndex);
-  // const noOfPagesInHistory = useStore(store, (state) => state.navigationHistory.history.length - 1);
 
   const { t } = useTranslation();
 
@@ -43,7 +38,7 @@ const NavigationControlsContainer = (props: Props) => {
           className={`goToHomePageBtn app-region-no-drag hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-dark-font-color-highlight invisible mr-0! flex h-fit scale-50 rounded-md! border-0! bg-transparent px-2! py-1! opacity-0 outline-offset-1 transition-all! dark:bg-transparent ${
             canGoBack ? 'visible! scale-100! opacity-100! focus-visible:outline!' : ''
           } `}
-          clickHandler={() => navigate({ to: '/main-player/home', replace: true })}
+          clickHandler={() => navigate({ to: '/main-player/home' })}
           tooltipLabel={t('titleBar.goHome')}
         />
       )}

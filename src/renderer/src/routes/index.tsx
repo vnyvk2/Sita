@@ -16,5 +16,5 @@ export const Route = createFileRoute('/')({
 });
 
 function RouteComponent() {
-  return <Navigate to="/main-player/home" />;
+  return <Navigate to="/main-player/home" replace />;
 }

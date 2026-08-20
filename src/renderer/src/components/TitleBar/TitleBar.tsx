@@ -19,9 +19,8 @@ const appReleasePhase = getVersionInfoFromString(version)?.releasePhase || 'stab
 
 const TitleBar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
+  const isFullScreenPlayer = useStore(store, (state) => state.playerType === 'full');
   const location = useLocation();
-
-  const isFullScreenPlayer = location.href.includes('/fullscreen-player');
   const isDarwin = window.api.properties.platform === 'darwin';
 
   return (

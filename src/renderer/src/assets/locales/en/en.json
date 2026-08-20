@@ -497,6 +497,8 @@
     "enableSongIndexing": "Enable song indexing",
     "showTrackNumberAsSongIndexDescription": "Show track number in front of the song when in albums page.",
     "showTrackNumberAsSongIndex": "Show track number as song index",
+    "showEqualizerOnTracklistDescription": "Show an animated dot-matrix mini-equalizer indicator on the currently playing track in tracklists and queue.",
+    "showEqualizerOnTracklist": "Show mini-equalizer on playing track",
     "showArtistArtworkNearSongControlsDescription": "Shows artist artworks next to the artist names near the title of the song on the song controls panel.",
     "showArtistArtworkNearSongControls": "Show available artist artworks next to their name (bottom left).",
     "disableBackgroundArtworksDescription": "Disables the large artworks shown on the background of some pages.",
