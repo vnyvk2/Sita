@@ -11,6 +11,7 @@ import type {
 } from '../../../types/last_fm_album_info_api';
 import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
+import { LASTFM_BASE_URL } from './lastFmUtils';
 
 const sortTracks = (a: ParsedAlbumTrack, b: ParsedAlbumTrack) => {
   if (a.rank > b.rank) return 1;
@@ -128,7 +129,7 @@ const getAlbumInfoFromLastFM = async (albumId: number): Promise<LastFMAlbumInfo 
     const { title, artists = [] } = selectedAlbum;
     const artistsStr = artists?.map((artist) => artist.name).join(', ') || '';
 
-    const url = new URL('http://ws.audioscrobbler.com/2.0/');
+    const url = new URL(LASTFM_BASE_URL);
     url.searchParams.set('method', 'album.getInfo');
     url.searchParams.set('api_key', LAST_FM_API_KEY);
     url.searchParams.set('album', title);

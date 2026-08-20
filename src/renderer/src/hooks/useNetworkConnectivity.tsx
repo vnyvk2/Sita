@@ -8,9 +8,16 @@ const useNetworkConnectivity = () => {
 
     setIsOnline(navigator.onLine);
 
-    window.addEventListener('online', () => setIsOnline(true), {
-      signal: controller.signal
-    });
+    window.addEventListener(
+      'online',
+      () => {
+        setIsOnline(true);
+        window.api.audioLibraryControls?.flushScrobbleQueue?.().catch(() => {});
+      },
+      {
+        signal: controller.signal
+      }
+    );
     window.addEventListener('offline', () => setIsOnline(false), {
       signal: controller.signal
     });

@@ -35,6 +35,9 @@ vi.mock('electron', () => ({
   },
   protocol: {
     registerSchemesAsPrivileged: vi.fn()
+  },
+  net: {
+    isOnline: vi.fn(() => true)
   }
 }));
 

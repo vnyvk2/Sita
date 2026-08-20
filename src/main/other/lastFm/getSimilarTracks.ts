@@ -9,6 +9,7 @@ import type {
 } from '../../../types/last_fm_similar_tracks_api';
 import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
+import { LASTFM_BASE_URL } from './lastFmUtils';
 
 const sortSimilarTracks = (a: ParsedSimilarTrack, b: ParsedSimilarTrack) => {
   if (a.match > b.match) return -1;
@@ -68,7 +69,7 @@ const getSimilarTracks = async (songId: number): Promise<SimilarTracksOutput> =>
     const { title, artists } = convertToSongData(song);
     const artistsStr = artists?.map((artist) => artist.name).join(', ') || '';
 
-    const url = new URL('http://ws.audioscrobbler.com/2.0/');
+    const url = new URL(LASTFM_BASE_URL);
     url.searchParams.set('method', 'track.getSimilar');
     url.searchParams.set('api_key', LAST_FM_API_KEY);
     url.searchParams.set('track', title);

@@ -1,8 +1,105 @@
 import { db } from '@main/db/db';
-import { invertSongFavoriteStatuses, updateSongFavoriteStatuses } from '@main/db/queries/songs';
+import { insertScrobble } from '@main/db/queries/scrobble_queue';
+import { getUserSettings } from '@main/db/queries/settings';
+import {
+  getSongById,
+  invertSongFavoriteStatuses,
+  updateSongFavoriteStatuses
+} from '@main/db/queries/songs';
+import {
+  flushScrobbleQueue,
+  getCurrentLastFmGeneration
+} from '@main/other/lastFm/flushScrobbleQueue';
+import { convertToSongData } from '@main/utils/convert';
 
 import logger from '../logger';
 import { dataUpdateEvent } from '../main';
+
+const syncFavoritesToLastFm = async (
+  likes: number[],
+  dislikes: number[],
+  accountGen: number
+) => {
+  try {
+    if (accountGen !== getCurrentLastFmGeneration()) {
+      logger.info('Discarding favorites sync: Last.fm account generation changed before execution', {
+        actionGen: accountGen,
+        currentGen: getCurrentLastFmGeneration()
+      });
+      return;
+    }
+
+    const { sendSongFavoritesDataToLastFM } = await getUserSettings();
+    if (!sendSongFavoritesDataToLastFM) {
+      return;
+    }
+
+    if (accountGen !== getCurrentLastFmGeneration()) {
+      logger.info('Discarding favorites sync: Last.fm account generation changed after fetching settings');
+      return;
+    }
+
+    const [likeSongs, dislikeSongs] = await Promise.all([
+      Promise.all(likes.map((id) => getSongById(id).catch(() => null))),
+      Promise.all(dislikes.map((id) => getSongById(id).catch(() => null)))
+    ]);
+
+    if (accountGen !== getCurrentLastFmGeneration()) {
+      logger.info('Discarding favorites sync: Last.fm account generation changed after querying songs');
+      return;
+    }
+
+    for (const songData of likeSongs) {
+      if (songData) {
+        if (accountGen !== getCurrentLastFmGeneration()) return;
+        const song = convertToSongData(songData);
+        const artistNames = song.artists?.map((a) => a.name).join(', ');
+        await insertScrobble({
+          songId: songData.id,
+          operationType: 'track.love',
+          trackTitle: song.title,
+          artistNames
+        });
+      }
+    }
+
+    for (const songData of dislikeSongs) {
+      if (songData) {
+        if (accountGen !== getCurrentLastFmGeneration()) return;
+        const song = convertToSongData(songData);
+        const artistNames = song.artists?.map((a) => a.name).join(', ');
+        await insertScrobble({
+          songId: songData.id,
+          operationType: 'track.unlove',
+          trackTitle: song.title,
+          artistNames
+        });
+      }
+    }
+
+    if (accountGen !== getCurrentLastFmGeneration()) return;
+
+    flushScrobbleQueue().catch((err) => {
+      logger.warn('Failed to flush scrobble queue after updating favorites', { err });
+    });
+  } catch (error) {
+    logger.error('Error occurred in syncFavoritesToLastFm', { error });
+  }
+};
+
+let lastFmSyncChain: Promise<void> = Promise.resolve();
+
+export function enqueueFavoritesSync(
+  likes: number[],
+  dislikes: number[],
+  accountGen: number = getCurrentLastFmGeneration()
+): Promise<void> {
+  const task = async () => {
+    await syncFavoritesToLastFm(likes, dislikes, accountGen);
+  };
+  lastFmSyncChain = lastFmSyncChain.then(task, task);
+  return lastFmSyncChain;
+}
 
 const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
   const result: ToggleLikeSongReturnValue = {
@@ -15,6 +112,8 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
   if (songIds.length === 0) {
     return result;
   }
+
+  const accountGen = getCurrentLastFmGeneration();
 
   await db.transaction(async (trx) => {
     if (isLikeSong !== undefined) {
@@ -39,6 +138,13 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
   });
 
   dataUpdateEvent('songs/likes', [...result.likes, ...result.dislikes]);
+
+  if (result.likes.length > 0 || result.dislikes.length > 0) {
+    enqueueFavoritesSync(result.likes, result.dislikes, accountGen).catch((error) => {
+      logger.error('Failed to sync favorites to LastFM', { error });
+    });
+  }
+
   return result;
 };
 

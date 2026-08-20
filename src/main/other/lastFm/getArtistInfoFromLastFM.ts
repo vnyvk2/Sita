@@ -1,8 +1,7 @@
 import type { LastFmArtistInfoAPI } from '../../../types/last_fm_artist_info_api';
 import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
-
-const LAST_FM_BASE_URL = 'http://ws.audioscrobbler.com/2.0/';
+import { LASTFM_BASE_URL } from './lastFmUtils';
 
 const getArtistInfoFromLastFM = async (artistName: string) => {
   const isConnectedToInternet = checkIfConnectedToInternet();

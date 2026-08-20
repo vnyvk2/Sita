@@ -62,6 +62,7 @@ import {
   removeIgnoredFeaturingArtist
 } from './db/queries/ignoredItems';
 import { getDatabaseMetrics } from './db/queries/other';
+import { clearScrobbleQueue } from './db/queries/scrobble_queue';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
 import { getAllSongIds, getSongById } from './db/queries/songs';
 import {
@@ -105,6 +106,7 @@ import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
 import { MetadataBootstrap } from './metadata/setup';
 import { setDiscordRpcActivity } from './other/discordRPC';
 import { generatePalettes } from './other/generatePalette';
+import { flushScrobbleQueue, invalidateLastFmSession } from './other/lastFm/flushScrobbleQueue';
 import getAlbumInfoFromLastFM from './other/lastFm/getAlbumInfoFromLastFM';
 import getSimilarTracks from './other/lastFm/getSimilarTracks';
 import scrobbleSong from './other/lastFm/scrobbleSong';
@@ -450,6 +452,16 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       scrobbleSong(songId, startTimeInSecs)
     );
 
+    ipcMain.handle('app/flushScrobbleQueue', () => flushScrobbleQueue());
+
+    ipcMain.handle('app/disconnectLastFm', async () => {
+      invalidateLastFmSession();
+      await clearScrobbleQueue();
+      await saveUserSettings({ lastFmSessionName: null, lastFmSessionKey: null });
+      dataUpdateEvent('userData');
+      return true;
+    });
+
     ipcMain.handle('app/sendNowPlayingSongDataToLastFM', (_, songId: number) =>
       sendNowPlayingSongDataToLastFM(songId)
     );
@@ -670,7 +682,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.on('app/loginToLastFmInBrowser', () =>
       shell.openExternal(
-        `http://www.last.fm/api/auth/?api_key=${import.meta.env.MAIN_VITE_LAST_FM_API_KEY}&cb=nora://auth?service=lastfm`
+        `https://www.last.fm/api/auth/?api_key=${import.meta.env.MAIN_VITE_LAST_FM_API_KEY}&cb=nora://auth?service=lastfm`
       )
     );
 

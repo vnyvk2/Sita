@@ -174,6 +174,7 @@ const audioLibraryControls = {
   clearSongHistory: (): PromiseFunctionReturn => ipcRenderer.invoke('app/clearSongHistory'),
   scrobbleSong: (songId: number, startTimeInSecs: number): Promise<void> =>
     ipcRenderer.invoke('app/scrobbleSong', songId, startTimeInSecs),
+  flushScrobbleQueue: (): Promise<void> => ipcRenderer.invoke('app/flushScrobbleQueue'),
   sendNowPlayingSongDataToLastFM: (songId: number): Promise<void> =>
     ipcRenderer.invoke('app/sendNowPlayingSongDataToLastFM', songId),
   getSimilarTracksForASong: (songId: number): Promise<SimilarTracksOutput> =>
@@ -551,6 +552,7 @@ const settingsHelpers = {
   importAppData: (): Promise<void | LocalStorage> => ipcRenderer.invoke('app/importAppData'),
   compareEncryptedData: (): Promise<boolean> => ipcRenderer.invoke('app/compareEncryptedData'),
   loginToLastFmInBrowser: () => ipcRenderer.send('app/loginToLastFmInBrowser'),
+  disconnectLastFm: (): Promise<boolean> => ipcRenderer.invoke('app/disconnectLastFm'),
   getFolderLocation: (): Promise<string> => ipcRenderer.invoke('app/getFolderLocation'),
 
   // User Keyboard Shortcuts

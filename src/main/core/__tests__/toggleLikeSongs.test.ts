@@ -3,11 +3,29 @@ import { songs } from '@main/db/schema';
 import { inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
+import * as settingsQueries from '@main/db/queries/settings';
+import * as flushModule from '@main/other/lastFm/flushScrobbleQueue';
 import { dataUpdateEvent } from '../../main';
 import toggleLikeSongs from '../toggleLikeSongs';
 
 vi.mock('../../main', () => ({
   dataUpdateEvent: vi.fn()
+}));
+
+vi.mock('@main/db/queries/settings', () => ({
+  getUserSettings: vi.fn().mockResolvedValue({
+    sendSongFavoritesDataToLastFM: true
+  })
+}));
+
+vi.mock('@main/db/queries/scrobble_queue', () => ({
+  insertScrobble: vi.fn().mockResolvedValue(undefined)
+}));
+
+vi.mock('@main/other/lastFm/flushScrobbleQueue', () => ({
+  flushScrobbleQueue: vi.fn().mockResolvedValue(undefined),
+  getCurrentLastFmGeneration: vi.fn(() => 0)
 }));
 
 vi.mock('../../logger', () => ({
@@ -209,5 +227,89 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
 
     expect(res).toEqual({ likes: [], dislikes: [] });
     expect(dataUpdateEvent).not.toHaveBeenCalled();
+  });
+
+  it('Last.fm Sync: enqueues track.love / track.unlove into durable scrobble_queue and flushes', async () => {
+    const insertSpy = vi.mocked(scrobbleQueueQueries.insertScrobble);
+    const flushSpy = vi.mocked(flushModule.flushScrobbleQueue);
+
+    // Song 2 is false -> liking it should trigger track.love
+    await toggleLikeSongs([song2Id], true);
+
+    // Wait for the background un-awaited favorite sync promise to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        songId: song2Id,
+        operationType: 'track.love',
+        trackTitle: 'Test Song 2'
+      })
+    );
+    expect(flushSpy).toHaveBeenCalled();
+  });
+
+  it('Last.fm Sync Concurrency: rapid like then unlike guarantees strict sequential FIFO insertion into queue', async () => {
+    const insertSpy = vi.mocked(scrobbleQueueQueries.insertScrobble);
+    insertSpy.mockClear();
+
+    // Rapid sequential calls without awaiting in caller
+    const p1 = toggleLikeSongs([song2Id], true);
+    const p2 = toggleLikeSongs([song2Id], false);
+    await Promise.all([p1, p2]);
+
+    // Wait for the serialized promise chain to drain
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Must have inserted track.love FIRST, then track.unlove SECOND
+    expect(insertSpy).toHaveBeenCalledTimes(2);
+    expect(insertSpy.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        songId: song2Id,
+        operationType: 'track.love'
+      })
+    );
+    expect(insertSpy.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        songId: song2Id,
+        operationType: 'track.unlove'
+      })
+    );
+  });
+
+  it('Last.fm Account Switch Isolation: discards pending favorite sync operations when account session is invalidated', async () => {
+    const insertSpy = vi.mocked(scrobbleQueueQueries.insertScrobble);
+    insertSpy.mockClear();
+
+    // User A starts active at generation = 0
+    let currentGen = 0;
+    vi.mocked(flushModule.getCurrentLastFmGeneration).mockImplementation(() => currentGen);
+
+    // Gate getUserSettings with an explicit promise resolution trigger
+    let releaseSettingsPromise: (() => void) | undefined;
+    vi.mocked(settingsQueries.getUserSettings).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseSettingsPromise = () =>
+            resolve({ sendSongFavoritesDataToLastFM: true } as unknown as Awaited<
+              ReturnType<typeof settingsQueries.getUserSettings>
+            >);
+        })
+    );
+
+    // User A likes song 2 -> initiates favorite sync and pauses inside getUserSettings
+    await toggleLikeSongs([song2Id], true);
+
+    // While the producer is suspended awaiting settings, account invalidation / switch occurs!
+    currentGen = 1;
+
+    // Now release the settings promise to resume the producer
+    releaseSettingsPromise?.();
+
+    // Deterministically drain the serialized promise chain with zero arbitrary timeouts
+    await toggleLikeSongs([]);
+
+    // Must NOT have inserted anything into scrobble queue under the invalidated epoch
+    expect(insertSpy).not.toHaveBeenCalled();
   });
 });

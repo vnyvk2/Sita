@@ -64,6 +64,15 @@ const AccountsSettings = () => {
     }
   });
 
+  const { mutate: disconnectLastFm, isPending: isDisconnectingLastFm } = useMutation({
+    mutationFn: async () => {
+      return await window.api.settingsHelpers.disconnectLastFm();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
   const { mutate: connectSpotify } = useMutation({
     mutationFn: async () => {
       setIsConnectingSpotify(true);
@@ -251,16 +260,36 @@ const AccountsSettings = () => {
                 <li>{t('settingsPage.lastFmDescription3')}</li>
                 <li>{t('settingsPage.lastFmDescription4')}</li>
               </ul>
-              <Button
-                label={
-                  isLastFmConnected
-                    ? t('settingsPage.authenticateAgain')
-                    : t('settingsPage.loginInBrowser')
-                }
-                iconName="open_in_new"
-                className="mt-2"
-                clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
-              />
+              <div className="mt-3 flex items-center gap-3">
+                {isLastFmConnected ? (
+                  <>
+                    <Button
+                      label={
+                        isDisconnectingLastFm
+                          ? 'Disconnecting...'
+                          : t('settingsPage.disconnectLastFm', 'Disconnect Last.fm')
+                      }
+                      iconName="link_off"
+                      className="border-red-500 text-red-500 hover:bg-red-500/10"
+                      clickHandler={() => disconnectLastFm()}
+                      isDisabled={isDisconnectingLastFm}
+                    />
+                    <Button
+                      label={t('settingsPage.switchAccount', 'Switch account')}
+                      iconName="swap_horiz"
+                      clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
+                      isDisabled={isDisconnectingLastFm}
+                    />
+                  </>
+                ) : (
+                  <Button
+                    label={t('settingsPage.loginInBrowser')}
+                    iconName="open_in_new"
+                    className="mt-2"
+                    clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
+                  />
+                )}
+              </div>
             </div>
           </div>
           <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
