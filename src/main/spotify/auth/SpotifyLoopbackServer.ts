@@ -157,11 +157,31 @@ export class SpotifyLoopbackServer {
     });
 
     const port = await new Promise<number>((resolve, reject) => {
-      server!.listen(preferredPort, '127.0.0.1', () => {
-        const address = server!.address() as AddressInfo;
-        resolve(address.port);
-      });
-      server!.on('error', (err) => reject(err));
+      const startListening = (targetPort: number) => {
+        const onError = (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE' && targetPort !== 0) {
+            logger.warn(
+              `Spotify loopback port ${targetPort} in use, retrying with OS-assigned ephemeral port...`
+            );
+            server!.removeListener('listening', onListening);
+            startListening(0);
+          } else {
+            reject(err);
+          }
+        };
+
+        const onListening = () => {
+          server!.removeListener('error', onError);
+          const address = server!.address() as AddressInfo;
+          resolve(address.port);
+        };
+
+        server!.once('error', onError);
+        server!.once('listening', onListening);
+        server!.listen(targetPort, '127.0.0.1');
+      };
+
+      startListening(preferredPort);
     });
 
     timeoutTimer = setTimeout(() => {

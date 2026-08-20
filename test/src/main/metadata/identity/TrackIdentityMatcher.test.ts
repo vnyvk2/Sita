@@ -131,5 +131,54 @@ describe('TrackIdentityMatcher', () => {
       expect(result.score).toBeLessThan(50);
       expect(result.matchType).toBe('NONE');
     });
+
+    it('should reject common ambiguous titles with different artists (e.g. "Home", "Stay", "One")', () => {
+      const trackHomeA: CanonicalTrackIdentity = {
+        title: 'Home',
+        artists: ['Michael Bublé'],
+        durationSecs: 225
+      };
+      const trackHomeB: CanonicalTrackIdentity = {
+        title: 'Home',
+        artists: ['Edward Sharpe & The Magnetic Zeros'],
+        durationSecs: 303
+      };
+
+      const resultHome = TrackIdentityMatcher.scorePair(trackHomeA, trackHomeB);
+      expect(resultHome.isMatch).toBe(false);
+      expect(resultHome.score).toBeLessThan(50);
+      expect(resultHome.matchType).toBe('NONE');
+
+      const trackStayA: CanonicalTrackIdentity = {
+        title: 'Stay',
+        artists: ['The Kid LAROI', 'Justin Bieber'],
+        durationSecs: 141
+      };
+      const trackStayB: CanonicalTrackIdentity = {
+        title: 'Stay',
+        artists: ['Rihanna', 'Mikky Ekko'],
+        durationSecs: 240
+      };
+
+      const resultStay = TrackIdentityMatcher.scorePair(trackStayA, trackStayB);
+      expect(resultStay.isMatch).toBe(false);
+      expect(resultStay.score).toBeLessThan(50);
+      expect(resultStay.matchType).toBe('NONE');
+    });
+
+    it('should handle malformed / empty metadata inputs without throwing errors', () => {
+      const emptyTrack: CanonicalTrackIdentity = {
+        title: '',
+        artists: []
+      };
+      const validTrack: CanonicalTrackIdentity = {
+        title: 'Imagine',
+        artists: ['John Lennon']
+      };
+
+      expect(() => TrackIdentityMatcher.scorePair(emptyTrack, validTrack)).not.toThrow();
+      const result = TrackIdentityMatcher.scorePair(emptyTrack, validTrack);
+      expect(result.isMatch).toBe(false);
+    });
   });
 });

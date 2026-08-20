@@ -1,3 +1,15 @@
+export type RecordingVariant =
+  | 'STUDIO'
+  | 'LIVE'
+  | 'ACOUSTIC'
+  | 'REMIX'
+  | 'INSTRUMENTAL'
+  | 'DELUXE'
+  | 'RADIO_EDIT'
+  | 'DEMO'
+  | 'EXTENDED'
+  | string;
+
 export interface CanonicalTrackIdentity {
   id?: string | number;
   title: string;
@@ -12,4 +24,5 @@ export interface CanonicalTrackIdentity {
   discNumber?: number;
   genre?: string;
   pathOrUri?: string;
+  recordingVariant?: RecordingVariant;
 }

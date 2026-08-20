@@ -49,19 +49,26 @@ export class SpotifyPlaylistImportPlanner {
         mbidMap.set(key, existing);
       }
 
-      const normTitle = MetadataNormalizer.normalizeTitle(song.title);
       const primaryArtist = song.artists[0]
         ? MetadataNormalizer.normalizeArtist(song.artists[0])
         : '';
 
-      if (normTitle && primaryArtist) {
-        const key = `${normTitle}::${primaryArtist}`;
-        const existing = titleArtistMap.get(key) ?? [];
-        existing.push(song);
-        titleArtistMap.set(key, existing);
-      }
+      // Index both raw metadata title and effective filename title (for useless title fallback)
+      const titlesToIndex = new Set<string>();
+      const effectiveTitle = MetadataNormalizer.getEffectiveTitle(song);
+      if (effectiveTitle) titlesToIndex.add(effectiveTitle);
 
-      if (normTitle) {
+      const rawNormTitle = MetadataNormalizer.normalizeTitle(song.title);
+      if (rawNormTitle) titlesToIndex.add(rawNormTitle);
+
+      for (const normTitle of titlesToIndex) {
+        if (primaryArtist) {
+          const key = `${normTitle}::${primaryArtist}`;
+          const existing = titleArtistMap.get(key) ?? [];
+          existing.push(song);
+          titleArtistMap.set(key, existing);
+        }
+
         const existing = titleMap.get(normTitle) ?? [];
         existing.push(song);
         titleMap.set(normTitle, existing);
@@ -220,17 +227,22 @@ export class SpotifyPlaylistImportPlanner {
         if (mbidList) mbidList.forEach((c) => candidateSet.add(c));
       }
 
-      const normTitle = MetadataNormalizer.normalizeTitle(canonicalSpotify.title);
       const primaryArtist = canonicalSpotify.artists[0]
         ? MetadataNormalizer.normalizeArtist(canonicalSpotify.artists[0])
         : '';
 
-      if (normTitle && primaryArtist) {
-        const taList = titleArtistMap.get(`${normTitle}::${primaryArtist}`);
-        if (taList) taList.forEach((c) => candidateSet.add(c));
-      }
+      const spotifyTitlesToQuery = new Set<string>();
+      const effectiveSpotifyTitle = MetadataNormalizer.getEffectiveTitle(canonicalSpotify);
+      if (effectiveSpotifyTitle) spotifyTitlesToQuery.add(effectiveSpotifyTitle);
+      const rawNormSpotifyTitle = MetadataNormalizer.normalizeTitle(canonicalSpotify.title);
+      if (rawNormSpotifyTitle) spotifyTitlesToQuery.add(rawNormSpotifyTitle);
 
-      if (normTitle) {
+      for (const normTitle of spotifyTitlesToQuery) {
+        if (primaryArtist) {
+          const taList = titleArtistMap.get(`${normTitle}::${primaryArtist}`);
+          if (taList) taList.forEach((c) => candidateSet.add(c));
+        }
+
         const tList = titleMap.get(normTitle);
         if (tList) tList.forEach((c) => candidateSet.add(c));
       }
@@ -244,9 +256,11 @@ export class SpotifyPlaylistImportPlanner {
         const result = TrackIdentityMatcher.scorePair(canonicalSpotify, candidate);
 
         // Precise variant conflict check: candidate matched artist+title identity but had variant penalty >= 30
-        const candNormTitle = MetadataNormalizer.normalizeTitle(candidate.title);
+        const candNormTitle = MetadataNormalizer.getEffectiveTitle(candidate);
         const candArtist = candidate.artists[0] ? MetadataNormalizer.normalizeArtist(candidate.artists[0]) : '';
-        const isTitleArtistCompatible = normTitle === candNormTitle && (!primaryArtist || !candArtist || primaryArtist === candArtist);
+        const isTitleArtistCompatible =
+          effectiveSpotifyTitle === candNormTitle &&
+          (!primaryArtist || !candArtist || primaryArtist === candArtist);
 
         if (isTitleArtistCompatible && result.breakdown.variantPenalty >= 30) {
           hadVariantConflict = true;
@@ -285,7 +299,7 @@ export class SpotifyPlaylistImportPlanner {
         const libraryMatch: LibraryMatch = {
           matchedSongId: songId,
           status: 'MATCHED',
-          matchType: bestMatchResult.isAuthoritative ? 'EXACT' : 'REPAIRED',
+          matchType: bestMatchResult.matchType,
           confidence: bestMatchResult.confidence,
           diagnostics: [
             bestMatchResult.matchType,
