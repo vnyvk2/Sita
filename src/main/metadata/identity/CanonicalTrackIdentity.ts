@@ -8,7 +8,7 @@ export type RecordingVariant =
   | 'RADIO_EDIT'
   | 'DEMO'
   | 'EXTENDED'
-  | string;
+  | (string & {});
 
 export interface CanonicalTrackIdentity {
   id?: string | number;

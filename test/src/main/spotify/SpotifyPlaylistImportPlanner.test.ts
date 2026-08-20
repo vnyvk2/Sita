@@ -300,21 +300,22 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
     expect(plan.statistics.missingEntries).toBe(1);
   });
 
-  it('should match local track with useless title (e.g. "Track 01") using filename fallback candidate indexing', () => {
-    const libraryWithUselessTitle: CanonicalTrackIdentity[] = [
+  it('should detect VARIANT_CONFLICT when local track has useless title, Live filename/variant, vs Spotify Studio track', () => {
+    const libraryWithLiveFilename: CanonicalTrackIdentity[] = [
       {
-        id: 301,
+        id: 302,
         title: 'Track 01',
         artists: ['Queen'],
-        durationSecs: 354,
-        pathOrUri: '/music/Queen/01 - Bohemian Rhapsody.flac'
+        durationSecs: 410,
+        recordingVariant: 'LIVE',
+        pathOrUri: '/music/Queen/01 - Bohemian Rhapsody (Live at Wembley).flac'
       }
     ];
 
     const items: SpotifyPlaylistItemDTO[] = [
       {
         item: {
-          id: 'sp_queen_bohemian',
+          id: 'sp_queen_studio',
           name: 'Bohemian Rhapsody',
           artists: [{ name: 'Queen' }],
           duration_ms: 354000,
@@ -324,13 +325,87 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
     ];
 
     const plan = SpotifyPlaylistImportPlanner.generatePlan(
-      { name: 'Queen Playlist' },
+      { name: 'Queen Studio' },
       items,
-      libraryWithUselessTitle
+      libraryWithLiveFilename
+    );
+
+    expect(plan.entries[0].decision).toBe('SKIP_NOT_IN_LIBRARY');
+    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('VARIANT_CONFLICT');
+    expect(plan.statistics.importedEntries).toBe(0);
+    expect(plan.statistics.notInLibraryEntries).toBe(1);
+  });
+
+  it('should handle duplicate local tracks with identical ISRC or MBID safely', () => {
+    const libraryWithDuplicates: CanonicalTrackIdentity[] = [
+      {
+        id: 401,
+        title: 'Yesterday (Lossless)',
+        artists: ['The Beatles'],
+        isrc: 'GBAYE6500001',
+        pathOrUri: '/music/beatles/yesterday.flac'
+      },
+      {
+        id: 402,
+        title: 'Yesterday (MP3)',
+        artists: ['The Beatles'],
+        isrc: 'GBAYE6500001',
+        pathOrUri: '/music/beatles/yesterday.mp3'
+      }
+    ];
+
+    const items: SpotifyPlaylistItemDTO[] = [
+      {
+        item: {
+          id: 'sp_beatles_yesterday',
+          name: 'Yesterday',
+          artists: [{ name: 'The Beatles' }],
+          external_ids: { isrc: 'GBAYE6500001' },
+          type: 'track'
+        }
+      }
+    ];
+
+    const plan = SpotifyPlaylistImportPlanner.generatePlan(
+      { name: 'Beatles' },
+      items,
+      libraryWithDuplicates
     );
 
     expect(plan.entries[0].decision).toBe('IMPORT');
-    expect(plan.entries[0].source.trackReference.libraryMatch.matchedSongId).toBe(301);
+    expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('MATCHED');
     expect(plan.statistics.importedEntries).toBe(1);
+  });
+
+  it('should handle malformed Spotify track payloads without throwing exceptions', () => {
+    const items: SpotifyPlaylistItemDTO[] = [
+      {
+        item: {
+          id: 'sp_corrupted_1',
+          name: '',
+          type: 'track'
+        } as never
+      },
+      {
+        item: {
+          id: 'sp_corrupted_2',
+          name: 'Some Track',
+          artists: undefined,
+          duration_ms: undefined,
+          type: 'track'
+        } as never
+      }
+    ];
+
+    expect(() =>
+      SpotifyPlaylistImportPlanner.generatePlan({ name: 'Malformed' }, items, localSongLibrary)
+    ).not.toThrow();
+
+    const plan = SpotifyPlaylistImportPlanner.generatePlan(
+      { name: 'Malformed' },
+      items,
+      localSongLibrary
+    );
+    expect(plan.entries.length).toBe(2);
   });
 });
