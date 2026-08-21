@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    globals: false,
+    globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./test/setup.ts'],
@@ -27,6 +27,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      vitest: path.resolve(__dirname, './node_modules/vitest'),
       '@renderer': path.resolve(__dirname, './src/renderer/src'),
       '@assets': path.resolve(__dirname, './src/renderer/src/assets'),
       '@common': path.resolve(__dirname, './src/common'),

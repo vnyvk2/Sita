@@ -273,6 +273,11 @@ function HistoryPlaylistInfoPage() {
             iconName: 'playlist_add',
             clickHandler: createPlaylistFromHistory,
             isDisabled: !(historySongs.length > 0)
+          },
+          {
+            tooltipLabel: t('historyPage.viewInsights', 'View Insights & Stats'),
+            iconName: 'auto_graph',
+            clickHandler: () => navigate({ to: '/main-player/insights' })
           }
         ]}
         dropdowns={dropdowns}
