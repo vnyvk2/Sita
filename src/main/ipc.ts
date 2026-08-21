@@ -621,9 +621,6 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         updates: Array<{ songId: number; tags: SongTags }>
       ): Promise<BatchUpdateSongTagsResult> => {
         const total = updates?.length ?? 0;
-        let savedCount = 0;
-        let failedCount = 0;
-        const results: BatchSongItemResult[] = [];
 
         if (total === 0) {
           return { total: 0, savedCount: 0, failedCount: 0, results: [] };
