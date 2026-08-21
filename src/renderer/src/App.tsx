@@ -447,7 +447,7 @@ export default function App() {
       </AppUpdateContext.Provider>
       {import.meta.env.DEV && DevAgentation && (
         <Suspense fallback={null}>
-          <DevAgentation endpoint="http://localhost:4747" />
+          <DevAgentation />
         </Suspense>
       )}
       {/* <TanStackRouterDevtools position="bottom-right" /> */}
