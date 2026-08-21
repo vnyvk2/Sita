@@ -501,15 +501,27 @@ const Song = memo(
           isDisabled: !album
         },
         {
-          label: t('song.editSongTags'),
+          label: isMultiSelectionActive
+            ? t('song.editSongsTags', {
+                count: multipleSelectionsData.multipleSelections.length,
+                defaultValue: `Edit Tags (${multipleSelectionsData.multipleSelections.length} tracks)`
+              })
+            : t('song.editSongTags'),
           class: 'edit',
           iconName: 'edit',
-          handlerFunction: () =>
-            navigate({
-              to: '/main-player/songs/$songId/edit',
-              params: { songId: String(songId) }
-            }),
-          isDisabled: isMultiSelectionActive
+          handlerFunction: () => {
+            if (isMultiSelectionActive) {
+              navigate({
+                to: '/main-player/songs/batch-edit',
+                search: { songIds: multipleSelectionsData.multipleSelections }
+              });
+            } else {
+              navigate({
+                to: '/main-player/songs/$songId/edit',
+                params: { songId: String(songId) }
+              });
+            }
+          }
         },
         {
           label: 'Auto Tag Track',

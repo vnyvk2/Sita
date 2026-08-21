@@ -57,6 +57,7 @@ declare global {
     | 'app/resyncSongsLibrary'
     | 'app/restoreBlacklistedSong'
     | 'app/updateSongId3Tags'
+    | 'app/batchUpdateSongTags'
     | 'app/getSongId3Tags'
     | 'app/openLogFile'
     | 'revealSongInFileExplorer'
@@ -1379,6 +1380,7 @@ declare global {
     isMetadataSavePending?: boolean;
     musicBrainzRecordingId?: string;
     isrc?: string;
+    path?: string;
   }
 
   interface SongOutsideLibraryData {
@@ -1434,6 +1436,29 @@ declare global {
     reason?: string;
     updatedData?: AudioPlayerData;
     deferred?: boolean;
+  }
+
+  export type BatchSongUpdateStatus = 'saved' | 'failed' | 'skipped';
+
+  export interface BatchSongItemResult {
+    songId: number;
+    status: BatchSongUpdateStatus;
+    message?: string;
+  }
+
+  export interface BatchUpdateSongTagsResult {
+    total: number;
+    savedCount: number;
+    failedCount: number;
+    results: BatchSongItemResult[];
+  }
+
+  export interface BatchTagUpdateProgressEvent {
+    current: number;
+    total: number;
+    songId: number;
+    status: BatchSongUpdateStatus;
+    message?: string;
   }
 
   // ? Song metadata results related types

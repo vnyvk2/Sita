@@ -87,6 +87,7 @@ import {
   getImagefileLocation,
   getRendererLogs,
   IS_DEVELOPMENT,
+  dataUpdateEvent,
   resetApp,
   resetMiniPlayerToDefault,
   restartApp,
@@ -610,6 +611,107 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
           isKnownSource
         });
         return updateSongId3Tags(songIdOrPath, tags, sendUpdatedData, isKnownSource);
+      }
+    );
+
+    ipcMain.handle(
+      'app/batchUpdateSongTags',
+      async (
+        event,
+        updates: Array<{ songId: number; tags: SongTags }>
+      ): Promise<BatchUpdateSongTagsResult> => {
+        const total = updates?.length ?? 0;
+        let savedCount = 0;
+        let failedCount = 0;
+        const results: BatchSongItemResult[] = [];
+
+        if (total === 0) {
+          return { total: 0, savedCount: 0, failedCount: 0, results: [] };
+        }
+
+        // Concurrency limit = 3 for disk I/O throughput
+        const CONCURRENCY = 3;
+        const results: BatchSongItemResult[] = new Array(total);
+        let completed = 0;
+        let currentIndex = 0;
+
+        const processIndex = async (index: number) => {
+          const item = updates[index];
+          if (!item) return;
+
+          try {
+            const res = await updateSongId3Tags(item.songId, item.tags, false, true);
+            if (res.success) {
+              const itemResult: BatchSongItemResult = {
+                songId: item.songId,
+                status: 'saved'
+              };
+              results[index] = itemResult;
+              event.sender.send('app/batchTagUpdateProgress', {
+                current: ++completed,
+                total,
+                songId: item.songId,
+                status: 'saved'
+              });
+            } else {
+              const itemResult: BatchSongItemResult = {
+                songId: item.songId,
+                status: 'failed',
+                message: res.reason
+              };
+              results[index] = itemResult;
+              event.sender.send('app/batchTagUpdateProgress', {
+                current: ++completed,
+                total,
+                songId: item.songId,
+                status: 'failed',
+                message: res.reason
+              });
+            }
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            const itemResult: BatchSongItemResult = {
+              songId: item.songId,
+              status: 'failed',
+              message: errorMessage
+            };
+            results[index] = itemResult;
+            event.sender.send('app/batchTagUpdateProgress', {
+              current: ++completed,
+              total,
+              songId: item.songId,
+              status: 'failed',
+              message: errorMessage
+            });
+          }
+        };
+
+        const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, async () => {
+          while (currentIndex < total) {
+            const idx = currentIndex++;
+            await processIndex(idx);
+          }
+        });
+
+        await Promise.all(workers);
+
+        const savedCount = results.filter((r) => r?.status === 'saved').length;
+        const failedCount = total - savedCount;
+
+        // Consolidated data update events after the entire batch finishes
+        if (savedCount > 0) {
+          dataUpdateEvent('songs');
+          dataUpdateEvent('artists');
+          dataUpdateEvent('albums');
+          dataUpdateEvent('genres');
+        }
+
+        return {
+          total,
+          savedCount,
+          failedCount,
+          results
+        };
       }
     );
 

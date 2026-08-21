@@ -165,7 +165,8 @@ const sendSongMetadata = async (
         duration: parseFloat(song.duration),
         trackNumber,
         isLyricsSavePending: isLyricsSavePending(song.path),
-        isMetadataSavePending: isMetadataUpdatesPending(song.path)
+        isMetadataSavePending: isMetadataUpdatesPending(song.path),
+        path: song.path
       };
 
       console.log('[STAGE 5: sendSongMetadata] Final Payload returning to IPC:', {
