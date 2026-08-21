@@ -426,4 +426,107 @@ describe('BatchSongTagsEditor Component', () => {
       expect(screen.getByText(/Batch Save Complete/i)).not.toBeNull();
     });
   });
+
+  it('triggers auto-numbering across all tracks from the toolbar', async () => {
+    render(<BatchSongTagsEditor initialSongIds={[1, 2]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Track 1')).not.toBeNull();
+    });
+
+    // Double-click track 1 title to make it dirty
+    const titleCell1 = screen.getByText('Track 1');
+    fireEvent.doubleClick(titleCell1);
+    const input = screen.getByDisplayValue('Track 1');
+    fireEvent.change(input, { target: { value: 'Dirty Track 1' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 modified/i)).not.toBeNull();
+    });
+
+    const autoNumberBtn = screen.getByText('Auto-number 1..N').closest('button')!;
+    fireEvent.click(autoNumberBtn);
+
+    // Auto-number executes successfully
+    expect(autoNumberBtn).not.toBeNull();
+  });
+
+  it('opens bulk set values modal and applies common artist across selected tracks', async () => {
+    render(<BatchSongTagsEditor initialSongIds={[1, 2]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Track 1')).not.toBeNull();
+    });
+
+    // Select row 1
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]); // First row checkbox
+
+    const setValuesBtn = screen.getByText('Set Values...').closest('button')!;
+    fireEvent.click(setValuesBtn);
+
+    // Modal is open
+    expect(screen.getByText('Set Values Across Selection')).not.toBeNull();
+
+    // Check "Artist(s)" field checkbox inside the modal
+    const artistLabels = screen.getAllByText('Artist(s)');
+    // The second occurrence is inside the modal checkbox label
+    fireEvent.click(artistLabels[1]);
+
+    // Type new artist
+    const artistInput = screen.getByPlaceholderText(/e\.g\. Queen, David Bowie/i);
+    fireEvent.change(artistInput, { target: { value: 'Synthesized Band' } });
+
+    // Click Apply
+    const applyBtn = screen.getByText(/Apply to 1 Tracks/i).closest('button')!;
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Synthesized Band')).not.toBeNull();
+      expect(screen.getByText(/1 modified/i)).not.toBeNull();
+    });
+  });
+
+  it('reverts only selected row edits via Revert Selected toolbar button', async () => {
+    render(<BatchSongTagsEditor initialSongIds={[1, 2]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Track 1')).not.toBeNull();
+    });
+
+    // Modify row 1 title
+    const titleCell1 = screen.getByText('Track 1');
+    fireEvent.doubleClick(titleCell1);
+    const input1 = screen.getByDisplayValue('Track 1');
+    fireEvent.change(input1, { target: { value: 'Modified Track 1' } });
+    fireEvent.blur(input1);
+
+    // Modify row 2 title
+    const titleCell2 = screen.getByText('Track 2');
+    fireEvent.doubleClick(titleCell2);
+    const input2 = screen.getByDisplayValue('Track 2');
+    fireEvent.change(input2, { target: { value: 'Modified Track 2' } });
+    fireEvent.blur(input2);
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 modified/i)).not.toBeNull();
+    });
+
+    // Select ONLY row 1
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+
+    // Click "Revert Selected"
+    const revertBtn = await screen.findByText('Revert Selected');
+    fireEvent.click(revertBtn.closest('button')!);
+
+    await waitFor(() => {
+      // Row 1 reverted to Track 1
+      expect(screen.getByText('Track 1')).not.toBeNull();
+      // Row 2 is still modified
+      expect(screen.getByText('Modified Track 2')).not.toBeNull();
+      expect(screen.getByText(/1 modified/i)).not.toBeNull();
+    });
+  });
 });

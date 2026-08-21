@@ -270,8 +270,8 @@ describe('MiniPlayer QueueContainer Virtualization & Invariants (Phase 4)', () =
     // Wait for metadata hydration
     await screen.findByText('Track 101');
 
-    // Should render equalizer icon for active track
-    expect(screen.getByText('equalizer')).toBeDefined();
+    // Should render SoundBarsIndicator equalizer for active track
+    expect(document.querySelector('.sound-bars-indicator')).not.toBeNull();
   });
 
   it('maintains zero metadata refetch on shuffle when queue is reordered in MiniPlayer', async () => {

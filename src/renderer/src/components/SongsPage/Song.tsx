@@ -503,8 +503,8 @@ const Song = memo(
         {
           label: isMultiSelectionActive
             ? t('song.editSongsTags', {
-                count: multipleSelectionsData.multipleSelections.length,
-                defaultValue: `Edit Tags (${multipleSelectionsData.multipleSelections.length} tracks)`
+                count: store.state.multipleSelectionsData.multipleSelections.length,
+                defaultValue: `Edit Tags (${store.state.multipleSelectionsData.multipleSelections.length} tracks)`
               })
             : t('song.editSongTags'),
           class: 'edit',
@@ -513,7 +513,7 @@ const Song = memo(
             if (isMultiSelectionActive) {
               navigate({
                 to: '/main-player/songs/batch-edit',
-                search: { songIds: multipleSelectionsData.multipleSelections }
+                search: { songIds: store.state.multipleSelectionsData.multipleSelections }
               });
             } else {
               navigate({

@@ -13,6 +13,11 @@ import { useTranslation } from 'react-i18next';
 import Button from '../Button';
 import EditableCell from './EditableCell';
 import SaveProgressModal from './SaveProgressModal';
+import BulkOperationsBar from './BulkOperationsBar';
+import BulkSetValuesModal from './BulkSetValuesModal';
+import FindReplaceModal from './FindReplaceModal';
+import CaseConvertModal from './CaseConvertModal';
+import PatternParserModal from './PatternParserModal';
 import type { BatchEditStats, BatchTrackData, BatchTrackRow, EditableField } from './types';
 import {
   buildCanonicalSongTags,
@@ -22,6 +27,19 @@ import {
   parseStringList,
   validateField
 } from './utils';
+import {
+  autoNumber,
+  bulkApply,
+  caseTransform,
+  findReplace,
+  parsePattern,
+  revertSelected,
+  type BatchTransformContext,
+  type BulkFieldOperation,
+  type CaseTransformConfig,
+  type FindReplaceConfig,
+  type PatternParserConfig
+} from './batchTransforms';
 import type { BatchSongItemResult, BatchTagUpdateProgressEvent } from '../../../../types/app';
 
 export interface BatchSongTagsEditorProps {
@@ -44,6 +62,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+
+  // Tool Modals State
+  const [showBulkSetModal, setShowBulkSetModal] = useState(false);
+  const [showFindReplaceModal, setShowFindReplaceModal] = useState(false);
+  const [showCaseConvertModal, setShowCaseConvertModal] = useState(false);
+  const [showPatternParserModal, setShowPatternParserModal] = useState(false);
 
   // Save coordinator state
   const [isSaving, setIsSaving] = useState(false);
@@ -463,6 +487,119 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
   const tableRows = table.getRowModel().rows;
 
+  // Selection and Ordering Context for Transforms
+  const selectedSongIds = useMemo(() => {
+    const ids = new Set<number>();
+    Object.keys(rowSelection).forEach((rowId) => {
+      const row = tableRows[Number(rowId)];
+      if (row) ids.add(row.original.songId);
+    });
+    return ids;
+  }, [rowSelection, tableRows]);
+
+  const sortedSongIds = useMemo(() => {
+    return tableRows.map((r) => r.original.songId);
+  }, [tableRows]);
+
+  const transformContext: BatchTransformContext = useMemo(
+    () => ({
+      rows,
+      selectedSongIds,
+      sortedSongIds
+    }),
+    [rows, selectedSongIds, sortedSongIds]
+  );
+
+  const hasSelectedDirtyRows = useMemo(() => {
+    return Array.from(selectedSongIds).some((id) => {
+      const row = rows.find((r) => r.songId === id);
+      return row && row.dirtyFields.size > 0;
+    });
+  }, [selectedSongIds, rows]);
+
+  // Bulk Operations Handlers
+  const handleSelectAll = useCallback(() => {
+    table.toggleAllRowsSelected(true);
+  }, [table]);
+
+  const handleDeselectAll = useCallback(() => {
+    table.toggleAllRowsSelected(false);
+  }, [table]);
+
+  const handleInvertSelection = useCallback(() => {
+    const nextSelection: Record<string, boolean> = {};
+    tableRows.forEach((_, idx) => {
+      if (!rowSelection[String(idx)]) {
+        nextSelection[String(idx)] = true;
+      }
+    });
+    setRowSelection(nextSelection);
+  }, [tableRows, rowSelection]);
+
+  const handleSelectModifiedOnly = useCallback(() => {
+    const nextSelection: Record<string, boolean> = {};
+    tableRows.forEach((r, idx) => {
+      if (r.original.dirtyFields.size > 0) {
+        nextSelection[String(idx)] = true;
+      }
+    });
+    setRowSelection(nextSelection);
+  }, [tableRows]);
+
+  const handleAutoNumber = useCallback(() => {
+    const result = autoNumber(transformContext, { startNumber: 1, allowAllWhenNoneSelected: true });
+    if (result.changedSongIds.length > 0) {
+      setRows(result.rows);
+    }
+  }, [transformContext]);
+
+  const handleApplyBulkSet = useCallback(
+    (operations: BulkFieldOperation[]) => {
+      const result = bulkApply(transformContext, { operations, allowAllWhenNoneSelected: false });
+      if (result.changedSongIds.length > 0) {
+        setRows(result.rows);
+      }
+    },
+    [transformContext]
+  );
+
+  const handleApplyCaseConvert = useCallback(
+    (config: CaseTransformConfig) => {
+      const result = caseTransform(transformContext, config);
+      if (result.changedSongIds.length > 0) {
+        setRows(result.rows);
+      }
+    },
+    [transformContext]
+  );
+
+  const handleApplyFindReplace = useCallback(
+    (config: FindReplaceConfig) => {
+      const result = findReplace(transformContext, config);
+      if (result.changedSongIds.length > 0) {
+        setRows(result.rows);
+      }
+    },
+    [transformContext]
+  );
+
+  const handleApplyPatternParser = useCallback(
+    (config: PatternParserConfig) => {
+      const result = parsePattern(transformContext, config);
+      if (result.changedSongIds.length > 0) {
+        setRows(result.rows);
+      }
+    },
+    [transformContext]
+  );
+
+  const handleRevertSelected = useCallback(() => {
+    const result = revertSelected(transformContext);
+    if (result.changedSongIds.length > 0) {
+      setRows(result.rows);
+    }
+  }, [transformContext]);
+
   const handleNavigateBack = useCallback(() => {
     if (onBack) {
       onBack();
@@ -556,6 +693,24 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
           />
         </div>
       </header>
+
+      {/* Bulk Operations Toolbar */}
+      <BulkOperationsBar
+        totalCount={stats.totalRows}
+        selectedCount={stats.selectedCount}
+        modifiedCount={stats.modifiedTrackCount}
+        hasSelectedDirtyRows={hasSelectedDirtyRows}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onInvertSelection={handleInvertSelection}
+        onSelectModifiedOnly={handleSelectModifiedOnly}
+        onAutoNumber={handleAutoNumber}
+        onOpenBulkSet={() => setShowBulkSetModal(true)}
+        onOpenCaseConvert={() => setShowCaseConvertModal(true)}
+        onOpenFindReplace={() => setShowFindReplaceModal(true)}
+        onOpenPatternParser={() => setShowPatternParserModal(true)}
+        onRevertSelected={handleRevertSelected}
+      />
 
       {/* Main Virtualized Data Table View */}
       <main className="flex-1 overflow-hidden p-4">
@@ -653,6 +808,35 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
           />
         </div>
       </main>
+
+      {/* Bulk Operations Modals */}
+      <BulkSetValuesModal
+        isOpen={showBulkSetModal}
+        selectedCount={stats.selectedCount}
+        onApply={handleApplyBulkSet}
+        onClose={() => setShowBulkSetModal(false)}
+      />
+
+      <FindReplaceModal
+        isOpen={showFindReplaceModal}
+        context={transformContext}
+        onApply={handleApplyFindReplace}
+        onClose={() => setShowFindReplaceModal(false)}
+      />
+
+      <CaseConvertModal
+        isOpen={showCaseConvertModal}
+        context={transformContext}
+        onApply={handleApplyCaseConvert}
+        onClose={() => setShowCaseConvertModal(false)}
+      />
+
+      <PatternParserModal
+        isOpen={showPatternParserModal}
+        context={transformContext}
+        onApply={handleApplyPatternParser}
+        onClose={() => setShowPatternParserModal(false)}
+      />
 
       {/* Progress & Completion Modal */}
       <SaveProgressModal
