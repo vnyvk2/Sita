@@ -8,9 +8,22 @@ export const fetchWithTimeout = async (
 ): Promise<Response> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const onExternalAbort = () => controller.abort();
+  if (init.signal) {
+    if (init.signal.aborted) {
+      controller.abort();
+    } else {
+      init.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    if (init.signal) {
+      init.signal.removeEventListener('abort', onExternalAbort);
+    }
   }
 };

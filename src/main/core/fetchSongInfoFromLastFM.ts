@@ -1,8 +1,8 @@
+import { LASTFM_BASE_URL } from '@main/other/lastFm/lastFmUtils';
+
 import type { LastFMTrackInfoApi } from '../../types/last_fm_api';
 import logger from '../logger';
 import { checkIfConnectedToInternet } from '../main';
-
-const LAST_FM_BASE_URL = 'http://ws.audioscrobbler.com/2.0/';
 
 const fetchSongInfoFromLastFM = async (
   songTitle: string,

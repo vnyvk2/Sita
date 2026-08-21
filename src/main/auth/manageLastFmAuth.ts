@@ -1,4 +1,7 @@
-import { saveUserSettings } from '@main/db/queries/settings';
+import { clearScrobbleQueue } from '@main/db/queries/scrobble_queue';
+import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
+import { flushScrobbleQueue, invalidateLastFmSession } from '@main/other/lastFm/flushScrobbleQueue';
+import { LASTFM_BASE_URL } from '@main/other/lastFm/lastFmUtils';
 
 import type { LastFMSessionGetResponse } from '../../types/last_fm_api';
 import logger from '../logger';
@@ -23,7 +26,7 @@ const manageLastFmAuth = async (token: string) => {
 
     const sig = createLastFmAuthSignature(token, LAST_FM_API_KEY);
 
-    const url = new URL('http://ws.audioscrobbler.com/2.0/');
+    const url = new URL(LASTFM_BASE_URL);
     url.searchParams.set('method', 'auth.getSession');
     url.searchParams.set('api_key', LAST_FM_API_KEY);
     url.searchParams.set('format', 'json');
@@ -41,8 +44,24 @@ const manageLastFmAuth = async (token: string) => {
       const encryptedKey = encrypt(key);
       logger.info('Successfully retrieved user authentication for LastFM', { name });
 
+      // Account isolation: If switching accounts (or logging in as a different user),
+      // invalidate in-flight session and wipe pending queue from the previous account to prevent cross-account queue submission.
+      const currentSettings = await getUserSettings();
+      if (currentSettings.lastFmSessionKey && currentSettings.lastFmSessionName !== name) {
+        logger.info('Switching Last.fm accounts: invalidating in-flight flush and clearing previous account queue', {
+          previousUser: currentSettings.lastFmSessionName,
+          newUser: name
+        });
+        invalidateLastFmSession();
+        await clearScrobbleQueue();
+      }
+
       await saveUserSettings({ lastFmSessionName: name, lastFmSessionKey: encryptedKey });
       dataUpdateEvent('userData');
+
+      flushScrobbleQueue().catch((error) => {
+        logger.error('Failed to flush scrobble queue after LastFM login', { error });
+      });
 
       return sendMessageToRenderer({ messageCode: 'LASTFM_LOGIN_SUCCESS' });
     }

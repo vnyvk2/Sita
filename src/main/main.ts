@@ -42,6 +42,7 @@ import libraryLifecycleController from './library/LibraryLifecycleController';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
+import { flushScrobbleQueue } from './other/lastFm/flushScrobbleQueue';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
 import checkForUpdates from './update';
@@ -523,6 +524,10 @@ async function manageWindowFinishLoad() {
   nativeTheme.addListener('updated', () => {
     watchForSystemThemeChanges();
     manageTaskbarPlaybackButtonControls(mainWindow, true, isAudioPlaying);
+  });
+
+  flushScrobbleQueue().catch((error) => {
+    logger.error('Failed initial startup scrobble queue flush', { error });
   });
 }
 

@@ -6,6 +6,7 @@ import { convertToSongData } from '@main/utils/convert';
 import type { LastFMScrobblePostResponse, ScrobbleParams } from '../../../types/last_fm_api';
 import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
+import { flushScrobbleQueue } from './flushScrobbleQueue';
 import generateApiRequestBodyForLastFMPostRequests from './generateApiRequestBodyForLastFMPostRequests';
 import getLastFmAuthData from './getLastFMAuthData';
 import { LASTFM_BASE_URL, LASTFM_REQUEST_TIMEOUT_MS, fetchWithTimeout } from './lastFmUtils';
@@ -94,7 +95,11 @@ const scrobbleSong = async (songId: number, startTimeSecs: number) => {
 
       const hasError = !res.ok || ('error' in json && Boolean(json.error));
       if (!hasError) {
-        return logger.debug(`Scrobbled song accepted.`, { songId: song.songId });
+        logger.debug(`Scrobbled song accepted.`, { songId: song.songId });
+        flushScrobbleQueue().catch((err) => {
+          logger.error('Failed to flush scrobble queue after live scrobble', { err });
+        });
+        return;
       }
 
       const errorCode = 'error' in json ? json.error : undefined;

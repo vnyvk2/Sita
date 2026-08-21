@@ -445,6 +445,8 @@
     "lastFmDescription3": "Whenever you listen to a song, Last.fm “Scrobbles” that song and adds it to your account.",
     "lastFmDescription4": "This feature requires an internet connection.",
     "authenticateAgain": "Authenticate again",
+    "disconnectLastFm": "Disconnect Last.fm",
+    "switchAccount": "Switch account",
     "loginInBrowser": "Login via browser",
     "scrobblingDescription": "Enable Last.fm Scrobbling to send data related to how you listen to songs.",
     "enableScrobbling": "Enable Last.fm Scrobbling",

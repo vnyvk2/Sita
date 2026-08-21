@@ -1,3 +1,5 @@
+import { LASTFM_BASE_URL } from '@main/other/lastFm/lastFmUtils';
+
 import type { AppleITunesMusicAPI } from '../../types/apple_itunes_music_api';
 import type { DeezerTrackDataAPI, DeezerTrackResultsAPI } from '../../types/deezer_api';
 import type { GeniusLyricsAPI, GeniusSongMetadataResponse } from '../../types/genius_lyrics_api';
@@ -135,7 +137,6 @@ const fetchSongMetadataFromItunes = (sourceId: string) => {
   return undefined;
 };
 
-const LAST_FM_API_URL = 'http://ws.audioscrobbler.com/2.0/';
 const lastFMHitCache = { id: '' } as LastFMHitCache;
 
 async function fetchSongMetadataResultsFromLastFM(
@@ -149,7 +150,7 @@ async function fetchSongMetadataResultsFromLastFM(
     throw new Error('LAST_FM_API_KEY not found');
   }
 
-  const url = new URL(LAST_FM_API_URL);
+  const url = new URL(LASTFM_BASE_URL);
   url.searchParams.set('method', 'track.getInfo');
   url.searchParams.set('format', 'json');
   url.searchParams.set('api_key', LAST_FM_API_KEY);
