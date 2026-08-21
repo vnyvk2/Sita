@@ -529,4 +529,40 @@ describe('BatchSongTagsEditor Component', () => {
       expect(screen.getByText(/1 modified/i)).not.toBeNull();
     });
   });
+
+  it('guarantees ID-based selection isolation when table is sorted descending (sorted-selection regression)', async () => {
+    render(<BatchSongTagsEditor initialSongIds={[1, 2]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Track 1')).not.toBeNull();
+    });
+
+    // Sort by Title descending: Track 2 becomes visual row 0, Track 1 becomes visual row 1
+    const titleHeader = screen.getByText('Title').closest('th')!;
+    fireEvent.click(titleHeader); // asc
+    fireEvent.click(titleHeader); // desc
+
+    // Select visual row 0 (which is Track 2, songId 2)
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]); // Visual row 0
+
+    // Open Set Values modal and set Album to "Descending Album"
+    const setValuesBtn = screen.getByText(/Set Values/i).closest('button')!;
+    fireEvent.click(setValuesBtn);
+
+    const albumLabel = screen.getAllByText('Album')[1]; // Label inside modal
+    fireEvent.click(albumLabel);
+
+    const albumInput = screen.getByPlaceholderText(/e\.g\. Greatest Hits/i);
+    fireEvent.change(albumInput, { target: { value: 'Descending Album' } });
+
+    const applyBtn = screen.getByText(/Apply to 1 Tracks/i).closest('button')!;
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      // Exactly 1 track modified
+      expect(screen.getByText(/1 modified/i)).not.toBeNull();
+      expect(screen.getByText('Descending Album')).not.toBeNull();
+    });
+  });
 });

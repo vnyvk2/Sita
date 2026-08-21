@@ -1,4 +1,4 @@
-﻿import { parseStringList } from '../utils';
+import { parseStringList } from '../utils';
 import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
 import type { BatchTransformContext, BatchTransformResult, BulkApplyConfig } from './types';
 
@@ -44,7 +44,17 @@ export function bulkApply(
         if (op.field === 'artists' || op.field === 'albumArtists' || op.field === 'genres') {
           finalValue = typeof op.value === 'string' ? parseStringList(op.value) : (op.value || []);
         } else if (op.field === 'trackNumber' || op.field === 'discNumber' || op.field === 'year') {
-          finalValue = op.value === '' || op.value === undefined || op.value === null ? undefined : Number(op.value);
+          if (op.value === '' || op.value === undefined || op.value === null) {
+            finalValue = undefined;
+          } else {
+            const num = Number(op.value);
+            if (!isNaN(num) && Number.isFinite(num)) {
+              finalValue = num;
+            } else {
+              // Reject non-numeric input before mutating draft
+              continue;
+            }
+          }
         } else {
           finalValue = op.value ?? '';
         }

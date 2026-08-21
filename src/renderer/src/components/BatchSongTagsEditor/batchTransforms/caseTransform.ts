@@ -1,4 +1,4 @@
-﻿import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
+import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
 import type {
   BatchTransformContext,
   BatchTransformPreview,
@@ -64,8 +64,8 @@ export function toTitleCase(input: string): string {
 
 function capitalizeWord(word: string): string {
   if (!word) return '';
-  // Check for leading quotes or parentheses
-  const match = word.match(/^([("'\u2018\u201C]*)(.)(.*)$/);
+  // Match any leading non-alphanumeric punctuation followed by the first letter/digit and the rest
+  const match = word.match(/^([^A-Za-z0-9]*)([\s\S])([\s\S]*)$/);
   if (!match) return word;
 
   const [, prefix, firstChar, rest] = match;

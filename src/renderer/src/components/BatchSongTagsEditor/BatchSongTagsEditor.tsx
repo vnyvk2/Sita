@@ -479,6 +479,7 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
       rowSelection
     },
     enableRowSelection: true,
+    getRowId: (row) => String(row.songId),
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
@@ -490,12 +491,14 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
   // Selection and Ordering Context for Transforms
   const selectedSongIds = useMemo(() => {
     const ids = new Set<number>();
-    Object.keys(rowSelection).forEach((rowId) => {
-      const row = tableRows[Number(rowId)];
-      if (row) ids.add(row.original.songId);
-    });
+    for (const [idStr, isSelected] of Object.entries(rowSelection)) {
+      if (isSelected) {
+        const num = Number(idStr);
+        if (!isNaN(num)) ids.add(num);
+      }
+    }
     return ids;
-  }, [rowSelection, tableRows]);
+  }, [rowSelection]);
 
   const sortedSongIds = useMemo(() => {
     return tableRows.map((r) => r.original.songId);
@@ -528,23 +531,24 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
   const handleInvertSelection = useCallback(() => {
     const nextSelection: Record<string, boolean> = {};
-    tableRows.forEach((_, idx) => {
-      if (!rowSelection[String(idx)]) {
-        nextSelection[String(idx)] = true;
+    rows.forEach((r) => {
+      const idStr = String(r.songId);
+      if (!rowSelection[idStr]) {
+        nextSelection[idStr] = true;
       }
     });
     setRowSelection(nextSelection);
-  }, [tableRows, rowSelection]);
+  }, [rows, rowSelection]);
 
   const handleSelectModifiedOnly = useCallback(() => {
     const nextSelection: Record<string, boolean> = {};
-    tableRows.forEach((r, idx) => {
-      if (r.original.dirtyFields.size > 0) {
-        nextSelection[String(idx)] = true;
+    rows.forEach((r) => {
+      if (r.dirtyFields.size > 0) {
+        nextSelection[String(r.songId)] = true;
       }
     });
     setRowSelection(nextSelection);
-  }, [tableRows]);
+  }, [rows]);
 
   const handleAutoNumber = useCallback(() => {
     const result = autoNumber(transformContext, { startNumber: 1, allowAllWhenNoneSelected: true });

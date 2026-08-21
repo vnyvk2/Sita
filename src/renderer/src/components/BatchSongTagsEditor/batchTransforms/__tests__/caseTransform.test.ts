@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { caseTransform, previewCaseTransform, toSentenceCase, toTitleCase } from '../caseTransform';
 import type { BatchTransformContext } from '../types';
 import type { BatchTrackRow } from '../../types';
@@ -9,6 +9,8 @@ describe('batchTransforms — caseTransform', () => {
     expect(toTitleCase('don\'t stop believin\'')).toBe('Don\'t Stop Believin\'');
     expect(toTitleCase('spider-man: into the spider-verse')).toBe('Spider-Man: Into the Spider-Verse');
     expect(toTitleCase('A HARD DAY\'S NIGHT')).toBe('A Hard Day\'s Night');
+    expect(toTitleCase('(live at wembley stadium)')).toBe('(Live at Wembley Stadium)');
+    expect(toTitleCase('"heroes" (2017 remaster)')).toBe('"Heroes" (2017 Remaster)');
   });
 
   it('converts strings to Sentence case', () => {

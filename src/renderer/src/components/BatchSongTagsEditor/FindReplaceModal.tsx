@@ -1,4 +1,4 @@
-﻿import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import Button from '../Button';
 import type { EditableField } from './types';
 import { formatStringList } from './utils';
@@ -58,6 +58,11 @@ export const FindReplaceModal = memo(function FindReplaceModal({
       allowAllWhenNoneSelected: false
     });
   }, [context, query, replacement, isRegex, matchCase, targetFields, regexValidation.valid]);
+
+  const affectedTracksCount = useMemo(
+    () => new Set(previews.map((p) => p.songId)).size,
+    [previews]
+  );
 
   if (!isOpen) return null;
 
@@ -194,7 +199,7 @@ export const FindReplaceModal = memo(function FindReplaceModal({
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-semibold text-font-color-black dark:text-font-color-white">
-              Preview Matches ({previews.length} fields affected)
+              Preview Matches ({affectedTracksCount} tracks affected &middot; {previews.length} fields changed)
             </span>
           </div>
 
