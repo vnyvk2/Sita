@@ -1,4 +1,4 @@
-﻿import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
+import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
 import type {
   BatchTransformContext,
   BatchTransformPreview,
@@ -59,14 +59,20 @@ function replaceValue(val: unknown, regex: RegExp, replacement: string): { chang
 
   if (Array.isArray(val)) {
     let arrayChanged = false;
-    const nextArray = val.map((item) => {
-      if (typeof item === 'string') {
-        const next = item.replace(regex, replacement).trim();
-        if (next !== item) arrayChanged = true;
-        return next;
-      }
-      return item;
-    }).filter(Boolean);
+    const nextArray = val
+      .map((item) => {
+        if (typeof item === 'string') {
+          const next = item.replace(regex, replacement).trim();
+          if (next !== item) arrayChanged = true;
+          return next;
+        }
+        return item;
+      })
+      .filter((item) => typeof item === 'string' && item.length > 0);
+
+    if (nextArray.length !== val.length) {
+      arrayChanged = true;
+    }
 
     return { changed: arrayChanged, value: nextArray };
   }

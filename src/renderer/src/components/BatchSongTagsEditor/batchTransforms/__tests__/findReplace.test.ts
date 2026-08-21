@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { findReplace, previewFindReplace, validateFindReplaceRegex } from '../findReplace';
 import type { BatchTransformContext } from '../types';
 import type { BatchTrackRow } from '../../types';
@@ -85,5 +85,29 @@ describe('batchTransforms — findReplace', () => {
     expect(r1.draft.title).toBe('Intro (#01)');
     expect(r2.draft.title).toBe('Outro (#02)');
     expect(r1.dirtyFields.has('title')).toBe(true);
+  });
+
+  it('removes matching array items when replaced with empty string, preserving remaining non-empty elements', () => {
+    const rows = [
+      createMockRow(1, 'Song 1', ['Queen', 'David Bowie'], 'Greatest Hits')
+    ];
+    const context: BatchTransformContext = {
+      rows,
+      selectedSongIds: new Set([1]),
+      sortedSongIds: [1]
+    };
+
+    const result = findReplace(context, {
+      query: 'David Bowie',
+      replacement: '',
+      isRegex: false,
+      matchCase: false,
+      targetFields: ['artists']
+    });
+
+    expect(result.changedSongIds).toEqual([1]);
+    const r1 = result.rows[0];
+    expect(r1.draft.artists).toEqual(['Queen']);
+    expect(r1.dirtyFields.has('artists')).toBe(true);
   });
 });
