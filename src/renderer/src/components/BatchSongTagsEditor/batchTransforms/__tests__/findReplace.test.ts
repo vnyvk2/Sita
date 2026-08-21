@@ -110,4 +110,26 @@ describe('batchTransforms — findReplace', () => {
     expect(r1.draft.artists).toEqual(['Queen']);
     expect(r1.dirtyFields.has('artists')).toBe(true);
   });
+
+  it('preserves literal dollar signs without treating them as capture group backreferences in plain-text mode', () => {
+    const rows = [
+      createMockRow(1, 'Price 100', ['Artist'], 'Album')
+    ];
+    const context: BatchTransformContext = {
+      rows,
+      selectedSongIds: new Set([1]),
+      sortedSongIds: [1]
+    };
+
+    const result = findReplace(context, {
+      query: '100',
+      replacement: '$100',
+      isRegex: false,
+      matchCase: false,
+      targetFields: ['title']
+    });
+
+    const r1 = result.rows[0];
+    expect(r1.draft.title).toBe('Price $100');
+  });
 });

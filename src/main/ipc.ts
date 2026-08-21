@@ -632,6 +632,22 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         let completed = 0;
         let currentIndex = 0;
 
+        const sendProgress = (payload: {
+          current: number;
+          total: number;
+          songId: number;
+          status: 'saved' | 'failed';
+          message?: string;
+        }) => {
+          if (event.sender && !event.sender.isDestroyed()) {
+            try {
+              event.sender.send('app/batchTagUpdateProgress', payload);
+            } catch {
+              // Window destroyed or navigated during in-flight batch update
+            }
+          }
+        };
+
         const processIndex = async (index: number) => {
           const item = updates[index];
           if (!item) return;
@@ -644,7 +660,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
                 status: 'saved'
               };
               results[index] = itemResult;
-              event.sender.send('app/batchTagUpdateProgress', {
+              sendProgress({
                 current: ++completed,
                 total,
                 songId: item.songId,
@@ -657,7 +673,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
                 message: res.reason
               };
               results[index] = itemResult;
-              event.sender.send('app/batchTagUpdateProgress', {
+              sendProgress({
                 current: ++completed,
                 total,
                 songId: item.songId,
@@ -673,7 +689,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
               message: errorMessage
             };
             results[index] = itemResult;
-            event.sender.send('app/batchTagUpdateProgress', {
+            sendProgress({
               current: ++completed,
               total,
               songId: item.songId,

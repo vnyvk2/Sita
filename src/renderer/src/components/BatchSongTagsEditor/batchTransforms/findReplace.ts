@@ -51,9 +51,17 @@ function compileSearchPattern(
 /**
  * Transforms a single text value or array of strings with search-and-replace.
  */
-function replaceValue(val: unknown, regex: RegExp, replacement: string): { changed: boolean; value: unknown } {
+function replaceValue(
+  val: unknown,
+  regex: RegExp,
+  replacement: string,
+  isRegex: boolean
+): { changed: boolean; value: unknown } {
+  const doReplace = (str: string) =>
+    isRegex ? str.replace(regex, replacement) : str.replace(regex, () => replacement);
+
   if (typeof val === 'string') {
-    const next = val.replace(regex, replacement);
+    const next = doReplace(val);
     return { changed: next !== val, value: next };
   }
 
@@ -62,7 +70,7 @@ function replaceValue(val: unknown, regex: RegExp, replacement: string): { chang
     const nextArray = val
       .map((item) => {
         if (typeof item === 'string') {
-          const next = item.replace(regex, replacement).trim();
+          const next = doReplace(item).trim();
           if (next !== item) arrayChanged = true;
           return next;
         }
@@ -88,8 +96,9 @@ export function previewFindReplace(
   config: FindReplaceConfig
 ): BatchTransformPreview[] {
   const { rows } = context;
+  const isRegex = config.isRegex ?? false;
   const targetIds = getTargetRowIds(context, config.allowAllWhenNoneSelected ?? false);
-  const regex = compileSearchPattern(config.query, config.isRegex, config.matchCase);
+  const regex = compileSearchPattern(config.query, isRegex, config.matchCase);
 
   if (targetIds.length === 0 || !regex || config.targetFields.length === 0) {
     return [];
@@ -103,7 +112,7 @@ export function previewFindReplace(
 
     for (const field of config.targetFields) {
       const currentVal = row.draft[field];
-      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement);
+      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement, isRegex);
 
       if (changed) {
         previews.push({
@@ -127,8 +136,9 @@ export function findReplace(
   config: FindReplaceConfig
 ): BatchTransformResult {
   const { rows } = context;
+  const isRegex = config.isRegex ?? false;
   const targetIds = getTargetRowIds(context, config.allowAllWhenNoneSelected ?? false);
-  const regex = compileSearchPattern(config.query, config.isRegex, config.matchCase);
+  const regex = compileSearchPattern(config.query, isRegex, config.matchCase);
 
   if (targetIds.length === 0 || !regex || config.targetFields.length === 0) {
     return { rows, changedSongIds: [], totalFieldsChanged: 0 };
@@ -146,7 +156,7 @@ export function findReplace(
 
     for (const field of config.targetFields) {
       const currentVal = cloned.draft[field];
-      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement);
+      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement, isRegex);
 
       if (changed && applyFieldChange(cloned, field, nextVal)) {
         rowChanged = true;

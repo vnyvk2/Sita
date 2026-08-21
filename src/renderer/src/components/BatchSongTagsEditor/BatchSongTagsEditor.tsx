@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ColumnDef,
   flexRender,
@@ -10,6 +10,11 @@ import {
 import { TableVirtuoso } from 'react-virtuoso';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { queryClient } from '@renderer/queryClient';
+import { songQuery } from '@renderer/queries/songs';
+import { artistQuery } from '@renderer/queries/artists';
+import { albumQuery } from '@renderer/queries/albums';
+import { genreQuery } from '@renderer/queries/genres';
 import Button from '../Button';
 import EditableCell from './EditableCell';
 import SaveProgressModal from './SaveProgressModal';
@@ -253,6 +258,20 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
   }, []);
 
   // Save coordinator execution
+  const isMountedRef = useRef(true);
+  const activeProgressHandlerRef = useRef<((_: unknown, event: BatchTagUpdateProgressEvent) => void) | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (activeProgressHandlerRef.current) {
+        window.api.songUpdates.removeBatchTagUpdateProgressListener(activeProgressHandlerRef.current);
+        activeProgressHandlerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleSave = useCallback(async () => {
     const dirtyRows = rows.filter((r) => r.dirtyFields.size > 0);
     if (dirtyRows.length === 0 || stats.hasValidationErrors || isSaving) return;
@@ -263,9 +282,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
     setShowProgressModal(true);
 
     const progressHandler = (_: unknown, event: BatchTagUpdateProgressEvent) => {
-      setSaveProgress({ current: event.current, total: event.total });
+      if (isMountedRef.current) {
+        setSaveProgress({ current: event.current, total: event.total });
+      }
     };
 
+    activeProgressHandlerRef.current = progressHandler;
     window.api.songUpdates.onBatchTagUpdateProgress(progressHandler);
 
     try {
@@ -276,36 +298,50 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
       const res = await window.api.songUpdates.batchUpdateSongTags(updates);
 
-      setSaveResults(res.results);
-
       // Clean dirty states for successfully saved rows
       const savedIds = new Set(
         res.results.filter((r) => r.status === 'saved').map((r) => r.songId)
       );
 
-      setRows((prev) =>
-        prev.map((r) => {
-          if (savedIds.has(r.songId)) {
-            return {
-              ...r,
-              original: { ...r.draft, artists: [...r.draft.artists], albumArtists: [...r.draft.albumArtists], genres: [...r.draft.genres] },
-              dirtyFields: new Set<EditableField>(),
-              validationErrors: new Map<EditableField, string>(),
-              status: 'saved'
-            };
-          }
-          const itemRes = res.results.find((item) => item.songId === r.songId);
-          if (itemRes) {
-            return { ...r, status: itemRes.status, errorMessage: itemRes.message };
-          }
-          return r;
-        })
-      );
+      if (savedIds.size > 0) {
+        // Invalidate global React Query cache to ensure immediate view sync across app
+        void queryClient.invalidateQueries({ queryKey: songQuery.all.queryKey });
+        void queryClient.invalidateQueries({ queryKey: artistQuery.all.queryKey });
+        void queryClient.invalidateQueries({ queryKey: albumQuery.all.queryKey });
+        void queryClient.invalidateQueries({ queryKey: genreQuery.all.queryKey });
+      }
+
+      if (isMountedRef.current) {
+        setSaveResults(res.results);
+        setRows((prev) =>
+          prev.map((r) => {
+            if (savedIds.has(r.songId)) {
+              return {
+                ...r,
+                original: { ...r.draft, artists: [...r.draft.artists], albumArtists: [...r.draft.albumArtists], genres: [...r.draft.genres] },
+                dirtyFields: new Set<EditableField>(),
+                validationErrors: new Map<EditableField, string>(),
+                status: 'saved'
+              };
+            }
+            const itemRes = res.results.find((item) => item.songId === r.songId);
+            if (itemRes) {
+              return { ...r, status: itemRes.status, errorMessage: itemRes.message };
+            }
+            return r;
+          })
+        );
+      }
     } catch (err) {
       console.error('[BatchSongTagsEditor] Batch update failed:', err);
     } finally {
-      window.api.songUpdates.removeBatchTagUpdateProgressListener(progressHandler);
-      setIsSaving(false);
+      if (activeProgressHandlerRef.current) {
+        window.api.songUpdates.removeBatchTagUpdateProgressListener(activeProgressHandlerRef.current);
+        activeProgressHandlerRef.current = null;
+      }
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
   }, [rows, stats.hasValidationErrors, isSaving, rawTagsMap]);
 
