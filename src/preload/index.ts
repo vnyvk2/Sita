@@ -314,6 +314,16 @@ const songUpdates = {
     isKnownSource: boolean
   ): Promise<UpdateSongDataResult> =>
     ipcRenderer.invoke('app/updateSongId3Tags', songIdOrPath, tags, sendUpdatedData, isKnownSource),
+  batchUpdateSongTags: (
+    updates: Array<{ songId: number; tags: SongTags }>
+  ): Promise<BatchUpdateSongTagsResult> =>
+    ipcRenderer.invoke('app/batchUpdateSongTags', updates),
+  onBatchTagUpdateProgress: (
+    callback: (e: unknown, progress: BatchTagUpdateProgressEvent) => void
+  ) => ipcRenderer.on('app/batchTagUpdateProgress', callback),
+  removeBatchTagUpdateProgressListener: (
+    callback: (e: unknown, progress: BatchTagUpdateProgressEvent) => void
+  ) => ipcRenderer.removeListener('app/batchTagUpdateProgress', callback),
   reParseSong: (songPath: string): Promise<SavableSongData | undefined> =>
     ipcRenderer.invoke('app/reParseSong', songPath),
   reloadSongFromFile: (songIdOrPath: string | number): Promise<SongTags> =>
