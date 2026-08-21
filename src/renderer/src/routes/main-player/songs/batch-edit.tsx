@@ -1,7 +1,7 @@
-﻿import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { store } from '../../store/store';
-import BatchSongTagsEditor from '../../components/BatchSongTagsEditor';
+import { store } from '@renderer/store/store';
+import BatchSongTagsEditor from '@renderer/components/BatchSongTagsEditor';
 
 export const Route = createFileRoute('/main-player/songs/batch-edit')({
   validateSearch: (search: Record<string, unknown>) => {

@@ -24,6 +24,7 @@ import { Route as MainPlayerGenresIndexRouteImport } from './routes/main-player/
 import { Route as MainPlayerFoldersIndexRouteImport } from './routes/main-player/folders/index'
 import { Route as MainPlayerArtistsIndexRouteImport } from './routes/main-player/artists/index'
 import { Route as MainPlayerAlbumsIndexRouteImport } from './routes/main-player/albums/index'
+import { Route as MainPlayerSongsBatchEditRouteImport } from './routes/main-player/songs/batch-edit'
 import { Route as MainPlayerSongsSongIdRouteImport } from './routes/main-player/songs/$songId'
 import { Route as MainPlayerPlaylistsRecentlyAddedRouteImport } from './routes/main-player/playlists/recently-added'
 import { Route as MainPlayerPlaylistsHistoryRouteImport } from './routes/main-player/playlists/history'
@@ -114,6 +115,12 @@ const MainPlayerAlbumsIndexRoute = MainPlayerAlbumsIndexRouteImport.update({
   path: '/albums/',
   getParentRoute: () => MainPlayerRouteRoute,
 } as any)
+const MainPlayerSongsBatchEditRoute =
+  MainPlayerSongsBatchEditRouteImport.update({
+    id: '/songs/batch-edit',
+    path: '/songs/batch-edit',
+    getParentRoute: () => MainPlayerRouteRoute,
+  } as any)
 const MainPlayerSongsSongIdRoute = MainPlayerSongsSongIdRouteImport.update({
   id: '/songs/$songId',
   path: '/songs/$songId',
@@ -204,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
   '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
   '/main-player/songs/$songId': typeof MainPlayerSongsSongIdRouteWithChildren
+  '/main-player/songs/batch-edit': typeof MainPlayerSongsBatchEditRoute
   '/main-player/albums/': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists/': typeof MainPlayerArtistsIndexRoute
   '/main-player/folders/': typeof MainPlayerFoldersIndexRoute
@@ -233,6 +241,7 @@ export interface FileRoutesByTo {
   '/main-player/playlists/favorites': typeof MainPlayerPlaylistsFavoritesRoute
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
   '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
+  '/main-player/songs/batch-edit': typeof MainPlayerSongsBatchEditRoute
   '/main-player/albums': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists': typeof MainPlayerArtistsIndexRoute
   '/main-player/folders': typeof MainPlayerFoldersIndexRoute
@@ -264,6 +273,7 @@ export interface FileRoutesById {
   '/main-player/playlists/history': typeof MainPlayerPlaylistsHistoryRoute
   '/main-player/playlists/recently-added': typeof MainPlayerPlaylistsRecentlyAddedRoute
   '/main-player/songs/$songId': typeof MainPlayerSongsSongIdRouteWithChildren
+  '/main-player/songs/batch-edit': typeof MainPlayerSongsBatchEditRoute
   '/main-player/albums/': typeof MainPlayerAlbumsIndexRoute
   '/main-player/artists/': typeof MainPlayerArtistsIndexRoute
   '/main-player/folders/': typeof MainPlayerFoldersIndexRoute
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/history'
     | '/main-player/playlists/recently-added'
     | '/main-player/songs/$songId'
+    | '/main-player/songs/batch-edit'
     | '/main-player/albums/'
     | '/main-player/artists/'
     | '/main-player/folders/'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/favorites'
     | '/main-player/playlists/history'
     | '/main-player/playlists/recently-added'
+    | '/main-player/songs/batch-edit'
     | '/main-player/albums'
     | '/main-player/artists'
     | '/main-player/folders'
@@ -355,6 +367,7 @@ export interface FileRouteTypes {
     | '/main-player/playlists/history'
     | '/main-player/playlists/recently-added'
     | '/main-player/songs/$songId'
+    | '/main-player/songs/batch-edit'
     | '/main-player/albums/'
     | '/main-player/artists/'
     | '/main-player/folders/'
@@ -486,6 +499,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainPlayerAlbumsIndexRouteImport
       parentRoute: typeof MainPlayerRouteRoute
     }
+    '/main-player/songs/batch-edit': {
+      id: '/main-player/songs/batch-edit'
+      path: '/songs/batch-edit'
+      fullPath: '/main-player/songs/batch-edit'
+      preLoaderRoute: typeof MainPlayerSongsBatchEditRouteImport
+      parentRoute: typeof MainPlayerRouteRoute
+    }
     '/main-player/songs/$songId': {
       id: '/main-player/songs/$songId'
       path: '/songs/$songId'
@@ -605,6 +625,7 @@ interface MainPlayerRouteRouteChildren {
   MainPlayerPlaylistsHistoryRoute: typeof MainPlayerPlaylistsHistoryRoute
   MainPlayerPlaylistsRecentlyAddedRoute: typeof MainPlayerPlaylistsRecentlyAddedRoute
   MainPlayerSongsSongIdRoute: typeof MainPlayerSongsSongIdRouteWithChildren
+  MainPlayerSongsBatchEditRoute: typeof MainPlayerSongsBatchEditRoute
   MainPlayerAlbumsIndexRoute: typeof MainPlayerAlbumsIndexRoute
   MainPlayerArtistsIndexRoute: typeof MainPlayerArtistsIndexRoute
   MainPlayerFoldersIndexRoute: typeof MainPlayerFoldersIndexRoute
@@ -630,6 +651,7 @@ const MainPlayerRouteRouteChildren: MainPlayerRouteRouteChildren = {
   MainPlayerPlaylistsHistoryRoute: MainPlayerPlaylistsHistoryRoute,
   MainPlayerPlaylistsRecentlyAddedRoute: MainPlayerPlaylistsRecentlyAddedRoute,
   MainPlayerSongsSongIdRoute: MainPlayerSongsSongIdRouteWithChildren,
+  MainPlayerSongsBatchEditRoute: MainPlayerSongsBatchEditRoute,
   MainPlayerAlbumsIndexRoute: MainPlayerAlbumsIndexRoute,
   MainPlayerArtistsIndexRoute: MainPlayerArtistsIndexRoute,
   MainPlayerFoldersIndexRoute: MainPlayerFoldersIndexRoute,
