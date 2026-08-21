@@ -1,10 +1,13 @@
 // ? BASE IMPORTS
-import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
-// ? MAIN APP COMPONENTS
+import ContextMenu from './components/ContextMenu/ContextMenu';
 import ErrorBoundary from './components/ErrorBoundary';
+import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
+import MiniPlayer from './components/MiniPlayer/MiniPlayer';
+import PromptMenu from './components/PromptMenu/PromptMenu';
 import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
@@ -36,10 +39,19 @@ import { initializeQueuesManager } from './other/queuesManager';
 // ? PROMPTS
 const SongUnplayableErrorPrompt = lazy(() => import('./components/SongUnplayableErrorPrompt'));
 
+// Dev-only visual feedback tool for AI coding agent (Antigravity)
+const DevAgentation = import.meta.env.DEV
+  ? lazy(() =>
+      import('agentation').then((m) => ({
+        default: m.Agentation
+      }))
+    )
+  : null;
+
 // ? SCREENS
 
 // import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { Outlet, useNavigate } from '@tanstack/react-router';
+import { Outlet } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 
 // ? UTILS
@@ -79,22 +91,7 @@ export default function App() {
   const AppRef = useRef(null as HTMLDivElement | null);
   // const storeRef = useRef<AppReducer>(undefined);
 
-  const navigate = useNavigate();
   const playerType = useStore(store, (state) => state.playerType);
-
-  useEffect(() => {
-    if (playerType === 'mini') {
-      navigate({ to: '/mini-player' });
-    } else if (playerType === 'full') {
-      navigate({ to: '/fullscreen-player' });
-    } else if (
-      window.location.hash === '#/' ||
-      window.location.hash.startsWith('#/mini-player') ||
-      window.location.hash.startsWith('#/fullscreen-player')
-    ) {
-      navigate({ to: '/main-player/home' });
-    }
-  }, [playerType, navigate]);
 
   const { isOnline } = useNetworkConnectivity();
 
@@ -386,7 +383,12 @@ export default function App() {
   }>({ isOpen: false, songs: [] });
 
   const openAutoTagDialog = useCallback(
-    (songs: any[], albumName?: string, artistName?: string, workflow: import('./hooks/useMetadataWorkflow').WorkflowType = 'album') => {
+    (
+      songs: any[],
+      albumName?: string,
+      artistName?: string,
+      workflow: import('./hooks/useMetadataWorkflow').WorkflowType = 'album'
+    ) => {
       setAutoTagState({ isOpen: true, songs, albumName, artistName, workflow });
     },
     []
@@ -419,7 +421,20 @@ export default function App() {
           }}
           onDrop={windowManagement.onSongDrop}
         >
-          <Outlet />
+          {playerType === 'mini' ? (
+            <>
+              <MiniPlayer />
+              <ContextMenu />
+            </>
+          ) : playerType === 'full' ? (
+            <>
+              <FullScreenPlayer />
+              <ContextMenu />
+              <PromptMenu />
+            </>
+          ) : (
+            <Outlet />
+          )}
           <MetadataCenterDialog
             isOpen={autoTagState.isOpen}
             localSongs={autoTagState.songs}
@@ -430,6 +445,11 @@ export default function App() {
           />
         </div>
       </AppUpdateContext.Provider>
+      {import.meta.env.DEV && DevAgentation && (
+        <Suspense fallback={null}>
+          <DevAgentation endpoint="http://localhost:4747" />
+        </Suspense>
+      )}
       {/* <TanStackRouterDevtools position="bottom-right" /> */}
     </ErrorBoundary>
   );

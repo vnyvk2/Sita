@@ -1,6 +1,13 @@
-import FullScreenPlayer from '@renderer/components/FullScreenPlayer/FullScreenPlayer';
-import { createFileRoute } from '@tanstack/react-router';
+import { dispatch } from '@renderer/store/store';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/fullscreen-player/')({
-  component: FullScreenPlayer
+  beforeLoad: () => {
+    dispatch({ type: 'UPDATE_PLAYER_TYPE', data: 'full' });
+  },
+  component: RouteComponent
 });
+
+function RouteComponent() {
+  return <Navigate to="/main-player/home" replace />;
+}

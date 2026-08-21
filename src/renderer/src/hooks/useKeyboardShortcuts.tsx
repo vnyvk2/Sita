@@ -267,10 +267,10 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             navigate({ to: '/main-player/home' });
             break;
           case i18n.t('appShortcutsPrompt.goBack'):
-            // TODO: Implement page history back navigation.
+            history.back();
             break;
           case i18n.t('appShortcutsPrompt.goForward'):
-            // TODO: Implement page history forward navigation.
+            history.forward();
             break;
           case i18n.t('appShortcutsPrompt.openMiniPlayer'):
             updatePlayerType(store.state.playerType === 'mini' ? 'normal' : 'mini');
