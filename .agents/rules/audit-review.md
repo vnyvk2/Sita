@@ -16,7 +16,7 @@ flowchart TD
     IsBranch -- "NO" --> RiskLevel{"Assess Risk Surface"}
     
     RiskLevel -- "High Risk (DB, State, Auth, Queue, Lifecycle, Workers)" --> Tier3
-    RiskLevel -- "Medium Risk (IPC, React Query, Transforms, Local Store)" --> Tier2["Tier 2: Single Adversarial Reviewer<br/>(1 Instance of adversarial-reviewer-v2)"]
+    RiskLevel -- "Medium Risk (IPC, React Query, Transforms, Local Store)" --> Tier2["Tier 2: Single Adversarial Reviewer<br/>(1 Instance of adversarial-reviewer)"]
     RiskLevel -- "Low Risk (UI text, CSS, pure helpers, simple tests)" --> Tier1["Tier 1: Fast In-Place Review<br/>(1 standard reviewer / in-place check)"]
 ```
 
@@ -25,8 +25,8 @@ flowchart TD
 | Tier | Change Surface / Trigger Condition | Review Topology | Verification Bar |
 | :--- | :--- | :--- | :--- |
 | **Tier 1: Low Risk** | • UI copy, text, CSS, Tailwind styling<br/>• Isolated pure utilities (`utils/formatters.ts`)<br/>• Simple component visual adjustments | **1 Agent** (Standard review or direct orchestrator inspection) | Syntax, rendering, unit tests. |
-| **Tier 2: Medium Risk** | • New IPC handler / DTO shape<br/>• React Query cache invalidation & keys<br/>• Metadata parser transformations<br/>• Local Zustand store modifications | **1 Agent** (`adversarial-reviewer-v2` attacking diff, concurrency, and negative space) | Concurrency check, cache staleness proof, error propagation. |
-| **Tier 3: High Risk & Pre-Merge** | • **Pre-Merge / Branch-Level Audits** (*"is this merge ready?"*, branch vs master)<br/>• SQLite schema & migrations<br/>• Queue & audio engine playback pipeline<br/>• Authentication, keychain & token lifecycle<br/>• Background workers & synchronization<br/>• App startup, ungraceful shutdown & restart | **3 Execution Contexts**:<br/>1. `deep-auditor-v2` (Reality mapping)<br/>2. `adversarial-reviewer-v2` #1 (*Invariant & Claim Falsifier*)<br/>3. `adversarial-reviewer-v2` #2 (*Negative Space Hunter*) | **Strict P0/P1 Proof Contract**: Line-level call-graph trace, execution conditions, reproduction path. |
+| **Tier 2: Medium Risk** | • New IPC handler / DTO shape<br/>• React Query cache invalidation & keys<br/>• Metadata parser transformations<br/>• Local Zustand store modifications | **1 Agent** (`adversarial-reviewer` attacking diff, concurrency, and negative space) | Concurrency check, cache staleness proof, error propagation. |
+| **Tier 3: High Risk & Pre-Merge** | • **Pre-Merge / Branch-Level Audits** (*"is this merge ready?"*, branch vs master)<br/>• SQLite schema & migrations<br/>• Queue & audio engine playback pipeline<br/>• Authentication, keychain & token lifecycle<br/>• Background workers & synchronization<br/>• App startup, ungraceful shutdown & restart | **3 Execution Contexts**:<br/>1. `deep-auditor` (Reality mapping)<br/>2. `adversarial-reviewer` #1 (*Invariant & Claim Falsifier*)<br/>3. `adversarial-reviewer` #2 (*Negative Space Hunter*) | **Strict P0/P1 Proof Contract**: Line-level call-graph trace, execution conditions, reproduction path. |
 
 ---
 
@@ -43,9 +43,9 @@ For any non-trivial review, the Orchestrator must output an explainable routing 
   ✓ Cross-process / IPC changes detected
   ✓ State/lifecycle surface detected (Audio / Queue / Equalizer)
 - **Review Strategy**:
-  ✓ `deep-auditor-v2` (Reality mapping)
-  ✓ `adversarial-reviewer-v2` #1 (Invariant & Claim Falsifier)
-  ✓ `adversarial-reviewer-v2` #2 (Negative Space Hunter)
+  ✓ `deep-auditor` (Reality mapping)
+  ✓ `adversarial-reviewer` #1 (Invariant & Claim Falsifier)
+  ✓ `adversarial-reviewer` #2 (Negative Space Hunter)
 ```
 
 ---
@@ -71,7 +71,7 @@ When evaluating claims or peer findings:
 * **`CONFIRMED`**: Flaw or risk is verified with a clear, credible execution path and line-level evidence.
 * **`DISPROVED`**: Existing safeguards, guards, or invalid assumptions were proven via code inspection.
 * **`PARTIALLY CONFIRMED`**: Flaw is real, but the claimed severity or impact was overstated, or mitigating factors exist.
-* **`UNRESOLVED`**: **A legitimate success state** when static repository evidence is insufficient. Never manufacture certainty.
+* **`UNRESOLVED`**: **A legitimate success state** when static repository evidence is inconclusive. Never manufacture certainty.
 
 ---
 
