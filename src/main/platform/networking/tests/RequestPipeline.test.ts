@@ -90,4 +90,67 @@ describe('Platform Networking — RequestPipeline & Utilities', () => {
     expect(mockClient.calls.length).toBe(2);
     expect(rateLimiter.getAvailableTokens()).toBe(0);
   });
+
+  it('does NOT retry non-idempotent POST mutations on network socket errors', async () => {
+    const mockClient = new MockHttpClient();
+    // Simulate socket hangup
+    mockClient.request = async (options: HttpRequestOptions) => {
+      mockClient.calls.push(options);
+      throw new Error('socket hang up (ECONNRESET)');
+    };
+
+    const retryPolicy = new RetryPolicy({ maxRetries: 3, initialDelayMs: 10, useJitter: false });
+    const pipeline = new RequestPipeline({ client: mockClient, retryPolicy });
+
+    await expect(
+      pipeline.execute({ url: 'https://api.spotify.com/v1/playlists/123/items', method: 'POST', body: { uris: ['spotify:track:1'] } })
+    ).rejects.toThrow('socket hang up');
+
+    // Invariant: Non-idempotent POST mutation must NOT be auto-retried (attempt count === 1)
+    expect(mockClient.calls.length).toBe(1);
+  });
+
+  it('retries idempotent GET requests on network socket errors', async () => {
+    let attempts = 0;
+    const mockClient = new MockHttpClient();
+    mockClient.request = async <T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>> => {
+      mockClient.calls.push(options);
+      attempts += 1;
+      if (attempts < 3) {
+        throw new Error('fetch failed (ETIMEDOUT)');
+      }
+      return mockClient.mockResponse as HttpResponse<T>;
+    };
+
+    const retryPolicy = new RetryPolicy({ maxRetries: 3, initialDelayMs: 10, useJitter: false });
+    const pipeline = new RequestPipeline({ client: mockClient, retryPolicy });
+
+    const res = await pipeline.execute({ url: 'https://api.spotify.com/v1/me', method: 'GET' });
+    expect(res.status).toBe(200);
+    expect(mockClient.calls.length).toBe(3);
+  });
+
+  it('allows retrying POST mutation if allowNonIdempotentRetry is explicitly true', async () => {
+    let attempts = 0;
+    const mockClient = new MockHttpClient();
+    mockClient.request = async <T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>> => {
+      mockClient.calls.push(options);
+      attempts += 1;
+      if (attempts < 2) {
+        throw new Error('socket hang up');
+      }
+      return mockClient.mockResponse as HttpResponse<T>;
+    };
+
+    const retryPolicy = new RetryPolicy({ maxRetries: 3, initialDelayMs: 10, useJitter: false });
+    const pipeline = new RequestPipeline({ client: mockClient, retryPolicy });
+
+    const res = await pipeline.execute({
+      url: 'https://api.spotify.com/v1/playlists/123/items',
+      method: 'POST',
+      allowNonIdempotentRetry: true
+    });
+    expect(res.status).toBe(200);
+    expect(mockClient.calls.length).toBe(2);
+  });
 });

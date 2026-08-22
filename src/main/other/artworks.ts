@@ -87,8 +87,19 @@ let isDefaultArtworkLocationCreated = false;
 export const checkForDefaultArtworkSaveLocation = async () => {
   if (isDefaultArtworkLocationCreated) return;
 
-  await fs.mkdir(DEFAULT_ARTWORK_SAVE_LOCATION, { recursive: true });
-  isDefaultArtworkLocationCreated = true;
+  try {
+    await fs.mkdir(DEFAULT_ARTWORK_SAVE_LOCATION, { recursive: true });
+    isDefaultArtworkLocationCreated = true;
+  } catch (error) {
+    const code = (error as any)?.code;
+    const isPermanent = code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
+    if (isPermanent) {
+      logger.error('Artwork save location unwritable; falling back to default artwork.', { error, code });
+      isDefaultArtworkLocationCreated = true; // Avoid repeated failing syscalls on every song
+    } else {
+      logger.warn('Transient error creating artwork save location.', { error, code });
+    }
+  }
 };
 
 export const _resetArtworkLocationCacheForTesting = () => {

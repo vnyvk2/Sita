@@ -65,19 +65,25 @@ export class RequestPipeline {
         ? { url: urlOrOptions, ...options }
         : urlOrOptions;
 
-    const authenticatedOptions = this.authenticator.applyAuthentication(opts);
+    return this.retryPolicy.execute(
+      async () => {
+        const authenticatedOptions = this.authenticator.applyAuthentication(opts);
 
-    return this.retryPolicy.execute(async () => {
-      if (this.rateLimiter) {
-        await this.rateLimiter.acquire();
+        if (this.rateLimiter) {
+          await this.rateLimiter.acquire();
+        }
+        await this.acquireSlot(authenticatedOptions.signal);
+        try {
+          return await this.client.request<T>(authenticatedOptions);
+        } finally {
+          this.releaseSlot();
+        }
+      },
+      {
+        method: opts.method,
+        allowNonIdempotentRetry: opts.allowNonIdempotentRetry
       }
-      await this.acquireSlot(authenticatedOptions.signal);
-      try {
-        return await this.client.request<T>(authenticatedOptions);
-      } finally {
-        this.releaseSlot();
-      }
-    });
+    );
   }
 
   private async acquireSlot(signal?: AbortSignal): Promise<void> {

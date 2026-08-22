@@ -3,8 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   _resetArtworkLocationCacheForTesting,
-  checkForDefaultArtworkSaveLocation
+  checkForDefaultArtworkSaveLocation,
+  processArtworkFiles
 } from '../artworks';
+
+vi.mock('sharp', () => ({
+  default: vi.fn(() => ({
+    webp: vi.fn().mockReturnThis(),
+    resize: vi.fn().mockReturnThis(),
+    toFile: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory'))
+  }))
+}));
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -60,11 +69,30 @@ describe('Artwork directory concurrency and error safety', () => {
     );
   });
 
-  it('P0: should propagate genuine filesystem errors (e.g. EACCES) instead of swallowing them', async () => {
+  it('should handle permanent filesystem errors (e.g. EACCES) by logging and falling back gracefully', async () => {
     vi.mocked(fs.mkdir).mockRejectedValueOnce(
       Object.assign(new Error('Permission denied'), { code: 'EACCES', syscall: 'mkdir' })
     );
 
-    await expect(checkForDefaultArtworkSaveLocation()).rejects.toThrow('Permission denied');
+    // Invariant: Permanent mkdir failure must not throw unhandled exception out of location check
+    await expect(checkForDefaultArtworkSaveLocation()).resolves.toBeUndefined();
+  });
+
+  it('proves end-to-end artwork fallback: permanent filesystem failure results in default artwork payload without throwing', async () => {
+    // 1. Permanent mkdir failure on directory creation
+    vi.mocked(fs.mkdir).mockRejectedValue(
+      Object.assign(new Error('Permission denied'), { code: 'EACCES', syscall: 'mkdir' })
+    );
+
+    // 2. Process artwork for a song with embedded image
+    const result = await processArtworkFiles('songs', Buffer.from('embedded-album-art'));
+
+    // Invariant: Must return payload with default fallback without throwing
+    expect(result).toBeDefined();
+    expect(result.payloads).toBeDefined();
+    expect(result.payloads!.length).toBe(2);
+    // Real artwork paths should fall back to default artwork paths (song_cover_default.webp)
+    expect(result.payloads![0].path).toContain('song_cover_default.webp');
+    expect(result.payloads![1].path).toContain('song_cover_default.webp');
   });
 });

@@ -567,13 +567,17 @@ export function toggleAudioPlayingState(isPlaying: boolean) {
 
 export function toggleOnBatteryPower() {
   isOnBatteryPower = powerMonitor.isOnBatteryPower();
-  mainWindow.webContents.send('app/isOnBatteryPower', isOnBatteryPower);
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+    mainWindow.webContents.send('app/isOnBatteryPower', isOnBatteryPower);
+  }
 }
 
 export function sendMessageToRenderer(props: MessageToRendererProps) {
   const { messageCode, data } = props;
 
-  mainWindow.webContents.send('app/sendMessageToRendererEvent', messageCode, data);
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+    mainWindow.webContents.send('app/sendMessageToRendererEvent', messageCode, data);
+  }
 }
 
 let dataUpdateEventTimeOutId: NodeJS.Timeout;
@@ -588,7 +592,9 @@ export function dataUpdateEvent(
   addEventsToCache(dataType, data, message);
   dataUpdateEventTimeOutId = setTimeout(() => {
     logger.verbose('Data Events Cache', { dataEventsCache });
-    mainWindow.webContents.send('app/dataUpdateEvent', dataEventsCache, data, message);
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+      mainWindow.webContents.send('app/dataUpdateEvent', dataEventsCache, data, message);
+    }
     dataEventsCache = [];
   }, 1000);
 }
@@ -777,7 +783,9 @@ async function handleSecondInstances(_: unknown, argv: string[]) {
   process.argv = argv;
 
   manageSecondInstanceArgs(argv);
-  mainWindow?.webContents.send('app/playSongFromUnknownSource', await checkForStartUpSongs());
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+    mainWindow.webContents.send('app/playSongFromUnknownSource', await checkForStartUpSongs());
+  }
 }
 
 function manageSecondInstanceArgs(args: string[]) {
@@ -791,7 +799,9 @@ export function restartApp(reason: string, noQuitEvents = false) {
   logger.debug(`Requested a full app refresh.`, { reason });
 
   if (!noQuitEvents) {
-    mainWindow.webContents.send('app/beforeQuitEvent');
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+      mainWindow.webContents.send('app/beforeQuitEvent');
+    }
     savePendingSongLyrics(currentSongPath, true);
     savePendingMetadataUpdates(currentSongPath, true);
     closeAllAbortControllers();
@@ -911,7 +921,9 @@ function recordWindowState(state: WindowState) {
 }
 
 export function restartRenderer() {
-  mainWindow.webContents.send('app/beforeQuitEvent');
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+    mainWindow.webContents.send('app/beforeQuitEvent');
+  }
   mainWindow.reload();
   if (playerType !== 'normal') {
     changePlayerType('normal');

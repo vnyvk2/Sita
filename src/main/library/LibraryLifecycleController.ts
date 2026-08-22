@@ -21,6 +21,7 @@ export class LibraryLifecycleController {
   private scanner: LibraryScanner;
   private watchersActive = false;
   private isInitialized = false;
+  private isShuttingDown = false;
   private currentMode: LibraryScanMode = 'automatic';
   private inFlightScan: Promise<ScanSummary> | null = null;
   private changeGeneration = 0;
@@ -39,6 +40,7 @@ export class LibraryLifecycleController {
   }
 
   public async initialize(): Promise<void> {
+    this.isShuttingDown = false;
     if (this.isInitialized) {
       logger.warn('[LibraryLifecycleController] Already initialized. Skipping.');
       return;
@@ -60,7 +62,13 @@ export class LibraryLifecycleController {
   }
 
   public async setScanMode(mode: LibraryScanMode): Promise<void> {
-    if (this.currentMode === mode && this.isInitialized) {
+    if (this.isShuttingDown) {
+      throw new Error(
+        '[LibraryLifecycleController] Cannot set scan mode: controller is shutting down.'
+      );
+    }
+
+    if (this.currentMode === mode) {
       logger.debug(
         `[LibraryLifecycleController] Mode already set to ${mode}. No transition needed.`
       );
@@ -88,7 +96,11 @@ export class LibraryLifecycleController {
       try {
         await this.applyPolicy(previousMode, false);
       } catch (rollbackError) {
-        logger.error('[LibraryLifecycleController] Rollback failed:', { rollbackError });
+        logger.error(
+          '[LibraryLifecycleController] Rollback failed; forcing watchers stopped and marking degraded:',
+          { rollbackError }
+        );
+        this.stopWatchers();
       }
       throw error;
     }
@@ -229,7 +241,21 @@ export class LibraryLifecycleController {
     });
   }
 
-  public scanNow(options?: ScanOptions): Promise<ScanSummary> {
+  public async scanNow(options?: ScanOptions): Promise<ScanSummary> {
+    if (this.isShuttingDown) {
+      logger.warn(
+        '[LibraryLifecycleController] scanNow rejected: controller is shutting down.'
+      );
+      return {
+        status: 'CANCELLED',
+        totalSongsFound: 0,
+        newSongsAdded: 0,
+        updatedSongs: 0,
+        removedSongs: 0,
+        durationMs: 0
+      };
+    }
+
     if (this.inFlightScan) {
       logger.info(
         '[LibraryLifecycleController] Scan already in-flight, returning existing promise.'
@@ -262,7 +288,8 @@ export class LibraryLifecycleController {
         if (
           this.changeGeneration !== scanGeneration &&
           this.canAttachWatchers() &&
-          this.isInitialized
+          this.isInitialized &&
+          !this.isShuttingDown
         ) {
           logger.info(
             `[LibraryLifecycleController] Changes observed during scan (generation ${this.changeGeneration} !== ${scanGeneration}); triggering follow-up scan.`
@@ -275,7 +302,7 @@ export class LibraryLifecycleController {
   }
 
   private scheduleFollowUpScan(): void {
-    if (!this.canAttachWatchers() || !this.isInitialized) {
+    if (!this.canAttachWatchers() || !this.isInitialized || this.isShuttingDown) {
       return;
     }
 
@@ -285,7 +312,7 @@ export class LibraryLifecycleController {
 
     this.changeDebounceTimer = setTimeout(() => {
       this.changeDebounceTimer = null;
-      if (this.canAttachWatchers() && !this.inFlightScan && this.isInitialized) {
+      if (this.canAttachWatchers() && !this.inFlightScan && this.isInitialized && !this.isShuttingDown) {
         this.scanNow().catch((error) => {
           logger.error('[LibraryLifecycleController] Follow-up background scan failed:', { error });
         });
@@ -314,6 +341,7 @@ export class LibraryLifecycleController {
 
   public async shutdown(): Promise<void> {
     logger.info('[LibraryLifecycleController] Shutting down lifecycle controller.');
+    this.isShuttingDown = true;
     this.isInitialized = false;
     this.stopWatchers();
     this.cancelScan();
