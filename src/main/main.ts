@@ -515,7 +515,8 @@ async function manageWindowFinishLoad() {
   mainWindow.show();
   manageWindowPositionInMonitor();
 
-  if (IS_DEVELOPMENT) mainWindow.webContents.openDevTools({ mode: 'detach', activate: true });
+  if (IS_DEVELOPMENT && !process.env.NORA_DEVTOOLS_CLOSED)
+    mainWindow.webContents.openDevTools({ mode: 'detach', activate: true });
 
   logger.debug(`Starting up the renderer.`);
 
