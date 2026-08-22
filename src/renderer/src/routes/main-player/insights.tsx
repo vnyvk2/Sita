@@ -47,7 +47,7 @@ export function InsightsPage() {
     isLoading: isStatsLoading,
     isRefetching: isStatsRefetching,
     refetch: refetchStats
-  } = useQuery(analyticsQuery.libraryStats());
+  } = useQuery(analyticsQuery.libraryStats);
 
   const handleRefresh = useCallback(() => {
     refetchListening();

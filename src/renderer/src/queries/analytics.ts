@@ -1,4 +1,4 @@
-﻿import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { createQueryKeys } from '@lukemorales/query-key-factory';
 import type {
   HistoryPeriod,
   ListeningAnalyticsData,
@@ -14,10 +14,10 @@ export const analyticsQuery = createQueryKeys('analytics', {
       return window.api.audioLibraryControls.getListeningAnalytics(period);
     }
   }),
-  libraryStats: () => ({
+  libraryStats: {
     queryKey: null,
     queryFn: async (): Promise<LibraryAudioStatsData> => {
       return window.api.audioLibraryControls.getLibraryAudioStats();
     }
-  })
+  }
 });

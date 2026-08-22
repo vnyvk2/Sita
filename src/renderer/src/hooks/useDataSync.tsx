@@ -199,7 +199,7 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
       client.invalidateQueries({ queryKey: analyticsQuery.listening._def });
       break;
     case 'analytics:libraryStats':
-      client.invalidateQueries({ queryKey: analyticsQuery.libraryStats._def });
+      client.invalidateQueries({ queryKey: analyticsQuery.libraryStats.queryKey });
       break;
   }
 }
