@@ -76,6 +76,7 @@ export class SmartPlaylistCompiler {
       case 'artist': return artists.name;
       case 'album': return albums.title;
       case 'genre': return genres.name;
+      case 'language': return songs.language;
       case 'year': return songs.year;
       case 'duration': return songs.duration;
       case 'playCount': throw new Error('playCount is not supported');

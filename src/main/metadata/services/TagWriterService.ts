@@ -15,6 +15,7 @@ export interface TagWritePayload {
   discNumber?: number;
   genre?: string;
   isrc?: string;
+  language?: string;
   musicBrainzRecordingId?: string;
   artworkBuffer?: Buffer;
 }
@@ -48,6 +49,13 @@ export class TagWriterService {
         if (payload.trackNumber !== undefined) file.tag.track = payload.trackNumber;
         if (payload.discNumber !== undefined) file.tag.disc = payload.discNumber;
         if (payload.year !== undefined) file.tag.year = payload.year;
+        if (payload.language !== undefined) {
+          if (payload.language) {
+            (file.tag as any).languages = [payload.language];
+          } else {
+            (file.tag as any).languages = [];
+          }
+        }
         if (payload.musicBrainzRecordingId !== undefined) {
           if (payload.musicBrainzRecordingId) {
             if (file.tag.musicBrainzTrackId) {

@@ -153,7 +153,8 @@ export class PlaylistProvider implements CollectionProvider {
         artworkPath: '',
         optimizedArtworkPath: ''
       },
-      isBlacklisted: false
+      isBlacklisted: false,
+      language: row.language || undefined
     };
   }
 }

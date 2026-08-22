@@ -71,4 +71,22 @@ describe('SmartPlaylistCompiler', () => {
     const compiled = compiler.compilePredicate(rule);
     expect(compiled).toBeUndefined();
   });
+
+  it('should compile language field conditions properly', () => {
+    const compiler = new SmartPlaylistCompiler();
+    const rule: SmartPlaylistRuleAST = {
+      type: 'group',
+      logicalOperator: 'and',
+      rules: [
+        { type: 'condition', field: 'language', operator: 'eq', value: 'Telugu' },
+        { type: 'condition', field: 'language', operator: 'neq', value: 'Hindi' }
+      ]
+    };
+
+    const compiled = compiler.compilePredicate(rule);
+    expect(compiled).toBeDefined();
+    const queryStr = new PgDialect().sqlToQuery(compiled!).sql;
+    expect(queryStr).toContain('"songs"."language" = $1');
+    expect(queryStr).toContain('"songs"."language" != $2');
+  });
 });

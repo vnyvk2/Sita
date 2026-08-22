@@ -1,10 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
 
+import { and, eq } from 'drizzle-orm';
 import { db } from '@main/db/db';
 import { saveArtworks, syncSongArtworks } from '@main/db/queries/artworks';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
-import type { songs } from '@main/db/schema';
+import { metadataOverrides, type songs } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
 import { File } from 'node-taglib-sharp';
 
@@ -12,6 +13,7 @@ import { removeDefaultAppProtocolFromFilePath, resetArtworkCache } from '../fs/r
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
+import { detectSongLanguage } from './detectLanguage';
 import { libraryScheduler } from '../workers/jobScheduler';
 import { PaletteJob } from '../workers/jobs/paletteJob';
 // (GC job will be dispatched by Maintenance orchestrator)
@@ -47,6 +49,7 @@ const reParseSong = async (filePath: string) => {
       let albumArtistsData: string[] = [];
       let albumData: string | undefined;
       let genresData: string[] = [];
+      let detectedLanguage: string | undefined;
       let rawPictureBytes: Uint8Array | undefined;
 
       try {
@@ -55,6 +58,13 @@ const reParseSong = async (filePath: string) => {
           metadata?.title || path.basename(songPath, path.extname(songPath)) || 'Unknown Title';
 
         if (metadata) {
+          artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
+          albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
+          albumData = getAlbumInfoFromSong(metadata.album);
+          genresData = getGenreInfoFromSong(metadata.genres);
+          rawPictureBytes = extractFrontCover(metadata.pictures);
+          detectedLanguage = detectSongLanguage(metadata, songPath, songTitle, artistsData);
+
           updatedSong = {
             title: songTitle,
             duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
@@ -72,12 +82,6 @@ const reParseSong = async (filePath: string) => {
             fileCreatedAt: stats ? stats.birthtime : new Date(),
             fileModifiedAt: stats ? stats.mtime : new Date()
           };
-
-          artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
-          albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
-          albumData = getAlbumInfoFromSong(metadata.album);
-          genresData = getGenreInfoFromSong(metadata.genres);
-          rawPictureBytes = extractFrontCover(metadata.pictures);
         }
       } finally {
         file.dispose?.();
@@ -90,6 +94,21 @@ const reParseSong = async (filePath: string) => {
           await removeDeletedArtistDataOfSong(song, trx);
           await removeDeletedAlbumDataOfSong(song, trx);
           await removeDeletedGenreDataOfSong(song, trx);
+
+          // Check if user manually set a language override
+          const userOverride = await trx.query?.metadataOverrides?.findFirst?.({
+            where: and(
+              eq(metadataOverrides.entityKind, 'song'),
+              eq(metadataOverrides.entityId, String(songData.id)),
+              eq(metadataOverrides.fieldId, 'language')
+            )
+          });
+
+          if (userOverride?.stringValue) {
+            updatedSong.language = userOverride.stringValue;
+          } else {
+            updatedSong.language = detectedLanguage;
+          }
 
           // No need to delete playlists, play events, seek events, or skip events as they will be the same even after re-parsing.
 

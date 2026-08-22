@@ -1,5 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
-import type { DropdownProp } from '@renderer/components/Dropdown';
+import type { DropdownOption, DropdownProp } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
@@ -11,7 +11,6 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { songQuery } from '@renderer/queries/songs';
-import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
@@ -19,7 +18,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo } from 'react';
+import { type ChangeEvent, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import historyPlaylistCoverImage from '../../../assets/images/webp/history-playlist-icon.webp';
@@ -65,7 +64,7 @@ const mostPlayedLimitOptions = [
  * @returns A React element representing the History playlist information page.
  */
 function HistoryPlaylistInfoPage() {
-  const { period: searchPeriod, mostPlayedLimit: searchLimit } = Route.useSearch();
+  const { period: searchPeriod, mostPlayedLimit: searchLimit, language = 'all' } = Route.useSearch();
 
   const playlistSortingState = useStore(
     store,
@@ -91,8 +90,8 @@ function HistoryPlaylistInfoPage() {
   const mostPlayedLimit = searchLimit || storedLimit;
 
   const scrollKey = useMemo(
-    () => `history-playlist:${sortingOrder}:${period}:${mostPlayedLimit}`,
-    [sortingOrder, period, mostPlayedLimit]
+    () => `history-playlist:${sortingOrder}:${period}:${mostPlayedLimit}:${language || 'all'}`,
+    [sortingOrder, period, mostPlayedLimit, language]
   );
 
   useEffect(() => {
@@ -116,11 +115,46 @@ function HistoryPlaylistInfoPage() {
     select: (data) => data.data
   });
 
-  const selectAllHandler = useSelectAllHandler(historySongs, 'songs', 'songId');
+  const availableLanguages = useMemo(() => {
+    if (!historySongs || historySongs.length === 0) return [];
+    const langs = new Set<string>();
+    for (const song of historySongs) {
+      if (song.language && song.language.trim() !== '') {
+        langs.add(song.language.trim());
+      }
+    }
+    return Array.from(langs).sort();
+  }, [historySongs]);
+
+  const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allLanguages', 'All Languages'), value: 'all' },
+      { label: t('common.unspecifiedLanguage', 'Unspecified'), value: 'unspecified' }
+    ];
+    if (availableLanguages.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const lang of availableLanguages) {
+        options.push({ label: lang, value: lang });
+      }
+    }
+    return options;
+  }, [availableLanguages, t]);
+
+  const filteredSongs = useMemo(() => {
+    if (!language || language === 'all') return historySongs;
+    return historySongs.filter((song) => {
+      if (language === 'unspecified') {
+        return !song.language || song.language.trim() === '';
+      }
+      return song.language?.toLowerCase() === language.toLowerCase();
+    });
+  }, [historySongs, language]);
+
+  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = historySongs
+      const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(
@@ -133,11 +167,11 @@ function HistoryPlaylistInfoPage() {
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, t, historySongs]
+    [createQueue, updateQueueData, t, filteredSongs]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = historySongs
+    const validSongIds = filteredSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
     getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
@@ -152,45 +186,61 @@ function HistoryPlaylistInfoPage() {
     ]);
   }, [
     addNewNotifications,
-    historySongs,
+    filteredSongs,
     t
   ]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        historySongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'playlist',
         true,
         'history',
         true
       ),
-    [createQueue, historySongs]
+    [createQueue, filteredSongs]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        historySongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'songs',
         false,
         'history',
         true
       ),
-    [createQueue, historySongs]
+    [createQueue, filteredSongs]
   );
 
   const createPlaylistFromHistory = useCallback(() => {
-    if (historySongs.length === 0) return;
-    const songIds = historySongs.map((song) => song.songId);
+    if (filteredSongs.length === 0) return;
+    const songIds = filteredSongs.map((song) => song.songId);
     changePromptMenuData(true, <NewPlaylistPrompt songIds={songIds} />);
-  }, [changePromptMenuData, historySongs]);
+  }, [changePromptMenuData, filteredSongs]);
 
   const isMostPlayedMode =
     sortingOrder === 'allTimeMostListened' || sortingOrder === 'monthlyMostListened';
 
   const dropdowns = useMemo(() => {
     const list: DropdownProp<string>[] = [
+      {
+        name: 'historyLanguageDropdown',
+        type: `${t('common.language', 'Language')} :`,
+        value: language,
+        options: languageDropdownOptions,
+        onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+          const val = e.currentTarget.value;
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              language: val === 'all' ? undefined : val
+            }),
+            replace: true
+          });
+        }
+      },
       {
         name: 'HistoryPeriodDropdown',
         type: `${t('historyPage.period', 'Period')} :`,
@@ -230,7 +280,16 @@ function HistoryPlaylistInfoPage() {
     }
 
     return list;
-  }, [isMostPlayedMode, mostPlayedLimit, navigate, period, sortingOrder, t]);
+  }, [
+    isMostPlayedMode,
+    language,
+    languageDropdownOptions,
+    mostPlayedLimit,
+    navigate,
+    period,
+    sortingOrder,
+    t
+  ]);
 
   return (
     <MainContainer
@@ -278,14 +337,14 @@ function HistoryPlaylistInfoPage() {
         dropdowns={dropdowns}
       />
       <VirtualizedList
-        data={historySongs}
+        data={filteredSongs}
         fixedItemHeight={60}
         scrollKey={scrollKey}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto(playlistData)}
-              songs={historySongs}
+              songs={filteredSongs}
             />
           )
         }}
@@ -293,7 +352,7 @@ function HistoryPlaylistInfoPage() {
           return (
             <Song
               key={index}
-              index={index}
+              index={index - 1}
               isIndexingSongs={preferences.isSongIndexingEnabled}
               onPlayClick={handleSongPlayBtnClick}
               selectAllHandler={selectAllHandler}
@@ -303,7 +362,7 @@ function HistoryPlaylistInfoPage() {
           );
         }}
       />
-      {historySongs.length === 0 && (
+      {filteredSongs.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}
