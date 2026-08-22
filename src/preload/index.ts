@@ -34,6 +34,11 @@ import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
+import type {
+  ArtistDiscographyPayload,
+  ArtistOnlineProfilePayload,
+  OnlineTrackDetail
+} from '../types/artist_discography';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -463,7 +468,22 @@ const artistsData = {
   ): Promise<ToggleLikeSongReturnValue | undefined> =>
     ipcRenderer.invoke('app/toggleLikeArtists', artistIds, likeArtist),
   getArtistArtworks: (artistId: number): Promise<ArtistInfoFromNet | undefined> =>
-    ipcRenderer.invoke('app/getArtistArtworks', artistId)
+    ipcRenderer.invoke('app/getArtistArtworks', artistId),
+  getArtistDiscography: (
+    artistId: number,
+    artistName: string
+  ): Promise<ArtistDiscographyPayload> =>
+    ipcRenderer.invoke('app/getArtistDiscography', artistId, artistName),
+  getAlbumOnlineTracks: (
+    onlineAlbumId: number,
+    artistId: number
+  ): Promise<OnlineTrackDetail[]> =>
+    ipcRenderer.invoke('app/getAlbumOnlineTracks', onlineAlbumId, artistId),
+  getArtistOnlineProfile: (
+    artistId: number,
+    artistName: string
+  ): Promise<ArtistOnlineProfilePayload> =>
+    ipcRenderer.invoke('app/getArtistOnlineProfile', artistId, artistName)
 };
 
 // $ GENRES DATA
