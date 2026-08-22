@@ -166,7 +166,7 @@ describe('reParseSong', () => {
         { id: 76, path: '/artwork/full.webp', isOptimized: false },
         { id: 77, path: '/artwork/thumb.webp', isOptimized: true }
       ] as any,
-      payloads: null
+      payloads: undefined
     });
 
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
