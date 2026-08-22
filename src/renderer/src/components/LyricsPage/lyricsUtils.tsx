@@ -6,7 +6,8 @@ export function renderLyricsLines(
   lyrics: SongLyrics | null | undefined,
   songDuration: number,
   isAutoScrolling = true,
-  playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal'
+  playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal',
+  activeLineIndex: number | null = null
 ): ReactNode[] {
   if (!lyrics?.lyrics) return [];
   const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
@@ -23,6 +24,7 @@ export function renderLyricsLines(
           playerType={playerType}
           key={index}
           index={index}
+          isActive={activeLineIndex === index}
           lyric={originalText}
           translatedLyricLines={lyric.translatedTexts}
           syncedLyrics={{ start, end }}
@@ -36,7 +38,8 @@ export function renderLyricsLines(
       <LyricLine
         playerType={playerType}
         key="..."
-        index={0}
+        index={-1}
+        isActive={activeLineIndex === -1}
         lyric="•••"
         syncedLyrics={{
           start: 0,
@@ -57,7 +60,9 @@ export function renderLyricsLines(
           playerType={playerType}
           key={index}
           index={index}
+          isActive={false}
           lyric={line.originalText}
+          translatedLyricLines={line.translatedTexts}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={line.romanizedText}
         />

@@ -13,6 +13,7 @@ import LyricsAmbientBackground from './LyricsAmbientBackground';
 import LyricsMetadata from './LyricsMetadata';
 import NoLyrics from './NoLyrics';
 import { renderLyricsLines } from './lyricsUtils';
+import { useActiveLyricIndex } from './useActiveLyricIndex';
 
 const LyricsDrawer = () => {
   const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
@@ -24,7 +25,6 @@ const LyricsDrawer = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const isLyricsPage = location.pathname.startsWith('/main-player/lyrics');
 
   const { data: lyrics, isPending: isLoadingLyrics } = useQuery({
@@ -46,9 +46,11 @@ const LyricsDrawer = () => {
 
   useSkipLyricsLines(lyrics);
 
+  const activeLineIndex = useActiveLyricIndex(isLyricsDrawerOpen ? lyrics : null);
+
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, true, 'drawer');
-  }, [currentSongData.duration, lyrics]);
+    return renderLyricsLines(lyrics, currentSongData.duration, true, 'drawer', activeLineIndex);
+  }, [currentSongData.duration, lyrics, activeLineIndex]);
 
   const handleExpandClick = () => {
     const fromPath = location.pathname + (location.searchStr ? `?${location.searchStr}` : '');
@@ -64,7 +66,6 @@ const LyricsDrawer = () => {
     return null;
   }
 
-  const isSynced = lyrics?.lyrics?.isSynced;
   const copyright = lyrics?.lyrics?.copyright;
 
   return (
@@ -76,10 +77,7 @@ const LyricsDrawer = () => {
       {preferences?.lyricsBackground === 'artwork' && currentSongData.artworkPath && (
         <LyricsAmbientBackground
           artworkPath={currentSongData.artworkPath}
-          blur={preferences.lyricsArtworkBlur}
-          darkness={preferences.lyricsArtworkDarkness}
-          enableAnimation={preferences.lyricsArtworkAnimation}
-          reducedMotion={preferences.isReducedMotion}
+          paletteData={currentSongData.paletteData}
         />
       )}
 
@@ -137,7 +135,14 @@ const LyricsDrawer = () => {
         )}
 
         {!isLoadingLyrics && lyricsComponents.length === 0 && (
-          <NoLyrics isSyncedLyrics={isSynced} />
+          <NoLyrics
+            iconName="release_alert"
+            title={t('lyricsPage.noLyrics', 'No lyrics available')}
+            description={t(
+              'lyricsPage.noLyricsDescription',
+              'Could not find lyrics for this track.'
+            )}
+          />
         )}
       </div>
     </aside>

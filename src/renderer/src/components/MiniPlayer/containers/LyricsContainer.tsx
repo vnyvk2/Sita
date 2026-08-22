@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 
 import useSkipLyricsLines from '../../../hooks/useSkipLyricsLines';
 import i18n from '../../../i18n';
-import LyricLine from '../../LyricsPage/LyricLine';
+import { renderLyricsLines } from '../../LyricsPage/lyricsUtils';
+import { useActiveLyricIndex } from '../../LyricsPage/useActiveLyricIndex';
 import LyricsMetadata from '../../LyricsPage/LyricsMetadata';
 
 type Props = { isLyricsVisible: boolean };
@@ -22,35 +23,52 @@ const LyricsContainer = (props: Props) => {
   const requestIdRef = useRef(0);
   useSkipLyricsLines(lyrics);
 
+  const activeLineIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
+
   useEffect(() => {
     if (isLyricsVisible) {
       const currentRequestId = ++requestIdRef.current;
-      setLyrics(null);
+
       window.api.lyrics
-        .getSongLyrics({
-          songTitle: currentSongData.title,
-          songArtists: Array.isArray(currentSongData.artists)
-            ? currentSongData.artists.map((artist) => artist.name)
-            : [],
-          album: currentSongData.album?.name,
-          songPath: currentSongData.path,
-          duration: currentSongData.duration
-        })
+        .getSongLyrics(
+          {
+            songTitle: currentSongData.title,
+            songArtists: Array.isArray(currentSongData.artists)
+              ? currentSongData.artists.map((artist) => artist.name)
+              : [],
+            album: currentSongData.album?.name,
+            songPath: currentSongData.path,
+            duration: currentSongData.duration
+          },
+          'ANY',
+          'ANY',
+          preferences.lyricsAutomaticallySaveState
+        )
         .then(async (res) => {
           if (currentRequestId !== requestIdRef.current) return;
-          setLyrics(res);
+          if (res) setLyrics(res);
 
           if (
             preferences.autoTranslateLyrics &&
+            res &&
+            !res?.lyrics.isTranslated &&
             !res?.lyrics.isReset &&
-            !res?.lyrics.isTranslated
+            res?.lyrics.originalLanguage !== i18n.language
           ) {
-            const translated = await window.api.lyrics.getTranslatedLyrics(i18n.language as LanguageCodes);
+            const translated = await window.api.lyrics.getTranslatedLyrics(
+              i18n.language as LanguageCodes
+            );
+
             if (currentRequestId !== requestIdRef.current) return;
-            setLyrics(translated);
+            if (translated) setLyrics(translated);
           }
-          if (preferences.autoConvertLyrics && !res?.lyrics.isReset && !res?.lyrics.isRomanized) {
-            let converted: SongLyrics | null | undefined;
+          if (
+            preferences.autoConvertLyrics &&
+            res &&
+            !res?.lyrics.isReset &&
+            !res?.lyrics.isRomanized
+          ) {
+            let converted: SongLyrics | undefined;
             if (res?.lyrics.originalLanguage === 'zh')
               converted = await window.api.lyrics.convertLyricsToPinyin();
             else if (res?.lyrics.originalLanguage === 'ja')
@@ -77,62 +95,13 @@ const LyricsContainer = (props: Props) => {
     currentSongData.title,
     preferences.autoTranslateLyrics,
     preferences.autoConvertLyrics,
+    preferences.lyricsAutomaticallySaveState,
     isLyricsVisible
   ]);
+
   const lyricsComponents = useMemo(() => {
-    if (lyrics && lyrics?.lyrics) {
-      const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
-
-      if (isSynced) {
-        const syncedLyricsLines = parsedLyrics.map((lyric, index) => {
-          const { originalText: text, end = 0, start = 0 } = lyric;
-          return (
-            <LyricLine
-              playerType="mini"
-              key={index}
-              index={index}
-              lyric={text}
-              syncedLyrics={{ start, end }}
-              translatedLyricLines={lyric.translatedTexts}
-              convertedLyric={lyric.romanizedText}
-            />
-          );
-        });
-
-        const firstLine = (
-          <LyricLine
-            playerType="mini"
-            key="..."
-            index={0}
-            lyric="•••"
-            syncedLyrics={{
-              start: 0,
-              end: (parsedLyrics[0]?.start || 0) + offset
-            }}
-          />
-        );
-
-        if ((parsedLyrics[0]?.start || 0) !== 0) syncedLyricsLines.unshift(firstLine);
-
-        return syncedLyricsLines;
-      }
-      if (!isSynced) {
-        return parsedLyrics.map((line, index) => {
-          return (
-            <LyricLine
-              playerType="mini"
-              key={index}
-              index={index}
-              lyric={line.originalText}
-              translatedLyricLines={line.translatedTexts}
-              convertedLyric={line.romanizedText}
-            />
-          );
-        });
-      }
-    }
-    return [];
-  }, [lyrics]);
+    return renderLyricsLines(lyrics, currentSongData.duration, true, 'mini', activeLineIndex);
+  }, [lyrics, currentSongData.duration, activeLineIndex]);
 
   const lyricsSource = useMemo(() => {
     if (lyrics && lyrics?.lyrics) {
