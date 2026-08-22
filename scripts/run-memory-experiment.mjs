@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'child_process';
+import { spawn, spawnSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const flagsFilePath = path.join(rootDir, 'src', 'renderer', 'src', 'utils', 'debug', 'memoryExperiments.ts');
 
-const RUN_CONFIGS = {
+export const RUN_CONFIGS = {
   '0A': {
     name: 'Run 0A: DevTools CLOSED (Current Code)',
     flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: false },
@@ -45,7 +45,7 @@ const RUN_CONFIGS = {
   }
 };
 
-function writeFlags(flags) {
+export function writeFlags(flags) {
   const content = `export const MEMORY_EXPERIMENTS = {
   // Test A: Disable cloneDeep(currentState) in store.subscribe
   DISABLE_STORE_CLONE_LOGGING: ${flags.DISABLE_STORE_CLONE_LOGGING},
@@ -63,47 +63,45 @@ function writeFlags(flags) {
   fs.writeFileSync(flagsFilePath, content, 'utf8');
 }
 
-function sleep(ms) {
+export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getProcessMemoryMetrics() {
+export function getProcessMemoryMetrics() {
   try {
-    const psScript = `
-      $processes = Get-Process -Name "electron", "nora" -ErrorAction SilentlyContinue
-      if (-not $processes) { return "{}" }
-      $cimProcs = @{}
+    const psCmd = `
+      $procs = Get-Process -Name "electron", "nora" -ErrorAction SilentlyContinue
+      if (-not $procs) { return "[]" }
+      $cimMap = @{}
       try {
-        Get-CimInstance Win32_Process -Filter "Name='electron.exe' or Name='nora.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
-          $cimProcs[$_.ProcessId] = $_.CommandLine
+        Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'electron*' -or $_.Name -like 'nora*' } | ForEach-Object {
+          $cimMap[$_.ProcessId] = $_.CommandLine
         }
-      } catch { }
+      } catch {}
 
-      $results = @()
-      foreach ($p in $processes) {
-        $cmd = $cimProcs[$p.Id]
+      $list = @()
+      foreach ($p in $procs) {
+        $cmd = $cimMap[$p.Id]
         $role = "Main"
         if ($cmd -match "--type=renderer") { $role = "Renderer" }
         elseif ($cmd -match "--type=gpu-process") { $role = "GPU" }
         elseif ($cmd -match "--type=utility") { $role = "Utility" }
         elseif ($cmd -match "--type=crashpad-handler") { $role = "Crashpad" }
 
-        $results += [PSCustomObject]@{
+        $list += [PSCustomObject]@{
           pid = $p.Id
           role = $role
           workingSetMB = [math]::Round($p.WorkingSet64 / 1MB, 2)
           privateMB = [math]::Round($p.PrivateMemorySize64 / 1MB, 2)
         }
       }
-      $results | ConvertTo-Json -Compress
+      $list | ConvertTo-Json -Compress
     `;
 
-    const raw = execSync(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, {
-      encoding: 'utf8',
-      timeout: 5000
-    }).trim();
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const raw = res.stdout?.trim();
+    if (!raw || raw === '[]') return null;
 
-    if (!raw || raw === '{}') return null;
     const parsed = JSON.parse(raw);
     const list = Array.isArray(parsed) ? parsed : [parsed];
 
@@ -111,6 +109,7 @@ function getProcessMemoryMetrics() {
       main: { ws: 0, pm: 0 },
       renderer: { ws: 0, pm: 0 },
       gpu: { ws: 0, pm: 0 },
+      utility: { ws: 0, pm: 0 },
       totalWS: 0,
       totalPM: 0
     };
@@ -127,6 +126,9 @@ function getProcessMemoryMetrics() {
       } else if (item.role === 'GPU') {
         summary.gpu.ws += item.workingSetMB;
         summary.gpu.pm += item.privateMB;
+      } else if (item.role === 'Utility') {
+        summary.utility.ws += item.workingSetMB;
+        summary.utility.pm += item.privateMB;
       }
     }
 
@@ -145,7 +147,7 @@ function getProcessMemoryMetrics() {
   }
 }
 
-class CDPClient {
+export class CDPClient {
   constructor(wsUrl) {
     this.wsUrl = wsUrl;
     this.ws = null;
@@ -201,13 +203,13 @@ class CDPClient {
   }
 }
 
-async function getCDPTarget(port = 9222, maxAttempts = 30) {
+export async function getCDPTarget(port = 9876, maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/json`);
       if (res.ok) {
         const list = await res.json();
-        const page = list.find((t) => t.type === 'page' && !t.url.includes('devtools://'));
+        const page = list.find((t) => t.type === 'page' && t.title === 'Nora');
         if (page && page.webSocketDebuggerUrl) {
           return page;
         }
@@ -215,10 +217,10 @@ async function getCDPTarget(port = 9222, maxAttempts = 30) {
     } catch (e) { }
     await sleep(1000);
   }
-  throw new Error(`Could not find CDP target on port ${port} after ${maxAttempts}s`);
+  throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
 }
 
-function killAllNora() {
+export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
   } catch (e) { }
@@ -227,7 +229,7 @@ function killAllNora() {
   } catch (e) { }
 }
 
-async function runExperiment(runKey) {
+export async function runExperiment(runKey) {
   const config = RUN_CONFIGS[runKey];
   if (!config) {
     console.error(`Unknown runKey: ${runKey}. Supported: ${Object.keys(RUN_CONFIGS).join(', ')}`);
@@ -251,9 +253,9 @@ async function runExperiment(runKey) {
     NORA_DEVTOOLS_CLOSED: config.devtoolsClosed ? '1' : ''
   };
 
-  // Launch Electron with remote debugging port 9222
-  console.log('[Runner] Launching Nora in dev mode with --remote-debugging-port=9222...');
-  const child = spawn('npm.cmd', ['run', 'dev', '--', '--', '--remote-debugging-port=9222'], {
+  // Launch Electron with remote debugging port 9876
+  console.log('[Runner] Launching Nora in dev mode with --remoteDebuggingPort 9876...');
+  spawn('npx.cmd', ['electron-vite', 'dev', '--watch=false', '--remoteDebuggingPort', '9876'], {
     cwd: rootDir,
     env,
     stdio: 'ignore',
@@ -264,9 +266,9 @@ async function runExperiment(runKey) {
   const timeline = [];
 
   try {
-    console.log('[Runner] Waiting for CDP target on port 9222...');
-    const target = await getCDPTarget(9222, 45);
-    console.log(`[Runner] Connected to CDP Target: ${target.title} (${target.url})`);
+    console.log('[Runner] Waiting for Nora CDP target on port 9876...');
+    const target = await getCDPTarget(9876, 45);
+    console.log(`[Runner] Connected to Nora CDP Target: ${target.title} (${target.url})`);
 
     const cdp = new CDPClient(target.webSocketDebuggerUrl);
     await cdp.connect();
@@ -301,7 +303,7 @@ async function runExperiment(runKey) {
       };
 
       timeline.push(record);
-      console.log(`[T+${Math.round(elapsedSec / 60)}m | ${stepName}] Total WS: ${record.totalWS} MB | Renderer WS: ${record.rendererWS} MB (PM: ${record.rendererPM} MB) | GPU WS: ${record.gpuWS} MB | Main WS: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB ?? 'N/A'} MB | Listeners: ${listeners ?? 'N/A'}`);
+      console.log(`[T+${Math.round(elapsedSec / 60)}m | ${stepName}] Total: ${record.totalWS} MB (PM: ${record.totalPM} MB) | Renderer: ${record.rendererWS} MB (PM: ${record.rendererPM} MB) | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB ?? 'N/A'} MB | Listeners: ${listeners ?? 'N/A'}`);
       return record;
     }
 
@@ -321,13 +323,13 @@ async function runExperiment(runKey) {
     // Step 2: Start playback + open Lyrics
     console.log('\n--- Step 2: Start Playback & Open Lyrics (T+2m)... ---');
     await cdp.evaluate(`(() => {
-      // 1. Try to start playback: click play button or first song
-      const playBtn = document.querySelector('.play-pause-btn') || document.querySelector('button[title*="Play"]');
+      // 1. If not playing, click play button
+      const playBtn = document.querySelector('.play-pause-btn');
       if (playBtn) playBtn.click();
       
       // 2. Click lyrics button to open lyrics view
       setTimeout(() => {
-        const lyricsBtn = document.querySelector('.lyrics-btn') || document.querySelector('button[title*="Lyrics"]');
+        const lyricsBtn = document.querySelector('.lyrics-btn');
         if (lyricsBtn) lyricsBtn.click();
       }, 1000);
     })()`);
@@ -343,7 +345,7 @@ async function runExperiment(runKey) {
     console.log('\n--- Step 3: 5 Rapid Track Skips (T+3m)... ---');
     for (let i = 1; i <= 5; i++) {
       await cdp.evaluate(`(() => {
-        const skipBtn = document.querySelector('.skip-forward-btn') || document.querySelector('button[title*="Next"]');
+        const skipBtn = document.querySelector('.skip-forward-btn');
         if (skipBtn) skipBtn.click();
       })()`);
       await sleep(2000);
@@ -360,7 +362,7 @@ async function runExperiment(runKey) {
     console.log('\n--- Step 4: 10 Rapid Track Skips (T+4m)... ---');
     for (let i = 1; i <= 10; i++) {
       await cdp.evaluate(`(() => {
-        const skipBtn = document.querySelector('.skip-forward-btn') || document.querySelector('button[title*="Next"]');
+        const skipBtn = document.querySelector('.skip-forward-btn');
         if (skipBtn) skipBtn.click();
       })()`);
       await sleep(500);
