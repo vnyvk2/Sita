@@ -75,13 +75,13 @@ export function getProcessMemoryMetrics() {
       $cimMap = @{}
       try {
         Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'electron*' -or $_.Name -like 'nora*' } | ForEach-Object {
-          $cimMap[$_.ProcessId] = $_.CommandLine
+          $cimMap[[string]$_.ProcessId] = $_.CommandLine
         }
       } catch {}
 
       $list = @()
       foreach ($p in $procs) {
-        $cmd = $cimMap[$p.Id]
+        $cmd = $cimMap[[string]$p.Id]
         $role = "Main"
         if ($cmd -match "--type=renderer") { $role = "Renderer" }
         elseif ($cmd -match "--type=gpu-process") { $role = "GPU" }
