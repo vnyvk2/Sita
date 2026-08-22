@@ -341,7 +341,6 @@ export class QueuesManager {
           const hasStructureVersionChanged =
             lastVersion !== undefined && lastVersion !== q.structureVersion;
           if (
-            q.songIds !== sq.songIds ||
             hasStructureVersionChanged ||
             q.position !== sq.position ||
             q.metadata?.title !== sq.metadata?.title ||
@@ -389,7 +388,7 @@ export class QueuesManager {
               const lastVersion = this.lastSyncedStructureVersions.get(q.id);
               const hasStructureVersionChanged =
                 lastVersion !== undefined && lastVersion !== q.structureVersion;
-              const songIdsChanged = q.songIds !== sq.songIds || hasStructureVersionChanged;
+              const songIdsChanged = hasStructureVersionChanged;
               const positionChanged = q.position !== sq.position;
               const metadataChanged = q.metadata?.title !== sq.metadata?.title;
               const shuffleChanged = !!q.queueBeforeShuffle !== !!sq.queueBeforeShuffle;

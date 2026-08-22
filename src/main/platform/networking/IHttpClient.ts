@@ -7,6 +7,7 @@ export interface HttpRequestOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   responseType?: 'json' | 'text' | 'buffer';
+  allowNonIdempotentRetry?: boolean;
 }
 
 export interface HttpResponse<T = unknown> {

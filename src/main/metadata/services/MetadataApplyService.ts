@@ -355,9 +355,9 @@ export class MetadataApplyService {
     const failedWriteIndex = tagWriteResults.findIndex((r) => !r.success);
 
     if (failedWriteIndex !== -1) {
-      // Roll back any files that were successfully written before the failure
-      if (failedWriteIndex > 0) {
-        const successfulRollbacks = rollbackPayloads.slice(0, failedWriteIndex);
+      // Roll back all files that were successfully written during the batch
+      const successfulRollbacks = rollbackPayloads.filter((_, idx) => tagWriteResults[idx]?.success === true);
+      if (successfulRollbacks.length > 0) {
         const rollbackResults = await this.tagWriter.writeBatch(successfulRollbacks);
         const failedRollbacks = rollbackResults.filter((r) => !r.success);
         const rollbackErrors = failedRollbacks.map((f) => `Rollback failed for ${f.filePath}: ${f.error}`);
@@ -406,80 +406,66 @@ export class MetadataApplyService {
           });
         }
       } else {
-        // Module resolution check separated from execution
-        let reParseSongModule: ((path: string) => Promise<unknown>) | undefined;
-        try {
-          reParseSongModule = (await import('../../parseSong/reParseSong')).default;
-        } catch {
-          reParseSongModule = undefined;
-        }
+        // Direct DB atomic transaction
+        const { db } = await import('../../db/db');
+        const { songs } = await import('../../db/schema');
+        const { eq } = await import('drizzle-orm');
 
-        if (reParseSongModule) {
+        const { getSongById } = await import('../../db/queries/songs');
+        const { convertToSongData } = await import('../../utils/convert');
+        const {
+          removeDeletedArtistDataOfSong,
+          removeDeletedAlbumDataOfSong,
+          removeDeletedGenreDataOfSong
+        } = await import('../../removeSongsFromLibrary');
+
+        const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
+        const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
+        const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
+
+        await db.transaction(async (trx) => {
           for (const snap of updatedSongs) {
-            await reParseSongModule(snap.path);
-          }
-        } else {
-          // Direct DB query fallback ONLY if module cannot be resolved (e.g. isolated test runner)
-          const { db } = await import('../../db/db');
-          const { songs } = await import('../../db/schema');
-          const { eq } = await import('drizzle-orm');
-
-          const { getSongById } = await import('../../db/queries/songs');
-          const { convertToSongData } = await import('../../utils/convert');
-          const {
-            removeDeletedArtistDataOfSong,
-            removeDeletedAlbumDataOfSong,
-            removeDeletedGenreDataOfSong
-          } = await import('../../removeSongsFromLibrary');
-
-          const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
-          const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
-          const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
-
-          await db.transaction(async (trx) => {
-            for (const snap of updatedSongs) {
-              const prevSongData = await getSongById(snap.songId, trx);
-              if (prevSongData) {
-                const prevSong = convertToSongData(prevSongData);
-                await removeDeletedArtistDataOfSong(prevSong, trx);
-                await removeDeletedAlbumDataOfSong(prevSong, trx);
-                await removeDeletedGenreDataOfSong(prevSong, trx);
-              }
-
-              // 1. Update scalar fields
-              await trx
-                .update(songs)
-                .set({
-                  title: snap.title,
-                  year: snap.year,
-                  trackNumber: snap.trackNumber,
-                  diskNumber: snap.discNumber,
-                  updatedAt: new Date()
-                })
-                .where(eq(songs.id, snap.songId));
-
-              // 2. Update relational metadata
-              if (snap.artist) {
-                await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
-              }
-              if (snap.album) {
-                await manageAlbumsOfParsedSong(
-                  {
-                    songId: snap.songId,
-                    artists: snap.artist ? [snap.artist] : [],
-                    albumArtists: snap.artist ? [snap.artist] : [],
-                    albumName: snap.album,
-                    songYear: snap.year
-                  },
-                  trx
-                );
-              }
-              if (snap.genre) {
-                await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
-              }
+            const prevSongData = await getSongById(snap.songId, trx);
+            if (prevSongData) {
+              const prevSong = convertToSongData(prevSongData);
+              await removeDeletedArtistDataOfSong(prevSong, trx);
+              await removeDeletedAlbumDataOfSong(prevSong, trx);
+              await removeDeletedGenreDataOfSong(prevSong, trx);
             }
-          });
-        }
+
+            // 1. Update scalar fields
+            await trx
+              .update(songs)
+              .set({
+                title: snap.title,
+                year: snap.year,
+                trackNumber: snap.trackNumber,
+                diskNumber: snap.discNumber,
+                updatedAt: new Date()
+              })
+              .where(eq(songs.id, snap.songId));
+
+            // 2. Update relational metadata
+            if (snap.artist) {
+              await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
+            }
+            if (snap.album) {
+              await manageAlbumsOfParsedSong(
+                {
+                  songId: snap.songId,
+                  artists: snap.artist ? [snap.artist] : [],
+                  albumArtists: snap.artist ? [snap.artist] : [],
+                  albumName: snap.album,
+                  songYear: snap.year
+                },
+                trx
+              );
+            }
+            if (snap.genre) {
+              await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
+            }
+          }
+        });
       }
 
       updatedCount = updatedSongs.length;

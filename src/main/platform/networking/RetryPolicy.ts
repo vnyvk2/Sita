@@ -9,6 +9,12 @@ export interface RetryPolicyOptions {
   retryableStatusCodes?: number[];
 }
 
+export const isIdempotentMethod = (method?: string): boolean => {
+  if (!method) return true;
+  const m = method.toUpperCase();
+  return m === 'GET' || m === 'HEAD' || m === 'OPTIONS';
+};
+
 export class RetryPolicy {
   private readonly maxRetries: number;
   private readonly initialDelayMs: number;
@@ -28,7 +34,10 @@ export class RetryPolicy {
     );
   }
 
-  public async execute<T>(fn: (attempt: number) => Promise<T>): Promise<T> {
+  public async execute<T>(
+    fn: (attempt: number) => Promise<T>,
+    options?: { method?: string; allowNonIdempotentRetry?: boolean }
+  ): Promise<T> {
     let attempt = 0;
 
     while (true) {
@@ -36,7 +45,10 @@ export class RetryPolicy {
       try {
         return await fn(attempt);
       } catch (err: unknown) {
-        if (attempt > this.maxRetries || !this.isRetryableError(err)) {
+        if (
+          attempt > this.maxRetries ||
+          !this.isRetryableError(err, options?.method, options?.allowNonIdempotentRetry)
+        ) {
           throw err;
         }
 
@@ -46,7 +58,16 @@ export class RetryPolicy {
     }
   }
 
-  public isRetryableError(err: unknown): boolean {
+  public isRetryableError(
+    err: unknown,
+    method?: string,
+    allowNonIdempotentRetry?: boolean
+  ): boolean {
+    const isIdempotent = isIdempotentMethod(method);
+    if (!isIdempotent && !allowNonIdempotentRetry) {
+      return false;
+    }
+
     if (err instanceof HttpError) {
       return this.retryableStatusCodes.has(err.status);
     }

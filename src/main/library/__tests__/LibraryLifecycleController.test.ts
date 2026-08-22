@@ -843,5 +843,37 @@ describe('LibraryLifecycleController', () => {
       expect(isShutdownComplete).toBe(true);
       expect(controller.areWatchersActive()).toBe(false);
     });
+
+    it('rejects scanNow and does not start scanner when controller is not initialized or post-shutdown', async () => {
+      await controller.shutdown();
+
+      const summary = await controller.scanNow();
+      expect(summary.status).toBe('CANCELLED');
+      expect(mockScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('throws in setScanMode when controller is not initialized or post-shutdown', async () => {
+      await controller.shutdown();
+
+      await expect(controller.setScanMode('manual')).rejects.toThrow(
+        'controller is shutting down'
+      );
+    });
+
+    it('forces stopWatchers when scan mode transition fails and rollback also throws', async () => {
+      await controller.initialize();
+      expect(controller.areWatchersActive()).toBe(true);
+
+      // Force saveUserSettings to throw
+      vi.mocked(saveUserSettings).mockRejectedValueOnce(new Error('DB write failed'));
+      // Force initializePassiveWatchers to throw on rollback
+      vi.mocked(initializePassiveWatchers).mockRejectedValueOnce(new Error('Watcher allocation failed'));
+
+      await expect(controller.setScanMode('manual')).rejects.toThrow('DB write failed');
+
+      // Invariant: Watchers must be forcefully stopped
+      expect(controller.areWatchersActive()).toBe(false);
+      expect(closeAllAbortControllers).toHaveBeenCalled();
+    });
   });
 });

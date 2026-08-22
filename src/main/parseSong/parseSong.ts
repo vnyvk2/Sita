@@ -55,11 +55,19 @@ export const tryToParseSong = (
         pathsQueue.delete(songPath);
         return result;
       } catch (error) {
-        if (errRetryCount < 5) {
-          // THIS ERROR OCCURRED WHEN THE APP STARTS READING DATA WHILE THE SONG IS STILL WRITING TO THE DISK. POSSIBLE SOLUTION IS TO SET A TIMEOUT AND REDO THE PROCESS.
+        const code = (error as any)?.code;
+        const isTransientError =
+          code === 'EBUSY' ||
+          code === 'EAGAIN' ||
+          code === 'EWOULDBLOCK' ||
+          code === 'ETIMEDOUT';
+
+        if (isTransientError && errRetryCount < 5) {
+          // THIS ERROR OCCURRED WHEN THE APP STARTS READING DATA WHILE THE SONG IS STILL WRITING TO THE DISK.
           if (timeOutId) clearTimeout(timeOutId);
-          logger.debug('Failed to parse song data. Retrying in 5 seconds. (error: read error)', {
-            error
+          logger.debug('Failed to parse song data due to transient lock. Retrying in 5 seconds.', {
+            error,
+            songPath
           });
           // Note: using a Promise wrapper to allow the recursive call to return its result
           return new Promise((resolve, reject) => {
@@ -69,8 +77,8 @@ export const tryToParseSong = (
           });
         } else {
           logger.debug(
-            `Failed to parse a newly added song while the app is open. Failed 5 of 5 retry efforts.`,
-            { error }
+            `Failed to parse a song (non-transient error or retries exhausted).`,
+            { error, songPath }
           );
           sendMessageToRenderer({
             messageCode: 'PARSE_FAILED',
