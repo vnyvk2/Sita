@@ -38,3 +38,5 @@ old_miniplayer.txt
 diff_output*.txt
 electron.vite.config.*.mjs
 *.zip
+memory_report_*.json
+
