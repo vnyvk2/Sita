@@ -3,6 +3,7 @@ export type SmartPlaylistField =
   | 'artist'
   | 'album'
   | 'genre'
+  | 'language'
   | 'year'
   | 'duration'
   | 'playCount'

@@ -166,7 +166,7 @@ describe('reParseSong', () => {
         { id: 76, path: '/artwork/full.webp', isOptimized: false },
         { id: 77, path: '/artwork/thumb.webp', isOptimized: true }
       ] as any,
-      payloads: null
+      payloads: undefined
     });
 
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
@@ -182,6 +182,46 @@ describe('reParseSong', () => {
         artworkPath: '/artwork/thumb.webp',
         id: 'palette_77'
       })
+    );
+  });
+
+  it('preserves user manual language override during reparse', async () => {
+    vi.mocked(getSongByPath).mockResolvedValue({
+      id: 42,
+      path: '/music/Telugu/reparse.mp3',
+      title: 'Updated Title',
+      duration: '200',
+      artists: [],
+      albums: [],
+      genres: [],
+      artworks: []
+    } as any);
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    const mockTrx = {
+      query: {
+        metadataOverrides: {
+          findFirst: vi.fn().mockResolvedValue({ stringValue: 'Tamil' })
+        }
+      }
+    };
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback(mockTrx);
+    });
+
+    await reParseSong('/music/Telugu/reparse.mp3');
+
+    expect(updateSongByPath).toHaveBeenCalledWith(
+      '/music/Telugu/reparse.mp3',
+      expect.objectContaining({
+        language: 'Tamil'
+      }),
+      mockTrx
     );
   });
 });

@@ -7,6 +7,7 @@ import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
+import { type DropdownOption } from '@renderer/components/Dropdown';
 import {
   canReorder,
   isPersistentPlaylistOrder,
@@ -29,10 +30,10 @@ import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
-import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SensitiveActionConfirmPrompt = lazy(
@@ -72,13 +73,14 @@ function PlaylistInfoPage() {
   const {
     sortingOrder = playlistSortingState || 'customOrder',
     filteringOrder = 'notSelected',
+    language = 'all',
     keyword
   } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
 
   const scrollKey = useMemo(
-    () => `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${keyword || ''}`,
-    [playlistId, sortingOrder, filteringOrder, keyword]
+    () => `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
+    [playlistId, sortingOrder, filteringOrder, language, keyword]
   );
 
   useEffect(() => {
@@ -140,6 +142,31 @@ function PlaylistInfoPage() {
     });
   }, [collectionEntries, rawPlaylistSongs, sortingOrder]);
 
+  const availableLanguages = useMemo(() => {
+    if (!playlistSongs || playlistSongs.length === 0) return [];
+    const langs = new Set<string>();
+    for (const song of playlistSongs) {
+      if (song.language && song.language.trim() !== '') {
+        langs.add(song.language.trim());
+      }
+    }
+    return Array.from(langs).sort();
+  }, [playlistSongs]);
+
+  const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allLanguages', 'All Languages'), value: 'all' },
+      { label: t('common.unspecifiedLanguage', 'Unspecified'), value: 'unspecified' }
+    ];
+    if (availableLanguages.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const lang of availableLanguages) {
+        options.push({ label: lang, value: lang });
+      }
+    }
+    return options;
+  }, [availableLanguages, t]);
+
   const search = usePageSearch({
     keyword,
     updateSearch: (val) =>
@@ -150,11 +177,22 @@ function PlaylistInfoPage() {
   });
 
   const filteredSongs = useMemo(() => {
+    let result = playlistSongs;
+
+    if (language && language !== 'all') {
+      result = result.filter((song) => {
+        if (language === 'unspecified') {
+          return !song.language || song.language.trim() === '';
+        }
+        return song.language?.toLowerCase() === language.toLowerCase();
+      });
+    }
+
     const q = keyword?.trim();
-    if (!q) return playlistSongs;
+    if (!q) return result;
     const lowerQ = q.toLowerCase();
 
-    return playlistSongs.filter((song) => {
+    return result.filter((song) => {
       const titleMatch = song.title?.toLowerCase().includes(lowerQ);
       const artistsStr =
         song.artists
@@ -171,7 +209,7 @@ function PlaylistInfoPage() {
       const genreMatch = genresStr.includes(lowerQ);
       return titleMatch || artistMatch || albumMatch || genreMatch;
     });
-  }, [playlistSongs, keyword]);
+  }, [playlistSongs, keyword, language]);
 
   useEffect(() => {
     console.log(
@@ -492,13 +530,17 @@ function PlaylistInfoPage() {
         } else if (e.ctrlKey && e.key === 'z') {
           e.preventDefault();
           if (e.shiftKey) {
-            CollectionClient.redo(`local://playlist/${playlistId}`).then(() => {
-              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
-            });
+            CollectionClient.redo(`local://playlist/${playlistId}`)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+              })
+              .catch((err) => console.error(err));
           } else {
-            CollectionClient.undo(`local://playlist/${playlistId}`).then(() => {
-              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
-            });
+            CollectionClient.undo(`local://playlist/${playlistId}`)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+              })
+              .catch((err) => console.error(err));
           }
         } else if (
           canReorder(sortingOrder) &&
@@ -578,6 +620,22 @@ function PlaylistInfoPage() {
           }
         ]}
         dropdowns={[
+          {
+            name: 'playlistPageLanguageDropdown',
+            type: `${t('common.language', 'Language')} :`,
+            value: language,
+            options: languageDropdownOptions,
+            onChange: (e) => {
+              const val = e.currentTarget.value;
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  language: val === 'all' ? undefined : val
+                })
+              });
+            },
+            isDisabled: !(playlistData.itemCount > 0)
+          },
           {
             name: 'songsPageFilterDropdown',
             type: `${t('common.filterBy')} :`,

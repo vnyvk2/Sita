@@ -1,3 +1,4 @@
+import { type DropdownOption } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
@@ -59,10 +60,13 @@ function FavoritesPlaylistInfoPage() {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { updateQueueData, addNewNotifications, createQueue } = useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState } = Route.useSearch();
+  const { sortingOrder = playlistSortingState, language = 'all' } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/favorites' });
 
-  const scrollKey = useMemo(() => `favorites-playlist:${sortingOrder}`, [sortingOrder]);
+  const scrollKey = useMemo(
+    () => `favorites-playlist:${sortingOrder}:${language || 'all'}`,
+    [sortingOrder, language]
+  );
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
@@ -73,21 +77,56 @@ function FavoritesPlaylistInfoPage() {
     select: (data) => data.data
   });
 
-  const selectAllHandler = useSelectAllHandler(favoriteSongs, 'songs', 'songId');
+  const availableLanguages = useMemo(() => {
+    if (!favoriteSongs || favoriteSongs.length === 0) return [];
+    const langs = new Set<string>();
+    for (const song of favoriteSongs) {
+      if (song.language && song.language.trim() !== '') {
+        langs.add(song.language.trim());
+      }
+    }
+    return Array.from(langs).sort();
+  }, [favoriteSongs]);
+
+  const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allLanguages', 'All Languages'), value: 'all' },
+      { label: t('common.unspecifiedLanguage', 'Unspecified'), value: 'unspecified' }
+    ];
+    if (availableLanguages.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const lang of availableLanguages) {
+        options.push({ label: lang, value: lang });
+      }
+    }
+    return options;
+  }, [availableLanguages, t]);
+
+  const filteredSongs = useMemo(() => {
+    if (!language || language === 'all') return favoriteSongs;
+    return favoriteSongs.filter((song) => {
+      if (language === 'unspecified') {
+        return !song.language || song.language.trim() === '';
+      }
+      return song.language?.toLowerCase() === language.toLowerCase();
+    });
+  }, [favoriteSongs, language]);
+
+  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = favoriteSongs
+      const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(queueSongIds, 'favorites', false, '', false, t('common.favorites', 'Favorites'));
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, t, favoriteSongs]
+    [createQueue, updateQueueData, t, filteredSongs]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = favoriteSongs
+    const validSongIds = filteredSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
     getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
@@ -102,32 +141,32 @@ function FavoritesPlaylistInfoPage() {
     ]);
   }, [
     addNewNotifications,
-    favoriteSongs,
+    filteredSongs,
     t
   ]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        favoriteSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'favorites',
         true,
         '',
         true
       ),
-    [createQueue, favoriteSongs]
+    [createQueue, filteredSongs]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        favoriteSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'favorites',
         false,
         '',
         true
       ),
-    [createQueue, favoriteSongs]
+    [createQueue, filteredSongs]
   );
 
   const importSongsToFavorites = useCallback(() => {
@@ -182,6 +221,23 @@ function FavoritesPlaylistInfoPage() {
         ]}
         dropdowns={[
           {
+            name: 'favoritesLanguageDropdown',
+            type: `${t('common.language', 'Language')} :`,
+            value: language,
+            options: languageDropdownOptions,
+            onChange: (e) => {
+              const val = e.currentTarget.value;
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  language: val === 'all' ? undefined : val
+                }),
+                replace: true
+              });
+            },
+            isDisabled: !(favoriteSongs.length > 0)
+          },
+          {
             name: 'PlaylistPageSortDropdown',
             type: `${t('common.sortBy')} :`,
             value: sortingOrder,
@@ -195,14 +251,14 @@ function FavoritesPlaylistInfoPage() {
         ]}
       />
       <VirtualizedList
-        data={favoriteSongs}
+        data={filteredSongs}
         fixedItemHeight={60}
         scrollKey={scrollKey}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto(playlistData)}
-              songs={favoriteSongs}
+              songs={filteredSongs}
             />
           )
         }}
@@ -220,7 +276,7 @@ function FavoritesPlaylistInfoPage() {
           );
         }}
       />
-      {favoriteSongs.length === 0 && (
+      {filteredSongs.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}

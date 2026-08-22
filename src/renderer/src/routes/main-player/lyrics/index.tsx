@@ -3,6 +3,7 @@ import Button from '@renderer/components/Button';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import LyricsMetadata from '@renderer/components/LyricsPage/LyricsMetadata';
 import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
+import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import TheatreLyricsView from '@renderer/components/LyricsPage/TheatreLyricsView';
 import MainContainer from '@renderer/components/MainContainer';
@@ -146,9 +147,17 @@ function LyricsPage() {
   //   preferences.autoConvertLyrics
   // ]);
 
+  const activeLineIndex = useActiveLyricIndex(lyrics);
+
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, isAutoScrolling, 'normal');
-  }, [currentSongData.duration, isAutoScrolling, lyrics]);
+    return renderLyricsLines(
+      lyrics,
+      currentSongData.duration,
+      isAutoScrolling,
+      'normal',
+      activeLineIndex
+    );
+  }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex]);
 
   // const showOnlineLyrics = useCallback(
   //   (

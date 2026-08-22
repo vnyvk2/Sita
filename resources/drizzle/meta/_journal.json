@@ -148,6 +148,13 @@
       "when": 1786600000000,
       "tag": "0020_add_spotify_playlist_links",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786700000000,
+      "tag": "0021_add_language_to_songs",
+      "breakpoints": true
     }
   ]
 }

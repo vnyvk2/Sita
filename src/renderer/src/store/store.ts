@@ -1,5 +1,4 @@
 import { Store } from '@tanstack/store';
-import { cloneDeep } from 'es-toolkit/object';
 
 import {
   type AppReducer,
@@ -8,7 +7,6 @@ import {
   reducer as appReducer
 } from '../other/appReducer';
 import storage from '../utils/localStorage';
-// import hasDataChanged from '../utils/hasDataChanged';
 
 storage.checkLocalStorage();
 export const store = new Store(DEFAULT_REDUCER_DATA);
@@ -51,14 +49,5 @@ store.subscribe((state) => {
   }
 
   storage.setLocalStorage(currentState.localStorage);
-
-  // const modified = hasDataChanged(state.prevVal, state.currentVal);
-  // const onlyModified = Object.groupBy(
-  //   Object.entries(modified),
-  //   ([, value]) => `${value.isModified}`
-  // );
-
-  if (window.api.properties.isInDevelopment) {
-    console.debug('store state changed:', cloneDeep(currentState));
-  }
 });
+

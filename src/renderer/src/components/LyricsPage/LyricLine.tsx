@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { SYNCED_LYRICS_REGEX } from '@common/isLyricsSynced';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import roundTo from '../../../../common/roundTo';
@@ -14,12 +14,11 @@ interface LyricProp {
   translatedLyricLines?: TranslatedLyricLine[];
   convertedLyric?: string | SyncedLyricsLineWord[];
   index: number;
+  isActive?: boolean;
   syncedLyrics?: { start: number; end: number };
   isAutoScrolling?: boolean;
   playerType?: PlayerTypes | 'drawer';
 }
-
-// const syncedLyricsRegex = /^\[\d+:\d{1,2}\.\d{1,3}]/gm;
 
 const lyricsScrollIntoViewEvent = new CustomEvent('lyrics/scrollIntoView', {
   detail: 'scrollingUsingScrollIntoView'
@@ -34,14 +33,12 @@ const getLyricText = (lyrics: string) => {
 };
 
 const LyricLine = (props: LyricProp) => {
-  // const preferences = useStore(store, (state) => state.localStorage.preferences);
-
   const { updateSongPosition, updateContextMenuData } = useContext(AppUpdateContext);
-  const [isInRange, setIsInRange] = useState(false);
   const { t } = useTranslation();
 
-  const lyricsRef = useRef(null as HTMLDivElement | null);
-  const isTheCurrnetLineRef = useRef(false);
+  const lyricsRef = useRef<HTMLDivElement | null>(null);
+  const prevIsActiveRef = useRef(false);
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   const {
     index,
@@ -49,63 +46,74 @@ const LyricLine = (props: LyricProp) => {
     translatedLyricLines = [],
     convertedLyric,
     syncedLyrics,
+    isActive = false,
     isAutoScrolling = true,
     playerType = 'normal'
   } = props;
 
-  const handleLyricsActivity = useCallback(
-    (e: Event) => {
-      if ('detail' in e && !Number.isNaN(e.detail)) {
-        const songPosition = e.detail as number;
+  // Auto-scroll only when this line becomes active
+  useEffect(() => {
+    if (isActive && !prevIsActiveRef.current) {
+      if (isAutoScrolling && lyricsRef.current) {
+        lyricsRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+      document.dispatchEvent(lyricsScrollIntoViewEvent);
+    }
+    prevIsActiveRef.current = isActive;
+  }, [isActive, isAutoScrolling]);
 
-        if (lyricsRef.current && syncedLyrics) {
-          const { start, end } = syncedLyrics;
-          if (songPosition > start && songPosition < end) {
-            if (!isTheCurrnetLineRef.current) {
-              isTheCurrnetLineRef.current = true;
-              setIsInRange(true);
-              if (isAutoScrolling)
-                lyricsRef.current?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center'
-                });
+  // Word-level active tracking: ONLY when this line is active AND has word-level timestamps
+  useEffect(() => {
+    if (!isActive) {
+      setActiveWordIndex(null);
+      return undefined;
+    }
 
-              document.dispatchEvent(lyricsScrollIntoViewEvent);
-            }
-          } else {
-            isTheCurrnetLineRef.current = false;
-            setIsInRange(false);
+    const wordArrays = [lyric, translatedLyricLines[0]?.text, convertedLyric].filter(
+      (l): l is SyncedLyricsLineWord[] => Array.isArray(l)
+    );
+
+    if (wordArrays.length === 0) {
+      return undefined;
+    }
+
+    const handlePosition = (e: Event) => {
+      if ('detail' in e && typeof e.detail === 'number') {
+        const pos = e.detail;
+        const primaryWords = wordArrays[0];
+        let foundIdx: number | null = null;
+        for (let i = 0; i < primaryWords.length; i += 1) {
+          if (pos >= primaryWords[i].start && pos < primaryWords[i].end) {
+            foundIdx = i;
+            break;
           }
         }
+        setActiveWordIndex((prev) => (prev !== foundIdx ? foundIdx : prev));
       }
-    },
-    [isAutoScrolling, syncedLyrics]
-  );
+    };
 
-  useEffect(() => {
-    document.addEventListener('player/positionChange', handleLyricsActivity);
-
-    return () => document.removeEventListener('player/positionChange', handleLyricsActivity);
-  }, [handleLyricsActivity]);
+    document.addEventListener('player/positionChange', handlePosition);
+    return () => document.removeEventListener('player/positionChange', handlePosition);
+  }, [isActive, lyric, translatedLyricLines, convertedLyric]);
 
   const lyricString = useMemo(() => {
     if (typeof lyric === 'string') return getLyricText(lyric);
 
-    const extendedLyricLines = lyric.map((extendedText, i) => {
-      return (
-        <EnhancedSyncedLyricWord
-          key={i}
-          isActive={isInRange}
-          start={extendedText.start}
-          end={extendedText.end}
-          text={extendedText.text}
-          delay={0}
-        />
-      );
-    });
-
-    return extendedLyricLines;
-  }, [isInRange, lyric]);
+    return lyric.map((extendedText, i) => (
+      <EnhancedSyncedLyricWord
+        key={i}
+        isActive={isActive}
+        isHighlighted={activeWordIndex === i}
+        start={extendedText.start}
+        end={extendedText.end}
+        text={extendedText.text}
+        delay={0}
+      />
+    ));
+  }, [isActive, activeWordIndex, lyric]);
 
   const translatedLyricString = useMemo(() => {
     if (translatedLyricLines.length === 0) return undefined;
@@ -113,45 +121,38 @@ const LyricLine = (props: LyricProp) => {
     const translatedLyric = translatedLyricLines[0].text;
     if (typeof translatedLyric === 'string') return getLyricText(translatedLyric);
 
-    const extendedLyricLines = translatedLyric.map((extendedText, i) => {
-      return (
-        <EnhancedSyncedLyricWord
-          key={i}
-          isActive={isInRange}
-          start={extendedText.start}
-          end={extendedText.end}
-          text={extendedText.text}
-          delay={0}
-        />
-      );
-    });
-
-    return extendedLyricLines;
-  }, [isInRange, translatedLyricLines]);
+    return translatedLyric.map((extendedText, i) => (
+      <EnhancedSyncedLyricWord
+        key={i}
+        isActive={isActive}
+        isHighlighted={activeWordIndex === i}
+        start={extendedText.start}
+        end={extendedText.end}
+        text={extendedText.text}
+        delay={0}
+      />
+    ));
+  }, [isActive, activeWordIndex, translatedLyricLines]);
 
   const convertedLyricString = useMemo(() => {
     if (!convertedLyric || convertedLyric.length === 0) return undefined;
     if (typeof convertedLyric === 'string') return getLyricText(convertedLyric);
 
-    const extendedLyricLines = convertedLyric.map((extendedText, i) => {
-      return (
-        <EnhancedSyncedLyricWord
-          key={i}
-          isActive={isInRange}
-          start={extendedText.start}
-          end={extendedText.end}
-          text={extendedText.text}
-          delay={0}
-        />
-      );
-    });
-
-    return extendedLyricLines;
-  }, [isInRange, convertedLyric]);
+    return convertedLyric.map((extendedText, i) => (
+      <EnhancedSyncedLyricWord
+        key={i}
+        isActive={isActive}
+        isHighlighted={activeWordIndex === i}
+        start={extendedText.start}
+        end={extendedText.end}
+        text={extendedText.text}
+        delay={0}
+      />
+    ));
+  }, [isActive, activeWordIndex, convertedLyric]);
 
   const lyricStringLinePrimary = translatedLyricString ?? convertedLyricString ?? lyricString;
   let lyricStringLineSecondaryUpper;
-  // if (!preferences.compactLyrics && translatedLyricString)
   if (translatedLyricString) lyricStringLineSecondaryUpper = convertedLyricString ?? lyricString;
 
   return (
@@ -170,7 +171,7 @@ const LyricLine = (props: LyricProp) => {
       className={`highlight text-font-color-black/20 dark:text-font-color-white/20 z-0 mb-5 flex w-fit flex-col items-center justify-center text-center text-5xl font-medium text-balance transition-[transform,translate,scale,color,filter] duration-250 select-none first:mt-8 last:mb-4 empty:mb-16 ${
         syncedLyrics
           ? `cursor-pointer blur-[1px] ${
-              isInRange
+              isActive
                 ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! [&>div>span]:mr-3!'
                 : 'scale-75!'
             }`
@@ -219,7 +220,7 @@ const LyricLine = (props: LyricProp) => {
           } ${
             playerType === 'drawer'
               ? 'text-xs!'
-              : syncedLyrics && isInRange
+              : syncedLyrics && isActive
                 ? 'text-font-color-black/50! dark:text-font-color-white/50! text-xl!'
                 : 'text-xl!'
           }`}
@@ -234,9 +235,11 @@ const LyricLine = (props: LyricProp) => {
       >
         {lyricStringLinePrimary}
       </div>
-      {syncedLyrics && isInRange && <LyricsProgressBar delay={0} syncedLyrics={syncedLyrics} />}
+      {syncedLyrics && isActive && <LyricsProgressBar delay={0} syncedLyrics={syncedLyrics} />}
     </div>
   );
 };
 
-export default LyricLine;
+LyricLine.displayName = 'LyricLine';
+
+export default memo(LyricLine);

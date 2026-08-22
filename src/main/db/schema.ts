@@ -163,6 +163,7 @@ export const songs = pgTable(
     fileModifiedAt: timestamp('file_modified_at', { withTimezone: false }).notNull(),
     musicBrainzRecordingId: text('music_brainz_recording_id'),
     isrc: text('isrc'),
+    language: varchar('language', { length: 64 }),
     createdAt: timestamp('created_at', { withTimezone: false }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: false }).notNull().defaultNow()
   },
@@ -177,6 +178,7 @@ export const songs = pgTable(
     index('idx_songs_track_number').on(t.trackNumber.asc()),
     index('idx_songs_music_brainz_recording_id').on(t.musicBrainzRecordingId),
     index('idx_songs_isrc').on(t.isrc),
+    index('idx_songs_language').on(t.language.asc()),
     index('idx_songs_created_at').on(t.createdAt.desc()),
     index('idx_songs_file_modified_at').on(t.fileModifiedAt.desc()),
     index('idx_songs_folder_id').on(t.folderId),

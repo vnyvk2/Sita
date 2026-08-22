@@ -108,6 +108,7 @@
     "db:seed": "drizzle-kit seed",
     "db:drop": "node ./scripts/dropDatabase.ts",
     "logs": "node ./scripts/colorize-logs.ts --use-env-log-path",
+    "memory:monitor": "powershell -ExecutionPolicy Bypass -File ./scripts/monitor-memory.ps1",
     "renderer:generate-routes": "tsr generate",
     "renderer:watch-routes": "tsr watch",
     "preversion": "npm test",

@@ -162,8 +162,6 @@ export const getAllSongs = async (
 
   const timer = timeStart();
   const CHUNK_SIZE = 500;
-  type SongQueryResult = Awaited<ReturnType<typeof trx.query.songs.findMany>>;
-  let songsData: SongQueryResult = [];
 
   const relationsConfig = {
     artists: {
@@ -208,6 +206,15 @@ export const getAllSongs = async (
       }
     }
   } as const;
+
+  type SongQueryResult = Awaited<
+    ReturnType<
+      typeof trx.query.songs.findMany<{
+        with: typeof relationsConfig;
+      }>
+    >
+  >;
+  let songsData: SongQueryResult = [];
 
   if (songIds && songIds.length > CHUNK_SIZE) {
     const uniqueSongIds = Array.from(new Set(songIds));

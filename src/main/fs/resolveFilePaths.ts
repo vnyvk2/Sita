@@ -80,7 +80,7 @@ export const getSongArtworkPath = (
 };
 
 export const parseSongArtworks = (
-  artworks: (typeof artworksSchema.$inferSelect)[],
+  artworks: { path: string; isOptimized?: boolean }[],
   resetCache = false,
   sendRealPath = false
 ): ArtworkPaths => {

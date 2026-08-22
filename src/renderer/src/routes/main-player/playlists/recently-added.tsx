@@ -1,5 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
-import type { DropdownProp } from '@renderer/components/Dropdown';
+import type { DropdownOption, DropdownProp } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
@@ -42,7 +42,7 @@ const playlistData: Playlist = {
 };
 
 function RecentlyAddedPlaylistInfoPage() {
-  const { period: searchPeriod } = Route.useSearch();
+  const { period: searchPeriod, language = 'all' } = Route.useSearch();
 
   const playlistSortingState = useStore(
     store,
@@ -63,8 +63,8 @@ function RecentlyAddedPlaylistInfoPage() {
   const period = (searchPeriod as RecentlyAddedPeriod) || storedPeriod;
 
   const scrollKey = useMemo(
-    () => `recently-added-playlist:${sortingOrder}:${period}`,
-    [sortingOrder, period]
+    () => `recently-added-playlist:${sortingOrder}:${period}:${language || 'all'}`,
+    [sortingOrder, period, language]
   );
 
   useEffect(() => {
@@ -76,11 +76,46 @@ function RecentlyAddedPlaylistInfoPage() {
     select: (data) => data.data
   });
 
-  const selectAllHandler = useSelectAllHandler(recentlyAddedSongs, 'songs', 'songId');
+  const availableLanguages = useMemo(() => {
+    if (!recentlyAddedSongs || recentlyAddedSongs.length === 0) return [];
+    const langs = new Set<string>();
+    for (const song of recentlyAddedSongs) {
+      if (song.language && song.language.trim() !== '') {
+        langs.add(song.language.trim());
+      }
+    }
+    return Array.from(langs).sort();
+  }, [recentlyAddedSongs]);
+
+  const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
+    const options: DropdownOption<string>[] = [
+      { label: t('common.allLanguages', 'All Languages'), value: 'all' },
+      { label: t('common.unspecifiedLanguage', 'Unspecified'), value: 'unspecified' }
+    ];
+    if (availableLanguages.length > 0) {
+      options.push({ label: '', value: 'divider', isDivider: true });
+      for (const lang of availableLanguages) {
+        options.push({ label: lang, value: lang });
+      }
+    }
+    return options;
+  }, [availableLanguages, t]);
+
+  const filteredSongs = useMemo(() => {
+    if (!language || language === 'all') return recentlyAddedSongs;
+    return recentlyAddedSongs.filter((song) => {
+      if (language === 'unspecified') {
+        return !song.language || song.language.trim() === '';
+      }
+      return song.language?.toLowerCase() === language.toLowerCase();
+    });
+  }, [recentlyAddedSongs, language]);
+
+  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = recentlyAddedSongs
+      const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
       createQueue(
@@ -93,11 +128,11 @@ function RecentlyAddedPlaylistInfoPage() {
       );
       updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, recentlyAddedSongs, t]
+    [createQueue, updateQueueData, filteredSongs, t]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = recentlyAddedSongs
+    const validSongIds = filteredSongs
       .filter((song) => !song.isBlacklisted)
       .map((song) => song.songId);
     getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
@@ -112,42 +147,58 @@ function RecentlyAddedPlaylistInfoPage() {
     ]);
   }, [
     addNewNotifications,
-    recentlyAddedSongs,
+    filteredSongs,
     t
   ]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        recentlyAddedSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'recentlyAdded',
         true,
         'recentlyAdded',
         true
       ),
-    [createQueue, recentlyAddedSongs]
+    [createQueue, filteredSongs]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        recentlyAddedSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
         'recentlyAdded',
         false,
         'recentlyAdded',
         true
       ),
-    [createQueue, recentlyAddedSongs]
+    [createQueue, filteredSongs]
   );
 
   const createPlaylistFromRecentlyAdded = useCallback(() => {
-    if (recentlyAddedSongs.length === 0) return;
-    const songIds = recentlyAddedSongs.map((song) => song.songId);
+    if (filteredSongs.length === 0) return;
+    const songIds = filteredSongs.map((song) => song.songId);
     changePromptMenuData(true, <NewPlaylistPrompt songIds={songIds} />);
-  }, [changePromptMenuData, recentlyAddedSongs]);
+  }, [changePromptMenuData, filteredSongs]);
 
   const dropdowns = useMemo(() => {
     const list: DropdownProp<string>[] = [
+      {
+        name: 'recentlyAddedLanguageDropdown',
+        type: `${t('common.language', 'Language')} :`,
+        value: language,
+        options: languageDropdownOptions,
+        onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+          const val = e.currentTarget.value;
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              language: val === 'all' ? undefined : val
+            }),
+            replace: true
+          });
+        }
+      },
       {
         name: 'RecentlyAddedPeriodDropdown',
         type: `${t('playlistsPage.period', 'Period')} :`,
@@ -181,7 +232,7 @@ function RecentlyAddedPlaylistInfoPage() {
     ];
 
     return list;
-  }, [navigate, period, sortingOrder, t]);
+  }, [language, languageDropdownOptions, navigate, period, sortingOrder, t]);
 
   return (
     <MainContainer
@@ -226,7 +277,7 @@ function RecentlyAddedPlaylistInfoPage() {
         dropdowns={dropdowns}
       />
       <VirtualizedList
-        data={recentlyAddedSongs}
+        data={filteredSongs}
         fixedItemHeight={60}
         scrollKey={scrollKey}
         components={{
@@ -236,7 +287,7 @@ function RecentlyAddedPlaylistInfoPage() {
                 ...mapLegacyPlaylistToDto(playlistData),
                 name: t('common.recentlyAdded', 'Recently Added')
               }}
-              songs={recentlyAddedSongs}
+              songs={filteredSongs}
             />
           )
         }}
@@ -254,7 +305,7 @@ function RecentlyAddedPlaylistInfoPage() {
           );
         }}
       />
-      {recentlyAddedSongs.length === 0 && (
+      {filteredSongs.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}

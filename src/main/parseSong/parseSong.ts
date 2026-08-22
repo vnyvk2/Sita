@@ -11,6 +11,7 @@ import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
 import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
 import { extractFrontCover } from '../utils/extractFrontCover';
+import { detectSongLanguage } from './detectLanguage';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -153,7 +154,12 @@ export const parseSong = async (
         artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
         albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
         albumData = getAlbumInfoFromSong(metadata.album);
-        genresData = getGenreInfoFromSong(metadata.genres);
+        const detectedLanguage = detectSongLanguage(
+          metadata,
+          absoluteFilePath,
+          songTitle,
+          artistsData
+        );
 
         songInfo = {
           title: songTitle,
@@ -167,6 +173,7 @@ export const parseSong = async (
           trackNumber: metadata.track ?? undefined,
           musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
           isrc: metadata.isrc || undefined,
+          language: detectedLanguage,
           fileCreatedAt: stats ? stats.birthtime : new Date(),
           fileModifiedAt: stats ? stats.mtime : new Date(),
           folderId

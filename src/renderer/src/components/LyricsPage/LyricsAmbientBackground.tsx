@@ -11,12 +11,6 @@ interface LyricsAmbientBackgroundProps {
   className?: string;
 }
 
-const getLuminance = (rgb?: [number, number, number] | number[]): number => {
-  if (!rgb || rgb.length < 3) return 0.5;
-  const [r, g, b] = rgb;
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-};
-
 const LyricsAmbientBackground = ({
   artworkPath,
   paletteData,
@@ -73,12 +67,12 @@ const LyricsAmbientBackground = ({
     return undefined;
   }, [artworkPath]);
 
-  // Compute palette-based adaptive darkness
+  // Compute palette-based adaptive darkness using swatch HSL lightness
   const luminance = useMemo(() => {
-    if (paletteData?.Vibrant?.rgb) return getLuminance(paletteData.Vibrant.rgb);
-    if (paletteData?.LightVibrant?.rgb) return getLuminance(paletteData.LightVibrant.rgb);
-    if (paletteData?.DarkVibrant?.rgb) return getLuminance(paletteData.DarkVibrant.rgb);
-    if (paletteData?.Muted?.rgb) return getLuminance(paletteData.Muted.rgb);
+    if (paletteData?.Vibrant?.hsl) return paletteData.Vibrant.hsl[2];
+    if (paletteData?.LightVibrant?.hsl) return paletteData.LightVibrant.hsl[2];
+    if (paletteData?.DarkVibrant?.hsl) return paletteData.DarkVibrant.hsl[2];
+    if (paletteData?.Muted?.hsl) return paletteData.Muted.hsl[2];
     return 0.5;
   }, [paletteData]);
 
