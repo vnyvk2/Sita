@@ -1,5 +1,6 @@
 import { Store } from '@tanstack/store';
 import { cloneDeep } from 'es-toolkit/object';
+import { MEMORY_EXPERIMENTS } from '@renderer/utils/debug/memoryExperiments';
 
 import {
   type AppReducer,
@@ -58,7 +59,7 @@ store.subscribe((state) => {
   //   ([, value]) => `${value.isModified}`
   // );
 
-  if (window.api.properties.isInDevelopment) {
+  if (window.api.properties.isInDevelopment && !MEMORY_EXPERIMENTS.DISABLE_STORE_CLONE_LOGGING) {
     console.debug('store state changed:', cloneDeep(currentState));
   }
 });

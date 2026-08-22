@@ -3,6 +3,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { MEMORY_EXPERIMENTS } from '@renderer/utils/debug/memoryExperiments';
 
 type Props = {
   isActive: boolean;
@@ -29,7 +30,7 @@ const EnhancedSyncedLyricWord = (props: Props) => {
   );
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !MEMORY_EXPERIMENTS.DISABLE_LYRICS_POSITION_LISTENERS) {
       document.addEventListener('player/positionChange', handleSongPositionChange);
     } else {
       document.removeEventListener('player/positionChange', handleSongPositionChange);

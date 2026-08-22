@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import roundTo from '../../../../common/roundTo';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { MEMORY_EXPERIMENTS } from '@renderer/utils/debug/memoryExperiments';
 import EnhancedSyncedLyricWord from '../LyricsEditingPage/EnhancedSyncedLyricWord';
 import LyricsProgressBar from './LyricsProgressBar';
 
@@ -83,9 +84,11 @@ const LyricLine = (props: LyricProp) => {
   );
 
   useEffect(() => {
-    document.addEventListener('player/positionChange', handleLyricsActivity);
+    if (!MEMORY_EXPERIMENTS.DISABLE_LYRICS_POSITION_LISTENERS) {
+      document.addEventListener('player/positionChange', handleLyricsActivity);
 
-    return () => document.removeEventListener('player/positionChange', handleLyricsActivity);
+      return () => document.removeEventListener('player/positionChange', handleLyricsActivity);
+    }
   }, [handleLyricsActivity]);
 
   const lyricString = useMemo(() => {

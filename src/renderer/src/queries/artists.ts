@@ -1,4 +1,5 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { MEMORY_EXPERIMENTS } from '@renderer/utils/debug/memoryExperiments';
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const artistQuery = createQueryKeys('artists', {
@@ -50,7 +51,12 @@ export const artistQuery = createQueryKeys('artists', {
   fetchOnlineInfo: (data: { artistId: number }) => {
     return {
       queryKey: [data.artistId],
-      queryFn: async () => (await window.api.artistsData.getArtistArtworks(data.artistId)) ?? null
+      queryFn: async () => {
+        if (MEMORY_EXPERIMENTS.SUPPRESS_LASTFM_ERRORS) {
+          return null;
+        }
+        return (await window.api.artistsData.getArtistArtworks(data.artistId)) ?? null;
+      }
     };
   }
 });
