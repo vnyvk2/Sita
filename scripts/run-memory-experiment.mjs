@@ -42,25 +42,42 @@ export const RUN_CONFIGS = {
     name: 'Run 5: Combined Validation (A + B + C) (DevTools Open)',
     flags: { DISABLE_STORE_CLONE_LOGGING: true, DISABLE_AMBIENT_BACKGROUND: true, DISABLE_LYRICS_POSITION_LISTENERS: true, SUPPRESS_LASTFM_ERRORS: false },
     devtoolsClosed: false
+  },
+  'permanent': {
+    name: 'Run Permanent: Production Fixes Applied (DevTools OPEN)',
+    flags: {},
+    devtoolsClosed: false
+  },
+  'permanent_closed': {
+    name: 'Run Permanent: Production Fixes Applied (DevTools CLOSED)',
+    flags: {},
+    devtoolsClosed: true
   }
 };
 
 export function writeFlags(flags) {
+  if (!flags || Object.keys(flags).length === 0) return;
+  if (!fs.existsSync(path.dirname(flagsFilePath))) {
+    fs.mkdirSync(path.dirname(flagsFilePath), { recursive: true });
+  }
+  if (!fs.existsSync(flagsFilePath) && (!flags || Object.keys(flags).length === 0)) return;
   const content = `export const MEMORY_EXPERIMENTS = {
   // Test A: Disable cloneDeep(currentState) in store.subscribe
-  DISABLE_STORE_CLONE_LOGGING: ${flags.DISABLE_STORE_CLONE_LOGGING},
+  DISABLE_STORE_CLONE_LOGGING: ${flags.DISABLE_STORE_CLONE_LOGGING ?? false},
 
   // Test B: Disable LyricsAmbientBackground component entirely (render null)
-  DISABLE_AMBIENT_BACKGROUND: ${flags.DISABLE_AMBIENT_BACKGROUND},
+  DISABLE_AMBIENT_BACKGROUND: ${flags.DISABLE_AMBIENT_BACKGROUND ?? false},
 
   // Test C: Disable per-line and per-word 10Hz positionChange listeners entirely
-  DISABLE_LYRICS_POSITION_LISTENERS: ${flags.DISABLE_LYRICS_POSITION_LISTENERS},
+  DISABLE_LYRICS_POSITION_LISTENERS: ${flags.DISABLE_LYRICS_POSITION_LISTENERS ?? false},
 
   // Test D: Suppress Last.fm online queries in dev mode
-  SUPPRESS_LASTFM_ERRORS: ${flags.SUPPRESS_LASTFM_ERRORS},
+  SUPPRESS_LASTFM_ERRORS: ${flags.SUPPRESS_LASTFM_ERRORS ?? false},
 };
 `;
-  fs.writeFileSync(flagsFilePath, content, 'utf8');
+  if (fs.existsSync(flagsFilePath) || (flags && Object.keys(flags).length > 0 && flags.DISABLE_STORE_CLONE_LOGGING !== undefined)) {
+    fs.writeFileSync(flagsFilePath, content, 'utf8');
+  }
 }
 
 export function sleep(ms) {
@@ -405,14 +422,15 @@ export async function runExperiment(runKey) {
     console.error(`[Runner Error]: ${err.message}`, err);
   } finally {
     console.log('\n[Runner] Cleaning up and terminating Nora processes...');
-    killAllNora();
-    // Reset flags to default false
-    writeFlags({
-      DISABLE_STORE_CLONE_LOGGING: false,
-      DISABLE_AMBIENT_BACKGROUND: false,
-      DISABLE_LYRICS_POSITION_LISTENERS: false,
-      SUPPRESS_LASTFM_ERRORS: false
-    });
+    // Reset flags if run was using flags
+    if (config?.flags && Object.keys(config.flags).length > 0) {
+      writeFlags({
+        DISABLE_STORE_CLONE_LOGGING: false,
+        DISABLE_AMBIENT_BACKGROUND: false,
+        DISABLE_LYRICS_POSITION_LISTENERS: false,
+        SUPPRESS_LASTFM_ERRORS: false
+      });
+    }
   }
 
   // Save report
@@ -423,5 +441,13 @@ export async function runExperiment(runKey) {
   return { config, timeline };
 }
 
-const targetRun = process.argv.find((a) => a.startsWith('--run='))?.split('=')[1] || '0A';
-runExperiment(targetRun);
+const targetRun =
+  process.argv.find((a) => a.startsWith('--run='))?.split('=')[1] ||
+  (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : undefined) ||
+  'permanent';
+runExperiment(targetRun).then(() => {
+  process.exit(0);
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
