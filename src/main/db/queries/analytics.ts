@@ -223,32 +223,38 @@ export const getListeningAnalytics = async (
       .orderBy(sql`count(*) DESC`, sql`sum(${songs.duration}) DESC`)
       .limit(10);
 
-    const topArtists: TopArtistItem[] = await Promise.all(
-      artistHistoryRecords.map(async (a) => {
-        // Fetch artwork for top artist
-        const artistArtworksList = await trx
-          .select({
-            path: artworks.path,
-            source: artworks.source
-          })
-          .from(artistsArtworks)
-          .innerJoin(artworks, eq(artistsArtworks.artworkId, artworks.id))
-          .where(eq(artistsArtworks.artistId, a.artistId))
-          .limit(1);
+    const topArtistIds = artistHistoryRecords.map((a) => a.artistId);
+    const artistArtworksList =
+      topArtistIds.length > 0
+        ? await trx
+            .select({
+              artistId: artistsArtworks.artistId,
+              path: artworks.path,
+              source: artworks.source
+            })
+            .from(artistsArtworks)
+            .innerJoin(artworks, eq(artistsArtworks.artworkId, artworks.id))
+            .where(inArray(artistsArtworks.artistId, topArtistIds))
+        : [];
 
-        const artworkPaths = artistArtworksList[0]
-          ? parseArtistArtworks(artistArtworksList.map((art) => art.path))
-          : undefined;
+    const artistArtworksMap = new Map<number, string[]>();
+    for (const art of artistArtworksList) {
+      const list = artistArtworksMap.get(art.artistId) || [];
+      list.push(art.path);
+      artistArtworksMap.set(art.artistId, list);
+    }
 
-        return {
-          artistId: a.artistId,
-          name: a.name,
-          artworkPaths,
-          playCount: a.playCount,
-          totalSeconds: a.totalSeconds
-        };
-      })
-    );
+    const topArtists: TopArtistItem[] = artistHistoryRecords.map((a) => {
+      const paths = artistArtworksMap.get(a.artistId);
+      const artworkPaths = paths && paths.length > 0 ? parseArtistArtworks(paths) : undefined;
+      return {
+        artistId: a.artistId,
+        name: a.name,
+        artworkPaths,
+        playCount: a.playCount,
+        totalSeconds: a.totalSeconds
+      };
+    });
 
     // 5. Top Genres Rankings
     const genreHistoryRecords = await trx
@@ -289,55 +295,91 @@ export const getListeningAnalytics = async (
       .orderBy(sql`count(*) DESC`, sql`sum(${songs.duration}) DESC`)
       .limit(10);
 
-    const topTracks: TopTrackItem[] = await Promise.all(
-      trackHistoryRecords.map(async (t) => {
-        // Fetch track artists
-        const trackArtists = await trx
-          .select({
-            artistId: artists.id,
-            name: artists.name
-          })
-          .from(artistsSongs)
-          .innerJoin(artists, eq(artistsSongs.artistId, artists.id))
-          .where(eq(artistsSongs.songId, t.songId));
+    const trackSongIds = trackHistoryRecords.map((t) => t.songId);
 
-        // Fetch album
-        const trackAlbum = await trx
-          .select({
-            albumId: albums.id,
-            title: albums.title
-          })
-          .from(albumsSongs)
-          .innerJoin(albums, eq(albumsSongs.albumId, albums.id))
-          .where(eq(albumsSongs.songId, t.songId))
-          .limit(1);
+    // Batch fetch artists for all top tracks
+    const allTrackArtists =
+      trackSongIds.length > 0
+        ? await trx
+            .select({
+              songId: artistsSongs.songId,
+              artistId: artists.id,
+              name: artists.name
+            })
+            .from(artistsSongs)
+            .innerJoin(artists, eq(artistsSongs.artistId, artists.id))
+            .where(inArray(artistsSongs.songId, trackSongIds))
+        : [];
 
-        // Fetch artwork
-        const trackArtworks = await trx
-          .select({
-            path: artworks.path
-          })
-          .from(artworksSongs)
-          .innerJoin(artworks, eq(artworksSongs.artworkId, artworks.id))
-          .where(eq(artworksSongs.songId, t.songId))
-          .limit(1);
+    const trackArtistsMap = new Map<number, Array<{ artistId: number; name: string }>>();
+    for (const ta of allTrackArtists) {
+      const list = trackArtistsMap.get(ta.songId) || [];
+      list.push({ artistId: ta.artistId, name: ta.name });
+      trackArtistsMap.set(ta.songId, list);
+    }
 
-        const artworkPaths = trackArtworks[0]
-          ? parseSongArtworks(trackArtworks.map((art) => ({ path: art.path } as any)))
+    // Batch fetch albums for all top tracks
+    const allTrackAlbums =
+      trackSongIds.length > 0
+        ? await trx
+            .select({
+              songId: albumsSongs.songId,
+              albumId: albums.id,
+              title: albums.title
+            })
+            .from(albumsSongs)
+            .innerJoin(albums, eq(albumsSongs.albumId, albums.id))
+            .where(inArray(albumsSongs.songId, trackSongIds))
+        : [];
+
+    const trackAlbumMap = new Map<number, { albumId: number; title: string }>();
+    for (const al of allTrackAlbums) {
+      if (!trackAlbumMap.has(al.songId)) {
+        trackAlbumMap.set(al.songId, { albumId: al.albumId, title: al.title });
+      }
+    }
+
+    // Batch fetch artworks for all top tracks
+    const allTrackArtworks =
+      trackSongIds.length > 0
+        ? await trx
+            .select({
+              songId: artworksSongs.songId,
+              path: artworks.path
+            })
+            .from(artworksSongs)
+            .innerJoin(artworks, eq(artworksSongs.artworkId, artworks.id))
+            .where(inArray(artworksSongs.songId, trackSongIds))
+        : [];
+
+    const trackArtworkMap = new Map<number, string[]>();
+    for (const art of allTrackArtworks) {
+      const list = trackArtworkMap.get(art.songId) || [];
+      list.push(art.path);
+      trackArtworkMap.set(art.songId, list);
+    }
+
+    const topTracks: TopTrackItem[] = trackHistoryRecords.map((t) => {
+      const trackArtists = trackArtistsMap.get(t.songId) || [];
+      const trackAlbum = trackAlbumMap.get(t.songId);
+      const trackArtworksList = trackArtworkMap.get(t.songId);
+
+      const artworkPaths =
+        trackArtworksList && trackArtworksList.length > 0
+          ? parseSongArtworks(trackArtworksList.map((artPath) => ({ path: artPath } as any)))
           : undefined;
 
-        return {
-          songId: t.songId,
-          title: t.title,
-          duration: Number(t.duration),
-          artists: trackArtists,
-          album: trackAlbum[0] ? { albumId: trackAlbum[0].albumId, title: trackAlbum[0].title } : undefined,
-          artworkPaths,
-          playCount: t.playCount,
-          totalSeconds: t.totalSeconds
-        };
-      })
-    );
+      return {
+        songId: t.songId,
+        title: t.title,
+        duration: Number(t.duration),
+        artists: trackArtists,
+        album: trackAlbum,
+        artworkPaths,
+        playCount: t.playCount,
+        totalSeconds: t.totalSeconds
+      };
+    });
 
     return {
       period,

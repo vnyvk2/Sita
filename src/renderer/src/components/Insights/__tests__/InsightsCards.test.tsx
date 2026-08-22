@@ -85,7 +85,7 @@ describe('Insights Bento Cards Component Suite', () => {
       'songs',
       false,
       undefined,
-      true,
+      false,
       'Top Tracks'
     );
     expect(playSongMock).toHaveBeenCalledWith(101, true);

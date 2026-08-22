@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import MainContainer from '@renderer/components/MainContainer';
@@ -134,7 +134,7 @@ export function InsightsPage() {
           <div className="col-span-1 md:col-span-1 xl:col-span-1">
             <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
           </div>
-          <div className="col-span-1 md:col-span-2 xl:col-span-1">
+          <div className="col-span-1 md:col-span-1 xl:col-span-1">
             <TopGenresCard topGenres={listeningData.topGenres} />
           </div>
 

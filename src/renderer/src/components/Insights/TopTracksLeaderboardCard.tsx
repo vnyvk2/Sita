@@ -1,4 +1,4 @@
-﻿import React, { memo, useContext } from 'react';
+import React, { memo, useContext } from 'react';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import type { TopTrackItem } from '../../queries/analytics';
@@ -24,7 +24,7 @@ export const TopTracksLeaderboardCard = memo(({ topTracks }: TopTracksLeaderboar
         'songs',
         false,
         undefined,
-        true,
+        false,
         'Top Tracks'
       );
       playSong(songId, true);

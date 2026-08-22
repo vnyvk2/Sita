@@ -1,5 +1,6 @@
 import { collectionKeys } from '@renderer/api/collectionKeys';
 import { albumQuery } from '@renderer/queries/albums';
+import { analyticsQuery } from '@renderer/queries/analytics';
 import { artistQuery } from '@renderer/queries/artists';
 import { genreQuery } from '@renderer/queries/genres';
 import { homeQuery } from '@renderer/queries/home';
@@ -28,7 +29,9 @@ export type InvalidationTargetKey =
   | 'home:mostLovedSongs'
   | 'search:query'
   | 'search:recentResults'
-  | 'settings:all';
+  | 'settings:all'
+  | 'analytics:listening'
+  | 'analytics:libraryStats';
 
 /**
  * Maps incoming IPC DataUpdateEvent types to targeted invalidation keys based on audited query
@@ -57,7 +60,9 @@ export function getInvalidationTargetsForEvent(
         'songs:recentlyAdded',
         'songs:history',
         'search:query',
-        'home:recentlyPlayedSongs'
+        'home:recentlyPlayedSongs',
+        'analytics:listening',
+        'analytics:libraryStats'
       ];
 
     // 2. Song likes / favorites
@@ -78,14 +83,14 @@ export function getInvalidationTargetsForEvent(
     case 'songs/listeningData/skips':
     case 'songs/listeningData/listens':
     case 'songs/listeningData/inNoOfPlaylists':
-      return ['home:recentlyPlayedSongs'];
+      return ['home:recentlyPlayedSongs', 'analytics:listening'];
 
     // 5. Artists
     case 'artists':
     case 'artists/newArtist':
     case 'artists/updatedArtist':
     case 'artists/deletedArtist':
-      return ['artists:all', 'artists:single', 'home:recentSongArtists', 'search:query'];
+      return ['artists:all', 'artists:single', 'home:recentSongArtists', 'search:query', 'analytics:listening'];
     case 'artists/likes':
     case 'artists/artworks':
       return ['artists:all', 'artists:single'];
@@ -96,14 +101,14 @@ export function getInvalidationTargetsForEvent(
     case 'albums/updatedAlbum':
     case 'albums/deletedAlbum':
     case 'albums/likes':
-      return ['albums:all', 'albums:single', 'search:query'];
+      return ['albums:all', 'albums:single', 'search:query', 'analytics:listening'];
 
     // 7. Genres
     case 'genres':
     case 'genres/newGenre':
     case 'genres/updatedGenre':
     case 'genres/deletedGenre':
-      return ['genres:all', 'genres:single'];
+      return ['genres:all', 'genres:single', 'analytics:listening'];
 
     // 8. Playlists / Collections
     case 'playlists':
@@ -189,6 +194,12 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
       break;
     case 'settings:all':
       client.invalidateQueries({ queryKey: settingsQuery._def });
+      break;
+    case 'analytics:listening':
+      client.invalidateQueries({ queryKey: analyticsQuery.listening._def });
+      break;
+    case 'analytics:libraryStats':
+      client.invalidateQueries({ queryKey: analyticsQuery.libraryStats._def });
       break;
   }
 }
