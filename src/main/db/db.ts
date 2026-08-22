@@ -1,4 +1,4 @@
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
 import path from 'path';
 
 import * as schema from '@db/schema';
@@ -19,7 +19,9 @@ import { seedDatabase } from './seed';
 const DB_NAME = 'nora.pglite.db';
 const isTest = typeof process.env.VITEST !== 'undefined' || process.env.NODE_ENV === 'test';
 export const DB_PATH = isTest ? 'memory://' : app.getPath('userData') + '/' + DB_NAME;
-const migrationsFolder = path.join(app.getAppPath(), 'resources', 'drizzle');
+const migrationsFolder = existsSync(path.join(app.getAppPath(), 'resources', 'drizzle'))
+  ? path.join(app.getAppPath(), 'resources', 'drizzle')
+  : path.join(process.cwd(), 'resources', 'drizzle');
 logger.debug(`Migrations folder: ${migrationsFolder}`);
 
 if (!isTest) {

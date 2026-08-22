@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    SoundBarsIndicator — Segmented Dot-Matrix & Sound Bars Equalizer
    True discrete LED matrix animation with deterministic idle states.
    ========================================================================== */
@@ -263,7 +263,11 @@
    Only the bottom baseline row is lit. Upper rows remain 0% opacity.
    ========================================================================== */
 
-.sound-bars--paused .sound-bars-dot,
+.sound-bars--paused .sound-bars-dot {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sound-bars-dot {
     opacity: 0 !important;
