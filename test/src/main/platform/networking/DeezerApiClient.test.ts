@@ -46,25 +46,33 @@ describe('DeezerApiClient', () => {
     expect(result2).toBeNull();
   });
 
-  it('fetches artist albums and categorizes correctly', async () => {
-    const mockAlbums = [
-      { id: 101, title: 'Discovery', record_type: 'album', nb_tracks: 14, release_date: '2001-03-07' },
-      { id: 102, title: 'One More Time', record_type: 'single', nb_tracks: 3, release_date: '2000-11-13' }
+  it('fetches artist albums with pagination support', async () => {
+    const page1 = [
+      { id: 101, title: 'Discovery', record_type: 'album', nb_tracks: 14, release_date: '2001-03-07' }
+    ];
+    const page2 = [
+      { id: 102, title: 'Human After All', record_type: 'album', nb_tracks: 10, release_date: '2005-03-14' }
     ];
 
-    const mockPipeline: Partial<RequestPipeline> = {
-      execute: vi.fn().mockResolvedValue({
+    const mockExecute = vi.fn()
+      .mockResolvedValueOnce({
         status: 200,
-        data: { data: mockAlbums, total: 2 }
+        data: { data: page1, total: 2, next: 'https://api.deezer.com/artist/27/albums?index=1' }
       })
-    };
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { data: page2, total: 2 }
+      });
+
+    const mockPipeline: Partial<RequestPipeline> = { execute: mockExecute };
 
     const client = new DeezerApiClient(mockPipeline as RequestPipeline);
-    const albums = await client.getArtistAlbums(27);
+    const albums = await client.getArtistAlbums(27, 300);
 
     expect(albums).toHaveLength(2);
     expect(albums[0].title).toBe('Discovery');
-    expect(albums[1].record_type).toBe('single');
+    expect(albums[1].title).toBe('Human After All');
+    expect(mockExecute).toHaveBeenCalledTimes(2);
   });
 
   it('fetches album tracklist with 30s previews', async () => {

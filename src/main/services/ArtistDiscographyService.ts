@@ -1,4 +1,4 @@
-import { db } from '@main/db/db';
+import { getAlbumById, getAllAlbums } from '@main/db/queries/albums';
 import { getArtistById } from '@main/db/queries/artists';
 import { DeezerApiClient, type DeezerAlbumDto } from '@main/platform/networking/DeezerApiClient';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
@@ -36,15 +36,24 @@ export class ArtistDiscographyService {
     try {
       // 1. Fetch local artist data (albums and songs)
       const localArtist = await getArtistById(artistId);
-      const localAlbums = (localArtist?.albums ?? []).map((a) => a.album).filter(Boolean);
+      const localAlbumIds = (localArtist?.albums ?? []).map((a) => a.album?.id).filter((id): id is number => typeof id === 'number');
       const localSongs = (localArtist?.songs ?? []).map((s) => s.song).filter(Boolean);
 
+      // Fetch full album records to know the exact song count of each local album
+      const localAlbumsData = localAlbumIds.length > 0
+        ? (await getAllAlbums({ albumIds: localAlbumIds })).data
+        : [];
+
       // Map normalized local album titles for fast lookup
-      const localAlbumMap = new Map<string, { id: number; title: string }>();
-      for (const alb of localAlbums) {
+      const localAlbumMap = new Map<
+        string,
+        { id: number; title: string; songs: Array<{ id: number; title: string }> }
+      >();
+      for (const alb of localAlbumsData) {
         if (alb?.title) {
           const norm = normalizeForMatching(alb.title);
-          if (norm) localAlbumMap.set(norm, { id: alb.id, title: alb.title });
+          const albumSongs = (alb.songs ?? []).map((s) => s.song).filter(Boolean);
+          if (norm) localAlbumMap.set(norm, { id: alb.id, title: alb.title, songs: albumSongs });
         }
       }
 
@@ -64,8 +73,8 @@ export class ArtistDiscographyService {
         return fallbackPayload;
       }
 
-      // 3. Fetch all Deezer albums for this artist
-      const deezerAlbums = await this.deezerClient.getArtistAlbums(deezerArtist.id, 100);
+      // 3. Fetch all Deezer albums for this artist (paginating up to 300 releases)
+      const deezerAlbums = await this.deezerClient.getArtistAlbums(deezerArtist.id, 300);
       if (!deezerAlbums || deezerAlbums.length === 0) {
         return {
           ...fallbackPayload,
@@ -79,7 +88,7 @@ export class ArtistDiscographyService {
       const compilationsAndLive: OnlineReleaseSummary[] = [];
 
       for (const release of deezerAlbums) {
-        const summary = this.reconcileRelease(release, localAlbumMap, localSongs);
+        const summary = this.reconcileRelease(release, localAlbumMap, localSongMap);
         const recordType = (release.record_type || 'album').toLowerCase();
 
         if (recordType === 'album') {
@@ -159,12 +168,13 @@ export class ArtistDiscographyService {
 
   private reconcileRelease(
     release: DeezerAlbumDto,
-    localAlbumMap: Map<string, { id: number; title: string }>,
-    localSongs: Array<{ id: number; title: string }>
+    localAlbumMap: Map<string, { id: number; title: string; songs: Array<{ id: number; title: string }> }>,
+    localSongMap: Map<string, number>
   ): OnlineReleaseSummary {
     const normTitle = normalizeForMatching(release.title);
     const matchedLocalAlbum = normTitle ? localAlbumMap.get(normTitle) : undefined;
     const trackCount = release.nb_tracks || 0;
+    const recordType = (release.record_type || 'album').toLowerCase();
 
     let inLibraryStatus: InLibraryStatus = 'discover';
     let localAlbumId: number | undefined = undefined;
@@ -173,18 +183,24 @@ export class ArtistDiscographyService {
 
     if (matchedLocalAlbum) {
       localAlbumId = matchedLocalAlbum.id;
-      // Count local songs that share this album title
-      inLibraryStatus = 'in_library';
-      matchedTrackCount = trackCount;
-      totalLocalTracks = trackCount;
-    } else {
-      // Check if any local song titles match the album title (e.g. single)
-      const matchingSong = localSongs.find((s) => s.title && normalizeForMatching(s.title) === normTitle);
-      if (matchingSong) {
+      const localAlbumSongs = matchedLocalAlbum.songs ?? [];
+      totalLocalTracks = localAlbumSongs.length;
+
+      if (trackCount > 0 && totalLocalTracks >= trackCount) {
+        inLibraryStatus = 'in_library';
+        matchedTrackCount = trackCount;
+      } else if (totalLocalTracks > 0) {
         inLibraryStatus = 'partial';
-        matchedTrackCount = 1;
-        totalLocalTracks = 1;
+        matchedTrackCount = Math.min(totalLocalTracks, trackCount || totalLocalTracks);
+      } else {
+        inLibraryStatus = 'discover';
+        matchedTrackCount = 0;
       }
+    } else if (recordType === 'single' && normTitle && localSongMap.has(normTitle)) {
+      // For standalone singles where the single release title matches a local song
+      inLibraryStatus = trackCount <= 1 ? 'in_library' : 'partial';
+      matchedTrackCount = 1;
+      totalLocalTracks = 1;
     }
 
     return {

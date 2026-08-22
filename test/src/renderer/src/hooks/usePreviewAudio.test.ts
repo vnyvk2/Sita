@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { store } from '../../../../../src/renderer/src/store/store';
 import {
   usePreviewAudio,
   resetPreviewAudioForTesting
@@ -64,5 +65,28 @@ describe('usePreviewAudio Hook', () => {
 
     expect(pauseMock).toHaveBeenCalled();
     expect(result.current.activePreviewId).toBeNull();
+  });
+
+  it('automatically pauses preview when Nora main player starts playback', () => {
+    const { result } = renderHook(() => usePreviewAudio());
+
+    act(() => {
+      result.current.playPreview('track-101', 'https://preview.mp3');
+    });
+
+    expect(result.current.activePreviewId).toBe('track-101');
+
+    // Simulate Nora main player starting playback
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        player: {
+          ...state.player,
+          isCurrentSongPlaying: true
+        }
+      }));
+    });
+
+    expect(pauseMock).toHaveBeenCalled();
   });
 });

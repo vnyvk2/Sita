@@ -78,33 +78,57 @@ export class DeezerApiClient {
   }
 
   /**
-   * Get all albums, singles, EPs, and compilations for a Deezer artist ID.
+   * Get all albums, singles, EPs, and compilations for a Deezer artist ID,
+   * paginating through results up to maxReleases (default 300).
    */
   public async getArtistAlbums(
     deezerArtistId: number,
-    limit = 100,
+    maxReleases = 300,
     signal?: AbortSignal
   ): Promise<DeezerAlbumDto[]> {
     if (!deezerArtistId || deezerArtistId <= 0) return [];
 
-    const url = `${this.baseUrl}/artist/${deezerArtistId}/albums`;
-    try {
-      const response = await this.pipeline.execute<DeezerAlbumResponse>({
-        url,
-        method: 'GET',
-        params: {
-          limit
-        },
-        signal
-      });
+    const PAGE_LIMIT = 100;
+    const allAlbums: DeezerAlbumDto[] = [];
+    let currentIndex = 0;
+    let hasMore = true;
 
-      return response.data.data ?? [];
+    try {
+      while (hasMore && allAlbums.length < maxReleases) {
+        const pageSize = Math.min(PAGE_LIMIT, maxReleases - allAlbums.length);
+        const url = `${this.baseUrl}/artist/${deezerArtistId}/albums`;
+
+        const response = await this.pipeline.execute<DeezerAlbumResponse>({
+          url,
+          method: 'GET',
+          params: {
+            limit: pageSize,
+            index: currentIndex
+          },
+          signal
+        });
+
+        const batch = response.data?.data ?? [];
+        if (batch.length === 0) {
+          break;
+        }
+
+        allAlbums.push(...batch);
+
+        if (response.data?.next && allAlbums.length < (response.data.total ?? maxReleases)) {
+          currentIndex += batch.length;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      return allAlbums;
     } catch (err) {
       if (err instanceof HttpError && err.status === 404) {
-        return [];
+        return allAlbums;
       }
       logger.warn(`Failed to fetch albums for Deezer artist ID ${deezerArtistId}`, { error: err });
-      return [];
+      return allAlbums;
     }
   }
 
