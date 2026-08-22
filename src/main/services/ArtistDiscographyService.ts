@@ -1,5 +1,6 @@
 import { getAlbumById, getAllAlbums } from '@main/db/queries/albums';
 import { getArtistById } from '@main/db/queries/artists';
+import { ITunesApiClient, type ITunesAlbumDto } from '@main/platform/networking/ITunesApiClient';
 import { DeezerApiClient, type DeezerAlbumDto } from '@main/platform/networking/DeezerApiClient';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
 import type {
@@ -11,9 +12,11 @@ import type {
 import logger from '../logger';
 
 export class ArtistDiscographyService {
+  private readonly itunesClient: ITunesApiClient;
   private readonly deezerClient: DeezerApiClient;
 
-  constructor(deezerClient?: DeezerApiClient) {
+  constructor(itunesClient?: ITunesApiClient, deezerClient?: DeezerApiClient) {
+    this.itunesClient = itunesClient ?? new ITunesApiClient();
     this.deezerClient = deezerClient ?? new DeezerApiClient();
   }
 
@@ -66,30 +69,82 @@ export class ArtistDiscographyService {
         }
       }
 
-      // 2. Search Deezer for the artist
-      const deezerArtist = await this.deezerClient.searchArtist(artistName);
-      if (!deezerArtist) {
-        logger.info(`[ArtistDiscographyService] No Deezer match found for artist: ${artistName}`);
+      // 2. Fetch discography from iTunes first (global, free, no geo-block)
+      let rawAlbums: Array<{
+        id: number;
+        title: string;
+        releaseDate?: string;
+        recordType: string;
+        coverMedium: string;
+        coverXl: string;
+        trackCount: number;
+        explicitLyrics: boolean;
+      }> = [];
+
+      try {
+        const itunesAlbums = await this.itunesClient.getArtistAlbums(artistName, 100);
+        if (itunesAlbums && itunesAlbums.length > 0) {
+          rawAlbums = itunesAlbums.map((alb) => {
+            const lowerTitle = (alb.collectionName || '').toLowerCase();
+            let recordType = 'album';
+            if (alb.trackCount === 1 || lowerTitle.includes(' - single') || lowerTitle.includes(' - ep')) {
+              recordType = 'single';
+            } else if (lowerTitle.includes('best of') || lowerTitle.includes('greatest hits') || lowerTitle.includes('soundtrack')) {
+              recordType = 'compile';
+            }
+
+            return {
+              id: alb.collectionId,
+              title: alb.collectionName,
+              releaseDate: alb.releaseDate ? alb.releaseDate.split('T')[0] : undefined,
+              recordType,
+              coverMedium: alb.artworkUrl600 || alb.artworkUrl100,
+              coverXl: alb.artworkUrl600 || alb.artworkUrl100,
+              trackCount: alb.trackCount || 1,
+              explicitLyrics: alb.collectionExplicitness === 'explicit'
+            };
+          });
+        }
+      } catch (err) {
+        logger.warn(`[ArtistDiscographyService] iTunes album fetch failed for ${artistName}`, { error: err });
+      }
+
+      // 3. Fallback to Deezer if iTunes returned 0
+      if (rawAlbums.length === 0) {
+        try {
+          const deezerArtist = await this.deezerClient.searchArtist(artistName);
+          if (deezerArtist) {
+            const deezerAlbums = await this.deezerClient.getArtistAlbums(deezerArtist.id, 100);
+            if (deezerAlbums && deezerAlbums.length > 0) {
+              rawAlbums = deezerAlbums.map((d) => ({
+                id: d.id,
+                title: d.title,
+                releaseDate: d.release_date,
+                recordType: d.record_type || 'album',
+                coverMedium: d.cover_medium || d.cover_big || d.cover,
+                coverXl: d.cover_xl || d.cover_big || d.cover,
+                trackCount: d.nb_tracks || 1,
+                explicitLyrics: Boolean(d.explicit_lyrics)
+              }));
+            }
+          }
+        } catch (err) {
+          logger.warn(`[ArtistDiscographyService] Deezer album fetch fallback failed for ${artistName}`, { error: err });
+        }
+      }
+
+      if (rawAlbums.length === 0) {
         return fallbackPayload;
       }
 
-      // 3. Fetch all Deezer albums for this artist (paginating up to 300 releases)
-      const deezerAlbums = await this.deezerClient.getArtistAlbums(deezerArtist.id, 300);
-      if (!deezerAlbums || deezerAlbums.length === 0) {
-        return {
-          ...fallbackPayload,
-          deezerArtistId: deezerArtist.id
-        };
-      }
-
-      // 4. Categorize and reconcile each release
+      // 4. Categorize and reconcile each release against local library
       const albums: OnlineReleaseSummary[] = [];
       const singlesAndEPs: OnlineReleaseSummary[] = [];
       const compilationsAndLive: OnlineReleaseSummary[] = [];
 
-      for (const release of deezerAlbums) {
+      for (const release of rawAlbums) {
         const summary = this.reconcileRelease(release, localAlbumMap, localSongMap);
-        const recordType = (release.record_type || 'album').toLowerCase();
+        const recordType = (release.recordType || 'album').toLowerCase();
 
         if (recordType === 'album') {
           albums.push(summary);
@@ -114,11 +169,10 @@ export class ArtistDiscographyService {
       return {
         artistId,
         artistName,
-        deezerArtistId: deezerArtist.id,
         albums,
         singlesAndEPs,
         compilationsAndLive,
-        totalOnlineReleases: deezerAlbums.length
+        totalOnlineReleases: rawAlbums.length
       };
     } catch (err) {
       logger.error(`[ArtistDiscographyService] Failed to resolve discography for ${artistName}`, { error: err });
@@ -143,18 +197,54 @@ export class ArtistDiscographyService {
         }
       }
 
-      // 2. Fetch tracks from Deezer
-      const tracks = await this.deezerClient.getAlbumTracks(onlineAlbumId);
+      // 2. Fetch tracks from iTunes lookup first
+      let tracks: Array<{
+        id: number;
+        title: string;
+        duration: number;
+        previewUrl?: string;
+      }> = [];
+
+      try {
+        const itunesTracks = await this.itunesClient.getAlbumTracks(onlineAlbumId);
+        if (itunesTracks && itunesTracks.length > 0) {
+          tracks = itunesTracks.map((t) => ({
+            id: t.trackId,
+            title: t.trackName,
+            duration: Math.round((t.trackTimeMillis || 0) / 1000),
+            previewUrl: t.previewUrl
+          }));
+        }
+      } catch {
+        // ignore
+      }
+
+      // 3. Fallback to Deezer lookup if iTunes had no results
+      if (tracks.length === 0) {
+        try {
+          const deezerTracks = await this.deezerClient.getAlbumTracks(onlineAlbumId);
+          if (deezerTracks && deezerTracks.length > 0) {
+            tracks = deezerTracks.map((t) => ({
+              id: t.id,
+              title: t.title || t.title_short,
+              duration: t.duration,
+              previewUrl: t.preview
+            }));
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       return tracks.map((track, idx) => {
-        const normTitle = normalizeForMatching(track.title || track.title_short);
+        const normTitle = normalizeForMatching(track.title);
         const localSongId = normTitle ? localSongMap.get(normTitle) : undefined;
 
         return {
           id: track.id,
-          title: track.title || track.title_short,
+          title: track.title,
           duration: track.duration,
-          previewUrl: track.preview,
+          previewUrl: track.previewUrl,
           trackPosition: idx + 1,
           localSongId,
           isInLibrary: localSongId !== undefined
@@ -167,14 +257,28 @@ export class ArtistDiscographyService {
   }
 
   private reconcileRelease(
-    release: DeezerAlbumDto,
+    release: {
+      id: number;
+      title: string;
+      releaseDate?: string;
+      recordType: string;
+      coverMedium: string;
+      coverXl: string;
+      trackCount: number;
+      explicitLyrics: boolean;
+    },
     localAlbumMap: Map<string, { id: number; title: string; songs: Array<{ id: number; title: string }> }>,
     localSongMap: Map<string, number>
   ): OnlineReleaseSummary {
     const normTitle = normalizeForMatching(release.title);
-    const matchedLocalAlbum = normTitle ? localAlbumMap.get(normTitle) : undefined;
-    const trackCount = release.nb_tracks || 0;
-    const recordType = (release.record_type || 'album').toLowerCase();
+    const cleanSingleTitle = release.title.replace(/\s*-\s*(single|ep)\s*$/i, '').trim();
+    const normCleanSingleTitle = normalizeForMatching(cleanSingleTitle);
+
+    const matchedLocalAlbum = (normTitle ? localAlbumMap.get(normTitle) : undefined) ??
+      (normCleanSingleTitle ? localAlbumMap.get(normCleanSingleTitle) : undefined);
+
+    const trackCount = release.trackCount || 0;
+    const recordType = (release.recordType || 'album').toLowerCase();
 
     let inLibraryStatus: InLibraryStatus = 'discover';
     let localAlbumId: number | undefined = undefined;
@@ -196,22 +300,25 @@ export class ArtistDiscographyService {
         inLibraryStatus = 'discover';
         matchedTrackCount = 0;
       }
-    } else if (recordType === 'single' && normTitle && localSongMap.has(normTitle)) {
-      // For standalone singles where the single release title matches a local song
-      inLibraryStatus = trackCount <= 1 ? 'in_library' : 'partial';
-      matchedTrackCount = 1;
-      totalLocalTracks = 1;
+    } else if (recordType === 'single') {
+      const isSongMatch = (normCleanSingleTitle && localSongMap.has(normCleanSingleTitle)) ||
+        (normTitle && localSongMap.has(normTitle));
+      if (isSongMatch) {
+        inLibraryStatus = trackCount <= 1 ? 'in_library' : 'partial';
+        matchedTrackCount = 1;
+        totalLocalTracks = 1;
+      }
     }
 
     return {
       id: release.id,
       title: release.title,
-      releaseDate: release.release_date,
-      recordType: release.record_type || 'album',
-      coverMedium: release.cover_medium || release.cover_big || release.cover,
-      coverXl: release.cover_xl || release.cover_big || release.cover_medium || release.cover,
-      trackCount: release.nb_tracks || 0,
-      explicitLyrics: Boolean(release.explicit_lyrics),
+      releaseDate: release.releaseDate,
+      recordType: release.recordType,
+      coverMedium: release.coverMedium,
+      coverXl: release.coverXl,
+      trackCount: release.trackCount,
+      explicitLyrics: release.explicitLyrics,
       inLibraryStatus,
       localAlbumId,
       matchedTrackCount,

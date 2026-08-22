@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ArtistDiscographyService } from '@main/services/ArtistDiscographyService';
+import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import type { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import * as artistsDb from '@main/db/queries/artists';
 import * as albumsDb from '@main/db/queries/albums';
@@ -57,45 +58,40 @@ describe('ArtistDiscographyService', () => {
       ]
     });
 
-    const mockDeezerClient: Partial<DeezerApiClient> = {
-      searchArtist: vi.fn().mockResolvedValue({ id: 27, name: 'Daft Punk' }),
+    const mockItunesClient: Partial<ITunesApiClient> = {
       getArtistAlbums: vi.fn().mockResolvedValue([
         {
-          id: 301,
-          title: 'Discovery',
-          record_type: 'album',
-          release_date: '2001-03-07',
-          cover_medium: 'http://pic.jpg',
-          nb_tracks: 14 // Online has 14 tracks, local has 5 -> should be PARTIAL
+          collectionId: 301,
+          collectionName: 'Discovery',
+          releaseDate: '2001-03-07T00:00:00Z',
+          artworkUrl100: 'http://pic.jpg',
+          trackCount: 14
         },
         {
-          id: 302,
-          title: 'Homework',
-          record_type: 'album',
-          release_date: '1997-01-20',
-          cover_medium: 'http://hw.jpg',
-          nb_tracks: 16 // Online has 16 tracks, local has 16 -> should be IN_LIBRARY
+          collectionId: 302,
+          collectionName: 'Homework',
+          releaseDate: '1997-01-20T00:00:00Z',
+          artworkUrl100: 'http://hw.jpg',
+          trackCount: 16
         },
         {
-          id: 303,
-          title: 'Random Access Memories',
-          record_type: 'album',
-          release_date: '2013-05-17',
-          cover_medium: 'http://ram.jpg',
-          nb_tracks: 13 // Online has 13 tracks, local has 0 -> should be DISCOVER
+          collectionId: 303,
+          collectionName: 'Random Access Memories',
+          releaseDate: '2013-05-17T00:00:00Z',
+          artworkUrl100: 'http://ram.jpg',
+          trackCount: 13
         },
         {
-          id: 304,
-          title: 'Get Lucky',
-          record_type: 'single',
-          release_date: '2013-04-19',
-          cover_medium: 'http://single.jpg',
-          nb_tracks: 1 // Single matching local song Get Lucky -> should be IN_LIBRARY
+          collectionId: 304,
+          collectionName: 'Get Lucky - Single',
+          releaseDate: '2013-04-19T00:00:00Z',
+          artworkUrl100: 'http://single.jpg',
+          trackCount: 1
         }
       ])
     };
 
-    const service = new ArtistDiscographyService(mockDeezerClient as DeezerApiClient);
+    const service = new ArtistDiscographyService(mockItunesClient as ITunesApiClient);
     const discography = await service.getDiscography(1, 'Daft Punk');
 
     expect(discography.albums).toHaveLength(3);
@@ -126,7 +122,7 @@ describe('ArtistDiscographyService', () => {
     expect(ram?.localAlbumId).toBeUndefined();
 
     // 4. Single: Get Lucky (1/1)
-    const getLucky = discography.singlesAndEPs.find((s) => s.title === 'Get Lucky');
+    const getLucky = discography.singlesAndEPs.find((s) => s.title.includes('Get Lucky'));
     expect(getLucky?.inLibraryStatus).toBe('in_library');
     expect(getLucky?.matchedTrackCount).toBe(1);
   });
@@ -140,14 +136,14 @@ describe('ArtistDiscographyService', () => {
       ]
     });
 
-    const mockDeezerClient: Partial<DeezerApiClient> = {
+    const mockItunesClient: Partial<ITunesApiClient> = {
       getAlbumTracks: vi.fn().mockResolvedValue([
-        { id: 1001, title: 'One More Time', duration: 320, preview: 'https://preview1.mp3' },
-        { id: 1002, title: 'Aerodynamic', duration: 207, preview: 'https://preview2.mp3' }
+        { trackId: 1001, trackName: 'One More Time', trackTimeMillis: 320000, previewUrl: 'https://preview1.m4a', wrapperType: 'track' },
+        { trackId: 1002, trackName: 'Aerodynamic', trackTimeMillis: 207000, previewUrl: 'https://preview2.m4a', wrapperType: 'track' }
       ])
     };
 
-    const service = new ArtistDiscographyService(mockDeezerClient as DeezerApiClient);
+    const service = new ArtistDiscographyService(mockItunesClient as ITunesApiClient);
     const tracks = await service.getAlbumTracks(301, 1);
 
     expect(tracks).toHaveLength(2);
@@ -157,18 +153,21 @@ describe('ArtistDiscographyService', () => {
 
     expect(tracks[1].title).toBe('Aerodynamic');
     expect(tracks[1].isInLibrary).toBe(false);
-    expect(tracks[1].previewUrl).toBe('https://preview2.mp3');
+    expect(tracks[1].previewUrl).toBe('https://preview2.m4a');
   });
 
   it('gracefully returns empty collections if artist is not found online', async () => {
     (artistsDb.getArtistById as any).mockResolvedValue({ id: 99, name: 'Local Band Only', albums: [], songs: [] });
     (albumsDb.getAllAlbums as any).mockResolvedValue({ data: [] });
 
+    const mockItunesClient: Partial<ITunesApiClient> = {
+      getArtistAlbums: vi.fn().mockResolvedValue([])
+    };
     const mockDeezerClient: Partial<DeezerApiClient> = {
       searchArtist: vi.fn().mockResolvedValue(null)
     };
 
-    const service = new ArtistDiscographyService(mockDeezerClient as DeezerApiClient);
+    const service = new ArtistDiscographyService(mockItunesClient as ITunesApiClient, mockDeezerClient as DeezerApiClient);
     const discography = await service.getDiscography(99, 'Local Band Only');
 
     expect(discography.albums).toHaveLength(0);

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ArtistProfileService } from '@main/services/ArtistProfileService';
+import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import type { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import * as artistsDb from '@main/db/queries/artists';
 import * as lastFmInfo from '@main/other/lastFm/getArtistInfoFromLastFM';
@@ -56,19 +57,20 @@ describe('ArtistProfileService', () => {
       { name: 'Harder, Better, Faster, Stronger', listeners: '1200000', playcount: '9000000', url: 'http://last.fm/track2' }
     ]);
 
-    const mockDeezerClient: Partial<DeezerApiClient> = {
-      searchArtist: vi.fn().mockResolvedValue({ id: 27, name: 'Daft Punk', link: 'https://deezer.com/artist/27' }),
+    const mockItunesClient: Partial<ITunesApiClient> = {
       getArtistTopTracks: vi.fn().mockResolvedValue([
         {
-          id: 501,
-          title: 'Harder, Better, Faster, Stronger',
-          preview: 'https://preview-hbfs.mp3',
-          album: { title: 'Discovery', cover_medium: 'http://cover.jpg' }
+          trackId: 501,
+          trackName: 'Harder, Better, Faster, Stronger',
+          previewUrl: 'https://preview-hbfs.m4a',
+          collectionName: 'Discovery',
+          artworkUrl100: 'http://cover.jpg',
+          wrapperType: 'track'
         }
       ])
     };
 
-    const service = new ArtistProfileService(mockDeezerClient as DeezerApiClient);
+    const service = new ArtistProfileService(mockItunesClient as ITunesApiClient);
     const profile = await service.getProfile(1, 'Daft Punk');
 
     expect(profile.artistId).toBe(1);
@@ -84,10 +86,10 @@ describe('ArtistProfileService', () => {
     expect(profile.topTracks[0].isInLibrary).toBe(true);
     expect(profile.topTracks[0].localSongId).toBe(101);
 
-    // Track 2 (HBFS) not in local DB, matches Deezer preview
+    // Track 2 (HBFS) not in local DB, matches iTunes preview
     expect(profile.topTracks[1].title).toBe('Harder, Better, Faster, Stronger');
     expect(profile.topTracks[1].isInLibrary).toBe(false);
-    expect(profile.topTracks[1].previewUrl).toBe('https://preview-hbfs.mp3');
+    expect(profile.topTracks[1].previewUrl).toBe('https://preview-hbfs.m4a');
 
     // Verify similar artists split
     expect(profile.similarArtists.availableArtists).toHaveLength(1);
@@ -97,9 +99,9 @@ describe('ArtistProfileService', () => {
 
     // Verify external links
     expect(profile.externalLinks.some((l) => l.name === 'Last.fm')).toBe(true);
-    expect(profile.externalLinks.some((l) => l.name === 'Deezer')).toBe(true);
-    expect(profile.externalLinks.some((l) => l.name === 'MusicBrainz')).toBe(true);
+    expect(profile.externalLinks.some((l) => l.name === 'Apple Music')).toBe(true);
     expect(profile.externalLinks.some((l) => l.name === 'Spotify')).toBe(true);
+    expect(profile.externalLinks.some((l) => l.name === 'MusicBrainz')).toBe(true);
   });
 
   it('gracefully handles complete network failure', async () => {
@@ -107,11 +109,11 @@ describe('ArtistProfileService', () => {
     (lastFmInfo.default as any).mockRejectedValue(new Error('Network error'));
     (lastFmTopTracks.default as any).mockRejectedValue(new Error('Network error'));
 
-    const mockDeezerClient: Partial<DeezerApiClient> = {
-      searchArtist: vi.fn().mockRejectedValue(new Error('Network error'))
+    const mockItunesClient: Partial<ITunesApiClient> = {
+      getArtistTopTracks: vi.fn().mockRejectedValue(new Error('Network error'))
     };
 
-    const service = new ArtistProfileService(mockDeezerClient as DeezerApiClient);
+    const service = new ArtistProfileService(mockItunesClient as ITunesApiClient);
     const profile = await service.getProfile(1, 'Offline Artist');
 
     expect(profile.artistId).toBe(1);

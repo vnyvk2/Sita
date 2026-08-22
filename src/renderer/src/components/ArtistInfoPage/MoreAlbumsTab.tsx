@@ -62,18 +62,18 @@ export function MoreAlbumsTab({ artistId, artistName }: MoreAlbumsTabProps) {
     );
   }
 
-  if (isError || !discography || discography.totalOnlineReleases === 0) {
+  if (isError) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center space-y-4 rounded-2xl bg-background-color-2/30 p-8 text-center backdrop-blur-sm dark:bg-dark-background-color-2/30">
         <span className="material-icons-round text-5xl opacity-40">cloud_off</span>
         <div className="max-w-md">
           <h3 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
-            {t('moreAlbums.noReleasesFound', 'No online releases found')}
+            {t('moreAlbums.connectionError', 'Unable to connect to online catalog')}
           </h3>
           <p className="mt-1 text-sm text-font-color-dimmed dark:text-font-color-white/60">
             {t(
               'moreAlbums.offlineNotice',
-              'Unable to fetch online discography. Check your internet connection and try again.'
+              'Check your internet connection and try again.'
             )}
           </p>
         </div>
@@ -84,6 +84,33 @@ export function MoreAlbumsTab({ artistId, artistName }: MoreAlbumsTabProps) {
         >
           <span className="material-icons-round text-lg">refresh</span>
           <span>{t('common.retry', 'Retry')}</span>
+        </button>
+      </div>
+    );
+  }
+
+  if (!discography || discography.totalOnlineReleases === 0) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center space-y-4 rounded-2xl bg-background-color-2/30 p-8 text-center backdrop-blur-sm dark:bg-dark-background-color-2/30">
+        <span className="material-icons-round text-5xl opacity-40">album</span>
+        <div className="max-w-md">
+          <h3 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
+            {t('moreAlbums.noReleasesFound', 'No releases found')}
+          </h3>
+          <p className="mt-1 text-sm text-font-color-dimmed dark:text-font-color-white/60">
+            {t(
+              'moreAlbums.emptyCatalogNotice',
+              'No additional albums or singles were found in the global catalog for this artist.'
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="flex items-center space-x-2 rounded-full bg-background-color-2 px-5 py-2 text-sm font-medium text-font-color-highlight shadow-sm transition-transform hover:scale-105 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight"
+        >
+          <span className="material-icons-round text-lg">refresh</span>
+          <span>{t('common.refresh', 'Refresh')}</span>
         </button>
       </div>
     );

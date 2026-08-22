@@ -1,4 +1,5 @@
 import { getArtistById, getArtistsByName } from '@main/db/queries/artists';
+import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
 import getArtistInfoFromLastFM from '@main/other/lastFm/getArtistInfoFromLastFM';
@@ -12,9 +13,11 @@ import type { SimilarArtist, SimilarArtistInfo } from '../../types/last_fm_artis
 import logger from '../logger';
 
 export class ArtistProfileService {
+  private readonly itunesClient: ITunesApiClient;
   private readonly deezerClient: DeezerApiClient;
 
-  constructor(deezerClient?: DeezerApiClient) {
+  constructor(itunesClient?: ITunesApiClient, deezerClient?: DeezerApiClient) {
+    this.itunesClient = itunesClient ?? new ITunesApiClient();
     this.deezerClient = deezerClient ?? new DeezerApiClient();
   }
 
@@ -46,25 +49,16 @@ export class ArtistProfileService {
         }
       }
 
-      // 2. Concurrently fetch Last.fm info, Last.fm top tracks, Deezer search, and Deezer top tracks
-      const [lastFmInfoRes, lastFmTopTracks, deezerArtist] = await Promise.allSettled([
+      // 2. Concurrently fetch Last.fm info, Last.fm top tracks, and iTunes top tracks
+      const [lastFmInfoRes, lastFmTopTracksRes, itunesTopTracksRes] = await Promise.allSettled([
         getArtistInfoFromLastFM(artistName),
         getArtistTopTracksFromLastFM(artistName, 10),
-        this.deezerClient.searchArtist(artistName)
+        this.itunesClient.getArtistTopTracks(artistName, 10)
       ]);
 
       const lastFmInfo = lastFmInfoRes.status === 'fulfilled' ? lastFmInfoRes.value : null;
-      const lastFmTracks = lastFmTopTracks.status === 'fulfilled' ? lastFmTopTracks.value : [];
-      const deezer = deezerArtist.status === 'fulfilled' ? deezerArtist.value : null;
-
-      let deezerTopTracks: any[] = [];
-      if (deezer?.id) {
-        try {
-          deezerTopTracks = await this.deezerClient.getArtistTopTracks(deezer.id, 10);
-        } catch {
-          // ignore
-        }
-      }
+      const lastFmTracks = lastFmTopTracksRes.status === 'fulfilled' ? lastFmTopTracksRes.value : [];
+      const itunesTracks = itunesTopTracksRes.status === 'fulfilled' ? itunesTopTracksRes.value : [];
 
       // 3. Extract bio and tags
       let bio: string | undefined = undefined;
@@ -80,14 +74,14 @@ export class ArtistProfileService {
         }));
       }
 
-      // 4. Build Popular Tracks (Top 5 - 10)
-      const topTracks = this.buildPopularTracks(lastFmTracks, deezerTopTracks, localSongMap);
+      // 4. Build Popular Tracks (Top 10)
+      const topTracks = this.buildPopularTracks(lastFmTracks, itunesTracks, localSongMap);
 
       // 5. Build Similar Artists
       const similarArtists = await this.buildSimilarArtists(lastFmInfo);
 
       // 6. Build External Links
-      const externalLinks = this.buildExternalLinks(artistName, deezer?.link, lastFmInfo?.artist?.url);
+      const externalLinks = this.buildExternalLinks(artistName, lastFmInfo?.artist?.url);
 
       return {
         artistId,
@@ -107,20 +101,20 @@ export class ArtistProfileService {
 
   private buildPopularTracks(
     lastFmTracks: LastFmTopTrack[],
-    deezerTracks: any[],
+    itunesTracks: any[],
     localSongMap: Map<string, number>
   ): ArtistPopularTrack[] {
     const popularTracks: ArtistPopularTrack[] = [];
     const seenTitles = new Set<string>();
 
-    // Map deezer tracks by normalized title for quick audio preview pairing
-    const deezerMap = new Map<string, any>();
-    for (const dt of deezerTracks) {
-      const norm = normalizeForMatching(dt.title || dt.title_short);
-      if (norm) deezerMap.set(norm, dt);
+    // Map iTunes tracks by normalized title for quick audio preview pairing
+    const itunesMap = new Map<string, any>();
+    for (const it of itunesTracks) {
+      const norm = normalizeForMatching(it.trackName);
+      if (norm) itunesMap.set(norm, it);
     }
 
-    // Process Last.fm tracks first (authoritative global ranking)
+    // Process Last.fm tracks first if available
     if (lastFmTracks.length > 0) {
       for (const lt of lastFmTracks) {
         const norm = normalizeForMatching(lt.name);
@@ -128,24 +122,24 @@ export class ArtistProfileService {
         seenTitles.add(norm);
 
         const localSongId = localSongMap.get(norm);
-        const deezerMatch = deezerMap.get(norm);
+        const itunesMatch = itunesMap.get(norm);
 
         popularTracks.push({
           id: lt.url || lt.name,
           title: lt.name,
           listeners: lt.listeners ? Number(lt.listeners) : undefined,
           playcount: lt.playcount ? Number(lt.playcount) : undefined,
-          previewUrl: deezerMatch?.preview,
-          albumTitle: deezerMatch?.album?.title,
-          coverMedium: deezerMatch?.album?.cover_medium,
+          previewUrl: itunesMatch?.previewUrl,
+          albumTitle: itunesMatch?.collectionName,
+          coverMedium: itunesMatch?.artworkUrl600 || itunesMatch?.artworkUrl100,
           localSongId,
           isInLibrary: localSongId !== undefined
         });
       }
-    } else if (deezerTracks.length > 0) {
-      // Fallback to Deezer top tracks if Last.fm returned no tracks
-      for (const dt of deezerTracks) {
-        const title = dt.title || dt.title_short;
+    } else if (itunesTracks.length > 0) {
+      // Direct iTunes top songs ranking (guaranteed global availability)
+      for (const it of itunesTracks) {
+        const title = it.trackName;
         const norm = normalizeForMatching(title);
         if (!norm || seenTitles.has(norm)) continue;
         seenTitles.add(norm);
@@ -153,12 +147,12 @@ export class ArtistProfileService {
         const localSongId = localSongMap.get(norm);
 
         popularTracks.push({
-          id: dt.id,
+          id: it.trackId,
           title,
-          duration: dt.duration,
-          previewUrl: dt.preview,
-          albumTitle: dt.album?.title,
-          coverMedium: dt.album?.cover_medium,
+          duration: Math.round((it.trackTimeMillis || 0) / 1000),
+          previewUrl: it.previewUrl,
+          albumTitle: it.collectionName,
+          coverMedium: it.artworkUrl600 || it.artworkUrl100,
           localSongId,
           isInLibrary: localSongId !== undefined
         });
@@ -204,7 +198,6 @@ export class ArtistProfileService {
 
   private buildExternalLinks(
     artistName: string,
-    deezerUrl?: string,
     lastFmUrl?: string
   ): Array<{ name: string; url: string; icon: string }> {
     const links: Array<{ name: string; url: string; icon: string }> = [];
@@ -216,20 +209,22 @@ export class ArtistProfileService {
       links.push({ name: 'Last.fm', url: `https://www.last.fm/music/${encoded}`, icon: 'public' });
     }
 
-    if (deezerUrl) {
-      links.push({ name: 'Deezer', url: deezerUrl, icon: 'graphic_eq' });
-    }
-
     links.push({
-      name: 'MusicBrainz',
-      url: `https://musicbrainz.org/search?query=${encoded}&type=artist`,
-      icon: 'library_music'
+      name: 'Apple Music',
+      url: `https://music.apple.com/us/search?term=${encoded}`,
+      icon: 'graphic_eq'
     });
 
     links.push({
       name: 'Spotify',
       url: `https://open.spotify.com/search/${encoded}`,
       icon: 'open_in_new'
+    });
+
+    links.push({
+      name: 'MusicBrainz',
+      url: `https://musicbrainz.org/search?query=${encoded}&type=artist`,
+      icon: 'library_music'
     });
 
     links.push({
