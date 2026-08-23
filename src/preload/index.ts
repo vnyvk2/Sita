@@ -39,6 +39,11 @@ import type {
   ListeningAnalyticsData,
   LibraryAudioStatsData
 } from '../main/db/queries/analytics';
+import type {
+  ArtistDiscographyPayload,
+  ArtistOnlineProfilePayload,
+  OnlineTrackDetail
+} from '../types/artist_discography';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -472,7 +477,22 @@ const artistsData = {
   ): Promise<ToggleLikeSongReturnValue | undefined> =>
     ipcRenderer.invoke('app/toggleLikeArtists', artistIds, likeArtist),
   getArtistArtworks: (artistId: number): Promise<ArtistInfoFromNet | undefined> =>
-    ipcRenderer.invoke('app/getArtistArtworks', artistId)
+    ipcRenderer.invoke('app/getArtistArtworks', artistId),
+  getArtistDiscography: (
+    artistId: number,
+    artistName: string
+  ): Promise<ArtistDiscographyPayload> =>
+    ipcRenderer.invoke('app/getArtistDiscography', artistId, artistName),
+  getAlbumOnlineTracks: (
+    onlineAlbumId: number,
+    artistId: number
+  ): Promise<OnlineTrackDetail[]> =>
+    ipcRenderer.invoke('app/getAlbumOnlineTracks', onlineAlbumId, artistId),
+  getArtistOnlineProfile: (
+    artistId: number,
+    artistName: string
+  ): Promise<ArtistOnlineProfilePayload> =>
+    ipcRenderer.invoke('app/getArtistOnlineProfile', artistId, artistName)
 };
 
 // $ GENRES DATA

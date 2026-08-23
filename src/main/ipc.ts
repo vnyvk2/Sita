@@ -39,6 +39,8 @@ import removeMusicFolder from './core/removeMusicFolder';
 import { resolveArtistDuplicates } from './core/resolveDuplicates';
 import resolveFeaturingArtists from './core/resolveFeaturingArtists';
 import { resolveSeparateArtists } from './core/resolveSeparateArtists';
+import { artistDiscographyService } from './services/ArtistDiscographyService';
+import { artistProfileService } from './services/ArtistProfileService';
 import restoreBlacklistedFolders from './core/restoreBlacklistedFolder';
 import restoreBlacklistedSongs from './core/restoreBlacklistedSongs';
 import saveArtworkToSystem from './core/saveArtworkToSystem';
@@ -479,6 +481,18 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/getArtistArtworks', (_, artistId: number) =>
       getArtistInfoFromNet(artistId)
+    );
+
+    ipcMain.handle('app/getArtistDiscography', (_, artistId: number, artistName: string) =>
+      artistDiscographyService.getDiscography(artistId, artistName)
+    );
+
+    ipcMain.handle('app/getAlbumOnlineTracks', (_, onlineAlbumId: number, artistId: number) =>
+      artistDiscographyService.getAlbumTracks(onlineAlbumId, artistId)
+    );
+
+    ipcMain.handle('app/getArtistOnlineProfile', (_, artistId: number, artistName: string) =>
+      artistProfileService.getProfile(artistId, artistName)
     );
 
     ipcMain.handle('app/fetchSongInfoFromNet', (_, songTitle: string, songArtists: string[]) =>

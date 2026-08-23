@@ -52,6 +52,27 @@ export const artistQuery = createQueryKeys('artists', {
       queryKey: [data.artistId],
       queryFn: async () => (await window.api.artistsData.getArtistArtworks(data.artistId)) ?? null
     };
+  },
+  discography: (data: { artistId: number; artistName: string }) => {
+    return {
+      queryKey: [data.artistId, data.artistName, 'discography'],
+      queryFn: async () => window.api.artistsData.getArtistDiscography(data.artistId, data.artistName),
+      staleTime: 1000 * 60 * 60 * 24
+    };
+  },
+  onlineAlbumTracks: (data: { onlineAlbumId: number; artistId: number }) => {
+    return {
+      queryKey: [data.artistId, data.onlineAlbumId, 'tracks'],
+      queryFn: async () => window.api.artistsData.getAlbumOnlineTracks(data.onlineAlbumId, data.artistId),
+      staleTime: 1000 * 60 * 60 * 24
+    };
+  },
+  onlineProfile: (data: { artistId: number; artistName: string }) => {
+    return {
+      queryKey: [data.artistId, data.artistName, 'profile'],
+      queryFn: async () => window.api.artistsData.getArtistOnlineProfile(data.artistId, data.artistName),
+      staleTime: 1000 * 60 * 60 * 24
+    };
   }
 });
 
