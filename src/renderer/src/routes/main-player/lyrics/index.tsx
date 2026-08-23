@@ -355,7 +355,9 @@ function LyricsPage() {
     >
       {preferences?.lyricsBackground === 'artwork' && (
         <LyricsAmbientBackground
-          artworkPath={currentSongData.artworkPath}
+          artworkPath={
+            currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath
+          }
           paletteData={currentSongData.paletteData}
         />
       )}

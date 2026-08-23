@@ -272,13 +272,16 @@ export async function runExperiment(runKey) {
 
   // Launch Electron with remote debugging port 9876
   console.log('[Runner] Launching Nora in dev mode with --remoteDebuggingPort 9876...');
-  spawn('npx.cmd', ['electron-vite', 'dev', '--watch=false', '--remoteDebuggingPort', '9876'], {
-    cwd: rootDir,
-    env,
-    stdio: 'ignore',
-    shell: true,
-    detached: true
-  });
+  spawn(
+    process.execPath,
+    [path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'dev', '--watch=false', '--remoteDebuggingPort', '9876'],
+    {
+      cwd: rootDir,
+      env,
+      stdio: 'ignore',
+      detached: true
+    }
+  );
 
   const timeline = [];
 

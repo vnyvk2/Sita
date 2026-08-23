@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
 import { SYNCED_LYRICS_REGEX } from '@common/isLyricsSynced';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
@@ -105,12 +107,12 @@ const CompactLyricsPanel = (props: Props) => {
       {/* ── Layer 1: Ambient Blurred Artwork Background (z-0) ── */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <Img
-          src={currentSongData.artworkPath}
+          src={currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath}
           fallbackSrc={DefaultSongCover}
           alt="Album Art Ambient Background"
           className="h-full w-full object-cover blur-2xl brightness-[0.35] scale-125 transition-[filter,transform] duration-500"
         />
-        <div className="absolute inset-0 bg-black/45 backdrop-blur-md" />
+        <div className="absolute inset-0 bg-black/60" />
       </div>
 
       {/* ── Layer 2: Floating Close Button (z-30) ── */}

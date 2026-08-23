@@ -55,7 +55,9 @@ const TheatreLyricsView = ({
       {/* Ambient Artwork Background */}
       {isArtworkBackground && (
         <LyricsAmbientBackground
-          artworkPath={currentSongData.artworkPath}
+          artworkPath={
+            currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath
+          }
           paletteData={currentSongData.paletteData}
           blur={preferences?.lyricsArtworkBlur}
           darkness={preferences?.lyricsArtworkDarkness}

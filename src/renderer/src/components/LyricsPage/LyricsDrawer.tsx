@@ -62,7 +62,9 @@ const LyricsDrawer = () => {
       {/* Ambient Artwork Background */}
       {preferences?.lyricsBackground === 'artwork' && currentSongData.artworkPath && (
         <LyricsAmbientBackground
-          artworkPath={currentSongData.artworkPath}
+          artworkPath={
+            currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath
+          }
           paletteData={currentSongData.paletteData}
         />
       )}
