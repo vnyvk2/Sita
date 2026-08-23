@@ -1,220 +1,294 @@
-﻿import { describe, it, expect } from 'vitest';
-import { EventEmitter } from 'events';
+﻿// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import sharp from 'sharp';
 
-describe('Playback Pipeline Adversarial Audit & Performance Profiling', () => {
-  describe('P0: Artwork Sharp & IPC Serialization Overhead', () => {
-    it('quantifies latency and buffer size of Sharp processing on song load', async () => {
-      const fakeImageBuffer = Buffer.alloc(4 * 1024 * 1024); // 4 MB raw buffer
+// Mock Web Audio API for jsdom environment
+class MockAudioContext {
+  currentTime = 0;
+  destination = {};
+  createGain() {
+    return {
+      gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn()
+    };
+  }
+  createBiquadFilter() {
+    return {
+      type: 'peaking',
+      frequency: { value: 1000 },
+      gain: { value: 0 },
+      Q: { value: 1 },
+      connect: vi.fn()
+    };
+  }
+  createMediaElementSource() {
+    return { connect: vi.fn() };
+  }
+  close() {
+    return Promise.resolve();
+  }
+}
+window.AudioContext = MockAudioContext as any;
 
-      const startSharp = performance.now();
-      const base64Str = fakeImageBuffer.toString('base64');
-      const endSharp = performance.now();
+import AudioPlayer from '@renderer/other/player';
+import { store } from '@renderer/store/store';
 
-      const serializationDuration = endSharp - startSharp;
-      console.log(`[Playback Audit] 4MB Artwork Base64 string length: ${base64Str.length} chars (~${(base64Str.length / (1024 * 1024)).toFixed(2)} MB)`);
-      console.log(`[Playback Audit] Base64 serialization time: ${serializationDuration.toFixed(2)} ms`);
+describe('Playback Pipeline Rigorous Engineering Audit', () => {
+  let tempDir: string;
 
-      expect(base64Str.length).toBeGreaterThan(4 * 1024 * 1024);
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-playback-audit-'));
+  });
+
+  afterEach(() => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  });
+
+  describe('P0: Real Sharp Image Decoding vs Path-Only Payload', () => {
+    it('benchmarks real Sharp decoding time and memory on disk image', async () => {
+      const testImagePath = path.join(tempDir, 'test_cover.jpg');
+
+      // Generate a realistic 2000x2000 JPEG cover artwork
+      await sharp({
+        create: {
+          width: 2000,
+          height: 2000,
+          channels: 3,
+          background: { r: 64, g: 128, b: 200 }
+        }
+      })
+        .jpeg({ quality: 85 })
+        .toFile(testImagePath);
+
+      const fileSize = fs.statSync(testImagePath).size;
+
+      // 1. Measure real Sharp .toBuffer() duration and memory
+      const t0 = performance.now();
+      const sharpBuffer = await sharp(testImagePath).toBuffer();
+      const t1 = performance.now();
+      const sharpDuration = t1 - t0;
+
+      // 2. Measure path-only duration (just string resolution)
+      const t2 = performance.now();
+      const resolvedPath = `nora://artworks/test_cover.jpg`;
+      const t3 = performance.now();
+      const pathDuration = t3 - t2;
+
+      console.log(`[Sharp Real Benchmark] 2000x2000 JPEG file size: ${(fileSize / 1024).toFixed(1)} KB`);
+      console.log(`[Sharp Real Benchmark] sharp(path).toBuffer() execution time: ${sharpDuration.toFixed(2)} ms`);
+      console.log(`[Sharp Real Benchmark] path-only resolution time: ${pathDuration.toFixed(4)} ms`);
+      console.log(`[Sharp Real Benchmark] Sharp Buffer allocated in RAM: ${(sharpBuffer.length / 1024).toFixed(1)} KB`);
+
+      expect(sharpBuffer.length).toBeGreaterThan(0);
+      expect(sharpDuration).toBeGreaterThan(pathDuration);
     });
 
-    it('benchmarks RAM footprint over 100 song skips: with Sharp buffers vs with artworkPath only', async () => {
-      // 1. Old Architecture: 100 skips with 2MB Sharp image buffers
+    it('measures payload memory retention accurately (Heap vs External vs RSS)', () => {
+      // Clean memory measurement of retaining 50 raw 2MB Buffer objects vs 50 path strings
       const initialMem = process.memoryUsage();
-      const initialTotal = initialMem.heapUsed + initialMem.external + initialMem.arrayBuffers;
 
-      const oldPayloads: any[] = [];
-      for (let i = 0; i < 100; i++) {
-        oldPayloads.push({
-          songId: i,
-          title: `Song ${i}`,
-          artwork: Buffer.alloc(2 * 1024 * 1024) // 2MB binary buffer per track
-        });
+      // 50 x 2MB binary buffers
+      const buffers: Buffer[] = [];
+      for (let i = 0; i < 50; i++) {
+        buffers.push(Buffer.alloc(2 * 1024 * 1024));
       }
+
       const memWithBuffers = process.memoryUsage();
-      const totalWithBuffers = memWithBuffers.heapUsed + memWithBuffers.external + memWithBuffers.arrayBuffers;
-      const bufferOverheadMB = (totalWithBuffers - initialTotal) / (1024 * 1024);
-      console.log(`[RAM Benchmark] 100 skips with Sharp binary Buffers: +${bufferOverheadMB.toFixed(2)} MB total RAM (external + arrayBuffers)`);
+      const bufferExternalMB = (memWithBuffers.external - initialMem.external) / (1024 * 1024);
+      const bufferRssMB = (memWithBuffers.rss - initialMem.rss) / (1024 * 1024);
 
-      // Clear old payloads
-      oldPayloads.length = 0;
+      console.log(`[Accurate Memory Profile] 50 x 2MB Buffers retained in Node memory:`);
+      console.log(`  - External (ArrayBuffer/C++ bindings): +${bufferExternalMB.toFixed(2)} MB`);
+      console.log(`  - Process RSS delta: +${bufferRssMB.toFixed(2)} MB`);
 
-      // 2. New Architecture: 100 skips with artworkPath string only
+      // Clear buffers
+      buffers.length = 0;
+
+      // 50 path strings
       const baseMem = process.memoryUsage();
-      const baseTotal = baseMem.heapUsed + baseMem.external + baseMem.arrayBuffers;
-
-      const newPayloads: any[] = [];
-      for (let i = 0; i < 100; i++) {
-        newPayloads.push({
-          songId: i,
-          title: `Song ${i}`,
-          artwork: undefined,
-          artworkPath: `nora://artworks/${i}.webp`
-        });
+      const paths: string[] = [];
+      for (let i = 0; i < 50; i++) {
+        paths.push(`nora://artworks/${i}.webp`);
       }
+
       const memWithPaths = process.memoryUsage();
-      const totalWithPaths = memWithPaths.heapUsed + memWithPaths.external + memWithPaths.arrayBuffers;
-      const pathOverheadMB = (totalWithPaths - baseTotal) / (1024 * 1024);
-      console.log(`[RAM Benchmark] 100 skips with artworkPath string only: +${pathOverheadMB.toFixed(2)} MB total RAM`);
+      const pathExternalMB = (memWithPaths.external - baseMem.external) / (1024 * 1024);
 
-      expect(bufferOverheadMB).toBeGreaterThan(150); // ~200MB allocated
-      expect(pathOverheadMB).toBeLessThan(1); // < 1MB allocated
+      console.log(`[Accurate Memory Profile] 50 path strings retained:`);
+      console.log(`  - External memory: ${pathExternalMB.toFixed(4)} MB`);
+
+      expect(bufferExternalMB).toBeGreaterThan(90); // ~100MB allocated in external buffer memory
     });
   });
 
-  describe('P0: Rapid Skip Race Condition in AudioPlayer', () => {
-    it('proves out-of-order resolution overwrites audio.src without a generation token', async () => {
-      let currentAudioSrc = '';
-      let currentSongIdInStore = 0;
+  describe('P0: Real AudioPlayer Class Race Condition & Caller Integration', () => {
+    it('proves AudioPlayer class discards out-of-order getSong responses and suppresses stale recordListening', async () => {
+      const mockQueuesManager = {
+        getActiveQueue: () => ({
+          on: vi.fn(),
+          currentSongId: 1,
+          hasNext: true,
+          hasPrevious: false,
+          length: 5,
+          position: 0,
+          moveToNext: vi.fn(),
+          moveToPrevious: vi.fn(),
+          moveToPosition: vi.fn(),
+          moveToStart: vi.fn(),
+          isEmpty: false
+        }),
+        on: vi.fn()
+      } as any;
 
-      const mockAudio = {
-        set src(val: string) {
-          currentAudioSrc = val;
-        },
-        get src() {
-          return currentAudioSrc;
+      const player = new AudioPlayer(mockQueuesManager);
+
+      // Mock audio element behavior in jsdom
+      player.audio.load = vi.fn();
+      player.audio.play = vi.fn().mockResolvedValue(undefined);
+
+      const recordListeningEvents: number[] = [];
+      player.on('recordListening', (data: any) => {
+        recordListeningEvents.push(data.songId);
+      });
+
+      // Variable latencies: Track 1 = 80ms, Track 2 = 40ms, Track 3 = 10ms
+      const latencies: Record<number, number> = { 1: 80, 2: 40, 3: 10 };
+
+      window.api = {
+        audioLibraryControls: {
+          getSong: vi.fn().mockImplementation((songId: number) => {
+            return new Promise((resolve) => {
+              setTimeout(() => {
+                resolve({
+                  songId,
+                  title: `Track ${songId}`,
+                  duration: 200,
+                  path: `nora://music/song_${songId}.flac`,
+                  artworkPaths: { artworkPath: `nora://artworks/${songId}.webp` }
+                });
+              }, latencies[songId]);
+            });
+          })
         }
-      };
+      } as any;
 
-      const songLatencies: Record<number, number> = {
-        1: 100,
-        2: 50,
-        3: 10
-      };
-
-      const getSongMock = (songId: number): Promise<{ songId: number; path: string }> => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({ songId, path: `nora://music/song_${songId}.flac` });
-          }, songLatencies[songId]);
-        });
-      };
-
-      async function vulnerableLoadSong(songId: number) {
-        const songData = await getSongMock(songId);
-        currentSongIdInStore = songData.songId;
-        mockAudio.src = `${songData.path}?ts=${Date.now()}`;
-      }
-
-      const p1 = vulnerableLoadSong(1);
-      const p2 = vulnerableLoadSong(2);
-      const p3 = vulnerableLoadSong(3);
+      // User rapidly calls playSongById for 1, then 2, then 3
+      const p1 = player.playSongById(1);
+      const p2 = player.playSongById(2);
+      const p3 = player.playSongById(3);
 
       await Promise.all([p1, p2, p3]);
 
-      // Vulnerable: Track 1 finished last and overwrote Track 3!
-      expect(currentSongIdInStore).toBe(1);
-      expect(mockAudio.src).toContain('song_1.flac');
-    });
+      console.log(`[AudioPlayer Class Integration] Final player.audio.src: ${player.audio.src}`);
+      console.log(`[AudioPlayer Class Integration] Final store.state.currentSongData.songId: ${store.state.currentSongData?.songId}`);
+      console.log(`[AudioPlayer Class Integration] Record listening events emitted: ${JSON.stringify(recordListeningEvents)}`);
 
-    it('proves generation token / requestId guarantees correct latest song resolution', async () => {
-      let currentAudioSrc = '';
-      let currentSongIdInStore = 0;
-      let loadRequestId = 0;
+      // 1. Final audio source is strictly Track 3
+      expect(player.audio.src).toBe('nora://music/song_3.flac');
 
-      const mockAudio = {
-        set src(val: string) {
-          currentAudioSrc = val;
-        },
-        get src() {
-          return currentAudioSrc;
-        }
-      };
+      // 2. Final store songId is strictly Track 3
+      expect(store.state.currentSongData?.songId).toBe(3);
 
-      const songLatencies: Record<number, number> = {
-        1: 100,
-        2: 50,
-        3: 10
-      };
+      // 3. Stale track 1 and 2 did NOT emit recordListening events
+      expect(recordListeningEvents).toEqual([3]);
 
-      const getSongMock = (songId: number): Promise<{ songId: number; path: string }> => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({ songId, path: `nora://music/song_${songId}.flac` });
-          }, songLatencies[songId]);
-        });
-      };
-
-      async function hardenedLoadSong(songId: number) {
-        const currentReq = ++loadRequestId;
-        const songData = await getSongMock(songId);
-
-        if (currentReq !== loadRequestId) {
-          return;
-        }
-
-        currentSongIdInStore = songData.songId;
-        mockAudio.src = songData.path;
-      }
-
-      const p1 = hardenedLoadSong(1);
-      const p2 = hardenedLoadSong(2);
-      const p3 = hardenedLoadSong(3);
-
-      await Promise.all([p1, p2, p3]);
-
-      // Hardened: Track 3 is properly retained as the final active track!
-      expect(currentSongIdInStore).toBe(3);
-      expect(mockAudio.src).toBe('nora://music/song_3.flac');
+      player.destroy();
     });
   });
 
-  describe('P1: Stream Backpressure Simulation', () => {
-    it('verifies that backpressure pauses producer when consumer queue is full', async () => {
-      class MockReadStream extends EventEmitter {
-        paused = false;
-        pause() {
-          this.paused = true;
-        }
-        resume() {
-          this.paused = false;
-        }
-        destroy() {}
+  describe('P1: Real Disk File Stream Backpressure Flow Control', () => {
+    it('demonstrates that pause/resume bounds producer chunk buffering on slow consumer reading a real file', async () => {
+      // 1. Create a 5 MB binary test file on disk
+      const testFilePath = path.join(tempDir, 'test_audio.flac');
+      const chunkSize = 64 * 1024; // 64 KB
+      const totalChunks = 80; // 80 * 64KB = 5.12 MB
+      const testBuffer = Buffer.alloc(chunkSize, 0xaa);
+
+      const writeStream = fs.createWriteStream(testFilePath);
+      for (let i = 0; i < totalChunks; i++) {
+        writeStream.write(testBuffer);
       }
+      await new Promise((r) => writeStream.end(r));
 
-      const mockFileStream = new MockReadStream();
-      let streamPausedCount = 0;
-      let streamResumedCount = 0;
+      // 2. Set up Web ReadableStream with backpressure (as implemented in handleFileProtocol)
+      const fileStream = fs.createReadStream(testFilePath, { highWaterMark: chunkSize });
+      let chunksEnqueued = 0;
+      let pauseCalls = 0;
+      let resumeCalls = 0;
 
-      const originalPause = mockFileStream.pause.bind(mockFileStream);
-      const originalResume = mockFileStream.resume.bind(mockFileStream);
+      const origPause = fileStream.pause.bind(fileStream);
+      const origResume = fileStream.resume.bind(fileStream);
 
-      mockFileStream.pause = () => {
-        streamPausedCount++;
-        originalPause();
+      fileStream.pause = () => {
+        pauseCalls++;
+        return origPause();
       };
-      mockFileStream.resume = () => {
-        streamResumedCount++;
-        originalResume();
+      fileStream.resume = () => {
+        resumeCalls++;
+        return origResume();
       };
 
       const webStream = new ReadableStream<Uint8Array>({
         start(controller) {
-          mockFileStream.on('data', (chunk: Buffer) => {
-            controller.enqueue(new Uint8Array(chunk));
+          fileStream.on('data', (chunk) => {
+            const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            controller.enqueue(new Uint8Array(bufferChunk));
+            chunksEnqueued++;
+
+            // Backpressure: pause disk stream when WebStream queue is satisfied
             if (controller.desiredSize !== null && controller.desiredSize <= 0) {
-              mockFileStream.pause();
+              fileStream.pause();
             }
+          });
+
+          fileStream.on('end', () => {
+            try {
+              controller.close();
+            } catch {}
           });
         },
         pull() {
-          mockFileStream.resume();
+          fileStream.resume();
+        },
+        cancel() {
+          fileStream.destroy();
         }
       });
 
-      // Emit chunk that fills queue
-      mockFileStream.emit('data', Buffer.alloc(64 * 1024));
-
-      expect(mockFileStream.paused).toBe(true);
-      expect(streamPausedCount).toBe(1);
-
-      // Downstream reader consumes chunk
+      // 3. Read 3 chunks slowly (simulating slow media decode by browser)
       const reader = webStream.getReader();
-      const readResult = await reader.read();
-      expect(readResult.value?.length).toBe(64 * 1024);
 
-      // When reader needs more, pull() resumes producer
-      expect(mockFileStream.paused).toBe(false);
-      expect(streamResumedCount).toBe(1);
+      // Read chunk 1
+      const chunk1 = await reader.read();
+      expect(chunk1.value?.length).toBe(chunkSize);
+
+      // Give event loop 30ms to verify disk stream did NOT dump all 80 chunks
+      await new Promise((r) => setTimeout(r, 30));
+      console.log(`[Stream Backpressure Real File] Chunks enqueued after reading 1 chunk: ${chunksEnqueued} / ${totalChunks}`);
+      console.log(`[Stream Backpressure Real File] Stream pause calls: ${pauseCalls}, resume calls: ${resumeCalls}`);
+
+      // With backpressure, the fileStream paused after initial buffer filled (<= 3 chunks enqueued)
+      expect(chunksEnqueued).toBeLessThan(5);
+      expect(pauseCalls).toBeGreaterThanOrEqual(1);
+
+      // Read chunk 2
+      const chunk2 = await reader.read();
+      expect(chunk2.value?.length).toBe(chunkSize);
+
+      // Read chunk 3
+      const chunk3 = await reader.read();
+      expect(chunk3.value?.length).toBe(chunkSize);
+
+      // Cancel stream to clean up
+      await reader.cancel();
+      fileStream.destroy();
+
+      console.log(`[Stream Backpressure Real File] Successfully bounded producer memory to ${chunksEnqueued * 64} KB instead of full 5.12 MB!`);
     });
   });
 });

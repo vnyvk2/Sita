@@ -218,7 +218,7 @@ class AudioPlayer {
   private async loadSong(
     songIdOrData: number | AudioPlayerData,
     options?: { autoPlay?: boolean; updateStore?: boolean }
-  ): Promise<AudioPlayerData> {
+  ): Promise<AudioPlayerData | null> {
     const currentRequestId = ++this.loadRequestId;
     let songData: AudioPlayerData;
 
@@ -240,7 +240,7 @@ class AudioPlayer {
         currentRequestId,
         latestRequestId: this.loadRequestId
       });
-      return songData;
+      return null;
     }
 
     try {
@@ -309,7 +309,7 @@ class AudioPlayer {
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
-    this.queueEventsUnsubscribe.forEach((unsub) => unsub());
+    this.queueEventsUnsubscribe.forEach((unsub) => typeof unsub === 'function' && unsub());
     this.removeAllListeners();
     this.audio.pause();
     this.audio.src = '';
@@ -523,16 +523,13 @@ class AudioPlayer {
     try {
       logPlayer('[AudioPlayer.playSongById]', { songId, autoPlay });
 
-      // Fetch song data once
-      const songData = await window.api.audioLibraryControls.getSong(songId);
+      // Pass songId directly to loadSong so loadRequestId is incremented immediately before async IPC fetch
+      const loadedSongData = await this.loadSong(songId, { autoPlay, updateStore: true });
 
-      // Load song with store updates
-      await this.loadSong(songData, { autoPlay, updateStore: true });
-
-      // Record listening data if requested
-      if (recordListening) {
+      // Record listening data only if request was not discarded as stale
+      if (loadedSongData && recordListening) {
         // Note: Listening data recording will be handled by the hook until fully migrated
-        this.emit('recordListening', { songId, duration: songData.duration });
+        this.emit('recordListening', { songId: loadedSongData.songId, duration: loadedSongData.duration });
       }
     } catch (error) {
       if (onError) {
