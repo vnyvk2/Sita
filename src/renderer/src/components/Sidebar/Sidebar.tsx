@@ -86,6 +86,14 @@ const Sidebar = memo(() => {
           isActive: false
         },
         {
+          to: '/main-player/insights',
+          id: 'Insights',
+          parentClassName: 'insights',
+          icon: 'auto_graph',
+          content: t('sideBar.insights', { defaultValue: 'Insights' }),
+          isActive: false
+        },
+        {
           to: '/main-player/settings',
           id: 'Settings',
           parentClassName: 'settings',

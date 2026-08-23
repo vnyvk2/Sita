@@ -34,6 +34,11 @@ import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
+import type {
+  HistoryPeriod,
+  ListeningAnalyticsData,
+  LibraryAudioStatsData
+} from '../main/db/queries/analytics';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -152,6 +157,10 @@ const audioLibraryControls = {
     ipcRenderer.invoke('app/getAllFavoriteSongs', sortType, paginatingData),
   getSongListeningData: (songIds: number[]): Promise<SongListeningData[]> =>
     ipcRenderer.invoke('app/getSongListeningData', songIds),
+  getListeningAnalytics: (period?: HistoryPeriod): Promise<ListeningAnalyticsData> =>
+    ipcRenderer.invoke('app/getListeningAnalytics', period),
+  getLibraryAudioStats: (): Promise<LibraryAudioStatsData> =>
+    ipcRenderer.invoke('app/getLibraryAudioStats'),
   updateSongListeningData: (
     songId: number,
     dataType: ListeningDataEvents,

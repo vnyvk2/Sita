@@ -1238,5 +1238,16 @@
     "untitledSong": "An untitled song",
     "unknownArtist": "an unknown artist",
     "playingASong": "Playing a song"
+  },
+
+  "sideBar": {
+    "home": "Home",
+    "search": "Search",
+    "insights": "Insights"
+  },
+
+  "insightsPage": {
+    "title": "Insights & Audio Stats",
+    "subtitle": "Listening trends, format breakdown, and circadian rhythm analysis"
   }
 }

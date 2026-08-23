@@ -1,0 +1,119 @@
+{
+  "config": {
+    "name": "Run 5: Combined Validation (A + B + C) (DevTools Open)",
+    "flags": {
+      "DISABLE_STORE_CLONE_LOGGING": true,
+      "DISABLE_AMBIENT_BACKGROUND": true,
+      "DISABLE_LYRICS_POSITION_LISTENERS": true,
+      "SUPPRESS_LASTFM_ERRORS": false
+    },
+    "devtoolsClosed": false
+  },
+  "timeline": [
+    {
+      "step": "T0 (Launch)",
+      "elapsedSec": 0,
+      "mainWS": 641.09,
+      "mainPM": 667.49,
+      "rendererWS": 159.97,
+      "rendererPM": 59.73,
+      "gpuWS": 81.38,
+      "gpuPM": 34.04,
+      "totalWS": 942.65,
+      "totalPM": 777.55,
+      "jsHeapUsedMB": 2.74,
+      "jsHeapTotalMB": 4.16,
+      "listeners": 18
+    },
+    {
+      "step": "T+1m (Idle)",
+      "elapsedSec": 60,
+      "mainWS": 483.72,
+      "mainPM": 476.95,
+      "rendererWS": 530.7,
+      "rendererPM": 340.2,
+      "gpuWS": 191.14,
+      "gpuPM": 129.03,
+      "totalWS": 1355.51,
+      "totalPM": 975.8,
+      "jsHeapUsedMB": 28.56,
+      "jsHeapTotalMB": 30.61,
+      "listeners": 604
+    },
+    {
+      "step": "T+2m (Play+Lyrics)",
+      "elapsedSec": 120,
+      "mainWS": 488.59,
+      "mainPM": 479.72,
+      "rendererWS": 529.55,
+      "rendererPM": 342.58,
+      "gpuWS": 170.27,
+      "gpuPM": 120.37,
+      "totalWS": 1337.59,
+      "totalPM": 971.86,
+      "jsHeapUsedMB": 28.47,
+      "jsHeapTotalMB": 31.61,
+      "listeners": 583
+    },
+    {
+      "step": "T+3m (5 Skips)",
+      "elapsedSec": 180,
+      "mainWS": 583.45,
+      "mainPM": 570.87,
+      "rendererWS": 656.56,
+      "rendererPM": 471.66,
+      "gpuWS": 170.86,
+      "gpuPM": 120.2,
+      "totalWS": 1559.98,
+      "totalPM": 1191.75,
+      "jsHeapUsedMB": 73.27,
+      "jsHeapTotalMB": 115.86,
+      "listeners": 791
+    },
+    {
+      "step": "T+4m (10 Rapid Skips Peak)",
+      "elapsedSec": 240,
+      "mainWS": 594.84,
+      "mainPM": 582.43,
+      "rendererWS": 720.27,
+      "rendererPM": 535.03,
+      "gpuWS": 175.23,
+      "gpuPM": 124.54,
+      "totalWS": 1639.51,
+      "totalPM": 1271.11,
+      "jsHeapUsedMB": 41.73,
+      "jsHeapTotalMB": 106.61,
+      "listeners": 592
+    },
+    {
+      "step": "T+5m (Stopped/Home)",
+      "elapsedSec": 300,
+      "mainWS": 595.06,
+      "mainPM": 582.16,
+      "rendererWS": 725.14,
+      "rendererPM": 538.25,
+      "gpuWS": 200.95,
+      "gpuPM": 149.48,
+      "totalWS": 1670.56,
+      "totalPM": 1298.97,
+      "jsHeapUsedMB": 57.7,
+      "jsHeapTotalMB": 112.11,
+      "listeners": 648
+    },
+    {
+      "step": "T+6m (Post-Rest Retention)",
+      "elapsedSec": 360,
+      "mainWS": 598.76,
+      "mainPM": 585.79,
+      "rendererWS": 687.57,
+      "rendererPM": 501.15,
+      "gpuWS": 174.86,
+      "gpuPM": 123.17,
+      "totalWS": 1610.67,
+      "totalPM": 1239.18,
+      "jsHeapUsedMB": 67.96,
+      "jsHeapTotalMB": 114.61,
+      "listeners": 656
+    }
+  ]
+}

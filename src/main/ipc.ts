@@ -50,6 +50,7 @@ import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
+import { getListeningAnalytics, getLibraryAudioStats, type HistoryPeriod } from './db/queries/analytics';
 import type { HistoryQueryOptions } from './db/queries/history';
 import {
   addIgnoredArtist,
@@ -316,6 +317,15 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       'app/getAllFavoriteSongs',
       (_, sortType?: SongSortTypes, paginatingData?: PaginatingData) =>
         getAllFavoriteSongs(sortType, paginatingData)
+    );
+
+    // Music Analytics & Insights Handlers
+    ipcMain.handle('app/getListeningAnalytics', (_, period?: HistoryPeriod) =>
+      getListeningAnalytics(period)
+    );
+
+    ipcMain.handle('app/getLibraryAudioStats', () =>
+      getLibraryAudioStats()
     );
 
     // ipcMain.handle('app/saveUserData', (_, dataType: UserDataTypes, data: string) =>

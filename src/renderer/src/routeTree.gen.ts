@@ -13,6 +13,7 @@ import { Route as MainPlayerRouteRouteImport } from './routes/main-player/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MiniPlayerIndexRouteImport } from './routes/mini-player/index'
 import { Route as FullscreenPlayerIndexRouteImport } from './routes/fullscreen-player/index'
+import { Route as MainPlayerInsightsRouteImport } from './routes/main-player/insights'
 import { Route as MainPlayerSongsIndexRouteImport } from './routes/main-player/songs/index'
 import { Route as MainPlayerSettingsIndexRouteImport } from './routes/main-player/settings/index'
 import { Route as MainPlayerSearchIndexRouteImport } from './routes/main-player/search/index'
@@ -58,6 +59,11 @@ const FullscreenPlayerIndexRoute = FullscreenPlayerIndexRouteImport.update({
   id: '/fullscreen-player/',
   path: '/fullscreen-player/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MainPlayerInsightsRoute = MainPlayerInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => MainPlayerRouteRoute,
 } as any)
 const MainPlayerSongsIndexRoute = MainPlayerSongsIndexRouteImport.update({
   id: '/songs/',
@@ -200,6 +206,7 @@ const MainPlayerLyricsEditorSongIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/main-player': typeof MainPlayerRouteRouteWithChildren
+  '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player/': typeof FullscreenPlayerIndexRoute
   '/mini-player/': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
@@ -231,6 +238,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/main-player': typeof MainPlayerRouteRouteWithChildren
+  '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player': typeof FullscreenPlayerIndexRoute
   '/mini-player': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
@@ -262,6 +270,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/main-player': typeof MainPlayerRouteRouteWithChildren
+  '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player/': typeof FullscreenPlayerIndexRoute
   '/mini-player/': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/main-player'
+    | '/main-player/insights'
     | '/fullscreen-player/'
     | '/mini-player/'
     | '/main-player/albums/$albumId'
@@ -326,6 +336,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/main-player'
+    | '/main-player/insights'
     | '/fullscreen-player'
     | '/mini-player'
     | '/main-player/albums/$albumId'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/main-player'
+    | '/main-player/insights'
     | '/fullscreen-player/'
     | '/mini-player/'
     | '/main-player/albums/$albumId'
@@ -421,6 +433,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/fullscreen-player/'
       preLoaderRoute: typeof FullscreenPlayerIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/main-player/insights': {
+      id: '/main-player/insights'
+      path: '/insights'
+      fullPath: '/main-player/insights'
+      preLoaderRoute: typeof MainPlayerInsightsRouteImport
+      parentRoute: typeof MainPlayerRouteRoute
     }
     '/main-player/songs/': {
       id: '/main-player/songs/'
@@ -616,6 +635,7 @@ const MainPlayerSongsSongIdRouteWithChildren =
   )
 
 interface MainPlayerRouteRouteChildren {
+  MainPlayerInsightsRoute: typeof MainPlayerInsightsRoute
   MainPlayerAlbumsAlbumIdRoute: typeof MainPlayerAlbumsAlbumIdRoute
   MainPlayerArtistsArtistIdRoute: typeof MainPlayerArtistsArtistIdRoute
   MainPlayerFoldersFolderPathRoute: typeof MainPlayerFoldersFolderPathRoute
@@ -642,6 +662,7 @@ interface MainPlayerRouteRouteChildren {
 }
 
 const MainPlayerRouteRouteChildren: MainPlayerRouteRouteChildren = {
+  MainPlayerInsightsRoute: MainPlayerInsightsRoute,
   MainPlayerAlbumsAlbumIdRoute: MainPlayerAlbumsAlbumIdRoute,
   MainPlayerArtistsArtistIdRoute: MainPlayerArtistsArtistIdRoute,
   MainPlayerFoldersFolderPathRoute: MainPlayerFoldersFolderPathRoute,
