@@ -253,27 +253,31 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
   });
 
   it('P1: cancels active fade and immediately settles pending fade promise when reverse fade starts', async () => {
-    let fadeOutSettled = false;
+    vi.useFakeTimers();
+    try {
+      let fadeOutSettled = false;
 
-    // Start fade-out (250ms duration)
-    const fadeOutPromise = player.pause().then(() => {
-      fadeOutSettled = true;
-    });
+      // Start fade-out (250ms duration)
+      const fadeOutPromise = player.pause().then(() => {
+        fadeOutSettled = true;
+      });
 
-    // 20ms later, reverse fade by calling play() (fade-in)
-    await new Promise((r) => setTimeout(r, 20));
-    expect(fadeOutSettled).toBe(false);
+      // 20ms later, fade-out is still pending
+      await vi.advanceTimersByTimeAsync(20);
+      expect(fadeOutSettled).toBe(false);
 
-    const fadeInPromise = player.play();
+      // Start fade-in (reverse fade)
+      const fadeInPromise = player.play();
 
-    // The fade-out promise should settle immediately upon cancellation
-    await Promise.race([
-      fadeOutPromise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Promise hung')), 50))
-    ]);
+      // The fade-out promise should settle immediately upon cancellation
+      await expect(fadeOutPromise).resolves.toBeUndefined();
+      expect(fadeOutSettled).toBe(true);
 
-    expect(fadeOutSettled).toBe(true);
-
-    await fadeInPromise;
+      // Advance through fade-in duration (250ms)
+      await vi.advanceTimersByTimeAsync(250);
+      await expect(fadeInPromise).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
