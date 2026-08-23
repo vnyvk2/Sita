@@ -763,6 +763,20 @@ const Song = memo(
               (isIndexingSongs || isMultipleSelectionEnabled || isBlacklisted) && 'sm:hidden'
             }`}
           >
+            {!isIndexingSongs &&
+              !showTrackNumberAsSongIndex &&
+              isCurrentSong &&
+              showEqualizerOnTracklist && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-200 group-focus-within:opacity-0 group-hover:opacity-0">
+                  <span className="bg-background-color-1/90 dark:bg-dark-background-color-1/90 text-font-color-highlight dark:text-dark-font-color-highlight flex items-center justify-center rounded-full p-1.5 shadow-md">
+                    <SoundBarsIndicator
+                      isPlaying={isSongPlaying && !isAnimationDisabled}
+                      variant="dots"
+                      size="xs"
+                    />
+                  </span>
+                </div>
+              )}
             <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
               <Button
                 className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"

@@ -118,13 +118,16 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       </AppUpdateContext.Provider>
     );
 
-  it('renders animated SoundBarsIndicator on the real Song component when track is current and playing', () => {
-    const { container } = renderTestSong(101, 0, 1);
+  it('renders animated SoundBarsIndicator in index badge when indexing is enabled and track is current and playing', () => {
+    const { container } = renderTestSong(101, 0, 1, true);
 
     const indicator = container.querySelector('.sound-bars-indicator');
     expect(indicator).not.toBeNull();
     expect(indicator?.classList.contains('sound-bars--playing')).toBe(true);
     expect(indicator?.classList.contains('sound-bars--paused')).toBe(false);
+
+    // Overlay on artwork must not be rendered when indexing pill is present
+    expect(container.querySelector('.song-cover-container .sound-bars-indicator')).toBeNull();
   });
 
   it('renders paused idle SoundBarsIndicator on Song when track is current but paused', () => {
@@ -133,12 +136,56 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       player: { ...prev.player, isCurrentSongPlaying: false }
     }));
 
-    const { container } = renderTestSong(101, 0, 1);
+    const { container } = renderTestSong(101, 0, 1, true);
 
     const indicator = container.querySelector('.sound-bars-indicator');
     expect(indicator).not.toBeNull();
     expect(indicator?.classList.contains('sound-bars--paused')).toBe(true);
     expect(indicator?.classList.contains('sound-bars--playing')).toBe(false);
+  });
+
+  it('renders artwork-positioned dot-matrix equalizer overlay when indexing is disabled and song is playing', () => {
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          isSongIndexingEnabled: false,
+          showTrackNumberAsSongIndex: false,
+          showEqualizerOnTracklist: true
+        }
+      }
+    }));
+
+    // Playing track (current song)
+    const { container: playingContainer } = renderTestSong(101, 0, undefined, false);
+    // Unplayed track (non-current song)
+    const { container: unplayedContainer } = renderTestSong(999, 1, undefined, false);
+
+    // No leading index badge pill should exist for either track
+    expect(
+      playingContainer.querySelector('.song-cover-and-play-btn-container > div.relative.mx-1')
+    ).toBeNull();
+    expect(
+      unplayedContainer.querySelector('.song-cover-and-play-btn-container > div.relative.mx-1')
+    ).toBeNull();
+
+    // Playing track must render equalizer overlay INSIDE song-cover-container
+    const coverEqualizer = playingContainer.querySelector(
+      '.song-cover-container .sound-bars-indicator'
+    );
+    expect(coverEqualizer).not.toBeNull();
+    expect(coverEqualizer?.classList.contains('sound-bars--playing')).toBe(true);
+
+    // Unplayed track must NOT render any equalizer
+    expect(unplayedContainer.querySelector('.sound-bars-indicator')).toBeNull();
+
+    // Equalizer overlay must have pointer-events-none and hover cross-fade classes
+    const overlayWrapper = coverEqualizer?.closest('.absolute');
+    expect(overlayWrapper?.className).toContain('pointer-events-none');
+    expect(overlayWrapper?.className).toContain('group-hover:opacity-0');
+    expect(overlayWrapper?.className).toContain('group-focus-within:opacity-0');
   });
 
   it('reverts to classic track number on Song component when showEqualizerOnTracklist is false', () => {
@@ -153,14 +200,14 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       }
     }));
 
-    const { container } = renderTestSong(101, 0, 1);
+    const { container } = renderTestSong(101, 0, 1, true);
 
     expect(container.querySelector('.sound-bars-indicator')).toBeNull();
     expect(container.textContent).toContain('1');
   });
 
   it('renders classic track number for non-current songs even when equalizer preference is true', () => {
-    const { container } = renderTestSong(999, 4, 5);
+    const { container } = renderTestSong(999, 4, 5, true);
 
     expect(container.querySelector('.sound-bars-indicator')).toBeNull();
     expect(container.textContent).toContain('5');
@@ -179,16 +226,16 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       }
     }));
 
-    const { container } = renderTestSong(101, 0, 1);
+    const { container } = renderTestSong(101, 0, 1, true);
 
     const indicator = container.querySelector('.sound-bars-indicator');
     expect(indicator).not.toBeNull();
     expect(indicator?.classList.contains('sound-bars--paused')).toBe(true);
   });
 
-  // --- Row Geometry Invariance Tests ---
+  // --- Row & Artwork Geometry Invariance Tests ---
 
-  it('maintains narrow leading container and renders no badge when indexing and track numbers are disabled', () => {
+  it('maintains strict row and artwork geometry invariance when indexing is disabled', () => {
     store.setState((prev) => ({
       ...prev,
       localStorage: {
@@ -212,16 +259,18 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       '.song-cover-and-play-btn-container'
     );
 
-    // Neither should render an equalizer or track number badge
-    expect(playingContainer.querySelector('.sound-bars-indicator')).toBeNull();
-    expect(unplayedContainer.querySelector('.sound-bars-indicator')).toBeNull();
+    const playingCoverContainer = playingContainer.querySelector('.song-cover-container');
+    const unplayedCoverContainer = unplayedContainer.querySelector('.song-cover-container');
 
     // Both should maintain the narrow container width class
     expect(playingLeadingDiv?.className).toContain('w-[clamp(4rem,10%,6rem)]!');
     expect(unplayedLeadingDiv?.className).toContain('w-[clamp(4rem,10%,6rem)]!');
+
+    // Artwork containers must maintain identical structural classes
+    expect(playingCoverContainer?.className).toBe(unplayedCoverContainer?.className);
   });
 
-  it('maintains wide leading container for both playing and unplayed songs when indexing is enabled', () => {
+  it('maintains strict row and artwork geometry invariance when indexing is enabled', () => {
     // Playing track (current song)
     const { container: playingContainer } = renderTestSong(101, 0, 1, true);
     // Unplayed track (non-current song)
@@ -232,10 +281,16 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       '.song-cover-and-play-btn-container'
     );
 
+    const playingCoverContainer = playingContainer.querySelector('.song-cover-container');
+    const unplayedCoverContainer = unplayedContainer.querySelector('.song-cover-container');
+
     expect(playingLeadingDiv?.className).not.toContain('w-[clamp(4rem,10%,6rem)]!');
     expect(unplayedLeadingDiv?.className).not.toContain('w-[clamp(4rem,10%,6rem)]!');
     expect(playingLeadingDiv?.className).toContain('w-[clamp(6rem,15%,9rem)]');
     expect(unplayedLeadingDiv?.className).toContain('w-[clamp(6rem,15%,9rem)]');
+
+    // Artwork containers must maintain identical structural classes
+    expect(playingCoverContainer?.className).toBe(unplayedCoverContainer?.className);
   });
 
   // --- Artwork & Hover Invariance Tests ---
