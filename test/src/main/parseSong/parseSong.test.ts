@@ -28,6 +28,13 @@ vi.mock('../../../../src/main/logger', () => ({
 vi.mock('node-taglib-sharp', () => ({
   File: {
     createFromPath: vi.fn()
+  },
+  PictureType: {
+    Other: 0,
+    FileIcon: 1,
+    OtherFileIcon: 2,
+    FrontCover: 3,
+    BackCover: 4
   }
 }));
 
@@ -420,6 +427,28 @@ describe('parseSong', () => {
   });
 
   describe('Metadata Parsing', () => {
+    test('should parse multiple genres separated by comma and semicolon into distinct genres', async () => {
+      const songPath = '/test/multi-genre-song.mp3';
+      const mockMetadata = createMockSongMetadata({
+        genres: ['Rock,pop', 'Jazz; Blues', 'Rock / Pop', 'Hip-Hop/Rap']
+      });
+
+      const taglib = await import('node-taglib-sharp');
+      vi.mocked(taglib.File.createFromPath).mockReturnValue(mockMetadata as any);
+
+      await parseSong(songPath);
+
+      const manageGenresOfParsedSong = (
+        await import('../../../../src/main/parseSong/manageGenresOfParsedSong')
+      ).default;
+      expect(manageGenresOfParsedSong).toHaveBeenCalledWith(
+        expect.objectContaining({
+          songGenres: ['Rock', 'pop', 'Jazz', 'Blues', 'Hip-Hop/Rap']
+        }),
+        expect.anything()
+      );
+    });
+
     test('should parse multiple artists separated by comma', async () => {
       const songPath = '/test/comma-artists-song.mp3';
       const mockMetadata = createMockSongMetadata({

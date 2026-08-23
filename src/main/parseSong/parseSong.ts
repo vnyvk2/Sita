@@ -16,10 +16,12 @@ import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
 import manageGenresOfParsedSong from './manageGenresOfParsedSong';
+import { parseGenreList, GENRE_SEPARATOR_REGEX } from '../../common/genreUtils';
 // import { timeEnd, timeStart } from './utils/measureTimeUsage';
 
 const pathsQueue = new Set<string>();
 export const ARTIST_SEPARATOR_REGEX = /[,&]/gm;
+export { GENRE_SEPARATOR_REGEX };
 
 export interface ParseSongResult {
   songData: typeof songs.$inferSelect;
@@ -154,6 +156,7 @@ export const parseSong = async (
         artistsData = getArtistNamesFromSong(metadata.performers.join(', '));
         albumArtistsData = getArtistNamesFromSong(metadata.albumArtists.join(', '));
         albumData = getAlbumInfoFromSong(metadata.album);
+        genresData = getGenreInfoFromSong(metadata.genres);
         const detectedLanguage = detectSongLanguage(
           metadata,
           absoluteFilePath,
@@ -344,8 +347,7 @@ export const getAlbumInfoFromSong = (album?: string) => {
   return undefined;
 };
 
-export const getGenreInfoFromSong = (genres?: string[]) => {
-  if (Array.isArray(genres) && genres.length > 0) return genres;
-
-  return [];
+export const getGenreInfoFromSong = (genres?: string[] | string | null): string[] => {
+  return parseGenreList(genres);
 };
+

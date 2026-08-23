@@ -29,11 +29,9 @@ const getAlbumInfoFromSong = (album?: string) => {
   return undefined;
 };
 
-const getGenreInfoFromSong = (genres?: string[]) => {
-  if (Array.isArray(genres) && genres.length > 0) return genres;
+import { parseGenreList } from '../../../../src/common/genreUtils';
 
-  return [];
-};
+const getGenreInfoFromSong = parseGenreList;
 
 describe('parseSong Helper Functions', () => {
   describe('ARTIST_SEPARATOR_REGEX', () => {
@@ -269,14 +267,28 @@ describe('parseSong Helper Functions', () => {
       expect(result).toEqual([]);
     });
 
-    test('should return empty array for non-array input', () => {
-      const result = getGenreInfoFromSong('Rock' as unknown as string[]);
-      expect(result).toEqual([]);
+    test('should parse single string genre into array', () => {
+      const result = getGenreInfoFromSong('Rock');
+      expect(result).toEqual(['Rock']);
     });
 
-    test('should preserve empty strings in array', () => {
+    test('should split comma-separated genres in string or array', () => {
+      expect(getGenreInfoFromSong('Rock,pop')).toEqual(['Rock', 'pop']);
+      expect(getGenreInfoFromSong(['Rock, Pop', 'Jazz'])).toEqual(['Rock', 'Pop', 'Jazz']);
+    });
+
+    test('should split semicolon-separated genres', () => {
+      expect(getGenreInfoFromSong('Rock; Pop; Indie')).toEqual(['Rock', 'Pop', 'Indie']);
+    });
+
+    test('should split whitespace-surrounded slashes and double slashes', () => {
+      expect(getGenreInfoFromSong('Rock / Pop')).toEqual(['Rock', 'Pop']);
+      expect(getGenreInfoFromSong('Rock//Pop')).toEqual(['Rock', 'Pop']);
+    });
+
+    test('should filter out empty strings in array', () => {
       const result = getGenreInfoFromSong(['Rock', '', 'Pop']);
-      expect(result).toEqual(['Rock', '', 'Pop']);
+      expect(result).toEqual(['Rock', 'Pop']);
     });
 
     test('should handle array with many genres', () => {
@@ -285,9 +297,13 @@ describe('parseSong Helper Functions', () => {
       expect(result).toEqual(genres);
     });
 
-    test('should preserve whitespace in genre names', () => {
+    test('should trim whitespace in genre names', () => {
       const result = getGenreInfoFromSong(['  Rock  ', 'Pop']);
-      expect(result).toEqual(['  Rock  ', 'Pop']);
+      expect(result).toEqual(['Rock', 'Pop']);
+    });
+
+    test('should deduplicate case-insensitively while preserving first casing', () => {
+      expect(getGenreInfoFromSong(['Rock', 'rock', 'ROCK'])).toEqual(['Rock']);
     });
 
     test('should handle genres with numbers', () => {

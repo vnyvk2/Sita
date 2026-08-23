@@ -1,6 +1,8 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { parseGenreList, GENRE_SEPARATOR_REGEX } from '../../../common/genreUtils';
+import { linkArtworksToGenre } from './artworks';
 
 export const isGenreWithIdAvailable = async (genreId: number, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(genres).where(eq(genres.id, genreId));
@@ -93,7 +95,7 @@ export const linkSongToGenre = async (
   songId: number,
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(genresSongs).values({ genreId, songId });
+  return trx.insert(genresSongs).values({ genreId, songId }).onConflictDoNothing().returning();
 };
 
 /**
@@ -175,3 +177,61 @@ export const getGenreSongIds = async (genreId: number, trx: DB | DBTransaction =
 export const deleteGenre = async (genreId: number, trx: DB | DBTransaction = db) => {
   return trx.delete(genres).where(eq(genres.id, genreId));
 };
+
+/**
+ * Scans existing genres in the database for delimiter-separated names (e.g. "Rock,pop", "Rock; Pop", "Rock / Pop").
+ * Splits each malformed genre into canonical genres, migrates song relationships (genres_songs) and
+ * artworks (artworks_genres), and removes the obsolete malformed genre records.
+ *
+ * Safe and idempotent.
+ */
+export const reconcileExistingMultiGenres = async (trx: DB | DBTransaction = db) => {
+  const allExistingGenres = await trx.query.genres.findMany({
+    with: {
+      songs: true,
+      artworks: true
+    }
+  });
+
+  let reconciledCount = 0;
+
+  for (const genre of allExistingGenres) {
+    const splitNames = parseGenreList(genre.name);
+    // If the genre name splits into more than 1 distinct genre (or contains delimiters that should be trimmed/normalized)
+    if (
+      splitNames.length > 1 ||
+      (splitNames.length === 1 && splitNames[0] !== genre.name && GENRE_SEPARATOR_REGEX.test(genre.name))
+    ) {
+      for (const canonicalName of splitNames) {
+        let canonicalGenre = await getGenreWithTitle(canonicalName, trx);
+        if (!canonicalGenre) {
+          canonicalGenre = await createGenre({ name: canonicalName }, trx);
+        }
+
+        // Migrate artwork if canonical genre does not have artwork
+        if (genre.artworks && genre.artworks.length > 0) {
+          for (const art of genre.artworks) {
+            await linkArtworksToGenre(
+              [{ artworkId: art.artworkId, genreId: canonicalGenre.id }],
+              trx
+            );
+          }
+        }
+
+        // Migrate song relations
+        if (genre.songs && genre.songs.length > 0) {
+          for (const s of genre.songs) {
+            await linkSongToGenre(canonicalGenre.id, s.songId, trx);
+          }
+        }
+      }
+
+      // Delete the old malformed genre record (cascade will clean up old genres_songs and artworks_genres)
+      await deleteGenre(genre.id, trx);
+      reconciledCount += 1;
+    }
+  }
+
+  return { reconciledCount };
+};
+
