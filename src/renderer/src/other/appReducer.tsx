@@ -424,7 +424,8 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
       genres: true,
       folders: true,
       artists: true,
-      albums: true
+      albums: true,
+      insights: true
     },
     themePreset: 'default',
     lyricsBackground: 'default',

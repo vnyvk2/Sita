@@ -18,7 +18,7 @@ import { queryClient } from '@renderer/queryClient';
 import storage from '@renderer/utils/localStorage';
 // import DataFetchingImage from '../../../assets/images/svg/Umbrella_Monochromatic.svg';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { lazy, useCallback, useContext, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -52,6 +52,7 @@ const AddMusicFoldersPrompt = lazy(
 );
 
 function HomePage() {
+  const navigate = useNavigate();
   const { updateContextMenuData, changePromptMenuData, addNewNotifications } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -247,6 +248,16 @@ function HomePage() {
         <SecondaryContainer className="appear-from-bottom mt-4 h-fit max-h-full w-full pb-4 pl-8">
           <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center justify-between text-2xl font-medium">
             {t('homePage.favoritesAndRecaps')}
+            <Button
+              tooltipLabel={t('sideBar.insights', { defaultValue: 'Insights' })}
+              iconName="auto_graph"
+              className="insights-btn text-sm font-normal"
+              clickHandler={() =>
+                navigate({
+                  to: '/main-player/insights'
+                })
+              }
+            />
           </div>
           <div className="flex gap-4">
             <SpecialPlaylistCard

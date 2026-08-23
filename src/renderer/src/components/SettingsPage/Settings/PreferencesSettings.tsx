@@ -133,7 +133,8 @@ const PreferencesSettings = () => {
                     genres: true,
                     folders: true,
                     artists: true,
-                    albums: true
+                    albums: true,
+                    insights: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -150,7 +151,8 @@ const PreferencesSettings = () => {
                     genres: true,
                     folders: true,
                     artists: true,
-                    albums: true
+                    albums: true,
+                    insights: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -167,7 +169,8 @@ const PreferencesSettings = () => {
                     genres: true,
                     folders: true,
                     artists: true,
-                    albums: true
+                    albums: true,
+                    insights: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -184,7 +187,8 @@ const PreferencesSettings = () => {
                     genres: true,
                     folders: true,
                     artists: true,
-                    albums: true
+                    albums: true,
+                    insights: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -192,6 +196,24 @@ const PreferencesSettings = () => {
                   });
                 }}
                 labelContent={t('common.album_other')}
+              />
+              <Checkbox
+                id="toggleSidebarTabInsights"
+                isChecked={preferences?.visibleSideTabs?.insights ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true,
+                    insights: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    insights: state
+                  });
+                }}
+                labelContent={t('sideBar.insights', { defaultValue: 'Insights' })}
               />
             </div>
           </div>

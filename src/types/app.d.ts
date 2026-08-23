@@ -538,6 +538,7 @@ declare global {
     folders: boolean;
     artists: boolean;
     albums: boolean;
+    insights?: boolean;
   }
 
   interface Preferences {

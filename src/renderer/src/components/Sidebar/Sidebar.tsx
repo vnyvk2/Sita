@@ -111,6 +111,7 @@ const Sidebar = memo(() => {
       if (link.id === 'Artists' && visibleSideTabs?.artists === false) return false;
       if (link.id === 'Albums' && visibleSideTabs?.albums === false) return false;
       if (link.id === 'Genres' && visibleSideTabs?.genres === false) return false;
+      if (link.id === 'Insights' && visibleSideTabs?.insights === false) return false;
       return true;
     });
   }, [linkData, visibleSideTabs]);
