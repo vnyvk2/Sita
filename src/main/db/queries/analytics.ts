@@ -230,6 +230,7 @@ export const getListeningAnalytics = async (
             .select({
               artistId: artistsArtworks.artistId,
               path: artworks.path,
+              isOptimized: artworks.isOptimized,
               source: artworks.source
             })
             .from(artistsArtworks)
@@ -237,16 +238,20 @@ export const getListeningAnalytics = async (
             .where(inArray(artistsArtworks.artistId, topArtistIds))
         : [];
 
-    const artistArtworksMap = new Map<number, string[]>();
+    const artistArtworksMap = new Map<number, Array<{ path: string; isOptimized: boolean }>>();
     for (const art of artistArtworksList) {
+      if (!art.path) continue;
       const list = artistArtworksMap.get(art.artistId) || [];
-      list.push(art.path);
+      list.push({ path: art.path, isOptimized: Boolean(art.isOptimized) });
       artistArtworksMap.set(art.artistId, list);
     }
 
     const topArtists: TopArtistItem[] = artistHistoryRecords.map((a) => {
-      const paths = artistArtworksMap.get(a.artistId);
-      const artworkPaths = paths && paths.length > 0 ? parseArtistArtworks(paths) : undefined;
+      const arts = artistArtworksMap.get(a.artistId);
+      const artworkPaths =
+        arts && arts.length > 0
+          ? parseArtistArtworks(arts as unknown as (typeof artworks.$inferSelect)[])
+          : undefined;
       return {
         artistId: a.artistId,
         name: a.name,
@@ -345,28 +350,30 @@ export const getListeningAnalytics = async (
         ? await trx
             .select({
               songId: artworksSongs.songId,
-              path: artworks.path
+              path: artworks.path,
+              isOptimized: artworks.isOptimized
             })
             .from(artworksSongs)
             .innerJoin(artworks, eq(artworksSongs.artworkId, artworks.id))
             .where(inArray(artworksSongs.songId, trackSongIds))
         : [];
 
-    const trackArtworkMap = new Map<number, string[]>();
+    const trackArtworkMap = new Map<number, Array<{ path: string; isOptimized: boolean }>>();
     for (const art of allTrackArtworks) {
+      if (!art.path) continue;
       const list = trackArtworkMap.get(art.songId) || [];
-      list.push(art.path);
+      list.push({ path: art.path, isOptimized: Boolean(art.isOptimized) });
       trackArtworkMap.set(art.songId, list);
     }
 
     const topTracks: TopTrackItem[] = trackHistoryRecords.map((t) => {
       const trackArtists = trackArtistsMap.get(t.songId) || [];
       const trackAlbum = trackAlbumMap.get(t.songId);
-      const trackArtworksList = trackArtworkMap.get(t.songId);
+      const trackArts = trackArtworkMap.get(t.songId);
 
       const artworkPaths =
-        trackArtworksList && trackArtworksList.length > 0
-          ? parseSongArtworks(trackArtworksList.map((artPath) => ({ path: artPath } as any)))
+        trackArts && trackArts.length > 0
+          ? parseSongArtworks(trackArts as unknown as (typeof artworks.$inferSelect)[])
           : undefined;
 
       return {

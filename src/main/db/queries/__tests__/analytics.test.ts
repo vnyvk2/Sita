@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getCutoffDate, type HistoryPeriod } from '../analytics';
 
 describe('Analytics Database Queries - Logic & Period Validation', () => {
@@ -31,5 +31,19 @@ describe('Analytics Database Queries - Logic & Period Validation', () => {
     expect(getCutoffDate(undefined)).toBeUndefined();
     expect(getCutoffDate('invalid' as HistoryPeriod)).toBeUndefined();
     expect(getCutoffDate('-5' as HistoryPeriod)).toBeUndefined();
+  });
+
+  it('executes getListeningAnalytics and getLibraryAudioStats cleanly against DB', async () => {
+    const { getListeningAnalytics, getLibraryAudioStats } = await import('../analytics');
+    const listening = await getListeningAnalytics('30');
+    expect(listening).toBeDefined();
+    expect(listening.summary).toBeDefined();
+    expect(Array.isArray(listening.hourlyDistribution)).toBe(true);
+    expect(Array.isArray(listening.topArtists)).toBe(true);
+    expect(Array.isArray(listening.topTracks)).toBe(true);
+
+    const stats = await getLibraryAudioStats();
+    expect(stats).toBeDefined();
+    expect(typeof stats.totalTracks).toBe('number');
   });
 });
