@@ -89,7 +89,10 @@ const SeekBarSlider = (props: Props) => {
       const handleSeekbarMouseDown = () => {
         isMouseDownRef.current = true;
       };
-      const handleSeekbarMouseUp = () => {
+      const handleTouchStart = () => {
+        isMouseDownRef.current = true;
+      };
+      const handleSeekbarEnd = () => {
         if (isMouseDownRef.current) {
           isMouseDownRef.current = false;
           const finalPos = seekBar.valueAsNumber || 0;
@@ -99,11 +102,15 @@ const SeekBarSlider = (props: Props) => {
       };
 
       seekBar.addEventListener('mousedown', handleSeekbarMouseDown);
-      window.addEventListener('mouseup', handleSeekbarMouseUp);
+      window.addEventListener('mouseup', handleSeekbarEnd);
+      seekBar.addEventListener('touchstart', handleTouchStart, { passive: true });
+      window.addEventListener('touchend', handleSeekbarEnd);
 
       return () => {
         seekBar.removeEventListener('mousedown', handleSeekbarMouseDown);
-        window.removeEventListener('mouseup', handleSeekbarMouseUp);
+        window.removeEventListener('mouseup', handleSeekbarEnd);
+        seekBar.removeEventListener('touchstart', handleTouchStart);
+        window.removeEventListener('touchend', handleSeekbarEnd);
       };
     }
     return undefined;
@@ -116,8 +123,16 @@ const SeekBarSlider = (props: Props) => {
     const percent = songDuration > 0 ? Math.min(100, Math.max(0, (pos / songDuration) * 100)) : 0;
     if (seekbarRef.current) {
       seekbarRef.current.style.setProperty('--seek-before-width', `${percent}%`);
+      seekbarRef.current.value = String(pos);
     }
     if (onSeek) onSeek(pos);
+
+    // If change triggered by keyboard without mousedown, commit seek after debounce
+    if (!isMouseDownRef.current) {
+      debounce(() => {
+        updateSongPosition(pos);
+      }, 150);
+    }
   };
 
   const handleOnWheel = (e: WheelEvent<HTMLInputElement>) => {

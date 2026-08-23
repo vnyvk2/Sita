@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 import AudioPlayer from '../other/player';
 import { PositionTimerScheduler } from '../other/positionScheduler';
 import { getQueuesManager } from '../other/queuesManager';
@@ -10,8 +8,9 @@ declare global {
   }
 }
 
-// Module-level singleton - initialized with queue on first hook call
+// Module-level singletons - initialized on first hook call
 let playerInstance: AudioPlayer | null = null;
+let schedulerInstance: PositionTimerScheduler | null = null;
 
 /**
  * Custom hook to manage the AudioPlayer singleton instance. Initializes the player with the shared
@@ -31,18 +30,10 @@ export function useAudioPlayer() {
         window.__NORA_AUDIO_PLAYER__ = playerInstance;
       }
     }
+    if (!schedulerInstance) {
+      schedulerInstance = new PositionTimerScheduler(playerInstance);
+    }
   }
-
-  // Cleanup on unmount is typically not needed for a global singleton player,
-  // but we provide it here for completeness if the app ever fully unmounts
-  useEffect(() => {
-    const player = playerInstance!;
-    const scheduler = new PositionTimerScheduler(player);
-
-    return () => {
-      scheduler.destroy();
-    };
-  }, []);
 
   return playerInstance;
 }
