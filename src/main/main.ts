@@ -144,7 +144,7 @@ function moveWindowProgrammatically(x: number, y: number, animate = false) {
   mainWindow.setPosition(x, y, animate);
 }
 
-function isRectOnAnyDisplay(bounds: { x: number; y: number; width: number; height: number }) {
+export function isRectOnAnyDisplay(bounds: { x: number; y: number; width: number; height: number }) {
   return screen.getAllDisplays().some((display) => {
     const { x, y, width, height } = display.bounds;
     return (
@@ -158,14 +158,27 @@ function isRectOnAnyDisplay(bounds: { x: number; y: number; width: number; heigh
 
 /**
  * Validates a persisted window position.
- * Guards against Windows' minimized-window coordinates (-32000) leaking into saved
- * settings and against positions that no longer lie on any connected display
- * (e.g. a detached monitor).
+ * Guards against Windows' minimized-window coordinates (-32000) and positions
+ * that do not intersect any connected display. Uses actual/minimum window
+ * footprint rather than a 1x1 point to allow legitimate partial overhangs.
  */
-function isValidPersistedPosition(x: number | null, y: number | null) {
-  if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) return false;
-  if (x <= -32000 || y <= -32000) return false;
-  return isRectOnAnyDisplay({ x, y, width: 1, height: 1 });
+export function isValidPersistedPosition(
+  x: number | null | undefined,
+  y: number | null | undefined,
+  width = MINI_PLAYER_MIN_SIZE_X,
+  height = MINI_PLAYER_MIN_SIZE_Y
+) {
+  if (
+    x === null ||
+    x === undefined ||
+    y === null ||
+    y === undefined ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y)
+  )
+    return false;
+  if (x <= -30000 || y <= -30000) return false;
+  return isRectOnAnyDisplay({ x, y, width, height });
 }
 
 // / / / / / / INITIALIZATION / / / / / / /
@@ -530,19 +543,25 @@ process.on('exit', (code) => {
 async function manageWindowFinishLoad() {
   const { mainWindowHeight, mainWindowWidth, mainWindowX, mainWindowY } = await getUserSettings();
 
-  if (mainWindowX !== null && mainWindowY !== null) {
-    mainWindow.setPosition(mainWindowX, mainWindowY, true);
+  const targetWidth = mainWindowWidth || MAIN_WINDOW_DEFAULT_SIZE_X;
+  const targetHeight = mainWindowHeight || MAIN_WINDOW_DEFAULT_SIZE_Y;
+
+  mainWindow.setSize(targetWidth, targetHeight, true);
+
+  if (isValidPersistedPosition(mainWindowX, mainWindowY, targetWidth, targetHeight)) {
+    mainWindow.setPosition(mainWindowX as number, mainWindowY as number, true);
+    ensureWindowIsVisible(mainWindow);
   } else {
+    if (mainWindowX !== null && mainWindowY !== null) {
+      logger.warn('Saved main window position is invalid on startup. Centering window.', {
+        mainWindowX,
+        mainWindowY
+      });
+    }
     mainWindow.center();
     const [x, y] = mainWindow.getPosition();
-    await saveUserSettings({ mainWindowX: x, mainWindowY: y });
-  }
-
-  if (mainWindowWidth !== null && mainWindowHeight !== null) {
-    mainWindow.setSize(
-      mainWindowWidth || MAIN_WINDOW_DEFAULT_SIZE_X,
-      mainWindowHeight || MAIN_WINDOW_DEFAULT_SIZE_Y,
-      true
+    await saveUserSettings({ mainWindowX: x, mainWindowY: y }).catch((error) =>
+      logger.error('Failed to persist centered main window position on startup', { error })
     );
   }
 
@@ -760,23 +779,32 @@ function manageAppMoveEvent() {
   if (mainWindow.isMinimized()) return;
 
   const [x, y] = mainWindow.getPosition();
-  if (!isValidPersistedPosition(x, y)) {
-    logger.warn('Ignoring window move reported at an invalid position', { playerType, x, y });
+  const [width, height] = mainWindow.getSize();
+
+  // Guard: if this move event matches our programmatic move target, consume it and ignore
+  if (
+    programmaticMoveTarget &&
+    programmaticMoveTarget.x === x &&
+    programmaticMoveTarget.y === y
+  ) {
+    programmaticMoveTarget = null;
+    return;
+  }
+  programmaticMoveTarget = null;
+
+  if (!isValidPersistedPosition(x, y, width, height)) {
+    logger.warn('Ignoring window move reported at an invalid position', {
+      playerType,
+      x,
+      y,
+      width,
+      height
+    });
     return;
   }
   logger.debug(`User moved the player`, { playerType, coordinates: { x, y } });
 
   if (playerType === 'mini') {
-    if (
-      programmaticMoveTarget &&
-      programmaticMoveTarget.x === x &&
-      programmaticMoveTarget.y === y
-    ) {
-      programmaticMoveTarget = null;
-      return;
-    }
-    programmaticMoveTarget = null;
-
     if (isQueueExpanded && compactHeight !== null && expandedHeight !== null) {
       const heightDelta = expandedHeight - compactHeight;
       const anchorY = expandedDirection === 'up' ? y + heightDelta : y;
@@ -1173,6 +1201,14 @@ export async function resetMiniPlayerToDefault() {
 
     const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
 
+    // Synchronize transition cache to default bounds so mode switches don't revert to pre-reset coordinates
+    compactX = defaultBounds.x;
+    compactY = defaultBounds.y;
+    isQueueExpanded = false;
+    compactHeight = null;
+    expandedHeight = null;
+    expandedDirection = null;
+
     setMiniPlayerBoundsProgrammatically(defaultBounds);
 
     if (currentMiniPlayerMode === 'compact') {
@@ -1251,7 +1287,7 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         expandedDirection = null;
         programmaticMoveTarget = null;
 
-        if (isValidPersistedPosition(miniPlayerX, miniPlayerY)) {
+        if (isValidPersistedPosition(miniPlayerX, miniPlayerY, targetWidth, targetHeight)) {
           moveWindowProgrammatically(miniPlayerX as number, miniPlayerY as number, true);
           ensureWindowIsVisible(mainWindow);
         } else {
@@ -1266,8 +1302,12 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
           }
           // Smart bottom-right screen anchoring on first launch
           const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
+          compactX = defaultBounds.x;
+          compactY = defaultBounds.y;
           moveWindowProgrammatically(defaultBounds.x, defaultBounds.y, true);
-          await saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y });
+          await saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y }).catch(
+            (error) => logger.error('Failed to persist default mini player position', { error })
+          );
         }
         mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
         playerType = 'mini';
@@ -1278,11 +1318,21 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         mainWindow.setAlwaysOnTop(false);
         mainWindow.setFullScreen(false);
 
+        const normalTargetWidth = mainWindowWidth || MAIN_WINDOW_DEFAULT_SIZE_X;
+        const normalTargetHeight = mainWindowHeight || MAIN_WINDOW_DEFAULT_SIZE_Y;
+
         if (mainWindowWidth !== null && mainWindowHeight !== null) {
-          mainWindow.setSize(mainWindowWidth, mainWindowHeight, true);
+          mainWindow.setSize(normalTargetWidth, normalTargetHeight, true);
         } else mainWindow.setSize(MAIN_WINDOW_DEFAULT_SIZE_X, MAIN_WINDOW_DEFAULT_SIZE_Y, true);
 
-        if (isValidPersistedPosition(mainWindowX, mainWindowY)) {
+        if (
+          isValidPersistedPosition(
+            mainWindowX,
+            mainWindowY,
+            normalTargetWidth,
+            normalTargetHeight
+          )
+        ) {
           moveWindowProgrammatically(mainWindowX as number, mainWindowY as number, true);
           ensureWindowIsVisible(mainWindow);
         } else {
@@ -1294,7 +1344,9 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
           }
           mainWindow.center();
           const [x, y] = mainWindow.getPosition();
-          await saveUserSettings({ mainWindowX: x, mainWindowY: y });
+          await saveUserSettings({ mainWindowX: x, mainWindowY: y }).catch((error) =>
+            logger.error('Failed to persist default main window position', { error })
+          );
         }
         mainWindow.setAspectRatio(MAIN_WINDOW_ASPECT_RATIO);
         playerType = 'normal';
@@ -1451,20 +1503,28 @@ function manageWindowOnDisplayMetricsChange() {
   if (playerType === 'mini') {
     const [width, height] = mainWindow.getSize();
     const defaultBounds = getDefaultMiniPlayerBounds(width, height);
+    compactX = defaultBounds.x;
+    compactY = defaultBounds.y;
     moveWindowProgrammatically(defaultBounds.x, defaultBounds.y);
     saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y }).catch(
       (error) => logger.error('Failed to persist recovered mini player position', { error })
     );
   } else {
     ensureWindowIsVisible(mainWindow);
+    const [x, y] = mainWindow.getPosition();
+    saveUserSettings({ mainWindowX: x, mainWindowY: y }).catch((error) =>
+      logger.error('Failed to persist recovered main window position', { error })
+    );
   }
 }
 
 function manageWindowPositionInMonitor() {
   manageWindowOnDisplayMetricsChange();
 
-  // Event listener for display change events
+  // Event listeners for display change events
   screen.on('display-metrics-changed', () => manageWindowOnDisplayMetricsChange());
+  screen.on('display-removed', () => manageWindowOnDisplayMetricsChange());
+  screen.on('display-added', () => manageWindowOnDisplayMetricsChange());
 }
 
 export async function toggleAutoLaunch(autoLaunchState: boolean) {

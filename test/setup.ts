@@ -38,6 +38,14 @@ vi.mock('electron', () => ({
   },
   net: {
     isOnline: vi.fn(() => true)
+  },
+  screen: {
+    getAllDisplays: vi.fn(() => []),
+    getDisplayMatching: vi.fn(() => ({
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      workArea: { x: 0, y: 0, width: 1920, height: 1040 }
+    })),
+    on: vi.fn()
   }
 }));
 
