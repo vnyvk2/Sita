@@ -34,109 +34,121 @@ const SeekBarSlider = (props: Props) => {
   const [songPos, setSongPos] = useState(0);
   const isMouseDownRef = useRef(false);
   const isMouseScrollRef = useRef(false);
-  const seekbarRef = useRef(null as HTMLInputElement | null);
-  const lowResponseSongPositionRef = useRef(0);
+  const seekbarRef = useRef<HTMLInputElement | null>(null);
+
+  const duration = currentSongData.duration || 0;
 
   const seekBarCssProperties: CSSProperties = {};
-  seekBarCssProperties['--seek-before-width'] = `${
-    (songPos /
-      ((currentSongData.duration || 0) >= songPos ? currentSongData.duration || 0 : songPos)) *
-    100
-  }%`;
   if (sliderOpacity !== undefined) seekBarCssProperties['--slider-opacity'] = `${sliderOpacity}`;
 
-  const handleSongPositionChange = useCallback((e: Event) => {
-    if ('detail' in e && typeof e.detail === 'number') {
-      const songPosition = e.detail as number;
+  const handleSongPositionChange = useCallback(
+    (e: Event) => {
+      if ('detail' in e && typeof e.detail === 'number') {
+        const songPosition = e.detail as number;
 
-      lowResponseSongPositionRef.current = songPosition;
-    }
-  }, []);
+        // When not actively scrubbing or dragging, update the visual progress directly on the DOM element
+        if (seekbarRef.current && !isMouseDownRef.current && !isMouseScrollRef.current) {
+          const liveDuration = currentSongData.duration || store.state.currentSongData?.duration || 0;
+          const songDuration = liveDuration > 0 ? liveDuration : songPosition;
+          const percent = songDuration > 0 ? Math.min(100, Math.max(0, (songPosition / songDuration) * 100)) : 0;
+
+          seekbarRef.current.style.setProperty('--seek-before-width', `${percent}%`);
+          seekbarRef.current.value = String(songPosition);
+
+          const time = calculateTime(songPosition);
+          seekbarRef.current.title = `${time.minutes}:${time.seconds}`;
+        }
+      }
+    },
+    [currentSongData.duration]
+  );
 
   useEffect(() => {
     document.addEventListener('player/positionChange', handleSongPositionChange);
-
     return () => document.removeEventListener('player/positionChange', handleSongPositionChange);
   }, [handleSongPositionChange]);
 
-  useEffect(() => {
-    lowResponseSongPositionRef.current = 0;
-    setSongPos(0);
-  }, [currentSongData.songId]);
+  const prevSongIdRef = useRef(currentSongData.songId);
 
+  // Reset progress on track change
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (seekbarRef.current && !isMouseDownRef.current && !isMouseScrollRef.current) {
-        setSongPos(lowResponseSongPositionRef.current);
-        if (onSeek) onSeek(lowResponseSongPositionRef.current);
+    if (prevSongIdRef.current !== currentSongData.songId) {
+      prevSongIdRef.current = currentSongData.songId;
+      setSongPos(0);
+      if (seekbarRef.current) {
+        seekbarRef.current.style.setProperty('--seek-before-width', '0%');
+        seekbarRef.current.value = '0';
       }
-    }, 500);
-
-    return () => clearInterval(intervalId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // useEffect(() => {
-  //   if (
-  //     seekbarRef.current &&
-  //     !isMouseDownRef.current &&
-  //     !isMouseScrollRef.current
-  //   ) {
-  //     setSongPos(songPosition);
-  //     if (onSeek) onSeek(songPosition);
-  //   }
-  //   //  ? Adding onSeek as a dependency makes the slider unresponsive while sliding for short times.
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [songPosition]);
+    }
+  }, [currentSongData.songId]);
 
   useEffect(() => {
     const seekBar = seekbarRef.current;
 
-    if (seekbarRef.current) {
+    if (seekBar) {
       const handleSeekbarMouseDown = () => {
         isMouseDownRef.current = true;
       };
       const handleSeekbarMouseUp = () => {
-        isMouseDownRef.current = false;
-        updateSongPosition(seekbarRef.current?.valueAsNumber ?? 0);
+        if (isMouseDownRef.current) {
+          isMouseDownRef.current = false;
+          const finalPos = seekBar.valueAsNumber || 0;
+          updateSongPosition(finalPos);
+          if (onSeek) onSeek(finalPos);
+        }
       };
-      seekbarRef.current.addEventListener('mousedown', () => handleSeekbarMouseDown());
-      seekbarRef.current.addEventListener('mouseup', () => handleSeekbarMouseUp());
+
+      seekBar.addEventListener('mousedown', handleSeekbarMouseDown);
+      window.addEventListener('mouseup', handleSeekbarMouseUp);
+
       return () => {
-        seekBar?.removeEventListener('mouseup', handleSeekbarMouseUp);
-        seekBar?.removeEventListener('mousedown', handleSeekbarMouseDown);
+        seekBar.removeEventListener('mousedown', handleSeekbarMouseDown);
+        window.removeEventListener('mouseup', handleSeekbarMouseUp);
       };
     }
     return undefined;
-  }, [updateSongPosition]);
-
-  const currentSongPosition = calculateTime(songPos);
+  }, [onSeek, updateSongPosition]);
 
   const handleOnChange = (e: ChangeEvent<HTMLInputElement>) => {
     const pos = e.currentTarget.valueAsNumber;
     setSongPos(pos);
+    const songDuration = duration > 0 ? duration : pos;
+    const percent = songDuration > 0 ? Math.min(100, Math.max(0, (pos / songDuration) * 100)) : 0;
+    if (seekbarRef.current) {
+      seekbarRef.current.style.setProperty('--seek-before-width', `${percent}%`);
+    }
     if (onSeek) onSeek(pos);
   };
 
   const handleOnWheel = (e: WheelEvent<HTMLInputElement>) => {
     isMouseScrollRef.current = true;
 
-    const max = parseInt(e.currentTarget.max);
+    const max = parseInt(e.currentTarget.max, 10);
     const scrollIncrement = preferences.seekbarScrollInterval;
 
     const incrementValue = e.deltaY > 0 ? -scrollIncrement : scrollIncrement;
-    let value = (songPos || 0) + incrementValue;
+    const currentVal = seekbarRef.current ? seekbarRef.current.valueAsNumber : songPos;
+    let value = (currentVal || 0) + incrementValue;
 
     if (value > max) value = max;
     if (value < 0) value = 0;
-    if (onSeek) onSeek(value);
+
     setSongPos(value);
+    const songDuration = duration > 0 ? duration : value;
+    const percent = songDuration > 0 ? Math.min(100, Math.max(0, (value / songDuration) * 100)) : 0;
+    if (seekbarRef.current) {
+      seekbarRef.current.style.setProperty('--seek-before-width', `${percent}%`);
+      seekbarRef.current.value = String(value);
+    }
+    if (onSeek) onSeek(value);
 
     debounce(() => {
       isMouseScrollRef.current = false;
       updateSongPosition(value);
     }, 250);
   };
+
+  const currentSongPosition = calculateTime(songPos);
 
   return (
     <input
@@ -148,8 +160,8 @@ const SeekBarSlider = (props: Props) => {
         "seek-bar-slider before:bg-seekbar-background-color/75 hover:before:bg-font-color-highlight dark:before:bg-dark-seekbar-background-color/75 dark:hover:before:bg-dark-font-color-highlight relative float-left m-0 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:max-w-full before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
       }
       min={0}
-      max={(currentSongData.duration || 0) >= songPos ? currentSongData.duration || 0 : songPos}
-      value={songPos || 0}
+      max={duration >= songPos ? duration : songPos}
+      defaultValue={0}
       onChange={handleOnChange}
       onWheel={handleOnWheel}
       ref={seekbarRef}

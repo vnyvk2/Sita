@@ -45,24 +45,23 @@ export function useMultiSelection(): UseMultiSelectionReturn {
       )
         return;
 
-      let { multipleSelections } = store.state.multipleSelectionsData;
+      const currentData = store.state.multipleSelectionsData;
+      let currentSelections = [...currentData.multipleSelections];
 
       if (type === 'add') {
-        // Don't add if already selected
-        if (multipleSelections.includes(id)) return;
-        multipleSelections.push(id);
+        if (currentSelections.includes(id)) return;
+        currentSelections.push(id);
       } else if (type === 'remove') {
-        // Don't remove if not selected
-        if (!multipleSelections.includes(id)) return;
-        multipleSelections = multipleSelections.filter((selection) => selection !== id);
+        if (!currentSelections.includes(id)) return;
+        currentSelections = currentSelections.filter((selection) => selection !== id);
       }
 
       dispatch({
         type: 'UPDATE_MULTIPLE_SELECTIONS_DATA',
         data: {
-          ...store.state.multipleSelectionsData,
+          ...currentData,
           selectionType,
-          multipleSelections: [...multipleSelections]
+          multipleSelections: currentSelections
         } as MultipleSelectionData
       });
     },
@@ -76,32 +75,30 @@ export function useMultiSelection(): UseMultiSelectionReturn {
       addSelections?: number[],
       replaceSelections = false
     ) => {
-      const updatedSelectionData = store.state.multipleSelectionsData;
+      const currentData = store.state.multipleSelectionsData;
 
       if (typeof isEnabled === 'boolean') {
-        updatedSelectionData.selectionType = selectionType;
+        let newSelections = isEnabled ? [...currentData.multipleSelections] : [];
 
-        // Add initial selections if provided and enabling
         if (Array.isArray(addSelections) && isEnabled === true) {
           if (replaceSelections) {
-            updatedSelectionData.multipleSelections = addSelections;
+            newSelections = [...addSelections];
           } else {
-            updatedSelectionData.multipleSelections.push(...addSelections);
+            const set = new Set(newSelections);
+            for (const item of addSelections) {
+              set.add(item);
+            }
+            newSelections = Array.from(set);
           }
         }
-
-        // Clear selections when disabling
-        if (isEnabled === false) {
-          updatedSelectionData.multipleSelections = [];
-          updatedSelectionData.selectionType = undefined;
-        }
-
-        updatedSelectionData.isEnabled = isEnabled;
 
         dispatch({
           type: 'UPDATE_MULTIPLE_SELECTIONS_DATA',
           data: {
-            ...updatedSelectionData
+            ...currentData,
+            isEnabled,
+            selectionType: isEnabled ? selectionType : undefined,
+            multipleSelections: newSelections
           } as MultipleSelectionData
         });
       }

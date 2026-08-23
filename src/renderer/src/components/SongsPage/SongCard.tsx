@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { getQueuesManager } from '../../other/queuesManager';
 import { store } from '../../store/store';
 import Button from '../Button';
@@ -61,11 +62,6 @@ const SongCard = (props: SongCardProp) => {
     (state) => state.localStorage.preferences.isSongCardDynamicArtworkBackgroundEnabled ?? false
   );
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
-  const isMultipleSelectionEnabled = useStore(
-    store,
-    (state) => state.multipleSelectionsData.isEnabled
-  );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
 
   const {
     playSong,
@@ -107,13 +103,8 @@ const SongCard = (props: SongCardProp) => {
     setIsSongPlaying(currentSongData.songId === songId && isCurrentSongPlaying);
   }, [currentSongData.songId, isCurrentSongPlaying, songId]);
 
-  const isAMultipleSelection = useMemo(
-    () =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'songs' &&
-      multipleSelectionsData.multipleSelections.includes(songId),
-    [isMultipleSelectionEnabled, multipleSelectionsData, songId]
-  );
+  const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
+    useSongSelection(songId);
 
   const handlePlayBtnClick = useCallback(() => {
     return playSong(songId);
@@ -143,42 +134,33 @@ const SongCard = (props: SongCardProp) => {
     [palette, isDynamicTintEnabled]
   );
 
-  const contextMenuItemData: ContextMenuAdditionalData = useMemo(
-    () =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'songs' &&
+  const contextMenuItemData: ContextMenuAdditionalData = useMemo(() => {
+    const multiData = store.state.multipleSelectionsData;
+    return isMultipleSelectionEnabled &&
+      multiData.selectionType === 'songs' &&
       isAMultipleSelection
-        ? {
-            title: t('song.selectedSongCount', {
-              count: multipleSelectionsData.multipleSelections.length
-            }),
-            artworkPath: DefaultSongCover
-          }
-        : {
-            title: title || t('common.unknownTitle'),
-            subTitle: artists?.map((artist) => artist.name).join(', ') ?? t('common.unknownArtist'),
-            artworkPath: artworkPath || DefaultSongCover
-          },
-    [
-      artists,
-      artworkPath,
-      isAMultipleSelection,
-      isMultipleSelectionEnabled,
-      multipleSelectionsData.multipleSelections.length,
-      multipleSelectionsData.selectionType,
-      t,
-      title
-    ]
-  );
+      ? {
+          title: t('song.selectedSongCount', {
+            count: multiData.multipleSelections.length
+          }),
+          artworkPath: DefaultSongCover
+        }
+      : {
+          title: title || t('common.unknownTitle'),
+          subTitle: artists?.map((artist) => artist.name).join(', ') ?? t('common.unknownArtist'),
+          artworkPath: artworkPath || DefaultSongCover
+        };
+  }, [artists, artworkPath, isAMultipleSelection, isMultipleSelectionEnabled, t, title]);
 
   const getContextMenuItems = useCallback(async (): Promise<ContextMenuItem[]> => {
+    const multiData = store.state.multipleSelectionsData;
     const isMultipleSelectionsEnabled =
-      multipleSelectionsData.isEnabled &&
-      multipleSelectionsData.selectionType === 'songs' &&
-      multipleSelectionsData.multipleSelections.length !== 1 &&
+      multiData.isEnabled &&
+      multiData.selectionType === 'songs' &&
+      multiData.multipleSelections.length !== 1 &&
       isAMultipleSelection;
 
-    const { multipleSelections: songIds } = multipleSelectionsData;
+    const { multipleSelections: songIds } = multiData;
 
     const playlistMenuItem = await buildSongPlaylistMenuItem({
       songIds: isMultipleSelectionsEnabled ? songIds : [songId],
@@ -421,7 +403,6 @@ const SongCard = (props: SongCardProp) => {
 
     return items;
   }, [
-    multipleSelectionsData,
     isAMultipleSelection,
     songId,
     title,

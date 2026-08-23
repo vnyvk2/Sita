@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { appPreferences } from '../../../../../package.json';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { useQueueOperations } from '../../hooks/useQueueOperations';
 import { songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
@@ -101,19 +102,8 @@ const Song = memo(
       state.currentSongData?.songId === songId ? state.currentSongData.isAFavorite : undefined
     );
     const bodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
-    const isMultipleSelectionEnabled = useStore(
-      store,
-      (state) =>
-        state.multipleSelectionsData.isEnabled &&
-        state.multipleSelectionsData.selectionType === 'songs'
-    );
-    const isAMultipleSelection = useStore(
-      store,
-      (state) =>
-        state.multipleSelectionsData.isEnabled &&
-        state.multipleSelectionsData.selectionType === 'songs' &&
-        state.multipleSelectionsData.multipleSelections.includes(songId)
-    );
+    const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
+      useSongSelection(songId);
     const showTrackNumberAsSongIndex = useStore(store, (state) =>
       Boolean(state.localStorage?.preferences?.showTrackNumberAsSongIndex)
     );
