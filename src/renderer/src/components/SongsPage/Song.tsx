@@ -701,10 +701,7 @@ const Song = memo(
       >
         <div
           className={`song-cover-and-play-btn-container flex w-[clamp(6rem,15%,9rem)] shrink-0 items-center justify-center ${
-            !isIndexingSongs &&
-            !showTrackNumberAsSongIndex &&
-            !(isCurrentSong && showEqualizerOnTracklist) &&
-            'w-[clamp(4rem,10%,6rem)]!'
+            !isIndexingSongs && !showTrackNumberAsSongIndex && 'w-[clamp(4rem,10%,6rem)]!'
           }`}
         >
           {isMultipleSelectionEnabled ? (
@@ -732,9 +729,7 @@ const Song = memo(
                 block
               </span>
             </div>
-          ) : isIndexingSongs ||
-            showTrackNumberAsSongIndex ||
-            (isCurrentSong && showEqualizerOnTracklist) ? (
+          ) : isIndexingSongs || showTrackNumberAsSongIndex ? (
             <div
               className={`bg-background-color-1 text-font-color-highlight group-even:bg-background-color-2/75 group-hover:bg-background-color-1 dark:bg-dark-background-color-1 dark:text-dark-background-color-3 dark:group-even:bg-dark-background-color-2/50 dark:group-hover:bg-dark-background-color-1 relative mx-1 flex items-center justify-center rounded-2xl px-3 py-1 text-center ${
                 index < 10
@@ -772,9 +767,9 @@ const Song = memo(
               <Button
                 className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
                 iconClassName={`text-3xl! text-font-color-white/0 leading-none! ${
-                  isCurrentSong && 'text-font-color-white/100'
+                  isCurrentSong && !showEqualizerOnTracklist && 'text-font-color-white/100'
                 } group-focus-within:text-font-color-white/100 group-hover:text-font-color-white/100 ${
-                  isSongPlaying && 'text-font-color-white/75!'
+                  isSongPlaying && !showEqualizerOnTracklist && 'text-font-color-white/75!'
                 }`}
                 clickHandler={handlePlayBtnClick}
                 iconName={isSongPlaying ? 'pause_circle' : 'play_circle'}
@@ -785,7 +780,7 @@ const Song = memo(
               loading="eager"
               alt="Song cover"
               className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
-                isSongPlaying ? 'brightness-50' : ''
+                isSongPlaying && !showEqualizerOnTracklist ? 'brightness-50' : ''
               }`}
               enableImgFadeIns={false}
             />

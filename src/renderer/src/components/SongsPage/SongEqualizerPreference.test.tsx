@@ -97,7 +97,12 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
     }));
   });
 
-  const renderTestSong = (songId: number, index = 0, trackNo = 1) =>
+  const renderTestSong = (
+    songId: number,
+    index = 0,
+    trackNo: number | undefined = 1,
+    isIndexingSongs = true
+  ) =>
     render(
       <AppUpdateContext.Provider value={mockContextValue}>
         <Song
@@ -107,7 +112,7 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
           title={`Test Song ${songId}`}
           duration={180}
           path={`/music/song_${songId}.mp3`}
-          isIndexingSongs={true}
+          isIndexingSongs={isIndexingSongs}
           isAFavorite={false}
         />
       </AppUpdateContext.Provider>
@@ -179,5 +184,102 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
     const indicator = container.querySelector('.sound-bars-indicator');
     expect(indicator).not.toBeNull();
     expect(indicator?.classList.contains('sound-bars--paused')).toBe(true);
+  });
+
+  // --- Row Geometry Invariance Tests ---
+
+  it('maintains narrow leading container and renders no badge when indexing and track numbers are disabled', () => {
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          isSongIndexingEnabled: false,
+          showTrackNumberAsSongIndex: false,
+          showEqualizerOnTracklist: true
+        }
+      }
+    }));
+
+    // Playing track (current song)
+    const { container: playingContainer } = renderTestSong(101, 0, undefined, false);
+    // Unplayed track (non-current song)
+    const { container: unplayedContainer } = renderTestSong(999, 1, undefined, false);
+
+    const playingLeadingDiv = playingContainer.querySelector('.song-cover-and-play-btn-container');
+    const unplayedLeadingDiv = unplayedContainer.querySelector(
+      '.song-cover-and-play-btn-container'
+    );
+
+    // Neither should render an equalizer or track number badge
+    expect(playingContainer.querySelector('.sound-bars-indicator')).toBeNull();
+    expect(unplayedContainer.querySelector('.sound-bars-indicator')).toBeNull();
+
+    // Both should maintain the narrow container width class
+    expect(playingLeadingDiv?.className).toContain('w-[clamp(4rem,10%,6rem)]!');
+    expect(unplayedLeadingDiv?.className).toContain('w-[clamp(4rem,10%,6rem)]!');
+  });
+
+  it('maintains wide leading container for both playing and unplayed songs when indexing is enabled', () => {
+    // Playing track (current song)
+    const { container: playingContainer } = renderTestSong(101, 0, 1, true);
+    // Unplayed track (non-current song)
+    const { container: unplayedContainer } = renderTestSong(999, 1, 2, true);
+
+    const playingLeadingDiv = playingContainer.querySelector('.song-cover-and-play-btn-container');
+    const unplayedLeadingDiv = unplayedContainer.querySelector(
+      '.song-cover-and-play-btn-container'
+    );
+
+    expect(playingLeadingDiv?.className).not.toContain('w-[clamp(4rem,10%,6rem)]!');
+    expect(unplayedLeadingDiv?.className).not.toContain('w-[clamp(4rem,10%,6rem)]!');
+    expect(playingLeadingDiv?.className).toContain('w-[clamp(6rem,15%,9rem)]');
+    expect(unplayedLeadingDiv?.className).toContain('w-[clamp(6rem,15%,9rem)]');
+  });
+
+  // --- Artwork & Hover Invariance Tests ---
+
+  it('leaves artwork undimmed at idle when equalizer is ON, while preserving group-hover dimming classes', () => {
+    const { container } = renderTestSong(101, 0, 1, true);
+    const img = container.querySelector('img');
+    const buttonIcon = container.querySelector('.play-btn-container .icon');
+
+    // Standalone static brightness-50 must not be present
+    const classes = img?.className.split(' ') || [];
+    expect(classes).not.toContain('brightness-50');
+
+    // Interactive hover/focus classes must remain available
+    expect(classes).toContain('group-hover:brightness-50');
+    expect(classes).toContain('group-focus-within:brightness-50');
+
+    // Play button icon should not have static text-font-color-white/100
+    const iconClasses = buttonIcon?.className.split(' ') || [];
+    expect(iconClasses).not.toContain('text-font-color-white/100');
+    expect(iconClasses).toContain('group-hover:text-font-color-white/100');
+    expect(iconClasses).toContain('group-focus-within:text-font-color-white/100');
+  });
+
+  it('applies fallback static brightness-50 and visible play icon when equalizer is OFF during playback', () => {
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          showEqualizerOnTracklist: false
+        }
+      }
+    }));
+
+    const { container } = renderTestSong(101, 0, 1, true);
+    const img = container.querySelector('img');
+    const buttonIcon = container.querySelector('.play-btn-container .icon');
+
+    const imgClasses = img?.className.split(' ') || [];
+    expect(imgClasses).toContain('brightness-50');
+
+    const iconClasses = buttonIcon?.className.split(' ') || [];
+    expect(iconClasses).toContain('text-font-color-white/100');
   });
 });
