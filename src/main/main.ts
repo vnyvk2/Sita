@@ -35,6 +35,7 @@ import manageLastFmAuth from './auth/manageLastFmAuth';
 import changeAppTheme from './core/changeAppTheme';
 import checkForStartUpSongs from './core/checkForStartUpSongs';
 import manageTaskbarPlaybackButtonControls from './core/manageTaskbarPlaybackButtonControls';
+import { recoverLibraryAssets } from './core/recovery';
 // import { fileURLToPath, pathToFileURL } from 'url';
 import { closeDatabaseInstance } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
@@ -569,6 +570,10 @@ async function manageWindowFinishLoad() {
 
   flushScrobbleQueue().catch((error) => {
     logger.error('Failed initial startup scrobble queue flush', { error });
+  });
+
+  recoverLibraryAssets().catch((error) => {
+    logger.error('Failed initial startup recovery and genre reconciliation sync', { error });
   });
 }
 

@@ -69,18 +69,31 @@ describe('SongGenresInput Component - Multi-Genre Delimiter & Tag Creation', () 
     expect(input.value).toBe('');
   });
 
-  it('splits multi-genre pasted text (e.g. "Rock, Pop, Indie; Jazz") on Enter key', () => {
+  it('immediately commits and splits multi-genre pasted text (e.g. "Rock, Pop, Indie; Jazz") on input change', () => {
     const { container } = render(<TestWrapper />);
     const input = screen.getByPlaceholderText('Search for genres') as HTMLInputElement;
 
+    // Simulate pasting "Rock, Pop, Indie; Jazz" into input
     fireEvent.change(input, { target: { value: 'Rock, Pop, Indie; Jazz' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
     const genresContainer = container.querySelector('.genres-container');
     expect(genresContainer?.textContent).toContain('Rock');
     expect(genresContainer?.textContent).toContain('Pop');
     expect(genresContainer?.textContent).toContain('Indie');
     expect(genresContainer?.textContent).toContain('Jazz');
+    expect(input.value).toBe('');
+  });
+
+  it('commits a non-delimited genre name on Enter key', () => {
+    const { container } = render(<TestWrapper />);
+    const input = screen.getByPlaceholderText('Search for genres') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'Synthwave' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    const genresContainer = container.querySelector('.genres-container');
+    expect(genresContainer?.textContent).toContain('Synthwave');
+    expect(input.value).toBe('');
   });
 
   it('splits spaced slashes ("Rock / Pop") into two distinct badges', () => {

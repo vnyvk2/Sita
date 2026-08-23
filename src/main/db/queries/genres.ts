@@ -178,14 +178,7 @@ export const deleteGenre = async (genreId: number, trx: DB | DBTransaction = db)
   return trx.delete(genres).where(eq(genres.id, genreId));
 };
 
-/**
- * Scans existing genres in the database for delimiter-separated names (e.g. "Rock,pop", "Rock; Pop", "Rock / Pop").
- * Splits each malformed genre into canonical genres, migrates song relationships (genres_songs) and
- * artworks (artworks_genres), and removes the obsolete malformed genre records.
- *
- * Safe and idempotent.
- */
-export const reconcileExistingMultiGenres = async (trx: DB | DBTransaction = db) => {
+const reconcileExistingMultiGenresInTrx = async (trx: DBTransaction | DB) => {
   const allExistingGenres = await trx.query.genres.findMany({
     with: {
       songs: true,
@@ -208,7 +201,7 @@ export const reconcileExistingMultiGenres = async (trx: DB | DBTransaction = db)
           canonicalGenre = await createGenre({ name: canonicalName }, trx);
         }
 
-        // Migrate artwork if canonical genre does not have artwork
+        // Migrate artwork if canonical genre does not have artwork (idempotent with onConflictDoNothing)
         if (genre.artworks && genre.artworks.length > 0) {
           for (const art of genre.artworks) {
             await linkArtworksToGenre(
@@ -218,7 +211,7 @@ export const reconcileExistingMultiGenres = async (trx: DB | DBTransaction = db)
           }
         }
 
-        // Migrate song relations
+        // Migrate song relations (idempotent with onConflictDoNothing)
         if (genre.songs && genre.songs.length > 0) {
           for (const s of genre.songs) {
             await linkSongToGenre(canonicalGenre.id, s.songId, trx);
@@ -233,5 +226,24 @@ export const reconcileExistingMultiGenres = async (trx: DB | DBTransaction = db)
   }
 
   return { reconciledCount };
+};
+
+/**
+ * Scans existing genres in the database for delimiter-separated names (e.g. "Rock,pop", "Rock; Pop", "Rock / Pop").
+ * Splits each malformed genre into canonical genres, migrates song relationships (genres_songs) and
+ * artworks (artworks_genres), and removes the obsolete malformed genre records.
+ *
+ * Guaranteed atomic and idempotent.
+ */
+export const reconcileExistingMultiGenres = async (trx?: DB | DBTransaction) => {
+  if (trx && typeof (trx as DB).transaction !== 'function') {
+    // Already within a transaction
+    return reconcileExistingMultiGenresInTrx(trx);
+  }
+
+  const dbHandle = trx ?? db;
+  return dbHandle.transaction(async (tx) => {
+    return reconcileExistingMultiGenresInTrx(tx);
+  });
 };
 
