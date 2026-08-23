@@ -59,6 +59,11 @@ class AudioPlayer {
   private queueEventsUnsubscribe: (() => void)[] = [];
   private loadRequestId: number = 0;
   private pendingCanPlayHandler: (() => void) | null = null;
+  private activeFade: {
+    type: 'in' | 'out';
+    timeoutId: NodeJS.Timeout;
+    resolve: () => void;
+  } | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -236,39 +241,39 @@ class AudioPlayer {
       this.pendingCanPlayHandler = null;
     }
 
-    let songData: AudioPlayerData;
+    try {
+      let songData: AudioPlayerData;
 
-    if (typeof songIdOrData === 'number') {
-      // Fetch song data if ID provided
-      songData = await window.api.audioLibraryControls.getSong(
-        songIdOrData,
-        options?.autoPlay ?? true
-      );
-    } else {
-      // Use provided song data
-      songData = songIdOrData;
-    }
+      if (typeof songIdOrData === 'number') {
+        // Fetch song data if ID provided
+        songData = await window.api.audioLibraryControls.getSong(
+          songIdOrData,
+          options?.autoPlay ?? true
+        );
+      } else {
+        // Use provided song data
+        songData = songIdOrData;
+      }
 
-    const tIpc = performance.now();
+      const tIpc = performance.now();
 
-    // Discard stale out-of-order resolution if user skipped again during in-flight fetch
-    if (currentRequestId !== this.loadRequestId) {
-      logPlayer('[AudioPerf] loadSong_discarded_stale', {
+      // Discard stale out-of-order resolution if user skipped again during in-flight fetch
+      if (currentRequestId !== this.loadRequestId) {
+        logPlayer('[AudioPerf] loadSong_discarded_stale', {
+          songId: songData.songId,
+          currentRequestId,
+          latestRequestId: this.loadRequestId,
+          ipcDurationMs: tIpc - tStart
+        });
+        return null;
+      }
+
+      logPlayer('[AudioPerf] ipc_resolved', {
         songId: songData.songId,
-        currentRequestId,
-        latestRequestId: this.loadRequestId,
+        requestId: currentRequestId,
         ipcDurationMs: tIpc - tStart
       });
-      return null;
-    }
 
-    logPlayer('[AudioPerf] ipc_resolved', {
-      songId: songData.songId,
-      requestId: currentRequestId,
-      ipcDurationMs: tIpc - tStart
-    });
-
-    try {
       logPlayer('[AudioPlayer.loadSong]', {
         songId: songData.songId,
         options
@@ -337,17 +342,29 @@ class AudioPlayer {
 
       return songData;
     } catch (error) {
+      // Discard stale rejections / errors from superseded in-flight requests
+      if (currentRequestId !== this.loadRequestId) {
+        logPlayer('[AudioPerf] loadSong_discarded_stale_error', {
+          songId,
+          currentRequestId,
+          latestRequestId: this.loadRequestId,
+          error
+        });
+        return null;
+      }
+
       console.error(
-        `Failed to load song (ID: ${songData.songId}):`,
+        `Failed to load song (ID: ${songId}):`,
         error instanceof Error ? error.message : error
       );
-      this.emit('loadError', { songId: songData.songId, error });
+      this.emit('loadError', { songId, error });
       throw error;
     }
   }
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
+    this.cancelActiveFade();
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
     if (this.pendingCanPlayHandler) {
       this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
@@ -358,6 +375,63 @@ class AudioPlayer {
     this.audio.pause();
     this.audio.src = '';
     this.currentContext.close();
+  }
+
+  /** Cancels any active fade transition, resetting scheduled audio ramps and settling pending promises immediately. */
+  private cancelActiveFade() {
+    if (this.activeFade) {
+      clearTimeout(this.activeFade.timeoutId);
+      try {
+        const currentTime = this.currentContext.currentTime;
+        this.gainNode.gain.cancelScheduledValues(currentTime);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      } catch {}
+      this.activeFade.resolve();
+      this.activeFade = null;
+    }
+  }
+
+  private fadeOutAudio(): Promise<void> {
+    this.cancelActiveFade();
+    return new Promise((resolve) => {
+      const currentTime = this.currentContext.currentTime;
+      const targetVolume = 0.001; // Very low but not zero to avoid clicks
+      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
+
+      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
+
+      const timeoutId = setTimeout(() => {
+        this.audio.pause();
+        if (this.activeFade?.timeoutId === timeoutId) {
+          this.activeFade = null;
+        }
+        resolve();
+      }, AUDIO_FADE_DURATION);
+
+      this.activeFade = { type: 'out', timeoutId, resolve };
+    });
+  }
+
+  private fadeInAudio(): Promise<void> {
+    this.cancelActiveFade();
+    return new Promise((resolve) => {
+      const currentTime = this.currentContext.currentTime;
+      const targetVolume = Math.max(0.001, this.currentVolume / 100);
+      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
+
+      this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
+      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
+
+      const timeoutId = setTimeout(() => {
+        if (this.activeFade?.timeoutId === timeoutId) {
+          this.activeFade = null;
+        }
+        resolve();
+      }, AUDIO_FADE_DURATION);
+
+      this.activeFade = { type: 'in', timeoutId, resolve };
+    });
   }
 
   /**
@@ -401,39 +475,6 @@ class AudioPlayer {
   /** Remove all listeners for all events. */
   removeAllListeners(): void {
     this.listeners.clear();
-  }
-
-  private fadeOutAudio(): Promise<void> {
-    return new Promise((resolve) => {
-      const currentTime = this.currentContext.currentTime;
-      const targetVolume = 0.001; // Very low but not zero to avoid clicks
-      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
-
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
-      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
-
-      // Schedule pause after fade completes
-      setTimeout(() => {
-        this.audio.pause();
-        resolve(undefined);
-      }, AUDIO_FADE_DURATION);
-    });
-  }
-
-  private fadeInAudio(): Promise<void> {
-    return new Promise((resolve) => {
-      const currentTime = this.currentContext.currentTime;
-      const targetVolume = this.currentVolume / 100;
-      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
-
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
-      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
-
-      // Resolve after fade completes
-      setTimeout(() => {
-        resolve(undefined);
-      }, AUDIO_FADE_DURATION);
-    });
   }
 
   private initializeEqualizer() {

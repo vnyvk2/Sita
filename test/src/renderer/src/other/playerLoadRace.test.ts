@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock Web Audio API for jsdom environment
@@ -7,7 +7,12 @@ class MockAudioContext {
   destination = {};
   createGain() {
     return {
-      gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      gain: {
+        value: 1,
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+        cancelScheduledValues: vi.fn()
+      },
       connect: vi.fn()
     };
   }
@@ -30,15 +35,13 @@ class MockAudioContext {
 window.AudioContext = MockAudioContext as any;
 
 import AudioPlayer from '@renderer/other/player';
-import { store, dispatch } from '@renderer/store/store';
+import { store } from '@renderer/store/store';
 
 describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
   let player: AudioPlayer;
   let mockQueuesManager: any;
-  let eventLog: string[] = [];
 
   beforeEach(() => {
-    eventLog = [];
     mockQueuesManager = {
       getActiveQueue: () => ({
         on: vi.fn().mockReturnValue(() => {}),
@@ -116,11 +119,6 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
   it('P3: executes exact operation sequencing (src -> load -> autoplay -> store -> trackchange -> songLoaded)', async () => {
     const sequence: string[] = [];
 
-    // Instrument audio element and player
-    const origSrcSet = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src')?.set;
-    const srcSpy = vi.fn().mockImplementation((val) => {
-      sequence.push(`src:${val}`);
-    });
     player.audio.load = vi.fn().mockImplementation(() => {
       sequence.push('audio.load');
     });
@@ -152,12 +150,9 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
   it('P1: guarantees zero side-effects for stale requests in rapid skip sequences', async () => {
     const srcAssignments: string[] = [];
     let loadCount = 0;
-    const storeSongIds: number[] = [];
     const songLoadedEvents: number[] = [];
     const recordListeningEvents: number[] = [];
 
-    // Track all side effects
-    const originalSrc = Object.getOwnPropertyDescriptor(player.audio, 'src');
     Object.defineProperty(player.audio, 'src', {
       set(val: string) {
         srcAssignments.push(val);
@@ -180,7 +175,6 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
       recordListeningEvents.push(data.songId);
     });
 
-    // Latency inversion: Track 1 takes 80ms, Track 2 takes 40ms, Track 3 takes 10ms
     const latencies: Record<number, number> = { 1: 80, 2: 40, 3: 10 };
 
     window.api = {
@@ -200,19 +194,86 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
       }
     } as any;
 
-    // Rapid skip sequence: 1 -> 2 -> 3
     const p1 = player.playSongById(1);
     const p2 = player.playSongById(2);
     const p3 = player.playSongById(3);
 
     await Promise.all([p1, p2, p3]);
 
-    // Side-effects assertions:
-    // Stale requests 1 and 2 must have produced ZERO side-effects!
     expect(srcAssignments).toEqual(['nora://music/song_3.flac']);
     expect(loadCount).toBe(1);
     expect(songLoadedEvents).toEqual([3]);
     expect(recordListeningEvents).toEqual([3]);
     expect(store.state.currentSongData?.songId).toBe(3);
+  });
+
+  it('P1: discards stale rejections when older in-flight request fails after newer request succeeded', async () => {
+    let rejectGetSong1: (err: any) => void;
+    const getSong1Promise = new Promise((_, reject) => {
+      rejectGetSong1 = reject;
+    });
+
+    const loadErrorEvents: any[] = [];
+    player.on('loadError', (err: any) => {
+      loadErrorEvents.push(err);
+    });
+
+    window.api = {
+      audioLibraryControls: {
+        getSong: vi.fn().mockImplementation((songId: number) => {
+          if (songId === 1) return getSong1Promise;
+          return Promise.resolve({
+            songId: 2,
+            title: 'Song Two',
+            duration: 200,
+            path: 'nora://music/song_2.flac'
+          });
+        })
+      }
+    } as any;
+
+    // Track 1 starts loading
+    const p1 = player.playSongById(1);
+
+    // User skips to Track 2 which resolves immediately
+    const p2 = player.playSongById(2);
+    await p2;
+
+    expect(player.audio.src).toBe('nora://music/song_2.flac');
+    expect(store.state.currentSongData?.songId).toBe(2);
+
+    // Now Track 1 rejects with error
+    rejectGetSong1!(new Error('NETWORK_TIMEOUT'));
+    await p1;
+
+    // NO loadError emitted for track 1
+    expect(loadErrorEvents).toHaveLength(0);
+    expect(player.audio.src).toBe('nora://music/song_2.flac');
+    expect(store.state.currentSongData?.songId).toBe(2);
+  });
+
+  it('P1: cancels active fade and immediately settles pending fade promise when reverse fade starts', async () => {
+    let fadeOutSettled = false;
+
+    // Start fade-out (250ms duration)
+    const fadeOutPromise = player.pause().then(() => {
+      fadeOutSettled = true;
+    });
+
+    // 20ms later, reverse fade by calling play() (fade-in)
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fadeOutSettled).toBe(false);
+
+    const fadeInPromise = player.play();
+
+    // The fade-out promise should settle immediately upon cancellation
+    await Promise.race([
+      fadeOutPromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Promise hung')), 50))
+    ]);
+
+    expect(fadeOutSettled).toBe(true);
+
+    await fadeInPromise;
   });
 });
