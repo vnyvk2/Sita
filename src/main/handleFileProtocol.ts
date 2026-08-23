@@ -44,8 +44,8 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
 
       const chunksize = end - start + 1;
 
-      // Create a proper ReadableStream from the file stream
-      const fileStream = createReadStream(filePath, { start, end });
+      // Create a proper ReadableStream with backpressure from the file stream
+      const fileStream = createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
 
       const webStream = new ReadableStream({
         start(controller) {
@@ -54,6 +54,11 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
               // Ensure chunk is a Buffer before converting to Uint8Array
               const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
               controller.enqueue(new Uint8Array(bufferChunk));
+
+              // Apply backpressure: pause disk read when WebStream buffer is full
+              if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+                fileStream.pause();
+              }
             } catch (error) {
               // Stream might be closed, ignore the error
               if (controller.desiredSize !== null) {
@@ -77,6 +82,11 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
               // Stream might already be closed, ignore the error
             }
           });
+        },
+
+        pull() {
+          // Resume reading when downstream consumer needs more data
+          fileStream.resume();
         },
 
         cancel() {

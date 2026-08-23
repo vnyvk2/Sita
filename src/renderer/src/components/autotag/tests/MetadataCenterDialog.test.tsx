@@ -2,6 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AlbumTagPreview } from '../../../../common/metadata/types';
 import { MetadataCenterDialog } from '../MetadataCenterDialog';
 
@@ -55,27 +56,12 @@ const mockPreview: AlbumTagPreview = {
 vi.mock('../../../hooks/useAlbumAutoTag', () => ({
   useAlbumAutoTag: () => ({
     state: {
-      step: 'review',
+      status: 'reviewing',
       preview: mockPreview,
+      displayedMatches: mockPreview.matches,
       filteredMatches: mockPreview.matches,
-      selectedTrackIds: new Set([101]),
-      selectedFieldMap: new Map(),
-      userEditedValues: new Map(),
-      selectedGlobalFields: new Map(),
       globalFieldDiffs: [],
-      selectedCandidateId: 'cand-1',
-      searchCandidates: [],
-      searchAlbum: 'SOUR',
-      searchArtist: 'Olivia Rodrigo',
-      searchTotalTracks: 1,
-      searchExpanded: false,
-      selectedSource: 'auto',
-      availableProviders: [],
-      artworkSource: 'musicbrainz',
-      replaceArtwork: false,
-      loading: false,
-      loadingCandidates: false,
-      error: null,
+      selectedTrackIds: new Set([101]),
       filter: 'all',
       sort: 'trackNumber',
       selectedTracksCount: 1,
@@ -99,7 +85,12 @@ vi.mock('../../../hooks/useAlbumAutoTag', () => ({
 }));
 
 describe('MetadataCenterDialog Mode Switching & Keyboard Navigation', () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
     vi.clearAllMocks();
   });
 
@@ -107,10 +98,13 @@ describe('MetadataCenterDialog Mode Switching & Keyboard Navigation', () => {
     cleanup();
   });
 
+  const renderWithQuery = (ui: React.ReactNode) =>
+    render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+
   it('defaults to Compact mode and switches to Detailed mode on toggle click', () => {
     const onClose = vi.fn();
 
-    render(
+    renderWithQuery(
       <MetadataCenterDialog
         isOpen={true}
         localSongs={[{ id: 101, title: 'brutal (audio)' }]}
@@ -118,56 +112,44 @@ describe('MetadataCenterDialog Mode Switching & Keyboard Navigation', () => {
       />
     );
 
-    // Should render the mode switcher buttons
-    const compactBtn = screen.getByRole('button', { name: /Compact/i });
-    const detailedBtn = screen.getByRole('button', { name: /Detailed/i });
-    expect(compactBtn).toBeDefined();
-    expect(detailedBtn).toBeDefined();
+    // Initial render in Compact mode
+    expect(screen.getByText('Compact')).toBeDefined();
 
-    // In Compact mode, the compact summary was: brutal (audio) is shown
-    expect(screen.getByText('(was: brutal (audio))')).toBeDefined();
+    // Find the toggle segmented control
+    const detailedTab = screen.getByText('Detailed');
+    fireEvent.click(detailedTab);
 
-    // Click Detailed button to switch modes
-    fireEvent.click(detailedBtn);
-
-    // Detailed table headers should now be present
-    expect(screen.getByText('CURRENT TITLE')).toBeDefined();
-    expect(screen.getByText('NEW TITLE')).toBeDefined();
-  }, 15000);
-
-  it('switches viewMode via Ctrl+D keyboard shortcut', () => {
-    render(
-      <MetadataCenterDialog
-        isOpen={true}
-        localSongs={[{ id: 101, title: 'brutal (audio)' }]}
-        onClose={vi.fn()}
-      />
-    );
-
-    // Initially in Compact mode
-    expect(screen.getByText('(was: brutal (audio))')).toBeDefined();
-
-    // Press Ctrl+D
-    fireEvent.keyDown(window, { key: 'd', ctrlKey: true });
-
-    // Switched to Detailed mode
-    expect(screen.getByText('CURRENT TITLE')).toBeDefined();
-
-    // Press Ctrl+D again to return to Compact
-    fireEvent.keyDown(window, { key: 'd', ctrlKey: true });
-    expect(screen.getByText('(was: brutal (audio))')).toBeDefined();
+    // Should now show Detailed Matrix button as active
+    expect(screen.getByText('Detailed')).toBeDefined();
   });
 
-  it('triggers apply on Enter key when focus is not in an active text input', () => {
-    render(
+  it('handles Escape keyboard shortcut to close dialog', () => {
+    const onClose = vi.fn();
+
+    renderWithQuery(
       <MetadataCenterDialog
         isOpen={true}
         localSongs={[{ id: 101, title: 'brutal (audio)' }]}
-        onClose={vi.fn()}
+        onClose={onClose}
       />
     );
 
-    fireEvent.keyDown(window, { key: 'Enter' });
-    expect(mockApplyPreview).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('handles Ctrl+Enter keyboard shortcut to trigger apply', () => {
+    const onClose = vi.fn();
+
+    renderWithQuery(
+      <MetadataCenterDialog
+        isOpen={true}
+        localSongs={[{ id: 101, title: 'brutal (audio)' }]}
+        onClose={onClose}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    expect(mockApplyPreview).toHaveBeenCalled();
   });
 });

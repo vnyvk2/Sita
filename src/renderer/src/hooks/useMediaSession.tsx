@@ -92,24 +92,28 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
     const updateMediaSessionMetaData = () => {
       const currentSong = store.state.currentSongData;
 
-      // Handle artwork
-      let artworkPath: string | undefined;
-      if (currentSong.artwork !== undefined) {
+      // Handle artwork: prioritize direct URL path without blob/buffer overhead
+      let artworkPath: string =
+        currentSong.artworkPaths?.artworkPath || currentSong.artworkPath || '';
+
+      if (!artworkPath && currentSong.artwork !== undefined) {
         if (typeof currentSong.artwork === 'object') {
-          // Handle Uint8Array artwork
+          // Fallback for raw byte artwork if ever provided
           const artwork = currentSong.artwork as Uint8Array<ArrayBuffer>;
           const blob = new Blob([artwork]);
           artworkPath = URL.createObjectURL(blob);
         } else {
-          // Handle base64 artwork
+          // Fallback for base64 artwork
           artworkPath = `data:;base64,${currentSong.artwork}`;
         }
-      } else {
-        artworkPath = '';
       }
 
-      // Clean up previous artwork URL
-      if (artworkPathRef.current && artworkPathRef.current !== artworkPath) {
+      // Clean up previous blob URL if needed
+      if (
+        artworkPathRef.current &&
+        artworkPathRef.current !== artworkPath &&
+        artworkPathRef.current.startsWith('blob:')
+      ) {
         URL.revokeObjectURL(artworkPathRef.current);
       }
       artworkPathRef.current = artworkPath;

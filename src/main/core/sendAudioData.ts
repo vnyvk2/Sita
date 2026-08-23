@@ -90,7 +90,6 @@ const sendAudioData = async (
       const artworks = song.artworks.map((a) => a.artwork);
       const artworkPaths = parseSongArtworks(artworks);
       const songArtwork = artworkPaths.artworkPath;
-      const artworkData = await getArtworkBuffer(songArtwork);
 
       const albumObj = song.albums?.[0]?.album;
       const album = albumObj ? { albumId: albumObj.id, name: albumObj.title } : undefined;
@@ -101,8 +100,9 @@ const sendAudioData = async (
         title: song.title,
         artists,
         duration: Number(song.duration),
-        artwork: parseArtworkDataForAudioPlayerData(artworkData),
+        artwork: undefined,
         artworkPath: songArtwork,
+        artworkPaths: artworkPaths,
         path: resolveSongFilePath(song.path),
         songId: song.id,
         isAFavorite,

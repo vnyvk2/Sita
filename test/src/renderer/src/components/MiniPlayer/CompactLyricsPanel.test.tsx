@@ -1,6 +1,7 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { store } from '@renderer/store/store';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,9 +18,14 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
+  let queryClient: QueryClient;
   const mockGetSongLyrics = vi.fn();
 
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+
     window.api = {
       ...window.api,
       lyrics: {
@@ -57,6 +63,9 @@ describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
     vi.clearAllMocks();
   });
 
+  const renderWithQuery = (ui: React.ReactNode) =>
+    render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+
   it('renders scrollable synced lyrics and updates active line on position change', async () => {
     mockGetSongLyrics.mockResolvedValue({
       lyrics: {
@@ -72,10 +81,10 @@ describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
     });
 
     const handleClose = vi.fn();
-    render(<CompactLyricsPanel isLyricsVisible={true} onClose={handleClose} />);
+    renderWithQuery(<CompactLyricsPanel isLyricsVisible={true} onClose={handleClose} />);
 
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(screen.getByText('First line of the song')).toBeDefined();
     });
 
     // Simulate playback position reaching 15 seconds (active on line 2)
@@ -102,10 +111,10 @@ describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
       source: 'Musixmatch'
     });
 
-    render(<CompactLyricsPanel isLyricsVisible={true} onClose={vi.fn()} />);
+    renderWithQuery(<CompactLyricsPanel isLyricsVisible={true} onClose={vi.fn()} />);
 
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(screen.getByText('Unsynced verse 1')).toBeDefined();
     });
 
     expect(screen.getByText('Unsynced verse 1')).not.toBeNull();
@@ -116,7 +125,7 @@ describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
     mockGetSongLyrics.mockResolvedValue(null);
     const handleClose = vi.fn();
 
-    const { container } = render(
+    const { container } = renderWithQuery(
       <CompactLyricsPanel isLyricsVisible={true} onClose={handleClose} />
     );
 

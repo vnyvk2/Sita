@@ -57,6 +57,7 @@ class AudioPlayer {
   private repeatMode: 'off' | 'one' | 'all' = 'off';
   private pendingAutoPlay: boolean = false;
   private queueEventsUnsubscribe: (() => void)[] = [];
+  private loadRequestId: number = 0;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -218,6 +219,7 @@ class AudioPlayer {
     songIdOrData: number | AudioPlayerData,
     options?: { autoPlay?: boolean; updateStore?: boolean }
   ): Promise<AudioPlayerData> {
+    const currentRequestId = ++this.loadRequestId;
     let songData: AudioPlayerData;
 
     if (typeof songIdOrData === 'number') {
@@ -229,6 +231,16 @@ class AudioPlayer {
     } else {
       // Use provided song data
       songData = songIdOrData;
+    }
+
+    // Discard stale out-of-order resolution if user skipped again during in-flight fetch
+    if (currentRequestId !== this.loadRequestId) {
+      logPlayer('[AudioPlayer.loadSong.discardedStale]', {
+        songId: songData.songId,
+        currentRequestId,
+        latestRequestId: this.loadRequestId
+      });
+      return songData;
     }
 
     try {
@@ -245,8 +257,8 @@ class AudioPlayer {
         storage.playback.setCurrentSongOptions('songId', songData.songId);
       }
 
-      // Set audio source with cache-busting timestamp
-      this.audio.src = `${songData.path}?ts=${Date.now()}`;
+      // Set audio source (clean protocol path without cache-busting to allow Chromium media buffer reuse)
+      this.audio.src = songData.path;
 
       // Load is synchronous, no need to await
       this.audio.load();

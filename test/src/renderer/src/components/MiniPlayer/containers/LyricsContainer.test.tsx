@@ -1,5 +1,6 @@
-// @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+﻿// @vitest-environment jsdom
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +18,13 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 describe('LyricsContainer Correctness & Race Protection', () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+
     store.setState((prev) => ({
       ...prev,
       currentSongData: {
@@ -44,6 +51,9 @@ describe('LyricsContainer Correctness & Race Protection', () => {
     cleanup();
   });
 
+  const renderWithQuery = (ui: React.ReactNode) =>
+    render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+
   it('renders unsynced plain-text lyrics when synced lyrics are unavailable', async () => {
     const mockLyrics: SongLyrics = {
       title: 'Song One',
@@ -66,14 +76,14 @@ describe('LyricsContainer Correctness & Race Protection', () => {
       }
     } as any;
 
-    render(<LyricsContainer isLyricsVisible />);
+    renderWithQuery(<LyricsContainer isLyricsVisible />);
 
     expect(await screen.findByText('First plain lyric line')).not.toBeNull();
     expect(await screen.findByText('Second plain lyric line')).not.toBeNull();
     expect(screen.queryByText('lyricsPage.noSyncedLyrics')).toBeNull();
   });
 
-  it('protects against stale out-of-order async lyrics responses using requestIdRef', async () => {
+  it('protects against stale out-of-order async lyrics responses via TanStack Query key isolation', async () => {
     let resolveSongA: (lyrics: SongLyrics) => void;
     const songAPromise = new Promise<SongLyrics>((resolve) => {
       resolveSongA = resolve;
@@ -111,7 +121,7 @@ describe('LyricsContainer Correctness & Race Protection', () => {
       }
     } as any;
 
-    const { rerender } = render(<LyricsContainer isLyricsVisible />);
+    const { rerender } = renderWithQuery(<LyricsContainer isLyricsVisible />);
 
     // Fast skip to Song B while Song A is still pending
     store.setState((prev) => ({
@@ -126,7 +136,11 @@ describe('LyricsContainer Correctness & Race Protection', () => {
       }
     }));
 
-    rerender(<LyricsContainer isLyricsVisible />);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <LyricsContainer isLyricsVisible />
+      </QueryClientProvider>
+    );
 
     // Song B should resolve and render first
     expect(await screen.findByText('Song B Lyric')).not.toBeNull();
@@ -136,7 +150,7 @@ describe('LyricsContainer Correctness & Race Protection', () => {
     resolveSongA!(songALyrics);
     await new Promise((r) => setTimeout(r, 50));
 
-    // Stale Song A must be ignored; Song B lyrics must remain on screen
+    // Stale Song A is isolated to Song A's query key; Song B lyrics must remain on screen
     expect(screen.getByText('Song B Lyric')).not.toBeNull();
     expect(screen.queryByText('Song A Lyric')).toBeNull();
   });

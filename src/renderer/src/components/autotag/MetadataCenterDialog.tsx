@@ -134,7 +134,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, state.preview, state.filteredMatches, focusedTrackIndex, state.selectedTrackIds.size, state.loading, viewMode]);
+  }, [isOpen, state.preview, state.filteredMatches, focusedTrackIndex, state.selectedTrackIds?.size, state.loading, viewMode]);
 
   if (!isOpen) return null;
 
