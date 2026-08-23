@@ -116,14 +116,25 @@ export class PositionTimerScheduler {
       this.recomputeState();
     };
 
+    const handleSongOrQueueChange = () => {
+      this.dispatchCurrentTime();
+      this.recomputeState();
+    };
+
     this.player.on('play', handlePlay);
     this.player.on('pause', handlePause);
     this.player.on('seeked', handleSeeked);
+    this.player.on('songChange', handleSongOrQueueChange);
+    this.player.on('queueChange', handleSongOrQueueChange);
+    this.player.on('durationChange', handleSongOrQueueChange);
 
     this.cleanups.push(() => {
       this.player.off('play', handlePlay);
       this.player.off('pause', handlePause);
       this.player.off('seeked', handleSeeked);
+      this.player.off('songChange', handleSongOrQueueChange);
+      this.player.off('queueChange', handleSongOrQueueChange);
+      this.player.off('durationChange', handleSongOrQueueChange);
     });
 
     if (this.documentRef.addEventListener) {

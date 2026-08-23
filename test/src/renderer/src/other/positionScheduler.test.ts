@@ -191,6 +191,54 @@ describe('PositionTimerScheduler', () => {
     scheduler.destroy();
   });
 
+  it('transitions to IDLE_NO_SONG and stops timers when playing song/queue is cleared', () => {
+    const scheduler = new PositionTimerScheduler(player as any, {
+      documentRef: fakeDoc as any,
+      onPositionChange: (time) => dispatchedEvents.push(time)
+    });
+
+    player.paused = false;
+    player.emit('play');
+    expect(scheduler.getState()).toBe('PLAYING_VISIBLE');
+    expect(dispatchedEvents.length).toBe(1);
+
+    // Clear queue/song
+    player.audio.src = '';
+    player.queue.currentSongId = 0;
+    player.emit('queueChange');
+
+    expect(scheduler.getState()).toBe('IDLE_NO_SONG');
+    expect(dispatchedEvents.length).toBe(2);
+
+    // Fast-forward time: no periodic events should be emitted after queue teardown
+    vi.advanceTimersByTime(5000);
+    expect(dispatchedEvents.length).toBe(2);
+
+    scheduler.destroy();
+  });
+
+  it('dispatches immediate position synchronization when song changes during playback', () => {
+    const scheduler = new PositionTimerScheduler(player as any, {
+      documentRef: fakeDoc as any,
+      onPositionChange: (time) => dispatchedEvents.push(time)
+    });
+
+    player.paused = false;
+    player.emit('play');
+    expect(dispatchedEvents.length).toBe(1);
+
+    // New song loaded at 0.0s
+    player.queue.currentSongId = 99;
+    player.currentTime = 0.0;
+    player.emit('songChange');
+
+    expect(dispatchedEvents.length).toBe(2);
+    expect(dispatchedEvents[1]).toBe(0.0);
+    expect(scheduler.getState()).toBe('PLAYING_VISIBLE');
+
+    scheduler.destroy();
+  });
+
   it('cleans up all listeners and cancels all timers upon destroy', () => {
     const scheduler = new PositionTimerScheduler(player as any, {
       documentRef: fakeDoc as any,

@@ -1,19 +1,19 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 
-let cachedArrayRef: number[] | null = null;
-let cachedSet: Set<number> = new Set();
+const selectionSetCache = new WeakMap<number[], Set<number>>();
 
 /**
- * Returns a cached Set<number> derived from the canonical multipleSelections array.
- * Reconstructed ONCE per array identity change.
+ * Returns a memoized Set<number> derived from the canonical multipleSelections array reference.
+ * Garbage-collected automatically when the array reference is replaced.
  */
 export function getSelectedSongsSet(selections: number[]): Set<number> {
-  if (selections !== cachedArrayRef) {
-    cachedArrayRef = selections;
-    cachedSet = new Set(selections);
+  let set = selectionSetCache.get(selections);
+  if (!set) {
+    set = new Set(selections);
+    selectionSetCache.set(selections, set);
   }
-  return cachedSet;
+  return set;
 }
 
 /**
