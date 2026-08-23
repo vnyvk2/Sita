@@ -27,10 +27,10 @@ const GenreImgAndInfoContainer = (props: Props) => {
         <div className="genre-img-and-info-container text-font-color-black dark:text-font-color-white flex flex-row items-center pb-8">
           <Img
             src={genreData.artworkPaths.artworkPath}
-            className="mr-8 aspect-square max-w-[14rem] rounded-lg"
+            className="mr-8 aspect-square max-w-[14rem] rounded-lg shrink-0"
             loading="eager"
           />
-          <div className="genre-info-container grow">
+          <div className="genre-info-container min-w-0 flex-1 grow overflow-hidden">
             <div className="font-semibold tracking-wider uppercase opacity-50">
               {t('common.genre_one')}
             </div>

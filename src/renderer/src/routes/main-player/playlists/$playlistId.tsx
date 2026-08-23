@@ -3,11 +3,11 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-p
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import { collectionKeys } from '@renderer/api/collectionKeys';
 import Button from '@renderer/components/Button';
+import { type DropdownOption } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
-import { type DropdownOption } from '@renderer/components/Dropdown';
 import {
   canReorder,
   isPersistentPlaylistOrder,
@@ -79,7 +79,8 @@ function PlaylistInfoPage() {
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
 
   const scrollKey = useMemo(
-    () => `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
+    () =>
+      `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
     [playlistId, sortingOrder, filteringOrder, language, keyword]
   );
 
@@ -442,11 +443,7 @@ function PlaylistInfoPage() {
         })
       }
     ]);
-  }, [
-    addNewNotifications,
-    filteredSongs,
-    t
-  ]);
+  }, [addNewNotifications, filteredSongs, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
@@ -564,7 +561,6 @@ function PlaylistInfoPage() {
       }}
     >
       <TitleContainer
-        title={playlistData.name}
         className="pr-4"
         otherItems={[searchBar]}
         buttons={[

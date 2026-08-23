@@ -66,7 +66,7 @@ const AlbumImgAndInfoContainer = (props: Props) => {
     <>
       {albumData && (
         <div className="album-img-and-info-container flex flex-row items-center pb-6">
-          <div className="album-cover-container relative mr-8">
+          <div className="album-cover-container relative mr-8 shrink-0">
             {albumData.artworkPaths && (
               <Img
                 src={albumData.artworkPaths.artworkPath}

@@ -1,13 +1,12 @@
-import { useMemo } from 'react';
+import type { PlaylistDto } from '@common/collections/dtos';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
-import { useContext } from 'react';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';
 import PlaylistCoverSettingsPrompt from '../PlaylistsPage/PlaylistCoverSettingsPrompt';
-
-import type { PlaylistDto } from '@common/collections/dtos';
+import ScrollableTitle from '../ScrollableTitle';
 
 type Props = {
   playlist: PlaylistDto;
@@ -44,55 +43,58 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
     <>
       {playlist && (
         <div className="playlist-img-and-info-container mb-8 flex flex-row items-center justify-start">
-          <div className="playlist-cover-container group relative mt-2 overflow-hidden rounded-xl h-60 w-60">
+          <div className="playlist-cover-container group relative mt-2 h-60 w-60 shrink-0 overflow-hidden rounded-xl">
             <PlaylistCover playlist={playlist} songs={songs} className="h-60 w-60" />
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 openCoverSettings();
               }}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer backdrop-blur-xs"
+              className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/60 opacity-0 backdrop-blur-xs transition-opacity duration-200 group-hover:opacity-100"
               title={t('playlistsPage.editCover', 'Edit Cover')}
             >
               <span className="material-icons-round text-3xl text-white">edit</span>
-              <span className="text-xs font-semibold tracking-wider text-white uppercase">Edit Cover</span>
+              <span className="text-xs font-semibold tracking-wider text-white uppercase">
+                Edit Cover
+              </span>
             </button>
           </div>
-            <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8">
-              <div className="font-semibold tracking-wider uppercase opacity-50">
-                {t('common.playlist_one')}
-              </div>
-              <div className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight mb-2 w-full overflow-hidden text-5xl text-ellipsis whitespace-nowrap">
-                {playlist.name}
-              </div>
-              <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
-                {isFiltered
-                  ? t('playlistsPage.filteredSongCount', {
-                      count: displaySongs.length,
-                      total: playlist.itemCount,
-                      defaultValue: '{{count}} of {{total}} songs'
-                    })
-                  : t('common.songWithCount', { count: playlist.itemCount })}
-              </div>
-              {displaySongs.length > 0 && (
-                <div className="playlist-total-duration">{totalPlaylistDuration}</div>
-              )}
-              {playlist.createdAt && (
-                <div className="playlist-created-date">
-                  {t('playlistsPage.createdOn', {
-                    val: new Date(playlist.createdAt),
-                    formatParams: {
-                      val: {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      }
-                    }
-                  })}
-                </div>
-              )}
+          <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8 min-w-0 flex-1 overflow-hidden">
+            <div className="font-semibold tracking-wider uppercase opacity-50">
+              {t('common.playlist_one')}
             </div>
+            <ScrollableTitle
+              title={playlist.name}
+              className="playlist-name text-font-color-highlight dark:text-dark-font-color-highlight mb-2 text-5xl font-semibold"
+            />
+            <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
+              {isFiltered
+                ? t('playlistsPage.filteredSongCount', {
+                    count: displaySongs.length,
+                    total: playlist.itemCount,
+                    defaultValue: '{{count}} of {{total}} songs'
+                  })
+                : t('common.songWithCount', { count: playlist.itemCount })}
+            </div>
+            {displaySongs.length > 0 && (
+              <div className="playlist-total-duration">{totalPlaylistDuration}</div>
+            )}
+            {playlist.createdAt && (
+              <div className="playlist-created-date">
+                {t('playlistsPage.createdOn', {
+                  val: new Date(playlist.createdAt),
+                  formatParams: {
+                    val: {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }
+                  }
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </>

@@ -1031,3 +1031,26 @@ input[type='checkbox']:checked ~ .checkmark .icon {
   animation-play-state: paused;
 }
 
+@keyframes marqueeScroll {
+  0%, 20% {
+    transform: translateX(0);
+  }
+  50%, 70% {
+    transform: translateX(var(--marquee-dist, 0px));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-scroll {
+  animation: marqueeScroll var(--marquee-duration, 6s) ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee-scroll {
+    animation: none !important;
+  }
+}
+

@@ -59,7 +59,7 @@ interface SongProp {
   isDraggable?: boolean;
   provided?: DraggableProvided;
   selectAllHandler?: (_upToId?: number) => void;
-  genres?: { genreId: string; name: string }[];
+  genres?: { genreId: number | string; name: string }[];
   discNo?: number;
   /** When provided, highlights the matching portion of the title in search results */
   highlightText?: string;
@@ -801,7 +801,7 @@ const Song = memo(
           </div>
         </div>
         <div
-          className={`song-info-container text-font-color-black dark:text-font-color-white grid grow grid-cols-[35%_2fr_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] items-center gap-3 sm:grid-cols-[45%_1fr_minmax(4.5rem,6rem)] sm:gap-2 lg:grid-cols-[40%_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] lg:gap-0! ${
+          className={`song-info-container text-font-color-black dark:text-font-color-white grid min-w-0 flex-1 grid-cols-[35%_2fr_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] items-center gap-3 sm:grid-cols-[45%_1fr_minmax(4.5rem,6rem)] sm:gap-2 lg:grid-cols-[40%_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] lg:gap-0! ${
             (isCurrentSong || isAMultipleSelection) && 'dark:text-font-color-black!'
           }`}
         >
