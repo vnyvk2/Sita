@@ -27,7 +27,8 @@ export function renderLyricsLines(
           isActive={activeLineIndex === index}
           lyric={originalText}
           translatedLyricLines={lyric.translatedTexts}
-          syncedLyrics={{ start, end }}
+          syncedStart={start}
+          syncedEnd={end}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={lyric.romanizedText}
         />
@@ -41,10 +42,8 @@ export function renderLyricsLines(
         index={-1}
         isActive={activeLineIndex === -1}
         lyric="•••"
-        syncedLyrics={{
-          start: 0,
-          end: (parsedLyrics[0]?.start || 0) + offset
-        }}
+        syncedStart={0}
+        syncedEnd={(parsedLyrics[0]?.start || 0) + offset}
         isAutoScrolling={isAutoScrolling}
       />
     );
