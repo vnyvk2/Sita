@@ -1,9 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import MainContainer from '@renderer/components/MainContainer';
 import TitleContainer from '@renderer/components/TitleContainer';
-import Button from '@renderer/components/Button';
 import { queryClient } from '@renderer/queryClient';
 import {
   analyticsQuery,
@@ -20,7 +19,12 @@ import {
 } from '@renderer/components/Insights';
 
 export const Route = createFileRoute('/main-player/insights')({
-  component: InsightsPage
+  component: InsightsPage,
+  pendingComponent: InsightsSkeleton,
+  loader: async () => {
+    await queryClient.ensureQueryData(analyticsQuery.listening('30'));
+    await queryClient.ensureQueryData(analyticsQuery.libraryStats);
+  }
 });
 
 const PERIOD_TABS: Array<{ id: HistoryPeriod; label: string }> = [
@@ -32,29 +36,25 @@ const PERIOD_TABS: Array<{ id: HistoryPeriod; label: string }> = [
 ];
 
 export function InsightsPage() {
-  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<HistoryPeriod>('30');
 
   const {
     data: listeningData,
-    isLoading: isListeningLoading,
     isRefetching: isListeningRefetching,
     refetch: refetchListening
-  } = useQuery(analyticsQuery.listening(selectedPeriod));
+  } = useSuspenseQuery(analyticsQuery.listening(selectedPeriod));
 
   const {
     data: libraryStats,
-    isLoading: isStatsLoading,
     isRefetching: isStatsRefetching,
     refetch: refetchStats
-  } = useQuery(analyticsQuery.libraryStats);
+  } = useSuspenseQuery(analyticsQuery.libraryStats);
 
   const handleRefresh = useCallback(() => {
     refetchListening();
     refetchStats();
   }, [refetchListening, refetchStats]);
 
-  const isLoading = isListeningLoading || isStatsLoading;
   const isRefetching = isListeningRefetching || isStatsRefetching;
 
   return (
@@ -112,54 +112,36 @@ export function InsightsPage() {
       </div>
 
       {/* Main Content / Bento Grid */}
-      {isLoading ? (
-        <InsightsSkeleton />
-      ) : listeningData && libraryStats ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* Row 1: Hero Listening Time (Span 2) + Audiophile Vault (Span 1) */}
-          <div className="md:col-span-2">
-            <HeroListeningTimeCard
-              summary={listeningData.summary}
-              dailyActivity={listeningData.dailyActivity}
-            />
-          </div>
-          <div className="col-span-1">
-            <AudiophileVaultCard stats={libraryStats} />
-          </div>
-
-          {/* Row 2: Top Tracks (Span 1 or 2) + Top Artists (Span 1) + Top Genres (Span 1) */}
-          <div className="col-span-1 md:col-span-1 xl:col-span-1">
-            <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
-          </div>
-          <div className="col-span-1 md:col-span-1 xl:col-span-1">
-            <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
-          </div>
-          <div className="col-span-1 md:col-span-1 xl:col-span-1">
-            <TopGenresCard topGenres={listeningData.topGenres} />
-          </div>
-
-          {/* Row 3: Circadian Rhythm (Span Full / 3) */}
-          <div className="col-span-1 md:col-span-2 xl:col-span-3">
-            <CircadianRhythmCard
-              hourlyDistribution={listeningData.hourlyDistribution}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="flex h-64 flex-col items-center justify-center text-center">
-          <span className="material-icons-round text-4xl text-font-color-dimmed dark:text-dark-font-color-dimmed mb-2">
-            analytics
-          </span>
-          <div className="text-sm font-medium text-font-color-black dark:text-font-color-white">
-            Failed to load insights data
-          </div>
-          <Button
-            label="Retry"
-            className="mt-3 !bg-font-color-highlight !text-white dark:!bg-dark-font-color-highlight dark:!text-dark-background-color-1"
-            clickHandler={handleRefresh}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* Row 1: Hero Listening Time (Span 2) + Audiophile Vault (Span 1) */}
+        <div className="md:col-span-2">
+          <HeroListeningTimeCard
+            summary={listeningData.summary}
+            dailyActivity={listeningData.dailyActivity}
           />
         </div>
-      )}
+        <div className="col-span-1">
+          <AudiophileVaultCard stats={libraryStats} />
+        </div>
+
+        {/* Row 2: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
+        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+          <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
+        </div>
+        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+          <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
+        </div>
+        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+          <TopGenresCard topGenres={listeningData.topGenres} />
+        </div>
+
+        {/* Row 3: Circadian Rhythm (Span Full / 3) */}
+        <div className="col-span-1 md:col-span-2 xl:col-span-3">
+          <CircadianRhythmCard
+            hourlyDistribution={listeningData.hourlyDistribution}
+          />
+        </div>
+      </div>
     </MainContainer>
   );
 }
