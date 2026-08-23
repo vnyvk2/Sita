@@ -50,6 +50,7 @@ import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
+import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
 
 // / / / / / / / CONSTANTS / / / / / / / / /
 const DEFAULT_APP_PROTOCOL = 'nora';
@@ -114,6 +115,25 @@ let compactX: number | null = null;
 let expandedHeight: number | null = null;
 let expandedDirection: 'up' | 'down' | null = null;
 let programmaticMoveTarget: { x: number; y: number } | null = null;
+let programmaticMoveTimeout: NodeJS.Timeout | null = null;
+
+function setProgrammaticMoveTarget(x: number, y: number) {
+  programmaticMoveTarget = { x, y };
+  if (programmaticMoveTimeout) clearTimeout(programmaticMoveTimeout);
+  programmaticMoveTimeout = setTimeout(() => {
+    programmaticMoveTarget = null;
+    programmaticMoveTimeout = null;
+  }, 500);
+}
+
+function clearProgrammaticMoveTarget() {
+  if (programmaticMoveTimeout) {
+    clearTimeout(programmaticMoveTimeout);
+    programmaticMoveTimeout = null;
+  }
+  programmaticMoveTarget = null;
+}
+
 let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
 let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
 export const COMPACT_MINI_PLAYER_HEIGHT = 64;
@@ -130,7 +150,7 @@ function setMiniPlayerBoundsProgrammatically(bounds: {
   if (!mainWindow) return;
   const [currentX, currentY] = mainWindow.getPosition();
   if (bounds.x !== currentX || bounds.y !== currentY) {
-    programmaticMoveTarget = { x: bounds.x, y: bounds.y };
+    setProgrammaticMoveTarget(bounds.x, bounds.y);
   }
   mainWindow.setBounds(bounds, false);
 }
@@ -139,47 +159,12 @@ function moveWindowProgrammatically(x: number, y: number, animate = false) {
   if (!mainWindow) return;
   const [currentX, currentY] = mainWindow.getPosition();
   if (x !== currentX || y !== currentY) {
-    programmaticMoveTarget = { x, y };
+    setProgrammaticMoveTarget(x, y);
   }
   mainWindow.setPosition(x, y, animate);
 }
 
-export function isRectOnAnyDisplay(bounds: { x: number; y: number; width: number; height: number }) {
-  return screen.getAllDisplays().some((display) => {
-    const { x, y, width, height } = display.bounds;
-    return (
-      bounds.x < x + width &&
-      bounds.x + bounds.width > x &&
-      bounds.y < y + height &&
-      bounds.y + bounds.height > y
-    );
-  });
-}
-
-/**
- * Validates a persisted window position.
- * Guards against Windows' minimized-window coordinates (-32000) and positions
- * that do not intersect any connected display. Uses actual/minimum window
- * footprint rather than a 1x1 point to allow legitimate partial overhangs.
- */
-export function isValidPersistedPosition(
-  x: number | null | undefined,
-  y: number | null | undefined,
-  width = MINI_PLAYER_MIN_SIZE_X,
-  height = MINI_PLAYER_MIN_SIZE_Y
-) {
-  if (
-    x === null ||
-    x === undefined ||
-    y === null ||
-    y === undefined ||
-    !Number.isFinite(x) ||
-    !Number.isFinite(y)
-  )
-    return false;
-  if (x <= -30000 || y <= -30000) return false;
-  return isRectOnAnyDisplay({ x, y, width, height });
-}
+export { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
 
 // / / / / / / INITIALIZATION / / / / / / /
 
@@ -781,16 +766,14 @@ function manageAppMoveEvent() {
   const [x, y] = mainWindow.getPosition();
   const [width, height] = mainWindow.getSize();
 
-  // Guard: if this move event matches our programmatic move target, consume it and ignore
-  if (
-    programmaticMoveTarget &&
-    programmaticMoveTarget.x === x &&
-    programmaticMoveTarget.y === y
-  ) {
-    programmaticMoveTarget = null;
+  // Guard: if a programmatic move is in progress, ignore all move events (both intermediate
+  // frames and the final event) until the window settles at the target coordinates or the guard expires.
+  if (programmaticMoveTarget) {
+    if (programmaticMoveTarget.x === x && programmaticMoveTarget.y === y) {
+      clearProgrammaticMoveTarget();
+    }
     return;
   }
-  programmaticMoveTarget = null;
 
   if (!isValidPersistedPosition(x, y, width, height)) {
     logger.warn('Ignoring window move reported at an invalid position', {
@@ -1285,7 +1268,7 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         compactX = null;
         expandedHeight = null;
         expandedDirection = null;
-        programmaticMoveTarget = null;
+        clearProgrammaticMoveTarget();
 
         if (isValidPersistedPosition(miniPlayerX, miniPlayerY, targetWidth, targetHeight)) {
           moveWindowProgrammatically(miniPlayerX as number, miniPlayerY as number, true);

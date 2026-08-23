@@ -1,7 +1,7 @@
 import { type Display, screen } from 'electron';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isRectOnAnyDisplay, isValidPersistedPosition } from '../main';
+import { isRectOnAnyDisplay, isValidPersistedPosition } from '../utils/windowPosition';
 
 describe('Window Positioning & Coordinate Validation', () => {
   beforeEach(() => {
