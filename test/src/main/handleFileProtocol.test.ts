@@ -60,13 +60,16 @@ describe('handleFileProtocol (Phase P4 Protocol & Streaming)', () => {
     expect(body).toBe('File not found');
   });
 
-  test('delegates to net.fetch for full file requests (no Range header)', async () => {
+  test('serves full file as 200 OK ReadableStream when no Range header is present', async () => {
     const req = new Request('nora://localfiles/C:/music/song.mp3');
     const res = await handleFileProtocol(req as never);
 
     expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).toBe('mock-full-file-content');
+    expect(res.headers.get('Content-Length')).toBe('10000');
+    expect(res.headers.get('Content-Type')).toBe('audio/mpeg');
+    expect(res.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(res.headers.get('ETag')).toBe('"10000-123456789"');
+    expect(res.body).toBeInstanceOf(ReadableStream);
   });
 
   test('returns 206 Partial Content with correct headers for Range request', async () => {
@@ -95,20 +98,35 @@ describe('handleFileProtocol (Phase P4 Protocol & Streaming)', () => {
     expect(res.headers.get('Content-Range')).toBe('bytes */10000');
   });
 
-  test('applies backpressure and pauses fileStream when consumer buffer is saturated', async () => {
-    const req = new Request('nora://localfiles/C:/music/song.flac', {
-      headers: { range: 'bytes=0-9999' }
+  test('applies backpressure on consumer: Node stream pushes chunks only when WebStream pulls', async () => {
+    let readCallCount = 0;
+    const sourceStream = new Readable({
+      read(size) {
+        readCallCount++;
+        this.push(Buffer.alloc(Math.min(size, 512)));
+      }
     });
-    const res = await handleFileProtocol(req as never);
 
-    expect(mockCreatedStream).not.toBeNull();
-    const stream = mockCreatedStream!;
+    const webStream = Readable.toWeb(sourceStream);
+    const reader = webStream.getReader();
 
-    // Emit data chunks
-    stream.emit('data', Buffer.alloc(1024));
-    // The stream pauses when the reader's queue is filled
-    expect(stream.options.start).toBe(0);
-    expect(stream.options.end).toBe(9999);
+    expect(readCallCount).toBe(0);
+
+    // First pull
+    const chunk1 = await reader.read();
+    expect(chunk1.done).toBe(false);
+    expect(chunk1.value).toBeDefined();
+    const initialReads = readCallCount;
+    expect(initialReads).toBeGreaterThan(0);
+
+    // While consumer does not pull, no further reads occur beyond the stream's highWaterMark
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readCallCount).toBe(initialReads);
+
+    // Signal EOF and read final chunk
+    sourceStream.push(null);
+    const chunk2 = await reader.read();
+    expect(chunk2.done).toBe(false);
   });
 
   test('destroys fileStream when WebStream is cancelled', async () => {

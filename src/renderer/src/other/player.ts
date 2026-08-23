@@ -60,6 +60,7 @@ class AudioPlayer {
   private currentLoadRequestId: number = 0;
   private activeCanPlayHandler: (() => void) | null = null;
   private fadeTimeout: NodeJS.Timeout | null = null;
+  private activeFadeResolve: (() => void) | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -360,6 +361,10 @@ class AudioPlayer {
       clearTimeout(this.fadeTimeout);
       this.fadeTimeout = null;
     }
+    if (this.activeFadeResolve) {
+      this.activeFadeResolve();
+      this.activeFadeResolve = null;
+    }
     if (this.activeCanPlayHandler) {
       this.audio.removeEventListener('canplay', this.activeCanPlayHandler);
       this.activeCanPlayHandler = null;
@@ -421,6 +426,12 @@ class AudioPlayer {
         clearTimeout(this.fadeTimeout);
         this.fadeTimeout = null;
       }
+      if (this.activeFadeResolve) {
+        this.activeFadeResolve();
+        this.activeFadeResolve = null;
+      }
+
+      this.activeFadeResolve = resolve;
 
       const currentTime = this.currentContext.currentTime;
       const targetVolume = 0.001; // Very low but not zero to avoid clicks
@@ -433,7 +444,10 @@ class AudioPlayer {
       this.fadeTimeout = setTimeout(() => {
         this.audio.pause();
         this.fadeTimeout = null;
-        resolve(undefined);
+        if (this.activeFadeResolve === resolve) {
+          this.activeFadeResolve = null;
+        }
+        resolve();
       }, AUDIO_FADE_DURATION);
     });
   }
@@ -444,6 +458,12 @@ class AudioPlayer {
         clearTimeout(this.fadeTimeout);
         this.fadeTimeout = null;
       }
+      if (this.activeFadeResolve) {
+        this.activeFadeResolve();
+        this.activeFadeResolve = null;
+      }
+
+      this.activeFadeResolve = resolve;
 
       const currentTime = this.currentContext.currentTime;
       const targetVolume = this.currentVolume / 100;
@@ -455,7 +475,10 @@ class AudioPlayer {
       // Resolve after fade completes
       this.fadeTimeout = setTimeout(() => {
         this.fadeTimeout = null;
-        resolve(undefined);
+        if (this.activeFadeResolve === resolve) {
+          this.activeFadeResolve = null;
+        }
+        resolve();
       }, AUDIO_FADE_DURATION);
     });
   }

@@ -59,9 +59,14 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         headers
       });
     } else {
-      const asFileUrl = pathToFileURL(filePath).toString();
-      const response = await net.fetch(asFileUrl);
-      return response;
+      headers['Content-Length'] = fileSize.toString();
+      const fileStream = createReadStream(filePath);
+      const webStream = Readable.toWeb(fileStream);
+
+      return new Response(webStream, {
+        status: 200,
+        headers
+      });
     }
   } catch (error) {
     logger.error('Error handling media protocol:', { error }, error);

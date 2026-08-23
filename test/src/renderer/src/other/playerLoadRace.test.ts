@@ -382,4 +382,13 @@ describe('AudioPlayer Playback Concurrency & Race Tests (Phase P2 & P3)', () => 
       })
     );
   });
+
+  test('superseded fade promise settles immediately without hanging when rapid play/pause occurs', async () => {
+    const pausePromise = player.pause();
+    const playPromise = player.play();
+
+    // The superseded pausePromise must settle rather than hanging unresolved forever
+    await expect(pausePromise).resolves.toBeUndefined();
+    await expect(playPromise).resolves.toBeUndefined();
+  });
 });
