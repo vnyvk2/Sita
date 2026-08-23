@@ -21,8 +21,7 @@ import {
   screen,
   session as electronSession,
   type OpenDialogOptions,
-  type SaveDialogOptions,
-  type Display
+  type SaveDialogOptions
 } from 'electron';
 
 if (process.env.REMOTE_DEBUGGING_PORT) {
@@ -134,6 +133,39 @@ function setMiniPlayerBoundsProgrammatically(bounds: {
     programmaticMoveTarget = { x: bounds.x, y: bounds.y };
   }
   mainWindow.setBounds(bounds, false);
+}
+
+function moveWindowProgrammatically(x: number, y: number, animate = false) {
+  if (!mainWindow) return;
+  const [currentX, currentY] = mainWindow.getPosition();
+  if (x !== currentX || y !== currentY) {
+    programmaticMoveTarget = { x, y };
+  }
+  mainWindow.setPosition(x, y, animate);
+}
+
+function isRectOnAnyDisplay(bounds: { x: number; y: number; width: number; height: number }) {
+  return screen.getAllDisplays().some((display) => {
+    const { x, y, width, height } = display.bounds;
+    return (
+      bounds.x < x + width &&
+      bounds.x + bounds.width > x &&
+      bounds.y < y + height &&
+      bounds.y + bounds.height > y
+    );
+  });
+}
+
+/**
+ * Validates a persisted window position.
+ * Guards against Windows' minimized-window coordinates (-32000) leaking into saved
+ * settings and against positions that no longer lie on any connected display
+ * (e.g. a detached monitor).
+ */
+function isValidPersistedPosition(x: number | null, y: number | null) {
+  if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  if (x <= -32000 || y <= -32000) return false;
+  return isRectOnAnyDisplay({ x, y, width: 1, height: 1 });
 }
 
 // / / / / / / INITIALIZATION / / / / / / /
@@ -723,7 +755,15 @@ export async function showSaveDialog(saveDialogOptions = DEFAULT_SAVE_DIALOG_OPT
 function manageAppMoveEvent() {
   if (isChangingPlayerType) return;
 
+  // Windows teleports minimized windows to (-32000, -32000) which Electron reports
+  // through the 'moved' event. Never treat that as a user-chosen position.
+  if (mainWindow.isMinimized()) return;
+
   const [x, y] = mainWindow.getPosition();
+  if (!isValidPersistedPosition(x, y)) {
+    logger.warn('Ignoring window move reported at an invalid position', { playerType, x, y });
+    return;
+  }
   logger.debug(`User moved the player`, { playerType, coordinates: { x, y } });
 
   if (playerType === 'mini') {
@@ -742,19 +782,28 @@ function manageAppMoveEvent() {
       const anchorY = expandedDirection === 'up' ? y + heightDelta : y;
       compactX = x;
       compactY = anchorY;
-      saveUserSettings({ miniPlayerX: x, miniPlayerY: anchorY });
+      saveUserSettings({ miniPlayerX: x, miniPlayerY: anchorY }).catch((error) =>
+        logger.error('Failed to persist mini player position', { error })
+      );
     } else {
       compactX = x;
       compactY = y;
-      saveUserSettings({ miniPlayerX: x, miniPlayerY: y });
+      saveUserSettings({ miniPlayerX: x, miniPlayerY: y }).catch((error) =>
+        logger.error('Failed to persist mini player position', { error })
+      );
     }
   } else if (playerType === 'normal') {
-    saveUserSettings({ mainWindowX: x, mainWindowY: y });
+    saveUserSettings({ mainWindowX: x, mainWindowY: y }).catch((error) =>
+      logger.error('Failed to persist main window position', { error })
+    );
   }
 }
 
 function manageAppResizeEvent() {
   if (isChangingPlayerType) return;
+
+  // Avoid persisting sizes reported while Windows has the window minimized
+  if (mainWindow.isMinimized()) return;
 
   const [width, height] = mainWindow.getSize();
   logger.debug(`User resized the player`, {
@@ -769,13 +818,19 @@ function manageAppResizeEvent() {
   if (playerType === 'mini') {
     if (currentMiniPlayerMode === 'compact') {
       // In Compact Mode, only save width so standard mode height is preserved
-      saveUserSettings({ miniPlayerWidth: width });
+      saveUserSettings({ miniPlayerWidth: width }).catch((error) =>
+        logger.error('Failed to persist mini player size', { error })
+      );
     } else {
       savedStandardHeight = height;
-      saveUserSettings({ miniPlayerWidth: width, miniPlayerHeight: height });
+      saveUserSettings({ miniPlayerWidth: width, miniPlayerHeight: height }).catch((error) =>
+        logger.error('Failed to persist mini player size', { error })
+      );
     }
   } else if (playerType === 'normal') {
-    saveUserSettings({ mainWindowWidth: width, mainWindowHeight: height });
+    saveUserSettings({ mainWindowWidth: width, mainWindowHeight: height }).catch((error) =>
+      logger.error('Failed to persist main window size', { error })
+    );
   }
 }
 
@@ -963,7 +1018,11 @@ function ensureWindowIsVisible(window: BrowserWindow) {
     logger.info(
       `Window is off-screen. Centering it. Bounds: ${JSON.stringify(bounds)}, Display: ${JSON.stringify(display.bounds)}`
     );
-    window.center();
+    // Center through the programmatic-move helper so this recovery move is not
+    // mistaken for a user move and persisted over the user's saved position.
+    const centerX = Math.round(display.workArea.x + (display.workArea.width - bounds.width) / 2);
+    const centerY = Math.round(display.workArea.y + (display.workArea.height - bounds.height) / 2);
+    moveWindowProgrammatically(centerX, centerY);
   }
 }
 
@@ -1192,13 +1251,22 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         expandedDirection = null;
         programmaticMoveTarget = null;
 
-        if (miniPlayerX !== null && miniPlayerY !== null) {
-          mainWindow.setPosition(miniPlayerX, miniPlayerY, true);
+        if (isValidPersistedPosition(miniPlayerX, miniPlayerY)) {
+          moveWindowProgrammatically(miniPlayerX as number, miniPlayerY as number, true);
           ensureWindowIsVisible(mainWindow);
         } else {
+          // First launch, or the saved position was corrupted/off-screen (e.g. the
+          // Windows minimized-position leak or a disconnected monitor): restore to
+          // the smart bottom-right anchor and heal the persisted values.
+          if (miniPlayerX !== null && miniPlayerY !== null) {
+            logger.warn('Saved mini player position is invalid. Restoring to default.', {
+              miniPlayerX,
+              miniPlayerY
+            });
+          }
           // Smart bottom-right screen anchoring on first launch
           const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
-          mainWindow.setPosition(defaultBounds.x, defaultBounds.y, true);
+          moveWindowProgrammatically(defaultBounds.x, defaultBounds.y, true);
           await saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y });
         }
         mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
@@ -1214,10 +1282,16 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
           mainWindow.setSize(mainWindowWidth, mainWindowHeight, true);
         } else mainWindow.setSize(MAIN_WINDOW_DEFAULT_SIZE_X, MAIN_WINDOW_DEFAULT_SIZE_Y, true);
 
-        if (mainWindowX !== null && mainWindowY !== null) {
-          mainWindow.setPosition(mainWindowX, mainWindowY, true);
+        if (isValidPersistedPosition(mainWindowX, mainWindowY)) {
+          moveWindowProgrammatically(mainWindowX as number, mainWindowY as number, true);
           ensureWindowIsVisible(mainWindow);
         } else {
+          if (mainWindowX !== null && mainWindowY !== null) {
+            logger.warn('Saved main window position is invalid. Restoring to default.', {
+              mainWindowX,
+              mainWindowY
+            });
+          }
           mainWindow.center();
           const [x, y] = mainWindow.getPosition();
           await saveUserSettings({ mainWindowX: x, mainWindowY: y });
@@ -1361,20 +1435,36 @@ export function expandMiniPlayer(
   }
 }
 
-function manageWindowOnDisplayMetricsChange(primaryDisplay: Display) {
-  const currentDisplay = screen.getDisplayMatching(mainWindow.getBounds());
+function manageWindowOnDisplayMetricsChange() {
+  if (!mainWindow || mainWindow.isDestroyed() || isChangingPlayerType) return;
 
-  if (!currentDisplay || currentDisplay.id !== primaryDisplay.id) {
-    mainWindow.setPosition(primaryDisplay.workArea.x, primaryDisplay.workArea.y);
+  const bounds = mainWindow.getBounds();
+  if (isRectOnAnyDisplay(bounds)) return;
+
+  // The window is stranded off-screen (display disconnected, resolution change, etc.).
+  // Restore it to a visible position instead of leaving it stranded, and persist the
+  // recovered position so the corruption does not repeat on every launch.
+  logger.info('Window is stranded off-screen after a display change. Restoring position.', {
+    bounds
+  });
+
+  if (playerType === 'mini') {
+    const [width, height] = mainWindow.getSize();
+    const defaultBounds = getDefaultMiniPlayerBounds(width, height);
+    moveWindowProgrammatically(defaultBounds.x, defaultBounds.y);
+    saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y }).catch(
+      (error) => logger.error('Failed to persist recovered mini player position', { error })
+    );
+  } else {
+    ensureWindowIsVisible(mainWindow);
   }
 }
 
 function manageWindowPositionInMonitor() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  manageWindowOnDisplayMetricsChange(primaryDisplay);
+  manageWindowOnDisplayMetricsChange();
 
   // Event listener for display change events
-  screen.on('display-metrics-changed', () => manageWindowOnDisplayMetricsChange(primaryDisplay));
+  screen.on('display-metrics-changed', () => manageWindowOnDisplayMetricsChange());
 }
 
 export async function toggleAutoLaunch(autoLaunchState: boolean) {
