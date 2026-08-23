@@ -1032,13 +1032,13 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 }
 
 @keyframes marqueeScroll {
-  0%, 20% {
+  0%, 8% {
     transform: translateX(0);
   }
-  50%, 70% {
+  48%, 56% {
     transform: translateX(var(--marquee-dist, 0px));
   }
-  100% {
+  96%, 100% {
     transform: translateX(0);
   }
 }

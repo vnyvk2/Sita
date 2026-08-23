@@ -16,10 +16,12 @@ const ScrollableTitle = ({ title, className = '', speed = 40 }: Props) => {
   const checkOverflow = useCallback(() => {
     if (containerRef.current && measureRef.current) {
       const containerWidth = containerRef.current.clientWidth;
-      const textWidth = measureRef.current.offsetWidth || measureRef.current.scrollWidth;
+      const textWidth = Math.ceil(
+        measureRef.current.getBoundingClientRect().width || measureRef.current.scrollWidth
+      );
       if (textWidth > containerWidth && containerWidth > 0) {
         setIsOverflowing(true);
-        setOverflowDistance(textWidth - containerWidth + 12); // +12px buffer for breathing room
+        setOverflowDistance(textWidth - containerWidth + 16); // +16px buffer for breathing room
       } else {
         setIsOverflowing(false);
         setOverflowDistance(0);
@@ -29,6 +31,13 @@ const ScrollableTitle = ({ title, className = '', speed = 40 }: Props) => {
 
   useEffect(() => {
     checkOverflow();
+
+    // Check when fonts finish loading to avoid fallback-font measurement skew
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        checkOverflow();
+      });
+    }
 
     const container = containerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
@@ -43,9 +52,32 @@ const ScrollableTitle = ({ title, className = '', speed = 40 }: Props) => {
     };
   }, [title, checkOverflow]);
 
-  // The @keyframes marqueeScroll uses 30% of totalDuration for each scroll phase (20%->50% and 70%->100%)
+  const handleMouseEnter = () => {
+    // Immediate measurement check on mouse entry
+    if (containerRef.current && measureRef.current) {
+      const containerWidth = containerRef.current.clientWidth;
+      const textWidth = Math.ceil(
+        measureRef.current.getBoundingClientRect().width || measureRef.current.scrollWidth
+      );
+      if (textWidth > containerWidth && containerWidth > 0) {
+        const dist = textWidth - containerWidth + 16;
+        setOverflowDistance(dist);
+        setIsOverflowing(true);
+        setIsHovered(true);
+        return;
+      }
+    }
+    setIsOverflowing(false);
+    setIsHovered(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  // Duration scales proportionally with scroll distance, keeping pauses concise (~0.8s)
   const scrollTime = overflowDistance / speed;
-  const totalDuration = Math.max(4, scrollTime / 0.3);
+  const totalDuration = Math.max(3, scrollTime * 2 + 2.4);
 
   const customStyle: CSSProperties & { [key: string]: string | number } = {
     '--marquee-dist': `-${overflowDistance}px`,
@@ -56,18 +88,15 @@ const ScrollableTitle = ({ title, className = '', speed = 40 }: Props) => {
     <div
       ref={containerRef}
       className={`group relative w-full min-w-0 overflow-hidden ${className}`}
-      onMouseEnter={() => {
-        checkOverflow();
-        setIsHovered(true);
-      }}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={customStyle}
     >
-      {/* Invisible measurement probe for 100% stable intrinsic text width calculation */}
+      {/* Invisible measurement probe with unconstrained w-max for 100% stable intrinsic width */}
       <span
         ref={measureRef}
         aria-hidden="true"
-        className="pointer-events-none invisible absolute whitespace-nowrap select-none"
+        className="pointer-events-none invisible absolute top-0 left-0 max-w-none w-max whitespace-nowrap select-none"
       >
         {title}
       </span>

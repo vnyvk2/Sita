@@ -30,7 +30,17 @@ describe('ScrollableTitle Component', () => {
     // Simulate container larger than text
     Object.defineProperty(wrapper, 'clientWidth', { configurable: true, value: 500 });
     const probe = container.querySelector('span[aria-hidden="true"]') as HTMLElement;
-    Object.defineProperty(probe, 'offsetWidth', { configurable: true, value: 100 });
+    vi.spyOn(probe, 'getBoundingClientRect').mockReturnValue({
+      width: 100,
+      height: 20,
+      top: 0,
+      left: 0,
+      bottom: 20,
+      right: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
 
     fireEvent.mouseEnter(wrapper);
 
@@ -47,14 +57,24 @@ describe('ScrollableTitle Component', () => {
     // Simulate text wider than container
     Object.defineProperty(wrapper, 'clientWidth', { configurable: true, value: 200 });
     const probe = container.querySelector('span[aria-hidden="true"]') as HTMLElement;
-    Object.defineProperty(probe, 'offsetWidth', { configurable: true, value: 400 });
+    vi.spyOn(probe, 'getBoundingClientRect').mockReturnValue({
+      width: 400,
+      height: 20,
+      top: 0,
+      left: 0,
+      bottom: 20,
+      right: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
 
     // Hover
     fireEvent.mouseEnter(wrapper);
 
     const animatedEl = wrapper.querySelector('.animate-marquee-scroll');
     expect(animatedEl).not.toBeNull();
-    expect(wrapper.style.getPropertyValue('--marquee-dist')).toBe('-212px'); // 400 - 200 + 12
+    expect(wrapper.style.getPropertyValue('--marquee-dist')).toBe('-216px'); // 400 - 200 + 16
   });
 
   it('stops marquee animation and restores truncate on mouse leave', () => {
@@ -63,7 +83,17 @@ describe('ScrollableTitle Component', () => {
 
     Object.defineProperty(wrapper, 'clientWidth', { configurable: true, value: 200 });
     const probe = container.querySelector('span[aria-hidden="true"]') as HTMLElement;
-    Object.defineProperty(probe, 'offsetWidth', { configurable: true, value: 400 });
+    vi.spyOn(probe, 'getBoundingClientRect').mockReturnValue({
+      width: 400,
+      height: 20,
+      top: 0,
+      left: 0,
+      bottom: 20,
+      right: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
 
     // Hover in
     fireEvent.mouseEnter(wrapper);
@@ -81,13 +111,23 @@ describe('ScrollableTitle Component', () => {
 
     Object.defineProperty(wrapper, 'clientWidth', { configurable: true, value: 200 });
     const probe = container.querySelector('span[aria-hidden="true"]') as HTMLElement;
-    Object.defineProperty(probe, 'offsetWidth', { configurable: true, value: 440 });
+    vi.spyOn(probe, 'getBoundingClientRect').mockReturnValue({
+      width: 440,
+      height: 20,
+      top: 0,
+      left: 0,
+      bottom: 20,
+      right: 440,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
 
     fireEvent.mouseEnter(wrapper);
 
-    // overflowDistance = 440 - 200 + 12 = 252px
-    // scrollTime = 252 / 80 = 3.15s
-    // totalDuration = 3.15 / 0.3 = 10.5s
-    expect(wrapper.style.getPropertyValue('--marquee-duration')).toBe('10.5s');
+    // overflowDistance = 440 - 200 + 16 = 256px
+    // scrollTime = 256 / 80 = 3.2s
+    // totalDuration = 3.2 * 2 + 2.4 = 8.8s
+    expect(wrapper.style.getPropertyValue('--marquee-duration')).toBe('8.8s');
   });
 });
