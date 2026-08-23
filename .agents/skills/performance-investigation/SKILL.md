@@ -11,37 +11,36 @@ description: Rigorous methodology for investigating memory leaks, UI render casc
 
 ---
 
-## 1. The Investigation Hierarchy
+## 1. The Investigation Hierarchy & Decision Flow
 
-When auditing memory and performance, investigate through this strict hierarchy from application-level state down to process-level native memory:
+When analyzing memory and performance, do not treat OS Working Set as an immediate indicator of a JavaScript bug. Follow this strict investigation flow:
 
 ```text
-Performance Investigation Hierarchy
-        │
-        ├── Level 1: V8 JavaScript Heap
-        │      └── Metric: JSHeapUsedSize / JSHeapTotalSize
-        │      └── Test: Does heap grow monotonically (e.g., 30MB → 60MB → 120MB → 250MB)?
-        │
-        ├── Level 2: DOM Node Lifecycle
-        │      └── Metric: CDP Nodes & Documents
-        │      └── Test: Do detached nodes accumulate across repeated mount/unmount cycles?
-        │
-        ├── Level 3: Event Subscriptions & Listeners
-        │      └── Metric: CDP JSEventListeners
-        │      └── Test: Do event listeners accumulate across component/route lifecycles?
-        │
-        ├── Level 4: Renderer Process Working Set
-        │      └── Metric: OS WorkingSet64 & PrivateMemorySize64
-        │      └── Test: Does Renderer WS reach a bounded plateau or experience runaway growth?
-        │
-        ├── Level 5: GPU Process Working Set
-        │      └── Metric: GPU Process WorkingSet64
-        │      └── Test: Does viewport size, blur shaders, or window resizing explain GPU usage?
-        │
-        └── Level 6: Main Process Native Memory
-               └── Metric: Node process.memoryUsage() / OS WorkingSet64
-               └── Test: Does database/image engine memory settle after cold launch?
+               "Task Manager reports high Working Set (e.g. 480 MB)"
+                                       │
+                                       ▼
+                       Is V8 JS Heap growing monotonically?
+                          /                         \
+                        YES                          NO
+                        │                             │
+          Application JS Memory Leak          Check DOM Nodes (CDP Nodes)
+          (retained closures/Redux/caches)            │
+                                              Check JS Event Listeners (CDP)
+                                                      │
+                                              Check Active Subscriptions & Timers
+                                                      │
+                                              Check GPU / Viewport Compositor
+                                                      │
+                                              Chromium Allocator / JIT Cache Plateau
 ```
+
+### Hierarchy Breakdown:
+* **Level 1: V8 JavaScript Heap** (`JSHeapUsedSize` / `JSHeapTotalSize`) — Is heap growing monotonically (e.g., $30\text{MB} \rightarrow 60\text{MB} \rightarrow 120\text{MB} \rightarrow 250\text{MB}$)?
+* **Level 2: DOM Node Lifecycle** (`Nodes` / `Documents`) — Are detached DOM nodes accumulating across mount/unmount cycles?
+* **Level 3: Event Subscriptions & Listeners** (`JSEventListeners`) — Are listeners accumulating across component/route transitions?
+* **Level 4: GPU Process Working Set** (`GPU WS`) — Does viewport size, blur shaders, or window resizing explain GPU usage?
+* **Level 5: Main Process Native Memory** (`Node process.memoryUsage()` / `Main WS`) — Does database/image engine memory settle after cold launch?
+* **Attribution Output: Renderer Process Working Set** (`Renderer WS` / `PrivateMemorySize64`) — Does it reach a bounded plateau or experience runaway growth?
 
 ---
 
@@ -95,3 +94,185 @@ To prove whether a system has a genuine memory leak or is simply warming up Chro
 3. **Reporting Standards**:
    - Explicitly separate **Observed Facts** from **Inferences** and **Assumptions**.
    - Do not claim causal percentage improvements from isolated runs without repeated A/B validation.
+
+---
+
+## 5. Memory Attribution: Three Different Meanings of "Small"
+
+When evaluating Main Player vs MiniPlayer vs Compact MiniPlayer, **NEVER equate visual/window size with process memory size**.
+
+Distinguish these three layers:
+
+### A. Visual Footprint
+What the user sees and what Chromium must actively render.
+- **Examples**: Viewport dimensions, visible DOM, active CSS animations, canvas/WebGL surfaces, blur/backdrop effects, compositor surfaces.
+- **Indicator**: Strongly reflected by GPU memory and rendering frame times.
+
+### B. Application Resource Footprint
+What Nora is actively keeping alive in memory.
+- **Examples**: Mounted React components, DOM nodes, event listeners, store subscriptions, observers, intervals/timers, query cache entries, audio/lyrics buffers, IPC listeners.
+- **Indicator**: The primary layer to investigate when asking: *"Does MiniPlayer actually unmount the Main Player?"*
+
+### C. Process Working Set
+What the OS currently reports as resident memory for the process.
+- **Includes**: V8/JS memory, Blink structures, PartitionAlloc arenas, JIT code pages, decoded web resources, font/glyph caches, Skia graphics caches, and previously allocated but reusable memory pages.
+
+> [!IMPORTANT]
+> A Compact MiniPlayer can have a large Renderer Working Set while simultaneously having a small active UI/resource footprint. A large Renderer WS alone is **NOT** evidence that Compact MiniPlayer is retaining the full Main Player.
+
+---
+
+## 6. Mode-Transition Attribution Protocol
+
+When comparing:
+$$\text{Main Player} \longrightarrow \text{Standard MiniPlayer} \longrightarrow \text{Compact MiniPlayer}$$
+
+Do not judge optimization using Working Set alone. For every mode, capture at minimum:
+* `Renderer WS` & `GPU WS` & `Main WS`
+* `JS Heap Used` & `JS Heap Total`
+* `DOM Nodes` & `Documents` & `Layout Objects`
+* `JS Event Listeners`
+
+Additionally investigate application lifecycle state where possible:
+- Mounted React views/components
+- Active store subscriptions and IPC listeners
+- Active timers and mutation observers
+- Query cache entries
+- Image and canvas resources
+
+### Expected Interpretation
+If:
+$$\text{Renderer WS: } 480\text{MB} \rightarrow 460\text{MB} \quad|\quad \text{JS Heap: } 32\text{MB} \rightarrow 29\text{MB} \quad|\quad \text{DOM Nodes: } 2100 \rightarrow 1500 \quad|\quad \text{GPU WS: } 260\text{MB} \rightarrow 175\text{MB}$$
+The correct conclusion is **NOT**: *"MiniPlayer still uses 460 MB, therefore it isn't lightweight."*
+The correct conclusion is: *"The active UI/resource footprint decreases, GPU usage decreases substantially, and the Renderer Working Set remains elevated. Further attribution is required before determining whether retained Renderer memory belongs to Nora or Chromium."*
+
+---
+
+## 7. Compact / MiniPlayer Specific Investigation
+
+When a smaller player mode is expected to have a significantly smaller footprint, investigate whether the Main Player is actually unmounted:
+
+### 10 Questions to Answer:
+1. Are Main Player components still mounted in the React tree?
+2. Are their DOM nodes still present in the document?
+3. Are their event listeners still registered?
+4. Are their store subscriptions still active?
+5. Are their timers or intersection observers still running?
+6. Are route-specific queries still active?
+7. Are hidden components merely CSS-hidden (`display: none` / `opacity: 0`) instead of unmounted?
+8. Are portals or context menu overlays still mounted?
+9. Are canvas or WebGL resources still active?
+10. Does the renderer continue performing work associated with the Main Player?
+
+### Evidence Signatures:
+* **Strong Evidence of Proper Lifecycle Cleanup**:
+  $$\text{Main} \rightarrow \text{Mini} \implies \text{DOM Nodes } \downarrow, \text{ Listeners } \downarrow, \text{ Active Effects } \downarrow, \text{ GPU Workload } \downarrow$$
+* **Evidence Requiring Further Investigation**:
+  $$\text{Main} \rightarrow \text{Mini} \implies \text{DOM Nodes } \approx \text{same}, \text{ Listeners } \approx \text{same}, \text{ Subscriptions } \approx \text{same}, \text{ GPU } \downarrow, \text{ Renderer WS } \approx \text{same}$$
+  *(This may indicate the window resized while substantial application UI remained mounted. Do NOT conclude a leak without repeated-cycle evidence).*
+
+---
+
+## 8. Chromium Retention vs Application Retention
+
+A memory allocation remaining in Renderer Working Set does not prove that the corresponding application object is still reachable.
+
+```text
+Application Retention
+    ↓
+Object / component / resource is still reachable or active in JS/DOM
+    ↓
+Potential application defect
+
+Chromium Allocation Retention
+    ↓
+Application object / resource has been garbage collected / unmounted
+    ↓
+Chromium allocator (PartitionAlloc / Skia / JIT cache) retains pages for reuse
+    ↓
+Normal runtime behavior
+```
+
+Whenever possible, prove reachability and lifecycle independently from OS Working Set.
+
+---
+
+## 9. Required Investigation Sequence
+
+For memory investigations, follow this exact sequence:
+
+1. **Phase 1 — Establish Baseline**: Capture Cold launch, Idle, and Active playback.
+2. **Phase 2 — Exercise Workload**: Perform the specific workload under test (playback, lyrics, queue skips, route changes).
+3. **Phase 3 — Lifecycle Transition**: Capture $\text{Main} \rightarrow \text{Standard Mini} \rightarrow \text{Compact Mini} \rightarrow \text{Main}$ (repeat at least 3 times).
+4. **Phase 4 — Attribution**: Compare JS Heap, DOM Nodes, Listeners, Layout Objects, GPU, Renderer WS, and Main WS.
+5. **Phase 5 — Rest**: Allow application to settle for 30–60 seconds. Do not interpret transient post-transition allocations as leaks.
+6. **Phase 6 — Verdict**: Classify findings using the standard verdict scale.
+
+---
+
+## 10. Benchmark Quality Rules
+
+* **Single-Run Results**: Useful for discovering suspicious behavior, identifying candidates, and establishing rough baselines. **Insufficient for proving a memory leak or claiming percentage improvements.**
+* **Multi-Cycle Results**: Required for lifecycle leak detection, retention analysis, and mode-transition stability.
+* **A/B Comparisons**: Required before claiming *"Change X reduced memory by Y%"*. Run $\text{Control} \times N\text{ cycles}$ vs $\text{Modified} \times N\text{ cycles}$ under equivalent workload and environment. Report median, min/max, cycle-to-cycle trend, and settled values.
+
+---
+
+## 11. Evidence Classification
+
+Every investigation report **MUST** separate:
+* **Observed Facts**: Direct measurements from CDP, OS process telemetry, or application instrumentation.
+* **Inferences**: Reasonable engineering interpretations of the measurements (e.g. *"GPU footprint decreases in Compact mode"*).
+* **Assumptions**: Unverified hypotheses (e.g. *"Remaining Renderer WS is probably retained Chromium allocator memory"*).
+* **Unproven Claims**: Hypotheses that require additional empirical testing.
+
+> **Never present an inference or assumption as an observed fact.**
+
+---
+
+## 12. Anti-Optimization Rules
+
+Do not recommend changes solely because they reduce Task Manager numbers. Avoid these superficial practices:
+* Calling `global.gc()` in production code.
+* Calling Win32 `SetProcessWorkingSetSize()`.
+* Arbitrary cache clearing without retention evidence.
+* Forced renderer reloads to artificially deflate memory.
+* Destroy/recreate component thrashing.
+
+### Prefer True Architectural Optimizations:
+- Unmount unused UI components.
+- Remove unnecessary store subscriptions.
+- Dispose observers and intervals.
+- Release GPU and canvas resources.
+- Evict genuinely unnecessary application caches.
+- Eliminate duplicate IPC listeners.
+
+---
+
+## 13. Final Reporting Template
+
+Every performance investigation must conclude with:
+
+```markdown
+### Observed
+- ...
+- ...
+
+### Inferred
+- ...
+- ...
+
+### Not Proven / Assumptions
+- ...
+- ...
+
+### Verdict
+- 🟢 Healthy / bounded
+- 🟡 Retention requires investigation
+- 🟠 Likely application-level retention
+- 🔴 Confirmed memory leak
+- ⚪ Inconclusive
+
+### Recommended Next Test
+[Specify the smallest experiment that can distinguish the remaining hypotheses. Do not modify production code when instrumentation can answer the question first.]
+```
