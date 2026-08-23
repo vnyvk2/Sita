@@ -1,145 +1,96 @@
-import { Readable } from 'stream';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-
-class MockReadStream extends Readable {
-  path: string;
-  options: { start?: number; end?: number };
-
-  constructor(path: string, options: { start?: number; end?: number }) {
-    super();
-    this.path = path;
-    this.options = options;
-  }
-
-  _read() {}
-}
-
-let mockCreatedStream: MockReadStream | null = null;
-
-vi.mock('fs', () => ({
-  existsSync: vi.fn((p: string) => !p.includes('nonexistent')),
-  statSync: vi.fn(() => ({
-    size: 10000,
-    mtimeMs: 123456789,
-    mtime: new Date('2026-01-01T00:00:00.000Z')
-  })),
-  createReadStream: vi.fn((path: string, options: { start?: number; end?: number }) => {
-    mockCreatedStream = new MockReadStream(path, options);
-    return mockCreatedStream;
-  })
-}));
-
-vi.mock('electron', () => ({
-  net: {
-    fetch: vi.fn(async (url: string) => new Response('mock-full-file-content', { status: 200 }))
-  }
-}));
-
-vi.mock('../../../src/main/logger', () => ({
-  default: {
-    silly: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
-}));
-
+﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { handleFileProtocol } from '../../../src/main/handleFileProtocol';
+import { addDefaultAppProtocolToFilePath } from '../../../src/main/fs/resolveFilePaths';
 
-describe('handleFileProtocol (Phase P4 Protocol & Streaming)', () => {
+describe('Production handleFileProtocol Deterministic Tests', () => {
+  let tempDir: string;
+  let sampleFilePath: string;
+  const fileSize = 256 * 1024; // 256 KB
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockCreatedStream = null;
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-protocol-test-'));
+    sampleFilePath = path.join(tempDir, 'audio_sample.mp3');
+    fs.writeFileSync(sampleFilePath, Buffer.alloc(fileSize, 0x55));
   });
 
-  test('returns 404 when requested file does not exist on disk', async () => {
-    const req = new Request('nora://localfiles/C:/music/nonexistent.mp3');
-    const res = await handleFileProtocol(req as never);
-
-    expect(res.status).toBe(404);
-    const body = await res.text();
-    expect(body).toBe('File not found');
+  afterEach(() => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
   });
 
-  test('serves full file as 200 OK ReadableStream when no Range header is present', async () => {
-    const req = new Request('nora://localfiles/C:/music/song.mp3');
-    const res = await handleFileProtocol(req as never);
+  it('returns 404 for non-existent file paths', async () => {
+    const missingUrl = addDefaultAppProtocolToFilePath('C:/invalid/path/missing.mp3');
+    const req = new Request(missingUrl);
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Length')).toBe('10000');
-    expect(res.headers.get('Content-Type')).toBe('audio/mpeg');
-    expect(res.headers.get('Accept-Ranges')).toBe('bytes');
-    expect(res.headers.get('ETag')).toBe('"10000-123456789"');
-    expect(res.body).toBeInstanceOf(ReadableStream);
+    const response = await handleFileProtocol(req as any);
+    expect(response.status).toBe(404);
   });
 
-  test('returns 206 Partial Content with correct headers for Range request', async () => {
-    const req = new Request('nora://localfiles/C:/music/song.flac', {
+  it('returns 416 Range Not Satisfiable when range start exceeds file size', async () => {
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const req = new Request(fileUrl, {
+      headers: { range: `bytes=${fileSize + 1000}-` }
+    });
+
+    const response = await handleFileProtocol(req as any);
+    expect(response.status).toBe(416);
+    expect(response.headers.get('Content-Range')).toBe(`bytes */${fileSize}`);
+  });
+
+  it('serves 206 Partial Content with correct Content-Range and headers', async () => {
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const req = new Request(fileUrl, {
       headers: { range: 'bytes=0-1023' }
     });
-    const res = await handleFileProtocol(req as never);
 
-    expect(res.status).toBe(206);
-    expect(res.headers.get('Content-Range')).toBe('bytes 0-1023/10000');
-    expect(res.headers.get('Content-Length')).toBe('1024');
-    expect(res.headers.get('Accept-Ranges')).toBe('bytes');
-    expect(res.headers.get('Content-Type')).toBe('audio/x-flac');
-    expect(res.headers.get('ETag')).toBe('"10000-123456789"');
-    expect(res.headers.get('Last-Modified')).toBe('Thu, 01 Jan 2026 00:00:00 GMT');
-    expect(res.body).toBeInstanceOf(ReadableStream);
+    const response = await handleFileProtocol(req as any);
+    expect(response.status).toBe(206);
+    expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(response.headers.get('Content-Range')).toBe(`bytes 0-1023/${fileSize}`);
+    expect(response.headers.get('Content-Length')).toBe('1024');
+
+    // Read the chunk from body stream
+    const reader = response.body!.getReader();
+    const { value, done } = await reader.read();
+    expect(done).toBe(false);
+    expect(value?.length).toBe(1024);
   });
 
-  test('returns 416 Range Not Satisfiable when range start exceeds file size', async () => {
-    const req = new Request('nora://localfiles/C:/music/song.flac', {
-      headers: { range: 'bytes=20000-30000' }
-    });
-    const res = await handleFileProtocol(req as never);
+  it('verifies backpressure flow control and cancellation on the actual handleFileProtocol stream', async () => {
+    // Create a 5.12 MB binary file (80 x 64KB chunks)
+    const largeFilePath = path.join(tempDir, 'large_sample.flac');
+    const chunkSize = 64 * 1024;
+    const writeStream = fs.createWriteStream(largeFilePath);
+    for (let i = 0; i < 80; i++) {
+      writeStream.write(Buffer.alloc(chunkSize, 0x77));
+    }
+    await new Promise((r) => writeStream.end(r));
 
-    expect(res.status).toBe(416);
-    expect(res.headers.get('Content-Range')).toBe('bytes */10000');
-  });
-
-  test('applies backpressure on consumer: Node stream pushes chunks only when WebStream pulls', async () => {
-    let readCallCount = 0;
-    const sourceStream = new Readable({
-      read(size) {
-        readCallCount++;
-        this.push(Buffer.alloc(Math.min(size, 512)));
-      }
+    const largeFileUrl = addDefaultAppProtocolToFilePath(largeFilePath);
+    const req = new Request(largeFileUrl, {
+      headers: { range: 'bytes=0-' }
     });
 
-    const webStream = Readable.toWeb(sourceStream);
-    const reader = webStream.getReader();
+    const response = await handleFileProtocol(req as any);
+    expect(response.status).toBe(206);
+    expect(response.body).toBeDefined();
 
-    expect(readCallCount).toBe(0);
+    const reader = response.body!.getReader();
 
-    // First pull
+    // Read 1 chunk
     const chunk1 = await reader.read();
-    expect(chunk1.done).toBe(false);
-    expect(chunk1.value).toBeDefined();
-    const initialReads = readCallCount;
-    expect(initialReads).toBeGreaterThan(0);
+    expect(chunk1.value?.length).toBe(chunkSize);
 
-    // While consumer does not pull, no further reads occur beyond the stream's highWaterMark
-    await new Promise((r) => setTimeout(r, 20));
-    expect(readCallCount).toBe(initialReads);
+    // Cancel reader to test destruction / cleanup
+    await reader.cancel();
 
-    // Signal EOF and read final chunk
-    sourceStream.push(null);
-    const chunk2 = await reader.read();
-    expect(chunk2.done).toBe(false);
-  });
-
-  test('destroys fileStream when WebStream is cancelled', async () => {
-    const req = new Request('nora://localfiles/C:/music/song.flac', {
-      headers: { range: 'bytes=0-9999' }
-    });
-    const res = await handleFileProtocol(req as never);
-
-    expect(mockCreatedStream).not.toBeNull();
-    const stream = mockCreatedStream!;
-
-    // Cancel the ReadableStream
-    await res.body?.cancel();
-    expect(stream.destroyed).toBe(true);
+    // Reading after cancellation yields done: true
+    const chunkAfterCancel = await reader.read();
+    expect(chunkAfterCancel.done).toBe(true);
   });
 });

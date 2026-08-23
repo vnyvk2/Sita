@@ -1,14 +1,62 @@
 import { addSongToPlayHistory } from '@main/db/queries/history';
 import { getPlayableSongById } from '@main/db/queries/songs';
 import { setDiscordRpcActivity } from '@main/other/discordRPC';
+
 import {
   parseArtistOnlineArtworks,
   parseSongArtworks,
+  removeDefaultAppProtocolFromFilePath,
   resolveSongFilePath
 } from '../fs/resolveFilePaths';
 import logger from '../logger';
-import { setCurrentSongPath } from '../main';
+import { IS_DEVELOPMENT, setCurrentSongPath } from '../main';
 import { parsePaletteFromArtworks } from './getAllSongs';
+
+export const parseArtworkDataForAudioPlayerData = (artworkData?: Buffer | Uint8Array) => {
+  if (artworkData === undefined) return undefined;
+
+  if (IS_DEVELOPMENT) return Buffer.from(artworkData).toString('base64');
+  return artworkData;
+};
+
+// const getRelevantArtistData = (
+//   songArtists?: {
+//     artistId: string;
+//     name: string;
+//   }[]
+// ) => {
+//   const artists = getArtistsData();
+//   const relevantArtists: {
+//     artistId: string;
+//     artworkName?: string;
+//     name: string;
+//     onlineArtworkPaths?: OnlineArtistArtworks;
+//   }[] = [];
+
+//   if (songArtists) {
+//     for (const songArtist of songArtists) {
+//       for (const artist of artists) {
+//         if (artist.artistId === songArtist.artistId) {
+//           if (!artist.onlineArtworkPaths)
+//             getArtistInfoFromNet(artist.artistId).catch((error) =>
+//               logger.warn('Failed to get artist info from net', { err: error })
+//             );
+
+//           const { artistId, name, artworkName, onlineArtworkPaths } = artist;
+
+//           relevantArtists.push({
+//             artistId,
+//             name,
+//             artworkName,
+//             onlineArtworkPaths
+//           });
+//         }
+//       }
+//     }
+//   }
+
+//   return relevantArtists;
+// };
 
 const sendAudioData = async (
   songId: number,
@@ -39,7 +87,9 @@ const sendAudioData = async (
         title: song.title,
         artists,
         duration: Number(song.duration),
+        artwork: undefined,
         artworkPath: songArtwork,
+        artworkPaths: artworkPaths,
         path: resolveSongFilePath(song.path),
         songId: song.id,
         isAFavorite,

@@ -9,7 +9,7 @@ import type { QueuesManager } from './queuesManager';
 const DEBUG_PLAYER = false;
 
 const logPlayer = (...args: unknown[]) => {
-  if (!DEBUG_PLAYER && !import.meta.env?.DEV) return;
+  if (!DEBUG_PLAYER) return;
   console.debug(...args);
 };
 
@@ -57,10 +57,13 @@ class AudioPlayer {
   private repeatMode: 'off' | 'one' | 'all' = 'off';
   private pendingAutoPlay: boolean = false;
   private queueEventsUnsubscribe: (() => void)[] = [];
-  private currentLoadRequestId: number = 0;
-  private activeCanPlayHandler: (() => void) | null = null;
-  private fadeTimeout: NodeJS.Timeout | null = null;
-  private activeFadeResolve: (() => void) | null = null;
+  private loadRequestId: number = 0;
+  private pendingCanPlayHandler: (() => void) | null = null;
+  private activeFade: {
+    type: 'in' | 'out';
+    timeoutId: NodeJS.Timeout;
+    resolve: () => void;
+  } | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -140,11 +143,6 @@ class AudioPlayer {
           console.error('[AudioPlayer.activeQueueChanged] Failed to load song:', err);
         });
       } else {
-        this.currentLoadRequestId++;
-        if (this.activeCanPlayHandler) {
-          this.audio.removeEventListener('canplay', this.activeCanPlayHandler);
-          this.activeCanPlayHandler = null;
-        }
         this.audio.src = '';
         this.audio.pause();
       }
@@ -185,10 +183,6 @@ class AudioPlayer {
     this.audio.addEventListener('seeked', () => {
       this.emit('seeked', this.audio.currentTime);
     });
-
-    this.audio.addEventListener('playing', () => {
-      logPlayer(`[AudioPerf] req=${this.currentLoadRequestId} playing event fired`);
-    });
   }
 
   /**
@@ -202,10 +196,6 @@ class AudioPlayer {
       this.audio.currentTime = 0;
       await this.play();
       this.emit('repeatOne');
-      const currentSongId = this.queue.currentSongId;
-      if (currentSongId) {
-        this.emit('repeatSong', { songId: currentSongId, duration: this.duration });
-      }
       return;
     }
 
@@ -229,99 +219,106 @@ class AudioPlayer {
    *
    * @param songIdOrData - The ID of the song to load or the song data object
    * @param options - Optional configuration for song loading
-   * @returns Promise resolving to the song data (or undefined if stale request is discarded)
+   * @returns Promise resolving to the song data
    */
   private async loadSong(
     songIdOrData: number | AudioPlayerData,
     options?: { autoPlay?: boolean; updateStore?: boolean }
-  ): Promise<AudioPlayerData | undefined> {
-    const requestId = ++this.currentLoadRequestId;
-    const t0 = performance.now();
+  ): Promise<AudioPlayerData | null> {
+    const currentRequestId = ++this.loadRequestId;
+    const tStart = performance.now();
+    const songId = typeof songIdOrData === 'number' ? songIdOrData : songIdOrData.songId;
 
-    // Detach any existing autoplay canplay listener belonging to a previous request
-    if (this.activeCanPlayHandler) {
-      this.audio.removeEventListener('canplay', this.activeCanPlayHandler);
-      this.activeCanPlayHandler = null;
+    logPlayer('[AudioPerf] loadSong_start', {
+      songId,
+      requestId: currentRequestId,
+      timestamp: tStart
+    });
+
+    // Detach any pending canplay listener from prior in-flight track loads
+    if (this.pendingCanPlayHandler) {
+      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.pendingCanPlayHandler = null;
     }
-
-    const initialSongId = typeof songIdOrData === 'number' ? songIdOrData : songIdOrData.songId;
-    logPlayer(`[AudioPerf] req=${requestId} song=${initialSongId} loadSong start`);
 
     try {
       let songData: AudioPlayerData;
 
       if (typeof songIdOrData === 'number') {
-        const t1 = performance.now();
+        // Fetch song data if ID provided
         songData = await window.api.audioLibraryControls.getSong(
           songIdOrData,
           options?.autoPlay ?? true
         );
-        const t2 = performance.now();
-        logPlayer(
-          `[AudioPerf] req=${requestId} song=${songData?.songId ?? initialSongId} getSong resolved +${(t2 - t1).toFixed(1)}ms`
-        );
       } else {
+        // Use provided song data
         songData = songIdOrData;
       }
 
-      // Playback Concurrency Invariant:
-      // If a newer request was dispatched while awaiting IPC/metadata, discard this stale resolution completely.
-      // Stale requests are strictly side-effect free (no src mutation, no .load(), no store dispatch, no play()).
-      if (requestId !== this.currentLoadRequestId) {
-        logPlayer(
-          `[AudioPerf] req=${requestId} song=${songData?.songId ?? initialSongId} STALE (current=${this.currentLoadRequestId}) - discarded`
-        );
-        return undefined;
+      const tIpc = performance.now();
+
+      // Discard stale out-of-order resolution if user skipped again during in-flight fetch
+      if (currentRequestId !== this.loadRequestId) {
+        logPlayer('[AudioPerf] loadSong_discarded_stale', {
+          songId: songData.songId,
+          currentRequestId,
+          latestRequestId: this.loadRequestId,
+          ipcDurationMs: tIpc - tStart
+        });
+        return null;
       }
 
+      logPlayer('[AudioPerf] ipc_resolved', {
+        songId: songData.songId,
+        requestId: currentRequestId,
+        ipcDurationMs: tIpc - tStart
+      });
+
       logPlayer('[AudioPlayer.loadSong]', {
-        requestId,
         songId: songData.songId,
         options
       });
 
-      const t3 = performance.now();
-      // Set audio source with stable path (without ?ts= cache-busting timestamp)
+      // 1. Set audio source (clean protocol path without cache-busting)
       this.audio.src = songData.path;
-      logPlayer(
-        `[AudioPerf] req=${requestId} song=${songData.songId} src assigned +${(performance.now() - t3).toFixed(1)}ms`
-      );
 
-      // Load is synchronous, no need to await
+      // 2. Load media pipeline
       this.audio.load();
-      logPlayer(`[AudioPerf] req=${requestId} song=${songData.songId} audio.load() invoked`);
 
-      // Set up auto-play if requested
+      // 3. Set up auto-play with generation guard and explicit listener tracking
       if (options?.autoPlay) {
-        // Check if audio is already ready to play (cached/buffered)
         if (this.audio.readyState >= 3) {
-          logPlayer(
-            `[AudioPerf] req=${requestId} song=${songData.songId} readyState >= 3 immediate play`
-          );
+          // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play immediately
           this.play().catch((err) =>
             console.error('[AudioPlayer] Immediate auto-play failed:', err)
           );
         } else {
-          // Wait for canplay event
+          // Wait for canplay event with generation guard
           const autoPlayHandler = () => {
-            if (requestId !== this.currentLoadRequestId) return;
-            logPlayer(
-              `[AudioPerf] req=${requestId} song=${songData.songId} canplay fired, invoking play()`
-            );
-            this.play().catch((err) =>
-              console.error('[AudioPlayer] Auto-play on canplay failed:', err)
-            );
-            this.audio.removeEventListener('canplay', autoPlayHandler);
-            if (this.activeCanPlayHandler === autoPlayHandler) {
-              this.activeCanPlayHandler = null;
+            if (currentRequestId === this.loadRequestId) {
+              const tCanPlay = performance.now();
+              logPlayer('[AudioPerf] canplay_fired', {
+                songId: songData.songId,
+                requestId: currentRequestId,
+                bufferDurationMs: tCanPlay - tIpc
+              });
+
+              this.play().catch((err) =>
+                console.error('[AudioPlayer] Auto-play on canplay failed:', err)
+              );
             }
+            if (this.pendingCanPlayHandler === autoPlayHandler) {
+              this.pendingCanPlayHandler = null;
+            }
+            this.audio.removeEventListener('canplay', autoPlayHandler);
           };
-          this.activeCanPlayHandler = autoPlayHandler;
+
+          this.pendingCanPlayHandler = autoPlayHandler;
           this.audio.addEventListener('canplay', autoPlayHandler);
         }
       }
 
-      // Update store with current song data if requested (after media assignment to not block audio decoder)
+      // 4. Update store with current song data if requested
       if (options?.updateStore !== false) {
         dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: songData });
 
@@ -329,52 +326,112 @@ class AudioPlayer {
         storage.playback.setCurrentSongOptions('songId', songData.songId);
       }
 
-      // Dispatch custom track change event
+      // 5. Dispatch custom track change event
       const trackChangeEvent = new CustomEvent('player/trackchange', {
         detail: songData.songId
       });
       this.audio.dispatchEvent(trackChangeEvent);
 
+      // 6. Emit songLoaded event
       this.emit('songLoaded', songData);
-      logPlayer('[AudioPlayer.loadSong.done]', {
-        requestId,
+
+      logPlayer('[AudioPerf] loadSong_completed', {
         songId: songData.songId,
-        title: songData.title,
-        totalElapsed: `${(performance.now() - t0).toFixed(1)}ms`
+        totalDurationMs: performance.now() - tStart
       });
 
       return songData;
     } catch (error) {
+      // Discard stale rejections / errors from superseded in-flight requests
+      if (currentRequestId !== this.loadRequestId) {
+        logPlayer('[AudioPerf] loadSong_discarded_stale_error', {
+          songId,
+          currentRequestId,
+          latestRequestId: this.loadRequestId,
+          error
+        });
+        return null;
+      }
+
       console.error(
-        `Failed to load song (ID: ${initialSongId}):`,
+        `Failed to load song (ID: ${songId}):`,
         error instanceof Error ? error.message : error
       );
-      this.emit('loadError', { songId: initialSongId, error });
-      throw error; // Re-throw for caller to handle
+      this.emit('loadError', { songId, error });
+      throw error;
     }
   }
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
-    this.currentLoadRequestId++;
-    if (this.fadeTimeout) {
-      clearTimeout(this.fadeTimeout);
-      this.fadeTimeout = null;
-    }
-    if (this.activeFadeResolve) {
-      this.activeFadeResolve();
-      this.activeFadeResolve = null;
-    }
-    if (this.activeCanPlayHandler) {
-      this.audio.removeEventListener('canplay', this.activeCanPlayHandler);
-      this.activeCanPlayHandler = null;
-    }
+    this.cancelActiveFade();
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
-    this.queueEventsUnsubscribe.forEach((unsub) => unsub());
+    if (this.pendingCanPlayHandler) {
+      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.pendingCanPlayHandler = null;
+    }
+    this.queueEventsUnsubscribe.forEach((unsub) => typeof unsub === 'function' && unsub());
     this.removeAllListeners();
     this.audio.pause();
     this.audio.src = '';
     this.currentContext.close();
+  }
+
+  /** Cancels any active fade transition, resetting scheduled audio ramps and settling pending promises immediately. */
+  private cancelActiveFade() {
+    if (this.activeFade) {
+      clearTimeout(this.activeFade.timeoutId);
+      try {
+        const currentTime = this.currentContext.currentTime;
+        this.gainNode.gain.cancelScheduledValues(currentTime);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      } catch {}
+      this.activeFade.resolve();
+      this.activeFade = null;
+    }
+  }
+
+  private fadeOutAudio(): Promise<void> {
+    this.cancelActiveFade();
+    return new Promise((resolve) => {
+      const currentTime = this.currentContext.currentTime;
+      const targetVolume = 0.001; // Very low but not zero to avoid clicks
+      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
+
+      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
+
+      const timeoutId = setTimeout(() => {
+        this.audio.pause();
+        if (this.activeFade?.timeoutId === timeoutId) {
+          this.activeFade = null;
+        }
+        resolve();
+      }, AUDIO_FADE_DURATION);
+
+      this.activeFade = { type: 'out', timeoutId, resolve };
+    });
+  }
+
+  private fadeInAudio(): Promise<void> {
+    this.cancelActiveFade();
+    return new Promise((resolve) => {
+      const currentTime = this.currentContext.currentTime;
+      const targetVolume = Math.max(0.001, this.currentVolume / 100);
+      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
+
+      this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
+      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
+
+      const timeoutId = setTimeout(() => {
+        if (this.activeFade?.timeoutId === timeoutId) {
+          this.activeFade = null;
+        }
+        resolve();
+      }, AUDIO_FADE_DURATION);
+
+      this.activeFade = { type: 'in', timeoutId, resolve };
+    });
   }
 
   /**
@@ -418,69 +475,6 @@ class AudioPlayer {
   /** Remove all listeners for all events. */
   removeAllListeners(): void {
     this.listeners.clear();
-  }
-
-  private fadeOutAudio(): Promise<void> {
-    return new Promise((resolve) => {
-      if (this.fadeTimeout) {
-        clearTimeout(this.fadeTimeout);
-        this.fadeTimeout = null;
-      }
-      if (this.activeFadeResolve) {
-        this.activeFadeResolve();
-        this.activeFadeResolve = null;
-      }
-
-      this.activeFadeResolve = resolve;
-
-      const currentTime = this.currentContext.currentTime;
-      const targetVolume = 0.001; // Very low but not zero to avoid clicks
-      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
-
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
-      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
-
-      // Schedule pause after fade completes
-      this.fadeTimeout = setTimeout(() => {
-        this.audio.pause();
-        this.fadeTimeout = null;
-        if (this.activeFadeResolve === resolve) {
-          this.activeFadeResolve = null;
-        }
-        resolve();
-      }, AUDIO_FADE_DURATION);
-    });
-  }
-
-  private fadeInAudio(): Promise<void> {
-    return new Promise((resolve) => {
-      if (this.fadeTimeout) {
-        clearTimeout(this.fadeTimeout);
-        this.fadeTimeout = null;
-      }
-      if (this.activeFadeResolve) {
-        this.activeFadeResolve();
-        this.activeFadeResolve = null;
-      }
-
-      this.activeFadeResolve = resolve;
-
-      const currentTime = this.currentContext.currentTime;
-      const targetVolume = this.currentVolume / 100;
-      const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
-
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
-      this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
-
-      // Resolve after fade completes
-      this.fadeTimeout = setTimeout(() => {
-        this.fadeTimeout = null;
-        if (this.activeFadeResolve === resolve) {
-          this.activeFadeResolve = null;
-        }
-        resolve();
-      }, AUDIO_FADE_DURATION);
-    });
   }
 
   private initializeEqualizer() {
@@ -614,13 +608,13 @@ class AudioPlayer {
     try {
       logPlayer('[AudioPlayer.playSongById]', { songId, autoPlay });
 
-      // Directly delegate to loadSong with songId to guarantee monotonic request generation before IPC
-      const songData = await this.loadSong(songId, { autoPlay, updateStore: true });
+      // Pass songId directly to loadSong so loadRequestId is incremented immediately before async IPC fetch
+      const loadedSongData = await this.loadSong(songId, { autoPlay, updateStore: true });
 
-      // Record listening data if requested and song committed
-      if (recordListening && songData) {
+      // Record listening data only if request was not discarded as stale
+      if (loadedSongData && recordListening) {
         // Note: Listening data recording will be handled by the hook until fully migrated
-        this.emit('recordListening', { songId, duration: songData.duration });
+        this.emit('recordListening', { songId: loadedSongData.songId, duration: loadedSongData.duration });
       }
     } catch (error) {
       if (onError) {

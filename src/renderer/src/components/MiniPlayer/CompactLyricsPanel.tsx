@@ -7,8 +7,10 @@ import { useTranslation } from 'react-i18next';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import i18n from '../../i18n';
+import { useLyricsQuery } from '../../queries/lyrics';
 import { CloseIcon } from '../Icons/WindowIcons';
 import Img from '../Img';
+import { useActiveLyricIndex } from '../LyricsPage/useActiveLyricIndex';
 
 type Props = {
   isLyricsVisible: boolean;
@@ -30,115 +32,18 @@ const CompactLyricsPanel = (props: Props) => {
   const { isLyricsVisible, onClose } = props;
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
-  const preferences = useStore(store, (state) => state.localStorage.preferences);
 
   const { updateSongPosition } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
-  const [lyrics, setLyrics] = useState<SongLyrics | null | undefined>(null);
-  const [currentLineIndex, setCurrentLineIndex] = useState<number>(-1);
-  const requestIdRef = useRef(0);
+  const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
+  const rawActiveIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
+  const currentLineIndex = rawActiveIndex ?? -1;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const isUserScrollingRef = useRef(false);
   const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Fetch lyrics on song or visibility change
-  useEffect(() => {
-    if (!isLyricsVisible) return;
-
-    const currentRequestId = ++requestIdRef.current;
-    setLyrics(null);
-    setCurrentLineIndex(-1);
-
-    window.api.lyrics
-      .getSongLyrics({
-        songTitle: currentSongData.title,
-        songArtists: Array.isArray(currentSongData.artists)
-          ? currentSongData.artists.map((artist) => artist.name)
-          : [],
-        album: currentSongData.album?.name,
-        songPath: currentSongData.path,
-        duration: currentSongData.duration
-      })
-      .then(async (res) => {
-        if (currentRequestId !== requestIdRef.current) return;
-        setLyrics(res);
-
-        if (
-          preferences.autoTranslateLyrics &&
-          !res?.lyrics.isReset &&
-          !res?.lyrics.isTranslated
-        ) {
-          const translated = await window.api.lyrics.getTranslatedLyrics(
-            i18n.language as LanguageCodes
-          );
-          if (currentRequestId !== requestIdRef.current) return;
-          setLyrics(translated);
-        }
-        if (
-          preferences.autoConvertLyrics &&
-          !res?.lyrics.isReset &&
-          !res?.lyrics.isRomanized
-        ) {
-          let converted: SongLyrics | null | undefined;
-          if (res?.lyrics.originalLanguage === 'zh')
-            converted = await window.api.lyrics.convertLyricsToPinyin();
-          else if (res?.lyrics.originalLanguage === 'ja')
-            converted = await window.api.lyrics.romanizeLyrics();
-          else if (res?.lyrics.originalLanguage === 'ko')
-            converted = await window.api.lyrics.convertLyricsToRomaja();
-
-          if (currentRequestId !== requestIdRef.current) return;
-          if (converted) setLyrics(converted);
-        }
-      })
-      .catch((err) => {
-        if (currentRequestId === requestIdRef.current) {
-          console.error('Failed to fetch lyrics for compact lyrics panel', err);
-        }
-      });
-  }, [
-    currentSongData.album?.name,
-    currentSongData.artists,
-    currentSongData.duration,
-    currentSongData.path,
-    currentSongData.songId,
-    currentSongData.title,
-    preferences.autoTranslateLyrics,
-    preferences.autoConvertLyrics,
-    isLyricsVisible
-  ]);
-
-  // Track playback position to highlight active synced line
-  const handlePositionChange = useCallback(
-    (e: Event) => {
-      if (!('detail' in e) || typeof e.detail !== 'number') return;
-      const position = e.detail;
-
-      if (lyrics?.lyrics?.isSynced && lyrics.lyrics.parsedLyrics) {
-        const parsed = lyrics.lyrics.parsedLyrics;
-        const index = parsed.findIndex((line) => {
-          const start = line.start ?? 0;
-          const end = line.end ?? Number.POSITIVE_INFINITY;
-          return position >= start && position < end;
-        });
-
-        if (index !== -1) {
-          setCurrentLineIndex(index);
-        } else if (parsed.length > 0 && position < (parsed[0].start ?? 0)) {
-          setCurrentLineIndex(-1);
-        }
-      }
-    },
-    [lyrics]
-  );
-
-  useEffect(() => {
-    document.addEventListener('player/positionChange', handlePositionChange);
-    return () => document.removeEventListener('player/positionChange', handlePositionChange);
-  }, [handlePositionChange]);
 
   // Auto-scroll isolated to the lyrics viewport (does NOT scroll parent containers)
   useEffect(() => {

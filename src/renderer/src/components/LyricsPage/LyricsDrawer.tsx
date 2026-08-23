@@ -1,9 +1,8 @@
 import Button from '@renderer/components/Button';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
-import { lyricsQuery } from '@renderer/queries/lyrics';
+import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
-import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useContext, useMemo } from 'react';
@@ -27,21 +26,8 @@ const LyricsDrawer = () => {
 
   const isLyricsPage = location.pathname.startsWith('/main-player/lyrics');
 
-  const { data: lyrics, isPending: isLoadingLyrics } = useQuery({
-    ...lyricsQuery.single({
-      title: currentSongData.title,
-      artists: Array.isArray(currentSongData.artists)
-        ? currentSongData.artists.map((artist) => artist.name)
-        : [],
-      album: currentSongData.album?.name,
-      path: currentSongData.path,
-      duration: currentSongData.duration,
-      lyricsType: 'ANY',
-      lyricsRequestType: 'ANY',
-      saveLyricsAutomatically: preferences.lyricsAutomaticallySaveState
-    }),
-    enabled: isLyricsDrawerOpen && !isLyricsPage,
-    staleTime: Infinity
+  const { data: lyrics, isPending: isLoadingLyrics } = useLyricsQuery({
+    enabled: isLyricsDrawerOpen && !isLyricsPage
   });
 
   useSkipLyricsLines(lyrics);

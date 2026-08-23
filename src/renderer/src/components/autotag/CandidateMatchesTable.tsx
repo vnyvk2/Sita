@@ -11,7 +11,7 @@ export interface CandidateMatchesTableProps {
 }
 
 export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
-  candidates,
+  candidates = [],
   selectedCandidateId,
   loadingCandidateId,
   loading,

@@ -10,7 +10,7 @@ import MainContainer from '@renderer/components/MainContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
-import { lyricsQuery } from '@renderer/queries/lyrics';
+import { lyricsQuery, useLyricsQuery } from '@renderer/queries/lyrics';
 import { queryClient } from '@renderer/queryClient';
 import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';
@@ -45,21 +45,9 @@ function LyricsPage() {
   const [lyricsRequestType, setLyricsRequestType] = useState<LyricsRequestTypes>('ANY');
   const [isTheatreMode, setIsTheatreMode] = useState(false);
 
-  const { data: lyrics, isPending: isLoadingLyrics } = useQuery({
-    ...lyricsQuery.single({
-      title: currentSongData.title,
-      artists: Array.isArray(currentSongData.artists)
-        ? currentSongData.artists.map((artist) => artist.name)
-        : [],
-      album: currentSongData.album?.name,
-      path: currentSongData.path,
-      duration: currentSongData.duration,
-      lyricsType: lyricsType,
-      lyricsRequestType: lyricsRequestType,
-      saveLyricsAutomatically: preferences.lyricsAutomaticallySaveState
-    }),
-    // Put stale time to infinity to prevent refetching after stale time has passed
-    staleTime: Infinity
+  const { data: lyrics, isPending: isLoadingLyrics } = useLyricsQuery({
+    lyricsType,
+    lyricsRequestType
   });
 
   const { mutate: saveLyricsToSong } = useMutation({

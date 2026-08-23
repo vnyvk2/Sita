@@ -15,7 +15,8 @@ interface LyricProp {
   convertedLyric?: string | SyncedLyricsLineWord[];
   index: number;
   isActive?: boolean;
-  syncedLyrics?: { start: number; end: number };
+  syncedStart?: number;
+  syncedEnd?: number;
   isAutoScrolling?: boolean;
   playerType?: PlayerTypes | 'drawer';
 }
@@ -45,16 +46,19 @@ const LyricLine = (props: LyricProp) => {
     lyric,
     translatedLyricLines = [],
     convertedLyric,
-    syncedLyrics,
+    syncedStart,
+    syncedEnd,
     isActive = false,
     isAutoScrolling = true,
     playerType = 'normal'
   } = props;
 
+  const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
+
   // Auto-scroll only when this line becomes active
   useEffect(() => {
     if (isActive && !prevIsActiveRef.current) {
-      if (isAutoScrolling && lyricsRef.current) {
+      if (isAutoScrolling && lyricsRef.current?.scrollIntoView) {
         lyricsRef.current.scrollIntoView({
           behavior: 'smooth',
           block: 'center'
@@ -161,15 +165,15 @@ const LyricLine = (props: LyricProp) => {
         animationDelay: `${100 + 20 * (index + 1)}ms`
       }}
       title={
-        syncedLyrics
+        isSynced
           ? t(`lyricsEditingPage.fromTo`, {
-              start: roundTo(syncedLyrics.start, 2),
-              end: roundTo(syncedLyrics.end, 2)
+              start: roundTo(syncedStart, 2),
+              end: roundTo(syncedEnd, 2)
             })
           : undefined
       }
       className={`highlight text-font-color-black/20 dark:text-font-color-white/20 z-0 mb-5 flex w-fit flex-col items-center justify-center text-center text-5xl font-medium text-balance transition-[transform,translate,scale,color,filter] duration-250 select-none first:mt-8 last:mb-4 empty:mb-16 ${
-        syncedLyrics
+        isSynced
           ? `cursor-pointer blur-[1px] ${
               isActive
                 ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! [&>div>span]:mr-3!'
@@ -185,9 +189,9 @@ const LyricLine = (props: LyricProp) => {
       }`}
       ref={lyricsRef}
       onClick={() =>
-        syncedLyrics &&
+        isSynced &&
         (typeof lyric === 'string' || translatedLyricString) &&
-        updateSongPosition(syncedLyrics.start)
+        updateSongPosition(syncedStart)
       }
       onContextMenu={(e) => {
         e.preventDefault();
@@ -220,7 +224,7 @@ const LyricLine = (props: LyricProp) => {
           } ${
             playerType === 'drawer'
               ? 'text-xs!'
-              : syncedLyrics && isActive
+              : isSynced && isActive
                 ? 'text-font-color-black/50! dark:text-font-color-white/50! text-xl!'
                 : 'text-xl!'
           }`}
@@ -235,7 +239,9 @@ const LyricLine = (props: LyricProp) => {
       >
         {lyricStringLinePrimary}
       </div>
-      {syncedLyrics && isActive && <LyricsProgressBar delay={0} syncedLyrics={syncedLyrics} />}
+      {isSynced && isActive && (
+        <LyricsProgressBar delay={0} syncedStart={syncedStart} syncedEnd={syncedEnd} />
+      )}
     </div>
   );
 };

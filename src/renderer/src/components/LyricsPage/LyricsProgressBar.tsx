@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 type Props = {
-  syncedLyrics: { start: number; end: number };
-  delay: number;
+  syncedStart: number;
+  syncedEnd: number;
+  delay?: number;
 };
 
 const LyricsProgressBar = (props: Props) => {
-  const { syncedLyrics, delay } = props;
+  const { syncedStart, syncedEnd, delay = 0 } = props;
   const myElementRef = useRef<HTMLSpanElement>(null);
 
   const handleLyricsActivity = useCallback(
@@ -14,13 +15,13 @@ const LyricsProgressBar = (props: Props) => {
       if ('detail' in e && typeof e.detail === 'number') {
         const songPosition = e.detail as number;
         const progress =
-          songPosition < syncedLyrics.start - delay
+          songPosition < syncedStart - delay
             ? '0%'
-            : songPosition > syncedLyrics.end - delay
+            : songPosition > syncedEnd - delay
               ? '100%'
               : `${
-                  ((songPosition - (syncedLyrics.start - delay)) /
-                    (syncedLyrics.end - delay - (syncedLyrics.start - delay))) *
+                  ((songPosition - (syncedStart - delay)) /
+                    (syncedEnd - delay - (syncedStart - delay))) *
                   100
                 }%`;
 
@@ -29,7 +30,7 @@ const LyricsProgressBar = (props: Props) => {
         }
       }
     },
-    [delay, syncedLyrics.end, syncedLyrics.start]
+    [delay, syncedEnd, syncedStart]
   );
 
   useEffect(() => {

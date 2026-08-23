@@ -25,10 +25,10 @@ export interface CompactReviewViewProps {
 }
 
 export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
-  matches,
-  selectedTrackIds,
-  selectedFieldMap,
-  userEditedValues,
+  matches = [],
+  selectedTrackIds = new Set(),
+  selectedFieldMap = new Map(),
+  userEditedValues = new Map(),
   expandedTrackId,
   focusedTrackIndex = -1,
   filter = 'all',

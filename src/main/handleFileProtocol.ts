@@ -1,5 +1,4 @@
 import { createReadStream, existsSync, statSync } from 'fs';
-import { Readable } from 'stream';
 import { pathToFileURL } from 'url';
 
 import { net } from 'electron';
@@ -28,9 +27,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'no-cache',
-      ETag: `"${fileSize}-${stat.mtimeMs}"`,
-      'Last-Modified': stat.mtime.toUTCString()
+      'Cache-Control': 'no-cache'
     };
 
     if (range) {
@@ -47,9 +44,55 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
 
       const chunksize = end - start + 1;
 
-      // Create a proper ReadableStream from the file stream with native backpressure
-      const fileStream = createReadStream(filePath, { start, end });
-      const webStream = Readable.toWeb(fileStream);
+      // Create a proper ReadableStream with backpressure from the file stream
+      const fileStream = createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
+
+      const webStream = new ReadableStream({
+        start(controller) {
+          fileStream.on('data', (chunk) => {
+            try {
+              // Ensure chunk is a Buffer before converting to Uint8Array
+              const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+              controller.enqueue(new Uint8Array(bufferChunk));
+
+              // Apply backpressure: pause disk read when WebStream buffer is full
+              if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+                fileStream.pause();
+              }
+            } catch (error) {
+              // Stream might be closed, ignore the error
+              if (controller.desiredSize !== null) {
+                controller.error(error);
+              }
+            }
+          });
+
+          fileStream.on('end', () => {
+            try {
+              controller.close();
+            } catch {
+              // Stream might already be closed, ignore the error
+            }
+          });
+
+          fileStream.on('error', (error) => {
+            try {
+              controller.error(error);
+            } catch {
+              // Stream might already be closed, ignore the error
+            }
+          });
+        },
+
+        pull() {
+          // Resume reading when downstream consumer needs more data
+          fileStream.resume();
+        },
+
+        cancel() {
+          fileStream.destroy();
+        }
+      });
 
       headers['Content-Range'] = `bytes ${start}-${end}/${fileSize}`;
       headers['Content-Length'] = chunksize.toString();
@@ -59,14 +102,9 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         headers
       });
     } else {
-      headers['Content-Length'] = fileSize.toString();
-      const fileStream = createReadStream(filePath);
-      const webStream = Readable.toWeb(fileStream);
-
-      return new Response(webStream, {
-        status: 200,
-        headers
-      });
+      const asFileUrl = pathToFileURL(filePath).toString();
+      const response = await net.fetch(asFileUrl);
+      return response;
     }
   } catch (error) {
     logger.error('Error handling media protocol:', { error }, error);
