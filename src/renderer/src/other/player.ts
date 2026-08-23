@@ -58,6 +58,7 @@ class AudioPlayer {
   private pendingAutoPlay: boolean = false;
   private queueEventsUnsubscribe: (() => void)[] = [];
   private loadRequestId: number = 0;
+  private pendingCanPlayHandler: (() => void) | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -220,6 +221,21 @@ class AudioPlayer {
     options?: { autoPlay?: boolean; updateStore?: boolean }
   ): Promise<AudioPlayerData | null> {
     const currentRequestId = ++this.loadRequestId;
+    const tStart = performance.now();
+    const songId = typeof songIdOrData === 'number' ? songIdOrData : songIdOrData.songId;
+
+    logPlayer('[AudioPerf] loadSong_start', {
+      songId,
+      requestId: currentRequestId,
+      timestamp: tStart
+    });
+
+    // Detach any pending canplay listener from prior in-flight track loads
+    if (this.pendingCanPlayHandler) {
+      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.pendingCanPlayHandler = null;
+    }
+
     let songData: AudioPlayerData;
 
     if (typeof songIdOrData === 'number') {
@@ -233,15 +249,24 @@ class AudioPlayer {
       songData = songIdOrData;
     }
 
+    const tIpc = performance.now();
+
     // Discard stale out-of-order resolution if user skipped again during in-flight fetch
     if (currentRequestId !== this.loadRequestId) {
-      logPlayer('[AudioPlayer.loadSong.discardedStale]', {
+      logPlayer('[AudioPerf] loadSong_discarded_stale', {
         songId: songData.songId,
         currentRequestId,
-        latestRequestId: this.loadRequestId
+        latestRequestId: this.loadRequestId,
+        ipcDurationMs: tIpc - tStart
       });
       return null;
     }
+
+    logPlayer('[AudioPerf] ipc_resolved', {
+      songId: songData.songId,
+      requestId: currentRequestId,
+      ipcDurationMs: tIpc - tStart
+    });
 
     try {
       logPlayer('[AudioPlayer.loadSong]', {
@@ -249,7 +274,46 @@ class AudioPlayer {
         options
       });
 
-      // Update store with current song data if requested
+      // 1. Set audio source (clean protocol path without cache-busting)
+      this.audio.src = songData.path;
+
+      // 2. Load media pipeline
+      this.audio.load();
+
+      // 3. Set up auto-play with generation guard and explicit listener tracking
+      if (options?.autoPlay) {
+        if (this.audio.readyState >= 3) {
+          // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play immediately
+          this.play().catch((err) =>
+            console.error('[AudioPlayer] Immediate auto-play failed:', err)
+          );
+        } else {
+          // Wait for canplay event with generation guard
+          const autoPlayHandler = () => {
+            if (currentRequestId === this.loadRequestId) {
+              const tCanPlay = performance.now();
+              logPlayer('[AudioPerf] canplay_fired', {
+                songId: songData.songId,
+                requestId: currentRequestId,
+                bufferDurationMs: tCanPlay - tIpc
+              });
+
+              this.play().catch((err) =>
+                console.error('[AudioPlayer] Auto-play on canplay failed:', err)
+              );
+            }
+            if (this.pendingCanPlayHandler === autoPlayHandler) {
+              this.pendingCanPlayHandler = null;
+            }
+            this.audio.removeEventListener('canplay', autoPlayHandler);
+          };
+
+          this.pendingCanPlayHandler = autoPlayHandler;
+          this.audio.addEventListener('canplay', autoPlayHandler);
+        }
+      }
+
+      // 4. Update store with current song data if requested
       if (options?.updateStore !== false) {
         dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: songData });
 
@@ -257,42 +321,18 @@ class AudioPlayer {
         storage.playback.setCurrentSongOptions('songId', songData.songId);
       }
 
-      // Set audio source (clean protocol path without cache-busting to allow Chromium media buffer reuse)
-      this.audio.src = songData.path;
-
-      // Load is synchronous, no need to await
-      this.audio.load();
-
-      // Set up auto-play if requested
-      if (options?.autoPlay) {
-        // Check if audio is already ready to play (cached/buffered)
-        if (this.audio.readyState >= 3) {
-          // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play
-          this.play().catch((err) =>
-            console.error('[AudioPlayer] Immediate auto-play failed:', err)
-          );
-        } else {
-          // Wait for canplay event
-          const autoPlayHandler = () => {
-            this.play().catch((err) =>
-              console.error('[AudioPlayer] Auto-play on canplay failed:', err)
-            );
-            this.audio.removeEventListener('canplay', autoPlayHandler);
-          };
-          this.audio.addEventListener('canplay', autoPlayHandler);
-        }
-      }
-
-      // Dispatch custom track change event
+      // 5. Dispatch custom track change event
       const trackChangeEvent = new CustomEvent('player/trackchange', {
         detail: songData.songId
       });
       this.audio.dispatchEvent(trackChangeEvent);
 
+      // 6. Emit songLoaded event
       this.emit('songLoaded', songData);
-      logPlayer('[AudioPlayer.loadSong.done]', {
+
+      logPlayer('[AudioPerf] loadSong_completed', {
         songId: songData.songId,
-        title: songData.title
+        totalDurationMs: performance.now() - tStart
       });
 
       return songData;
@@ -302,13 +342,17 @@ class AudioPlayer {
         error instanceof Error ? error.message : error
       );
       this.emit('loadError', { songId: songData.songId, error });
-      throw error; // Re-throw for caller to handle
+      throw error;
     }
   }
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
+    if (this.pendingCanPlayHandler) {
+      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.pendingCanPlayHandler = null;
+    }
     this.queueEventsUnsubscribe.forEach((unsub) => typeof unsub === 'function' && unsub());
     this.removeAllListeners();
     this.audio.pause();
