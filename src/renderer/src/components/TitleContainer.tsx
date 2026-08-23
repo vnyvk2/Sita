@@ -9,7 +9,7 @@ interface ExtendedButtonProps extends ButtonProps {
 }
 
 type Props = {
-  title: string;
+  title?: string;
   className?: string;
   titleClassName?: string;
   isButtonsAndDropdownsVisible?: boolean;
@@ -21,8 +21,8 @@ type Props = {
 const TitleContainer = (props: Props) => {
   const {
     title,
-    className,
-    titleClassName,
+    className = '',
+    titleClassName = '',
     dropdowns = [],
     buttons = [],
     otherItems = [],
@@ -84,11 +84,13 @@ const TitleContainer = (props: Props) => {
       // ref={containerRef}
     >
       <div className="grid grid-flow-col items-center gap-5">
-        <p
-          className={`text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-medium ${titleClassName}`}
-        >
-          {title}
-        </p>
+        {title && (
+          <p
+            className={`text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-medium ${titleClassName}`}
+          >
+            {title}
+          </p>
+        )}
         {otherItems}
       </div>
       {isButtonsAndDropdownsVisible && (
