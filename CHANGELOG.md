@@ -24,8 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored `MetadataProviderRuntime` to support multi-provider registration, rate-limiting, and circuit-breaking.
 - Optimized `RateLimiter` with single-drain timer scheduling and batch token consumption under concurrent bursts.
 - Added proactive TTL pruning to `IdentityResolutionCache` on cache pressure.
+- Removed binary artwork decoding (`sharp`) and payload transmission from the `getSong` IPC critical playback path.
+- Optimized `AudioPlayer` load sequencing and eliminated per-playback timestamp cache-busting to leverage Chromium media range caching.
+- Standardized `handleFileProtocol` on `Readable.toWeb` with native backpressure, byte-range slicing, and HTTP validator headers.
 
 ### Fixed
+
+- Fixed rapid track skip race conditions using monotonic generation token tracking (`currentLoadRequestId`) in `AudioPlayer`.
+- Fixed fade transition timeout collision during rapid play/pause toggles.
+- Fixed unhandled exceptions and swallowed `loadError` events during song load failures.
+- Fixed in-flight playback load resolution on player teardown and queue clearing.
+- Fixed repeat-one mode omitted telemetry events.
 
 - Fixed track title corruption where album titles were applied to track titles in auto-tag previews.
 - Fixed ASCII-only regex normalizers destroying non-Latin metadata.

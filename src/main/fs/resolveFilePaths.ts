@@ -42,11 +42,11 @@ export const resetArtworkCache = (type: keyof typeof timestamps | 'all') => {
   return now;
 };
 
-export const resolveSongFilePath = (songPath: string, resetCache = true, sendRealPath = false) => {
+export const resolveSongFilePath = (songPath: string, resetCache = false, sendRealPath = false) => {
   if (resetCache) resetArtworkCache('songs');
 
   const FILE_URL = sendRealPath ? '' : DEFAULT_FILE_URL;
-  const timestampStr = sendRealPath ? '' : `?ts=${timestamps.songs}`;
+  const timestampStr = resetCache && !sendRealPath ? `?ts=${timestamps.songs}` : '';
 
   const resolvedFilePath = joinPath(FILE_URL, songPath) + timestampStr;
   return resolvedFilePath;

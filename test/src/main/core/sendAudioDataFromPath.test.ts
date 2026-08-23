@@ -31,8 +31,7 @@ vi.mock('../../../../src/main/other/artworks', () => ({
 }));
 
 vi.mock('../../../../src/main/core/sendAudioData', () => ({
-  default: vi.fn(),
-  parseArtworkDataForAudioPlayerData: vi.fn(() => ({ hasArtwork: true, format: 'png' }))
+  default: vi.fn()
 }));
 
 vi.mock('../../../../src/renderer/src/assets/images/webp/song_cover_default.webp?asset', () => ({

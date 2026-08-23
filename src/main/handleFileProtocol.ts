@@ -1,4 +1,5 @@
 import { createReadStream, existsSync, statSync } from 'fs';
+import { Readable } from 'stream';
 import { pathToFileURL } from 'url';
 
 import { net } from 'electron';
@@ -27,7 +28,9 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      ETag: `"${fileSize}-${stat.mtimeMs}"`,
+      'Last-Modified': stat.mtime.toUTCString()
     };
 
     if (range) {
@@ -44,45 +47,9 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
 
       const chunksize = end - start + 1;
 
-      // Create a proper ReadableStream from the file stream
+      // Create a proper ReadableStream from the file stream with native backpressure
       const fileStream = createReadStream(filePath, { start, end });
-
-      const webStream = new ReadableStream({
-        start(controller) {
-          fileStream.on('data', (chunk) => {
-            try {
-              // Ensure chunk is a Buffer before converting to Uint8Array
-              const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-              controller.enqueue(new Uint8Array(bufferChunk));
-            } catch (error) {
-              // Stream might be closed, ignore the error
-              if (controller.desiredSize !== null) {
-                controller.error(error);
-              }
-            }
-          });
-
-          fileStream.on('end', () => {
-            try {
-              controller.close();
-            } catch {
-              // Stream might already be closed, ignore the error
-            }
-          });
-
-          fileStream.on('error', (error) => {
-            try {
-              controller.error(error);
-            } catch {
-              // Stream might already be closed, ignore the error
-            }
-          });
-        },
-
-        cancel() {
-          fileStream.destroy();
-        }
-      });
+      const webStream = Readable.toWeb(fileStream);
 
       headers['Content-Range'] = `bytes ${start}-${end}/${fileSize}`;
       headers['Content-Length'] = chunksize.toString();

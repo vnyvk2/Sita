@@ -9,7 +9,7 @@ import { DEFAULT_FILE_URL } from '../filesystem';
 import logger from '../logger';
 import { sendMessageToRenderer, addToSongsOutsideLibraryData } from '../main';
 import { createTempArtwork } from '../other/artworks';
-import sendAudioData, { parseArtworkDataForAudioPlayerData } from './sendAudioData';
+import sendAudioData from './sendAudioData';
 
 const toNoraLocalFileUrl = (filePath: string) => {
   const normalizedPath = filePath.replaceAll('\\', '/').replace(/^\/+/, '');
@@ -39,8 +39,6 @@ const sendAudioDataFromPath = async (songPath: string): Promise<AudioPlayerData>
       const file = File.createFromPath(songPath);
       const metadata = file.tag;
       if (metadata) {
-        const artworkData = metadata.pictures?.at(0)?.data?.toByteArray();
-
         const tempArtworkPath = path.join(
           DEFAULT_FILE_URL,
           metadata.pictures
@@ -63,7 +61,6 @@ const sendAudioDataFromPath = async (songPath: string): Promise<AudioPlayerData>
             name: artistName
           })),
           duration: (file.properties.durationMilliseconds ?? 0) / 1000,
-          artwork: parseArtworkDataForAudioPlayerData(artworkData),
           artworkPath: tempArtworkPath,
           path: toNoraLocalFileUrl(songPath),
           songId: Math.floor(Math.random() * 1000000),

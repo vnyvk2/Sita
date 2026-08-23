@@ -47,8 +47,15 @@ import {
 } from '../../../../src/main/fs/resolveFilePaths';
 
 describe('resolveFilePaths', () => {
-  test('resolveSongFilePath adds cache-busting timestamp by default', () => {
+  test('resolveSongFilePath returns stable nora protocol path by default without cache-busting timestamp', () => {
     const resolved = resolveSongFilePath('C:/Music/Test.flac');
+
+    expect(resolved).toBe('nora://localfiles/C:/Music/Test.flac');
+    expect(resolved).not.toContain('?ts=');
+  });
+
+  test('resolveSongFilePath adds cache-busting timestamp when resetCache=true', () => {
+    const resolved = resolveSongFilePath('C:/Music/Test.flac', true);
 
     expect(resolved).toContain('C:/Music/Test.flac');
     expect(resolved).toContain('?ts=');
