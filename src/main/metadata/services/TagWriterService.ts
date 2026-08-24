@@ -6,17 +6,23 @@ import { withFileHandle } from '../../utils/withFileHandle';
 
 export interface TagWritePayload {
   filePath: string;
-  title?: string;
-  artist?: string;
-  album?: string;
-  albumArtist?: string;
-  year?: number;
-  trackNumber?: number;
-  discNumber?: number;
-  genre?: string;
-  isrc?: string;
-  language?: string;
-  musicBrainzRecordingId?: string;
+  /**
+   * Field semantics:
+   * - `undefined`: leave the existing tag untouched.
+   * - `null` or `''`: explicitly clear the tag (required for value-complete rollback/undo).
+   * - otherwise: write the given value.
+   */
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  albumArtist?: string | null;
+  year?: number | null;
+  trackNumber?: number | null;
+  discNumber?: number | null;
+  genre?: string | null;
+  isrc?: string | null;
+  language?: string | null;
+  musicBrainzRecordingId?: string | null;
   artworkBuffer?: Buffer;
 }
 
@@ -39,16 +45,20 @@ export class TagWriterService {
       const realPath = removeDefaultAppProtocolFromFilePath(payload.filePath);
 
       await withFileHandle(realPath, async (file) => {
-        if (payload.title) file.tag.title = payload.title;
-        if (payload.artist) file.tag.performers = [payload.artist];
+        if (payload.title !== undefined) file.tag.title = payload.title ?? '';
+        if (payload.artist !== undefined) {
+          file.tag.performers = payload.artist ? [payload.artist] : [];
+        }
         if (payload.albumArtist !== undefined) {
           file.tag.albumArtists = payload.albumArtist ? [payload.albumArtist] : [];
         }
-        if (payload.album) file.tag.album = payload.album;
-        if (payload.genre) file.tag.genres = [payload.genre];
-        if (payload.trackNumber !== undefined) file.tag.track = payload.trackNumber;
-        if (payload.discNumber !== undefined) file.tag.disc = payload.discNumber;
-        if (payload.year !== undefined) file.tag.year = payload.year;
+        if (payload.album !== undefined) file.tag.album = payload.album ?? '';
+        if (payload.genre !== undefined) {
+          file.tag.genres = payload.genre ? [payload.genre] : [];
+        }
+        if (payload.trackNumber !== undefined) file.tag.track = payload.trackNumber ?? 0;
+        if (payload.discNumber !== undefined) file.tag.disc = payload.discNumber ?? 0;
+        if (payload.year !== undefined) file.tag.year = payload.year ?? 0;
         if (payload.language !== undefined) {
           if (payload.language) {
             (file.tag as any).languages = [payload.language];
