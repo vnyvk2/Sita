@@ -49,6 +49,7 @@ import { recoverLibraryAssets } from './core/recovery';
 import { closeDatabaseInstance } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
+import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
@@ -875,15 +876,14 @@ function manageSecondInstanceArgs(args: string[]) {
   return undefined;
 }
 
-export function restartApp(reason: string, noQuitEvents = false) {
+export async function restartApp(reason: string, noQuitEvents = false) {
   logger.debug(`Requested a full app refresh.`, { reason });
 
   if (!noQuitEvents) {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       mainWindow.webContents.send('app/beforeQuitEvent');
     }
-    savePendingSongLyrics(currentSongPath, true);
-    savePendingMetadataUpdates(currentSongPath, true);
+    await flushPendingWritesBeforeExit(currentSongPath);
     closeAllAbortControllers();
   }
   app.relaunch();
@@ -988,8 +988,10 @@ export async function getRendererLogs(
 
   if (forceWindowRestart) return mainWindow.reload();
   if (forceMainRestart) {
+    await flushPendingWritesBeforeExit(currentSongPath);
+    closeAllAbortControllers();
     app.relaunch();
-    return app.exit();
+    return app.exit(0);
   }
   return undefined;
 }
