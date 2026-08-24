@@ -1,7 +1,8 @@
+import {
+  MINI_PLAYER_MIN_SIZE_X,
+  MINI_PLAYER_MIN_SIZE_Y
+} from '@common/miniPlayerConstants';
 import { screen } from 'electron';
-
-export const MINI_PLAYER_MIN_SIZE_X = 240;
-export const MINI_PLAYER_MIN_SIZE_Y = 80;
 
 /**
  * Checks whether a rectangle intersects any connected display.

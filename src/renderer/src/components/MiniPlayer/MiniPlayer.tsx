@@ -1,3 +1,7 @@
+import {
+  COMPACT_MINI_PLAYER_HEIGHT,
+  COMPACT_MINI_PLAYER_MIN_WIDTH
+} from '@common/miniPlayerConstants';
 import { queryClient } from '@renderer/queryClient';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
@@ -85,7 +89,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     toggleIsFavorite,
     toggleMutedState,
     toggleRepeat,
-    toggleQueueShuffle
+    toggleShuffling
   } = useContext(AppUpdateContext);
 
   const { className } = props;
@@ -135,6 +139,16 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     };
   }, []);
 
+  // Mode Transition Boundary (F4): Cleanly reset overlays on any mode change
+  const prevModeRef = useRef(miniPlayerMode);
+  useEffect(() => {
+    if (prevModeRef.current !== miniPlayerMode) {
+      prevModeRef.current = miniPlayerMode;
+      setIsQueueVisible(false);
+      setIsLyricsVisible(false);
+    }
+  }, [miniPlayerMode]);
+
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -142,8 +156,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
   const measureAndSyncBounds = useCallback(() => {
     if (miniPlayerMode === 'compact') {
-      const calculatedMinWidth = 200;
-      const calculatedMinHeight = 64;
+      const calculatedMinWidth = COMPACT_MINI_PLAYER_MIN_WIDTH;
+      const calculatedMinHeight = COMPACT_MINI_PLAYER_HEIGHT;
 
       const prev = lastBoundsRef.current;
       if (
@@ -233,7 +247,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [measureAndSyncBounds]);
+  }, [measureAndSyncBounds, miniPlayerMode]);
 
   const isQueueTransitioningRef = useRef(false);
   const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
@@ -454,10 +468,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       switch (clickedId) {
         case 'compactMode': {
           const nextMode = miniPlayerMode === 'compact' ? 'standard' : 'compact';
-          if (nextMode === 'compact') {
-            setIsQueueVisible(false);
-            setIsLyricsVisible(false);
-          }
+          setIsQueueVisible(false);
+          setIsLyricsVisible(false);
           await window.api.miniPlayer.setMiniPlayerMode(nextMode);
           queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
@@ -466,13 +478,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           handleToggleQueue();
           break;
         case 'togglePlay':
-          if (isCurrentSongPlaying) toggleSongPlayback();
+          toggleSongPlayback();
           break;
         case 'toggleLove':
           if (currentSongData.isKnownSource) toggleIsFavorite(!isAFavorite);
           break;
         case 'toggleShuffle':
-          toggleQueueShuffle();
+          toggleShuffling();
           break;
         case 'toggleRepeat':
           toggleRepeat();
@@ -528,7 +540,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       isAFavorite,
       isCurrentSongPlaying,
       toggleSongPlayback,
-      toggleQueueShuffle,
+      toggleShuffling,
       settings?.isMiniPlayerAlwaysOnTop,
       toggleAlwaysOnTop,
       handleToggleQueue,
@@ -827,7 +839,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               iconClassName={`text-lg! ${
                 isShuffling ? 'text-dark-background-color-3!' : 'material-icons-round-outlined'
               }`}
-              clickHandler={toggleQueueShuffle}
+              clickHandler={() => toggleShuffling()}
               removeFocusOnClick
             />
           )}

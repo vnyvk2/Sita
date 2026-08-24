@@ -582,4 +582,235 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(showContextMenuMock).toHaveBeenCalled();
   });
+
+  it('re-attaches ResizeObserver to newly mounted deck DOM nodes after standard -> compact -> standard mode roundtrip (F1)', async () => {
+    let observeCalls = 0;
+    const observeMock = vi.fn(() => {
+      observeCalls++;
+    });
+
+    global.ResizeObserver = class MockRO {
+      observe = observeMock;
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+    } as any;
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+    const initialObserveCount = observeMock.mock.calls.length;
+    expect(initialObserveCount).toBeGreaterThan(0);
+
+    // Switch to compact mode
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'compact'
+    });
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Switch back to standard mode
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Verify observer re-attached to the newly mounted standard deck nodes
+    expect(observeMock.mock.calls.length).toBeGreaterThan(initialObserveCount);
+  });
+
+  it('dispatches toggleShuffling when shuffle button is clicked in standard deck (F2)', async () => {
+    const toggleShufflingMock = vi.fn();
+    const mockContextValue = {
+      toggleShuffling: toggleShufflingMock,
+      toggleSongPlayback: vi.fn(),
+      handleSkipBackwardClick: vi.fn(),
+      handleSkipForwardClick: vi.fn(),
+      toggleIsFavorite: vi.fn(),
+      toggleMutedState: vi.fn(),
+      toggleRepeat: vi.fn()
+    };
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['shuffle', 'play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue as any}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const shuffleButton = container.querySelector('.shuffle-btn');
+    expect(shuffleButton).not.toBeNull();
+    fireEvent.click(shuffleButton!);
+
+    expect(toggleShufflingMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches toggleShuffling when toggleShuffle is selected from context menu (F2)', async () => {
+    const toggleShufflingMock = vi.fn();
+    showContextMenuMock.mockResolvedValue('toggleShuffle');
+
+    const mockContextValue = {
+      toggleShuffling: toggleShufflingMock,
+      toggleSongPlayback: vi.fn(),
+      handleSkipBackwardClick: vi.fn(),
+      handleSkipForwardClick: vi.fn(),
+      toggleIsFavorite: vi.fn(),
+      toggleMutedState: vi.fn(),
+      toggleRepeat: vi.fn()
+    };
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue as any}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    const miniPlayerElement = container.querySelector('.mini-player')!;
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(toggleShufflingMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets active overlays when switching modes at the mode transition boundary (F4)', async () => {
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['queue', 'lyrics', 'play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { rerender, container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Switch to compact mode
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['queue', 'lyrics', 'play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'compact'
+    });
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Overlays should remain closed/reset
+    expect(container.querySelector('.compact-lyrics-panel')).toBeNull();
+  });
+
+  it('toggles song playback from context menu even when playback is paused (F5)', async () => {
+    const toggleSongPlaybackMock = vi.fn();
+    showContextMenuMock.mockResolvedValue('togglePlay');
+
+    store.setState((prev) => ({
+      ...prev,
+      player: {
+        ...prev.player,
+        isCurrentSongPlaying: false // Paused track
+      }
+    }));
+
+    const mockContextValue = {
+      toggleShuffling: vi.fn(),
+      toggleSongPlayback: toggleSongPlaybackMock,
+      handleSkipBackwardClick: vi.fn(),
+      handleSkipForwardClick: vi.fn(),
+      toggleIsFavorite: vi.fn(),
+      toggleMutedState: vi.fn(),
+      toggleRepeat: vi.fn()
+    };
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue as any}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <MiniPlayer />
+          </Suspense>
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    const miniPlayerElement = container.querySelector('.mini-player')!;
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(toggleSongPlaybackMock).toHaveBeenCalledTimes(1);
+  });
 });

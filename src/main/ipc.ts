@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
+import { COMPACT_LYRICS_EXTENSION_HEIGHT } from '@common/miniPlayerConstants';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import {
   playlistEngine,
@@ -854,7 +855,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     );
 
     ipcMain.handle('app/toggleMiniPlayerLyrics', (_, isExpanded: boolean) =>
-      expandMiniPlayer(isExpanded, 0, 160)
+      expandMiniPlayer(isExpanded, 0, COMPACT_LYRICS_EXTENSION_HEIGHT)
     );
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>

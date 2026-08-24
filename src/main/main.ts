@@ -30,6 +30,15 @@ if (process.env.REMOTE_DEBUGGING_PORT) {
 
 import { version, appPreferences } from '../../package.json';
 import noraAppIcon from '../../resources/logo_light_mode.png?asset';
+import {
+  COMPACT_LYRICS_EXTENSION_HEIGHT,
+  COMPACT_MINI_PLAYER_HEIGHT,
+  COMPACT_MINI_PLAYER_MIN_WIDTH,
+  MINI_PLAYER_DEFAULT_SIZE_X,
+  MINI_PLAYER_DEFAULT_SIZE_Y,
+  MINI_PLAYER_MIN_SIZE_X,
+  MINI_PLAYER_MIN_SIZE_Y
+} from '@common/miniPlayerConstants';
 import roundTo from '../common/roundTo';
 import manageLastFmAuth from './auth/manageLastFmAuth';
 import changeAppTheme from './core/changeAppTheme';
@@ -67,10 +76,6 @@ const MAIN_WINDOW_DEFAULT_ZOOM_FACTOR = 0.8;
 const MAIN_WINDOW_MIN_ZOOM_FACTOR = 0.5;
 const MAIN_WINDOW_MAX_ZOOM_FACTOR = 3;
 
-const MINI_PLAYER_MIN_SIZE_X = 240;
-const MINI_PLAYER_MIN_SIZE_Y = 80;
-const MINI_PLAYER_DEFAULT_SIZE_X = 320;
-const MINI_PLAYER_DEFAULT_SIZE_Y = 240;
 const MINI_PLAYER_MAX_SIZE_X = 540;
 const MINI_PLAYER_MAX_SIZE_Y = 405;
 const MINI_PLAYER_ASPECT_RATIO = 0;
@@ -136,8 +141,7 @@ function clearProgrammaticMoveTarget() {
 
 let currentMiniPlayerMinWidth = MINI_PLAYER_MIN_SIZE_X;
 let currentMiniPlayerMinHeight = MINI_PLAYER_MIN_SIZE_Y;
-export const COMPACT_MINI_PLAYER_HEIGHT = 64;
-export const COMPACT_MINI_PLAYER_MIN_WIDTH = 200;
+export { COMPACT_MINI_PLAYER_HEIGHT, COMPACT_MINI_PLAYER_MIN_WIDTH };
 let currentMiniPlayerMode: 'standard' | 'compact' = 'standard';
 let savedStandardHeight = MINI_PLAYER_DEFAULT_SIZE_Y;
 
@@ -1049,6 +1053,16 @@ export function applyMiniPlayerModeConstraints(mode: 'standard' | 'compact') {
 }
 
 export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) {
+  if (
+    !Number.isFinite(minWidth) ||
+    !Number.isFinite(minHeight) ||
+    minWidth < COMPACT_MINI_PLAYER_MIN_WIDTH ||
+    minHeight < COMPACT_MINI_PLAYER_HEIGHT
+  ) {
+    logger.warn('Ignoring invalid mini player dynamic minimum bounds', { minWidth, minHeight });
+    return;
+  }
+
   logger.debug('Updating mini player dynamic minimum bounds', {
     minWidth,
     minHeight,
@@ -1111,10 +1125,13 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
     expandedHeight = null;
     expandedDirection = null;
 
-    // 3. Constrain native window size to compact constraints
+    // 3. Arm programmatic guard before applying constraints or setting bounds
+    setProgrammaticMoveTarget(restoreX, restoreY);
+
+    // 4. Constrain native window size to compact constraints
     applyMiniPlayerModeConstraints('compact');
 
-    // 4. Atomically set bounds
+    // 5. Atomically set bounds
     const targetWidth = Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH);
     setMiniPlayerBoundsProgrammatically({
       x: restoreX,
@@ -1132,17 +1149,20 @@ export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
     expandedHeight = null;
     expandedDirection = null;
 
-    // 2. Restore standard window constraints
-    applyMiniPlayerModeConstraints('standard');
-
-    // 3. Restore standard height
+    // 2. Restore standard height
     const targetHeight = Math.max(
       savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y,
       currentMiniPlayerMinHeight
     );
     const targetWidth = Math.max(currentW, currentMiniPlayerMinWidth);
 
-    // 4. Atomically set bounds
+    // 3. Arm programmatic guard before applying constraints or setting bounds
+    setProgrammaticMoveTarget(restoreX, restoreY);
+
+    // 4. Restore standard window constraints
+    applyMiniPlayerModeConstraints('standard');
+
+    // 5. Atomically set bounds
     setMiniPlayerBoundsProgrammatically({
       x: restoreX,
       y: restoreY,
@@ -1425,6 +1445,7 @@ export function expandMiniPlayer(
     });
 
     // Temporarily allow larger max height for expansion
+    setProgrammaticMoveTarget(compactX ?? currentX, calculatedExpandedY);
     mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, calculatedExpandedHeight);
     setMiniPlayerBoundsProgrammatically({
       x: compactX ?? currentX,
@@ -1453,6 +1474,7 @@ export function expandMiniPlayer(
       currentMiniPlayerMode
     });
 
+    setProgrammaticMoveTarget(restoreX, restoreY);
     applyMiniPlayerModeConstraints(currentMiniPlayerMode);
     setMiniPlayerBoundsProgrammatically({
       x: restoreX,

@@ -145,4 +145,37 @@ describe('CompactMiniPlayer (Single-Tier Progressive Strip)', () => {
 
     expect(contextMenuHandler).toHaveBeenCalledTimes(1);
   });
+
+  it('dispatches toggleShuffling with inverted state when compact shuffle button is clicked (F2)', async () => {
+    const toggleShufflingMock = vi.fn();
+    const mockContextValue = {
+      toggleShuffling: toggleShufflingMock,
+      toggleSongPlayback: vi.fn(),
+      handleSkipBackwardClick: vi.fn(),
+      handleSkipForwardClick: vi.fn(),
+      toggleIsFavorite: vi.fn(),
+      toggleMutedState: vi.fn(),
+      toggleRepeat: vi.fn()
+    };
+
+    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+
+    const { container } = render(
+      <AppUpdateContext.Provider value={mockContextValue as any}>
+        <CompactMiniPlayer
+          isQueueVisible={false}
+          isLyricsVisible={false}
+          onToggleQueue={vi.fn()}
+          onToggleLyrics={vi.fn()}
+          pinnedControls={['shuffle']}
+        />
+      </AppUpdateContext.Provider>
+    );
+
+    const shuffleButton = container.querySelector('.shuffle-btn');
+    expect(shuffleButton).not.toBeNull();
+    fireEvent.click(shuffleButton!);
+
+    expect(toggleShufflingMock).toHaveBeenCalledWith(true);
+  });
 });
