@@ -2,6 +2,7 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { useTranslation } from 'react-i18next';
 
+import { parseGenreList } from '@common/genreUtils';
 import Button from '../../Button';
 
 type Props = {
@@ -19,6 +20,49 @@ type Props = {
 const SongGenresInput = (props: Props) => {
   const { t } = useTranslation();
   const { songGenres, genreResults, genreKeyword, updateSongInfo, updateGenreKeyword } = props;
+
+  const commitGenresFromInput = (inputStr: string) => {
+    const trimmed = inputStr.trim();
+    if (!trimmed) return;
+
+    const parsedTokens = parseGenreList(trimmed);
+    if (parsedTokens.length === 0) return;
+
+    updateSongInfo((prevData) => {
+      const existingGenres = [...(prevData.genres ?? [])];
+
+      for (const token of parsedTokens) {
+        const alreadyExists = existingGenres.some(
+          (g) => g.name.toLowerCase() === token.toLowerCase()
+        );
+        if (alreadyExists) continue;
+
+        const matchedResult = genreResults.find(
+          (r) => r.name.toLowerCase() === token.toLowerCase()
+        );
+
+        if (matchedResult) {
+          existingGenres.push({
+            name: matchedResult.name,
+            genreId: matchedResult.genreId,
+            artworkPath: matchedResult.artworkPath
+          });
+        } else {
+          existingGenres.push({
+            name: token,
+            genreId: undefined
+          });
+        }
+      }
+
+      return {
+        ...prevData,
+        genres: existingGenres
+      };
+    });
+
+    updateGenreKeyword('');
+  };
 
   return (
     <div className="tag-input flex max-w-2xl min-w-40 flex-col">
@@ -56,9 +100,19 @@ const SongGenresInput = (props: Props) => {
           value={genreKeyword}
           onChange={(e) => {
             const { value } = e.target;
-            updateGenreKeyword(value);
+            if (value.includes(',') || value.includes(';')) {
+              commitGenresFromInput(value);
+            } else {
+              updateGenreKeyword(value);
+            }
           }}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitGenresFromInput(genreKeyword);
+            }
+          }}
         />
         {genreResults.length > 0 && (
           <ol className="genres-results-container border-background-color-2 dark:border-dark-background-color-2 mt-4 max-h-60 overflow-y-auto rounded-xl border-2">
@@ -91,31 +145,7 @@ const SongGenresInput = (props: Props) => {
             label={t('songTagsEditingPage.addNewGenre')}
             className="bg-background-color-2! hover:bg-background-color-3! hover:text-font-color-black dark:bg-dark-background-color-2! dark:hover:bg-dark-background-color-3! dark:hover:text-font-color-black mt-4 w-full!"
             clickHandler={() => {
-              updateSongInfo((prevData) => {
-                const genres =
-                  prevData.genres?.filter((genre) => genre.name !== genreKeyword) ?? [];
-                if (genreResults.some((x) => genreKeyword.toLowerCase() === x.name.toLowerCase())) {
-                  for (let x = 0; x < genreResults.length; x += 1) {
-                    const result = genreResults[x];
-                    if (genreKeyword.toLowerCase() === result.name.toLowerCase())
-                      genres?.push({
-                        name: result.name,
-                        genreId: result.genreId
-                      });
-                  }
-                } else {
-                  genres?.push({
-                    name: genreKeyword,
-                    genreId: undefined
-                  });
-                }
-
-                return {
-                  ...prevData,
-                  genres
-                };
-              });
-              updateGenreKeyword('');
+              commitGenresFromInput(genreKeyword);
             }}
           />
         )}

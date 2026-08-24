@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MetadataFieldDiff } from '../../../../common/metadata/types';
 import styles from './MetadataCenter.module.css';
 
@@ -13,6 +14,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
   selectedFieldIds,
   onToggleField
 }) => {
+  const { t } = useTranslation();
   if (!fieldDiffs || fieldDiffs.length === 0) return null;
 
   return (
@@ -30,22 +32,29 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
           const isChanged = diff.status === 'changed' || diff.status === 'new';
 
           return (
-            <div
+            <label
               key={diff.fieldId}
-              onClick={() => onToggleField(diff.fieldId)}
               className={`${styles.diffCard} ${isSelected ? styles.selectedDiffCard : ''}`}
+              style={{ cursor: 'pointer' }}
             >
               <input
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => {}} // handled by parent onClick
+                onChange={() => onToggleField(diff.fieldId)}
                 style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#10B981' }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    {diff.fieldName}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                      {diff.fieldName}
+                    </span>
+                    {diff.fieldId === 'style' && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-color-dimmed)', fontStyle: 'italic', fontWeight: 500, textTransform: 'none' }}>
+                        · {t('common.addedToGenres', 'Added to Genres')}
+                      </span>
+                    )}
+                  </div>
                   <span
                     style={{
                       fontSize: '10px',
@@ -74,7 +83,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
                   )}
                 </div>
               </div>
-            </div>
+            </label>
           );
         })}
       </div>

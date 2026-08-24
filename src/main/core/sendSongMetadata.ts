@@ -13,6 +13,7 @@ import {
   parseSongArtworks,
   removeDefaultAppProtocolFromFilePath
 } from '../fs/resolveFilePaths';
+import { parseGenreList } from '../../common/genreUtils';
 import logger from '../logger';
 import { getSongsOutsideLibraryData } from '../main';
 import { isLyricsSavePending } from '../saveLyricsToSong';
@@ -148,7 +149,12 @@ const sendSongMetadata = async (
       const tagGenres =
         songGenres && songGenres.length > 0
           ? songGenres
-          : songMetadata?.genres?.map((genre: string) => ({ genreId: undefined, name: genre.trim() }));
+          : songMetadata?.genres
+            ? parseGenreList(songMetadata.genres).map((genre: string) => ({
+                genreId: undefined,
+                name: genre
+              }))
+            : undefined;
       const trackNumber = song.trackNumber ?? songMetadata?.trackCount;
       const releasedYear = Number(songMetadata?.year) || song.year || undefined;
       const artworks = song.artworks.map((a) => a.artwork);
@@ -209,7 +215,7 @@ const sendSongMetadata = async (
                 ]
               : undefined,
             genres: songMetadata.genres
-              ? songMetadata.genres.map((genre) => ({ name: genre }))
+              ? parseGenreList(songMetadata.genres).map((genre) => ({ name: genre }))
               : undefined,
             releasedYear: Number(songMetadata.year) || undefined,
             composer: songMetadata.composers ? songMetadata.composers.join(', ') : undefined,

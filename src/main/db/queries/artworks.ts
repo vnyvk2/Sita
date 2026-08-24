@@ -51,7 +51,7 @@ export const linkArtworksToSong = async (
   data: (typeof artworksSongs.$inferInsert)[],
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(artworksSongs).values(data).returning();
+  return trx.insert(artworksSongs).values(data).onConflictDoNothing().returning();
 };
 
 export const syncSongArtworks = async (
@@ -136,21 +136,21 @@ export const linkArtworksToAlbum = async (
   data: (typeof albumsArtworks.$inferInsert)[],
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(albumsArtworks).values(data).returning();
+  return trx.insert(albumsArtworks).values(data).onConflictDoNothing().returning();
 };
 
 export const linkArtworksToGenre = async (
   data: (typeof artworksGenres.$inferInsert)[],
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(artworksGenres).values(data).returning();
+  return trx.insert(artworksGenres).values(data).onConflictDoNothing().returning();
 };
 
 export const linkArtworksToArtist = async (
   data: (typeof artistsArtworks.$inferInsert)[],
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(artistsArtworks).values(data).returning();
+  return trx.insert(artistsArtworks).values(data).onConflictDoNothing().returning();
 };
 
 export const linkArtworkToPlaylist = async (
@@ -158,7 +158,7 @@ export const linkArtworkToPlaylist = async (
   artworkId: number,
   trx: DB | DBTransaction = db
 ) => {
-  return await trx.insert(artworksPlaylists).values({ playlistId, artworkId });
+  return await trx.insert(artworksPlaylists).values({ playlistId, artworkId }).onConflictDoNothing();
 };
 
 export const getArtistOnlineArtworksCount = async (

@@ -7,6 +7,7 @@ import sharp from 'sharp';
 
 import { appPreferences } from '../../../package.json';
 import parseLyrics from '../../common/parseLyrics';
+import { parseGenreList } from '../../common/genreUtils';
 import { updateCachedLyrics } from '../core/getSongLyrics';
 import saveLyricsToLRCFile from '../core/saveLyricsToLrcFile';
 import sendSongMetadata from '../core/sendSongMetadata';
@@ -1123,13 +1124,36 @@ const updateSongId3Tags = async (
 
       // / / / / / SONG GENRES / / / / / /
       if (tags.genres) {
+        // Expand and normalize any compound/delimiter genres into canonical list
+        const normalizedGenreItems: { genreId?: number; name: string }[] = [];
+        const seen = new Set<string>();
+
+        for (const genreData of tags.genres) {
+          if (genreData.genreId) {
+            const lower = genreData.name.toLowerCase();
+            if (!seen.has(lower)) {
+              seen.add(lower);
+              normalizedGenreItems.push(genreData);
+            }
+          } else {
+            const splitNames = parseGenreList(genreData.name);
+            for (const name of splitNames) {
+              const lower = name.toLowerCase();
+              if (!seen.has(lower)) {
+                seen.add(lower);
+                normalizedGenreItems.push({ name, genreId: undefined });
+              }
+            }
+          }
+        }
+
         // Get current genres linked to song
         const currentGenres = song.genres?.map((g) => g.genre) || [];
         const currentGenreIds = currentGenres.map((g) => g.id);
 
         // Separate new genres from existing ones
-        const genresWithoutIds = tags.genres.filter((genre) => !genre.genreId);
-        const genresWithIds = tags.genres.filter((genre) => genre.genreId);
+        const genresWithoutIds = normalizedGenreItems.filter((genre) => !genre.genreId);
+        const genresWithIds = normalizedGenreItems.filter((genre) => genre.genreId);
 
         // Create new genres
         for (const genreData of genresWithoutIds) {
@@ -1186,7 +1210,7 @@ const updateSongId3Tags = async (
       title: tags.title,
       artists: tags.artists?.map((artist) => artist.name),
       album: tags.albums?.[0]?.title,
-      genres: tags.genres?.map((genre) => genre.name),
+      genres: tags.genres ? parseGenreList(tags.genres.map((genre) => genre.name)) : undefined,
       composer: tags.composer,
       trackNumber: tags.trackNumber,
       discNumber: tags.discNumber,

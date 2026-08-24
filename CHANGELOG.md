@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!TIP]
 > The latest version, **( v3.1.0-stable )** contains a lot of new features and improvements. As always expect some bugs in the app
 
-## [Unreleased]
-
 ### Added
 
+- Unified Discogs musical style suggestions with Nora's canonical multi-genre engine (`parseGenreList`) and added localized "(Added to Genres)" visual guidance in AutoTag diff previews.
+- Centralized multi-genre tokenizer and normalizer (`parseGenreList`) with support for compound delimiter splitting while preserving legitimate slash-containing genres (`Hip-Hop/Rap`, `R&B/Soul`, `AC/DC`) and ampersands (`Rock & Roll`, `R&B`).
+- Automated startup reconciliation (`reconcileExistingMultiGenres`) to detect, split, and re-link legacy concatenated delimiter genres in the database.
+- Immediate badge creation on `,` (comma), `;` (semicolon), and `Enter` in the song genres tag editor (`SongGenresInput`).
 - Canonical Unicode-aware normalization contract (`normalizeForMatching`) preserving CJK, Cyrillic, accented characters, and token boundaries across search and auto-tag matching.
 - Strongly-typed MusicBrainz Recording MBID and ISRC provider extraction and persistence across database schema and physical ID3 tags.
 - Cover Art Archive release-group lookup fallback when release-level artwork returns HTTP 404.
@@ -30,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Discogs genre and style merging in `SongMetadataBuilder` using naive comma splitting instead of the canonical multi-genre tokenizer.
+- Fixed audio library scanning omitting genre extraction during track parsing (`parseSong`).
+- Fixed compound genre strings (e.g. `Rock,pop`, `Rock, Pop`, `Rock; Pop`, `Rock / Pop`) being indexed as a single literal genre instead of multiple distinct genres.
+- Fixed `linkSongToGenre` missing `ON CONFLICT DO NOTHING` idempotency for junction records.
 - Fixed rapid track skip race conditions using monotonic generation token tracking (`currentLoadRequestId`) in `AudioPlayer`.
 - Fixed fade transition timeout collision during rapid play/pause toggles.
 - Fixed unhandled exceptions and swallowed `loadError` events during song load failures.
