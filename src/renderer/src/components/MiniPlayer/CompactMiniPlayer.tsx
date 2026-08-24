@@ -1,3 +1,4 @@
+import { COMPACT_MINI_PLAYER_HEIGHT } from '@common/miniPlayerConstants';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import {
@@ -20,8 +21,6 @@ import { CloseIcon, MinimizeIcon } from '../Icons/WindowIcons';
 import Img from '../Img';
 import SeekBarSlider from '../SeekBarSlider';
 import VolumeSlider from '../VolumeSlider';
-
-const COMPACT_MINI_PLAYER_HEIGHT = 64;
 
 const COMPACT_OPTIONAL_PRIORITY = [
   'love',
@@ -67,7 +66,7 @@ const CompactMiniPlayer = (props: Props) => {
     toggleIsFavorite,
     toggleMutedState,
     toggleRepeat,
-    toggleQueueShuffle
+    toggleShuffling
   } = useContext(AppUpdateContext);
 
   const { t } = useTranslation();
@@ -387,7 +386,7 @@ const CompactMiniPlayer = (props: Props) => {
                 isShuffling &&
                 'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
               }`}
-              clickHandler={() => toggleQueueShuffle(!isShuffling)}
+              clickHandler={() => toggleShuffling(!isShuffling)}
               removeFocusOnClick
             />
           )}

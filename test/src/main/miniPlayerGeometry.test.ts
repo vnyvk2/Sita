@@ -1,0 +1,258 @@
+import {
+  COMPACT_LYRICS_EXTENSION_HEIGHT,
+  COMPACT_MINI_PLAYER_HEIGHT,
+  COMPACT_MINI_PLAYER_MIN_WIDTH,
+  MINI_PLAYER_DEFAULT_SIZE_X,
+  MINI_PLAYER_DEFAULT_SIZE_Y,
+  MINI_PLAYER_MIN_SIZE_X,
+  MINI_PLAYER_MIN_SIZE_Y
+} from '@common/miniPlayerConstants';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Track calls and mock state
+let persistedUserSettings: Record<string, unknown> = {};
+const mockSaveUserSettings = vi.fn(async (settings: Record<string, unknown>) => {
+  persistedUserSettings = { ...persistedUserSettings, ...settings };
+  return persistedUserSettings;
+});
+
+const mockGetUserSettings = vi.fn(async () => ({
+  mainWindowHeight: 720,
+  mainWindowWidth: 1280,
+  miniPlayerHeight: MINI_PLAYER_DEFAULT_SIZE_Y,
+  miniPlayerWidth: MINI_PLAYER_DEFAULT_SIZE_X,
+  miniPlayerMode: 'standard',
+  mainWindowX: 100,
+  mainWindowY: 100,
+  miniPlayerX: 500,
+  miniPlayerY: 500,
+  isMiniPlayerAlwaysOnTop: false,
+  ...persistedUserSettings
+}));
+
+// Mock main module dependencies
+vi.mock('@main/db/queries/settings', () => ({
+  getUserSettings: () => mockGetUserSettings(),
+  saveUserSettings: (s: any) => mockSaveUserSettings(s)
+}));
+
+vi.mock('@main/db/queries/songs', () => ({
+  getSongById: vi.fn()
+}));
+
+vi.mock('@main/fs/controlAbortControllers', () => ({
+  closeAllAbortControllers: vi.fn(),
+  saveAbortController: vi.fn()
+}));
+
+vi.mock('@main/ipc', () => ({
+  initializeIPC: vi.fn()
+}));
+
+vi.mock('@main/library/LibraryLifecycleController', () => ({
+  default: {}
+}));
+
+vi.mock('@main/lifecycle/ShutdownCoordinator', () => ({
+  default: {}
+}));
+
+vi.mock('@main/lifecycle/ShutdownLogger', () => ({
+  default: {
+    logBootMilestone: vi.fn()
+  }
+}));
+
+vi.mock('@main/core/manageTaskbarPlaybackButtonControls', () => ({
+  default: vi.fn()
+}));
+
+vi.mock('@main/db/db', () => ({
+  closeDatabaseInstance: vi.fn()
+}));
+
+describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () => {
+  let mainModule: typeof import('../../../src/main/main');
+  let currentBounds = { x: 500, y: 500, width: 320, height: 240 };
+  let moveEventHandler: (() => void) | null = null;
+  let resizeEventHandler: (() => void) | null = null;
+  const eventCallSequence: string[] = [];
+
+  const mockWindow = {
+    isDestroyed: vi.fn(() => false),
+    isMinimized: vi.fn(() => false),
+    getPosition: vi.fn(() => [currentBounds.x, currentBounds.y]),
+    getSize: vi.fn(() => [currentBounds.width, currentBounds.height]),
+    getBounds: vi.fn(() => ({ ...currentBounds })),
+    setPosition: vi.fn((x: number, y: number) => {
+      eventCallSequence.push(`setPosition:${x},${y}`);
+      currentBounds.x = x;
+      currentBounds.y = y;
+      moveEventHandler?.();
+    }),
+    setSize: vi.fn((width: number, height: number) => {
+      eventCallSequence.push(`setSize:${width},${height}`);
+      currentBounds.width = width;
+      currentBounds.height = height;
+      resizeEventHandler?.();
+    }),
+    setBounds: vi.fn((bounds: { x: number; y: number; width: number; height: number }) => {
+      eventCallSequence.push(`setBounds:${bounds.x},${bounds.y},${bounds.width},${bounds.height}`);
+      currentBounds = { ...bounds };
+      moveEventHandler?.();
+      resizeEventHandler?.();
+    }),
+    setMinimumSize: vi.fn((w: number, h: number) => {
+      eventCallSequence.push(`setMinimumSize:${w},${h}`);
+    }),
+    setMaximumSize: vi.fn((w: number, h: number) => {
+      eventCallSequence.push(`setMaximumSize:${w},${h}`);
+      // Simulate OS immediate constraint clamping when max size is reduced below current size
+      if (currentBounds.height > h) {
+        eventCallSequence.push(`osConstraintSnap:${currentBounds.x},${currentBounds.y - 20}`);
+        // OS emits move/resize event during snap
+        moveEventHandler?.();
+      }
+    }),
+    setMaximizable: vi.fn(),
+    setAlwaysOnTop: vi.fn(),
+    setFullScreen: vi.fn(),
+    setAspectRatio: vi.fn(),
+    webContents: {
+      isDestroyed: vi.fn(() => false),
+      send: vi.fn(),
+      session: {
+        clearStorageData: vi.fn()
+      }
+    },
+    on: vi.fn((event: string, handler: () => void) => {
+      if (event === 'moved') moveEventHandler = handler;
+      if (event === 'resized') resizeEventHandler = handler;
+    })
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    eventCallSequence.length = 0;
+    persistedUserSettings = {
+      miniPlayerX: 500,
+      miniPlayerY: 500,
+      miniPlayerWidth: MINI_PLAYER_DEFAULT_SIZE_X,
+      miniPlayerHeight: MINI_PLAYER_DEFAULT_SIZE_Y,
+      miniPlayerMode: 'standard'
+    };
+    currentBounds = {
+      x: 500,
+      y: 500,
+      width: MINI_PLAYER_DEFAULT_SIZE_X,
+      height: MINI_PLAYER_DEFAULT_SIZE_Y
+    };
+
+    mainModule = await import('../../../src/main/main');
+    // Attach mocked window
+    (mainModule as any).mainWindow = mockWindow;
+  });
+
+  describe('F7: Dynamic Minimum Bounds Validation and Rejection', () => {
+    it('rejects NaN, Infinity, negative, and zero bounds without mutating constraints', () => {
+      mockWindow.setMinimumSize.mockClear();
+
+      mainModule.setMiniPlayerMinimumBounds(NaN, 100);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+
+      mainModule.setMiniPlayerMinimumBounds(250, NaN);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+
+      mainModule.setMiniPlayerMinimumBounds(Infinity, 100);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+
+      mainModule.setMiniPlayerMinimumBounds(-100, 80);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+
+      mainModule.setMiniPlayerMinimumBounds(250, 0);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+    });
+
+    it('rejects bounds smaller than the canonical compact baseline', () => {
+      mockWindow.setMinimumSize.mockClear();
+
+      // Below COMPACT_MINI_PLAYER_MIN_WIDTH (200)
+      mainModule.setMiniPlayerMinimumBounds(150, COMPACT_MINI_PLAYER_HEIGHT);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+
+      // Below COMPACT_MINI_PLAYER_HEIGHT (64)
+      mainModule.setMiniPlayerMinimumBounds(COMPACT_MINI_PLAYER_MIN_WIDTH, 50);
+      expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
+    });
+
+    it('accepts valid dynamic bounds meeting canonical constraints', () => {
+      mockWindow.setMinimumSize.mockClear();
+
+      mainModule.setMiniPlayerMinimumBounds(300, 150);
+      // Valid bounds update native minimum constraints
+      expect(mockWindow.setMinimumSize).toHaveBeenCalled();
+    });
+  });
+
+  describe('F3: Mode Transition Geometry Sequencing & Persistence Invariant', () => {
+    it('preserves the persistence invariant during standard -> compact transition under OS constraint snaps', async () => {
+      // Enter mini player mode first
+      await mainModule.changePlayerType('mini');
+      mockSaveUserSettings.mockClear();
+
+      // Switch to compact mode
+      await mainModule.setMiniPlayerMode('compact');
+
+      // The final persisted miniPlayerMode must be compact
+      expect(persistedUserSettings.miniPlayerMode).toBe('compact');
+      // The persisted position must NOT be corrupted by OS constraint snaps
+      expect(persistedUserSettings.miniPlayerX).toBe(500);
+      expect(persistedUserSettings.miniPlayerY).toBe(500);
+      // Window bounds must settle at compact dimensions
+      expect(currentBounds.height).toBe(COMPACT_MINI_PLAYER_HEIGHT);
+      expect(currentBounds.width).toBe(Math.max(MINI_PLAYER_DEFAULT_SIZE_X, COMPACT_MINI_PLAYER_MIN_WIDTH));
+    });
+
+    it('handles rapid back-to-back mode transitions without corrupting geometry or swallowing subsequent user movement', async () => {
+      await mainModule.changePlayerType('mini');
+      mockSaveUserSettings.mockClear();
+
+      // Rapidly toggle: standard -> compact -> standard -> compact
+      const p1 = mainModule.setMiniPlayerMode('compact');
+      const p2 = mainModule.setMiniPlayerMode('standard');
+      const p3 = mainModule.setMiniPlayerMode('compact');
+
+      await Promise.all([p1, p2, p3]);
+
+      // Verify settled state
+      expect(persistedUserSettings.miniPlayerMode).toBe('compact');
+      expect(currentBounds.height).toBe(COMPACT_MINI_PLAYER_HEIGHT);
+
+      // Now simulate a legitimate user movement after transitions have settled
+      currentBounds.x = 620;
+      currentBounds.y = 410;
+      moveEventHandler?.();
+
+      // Verify legitimate user drag was captured and persisted
+      expect(persistedUserSettings.miniPlayerX).toBe(620);
+      expect(persistedUserSettings.miniPlayerY).toBe(410);
+    });
+  });
+
+  describe('F3 & F6: Spatial Lyrics Extension Geometry', () => {
+    it('uses canonical COMPACT_LYRICS_EXTENSION_HEIGHT and correctly expands and collapses', async () => {
+      await mainModule.changePlayerType('mini');
+      await mainModule.setMiniPlayerMode('compact');
+
+      // Expand lyrics
+      const expandResult = mainModule.expandMiniPlayer(true, 0, COMPACT_LYRICS_EXTENSION_HEIGHT);
+      expect(expandResult.isExpanded).toBe(true);
+      expect(expandResult.height).toBe(COMPACT_MINI_PLAYER_HEIGHT + COMPACT_LYRICS_EXTENSION_HEIGHT);
+
+      // Collapse lyrics
+      const collapseResult = mainModule.expandMiniPlayer(false);
+      expect(collapseResult.isExpanded).toBe(false);
+      expect(collapseResult.height).toBe(COMPACT_MINI_PLAYER_HEIGHT);
+    });
+  });
+});
