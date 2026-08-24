@@ -1,4 +1,3 @@
-import i18n from '@renderer/i18n';
 import { type ReactNode } from 'react';
 
 import { normalizedKeys } from './appShortcuts';
@@ -485,163 +484,163 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
   },
   keyboardShortcuts: [
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.mediaPlayback'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.mediaPlayback',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.playPause'),
+          label: 'appShortcutsPrompt.playPause',
           keys: [normalizedKeys.spaceKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.toggleMute'),
+          label: 'appShortcutsPrompt.toggleMute',
           keys: [normalizedKeys.ctrlKey, 'M']
         },
         {
-          label: i18n.t('appShortcutsPrompt.nextSong'),
+          label: 'appShortcutsPrompt.nextSong',
           keys: [normalizedKeys.ctrlKey, normalizedKeys.rightArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.prevSong'),
+          label: 'appShortcutsPrompt.prevSong',
           keys: [normalizedKeys.ctrlKey, normalizedKeys.leftArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.tenSecondsForward'),
+          label: 'appShortcutsPrompt.tenSecondsForward',
           keys: [normalizedKeys.shiftKey, normalizedKeys.rightArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.tenSecondsBackward'),
+          label: 'appShortcutsPrompt.tenSecondsBackward',
           keys: [normalizedKeys.shiftKey, normalizedKeys.leftArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.upVolume'),
+          label: 'appShortcutsPrompt.upVolume',
           keys: [normalizedKeys.ctrlKey, normalizedKeys.upArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.downVolume'),
+          label: 'appShortcutsPrompt.downVolume',
           keys: [normalizedKeys.ctrlKey, normalizedKeys.downArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.toggleShuffle'),
+          label: 'appShortcutsPrompt.toggleShuffle',
           keys: [normalizedKeys.ctrlKey, 'S']
         },
         {
-          label: i18n.t('appShortcutsPrompt.toggleRepeat'),
+          label: 'appShortcutsPrompt.toggleRepeat',
           keys: [normalizedKeys.ctrlKey, 'T']
         },
         {
-          label: i18n.t('appShortcutsPrompt.toggleFavorite'),
+          label: 'appShortcutsPrompt.toggleFavorite',
           keys: [normalizedKeys.ctrlKey, 'H']
         },
         {
-          label: i18n.t('appShortcutsPrompt.upPlaybackRate'),
+          label: 'appShortcutsPrompt.upPlaybackRate',
           keys: [normalizedKeys.ctrlKey, ']']
         },
         {
-          label: i18n.t('appShortcutsPrompt.downPlaybackRate'),
+          label: 'appShortcutsPrompt.downPlaybackRate',
           keys: [normalizedKeys.ctrlKey, '[']
         },
         {
-          label: i18n.t('appShortcutsPrompt.resetPlaybackRate'),
+          label: 'appShortcutsPrompt.resetPlaybackRate',
           keys: [normalizedKeys.ctrlKey, '\\']
         },
         {
-          label: i18n.t('appShortcutsPrompt.openAppShortcutsPrompt'),
+          label: 'appShortcutsPrompt.openAppShortcutsPrompt',
           keys: [normalizedKeys.ctrlKey, '/']
         }
       ]
     },
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.navigation'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.navigation',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.goHome'),
+          label: 'appShortcutsPrompt.goHome',
           keys: [normalizedKeys.altKey, normalizedKeys.homeKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.goBack'),
+          label: 'appShortcutsPrompt.goBack',
           keys: [normalizedKeys.altKey, normalizedKeys.leftArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.goForward'),
+          label: 'appShortcutsPrompt.goForward',
           keys: [normalizedKeys.altKey, normalizedKeys.rightArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.openMiniPlayer'),
+          label: 'appShortcutsPrompt.openMiniPlayer',
           keys: [normalizedKeys.ctrlKey, 'N']
         },
         {
-          label: i18n.t('appShortcutsPrompt.goToLyrics'),
+          label: 'appShortcutsPrompt.goToLyrics',
           keys: [normalizedKeys.ctrlKey, 'L']
         },
         {
-          label: i18n.t('appShortcutsPrompt.goToQueue'),
+          label: 'appShortcutsPrompt.goToQueue',
           keys: [normalizedKeys.ctrlKey, 'Q']
         },
         {
-          label: i18n.t('appShortcutsPrompt.goToSearch'),
+          label: 'appShortcutsPrompt.goToSearch',
           keys: [normalizedKeys.ctrlKey, 'F']
         }
       ]
     },
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.selections'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.selections',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.selectMultipleItems'),
+          label: 'appShortcutsPrompt.selectMultipleItems',
           keys: [normalizedKeys.shiftKey, normalizedKeys.mouseClick]
         }
       ]
     },
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.lyrics'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.lyrics',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.playNextLyricsLine'),
+          label: 'appShortcutsPrompt.playNextLyricsLine',
           keys: [normalizedKeys.altKey, normalizedKeys.downArrowKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.playPrevLyricsLine'),
+          label: 'appShortcutsPrompt.playPrevLyricsLine',
           keys: [normalizedKeys.altKey, normalizedKeys.upArrowKey]
         }
       ]
     },
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.lyricsEditor'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.lyricsEditor',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.selectNextLyricsLine'),
+          label: 'appShortcutsPrompt.selectNextLyricsLine',
           keys: [normalizedKeys.enterKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.selectPrevLyricsLine'),
+          label: 'appShortcutsPrompt.selectPrevLyricsLine',
           keys: [normalizedKeys.shiftKey, normalizedKeys.enterKey]
         },
         {
-          label: i18n.t('appShortcutsPrompt.selectCustomLyricsLine'),
+          label: 'appShortcutsPrompt.selectCustomLyricsLine',
           keys: [normalizedKeys.doubleClick]
         }
       ]
     },
     {
-      shortcutCategoryTitle: i18n.t('appShortcutsPrompt.otherShortcuts'),
+      shortcutCategoryTitle: 'appShortcutsPrompt.otherShortcuts',
       shortcuts: [
         {
-          label: i18n.t('appShortcutsPrompt.toggleTheme'),
+          label: 'appShortcutsPrompt.toggleTheme',
           keys: [normalizedKeys.ctrlKey, 'Y']
         },
         {
-          label: i18n.t('appShortcutsPrompt.toggleMiniPlayerAlwaysOnTop'),
+          label: 'appShortcutsPrompt.toggleMiniPlayerAlwaysOnTop',
           keys: [normalizedKeys.ctrlKey, 'O']
         },
         {
-          label: i18n.t('appShortcutsPrompt.reload'),
+          label: 'appShortcutsPrompt.reload',
           keys: [normalizedKeys.ctrlKey, 'R']
         },
         {
-          label: i18n.t('appShortcutsPrompt.openDevtools'),
+          label: 'appShortcutsPrompt.openDevtools',
           keys: ['F12']
         },
         {
-          label: i18n.t('appShortcutsPrompt.resyncLibrary'),
+          label: 'appShortcutsPrompt.resyncLibrary',
           keys: [normalizedKeys.insertKey]
         }
       ]

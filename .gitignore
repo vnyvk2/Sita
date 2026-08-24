@@ -39,4 +39,5 @@ diff_output*.txt
 electron.vite.config.*.mjs
 *.zip
 memory_report_*.json
+phase1_mini_report.json
 
