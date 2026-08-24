@@ -176,6 +176,37 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
 
       if (matchedShortcut) {
         e.preventDefault();
+
+        // In mini player mode only playback-centric shortcuts (plus the mini player toggle and
+        // the queue/search entries backed by mini surfaces) may act. Navigation and library
+        // shortcuts would otherwise mutate router history behind the unmounted main UI.
+        if (store.state.playerType === 'mini') {
+          const miniAllowedLabelKeys = [
+            'appShortcutsPrompt.playPause',
+            'appShortcutsPrompt.toggleMute',
+            'appShortcutsPrompt.nextSong',
+            'appShortcutsPrompt.prevSong',
+            'appShortcutsPrompt.tenSecondsForward',
+            'appShortcutsPrompt.tenSecondsBackward',
+            'appShortcutsPrompt.upVolume',
+            'appShortcutsPrompt.downVolume',
+            'appShortcutsPrompt.toggleShuffle',
+            'appShortcutsPrompt.toggleRepeat',
+            'appShortcutsPrompt.toggleFavorite',
+            'appShortcutsPrompt.upPlaybackRate',
+            'appShortcutsPrompt.downPlaybackRate',
+            'appShortcutsPrompt.resetPlaybackRate',
+            'appShortcutsPrompt.openMiniPlayer',
+            'appShortcutsPrompt.goToQueue',
+            'appShortcutsPrompt.goToSearch'
+          ];
+          const miniAllowedLabels = new Set(miniAllowedLabelKeys.map((labelKey) => i18n.t(labelKey)));
+
+          if (!miniAllowedLabels.has(matchedShortcut.label)) {
+            return;
+          }
+        }
+
         let updatedPlaybackRate: number;
         switch (matchedShortcut.label) {
           case i18n.t('appShortcutsPrompt.playPause'):
