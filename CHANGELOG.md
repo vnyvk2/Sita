@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Unified Discogs musical style suggestions with Nora's canonical multi-genre engine (`parseGenreList`) and added localized "(Added to Genres)" visual guidance in AutoTag diff previews.
 - Centralized multi-genre tokenizer and normalizer (`parseGenreList`) with support for compound delimiter splitting while preserving legitimate slash-containing genres (`Hip-Hop/Rap`, `R&B/Soul`, `AC/DC`) and ampersands (`Rock & Roll`, `R&B`).
 - Automated startup reconciliation (`reconcileExistingMultiGenres`) to detect, split, and re-link legacy concatenated delimiter genres in the database.
 - Immediate badge creation on `,` (comma), `;` (semicolon), and `Enter` in the song genres tag editor (`SongGenresInput`).
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Discogs genre and style merging in `SongMetadataBuilder` using naive comma splitting instead of the canonical multi-genre tokenizer.
 - Fixed audio library scanning omitting genre extraction during track parsing (`parseSong`).
 - Fixed compound genre strings (e.g. `Rock,pop`, `Rock, Pop`, `Rock; Pop`, `Rock / Pop`) being indexed as a single literal genre instead of multiple distinct genres.
 - Fixed `linkSongToGenre` missing `ON CONFLICT DO NOTHING` idempotency for junction records.

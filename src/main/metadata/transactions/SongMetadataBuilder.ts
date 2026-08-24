@@ -1,4 +1,5 @@
 import { getSongById } from '../../db/queries/songs';
+import { parseGenreList } from '../../../common/genreUtils';
 
 /**
  * SongMetadataBuilder — builds a COMPLETE SongTags object by reading
@@ -132,24 +133,16 @@ export class SongMetadataBuilder {
   }
 
   /**
-   * Merge genre & style changes: preserves existing IDs when names match,
-   * combining both genre and style strings into the SongTagsGenreData array.
+   * Merge genre & style changes: preserves existing IDs when names match case-insensitively,
+   * combining both genre and style strings into the SongTagsGenreData array through canonical tokenization.
    */
   private static mergeGenresAndStyles(
     genreStr: string | undefined,
     styleStr: string | undefined,
     currentGenres: SongTagsGenreData[]
   ): SongTagsGenreData[] {
-    const rawNames: string[] = [];
-
-    if (genreStr) {
-      rawNames.push(...genreStr.split(',').map((s) => s.trim()).filter(Boolean));
-    }
-    if (styleStr) {
-      rawNames.push(...styleStr.split(',').map((s) => s.trim()).filter(Boolean));
-    }
-
-    const uniqueNames = Array.from(new Set(rawNames));
+    const rawInput = [genreStr, styleStr].filter((s): s is string => Boolean(s && s.trim()));
+    const uniqueNames = parseGenreList(rawInput);
     if (uniqueNames.length === 0) return currentGenres;
 
     return uniqueNames.map((name) => {

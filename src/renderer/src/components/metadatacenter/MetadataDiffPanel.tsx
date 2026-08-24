@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MetadataFieldDiff } from '../../../../common/metadata/types';
 import styles from './MetadataCenter.module.css';
 
@@ -13,6 +14,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
   selectedFieldIds,
   onToggleField
 }) => {
+  const { t } = useTranslation();
   if (!fieldDiffs || fieldDiffs.length === 0) return null;
 
   return (
@@ -32,7 +34,15 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
           return (
             <div
               key={diff.fieldId}
+              role="button"
+              tabIndex={0}
               onClick={() => onToggleField(diff.fieldId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onToggleField(diff.fieldId);
+                }
+              }}
               className={`${styles.diffCard} ${isSelected ? styles.selectedDiffCard : ''}`}
             >
               <input
@@ -43,9 +53,16 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    {diff.fieldName}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-color-dimmed)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                      {diff.fieldName}
+                    </span>
+                    {diff.fieldId === 'style' && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-color-dimmed)', fontStyle: 'italic', fontWeight: 500, textTransform: 'none' }}>
+                        · {t('common.addedToGenres', 'Added to Genres')}
+                      </span>
+                    )}
+                  </div>
                   <span
                     style={{
                       fontSize: '10px',

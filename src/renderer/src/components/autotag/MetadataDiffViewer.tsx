@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
 import { isFieldChanged } from './utils/previewSummary';
 
@@ -25,6 +26,7 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
   onResetField,
   onSelectProviderForField
 }) => {
+  const { t } = useTranslation();
   const activeTrack = track ?? match;
   if (!activeTrack) return null;
 
@@ -76,7 +78,14 @@ export const MetadataDiffViewer: React.FC<MetadataDiffViewerProps> = ({
                   className="cursor-pointer"
                 />
 
-                <span className="font-semibold text-font-color-black dark:text-font-color-white">{diff.fieldName}</span>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-font-color-black dark:text-font-color-white">{diff.fieldName}</span>
+                  {diff.fieldId === 'style' && (
+                    <span className="text-[10px] text-font-color-dimmed dark:text-dark-font-color-dimmed italic font-normal leading-tight">
+                      {t('common.addedToGenres', 'Added to Genres')}
+                    </span>
+                  )}
+                </div>
 
                 <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed overflow-hidden text-ellipsis whitespace-nowrap font-medium">
                   {diff.oldValue !== undefined && diff.oldValue !== null ? String(diff.oldValue) : <em className="opacity-60">None</em>}

@@ -102,4 +102,53 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
 
     expect(result.discNumber).toBe(3);
   });
+
+  it('merges genre and style with case-insensitive deduplication and preserves existing genre IDs', async () => {
+    vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
+      id: 14,
+      title: 'Genre Merge Test',
+      duration: '190.0',
+      artists: [],
+      albums: [],
+      genres: [{ genre: { id: 42, name: 'Rock' } }]
+    } as any);
+
+    const result = await SongMetadataBuilder.buildCompleteTags(14, {
+      genre: 'rock',
+      style: 'Rock, Indie Rock'
+    });
+
+    expect(result.genres).toHaveLength(2);
+    // Preserves existing genre ID 42 from "Rock" even when incoming was lowercased "rock"
+    expect(result.genres?.[0]).toEqual({ genreId: 42, name: 'Rock' });
+    expect(result.genres?.[1]).toEqual({ name: 'Indie Rock' });
+  });
+
+  it('merges multiple delimiters in genre & style while preserving compound genres like Hip-Hop/Rap and AC/DC', async () => {
+    vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
+      id: 15,
+      title: 'Compound Genre Test',
+      duration: '240.0',
+      artists: [],
+      albums: [],
+      genres: []
+    } as any);
+
+    const result = await SongMetadataBuilder.buildCompleteTags(15, {
+      genre: 'Rock, Pop',
+      style: 'Post-Punk; Shoegaze, Hip-Hop/Rap, R&B/Soul, AC/DC, Rock & Roll'
+    });
+
+    const genreNames = result.genres?.map((g) => g.name);
+    expect(genreNames).toEqual([
+      'Rock',
+      'Pop',
+      'Post-Punk',
+      'Shoegaze',
+      'Hip-Hop/Rap',
+      'R&B/Soul',
+      'AC/DC',
+      'Rock & Roll'
+    ]);
+  });
 });
