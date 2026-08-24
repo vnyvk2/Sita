@@ -81,11 +81,16 @@ describe('MetadataDiffPanel Component', () => {
 
   it('allows toggling selective field changes', () => {
     render(<TestWrapper />);
-    const styleCard = screen.getByText('Style').closest('div');
-    expect(styleCard).toBeDefined();
+    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(3);
+    expect(checkboxes[2].checked).toBe(true);
 
-    if (styleCard) {
-      fireEvent.click(styleCard);
-    }
+    // Toggle the 3rd field (style) off
+    fireEvent.click(checkboxes[2]);
+    expect(checkboxes[2].checked).toBe(false);
+
+    // Toggle the 3rd field (style) back on
+    fireEvent.click(checkboxes[2]);
+    expect(checkboxes[2].checked).toBe(true);
   });
 });

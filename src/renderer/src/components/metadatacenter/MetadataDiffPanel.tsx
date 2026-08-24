@@ -32,23 +32,15 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
           const isChanged = diff.status === 'changed' || diff.status === 'new';
 
           return (
-            <div
+            <label
               key={diff.fieldId}
-              role="button"
-              tabIndex={0}
-              onClick={() => onToggleField(diff.fieldId)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onToggleField(diff.fieldId);
-                }
-              }}
               className={`${styles.diffCard} ${isSelected ? styles.selectedDiffCard : ''}`}
+              style={{ cursor: 'pointer' }}
             >
               <input
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => {}} // handled by parent onClick
+                onChange={() => onToggleField(diff.fieldId)}
                 style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#10B981' }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -91,7 +83,7 @@ export const MetadataDiffPanel: React.FC<MetadataDiffPanelProps> = ({
                   )}
                 </div>
               </div>
-            </div>
+            </label>
           );
         })}
       </div>

@@ -151,4 +151,23 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
       'Rock & Roll'
     ]);
   });
+
+  it('deduplicates when an existing canonical genre appears in both genre and style with different casing', async () => {
+    vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
+      id: 16,
+      title: 'Deduplicate Both Fields Test',
+      duration: '200.0',
+      artists: [],
+      albums: [],
+      genres: [{ genre: { id: 42, name: 'Rock' } }]
+    } as any);
+
+    const result = await SongMetadataBuilder.buildCompleteTags(16, {
+      genre: 'Rock',
+      style: 'rock'
+    });
+
+    expect(result.genres).toHaveLength(1);
+    expect(result.genres?.[0]).toEqual({ genreId: 42, name: 'Rock' });
+  });
 });
