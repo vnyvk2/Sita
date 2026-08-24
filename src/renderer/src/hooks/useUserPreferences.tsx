@@ -2,27 +2,52 @@ import { queryClient } from '@renderer/queryClient';
 import { userPreferencesQuery, userPreferencesMutation } from '@renderer/queries/userPreferences';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
+/** Options accepted by useUserPreferences. */
+export interface UserPreferencesOptions {
+  /**
+   * When false, none of the preference queries are fetched. Used to avoid unnecessary DB/IPC
+   * round-trips in presentation modes that never consume this data (e.g. the mini player).
+   * Mutations remain available regardless of this flag.
+   */
+  enabled?: boolean;
+}
+
 /**
  * Hook for managing user preferences from the database Includes keyboard shortcuts, equalizer
  * presets, and ignored items
  */
-export function useUserPreferences() {
+export function useUserPreferences(options: UserPreferencesOptions = {}) {
+  const isEnabled = options.enabled ?? true;
+
   // Load keyboard shortcuts
-  const { data: keyboardShortcuts } = useQuery(userPreferencesQuery.keyboardShortcuts);
+  const { data: keyboardShortcuts } = useQuery({
+    ...userPreferencesQuery.keyboardShortcuts,
+    enabled: isEnabled
+  });
 
   // Load equalizer preset
-  const { data: equalizerPreset } = useQuery(userPreferencesQuery.equalizerPreset);
+  const { data: equalizerPreset } = useQuery({
+    ...userPreferencesQuery.equalizerPreset,
+    enabled: isEnabled
+  });
 
   // Load ignored artists
-  const { data: ignoredArtists } = useQuery(userPreferencesQuery.ignoredArtists);
+  const { data: ignoredArtists } = useQuery({
+    ...userPreferencesQuery.ignoredArtists,
+    enabled: isEnabled
+  });
 
   // Load ignored featuring artists
-  const { data: ignoredFeaturingArtists } = useQuery(userPreferencesQuery.ignoredFeaturingArtists);
+  const { data: ignoredFeaturingArtists } = useQuery({
+    ...userPreferencesQuery.ignoredFeaturingArtists,
+    enabled: isEnabled
+  });
 
   // Load ignored duplicate metadata
-  const { data: ignoredDuplicateMetadata } = useQuery(
-    userPreferencesQuery.ignoredDuplicateMetadata
-  );
+  const { data: ignoredDuplicateMetadata } = useQuery({
+    ...userPreferencesQuery.ignoredDuplicateMetadata,
+    enabled: isEnabled
+  });
 
   // Mutation: Save keyboard shortcuts
   const saveKeyboardShortcutsMutation = useMutation({

@@ -123,7 +123,8 @@ export default function App() {
 
   // ? INITIALIZE USER PREFERENCES
   // User preferences hook loads keyboard shortcuts, equalizer preset, and ignored items from database
-  useUserPreferences();
+  // Gated off in mini player mode: those preference queries are never consumed there
+  useUserPreferences({ enabled: playerType !== 'mini' });
 
   // ? INITIALIZE KEYBOARD SHORTCUTS
   // Keyboard shortcuts hook handles all keyboard shortcuts and their actions
@@ -193,9 +194,12 @@ export default function App() {
 
   // ? INITIALIZE APP UPDATES
   // App updates hook handles checking for updates and showing release notes
+  // Gated off in mini player mode: halts remote changelog polling and prevents release-notes
+  // prompts from appearing over the passive mini player window
   const { updateAppUpdatesState } = useAppUpdates({
     changePromptMenuData,
-    isOnline
+    isOnline,
+    isEnabled: playerType !== 'mini'
   });
 
   const fetchSongFromUnknownSource = useCallback(
@@ -435,14 +439,16 @@ export default function App() {
           ) : (
             <Outlet />
           )}
-          <MetadataCenterDialog
-            isOpen={autoTagState.isOpen}
-            localSongs={autoTagState.songs}
-            initialAlbumName={autoTagState.albumName}
-            initialArtistName={autoTagState.artistName}
-            initialWorkflow={autoTagState.workflow ?? 'album'}
-            onClose={closeAutoTagDialog}
-          />
+          {autoTagState.isOpen && (
+            <MetadataCenterDialog
+              isOpen={autoTagState.isOpen}
+              localSongs={autoTagState.songs}
+              initialAlbumName={autoTagState.albumName}
+              initialArtistName={autoTagState.artistName}
+              initialWorkflow={autoTagState.workflow ?? 'album'}
+              onClose={closeAutoTagDialog}
+            />
+          )}
         </div>
       </AppUpdateContext.Provider>
       {import.meta.env.DEV && DevAgentation && (
