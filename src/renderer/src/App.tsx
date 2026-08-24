@@ -429,6 +429,9 @@ export default function App() {
             <>
               <MiniPlayer />
               <ContextMenu />
+              {/* Playback continues in mini mode, so playback error prompts (e.g. unplayable
+                  songs) must remain visible instead of silently queuing until restore. */}
+              <PromptMenu />
             </>
           ) : playerType === 'full' ? (
             <>
