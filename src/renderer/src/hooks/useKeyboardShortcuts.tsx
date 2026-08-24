@@ -1,4 +1,3 @@
-import i18n from '@renderer/i18n';
 import { normalizedKeys } from '@renderer/other/appShortcuts';
 import { dispatch, store } from '@renderer/store/store';
 import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
@@ -10,6 +9,34 @@ import { useAudioPlayer } from './useAudioPlayer';
 import { useOverlayNavigation } from './useOverlayNavigation';
 
 const AppShortcutsPrompt = lazy(() => import('../components/SettingsPage/AppShortcutsPrompt'));
+
+/**
+ * Shortcut labels persisted in localStorage are stable i18n KEYS (e.g. 'appShortcutsPrompt.playPause'),
+ * never runtime translations. Translate them with i18n.t only at display time.
+ *
+ * In mini player mode only these playback-centric shortcuts (plus the queue/search entries backed by
+ * mini surfaces) may act; navigation and library shortcuts would otherwise mutate router history
+ * behind the unmounted main UI.
+ */
+export const MINI_ALLOWED_SHORTCUT_KEYS = new Set([
+  'appShortcutsPrompt.playPause',
+  'appShortcutsPrompt.toggleMute',
+  'appShortcutsPrompt.nextSong',
+  'appShortcutsPrompt.prevSong',
+  'appShortcutsPrompt.tenSecondsForward',
+  'appShortcutsPrompt.tenSecondsBackward',
+  'appShortcutsPrompt.upVolume',
+  'appShortcutsPrompt.downVolume',
+  'appShortcutsPrompt.toggleShuffle',
+  'appShortcutsPrompt.toggleRepeat',
+  'appShortcutsPrompt.toggleFavorite',
+  'appShortcutsPrompt.upPlaybackRate',
+  'appShortcutsPrompt.downPlaybackRate',
+  'appShortcutsPrompt.resetPlaybackRate',
+  'appShortcutsPrompt.openMiniPlayer',
+  'appShortcutsPrompt.goToQueue',
+  'appShortcutsPrompt.goToSearch'
+]);
 
 /** Dependencies required by the keyboard shortcuts hook */
 export interface KeyboardShortcutDependencies {
@@ -180,70 +207,47 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
         // In mini player mode only playback-centric shortcuts (plus the mini player toggle and
         // the queue/search entries backed by mini surfaces) may act. Navigation and library
         // shortcuts would otherwise mutate router history behind the unmounted main UI.
-        if (store.state.playerType === 'mini') {
-          const miniAllowedLabelKeys = [
-            'appShortcutsPrompt.playPause',
-            'appShortcutsPrompt.toggleMute',
-            'appShortcutsPrompt.nextSong',
-            'appShortcutsPrompt.prevSong',
-            'appShortcutsPrompt.tenSecondsForward',
-            'appShortcutsPrompt.tenSecondsBackward',
-            'appShortcutsPrompt.upVolume',
-            'appShortcutsPrompt.downVolume',
-            'appShortcutsPrompt.toggleShuffle',
-            'appShortcutsPrompt.toggleRepeat',
-            'appShortcutsPrompt.toggleFavorite',
-            'appShortcutsPrompt.upPlaybackRate',
-            'appShortcutsPrompt.downPlaybackRate',
-            'appShortcutsPrompt.resetPlaybackRate',
-            'appShortcutsPrompt.openMiniPlayer',
-            'appShortcutsPrompt.goToQueue',
-            'appShortcutsPrompt.goToSearch'
-          ];
-          const miniAllowedLabels = new Set(miniAllowedLabelKeys.map((labelKey) => i18n.t(labelKey)));
-
-          if (!miniAllowedLabels.has(matchedShortcut.label)) {
-            return;
-          }
+        if (store.state.playerType === 'mini' && !MINI_ALLOWED_SHORTCUT_KEYS.has(matchedShortcut.label)) {
+          return;
         }
 
         let updatedPlaybackRate: number;
         switch (matchedShortcut.label) {
-          case i18n.t('appShortcutsPrompt.playPause'):
+          case 'appShortcutsPrompt.playPause':
             toggleSongPlayback();
             break;
-          case i18n.t('appShortcutsPrompt.toggleMute'):
+          case 'appShortcutsPrompt.toggleMute':
             toggleMutedState(!store.state.player.volume.isMuted);
             break;
-          case i18n.t('appShortcutsPrompt.nextSong'):
+          case 'appShortcutsPrompt.nextSong':
             handleSkipForwardClick();
             break;
-          case i18n.t('appShortcutsPrompt.prevSong'):
+          case 'appShortcutsPrompt.prevSong':
             handleSkipBackwardClick();
             break;
-          case i18n.t('appShortcutsPrompt.tenSecondsForward'):
+          case 'appShortcutsPrompt.tenSecondsForward':
             if (player.currentTime + 10 < player.duration) player.currentTime += 10;
             break;
-          case i18n.t('appShortcutsPrompt.tenSecondsBackward'):
+          case 'appShortcutsPrompt.tenSecondsBackward':
             if (player.currentTime - 10 >= 0) player.currentTime -= 10;
             else player.currentTime = 0;
             break;
-          case i18n.t('appShortcutsPrompt.upVolume'):
+          case 'appShortcutsPrompt.upVolume':
             updateVolume(player.volume + 0.05 <= 1 ? player.volume * 100 + 5 : 100);
             break;
-          case i18n.t('appShortcutsPrompt.downVolume'):
+          case 'appShortcutsPrompt.downVolume':
             updateVolume(player.volume - 0.05 >= 0 ? player.volume * 100 - 5 : 0);
             break;
-          case i18n.t('appShortcutsPrompt.toggleShuffle'):
+          case 'appShortcutsPrompt.toggleShuffle':
             toggleShuffling();
             break;
-          case i18n.t('appShortcutsPrompt.toggleRepeat'):
+          case 'appShortcutsPrompt.toggleRepeat':
             toggleRepeat();
             break;
-          case i18n.t('appShortcutsPrompt.toggleFavorite'):
+          case 'appShortcutsPrompt.toggleFavorite':
             toggleIsFavorite();
             break;
-          case i18n.t('appShortcutsPrompt.upPlaybackRate'):
+          case 'appShortcutsPrompt.upPlaybackRate':
             updatedPlaybackRate = store.state.localStorage.playback.playbackRate || 1;
             if (updatedPlaybackRate + 0.05 > 4) updatedPlaybackRate = 4;
             else updatedPlaybackRate += 0.05;
@@ -257,7 +261,7 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
               }
             ]);
             break;
-          case i18n.t('appShortcutsPrompt.downPlaybackRate'):
+          case 'appShortcutsPrompt.downPlaybackRate':
             updatedPlaybackRate = store.state.localStorage.playback.playbackRate || 1;
             if (updatedPlaybackRate - 0.05 < 0.25) updatedPlaybackRate = 0.25;
             else updatedPlaybackRate -= 0.05;
@@ -271,7 +275,7 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
               }
             ]);
             break;
-          case i18n.t('appShortcutsPrompt.resetPlaybackRate'):
+          case 'appShortcutsPrompt.resetPlaybackRate':
             storage.setItem('playback', 'playbackRate', 1);
             addNewNotifications([
               {
@@ -281,67 +285,67 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
               }
             ]);
             break;
-          case i18n.t('appShortcutsPrompt.goToSearch'):
+          case 'appShortcutsPrompt.goToSearch':
             navigate({ to: '/main-player/search' });
             break;
-          case i18n.t('appShortcutsPrompt.goToLyrics'):
+          case 'appShortcutsPrompt.goToLyrics':
             if (location.pathname.startsWith('/main-player/lyrics')) {
               history.back();
             } else {
               dispatch({ type: 'TOGGLE_LYRICS_DRAWER' });
             }
             break;
-          case i18n.t('appShortcutsPrompt.goToQueue'):
+          case 'appShortcutsPrompt.goToQueue':
             toggleOverlay('/main-player/queue');
             break;
-          case i18n.t('appShortcutsPrompt.goHome'):
+          case 'appShortcutsPrompt.goHome':
             navigate({ to: '/main-player/home' });
             break;
-          case i18n.t('appShortcutsPrompt.goBack'):
+          case 'appShortcutsPrompt.goBack':
             history.back();
             break;
-          case i18n.t('appShortcutsPrompt.goForward'):
+          case 'appShortcutsPrompt.goForward':
             history.forward();
             break;
-          case i18n.t('appShortcutsPrompt.openMiniPlayer'):
+          case 'appShortcutsPrompt.openMiniPlayer':
             updatePlayerType(store.state.playerType === 'mini' ? 'normal' : 'mini');
             break;
-          case i18n.t('appShortcutsPrompt.selectMultipleItems'):
+          case 'appShortcutsPrompt.selectMultipleItems':
             toggleMultipleSelections(true);
             break;
-          case i18n.t('appShortcutsPrompt.selectNextLyricsLine'):
+          case 'appShortcutsPrompt.selectNextLyricsLine':
             // TODO: Implement logic to select next lyrics line.
             break;
-          case i18n.t('appShortcutsPrompt.selectPrevLyricsLine'):
+          case 'appShortcutsPrompt.selectPrevLyricsLine':
             // TODO: Implement logic to select previous lyrics line.
             break;
-          case i18n.t('appShortcutsPrompt.selectCustomLyricsLine'):
+          case 'appShortcutsPrompt.selectCustomLyricsLine':
             // TODO: Implement logic to select custom lyrics line.
             break;
-          case i18n.t('appShortcutsPrompt.playNextLyricsLine'):
+          case 'appShortcutsPrompt.playNextLyricsLine':
             // TODO: Implement logic to jump to next lyrics line.
             break;
-          case i18n.t('appShortcutsPrompt.playPrevLyricsLine'):
+          case 'appShortcutsPrompt.playPrevLyricsLine':
             // TODO: Implement logic to jump to previous lyrics line.
             break;
-          case i18n.t('appShortcutsPrompt.toggleTheme'):
+          case 'appShortcutsPrompt.toggleTheme':
             window.api.theme.changeAppTheme();
             break;
-          case i18n.t('appShortcutsPrompt.toggleMiniPlayerAlwaysOnTop'):
+          case 'appShortcutsPrompt.toggleMiniPlayerAlwaysOnTop':
             // TODO: Implement logic to jump to to trigger mini player always on top.
             break;
-          case i18n.t('appShortcutsPrompt.reload'):
+          case 'appShortcutsPrompt.reload':
             window.api.appControls.restartRenderer?.('Shortcut: Ctrl+R');
             break;
-          case i18n.t('appShortcutsPrompt.openAppShortcutsPrompt'):
+          case 'appShortcutsPrompt.openAppShortcutsPrompt':
             changePromptMenuData(true, <AppShortcutsPrompt />);
             break;
-          case i18n.t('appShortcutsPrompt.openDevtools'):
+          case 'appShortcutsPrompt.openDevtools':
             if (!window.api.properties.isInDevelopment) {
               window.api.settingsHelpers.openDevtools();
             }
             break;
-          case i18n.t('appShortcutsPrompt.resyncLibrary'):
+          case 'appShortcutsPrompt.resyncLibrary':
             window.api.audioLibraryControls.resyncSongsLibrary();
             break;
           default:

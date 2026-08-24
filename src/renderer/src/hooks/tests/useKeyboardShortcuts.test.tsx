@@ -10,7 +10,6 @@ import {
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { dispatch } from '@renderer/store/store';
 
-import i18n from '../../i18n';
 import storage from '../../utils/localStorage';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 
@@ -211,7 +210,7 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
     await setupShortcuts();
 
     // Rebind resyncLibrary shortcut to Ctrl+Shift+R
-    const label = i18n.t('appShortcutsPrompt.resyncLibrary');
+    const label = 'appShortcutsPrompt.resyncLibrary';
     storage.keyboardShortcuts.setKeyboardShortcuts(label, ['Ctrl', 'Shift', 'R']);
 
     // Press Insert -> should NOT trigger resync
@@ -245,7 +244,7 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
       defaultProps.toggleSongPlayback.mockClear();
       await setupShortcuts();
 
-      storage.keyboardShortcuts.setKeyboardShortcuts(i18n.t('appShortcutsPrompt.playPause'), [
+      storage.keyboardShortcuts.setKeyboardShortcuts('appShortcutsPrompt.playPause', [
         'Ctrl',
         'P'
       ]);
