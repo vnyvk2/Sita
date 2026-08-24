@@ -265,8 +265,14 @@ export class MetadataProviderRuntime {
           this.recordSuccess(providerId, Date.now() - startTime);
           return results;
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          this.recordFailure(providerId, msg);
+          const isCancellation =
+            callerSignal?.aborted ||
+            (err instanceof Error &&
+              (err.name === 'AbortError' || (err as { code?: string }).code === 'ABORT_ERR'));
+          if (!isCancellation) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.recordFailure(providerId, msg);
+          }
           return [];
         } finally {
           if (timeoutHandle) clearTimeout(timeoutHandle);

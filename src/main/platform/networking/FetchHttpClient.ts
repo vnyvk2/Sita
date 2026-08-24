@@ -106,7 +106,16 @@ export class FetchHttpClient implements IHttpClient {
       if (err instanceof HttpError) {
         throw err;
       }
+      if (signal?.aborted) {
+        // Caller-initiated cancellation. Preserve AbortError identity so downstream
+        // retry / timeout / circuit-breaker stages treat this as cancellation,
+        // never as a timeout or provider failure.
+        const abortError = new Error('Operation aborted', { cause: err });
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
       if (err instanceof Error && err.name === 'AbortError') {
+        // Only the internal timeout timer remains as a possible abort source here.
         throw new Error(`Request timed out after ${timeout}ms: ${fullUrl}`);
       }
       throw err;
