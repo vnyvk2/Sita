@@ -1,3 +1,6 @@
+// MUST remain the first import: redirects userData before any module
+// (including the database bootstrap) reads Electron paths.
+import './lifecycle/userDataGuard';
 import fs from 'fs';
 import os from 'os';
 import path, { join } from 'path';
