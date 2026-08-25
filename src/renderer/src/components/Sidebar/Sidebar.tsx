@@ -38,6 +38,14 @@ const Sidebar = memo(() => {
           isActive: false
         },
         {
+          to: '/main-player/online',
+          id: 'Online',
+          parentClassName: 'online',
+          icon: 'cloud_download',
+          content: t('sideBar.online', { defaultValue: 'Online' }),
+          isActive: false
+        },
+        {
           to: '/main-player/songs',
           id: 'Songs',
           parentClassName: 'songs',

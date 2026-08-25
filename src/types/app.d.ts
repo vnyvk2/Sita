@@ -477,6 +477,9 @@ declare global {
     miniPlayerPinnedControls: string[];
     miniPlayerMode?: 'standard' | 'compact';
     customLrcFilesSaveLocation: string | null;
+    onlineDownloadsFolder?: string | null;
+    downloadsDuplicatePolicy?: 'SKIP' | 'OVERWRITE' | 'KEEP_BOTH';
+    addDownloadsToLibrary?: boolean;
     lastFmSessionName: string | null;
     lastFmSessionKey: string | null;
     libraryScanMode?: LibraryScanMode;

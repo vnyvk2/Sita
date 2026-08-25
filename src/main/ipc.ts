@@ -78,6 +78,7 @@ import {
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
+import { setupDownloadsIpc } from './downloads/setupDownloads';
 import libraryChangeTracker from './library/LibraryChangeTracker';
 import libraryLifecycleController, {
   type LibraryScanMode
@@ -178,6 +179,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   setupPlaylistExportIpc(playlistRepository);
   setupSpotifyIpc();
   registerMembershipIPCHandlers();
+  setupDownloadsIpc((snapshot) => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+      mainWindow.webContents.send('downloads/updated', snapshot);
+    }
+  });
 
   MetadataBootstrap.getInstance()
     .then(async (metadataContainer) => {

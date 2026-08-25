@@ -591,6 +591,14 @@ export const userSettings = pgTable(
     // Optional settings
     customLrcFilesSaveLocation: text('custom_lrc_files_save_location'),
 
+    // Online downloads (download-song feature)
+    onlineDownloadsFolder: text('online_downloads_folder'),
+    downloadsDuplicatePolicy: varchar('downloads_duplicate_policy', { length: 20 })
+      .$type<'SKIP' | 'OVERWRITE' | 'KEEP_BOTH'>()
+      .notNull()
+      .default('SKIP'),
+    addDownloadsToLibrary: boolean('add_downloads_to_library').notNull().default(true),
+
     // LastFM session data
     lastFmSessionName: varchar('lastfm_session_name', { length: 255 }),
     lastFmSessionKey: varchar('lastfm_session_key', { length: 255 }),

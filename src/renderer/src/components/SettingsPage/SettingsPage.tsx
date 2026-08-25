@@ -8,6 +8,7 @@ import AdvancedSettings from './Settings/AdvancedSettings';
 import AppearanceSettings from './Settings/AppearanceSettings';
 import AudioPlaybackSettings from './Settings/AudioPlaybackSettings';
 import DefaultPageSettings from './Settings/DefaultPageSettings';
+import DownloadsSettings from './Settings/DownloadsSettings';
 // import StorageSettings from './Settings/StorageSettings';
 import EqualizerSettings from './Settings/EqualizerSettings';
 import LanguageSettings from './Settings/LanguageSettings';
@@ -64,6 +65,9 @@ const SettingsPage = () => {
 
           {/* LIBRARY SCANNING SETTINGS */}
           <LibrarySettings />
+
+          {/* ONLINE DOWNLOADS SETTINGS */}
+          <DownloadsSettings />
 
           {/* METADATA & AUTOTAG SOURCES SETTINGS */}
           <MetadataSettings />
