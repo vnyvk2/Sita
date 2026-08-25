@@ -101,7 +101,9 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   };
 });
 
-// Render VirtualizedList contents synchronously so rows are clickable in jsdom
+// Render VirtualizedList contents synchronously so rows are clickable in jsdom.
+// Also invokes itemContent one index past the end (undefined item), mirroring the
+// stale-range race real Virtuoso exhibits while the result set shrinks mid-typing
 vi.mock('../../../VirtualizedList', () => ({
   default: ({
     data,
@@ -110,7 +112,14 @@ vi.mock('../../../VirtualizedList', () => ({
     data: unknown[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     itemContent: (index: number, item: any) => ReactNode;
-  }) => <div>{data.map((item, index) => <div key={index}>{itemContent(index, item)}</div>)}</div>
+  }) => (
+    <div>
+      {data.map((item, index) => (
+        <div key={index}>{itemContent(index, item)}</div>
+      ))}
+      <div data-testid="virtuoso-stale-index">{itemContent(data.length, undefined)}</div>
+    </div>
+  )
 }));
 
 vi.mock('../../../Img', () => ({

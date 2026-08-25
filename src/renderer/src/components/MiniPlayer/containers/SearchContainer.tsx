@@ -423,7 +423,13 @@ const SearchContainer = (props: Props) => {
   );
 
   const renderRow = useCallback(
-    (_index: number, row: MiniSearchRow) => {
+    (_index: number, row: MiniSearchRow | undefined) => {
+      // Virtuoso can transiently request indices beyond the array while the
+      // result set shrinks mid-typing; render a placeholder row instead of crashing
+      if (!row) {
+        return <div className="h-[52px] max-h-[52px] min-h-[52px] w-full" aria-hidden="true" />;
+      }
+
       if (row.kind === 'header') {
         return (
           <div className="flex h-[52px] items-end pb-1 pl-3">
