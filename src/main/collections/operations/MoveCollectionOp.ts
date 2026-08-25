@@ -1,10 +1,10 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { createCollectionId } from '../../../common/collections/id';
-import { playlists } from '../../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { HierarchyService } from '../engine/HierarchyService';
 
+import { createCollectionId } from '../../../common/collections/id';
 import type { MoveCollectionInput } from '../../../common/collections/operationInputs';
+import { playlists } from '../../db/schema';
+import { HierarchyService } from '../engine/HierarchyService';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput, void> {
   private resolver: HierarchyService;
@@ -17,8 +17,12 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
     input: MoveCollectionInput,
     ctx: OperationContext
   ): Promise<OperationResult<void>> {
-    const playlistIds = input.playlistIds ?? ((input as any).playlistId ? [(input as any).playlistId] : []);
-    const targetParentId = input.targetParentId !== undefined ? input.targetParentId : ((input as any).newParentId ?? null);
+    const playlistIds =
+      input.playlistIds ?? ((input as any).playlistId ? [(input as any).playlistId] : []);
+    const targetParentId =
+      input.targetParentId !== undefined
+        ? input.targetParentId
+        : ((input as any).newParentId ?? null);
 
     if (playlistIds.length === 0) {
       return {
@@ -35,9 +39,12 @@ export class MoveCollectionOp implements CollectionOperation<MoveCollectionInput
       };
     }
 
-    // 1. Validate the move using HierarchyService to prevent cycles
+    // 1. Validate the move using HierarchyService to prevent cycles.
+    // ctx.trx is mandatory here: validateMove queries the hierarchy, and the
+    // global connection is held by this transaction on PGlite (single-connection
+    // engine) - using it would self-deadlock.
     for (const sourceId of playlistIds) {
-      await this.resolver.validateMove(sourceId, targetParentId);
+      await this.resolver.validateMove(sourceId, targetParentId, ctx.trx);
     }
 
     // 2. Fetch the current state to generate the inverse operation
@@ -114,7 +121,7 @@ export class RestoreMoveOp implements CollectionOperation<RestoreMoveInput, void
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.move',
-        input: { playlistIds: input.moves.map(m => m.playlistId), targetParentId: null }
+        input: { playlistIds: input.moves.map((m) => m.playlistId), targetParentId: null }
       },
       version: 1,
       affectedSongIds: []
