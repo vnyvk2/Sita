@@ -75,7 +75,8 @@ function createMockDbState(initialGenres: MockGenre[]) {
             };
             options.where(dummyGenres, dummyHelpers);
             if (matchedTitle) {
-              return Promise.resolve(genresMap.get(matchedTitle) || undefined);
+              const found = genresMap.get(matchedTitle);
+              return Promise.resolve(found && !deletedGenreIds.has(found.id) ? found : undefined);
             }
           }
           return Promise.resolve(undefined);
@@ -92,6 +93,7 @@ function createMockDbState(initialGenres: MockGenre[]) {
             const existing = genresMap.get(lower)!;
             return {
               onConflictDoNothing: () => ({ returning: () => Promise.resolve([]) }),
+              onConflictDoUpdate: () => ({ returning: () => Promise.resolve([existing]) }),
               returning: () => Promise.resolve([existing])
             };
           }
@@ -106,6 +108,7 @@ function createMockDbState(initialGenres: MockGenre[]) {
           createdGenres.push(newGenre);
           return {
             onConflictDoNothing: () => ({ returning: () => Promise.resolve([newGenre]) }),
+            onConflictDoUpdate: () => ({ returning: () => Promise.resolve([newGenre]) }),
             returning: () => Promise.resolve([newGenre])
           };
         }
@@ -328,6 +331,34 @@ describe('reconcileExistingMultiGenres database migration / reconciliation', () 
     expect(mockTrx._state.songsGenresSet.has(`${pop.id}:101`)).toBe(true);
     expect(mockTrx._state.songsGenresSet.has(`${pop.id}:102`)).toBe(true);
     expect(mockTrx._state.songsGenresSet.has(`${pop.id}:103`)).toBe(true);
+  });
+
+  it('reconciles genres that differ from their canonical form only by surrounding whitespace', async () => {
+    // Regression: a legacy "Pop " parses to ["Pop"], but previously required
+    // GENRE_SEPARATOR_REGEX to match, which it never does for pure whitespace —
+    // so these dirty records were silently skipped forever.
+    const existingGenres: MockGenre[] = [
+      {
+        id: 1,
+        name: 'Pop ',
+        nameCI: 'Pop ',
+        songs: [{ songId: 10 }],
+        artworks: [{ artworkId: 5 }]
+      }
+    ];
+
+    const mockTrx = createMockDbState(existingGenres);
+    const result = await reconcileExistingMultiGenres(mockTrx);
+
+    expect(result.reconciledCount).toBe(1);
+
+    const createdNames = mockTrx._state.createdGenres.map((g: MockGenre) => g.name);
+    expect(createdNames).toContain('Pop');
+
+    const pop = mockTrx._state.genresMap.get('pop')!;
+    expect(pop).toBeDefined();
+    expect(mockTrx._state.songsGenresSet.has(`${pop.id}:10`)).toBe(true);
+    expect(mockTrx._state.artworksGenresSet.has(`5:${pop.id}`)).toBe(true);
   });
 
   it('automatically opens a database transaction when called without an existing transaction', async () => {

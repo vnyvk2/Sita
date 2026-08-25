@@ -314,8 +314,8 @@ export const genres = pgTable(
   (t) => [
     // Index for name-based lookups and sorting
     index('idx_genres_name').on(t.name.asc()),
-    // Index for case-insensitive exact matches
-    index('idx_genres_name_ci').on(t.nameCI.asc()),
+    // Unique index for case-insensitive exact matches (prevents duplicate genres from concurrent parsing)
+    uniqueIndex('idx_genres_name_ci').on(t.nameCI),
     // GIN index for fuzzy matching with pg_trgm trigram operator
     index('idx_genres_name_ci_trgm').using('gin', t.nameCI.op('gin_trgm_ops'))
   ]

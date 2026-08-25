@@ -162,6 +162,13 @@
       "when": 1787653687468,
       "tag": "0022_online_downloads",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787724000000,
+      "tag": "0023_dedupe_genres_and_unique_name_ci",
+      "breakpoints": true
     }
   ]
 }
