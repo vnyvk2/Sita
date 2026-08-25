@@ -1,9 +1,37 @@
 import { store } from '../store/store';
 import storage from '../utils/localStorage';
+import { getLibraryVersion } from './libraryVersion';
 import PlayerQueue from './playerQueue';
 
 export type QueuesManagerEvent = 'activeQueueChanged' | 'queuesChanged';
 type QueuesManagerCallback = () => void;
+
+export interface CanonicalQueueRequestOptions {
+  /**
+   * Fresh projection of the All Songs view (library IDs minus blacklisted songs). Required to
+   * create or rebuild the canonical queue; optional for pure navigation requests.
+   */
+  songIds?: number[];
+  /** Song ID to jump to after resolution. Defaults to the start of the queue. */
+  startSongId?: number;
+  /** Re-permute the canonical queue (Shuffle And Play). */
+  shuffle?: boolean;
+  /** Localized title used when the canonical queue has to be created. */
+  title?: string;
+  /**
+   * Sort order the caller's `songIds` are arranged in. A mismatch against the stored projection
+   * triggers an in-place reorder — except while the queue is shuffled, where source order is
+   * irrelevant to playback order.
+   */
+  sortingOrder?: string;
+  /**
+   * Library version the caller's `songIds` were actually derived from (data provenance). The
+   * manager stamps THIS value instead of the live counter, so a request served from a
+   * not-yet-refetched React Query cache during a library-update race stays honestly "stale" and
+   * self-heals on the next request instead of being poisoned as fresh.
+   */
+  builtAtLibraryVersion?: number;
+}
 
 type QueueStoreState = {
   localStorage?: LocalStorage;
@@ -32,6 +60,10 @@ export class QueuesManager {
   private listeners: Map<QueuesManagerEvent, Set<QueuesManagerCallback>>;
   private queueListeners: Map<string, (() => void)[]>;
   private lastSyncedStructureVersions: Map<string, number>;
+  /** Queue IDs whose in-flight queueChange is a manager-initiated canonical refresh, not a user edit */
+  private canonicalRefreshInFlight: Set<string>;
+  /** Queue IDs whose next queueChange is the synchronous side effect of shuffle/restore */
+  private shuffleSideEffectGuards: Set<string>;
 
   constructor() {
     this.queues = [];
@@ -39,6 +71,8 @@ export class QueuesManager {
     this.listeners = new Map();
     this.queueListeners = new Map();
     this.lastSyncedStructureVersions = new Map();
+    this.canonicalRefreshInFlight = new Set();
+    this.shuffleSideEffectGuards = new Set();
   }
 
   on(event: QueuesManagerEvent, callback: QueuesManagerCallback) {
@@ -67,6 +101,8 @@ export class QueuesManager {
     }
 
     this.queues.forEach((q) => this.bindQueueEvents(q));
+
+    this.enforceSingleCanonicalQueue();
 
     if (!this.isSettingUpSync) {
       this.setupStoreSync();
@@ -103,6 +139,182 @@ export class QueuesManager {
     this.triggerStoreSync();
     this.emit('queuesChanged');
     return newQueue;
+  }
+
+  /** Returns the single canonical All Songs queue, if one exists (Invariant 1 lookup). */
+  findCanonicalQueue(): PlayerQueue | undefined {
+    return this.queues.find((q) => {
+      const metadata = q.getMetadata();
+      return metadata.queueType === 'songs' && !!metadata.isCanonical;
+    });
+  }
+
+  /**
+   * Single entry point for unfiltered All Songs playback requests. Resolves to the canonical queue
+   * per docs/canonical-queue-architecture.md:
+   *
+   * - No canonical queue → create from `songIds`, tag it canonical, activate
+   * - Fresh + active + sort unchanged (or shuffled) → fast path: navigation only, zero churn
+   * - Stale and/or inactive and/or reordered source → rebuild the projection in place
+   *
+   * The caller is responsible for actually starting audio playback with the returned queue's
+   * `currentSongId`; this method only mutates queue-domain state.
+   */
+  getOrCreateCanonicalQueue(options: CanonicalQueueRequestOptions = {}): PlayerQueue | undefined {
+    const currentLibraryVersion = getLibraryVersion();
+    // Stamp data provenance, not the live counter — see builtAtLibraryVersion option docs.
+    const attestedVersion = options.builtAtLibraryVersion ?? currentLibraryVersion;
+    const requestIds = options.songIds && options.songIds.length > 0 ? options.songIds : undefined;
+
+    let queue = this.findCanonicalQueue();
+
+    if (!queue) {
+      if (!requestIds) return undefined;
+      const title = options.title || 'All Songs';
+      queue = this.createQueue(title, requestIds);
+      // Suppress the structural-edit detach: this creation IS the canonical projection.
+      this.canonicalRefreshInFlight.add(queue.id);
+      try {
+        queue.setMetadata({
+          queueType: 'songs',
+          isCanonical: true,
+          builtAtLibraryVersion: attestedVersion,
+          sortingOrder: options.sortingOrder,
+          title
+        });
+      } finally {
+        this.canonicalRefreshInFlight.delete(queue.id);
+      }
+    }
+
+    const queueIndex = this.queues.indexOf(queue);
+    if (queueIndex === -1) return undefined;
+
+    const metadata = queue.getMetadata();
+    const isStale = metadata.builtAtLibraryVersion !== currentLibraryVersion;
+    // A stored projection without a sort stamp (legacy state) adopts the incoming sort silently.
+    const sortChanged =
+      metadata.sortingOrder !== undefined &&
+      options.sortingOrder !== undefined &&
+      metadata.sortingOrder !== options.sortingOrder;
+    // While shuffled, playback order is the permutation; source order is irrelevant.
+    const isShuffled = !!queue.queueBeforeShuffle;
+    const isActive = this.activeQueueIndex === queueIndex;
+    const targetPosition =
+      options.startSongId !== undefined ? queue.getPositionOfSongId(options.startSongId) : -1;
+
+    if (options.shuffle) {
+      if (requestIds && (isStale || !isActive)) {
+        this.rebuildCanonicalProjection(
+          queue,
+          requestIds,
+          attestedVersion,
+          0,
+          options.sortingOrder
+        );
+      }
+      queue.shuffle();
+    } else if (
+      isActive &&
+      !isStale &&
+      (!sortChanged || isShuffled) &&
+      (options.startSongId === undefined || targetPosition >= 0)
+    ) {
+      // Fast path: pure position change; preserves shuffle permutation and structure version.
+      // Metadata is intentionally untouched so a later un-shuffled click performs one honest
+      // reorder instead of claiming the old arrangement matches the new sort.
+      if (targetPosition >= 0) {
+        queue.moveToPosition(targetPosition);
+      } else {
+        queue.moveToStart();
+      }
+    } else if (requestIds) {
+      this.rebuildCanonicalProjection(
+        queue,
+        requestIds,
+        attestedVersion,
+        targetPosition,
+        options.sortingOrder
+      );
+    } else if (targetPosition >= 0) {
+      queue.moveToPosition(targetPosition);
+    }
+
+    const activatedIndex = this.queues.indexOf(queue);
+    if (this.activeQueueIndex !== activatedIndex) {
+      this.switchQueue(activatedIndex);
+    }
+
+    return queue;
+  }
+
+  /**
+   * Demotes a canonical queue to a normal contextual queue (Invariant 4). The queue keeps all of
+   * its content — including the user's edits — and is renamed to a free "Queue N" title so tabs
+   * stay unambiguous once a new canonical queue appears.
+   */
+  detachCanonicalQueue(queueId: string): boolean {
+    const queue = this.queues.find((q) => q.id === queueId);
+    if (!queue || !queue.getMetadata().isCanonical) return false;
+
+    let candidate = this.queues.length + 1;
+    const takenTitles = new Set(this.queues.map((q) => q.getMetadata().title));
+    while (takenTitles.has(`Queue ${candidate}`)) {
+      candidate += 1;
+    }
+
+    this.canonicalRefreshInFlight.add(queue.id);
+    try {
+      queue.setMetadata({
+        isCanonical: false,
+        builtAtLibraryVersion: undefined,
+        sortingOrder: undefined,
+        title: `Queue ${candidate}`
+      });
+    } finally {
+      this.canonicalRefreshInFlight.delete(queue.id);
+    }
+
+    this.triggerStoreSync();
+    this.emit('queuesChanged');
+    return true;
+  }
+
+  private rebuildCanonicalProjection(
+    queue: PlayerQueue,
+    songIds: number[],
+    libraryVersion: number,
+    targetPosition = 0,
+    sortingOrder?: string
+  ): void {
+    this.canonicalRefreshInFlight.add(queue.id);
+    try {
+      queue.replaceQueue(songIds, Math.max(0, targetPosition), true, {
+        ...queue.getMetadata(),
+        isCanonical: true,
+        builtAtLibraryVersion: libraryVersion,
+        ...(sortingOrder !== undefined ? { sortingOrder } : {})
+      });
+    } finally {
+      this.canonicalRefreshInFlight.delete(queue.id);
+    }
+  }
+
+  /**
+   * Boot-time guard for corrupted/hand-edited persisted state: demote every canonical-marked queue
+   * beyond the first so Invariant 1 holds from startup.
+   */
+  private enforceSingleCanonicalQueue(): void {
+    let seenCanonical = false;
+    for (const q of this.queues) {
+      const metadata = q.getMetadata();
+      if (!(metadata.queueType === 'songs' && metadata.isCanonical)) continue;
+      if (!seenCanonical) {
+        seenCanonical = true;
+        continue;
+      }
+      q.setMetadata({ isCanonical: false });
+    }
   }
 
   switchQueue(index: number) {
@@ -258,8 +470,18 @@ export class QueuesManager {
 
     const unsubs = [
       queue.on('queueChange', () => {
+        // 'shuffled'/'restored' fire synchronously right before their queueChange; those are
+        // playback-state changes, not structural edits (docs/canonical-queue-architecture.md,
+        // Invariant 4).
+        if (this.shuffleSideEffectGuards.has(queue.id)) {
+          this.shuffleSideEffectGuards.delete(queue.id);
+        } else {
+          this.detachCanonicalQueueOnStructuralEdit(queue);
+        }
         this.triggerStoreSync();
       }),
+      queue.on('shuffled', () => this.markShuffleSideEffect(queue.id)),
+      queue.on('restored', () => this.markShuffleSideEffect(queue.id)),
       queue.on('positionChange', () => {
         this.triggerStoreSync();
       }),
@@ -269,6 +491,18 @@ export class QueuesManager {
     ];
 
     this.queueListeners.set(queue.id, unsubs);
+  }
+
+  private markShuffleSideEffect(queueId: string): void {
+    this.shuffleSideEffectGuards.add(queueId);
+    queueMicrotask(() => this.shuffleSideEffectGuards.delete(queueId));
+  }
+
+  private detachCanonicalQueueOnStructuralEdit(queue: PlayerQueue): void {
+    if (this.isSyncingFromStore) return;
+    if (this.canonicalRefreshInFlight.has(queue.id)) return;
+    if (!queue.getMetadata().isCanonical) return;
+    this.detachCanonicalQueue(queue.id);
   }
 
   private unbindQueueEvents(queue: PlayerQueue) {

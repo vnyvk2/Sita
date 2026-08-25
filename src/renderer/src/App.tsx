@@ -3,12 +3,12 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
+import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
 import MiniPlayer from './components/MiniPlayer/MiniPlayer';
 import PromptMenu from './components/PromptMenu/PromptMenu';
-import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';
@@ -222,6 +222,7 @@ export default function App() {
   // Queue management hook handles queue creation, updates, and shuffle operations
   const {
     createQueue,
+    playAllSongs,
     updateQueueData,
     toggleQueueShuffle,
     toggleShuffling,
@@ -297,7 +298,6 @@ export default function App() {
     toggleRepeat,
     playSongFromUnknownSource,
     playSong,
-    createQueue,
     changeUpNextSongData,
     managePlaybackErrors,
     toggleSongPlayback,
@@ -318,6 +318,7 @@ export default function App() {
       addNewNotifications,
       updateNotifications,
       createQueue,
+      playAllSongs,
       changeQueueCurrentSongIndex,
       updateCurrentSongPlaybackState,
       updatePlayerType,
@@ -351,6 +352,7 @@ export default function App() {
     addNewNotifications,
     updateNotifications,
     createQueue,
+    playAllSongs,
     changeQueueCurrentSongIndex,
     updateCurrentSongPlaybackState,
     updatePlayerType,

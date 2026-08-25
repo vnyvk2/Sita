@@ -705,6 +705,15 @@ declare global {
     queueType?: QueueTypes;
     title?: string;
     isLocked?: boolean;
+    /**
+     * True for the single canonical All Songs playback projection (see
+     * docs/canonical-queue-architecture.md)
+     */
+    isCanonical?: boolean;
+    /** LibraryVersion stamp captured when canonical songIds were last derived from the library */
+    builtAtLibraryVersion?: number;
+    /** Sort order the canonical projection was built from */
+    sortingOrder?: string;
   }
 
   type QueueEventType =
