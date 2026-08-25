@@ -1,5 +1,11 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DraggableProvided,
+  type DropResult
+} from '@hello-pangea/dnd';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import { collectionKeys } from '@renderer/api/collectionKeys';
 import Button from '@renderer/components/Button';
@@ -33,7 +39,7 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { Suspense, lazy, memo, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SensitiveActionConfirmPrompt = lazy(
@@ -57,6 +63,58 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
   }
 });
 
+type PlaylistRowSong = SongData & { entryId: number };
+
+type PlaylistRowProps = {
+  item: PlaylistRowSong;
+  index: number;
+  isIndexingSongs: boolean;
+  onPlayClick?: (currSongId: number) => void;
+  selectAllHandler?: (_upToId?: number) => void;
+  provided?: DraggableProvided;
+  isDragging?: boolean;
+  buildContextMenuItems: (item: PlaylistRowSong, index: number) => ContextMenuItem[];
+};
+
+/**
+ * Memoized row wrapper. Builds context-menu items once per (item, index) instead of allocating a
+ * fresh array on every parent render - without this, new prop identities defeat `memo` inside
+ * <Song> and every visible row re-renders deeply on each keystroke/drag frame.
+ */
+const PlaylistRow = memo(
+  ({
+    item,
+    index,
+    isIndexingSongs,
+    onPlayClick,
+    selectAllHandler,
+    provided,
+    isDragging = false,
+    buildContextMenuItems
+  }: PlaylistRowProps) => {
+    const additionalContextMenuItems = useMemo(
+      () => buildContextMenuItems(item, index),
+      [buildContextMenuItems, index, item]
+    );
+
+    return (
+      <Song
+        ref={provided?.innerRef}
+        provided={provided}
+        isDragging={isDragging}
+        index={index}
+        isIndexingSongs={isIndexingSongs}
+        onPlayClick={onPlayClick}
+        selectAllHandler={selectAllHandler}
+        {...item}
+        trackNo={undefined}
+        additionalContextMenuItems={additionalContextMenuItems}
+      />
+    );
+  }
+);
+PlaylistRow.displayName = 'PlaylistRow';
+
 function PlaylistInfoPage() {
   const { playlistId } = Route.useParams({
     select: (params) => ({ playlistId: Number(params.playlistId) })
@@ -77,6 +135,14 @@ function PlaylistInfoPage() {
     keyword
   } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/$playlistId' });
+
+  // Reordering is only meaningful in the persistent custom order, and only
+  // against the FULL list. When any filter (search keyword / language /
+  // favorites etc.) shrinks the visible list, row indices no longer match
+  // absolute positions - so drag + move actions are disabled until cleared.
+  const isFilteredView =
+    Boolean(keyword?.trim()) || language !== 'all' || filteringOrder !== 'notSelected';
+  const reorderEnabled = canReorder(sortingOrder) && !isFilteredView;
 
   const scrollKey = useMemo(
     () =>
@@ -212,39 +278,11 @@ function PlaylistInfoPage() {
     });
   }, [playlistSongs, keyword, language]);
 
-  useEffect(() => {
-    console.log(
-      '[Pipeline Stage 3: collectionEntries]',
-      collectionEntries.map((e) => ({ id: e.id, songId: e.songId, pos: e.position }))
-    );
-  }, [collectionEntries]);
-
-  useEffect(() => {
-    console.log(
-      '[Pipeline Stage 4: rawPlaylistSongs]',
-      rawPlaylistSongs.map((s) => s.songId)
-    );
-  }, [rawPlaylistSongs]);
-
-  useEffect(() => {
-    console.log(
-      '[Pipeline Stage 5: playlistSongs]',
-      playlistSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title }))
-    );
-  }, [playlistSongs]);
-
-  useEffect(() => {
-    console.log(
-      '[Pipeline Stage 6: filteredSongs]',
-      filteredSongs.map((s) => ({ entryId: s.entryId, songId: s.songId, title: s.title }))
-    );
-  }, [filteredSongs]);
-
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
   const handleReorder = useCallback(
     async (entryId: number, targetPosition: number, sourceIndex?: number) => {
-      if (!canReorder(sortingOrder) || !entryId) return;
+      if (!reorderEnabled || entryId <= 0) return;
 
       const entriesQuery = collectionEntriesOptions(playlistId, undefined, undefined, sortingOrder);
       const previousEntries = queryClient.getQueryData(entriesQuery.queryKey);
@@ -255,7 +293,11 @@ function PlaylistInfoPage() {
           const next = [...oldEntries];
           const [moved] = next.splice(sourceIndex, 1);
           next.splice(targetPosition, 0, moved);
-          return next;
+          // Keep stored positions in sync with the visual order so nothing
+          // downstream reads stale ranks before the refetch lands.
+          return next.map((entry, index) =>
+            entry.position === index ? entry : { ...entry, position: index }
+          );
         });
       }
 
@@ -270,11 +312,11 @@ function PlaylistInfoPage() {
         if (previousEntries) {
           queryClient.setQueryData(entriesQuery.queryKey, previousEntries);
         }
-      } finally {
-        queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
       }
+      // Server-state refresh is owned by CollectionEventProvider reacting to the
+      // backend's CollectionChanged event - no extra invalidation here.
     },
-    [playlistId, sortingOrder]
+    [playlistId, reorderEnabled, sortingOrder]
   );
 
   const moveSongAbsolute = useCallback(
@@ -296,22 +338,17 @@ function PlaylistInfoPage() {
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      if (!result.destination || !canReorder(sortingOrder)) return;
+      if (!result.destination || !reorderEnabled) return;
       const sourceIndex = result.source.index;
       const destIndex = result.destination.index;
       if (sourceIndex === destIndex) return;
 
       const draggedSong = filteredSongs[sourceIndex];
-      console.log('[Pipeline Stage 1: handleDragEnd]', {
-        sourceIndex,
-        destIndex,
-        draggedEntryId: draggedSong?.entryId
-      });
-      if (draggedSong?.entryId) {
+      if (draggedSong && draggedSong.entryId > 0) {
         moveSongAbsolute(draggedSong.entryId, destIndex, sourceIndex);
       }
     },
-    [filteredSongs, moveSongAbsolute, sortingOrder]
+    [filteredSongs, moveSongAbsolute, reorderEnabled]
   );
 
   const getContextMenuItems = useCallback(
@@ -338,7 +375,7 @@ function PlaylistInfoPage() {
         }
       ];
 
-      if (canReorder(sortingOrder)) {
+      if (reorderEnabled) {
         if (index > 0) {
           items.push({
             label: t('playlist.moveToTop', 'Move to Top'),
@@ -374,7 +411,7 @@ function PlaylistInfoPage() {
       moveSongRelative,
       playlistData.id,
       playlistData.name,
-      sortingOrder,
+      reorderEnabled,
       t
     ]
   );
@@ -517,6 +554,13 @@ function PlaylistInfoPage() {
       className="main-container playlist-info-page-container h-full! px-8 pr-0! pb-0!"
       focusable
       onKeyDown={(e) => {
+        const activeEl = document.activeElement;
+        const isTypingTarget =
+          activeEl instanceof HTMLInputElement ||
+          activeEl instanceof HTMLTextAreaElement ||
+          (activeEl as HTMLElement | null)?.isContentEditable === true;
+        if (isTypingTarget) return;
+
         if (e.ctrlKey && e.key === 'f') {
           e.preventDefault();
           e.stopPropagation();
@@ -525,25 +569,18 @@ function PlaylistInfoPage() {
           e.stopPropagation();
           selectAllHandler();
         } else if (e.ctrlKey && e.key === 'z') {
+          // Page-scoped undo/redo owner. Refreshes entries directly because
+          // UndoEngine does not emit CollectionChanged events.
           e.preventDefault();
-          if (e.shiftKey) {
-            CollectionClient.redo(`local://playlist/${playlistId}`)
-              .then(() => {
-                queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
-              })
-              .catch((err) => console.error(err));
-          } else {
-            CollectionClient.undo(`local://playlist/${playlistId}`)
-              .then(() => {
-                queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
-              })
-              .catch((err) => console.error(err));
-          }
-        } else if (
-          canReorder(sortingOrder) &&
-          e.altKey &&
-          (e.key === 'ArrowUp' || e.key === 'ArrowDown')
-        ) {
+          const historyAction = e.shiftKey
+            ? CollectionClient.redo(`local://playlist/${playlistId}`)
+            : CollectionClient.undo(`local://playlist/${playlistId}`);
+          historyAction
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(playlistId) });
+            })
+            .catch((err) => console.error(err));
+        } else if (reorderEnabled && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           e.preventDefault();
           e.stopPropagation();
           const selectedSongIds = store.state.multipleSelectionsData.multipleSelections;
@@ -552,7 +589,7 @@ function PlaylistInfoPage() {
             const currIdx = filteredSongs.findIndex((s) => s.songId === targetSongId);
             if (currIdx !== -1) {
               const targetEntryId = filteredSongs[currIdx].entryId;
-              if (targetEntryId) {
+              if (targetEntryId > 0) {
                 moveSongRelative(targetEntryId, currIdx, e.key === 'ArrowUp' ? -1 : 1);
               }
             }
@@ -656,27 +693,24 @@ function PlaylistInfoPage() {
         ]}
       />
       {filteredSongs.length > 0 &&
-        (canReorder(sortingOrder) ? (
+        (reorderEnabled ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable
               droppableId="playlist-droppable"
               mode="virtual"
-              renderClone={(provided, _snapshot, rubric) => {
+              renderClone={(provided, renderCloneSnapshot, rubric) => {
                 const item = filteredSongs[rubric.source.index];
                 if (!item) return null;
                 return (
-                  <Song
-                    ref={provided.innerRef}
-                    provided={provided}
-                    isDraggable
-                    key={item.entryId || item.songId}
+                  <PlaylistRow
+                    item={item}
                     index={rubric.source.index}
                     isIndexingSongs={preferences.isSongIndexingEnabled}
                     onPlayClick={handleSongPlayBtnClick}
                     selectAllHandler={selectAllHandler}
-                    {...item}
-                    trackNo={undefined}
-                    additionalContextMenuItems={getContextMenuItems(item, rubric.source.index)}
+                    provided={provided}
+                    isDragging={renderCloneSnapshot.isDragging}
+                    buildContextMenuItems={getContextMenuItems}
                   />
                 );
               }}
@@ -702,19 +736,19 @@ function PlaylistInfoPage() {
                       draggableId={String(item.entryId || item.songId)}
                       index={index}
                     >
-                      {(draggableProvided) => (
-                        <Song
+                      {(draggableProvided, draggableSnapshot) => (
+                        <PlaylistRow
                           key={item.entryId || item.songId}
+                          item={item}
                           index={index}
-                          ref={draggableProvided.innerRef}
-                          provided={draggableProvided}
-                          isDraggable
                           isIndexingSongs={preferences.isSongIndexingEnabled}
                           onPlayClick={handleSongPlayBtnClick}
                           selectAllHandler={selectAllHandler}
-                          {...item}
-                          trackNo={undefined}
-                          additionalContextMenuItems={getContextMenuItems(item, index)}
+                          provided={draggableProvided}
+                          isDragging={
+                            draggableSnapshot.isDragging && !draggableSnapshot.isDropAnimating
+                          }
+                          buildContextMenuItems={getContextMenuItems}
                         />
                       )}
                     </Draggable>
@@ -738,15 +772,14 @@ function PlaylistInfoPage() {
               )
             }}
             itemContent={(index, item) => (
-              <Song
+              <PlaylistRow
                 key={item.entryId || index}
+                item={item}
                 index={index}
                 isIndexingSongs={preferences.isSongIndexingEnabled}
                 onPlayClick={handleSongPlayBtnClick}
                 selectAllHandler={selectAllHandler}
-                {...item}
-                trackNo={undefined}
-                additionalContextMenuItems={getContextMenuItems(item, index)}
+                buildContextMenuItems={getContextMenuItems}
               />
             )}
           />

@@ -24,12 +24,12 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
   public readonly preferredProviders: MetadataProviderId[] = ['coverartarchive', 'discogs'];
 
   private readonly caaAdapter: CoverArtArchiveAdapter;
-  private readonly discogsAdapter: DiscogsAdapter;
+  private readonly discogsAdapter?: DiscogsAdapter;
   private readonly musicBrainzAdapter?: MusicBrainzAdapter;
 
   constructor(
     caaAdapter: CoverArtArchiveAdapter,
-    discogsAdapter: DiscogsAdapter,
+    discogsAdapter?: DiscogsAdapter,
     musicBrainzAdapter?: MusicBrainzAdapter
   ) {
     super();
@@ -69,20 +69,22 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
       }
     }
 
-    // Search Discogs for artwork candidates
-    const discogsReleases = await this.discogsAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
-    for (const rel of discogsReleases) {
-      const artUrl = rel.artwork?.primaryPath || rel.artwork?.onlineUrls?.[0];
-      if (artUrl) {
-        candidates.push({
-          id: rel.releaseId || rel.title,
-          title: rel.title,
-          artist: rel.artist,
-          album: rel.title,
-          coverArtUrl: artUrl,
-          provider: 'discogs',
-          confidenceScore: 0.85
-        });
+    // Search Discogs for artwork candidates (skipped when provider is not configured)
+    if (this.discogsAdapter) {
+      const discogsReleases = await this.discogsAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
+      for (const rel of discogsReleases) {
+        const artUrl = rel.artwork?.primaryPath || rel.artwork?.onlineUrls?.[0];
+        if (artUrl) {
+          candidates.push({
+            id: rel.releaseId || rel.title,
+            title: rel.title,
+            artist: rel.artist,
+            album: rel.title,
+            coverArtUrl: artUrl,
+            provider: 'discogs',
+            confidenceScore: 0.85
+          });
+        }
       }
     }
 
@@ -114,6 +116,9 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
       });
       coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl' || c.fieldId === 'artworkPath')?.value as string;
     } else {
+      if (!this.discogsAdapter) {
+        throw new Error('Discogs provider is not configured (missing personal access token).');
+      }
       const release = await this.discogsAdapter.resolveRelease(candidateId);
       coverArtUrl = release?.album.artwork?.primaryPath || release?.album.artwork?.onlineUrls?.[0];
     }

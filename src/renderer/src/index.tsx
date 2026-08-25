@@ -3,9 +3,8 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Link, RouterProvider, createHashHistory, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CollectionEventProvider } from './components/providers/CollectionEventProvider';
-import { UndoShortcutProvider } from './components/UndoShortcutProvider';
 
+import { CollectionEventProvider } from './components/providers/CollectionEventProvider';
 import './i18n';
 import { queryClient } from './queryClient';
 // Import the generated route tree
@@ -60,18 +59,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+declare global {
+  interface Window {
+    __noraProfile?: { qc: typeof queryClient; router: typeof router };
+  }
+}
+
+window.__noraProfile = { qc: queryClient, router };
+
 const container = document.getElementById('root') as HTMLElement;
 const root = createRoot(container);
-
-
 
 root.render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <CollectionEventProvider>
-        <UndoShortcutProvider>
-          <RouterProvider router={router} />
-        </UndoShortcutProvider>
+        <RouterProvider router={router} />
       </CollectionEventProvider>
       <ReactQueryDevtools />
     </QueryClientProvider>

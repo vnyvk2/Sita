@@ -3,12 +3,12 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
+import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
 import MiniPlayer from './components/MiniPlayer/MiniPlayer';
 import PromptMenu from './components/PromptMenu/PromptMenu';
-import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';
@@ -123,7 +123,8 @@ export default function App() {
 
   // ? INITIALIZE USER PREFERENCES
   // User preferences hook loads keyboard shortcuts, equalizer preset, and ignored items from database
-  useUserPreferences();
+  // Gated off in mini player mode: those preference queries are never consumed there
+  useUserPreferences({ enabled: playerType !== 'mini' });
 
   // ? INITIALIZE KEYBOARD SHORTCUTS
   // Keyboard shortcuts hook handles all keyboard shortcuts and their actions
@@ -193,9 +194,12 @@ export default function App() {
 
   // ? INITIALIZE APP UPDATES
   // App updates hook handles checking for updates and showing release notes
+  // Gated off in mini player mode: halts remote changelog polling and prevents release-notes
+  // prompts from appearing over the passive mini player window
   const { updateAppUpdatesState } = useAppUpdates({
     changePromptMenuData,
-    isOnline
+    isOnline,
+    isEnabled: playerType !== 'mini'
   });
 
   const fetchSongFromUnknownSource = useCallback(
@@ -222,6 +226,7 @@ export default function App() {
   // Queue management hook handles queue creation, updates, and shuffle operations
   const {
     createQueue,
+    playAllSongs,
     updateQueueData,
     toggleQueueShuffle,
     toggleShuffling,
@@ -258,6 +263,30 @@ export default function App() {
       }
     }
   }, []);
+
+  // ? RESTORE PRESENTATION AFTER RENDERER CRASH RECOVERY
+  // Main re-asserts the pre-crash playerType after a crash-triggered reload
+  // (the renderer store resets to 'normal' on reload). Repeats are harmless:
+  // updatePlayerType no-ops when the store already matches.
+  useEffect(() => {
+    if (!window.api?.messages?.getMessageFromMain) return undefined;
+    const handleRestoreMessage = (
+      _: unknown,
+      messageCode: MessageCodes,
+      data: Record<string, unknown>
+    ) => {
+      if (messageCode === 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY') {
+        const type = data?.playerType;
+        if (type === 'mini' || type === 'normal' || type === 'full') {
+          void updatePlayerType(type);
+        }
+      }
+    };
+    window.api.messages.getMessageFromMain(handleRestoreMessage);
+    return () => {
+      window.api.messages.removeMessageToRendererEventListener?.(handleRestoreMessage);
+    };
+  }, [updatePlayerType]);
 
   // ? INITIALIZE MEDIA SESSION
   // Media session hook handles OS-level media controls and browser media notifications
@@ -297,7 +326,6 @@ export default function App() {
     toggleRepeat,
     playSongFromUnknownSource,
     playSong,
-    createQueue,
     changeUpNextSongData,
     managePlaybackErrors,
     toggleSongPlayback,
@@ -318,6 +346,7 @@ export default function App() {
       addNewNotifications,
       updateNotifications,
       createQueue,
+      playAllSongs,
       changeQueueCurrentSongIndex,
       updateCurrentSongPlaybackState,
       updatePlayerType,
@@ -351,6 +380,7 @@ export default function App() {
     addNewNotifications,
     updateNotifications,
     createQueue,
+    playAllSongs,
     changeQueueCurrentSongIndex,
     updateCurrentSongPlaybackState,
     updatePlayerType,
@@ -425,6 +455,9 @@ export default function App() {
             <>
               <MiniPlayer />
               <ContextMenu />
+              {/* Playback continues in mini mode, so playback error prompts (e.g. unplayable
+                  songs) must remain visible instead of silently queuing until restore. */}
+              <PromptMenu />
             </>
           ) : playerType === 'full' ? (
             <>
@@ -435,14 +468,16 @@ export default function App() {
           ) : (
             <Outlet />
           )}
-          <MetadataCenterDialog
-            isOpen={autoTagState.isOpen}
-            localSongs={autoTagState.songs}
-            initialAlbumName={autoTagState.albumName}
-            initialArtistName={autoTagState.artistName}
-            initialWorkflow={autoTagState.workflow ?? 'album'}
-            onClose={closeAutoTagDialog}
-          />
+          {autoTagState.isOpen && (
+            <MetadataCenterDialog
+              isOpen={autoTagState.isOpen}
+              localSongs={autoTagState.songs}
+              initialAlbumName={autoTagState.albumName}
+              initialArtistName={autoTagState.artistName}
+              initialWorkflow={autoTagState.workflow ?? 'album'}
+              onClose={closeAutoTagDialog}
+            />
+          )}
         </div>
       </AppUpdateContext.Provider>
       {import.meta.env.DEV && DevAgentation && (

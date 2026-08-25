@@ -87,7 +87,12 @@ export class RetryPolicy {
 
   public calculateDelay(attempt: number, err?: unknown): number {
     if (err instanceof HttpError && err.status === 429) {
-      // Respect Retry-After header in pipeline if needed
+      const serverDelay = this.parseRetryAfterMs(err);
+      if (serverDelay !== undefined) {
+        // Server explicitly told us how long to wait; honor it exactly
+        // (capped by maxDelayMs) without adding jitter.
+        return Math.min(this.maxDelayMs, serverDelay);
+      }
     }
 
     const exponentialDelay = this.initialDelayMs * Math.pow(this.backoffFactor, attempt - 1);
@@ -100,6 +105,18 @@ export class RetryPolicy {
     }
 
     return clampedDelay;
+  }
+
+  /**
+   * Parses a numeric-seconds `Retry-After` header into milliseconds.
+   * HTTP-date form is intentionally not supported (rare for rate limiting).
+   */
+  private parseRetryAfterMs(err: HttpError): number | undefined {
+    const raw = err.responseHeaders?.['retry-after'];
+    if (!raw) return undefined;
+    const seconds = Number(raw.trim());
+    if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+    return seconds * 1000;
   }
 
   private delay(ms: number): Promise<void> {

@@ -1,12 +1,8 @@
 import { EventEmitter } from 'events';
 
-export type CollectionEvent =
-  | { type: 'CollectionChanged'; payload: { collectionId?: number; action?: string; [key: string]: any } }
-  | { type: 'CollectionDeleted'; payload: { collectionIds: number[] } }
-  | { type: 'CollectionMoved'; payload: { collectionId: number; newParentId: number | null } }
-  | { type: 'CollectionPinned'; payload: { collectionId: number; isPinned: boolean } }
-  | { type: 'SmartPlaylistUpdated'; payload: { collectionId: number } }
-  | { type: 'CollectionCreated'; payload: { collectionId: number; parentId: number | null } };
+import type { CollectionEvent } from '../../../common/collections/operationInputs';
+
+export type { CollectionEvent };
 
 export class CollectionEventBus extends EventEmitter {
   public emitEvent(event: CollectionEvent): boolean {

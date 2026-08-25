@@ -1,15 +1,23 @@
-import React, { useEffect } from 'react';
+import type { CollectionEvent } from '@common/collections/operationInputs';
 import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect } from 'react';
+
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';
-import type { CollectionEvent } from '@common/collections/operationInputs';
 
+/**
+ * Maps backend CollectionEvents to query-cache invalidation.
+ *
+ * Scoping notes: - `reorder` only changes entry order: entries + detail are enough. Tree and
+ * sidebar metadata (names, counts, pins) are untouched, so refetching them on every drag would be
+ * wasted work. - UndoEngine does not emit events yet; surfaces that undo/redo must invalidate their
+ * own queries.
+ */
 export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleEvent = (_e: unknown, event: CollectionEvent) => {
-      // Use Nora's window.api.properties.isInDevelopment if available, else standard fallback
       if (window.api?.properties?.isInDevelopment) {
         console.log('[CollectionEventProvider] Received event:', event);
       }
@@ -17,32 +25,49 @@ export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = 
       switch (event.type) {
         case 'CollectionCreated':
           queryClient.invalidateQueries({ queryKey: collectionKeys.tree() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.children(event.payload.parentId) });
+          queryClient.invalidateQueries({
+            queryKey: collectionKeys.children(event.payload.parentId)
+          });
           break;
         case 'CollectionMoved':
           queryClient.invalidateQueries({ queryKey: collectionKeys.tree() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.sidebar() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.children(event.payload.newParentId) });
+          queryClient.invalidateQueries({
+            queryKey: collectionKeys.children(event.payload.newParentId)
+          });
           break;
         case 'CollectionPinned':
           queryClient.invalidateQueries({ queryKey: collectionKeys.tree() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.sidebar() });
           if (event.payload.collectionId) {
-            queryClient.invalidateQueries({ queryKey: collectionKeys.detail(event.payload.collectionId) });
+            queryClient.invalidateQueries({
+              queryKey: collectionKeys.detail(event.payload.collectionId)
+            });
           }
           break;
-        case 'CollectionChanged':
-        case 'SmartPlaylistUpdated':
+        case 'CollectionChanged': {
+          const { collectionId, action } = event.payload;
+
+          if (action === 'reorder') {
+            // Order-only change - skip tree/sidebar refetches entirely
+            if (collectionId) {
+              queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
+              queryClient.invalidateQueries({ queryKey: collectionKeys.entries(collectionId) });
+            }
+            break;
+          }
+
           queryClient.invalidateQueries({ queryKey: collectionKeys.tree() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.sidebar() });
-          if (event.payload.collectionId) {
-            queryClient.invalidateQueries({ queryKey: collectionKeys.detail(event.payload.collectionId) });
-            queryClient.invalidateQueries({ queryKey: collectionKeys.entries(event.payload.collectionId) });
+          if (collectionId) {
+            queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
+            queryClient.invalidateQueries({ queryKey: collectionKeys.entries(collectionId) });
           }
           break;
+        }
         case 'CollectionDeleted':
           queryClient.invalidateQueries({ queryKey: collectionKeys.tree() });
-          queryClient.invalidateQueries({ queryKey: collectionKeys.sidebar() });
+          for (const id of event.payload.collectionIds ?? []) {
+            queryClient.removeQueries({ queryKey: collectionKeys.detail(id) });
+            queryClient.removeQueries({ queryKey: collectionKeys.entries(id) });
+          }
           break;
         default:
           queryClient.invalidateQueries({ queryKey: collectionKeys.all });

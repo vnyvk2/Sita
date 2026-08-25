@@ -63,6 +63,13 @@ class PlayerQueue {
     const index = this.songIds.indexOf(songId);
     if (index !== -1) {
       this.position = index;
+    } else if (this.metadata?.isCanonical) {
+      // Canonical queues are projections of the library (docs/canonical-queue-architecture.md,
+      // Invariant 6). A missing song means the projection is stale; it must be rebuilt via
+      // QueuesManager.getOrCreateCanonicalQueue, never repaired by appending here.
+      logQueue('[PlayerQueue.currentSongId] Refused to append missing song to canonical queue', {
+        songId
+      });
     } else {
       this.songIds.push(songId);
       this.position = this.songIds.length - 1;
@@ -369,8 +376,8 @@ class PlayerQueue {
 
   /**
    * Adds songs to play next, atomically removing any existing duplicate occurrences of those songs
-   * from the queue, inserting the incoming batch after the current position, and adjusting
-   * playback position in a single atomic O(N) mutation.
+   * from the queue, inserting the incoming batch after the current position, and adjusting playback
+   * position in a single atomic O(N) mutation.
    *
    * Only increments membershipVersion if new song IDs were introduced to the queue or existing
    * duplicate multiplicities changed. If playNext only reorders songs already present in the queue,
@@ -437,7 +444,10 @@ class PlayerQueue {
       newPosition = 0;
     } else {
       if (currentWasRemoved) {
-        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+        newPosition = Math.max(
+          0,
+          Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1)
+        );
       } else {
         newPosition = this.position - removedBeforeCurrent;
       }
@@ -503,7 +513,10 @@ class PlayerQueue {
     let newPosition = 0;
     if (newSongIds.length > 0) {
       if (currentWasRemoved) {
-        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+        newPosition = Math.max(
+          0,
+          Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1)
+        );
       } else {
         newPosition = this.position - removedBeforeCurrent;
       }
@@ -525,8 +538,8 @@ class PlayerQueue {
   }
 
   /**
-   * Removes multiple songs from the queue by their song IDs in a single O(N) pass,
-   * removing all duplicate occurrences of those IDs.
+   * Removes multiple songs from the queue by their song IDs in a single O(N) pass, removing all
+   * duplicate occurrences of those IDs.
    *
    * @param songIds - Set or Array of song IDs to remove
    * @returns True if at least one song was removed, false otherwise
@@ -566,7 +579,10 @@ class PlayerQueue {
     let newPosition = 0;
     if (newSongIds.length > 0) {
       if (currentWasRemoved) {
-        newPosition = Math.max(0, Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1));
+        newPosition = Math.max(
+          0,
+          Math.min(this.position - removedBeforeCurrent, newSongIds.length - 1)
+        );
       } else {
         newPosition = this.position - removedBeforeCurrent;
       }
@@ -818,7 +834,10 @@ class PlayerQueue {
     for (let i = this.songIds.length - 1; i > 0; i -= 1) {
       const randomIndex = Math.floor(Math.random() * (i + 1));
       [this.songIds[i], this.songIds[randomIndex]] = [this.songIds[randomIndex], this.songIds[i]];
-      [initialIndices[i], initialIndices[randomIndex]] = [initialIndices[randomIndex], initialIndices[i]];
+      [initialIndices[i], initialIndices[randomIndex]] = [
+        initialIndices[randomIndex],
+        initialIndices[i]
+      ];
     }
 
     // Place current song at the beginning

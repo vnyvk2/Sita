@@ -317,5 +317,33 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
       expect(receivedSignal).toBeInstanceOf(AbortSignal);
       expect(receivedSignal?.aborted).toBe(false);
     });
+
+    it('Cancellation is not a failure: aborted search does not degrade provider health', async () => {
+      const abortableAdapter: IMetadataProviderAdapter = {
+        identity: { id: 'discogs', name: 'Discogs', version: '1.0.0', providerType: 'online' },
+        capabilities: new ProviderCapabilities([ProviderCapability.Search]),
+        supports: () => true,
+        lookup: vi.fn(),
+        search: vi.fn(),
+        searchAlbums: vi
+          .fn()
+          .mockImplementation((_alb, _art, _opts, signal) => {
+            const abortErr = new Error('Operation aborted');
+            abortErr.name = 'AbortError';
+            void signal;
+            return Promise.reject(abortErr);
+          })
+      };
+
+      const runtime = new MetadataProviderRuntime([abortableAdapter]);
+      await runtime.initialize();
+
+      for (let i = 0; i < 10; i += 1) {
+        await expect(runtime.searchAlbums('SOUR', 'Olivia Rodrigo')).resolves.toEqual([]);
+      }
+
+      expect(runtime.status.state).toBe(ProviderState.Healthy);
+      expect(runtime.isAvailable()).toBe(true);
+    });
   });
 });

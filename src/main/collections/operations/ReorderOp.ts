@@ -1,9 +1,18 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-
 import type { ReorderInput } from '../../../common/collections/operationInputs';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
+/**
+ * Rank-based reorder.
+ *
+ * `newPosition` is interpreted as a dense visual rank (0-based index into the playlist's ordered
+ * entries), NOT as a raw stored `position` value. This keeps client semantics stable even when
+ * stored positions contain gaps or duplicates (e.g. after removals/restores): each execution reads
+ * the current visual order, splices it in memory, clamps the requested rank into range, and
+ * persists only the rows whose rank actually changed - writing contiguous positions in the process,
+ * which progressively heals legacy gaps.
+ */
 export class ReorderOp implements CollectionOperation<ReorderInput, void> {
   private readonly repository: PlaylistRepository;
 
@@ -11,74 +20,60 @@ export class ReorderOp implements CollectionOperation<ReorderInput, void> {
     this.repository = repository;
   }
 
-  public async execute(
-    input: ReorderInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<void>> {
-    const { playlistId, entryId, newPosition } = input;
+  public async execute(input: ReorderInput, ctx: OperationContext): Promise<OperationResult<void>> {
+    const { playlistId, entryId } = input;
 
-    // Get the current position of the entry
-    // We could query it efficiently but since playlists aren't huge, let's just get it
-    const entries = await this.repository.getEntries(playlistId, {}, ctx.trx);
-    const targetEntry = entries.find(e => e.entry.id === entryId);
-    
-    if (!targetEntry) {
+    const entries = await this.repository.getEntryPositions(playlistId, ctx.trx);
+
+    const sourceRank = entries.findIndex((e) => e.entryId === entryId);
+    if (sourceRank === -1) {
       throw new Error(`Entry ${entryId} not found in playlist ${playlistId}`);
     }
 
-    const oldPosition = targetEntry.entry.position;
-    console.log('[ReorderOp] Executing reorder:', { playlistId, entryId, oldPosition, newPosition });
+    const targetRank = Math.max(0, Math.min(entries.length - 1, input.newPosition));
 
-    if (oldPosition === newPosition) {
-      // Nothing to do
-      return {
-        data: undefined,
-        collectionId: createCollectionId('local', 'playlist', playlistId),
+    const unchangedResult = (): OperationResult<void> => ({
+      data: undefined,
+      collectionId: createCollectionId('local', 'playlist', playlistId),
+      operationType: 'playlist.reorder',
+      operationInput: { playlistId, entryId, newPosition: input.newPosition },
+      // Journal semantics boundary: since the rank-based rewrite, newPosition is
+      // a dense visual rank. Journals written by older builds stored absolute
+      // stored-position values; replaying those pre-rewrite entries interprets
+      // them as ranks (one-time historical edge for undo of pre-migration ops).
+      inverseInput: {
         operationType: 'playlist.reorder',
-        operationInput: { playlistId, entryId, newPosition },
-        inverseInput: {
-          operationType: 'playlist.reorder',
-          input: { playlistId, entryId, newPosition: oldPosition }
-        },
-        version: 1,
-        affectedSongIds: [] // Reordering does not affect membership
-      };
+        input: { playlistId, entryId, newPosition: sourceRank }
+      },
+      version: 1,
+      affectedSongIds: [] // Reordering does not affect membership
+    });
+
+    if (sourceRank === targetRank) {
+      // Nothing to do (also covers single-entry playlists)
+      return unchangedResult();
     }
 
-    // Move entry out of the way to avoid unique constraint violations if any
-    await this.repository.updateEntryPosition(entryId, -1, ctx.trx);
+    const nextOrder = [...entries];
+    const [moved] = nextOrder.splice(sourceRank, 1);
+    nextOrder.splice(targetRank, 0, moved);
 
-    if (newPosition < oldPosition) {
-      // Shift entries between newPosition and oldPosition - 1 UP by 1
-      await this.repository.shiftPositionsRange(
-        playlistId, 
-        newPosition, 
-        oldPosition - 1, 
-        1, 
-        ctx.trx
-      );
-    } else {
-      // Shift entries between oldPosition + 1 and newPosition DOWN by 1
-      await this.repository.shiftPositionsRange(
-        playlistId, 
-        oldPosition + 1, 
-        newPosition, 
-        -1, 
-        ctx.trx
-      );
+    const updates: { entryId: number; position: number }[] = [];
+    for (let rank = 0; rank < nextOrder.length; rank += 1) {
+      if (nextOrder[rank].position !== rank) {
+        updates.push({ entryId: nextOrder[rank].entryId, position: rank });
+      }
     }
-
-    // Put entry in new position
-    await this.repository.updateEntryPosition(entryId, newPosition, ctx.trx);
+    await this.repository.updatePositionsBulk(playlistId, updates, ctx.trx);
 
     return {
       data: undefined,
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.reorder',
-      operationInput: { playlistId, entryId, newPosition },
+      operationInput: { playlistId, entryId, newPosition: input.newPosition },
       inverseInput: {
         operationType: 'playlist.reorder',
-        input: { playlistId, entryId, newPosition: oldPosition }
+        input: { playlistId, entryId, newPosition: sourceRank }
       },
       version: 1,
       affectedSongIds: [] // Reordering does not affect membership

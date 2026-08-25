@@ -5,14 +5,22 @@ export class HttpError extends Error {
   public readonly statusText: string;
   public readonly responseUrl: string;
   public readonly responseBody?: unknown;
+  public readonly responseHeaders?: Record<string, string>;
 
-  constructor(status: number, statusText: string, responseUrl: string, responseBody?: unknown) {
+  constructor(
+    status: number,
+    statusText: string,
+    responseUrl: string,
+    responseBody?: unknown,
+    responseHeaders?: Record<string, string>
+  ) {
     super(`HTTP Error ${status} (${statusText}) for URL: ${responseUrl}`);
     this.name = 'HttpError';
     this.status = status;
     this.statusText = statusText;
     this.responseUrl = responseUrl;
     this.responseBody = responseBody;
+    this.responseHeaders = responseHeaders;
   }
 }
 
@@ -91,7 +99,7 @@ export class FetchHttpClient implements IHttpClient {
       }
 
       if (!response.ok) {
-        throw new HttpError(response.status, response.statusText, fullUrl, responseData);
+        throw new HttpError(response.status, response.statusText, fullUrl, responseData, responseHeaders);
       }
 
       return {
@@ -106,7 +114,16 @@ export class FetchHttpClient implements IHttpClient {
       if (err instanceof HttpError) {
         throw err;
       }
+      if (signal?.aborted) {
+        // Caller-initiated cancellation. Preserve AbortError identity so downstream
+        // retry / timeout / circuit-breaker stages treat this as cancellation,
+        // never as a timeout or provider failure.
+        const abortError = new Error('Operation aborted', { cause: err });
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
       if (err instanceof Error && err.name === 'AbortError') {
+        // Only the internal timeout timer remains as a possible abort source here.
         throw new Error(`Request timed out after ${timeout}ms: ${fullUrl}`);
       }
       throw err;
@@ -146,12 +163,9 @@ export class FetchHttpClient implements IHttpClient {
     if (userSignal.aborted) return userSignal;
     if (timeoutSignal.aborted) return timeoutSignal;
 
-    const controller = new AbortController();
-    const onAbort = () => controller.abort();
-
-    userSignal.addEventListener('abort', onAbort, { once: true });
-    timeoutSignal.addEventListener('abort', onAbort, { once: true });
-
-    return controller.signal;
+    // AbortSignal.any derives a signal without attaching listeners to the
+    // source signals, so reusing a long-lived caller signal across many
+    // requests never accumulates listeners.
+    return AbortSignal.any([userSignal, timeoutSignal]);
   }
 }

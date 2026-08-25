@@ -10,6 +10,7 @@ import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { getLibraryVersion } from '@renderer/other/libraryVersion';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';
@@ -85,10 +86,10 @@ function SongsPage() {
 
   const {
     createQueue,
+    playAllSongs,
     toggleMultipleSelections,
     updateContextMenuData,
-    changePromptMenuData,
-    updateQueueData
+    changePromptMenuData
   } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const {
@@ -244,6 +245,51 @@ function SongsPage() {
   const filteredSongsRef = useRef(filteredSongs);
   filteredSongsRef.current = filteredSongs;
 
+  // An unfiltered All Songs view is canonical-eligible: it projects the whole library.
+  // Any active keyword or sub-filter makes the request a contextual (filtered browse) queue
+  // (docs/canonical-queue-architecture.md, Invariant 8).
+  const trimmedKeyword = keyword?.trim();
+  const isCanonicalEligibleView = useMemo(
+    () =>
+      !trimmedKeyword &&
+      filteringOrder === 'notSelected' &&
+      (!language || language === 'all') &&
+      (!genre || genre === 'all') &&
+      !onlyFavoriteArtists &&
+      !onlyFavoriteAlbums,
+    [trimmedKeyword, filteringOrder, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums]
+  );
+
+  const canonicalQueueTitle = t('common.allSongs', 'All Songs');
+
+  // Library version the currently rendered songData was actually derived from. Stable while the
+  // React Query cache lags behind a structural IPC event, which lets QueuesManager stamp honest
+  // provenance instead of poisoning the projection as fresh (docs/canonical-queue-architecture.md,
+  // Invariant 7).
+  const songDataLibraryVersion = useMemo(() => getLibraryVersion(), [songData]);
+
+  const contextualQueueTitle = useMemo(() => {
+    const detail =
+      trimmedKeyword ||
+      (genre && genre !== 'all' ? genre : undefined) ||
+      (language && language !== 'all' ? language : undefined) ||
+      songFilterOptions.find((option) => option.value === filteringOrder)?.label ||
+      (onlyFavoriteArtists
+        ? t('songsPage.favoriteArtistsFilter', 'Favorite Artists')
+        : undefined) ||
+      (onlyFavoriteAlbums ? t('songsPage.favoriteAlbumsFilter', 'Favorite Albums') : undefined);
+    return detail ? `${canonicalQueueTitle}: ${detail}` : canonicalQueueTitle;
+  }, [
+    t,
+    trimmedKeyword,
+    genre,
+    language,
+    filteringOrder,
+    onlyFavoriteArtists,
+    onlyFavoriteAlbums,
+    canonicalQueueTitle
+  ]);
+
   const search = usePageSearch({
     keyword,
     updateSearch: (val) =>
@@ -327,17 +373,30 @@ function SongsPage() {
       const queueSongIds = filteredSongsRef.current
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
-      createQueue(
-        queueSongIds,
-        'songs',
-        false,
-        undefined,
-        false,
-        t('common.allSongs', 'All Songs')
-      );
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+
+      if (queueSongIds.length === 0) return;
+
+      if (isCanonicalEligibleView) {
+        playAllSongs({
+          songIds: queueSongIds,
+          startSongId: currSongId,
+          sortingOrder,
+          builtAtLibraryVersion: songDataLibraryVersion,
+          title: canonicalQueueTitle
+        });
+      } else {
+        createQueue(queueSongIds, 'songs', false, undefined, true, contextualQueueTitle);
+      }
     },
-    [createQueue, updateQueueData, t]
+    [
+      createQueue,
+      playAllSongs,
+      isCanonicalEligibleView,
+      canonicalQueueTitle,
+      contextualQueueTitle,
+      sortingOrder,
+      songDataLibraryVersion
+    ]
   );
 
   const renderSong = useCallback(
@@ -511,30 +570,45 @@ function SongsPage() {
             tooltipLabel={t('common.playAll')}
             className="play-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName="play_arrow"
-            clickHandler={() =>
-              createQueue(
-                filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-                'songs',
-                false,
-                undefined,
-                true
-              )
-            }
+            clickHandler={() => {
+              const queueSongIds = filteredSongs
+                .filter((song) => !song.isBlacklisted)
+                .map((song) => song.songId);
+              if (queueSongIds.length === 0) return;
+              if (isCanonicalEligibleView) {
+                playAllSongs({
+                  songIds: queueSongIds,
+                  sortingOrder,
+                  builtAtLibraryVersion: songDataLibraryVersion,
+                  title: canonicalQueueTitle
+                });
+              } else {
+                createQueue(queueSongIds, 'songs', false, undefined, true, contextualQueueTitle);
+              }
+            }}
           />
           <Button
             key={3}
             tooltipLabel={t('common.shuffleAndPlay')}
             className="shuffle-and-play-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName="shuffle"
-            clickHandler={() =>
-              createQueue(
-                filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-                'songs',
-                true,
-                undefined,
-                true
-              )
-            }
+            clickHandler={() => {
+              const queueSongIds = filteredSongs
+                .filter((song) => !song.isBlacklisted)
+                .map((song) => song.songId);
+              if (queueSongIds.length === 0) return;
+              if (isCanonicalEligibleView) {
+                playAllSongs({
+                  songIds: queueSongIds,
+                  shuffle: true,
+                  sortingOrder,
+                  builtAtLibraryVersion: songDataLibraryVersion,
+                  title: canonicalQueueTitle
+                });
+              } else {
+                createQueue(queueSongIds, 'songs', true, undefined, true, contextualQueueTitle);
+              }
+            }}
           />
           <Dropdown
             name="songsPageFilterDropdown"

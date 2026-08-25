@@ -40,7 +40,8 @@ const getMinTwoWidthNums = (num: number) => {
 };
 
 const getLogFilePath = () => {
-  const logSaveFolder = path?.join(app?.getPath('userData'), 'logs');
+  const baseDir = process.env.NORA_USER_DATA || app?.getPath('userData');
+  const logSaveFolder = path?.join(baseDir, 'logs');
 
   const date = new Date();
   const month = date.getMonth() + 1;

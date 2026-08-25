@@ -50,7 +50,13 @@ import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter'
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
 import { MusicBrainzAdapter, MusicBrainzApiClient } from './providers/musicbrainz';
 import { DiscogsAdapter } from './providers/discogs/DiscogsAdapter';
+import type { MetadataProviderId } from '../../common/metadata/types';
 import { DiscogsApiClient } from './providers/discogs/DiscogsApiClient';
+import {
+  DISCOGS_RATE_LIMIT_INTERVAL_MS,
+  DISCOGS_RATE_LIMIT_MAX_REQUESTS,
+  getDiscogsPersonalAccessToken
+} from './providers/discogs/discogsAuth';
 import { CoverArtArchiveAdapter } from './providers/coverartarchive/CoverArtArchiveAdapter';
 import { CaaApiClient } from './providers/coverartarchive/CaaApiClient';
 import { DefaultMetadataLookupGateway } from './resolution/MetadataLookupGateway';
@@ -152,7 +158,12 @@ export class MetadataBootstrap {
     const identityCache = new IdentityResolutionCache();
     const providerDiscovery = new MetadataProviderDiscovery(runtimeProviderRegistry);
 
-    // Dedicated isolated networking pipelines per provider domain
+    // Dedicated isolated networking pipelines per provider domain.
+    //
+    // Timeout hierarchy (see MetadataProviderRuntime.SEARCH_RACE_TIMEOUT_MS):
+    // HTTP socket 10s > metadata stage timeout 5s (execution pipeline only)
+    // > runtime search race 4s. Keep inner layers strictly smaller than
+    // outer ones so the real cause never gets masked.
     const platform = PlatformBootstrap.getInstance();
 
     // 1. MusicBrainz: strict 1 req / 1000ms token bucket with 3 retries
@@ -163,13 +174,25 @@ export class MetadataBootstrap {
     const mbApiClient = new MusicBrainzApiClient(mbPipeline);
     const musicBrainzAdapter = new MusicBrainzAdapter(mbApiClient, { cache: identityCache });
 
-    // 2. Discogs: isolated pipeline with 5 req / 1000ms capacity with 2 retries
-    const discogsPipeline = platform.createRequestPipeline({
-      rateLimiter: new RateLimiter({ maxRequests: 5, perIntervalMs: 1000 }),
-      retryPolicy: new RetryPolicy({ maxRetries: 2, initialDelayMs: 500 })
-    });
-    const discogsApiClient = new DiscogsApiClient(discogsPipeline);
-    const discogsAdapter = new DiscogsAdapter(discogsApiClient, { cache: identityCache });
+    // 2. Discogs: isolated pipeline, 60/min documented limit, Bearer PAT auth.
+    //    /database/search requires authentication - without a token the
+    //    provider is gracefully disabled instead of issuing doomed requests.
+    const discogsToken = getDiscogsPersonalAccessToken();
+    let discogsAdapter: DiscogsAdapter | undefined;
+    let discogsPipeline: RequestPipeline | undefined;
+
+    if (discogsToken) {
+      discogsPipeline = platform.createRequestPipeline({
+        rateLimiter: new RateLimiter({
+          maxRequests: DISCOGS_RATE_LIMIT_MAX_REQUESTS,
+          perIntervalMs: DISCOGS_RATE_LIMIT_INTERVAL_MS
+        }),
+        retryPolicy: new RetryPolicy({ maxRetries: 2, initialDelayMs: 500 }),
+        authCredentials: { type: 'bearer', token: discogsToken }
+      });
+      const discogsApiClient = new DiscogsApiClient(discogsPipeline);
+      discogsAdapter = new DiscogsAdapter(discogsApiClient, { cache: identityCache });
+    }
 
     // 3. CoverArtArchive: isolated CDN pipeline with high concurrency
     const caaPipeline = platform.createRequestPipeline({
@@ -181,7 +204,9 @@ export class MetadataBootstrap {
 
     const resolutionProviderRegistry = new ResolutionProviderRegistry();
     resolutionProviderRegistry.registerInstance('musicbrainz', musicBrainzAdapter as any);
-    resolutionProviderRegistry.registerInstance('discogs', discogsAdapter as any);
+    if (discogsAdapter) {
+      resolutionProviderRegistry.registerInstance('discogs', discogsAdapter as any);
+    }
     resolutionProviderRegistry.registerInstance('coverartarchive', coverArtArchiveAdapter as any);
 
     // Register default entity mappers
@@ -223,14 +248,19 @@ export class MetadataBootstrap {
     const userService = new UserMetadataService(userRepository, eventBus);
 
     let providerRuntime: MetadataProviderRuntime;
+    const registeredSearchAdapters = discogsAdapter
+      ? [musicBrainzAdapter, discogsAdapter]
+      : [musicBrainzAdapter];
     const preferencesService = new MetadataPreferencesService({
       getRegisteredSearchProviders: () =>
-        providerRuntime ? providerRuntime.getAvailableSearchProviders().map((p) => p.id) : ['musicbrainz', 'discogs']
+        providerRuntime
+          ? providerRuntime.getAvailableSearchProviders().map((p) => p.id)
+          : (registeredSearchAdapters.map((a) => a.identity.id.toLowerCase()) as MetadataProviderId[])
     });
 
     // AutoTag Application & Resolution Services construction inside MetadataBootstrap composition root
     providerRuntime = new MetadataProviderRuntime(
-      [musicBrainzAdapter, discogsAdapter],
+      registeredSearchAdapters,
       undefined,
       undefined,
       preferencesService
@@ -288,7 +318,9 @@ export class MetadataBootstrap {
     });
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
-    workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
+    if (discogsAdapter) {
+      workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
+    }
     workflowService.registerWorkflow(new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter, musicBrainzAdapter));
     workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter));
 

@@ -814,13 +814,21 @@ const updateSongId3TagsOfUnknownSource = async (
         lyrics: lyricsText
       };
 
-      // Kept to be saved later
-      addMetadataToPendingQueue({
+      // Persist immediately unless this exact song is currently playing, in
+      // which case the write stays deferred until playback moves away from it.
+      const queueResult = addMetadataToPendingQueue({
         songPath: songPathWithoutDefaultUrl,
         tags,
         isKnownSource: false,
         sendUpdatedData
       });
+
+      // The queue returns a promise when it flushes now and a plain marker when
+      // deferred. Awaiting here prevents floating-promise failures and ensures
+      // the write completed before this function reports success.
+      if (queueResult instanceof Promise) {
+        await queueResult;
+      }
 
       // Save synced lyrics to LRC file
       if (parsedSyncedLyrics) {

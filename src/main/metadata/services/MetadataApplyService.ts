@@ -276,12 +276,20 @@ export class MetadataApplyService {
         }
       }
 
+      // Snapshot values are narrowed from the (nullable) tag payload so
+      // SongMetadataSnapshot never receives null.
+      const snapshotAlbum = typeof payloadTags.album === 'string' ? payloadTags.album : undefined;
+      const snapshotAlbumArtist =
+        typeof payloadTags.albumArtist === 'string' ? payloadTags.albumArtist : undefined;
+      const snapshotYear = typeof payloadTags.year === 'number' ? payloadTags.year : undefined;
+      const snapshotGenre = typeof payloadTags.genre === 'string' ? payloadTags.genre : undefined;
+
       const updatedSnapshot: SongMetadataSnapshot = {
         ...previousSnapshot,
-        ...(payloadTags.album !== undefined && { album: payloadTags.album }),
-        ...(payloadTags.albumArtist !== undefined && { albumArtist: payloadTags.albumArtist }),
-        ...(payloadTags.year !== undefined && { year: payloadTags.year }),
-        ...(payloadTags.genre !== undefined && { genre: payloadTags.genre })
+        ...(snapshotAlbum !== undefined && { album: snapshotAlbum }),
+        ...(snapshotAlbumArtist !== undefined && { albumArtist: snapshotAlbumArtist }),
+        ...(snapshotYear !== undefined && { year: snapshotYear }),
+        ...(snapshotGenre !== undefined && { genre: snapshotGenre })
       };
 
       // 2. Apply Track-Level Mutations ONLY if this track is selected (match.applyTrack === true)
@@ -331,18 +339,20 @@ export class MetadataApplyService {
       tagWritePayloads.push(payloadTags as TagWritePayload);
       updatedSongs.push(updatedSnapshot);
 
-      // Complete rollback payload restoring ALL metadata fields
+      // Complete rollback payload restoring ALL metadata fields.
+      // Previously-absent values are normalized to explicit clears (null) so
+      // TagWriterService removes the newly-written value instead of skipping it.
       rollbackPayloads.push({
         filePath: match.songPath,
-        title: match.oldTitle,
-        artist: match.oldArtist,
-        album: match.oldAlbum,
-        year: match.oldYear,
-        trackNumber: match.oldTrackNumber,
-        discNumber: match.oldDiscNumber,
-        genre: match.oldGenre,
-        isrc: match.oldIsrc,
-        musicBrainzRecordingId: match.oldMbid
+        title: match.oldTitle ?? '',
+        artist: match.oldArtist ?? null,
+        album: match.oldAlbum ?? null,
+        year: match.oldYear ?? null,
+        trackNumber: match.oldTrackNumber ?? null,
+        discNumber: match.oldDiscNumber ?? null,
+        genre: match.oldGenre ?? null,
+        isrc: match.oldIsrc ?? null,
+        musicBrainzRecordingId: match.oldMbid ?? null
       });
     }
 
@@ -511,15 +521,20 @@ export class MetadataApplyService {
       return { success: false, restoredCount: 0, errors: ['No AutoTag history available to undo'] };
     }
 
+    // Value-complete restore payloads: absent fields become explicit clears so
+    // the file returns to its exact pre-AutoTag state (including isrc/mbid,
+    // which reParseSong would otherwise re-import from polluted tags).
     const restorePayloads: TagWritePayload[] = snapshot.previousSongs.map((s) => ({
       filePath: s.path,
-      title: s.title,
-      artist: s.artist,
-      album: s.album,
-      year: s.year,
-      trackNumber: s.trackNumber,
-      discNumber: s.discNumber,
-      genre: s.genre
+      title: s.title ?? '',
+      artist: s.artist ?? null,
+      album: s.album ?? null,
+      year: s.year ?? null,
+      trackNumber: s.trackNumber ?? null,
+      discNumber: s.discNumber ?? null,
+      genre: s.genre ?? null,
+      isrc: s.isrc ?? null,
+      musicBrainzRecordingId: s.musicBrainzRecordingId ?? null
     }));
 
     const tagWriteResults = await this.tagWriter.writeBatch(restorePayloads);

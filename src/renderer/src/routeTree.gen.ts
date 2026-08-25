@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as MainPlayerRouteRouteImport } from './routes/main-player/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as MiniPlayerIndexRouteImport } from './routes/mini-player/index'
 import { Route as FullscreenPlayerIndexRouteImport } from './routes/fullscreen-player/index'
 import { Route as MainPlayerInsightsRouteImport } from './routes/main-player/insights'
 import { Route as MainPlayerSongsIndexRouteImport } from './routes/main-player/songs/index'
@@ -48,11 +47,6 @@ const MainPlayerRouteRoute = MainPlayerRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MiniPlayerIndexRoute = MiniPlayerIndexRouteImport.update({
-  id: '/mini-player/',
-  path: '/mini-player/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FullscreenPlayerIndexRoute = FullscreenPlayerIndexRouteImport.update({
@@ -208,7 +202,6 @@ export interface FileRoutesByFullPath {
   '/main-player': typeof MainPlayerRouteRouteWithChildren
   '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player/': typeof FullscreenPlayerIndexRoute
-  '/mini-player/': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
   '/main-player/artists/$artistId': typeof MainPlayerArtistsArtistIdRoute
   '/main-player/folders/$folderPath': typeof MainPlayerFoldersFolderPathRoute
@@ -240,7 +233,6 @@ export interface FileRoutesByTo {
   '/main-player': typeof MainPlayerRouteRouteWithChildren
   '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player': typeof FullscreenPlayerIndexRoute
-  '/mini-player': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
   '/main-player/artists/$artistId': typeof MainPlayerArtistsArtistIdRoute
   '/main-player/folders/$folderPath': typeof MainPlayerFoldersFolderPathRoute
@@ -272,7 +264,6 @@ export interface FileRoutesById {
   '/main-player': typeof MainPlayerRouteRouteWithChildren
   '/main-player/insights': typeof MainPlayerInsightsRoute
   '/fullscreen-player/': typeof FullscreenPlayerIndexRoute
-  '/mini-player/': typeof MiniPlayerIndexRoute
   '/main-player/albums/$albumId': typeof MainPlayerAlbumsAlbumIdRoute
   '/main-player/artists/$artistId': typeof MainPlayerArtistsArtistIdRoute
   '/main-player/folders/$folderPath': typeof MainPlayerFoldersFolderPathRoute
@@ -306,7 +297,6 @@ export interface FileRouteTypes {
     | '/main-player'
     | '/main-player/insights'
     | '/fullscreen-player/'
-    | '/mini-player/'
     | '/main-player/albums/$albumId'
     | '/main-player/artists/$artistId'
     | '/main-player/folders/$folderPath'
@@ -338,7 +328,6 @@ export interface FileRouteTypes {
     | '/main-player'
     | '/main-player/insights'
     | '/fullscreen-player'
-    | '/mini-player'
     | '/main-player/albums/$albumId'
     | '/main-player/artists/$artistId'
     | '/main-player/folders/$folderPath'
@@ -369,7 +358,6 @@ export interface FileRouteTypes {
     | '/main-player'
     | '/main-player/insights'
     | '/fullscreen-player/'
-    | '/mini-player/'
     | '/main-player/albums/$albumId'
     | '/main-player/artists/$artistId'
     | '/main-player/folders/$folderPath'
@@ -401,7 +389,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MainPlayerRouteRoute: typeof MainPlayerRouteRouteWithChildren
   FullscreenPlayerIndexRoute: typeof FullscreenPlayerIndexRoute
-  MiniPlayerIndexRoute: typeof MiniPlayerIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -418,13 +405,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mini-player/': {
-      id: '/mini-player/'
-      path: '/mini-player'
-      fullPath: '/mini-player/'
-      preLoaderRoute: typeof MiniPlayerIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fullscreen-player/': {
@@ -696,7 +676,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MainPlayerRouteRoute: MainPlayerRouteRouteWithChildren,
   FullscreenPlayerIndexRoute: FullscreenPlayerIndexRoute,
-  MiniPlayerIndexRoute: MiniPlayerIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

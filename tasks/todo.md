@@ -15,3 +15,19 @@
 - Installed `oxfmt` as a dev dependency for consistent script behavior.
 - Automated migration handled `prettier-plugin-tailwindcss` correctly.
 - All scripts in `package.json` updated and verified.
+
+---
+
+# Canonical All Songs Queue — Pre-Merge Audit Follow-ups
+
+Source: Tier 3 pre-merge audit of `canonical_all_songs_queue` (P0/P1 fixed on branch; items below deferred).
+
+- [ ] **P2 — Cross-window in-place queue sync gap (pre-existing)**: `QueuesManager.setupStoreSync`
+      detects content changes via the in-memory `structureVersion`, which is not serialized
+      (`PlayerQueue.toJSON`), so a second window never receives in-place `songIds` mutations unless
+      title/position/shuffle-presence also changed. Fix: compare `q.songIds` with `sq.songIds` (or
+      serialize a membership counter) instead of relying on local structure versions.
+- [ ] **P3 — SongCard standalone playback bypasses queue domain (pre-existing pattern)**: Home page
+      cards call `playSong(songId)` directly without contextualizing `QueuesManager`; when the track
+      ends, playback resumes from whatever queue was previously active. Decide whether to route these
+      through canonical/contextual queue creation or keep as an accepted Nora pattern.

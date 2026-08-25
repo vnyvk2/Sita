@@ -57,6 +57,8 @@ interface SongProp {
   onPlayClick?: (currSongId: number) => void;
   style?: CSSProperties;
   isDraggable?: boolean;
+  /** True while an active drag operation holds this row (visual lift only). */
+  isDragging?: boolean;
   provided?: DraggableProvided;
   selectAllHandler?: (_upToId?: number) => void;
   genres?: { genreId: number | string; name: string }[];
@@ -87,6 +89,7 @@ const Song = memo(
       selectAllHandler,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       provided = {} as any,
+      isDragging = false,
       onPlayClick,
       highlightText
     } = props;
@@ -658,7 +661,11 @@ const Song = memo(
                     ? 'bg-background-color-2/70! dark:bg-dark-background-color-2/50!'
                     : 'bg-background-color-1! dark:bg-dark-background-color-1!'
                 }`
-        } ${!isAMultipleSelection && isBlacklisted && 'opacity-30!'}`}
+        } ${!isAMultipleSelection && isBlacklisted && 'opacity-30!'} ${
+          isDragging
+            ? 'ring-background-color-3 dark:ring-dark-background-color-3 z-50! opacity-90 shadow-2xl transition-none!'
+            : ''
+        }`}
         onContextMenu={async (e) => {
           e.preventDefault();
           e.stopPropagation();

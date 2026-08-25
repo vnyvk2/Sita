@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetadataApplyService } from '../MetadataApplyService';
 import { TagWriterService, type TagWritePayload, type TagWriteResult } from '../TagWriterService';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import type { TrackMatchPreview } from '../../../../common/metadata/types';
 import { db } from '../../../db/db';
 import { getSongById } from '../../../db/queries/songs';
@@ -254,5 +255,112 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     const rollbackPayloads: TagWritePayload[] = mockWriteBatch.mock.calls[1][0];
     expect(rollbackPayloads).toHaveLength(2);
     expect(rollbackPayloads.map((p) => p.title)).toEqual(['Old Title 1', 'Old Title 2']);
+  });
+
+  it('normalizes previously-absent fields to explicit null clears in rollback payloads', async () => {
+    const mockWriteBatch = vi.fn();
+
+    // First call: track 1 fails, track 2 succeeds -> rollback only track 2
+    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return [
+        { filePath: payloads[0].filePath, success: false, error: 'EPERM' },
+        { filePath: payloads[1].filePath, success: true }
+      ];
+    });
+    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        localSongId: 1,
+        songPath: '/music/had-genre.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'Had Everything',
+        oldGenre: 'Rock',
+        fieldDiffs: []
+      },
+      {
+        localSongId: 2,
+        songPath: '/music/was-empty.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'Was Empty',
+        suggestedTitle: 'Now Tagged',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Was Empty', suggestedValue: 'Now Tagged', applyField: true }]
+      }
+    ];
+
+    const preview: any = { album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] };
+    await service.applyPreview(preview);
+
+    expect(mockWriteBatch).toHaveBeenCalledTimes(2);
+    const rollbackPayloads: TagWritePayload[] = mockWriteBatch.mock.calls[1][0];
+    expect(rollbackPayloads).toHaveLength(1);
+    const rollback = rollbackPayloads[0];
+
+    // Previously-present value restores the original
+    expect(rollback.title).toBe('Was Empty');
+    // Previously-ABSENT values must be explicit clears, not undefined skips
+    expect(rollback.artist).toBeNull();
+    expect(rollback.album).toBeNull();
+    expect(rollback.genre).toBeNull();
+    expect(rollback.year).toBeNull();
+    expect(rollback.trackNumber).toBeNull();
+    expect(rollback.discNumber).toBeNull();
+    expect(rollback.isrc).toBeNull();
+    expect(rollback.musicBrainzRecordingId).toBeNull();
+  });
+
+  it('builds value-complete undo restore payloads including isrc and mbid clears', async () => {
+    const mockWriteBatch = vi.fn().mockResolvedValue([{ filePath: '/m/a.mp3', success: true }]);
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+
+    const historyService = new MetadataHistoryService();
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-1',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [
+        {
+          songId: 1,
+          path: '/m/a.mp3',
+          title: 'Original Title',
+          isrc: 'USUM71700001',
+          musicBrainzRecordingId: 'mbid-abc'
+        }
+      ],
+      updatedSongs: []
+    });
+
+    const result = await service.undoLastAutoTag();
+    expect(result.success).toBe(true);
+    expect(result.restoredCount).toBe(1);
+
+    const restorePayloads: TagWritePayload[] = mockWriteBatch.mock.calls[0][0];
+    expect(restorePayloads).toHaveLength(1);
+    expect(restorePayloads[0]).toMatchObject({
+      filePath: '/m/a.mp3',
+      title: 'Original Title',
+      artist: null,
+      album: null,
+      genre: null,
+      year: null,
+      isrc: 'USUM71700001',
+      musicBrainzRecordingId: 'mbid-abc'
+    });
   });
 });

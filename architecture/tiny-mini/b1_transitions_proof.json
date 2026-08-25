@@ -1,0 +1,79 @@
+{
+  "steps": [
+    {
+      "name": "playbackStarted",
+      "songId": 1280,
+      "paused": false,
+      "position": 3.44637,
+      "volume": 0.5,
+      "queueLen": 1297
+    },
+    {
+      "name": "enteredStandardMini",
+      "miniMounted": true,
+      "storePlayerType": "mini",
+      "paused": false,
+      "position": 6.978667,
+      "engineCounts": {
+        "audioContexts": 0,
+        "audioElements": 0
+      }
+    },
+    {
+      "name": "enteredTiny",
+      "enterMs": 2585,
+      "tinyMounted": true,
+      "miniMounted": false,
+      "runtime": "tiny",
+      "paused": false,
+      "position": 9.568,
+      "volume": 0.5,
+      "queueLen": 1297,
+      "playerSameRef": true,
+      "qmSameRef": true,
+      "engineCounts": {
+        "audioContexts": 0,
+        "audioElements": 0
+      }
+    },
+    {
+      "name": "exitedToStandardMini",
+      "exitMs": 4539,
+      "miniMounted": true,
+      "tinyMounted": false,
+      "runtime": "full",
+      "paused": false,
+      "position": 14.109333,
+      "volume": 0.5,
+      "queueLen": 1297,
+      "playerSameRef": true,
+      "qmSameRef": true,
+      "engineCounts": {
+        "audioContexts": 0,
+        "audioElements": 0
+      }
+    },
+    {
+      "name": "finalClockCheck",
+      "paused": false,
+      "position": 16.12
+    }
+  ],
+  "verdict": {
+    "R1_playingThroughout": true,
+    "R1_songAndQueuePreserved": true,
+    "R1_volumePreserved": true,
+    "R1_positionMonotonicNoReset": true,
+    "UI_swappedToTiny": true,
+    "UI_swappedBackToMini": true,
+    "R2_playerSingletonIdentity": true,
+    "R2_qmSingletonIdentity": true,
+    "R2_singleAudioElement": true,
+    "R2_singleAudioContext": true,
+    "transitionsMs": {
+      "enterTiny": 2585,
+      "exitTiny": 4539
+    },
+    "pass": true
+  }
+}

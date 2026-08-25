@@ -85,7 +85,9 @@ const checkLocalStorage = () => {
       (key) => console.warn(`Added missing '${key}' property to localStorage.`)
     );
 
-    localStorage.setItem('localStorage', JSON.stringify(updatedStore));
+    const normalizedStore = normalizeShortcutLabelsToKeys(updatedStore);
+
+    localStorage.setItem('localStorage', JSON.stringify(normalizedStore));
     localStorage.setItem('version', migratedVersion);
   }
   return console.log('local storage check successful.');
@@ -274,6 +276,39 @@ const getSortingStates = <Type extends keyof SortingStates>(type: Type) =>
 
 // KEYBOARD SHORTCUTS (Legacy - stored in localStorage for backward compat)
 // Note: These read/write from the store's initial keyboardShortcuts, not database
+
+/**
+ * Shortcut labels must be persisted as stable i18n KEYS ('appShortcutsPrompt.playPause'), never
+ * runtime translations. Older versions stored translated strings, which permanently desynchronized
+ * shortcut matching after a language switch. Rewrite any non-key label to the key at the same
+ * category/shortcut position (the shortcut list shape is fixed; custom key bindings are preserved).
+ *
+ * Idempotent: labels that already match the template keys are left untouched.
+ */
+export const normalizeShortcutLabelsToKeys = (storageData: LocalStorage): LocalStorage => {
+  const templateShortcuts = LOCAL_STORAGE_DEFAULT_TEMPLATE.keyboardShortcuts;
+  const persisted = storageData?.keyboardShortcuts;
+  if (!Array.isArray(persisted)) return storageData;
+
+  let changed = false;
+  const normalized = persisted.map((category, categoryIndex) => {
+    const templateCategory = templateShortcuts[categoryIndex];
+    if (!templateCategory) return category;
+
+    return {
+      ...category,
+      shortcutCategoryTitle: templateCategory.shortcutCategoryTitle,
+      shortcuts: category.shortcuts.map((shortcut, shortcutIndex) => {
+        const templateShortcut = templateCategory.shortcuts[shortcutIndex];
+        if (!templateShortcut || shortcut.label === templateShortcut.label) return shortcut;
+        changed = true;
+        return { ...shortcut, label: templateShortcut.label };
+      })
+    };
+  });
+
+  return changed ? { ...storageData, keyboardShortcuts: normalized } : storageData;
+};
 
 const getKeyboardShortcuts = (): ShortcutCategoryList => {
   const storage = getLocalStorage();

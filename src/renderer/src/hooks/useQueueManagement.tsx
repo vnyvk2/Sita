@@ -1,10 +1,17 @@
 import { useCallback } from 'react';
 
 import { getQueuesManager } from '../other/queuesManager';
+import type { CanonicalQueueRequestOptions } from '../other/queuesManager';
 import { dispatch, store } from '../store/store';
 
 export interface QueueManagementDependencies {
   playSong: (songId: number, isStartPlay?: boolean) => void;
+}
+
+/** UI-level canonical All Songs request; adds playback intent on top of the queue-domain options. */
+export interface PlayAllSongsOptions extends CanonicalQueueRequestOptions {
+  /** Whether resolving the request should start audio playback. Defaults to true. */
+  startPlaying?: boolean;
 }
 
 export function useQueueManagement(dependencies: QueueManagementDependencies) {
@@ -42,6 +49,25 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
       if (startPlaying && playerQueue.currentSongId) {
         playSong(playerQueue.currentSongId as number, true);
       }
+    },
+    [manager, playSong]
+  );
+
+  const playAllSongs = useCallback(
+    (options: PlayAllSongsOptions) => {
+      if (!options.songIds || options.songIds.length === 0) {
+        if (options.shuffle || options.startPlaying !== false) {
+          return console.error('Cannot create an empty queue.');
+        }
+        return undefined;
+      }
+
+      const playerQueue = manager.getOrCreateCanonicalQueue(options);
+
+      if (options.startPlaying !== false && playerQueue?.currentSongId != null) {
+        playSong(playerQueue.currentSongId, true);
+      }
+      return playerQueue;
     },
     [manager, playSong]
   );
@@ -112,6 +138,7 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
 
   return {
     createQueue,
+    playAllSongs,
     updateQueueData,
     toggleQueueShuffle,
     toggleShuffling,

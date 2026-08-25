@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { lazy } from 'react';
 
 import { releaseNotes, version } from '../../../../package.json';
@@ -22,6 +22,12 @@ export interface AppUpdatesDependencies {
   ) => void;
   /** Whether the app is currently online */
   isOnline: boolean;
+  /**
+   * When false, all update checking is halted: the startup check timeout and the periodic remote
+   * changelog polling interval are cleared, and no release-notes prompts can appear. Used to gate
+   * update activity in presentation modes that must stay passive (e.g. the mini player).
+   */
+  isEnabled?: boolean;
 }
 
 /**
@@ -63,7 +69,14 @@ export interface AppUpdatesDependencies {
  * @returns Object with update management functions
  */
 export function useAppUpdates(dependencies: AppUpdatesDependencies) {
-  const { changePromptMenuData, isOnline } = dependencies;
+  const { changePromptMenuData, isOnline, isEnabled = true } = dependencies;
+
+  /**
+   * Tracks whether the one-time post-startup changelog check has been scheduled. Without this,
+   * every transition back to normal mode re-arms the 5s startup timer and spams the remote
+   * changelog with duplicate requests during rapid mini/normal toggling.
+   */
+  const hasScheduledStartupCheckRef = useRef(false);
 
   /**
    * Updates the app update state in the store.
@@ -135,20 +148,30 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
 
   useEffect(
     () => {
-      // Check for app updates on app startup after 5 seconds
-      const timeoutId = setTimeout(checkForAppUpdates, 5000);
+      // When disabled (e.g. mini player mode), schedule nothing so no remote changelog polling
+      // happens and no release-notes modal can be generated over passive presentation modes.
+      if (!isEnabled) return undefined;
+
+      // Check for app updates once shortly after startup. Re-enabling after a mini player round
+      // trip resumes periodic polling but must NOT repeat the startup check.
+      const timeoutId = hasScheduledStartupCheckRef.current
+        ? undefined
+        : setTimeout(() => {
+            hasScheduledStartupCheckRef.current = true;
+            checkForAppUpdates();
+          }, 5000);
 
       // Check for app updates every 15 minutes
       const intervalId = setInterval(checkForAppUpdates, 1000 * 60 * 15);
 
       return () => {
-        clearTimeout(timeoutId);
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
         clearInterval(intervalId);
       };
     },
-    // Re-run when online status changes
+    // Re-run when online status or enabled state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isOnline]
+    [isOnline, isEnabled]
   );
 
   return {

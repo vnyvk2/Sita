@@ -28,6 +28,25 @@ if (process.env.REMOTE_DEBUGGING_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.REMOTE_DEBUGGING_PORT);
 }
 
+if (process.env.NORA_USER_DATA) {
+  fs.mkdirSync(process.env.NORA_USER_DATA, { recursive: true });
+  app.setPath('userData', process.env.NORA_USER_DATA);
+}
+memProfiler.stage('main-entry');
+
+if (memProfiler.enabled) {
+  process.on('unhandledRejection', (reason) => {
+    memProfiler.stage('unhandledRejection', {
+      reason: reason instanceof Error ? `${reason.message}\n${reason.stack}` : String(reason)
+    });
+  });
+  process.on('uncaughtException', (error) => {
+    memProfiler.stage('uncaughtException', {
+      reason: `${error?.message}\n${error?.stack ?? ''}`
+    });
+  });
+}
+
 import { version, appPreferences } from '../../package.json';
 import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import {
@@ -46,12 +65,14 @@ import checkForStartUpSongs from './core/checkForStartUpSongs';
 import manageTaskbarPlaybackButtonControls from './core/manageTaskbarPlaybackButtonControls';
 import { recoverLibraryAssets } from './core/recovery';
 // import { fileURLToPath, pathToFileURL } from 'url';
-import { closeDatabaseInstance } from './db/db';
+import { closeDatabaseInstance, isDatabaseStubbed } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
+import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
+import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
@@ -61,6 +82,7 @@ import { savePendingSongLyrics } from './saveLyricsToSong';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
 import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
+import memProfiler from './utils/memProfiler';
 
 // / / / / / / / CONSTANTS / / / / / / / / /
 const DEFAULT_APP_PROTOCOL = 'nora';
@@ -264,6 +286,7 @@ const installExtensions = async () => {
 };
 
 export const getBackgroundColor = async () => {
+  if (isDatabaseStubbed) return '#212226';
   const { isDarkMode } = await getUserSettings();
 
   if (isDarkMode) return '#212226';
@@ -332,7 +355,7 @@ const getPreloadPath = (): string => {
 };
 
 const createWindow = async () => {
-  if (IS_DEVELOPMENT) await installExtensions();
+  if (IS_DEVELOPMENT && !memProfiler.enabled) await installExtensions();
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -354,20 +377,63 @@ const createWindow = async () => {
   });
   ShutdownLogger.logBootMilestone('BrowserWindow created');
 
+  memProfiler.attachWindowDiagnostics(mainWindow);
+
   if (IS_DEVELOPMENT && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    mainWindow.loadFile(join(import.meta.dirname, '../renderer/index.html'));
+    let rendererIndexPath = join(import.meta.dirname, '../renderer/index.html');
+    if (memProfiler.enabled && !fs.existsSync(rendererIndexPath)) {
+      rendererIndexPath = join(app.getAppPath(), 'out', 'renderer', 'index.html');
+    }
+    mainWindow.loadFile(rendererIndexPath);
   }
   mainWindow.once('ready-to-show', () => {
-    if (app.hasSingleInstanceLock()) {
+    memProfiler.stage('ready-to-show');
+    if (app.hasSingleInstanceLock() && !isDatabaseStubbed) {
       logger.info('Initializing library lifecycle controller on startup.');
       void libraryLifecycleController.initialize();
     }
   });
+  mainWindow.webContents.once('did-finish-load', () => {
+    memProfiler.stage('did-finish-load');
+    manageWindowFinishLoad();
+  });
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {
     shell.openExternal(data.url);
     return { action: 'deny' };
+  });
+  attachRendererRecovery(mainWindow.webContents, {
+    getPlayerType: () => playerType,
+    onRecovered: (preCrashPlayerType) => {
+      // Main's playerType and window geometry survive a renderer-only crash,
+      // so changePlayerType is a no-op safeguard here. The RENDERER store,
+      // however, resets to 'normal' after a crash-triggered reload, and mini/
+      // full presentation is store-driven (not URL-driven). Re-assert the
+      // pre-crash presentation over the existing message channel until the
+      // renderer picks it up; repeats are idempotent on the renderer side.
+      void changePlayerType(preCrashPlayerType);
+      if (preCrashPlayerType === 'normal') return;
+
+      let attempts = 0;
+      const reassertInterval = setInterval(() => {
+        attempts += 1;
+        if (
+          attempts > 8 ||
+          !mainWindow ||
+          mainWindow.isDestroyed() ||
+          playerType !== preCrashPlayerType
+        ) {
+          clearInterval(reassertInterval);
+          return;
+        }
+        sendMessageToRenderer({
+          messageCode: 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY',
+          data: { playerType: preCrashPlayerType }
+        });
+      }, 750);
+    },
+    onRecoveryLimitExceeded: () => restartApp('renderer-crash-loop')
   });
 
   // mainWindow.on('closed', () => {
@@ -393,11 +459,17 @@ protocol.registerSchemesAsPrivileged([
 app
   .whenReady()
   .then(async () => {
-    const { windowState, zoomFactor } = await getUserSettings();
+    memProfiler.stage('when-ready');
+    memProfiler.startSampling(1500);
+
+    const { windowState, zoomFactor } = isDatabaseStubbed
+      ? { windowState: 'normal' as const, zoomFactor: null }
+      : await getUserSettings();
 
     currentWindowZoomFactor = normalizeZoomFactor(zoomFactor);
 
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    memProfiler.stage('window-created-and-loaded');
 
     if (windowState === 'maximized') mainWindow.maximize();
 
@@ -436,8 +508,6 @@ app
     });
 
     // powerMonitor.addListener('shutdown', (e) => e.preventDefault());
-
-    mainWindow.webContents.once('did-finish-load', manageWindowFinishLoad);
 
     app.on('before-quit', handleBeforeQuit);
 
@@ -488,6 +558,10 @@ app
     if (mainWindow) {
       initializeIPC(mainWindow, abortController.signal);
       ShutdownLogger.logBootMilestone('IPC initialized');
+      memProfiler.stage('ipc-initialized');
+      if (process.env.NORA_SCENARIO !== '0') {
+        void memProfiler.runBootScenario(mainWindow);
+      }
       checkForUpdates();
       //  / / / / / / / / / / / GLOBAL SHORTCUTS / / / / / / / / / / / / / /
       // globalShortcut.register('F5', () => {
@@ -514,6 +588,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   ShutdownLogger.logEventObservation('main.ts:app.on(will-quit)');
+  memProfiler.shutdown();
   void closeDatabaseInstance();
 });
 
@@ -875,15 +950,14 @@ function manageSecondInstanceArgs(args: string[]) {
   return undefined;
 }
 
-export function restartApp(reason: string, noQuitEvents = false) {
+export async function restartApp(reason: string, noQuitEvents = false) {
   logger.debug(`Requested a full app refresh.`, { reason });
 
   if (!noQuitEvents) {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       mainWindow.webContents.send('app/beforeQuitEvent');
     }
-    savePendingSongLyrics(currentSongPath, true);
-    savePendingMetadataUpdates(currentSongPath, true);
+    await flushPendingWritesBeforeExit(currentSongPath);
     closeAllAbortControllers();
   }
   app.relaunch();
@@ -988,8 +1062,10 @@ export async function getRendererLogs(
 
   if (forceWindowRestart) return mainWindow.reload();
   if (forceMainRestart) {
+    await flushPendingWritesBeforeExit(currentSongPath);
+    closeAllAbortControllers();
     app.relaunch();
-    return app.exit();
+    return app.exit(0);
   }
   return undefined;
 }

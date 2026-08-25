@@ -75,6 +75,14 @@ if (typeof window !== 'undefined') {
     },
     settings: {
       getUserSettings: vi.fn().mockResolvedValue({})
+    },
+    // store.ts invokes this during module initialization; provide a no-op for suites that do not
+    // stub the full preload bridge
+    storageHelpers: {
+      checkLocalStorage: vi.fn()
+    },
+    userData: {
+      saveUserData: vi.fn().mockResolvedValue(undefined)
     }
   };
 }

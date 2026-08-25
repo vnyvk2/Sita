@@ -103,12 +103,16 @@ const AppShortcutsPrompt = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [editingShortcut, newShortcut, newKeys, addNewNotifications]);
 
+  // Labels/titles are persisted as stable i18n keys; translate only at display time so language
+  // switches can never desynchronize shortcut matching. The strict i18n key union cannot express
+  // dynamically persisted keys, so widen through an explicit string-keyed translator.
+  const translateShortcutKey = (key: string): string => (t as (k: string) => string)(key);
   const shortcutCategoryComponents = useMemo(
     () =>
       shortcuts.map((category, categoryIndex) => (
         <li key={categoryIndex} className="shortcut-category mt-8">
           <div className="shortcut-category-title text-font-color-highlight dark:text-dark-font-color-highlight text-2xl">
-            {category.shortcutCategoryTitle}
+            {translateShortcutKey(category.shortcutCategoryTitle)}
           </div>
           <div className="shortcuts-container ml-4 flex flex-row flex-wrap justify-between">
             {category.shortcuts.map((shortcut, shortcutIndex) => {
@@ -124,7 +128,7 @@ const AppShortcutsPrompt = () => {
                       : ''
                   }`}
                 >
-                  <div className="shortcut-label opacity-75">{shortcut.label}</div>
+                  <div className="shortcut-label opacity-75">{translateShortcutKey(shortcut.label)}</div>
                   <div className="shortcut-keys flex items-center">
                     {isEditing ? (
                       <div className="flex items-center">

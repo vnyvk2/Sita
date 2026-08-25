@@ -27,7 +27,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      vitest: path.resolve(__dirname, './node_modules/vitest'),
+      // NOTE: never alias 'vitest' to its own package directory here. That resolves test files to
+      // a second vitest instance without runner state, breaking suites with
+      // "Cannot read properties of undefined (reading 'config')" and silently disabling vi.mock
+      // module interception.
       '@renderer': path.resolve(__dirname, './src/renderer/src'),
       '@assets': path.resolve(__dirname, './src/renderer/src/assets'),
       '@common': path.resolve(__dirname, './src/common'),
