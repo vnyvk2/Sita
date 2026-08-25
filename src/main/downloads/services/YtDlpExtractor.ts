@@ -18,6 +18,9 @@ import { ExtractorError, type OnlineExtractor, type OnlineSearchOptions } from '
 /** Containers Nora can ingest. Anything else (e.g. webm-only) is a surfaced failure. */
 const SUPPORTED_EXTENSIONS = new Set(['.m4a', '.mp3', '.opus', '.ogg', '.wav', '.flac', '.aac']);
 
+/** Hard ceiling for search result pages, regardless of what the caller asks for. */
+const MAX_SEARCH_LIMIT = 50;
+
 interface YtDlpFlatEntry {
   id?: string;
   title?: string;
@@ -44,7 +47,9 @@ export class YtDlpExtractor implements OnlineExtractor {
   readonly displayName = 'YouTube';
 
   async search(query: string, options?: OnlineSearchOptions): Promise<OnlineTrackResult[]> {
-    const limit = options?.limit ?? 25;
+    // The limit arrives from the renderer over IPC; clamp it so an unbounded
+    // value cannot make yt-dlp fetch thousands of results.
+    const limit = Math.min(Math.max(1, Math.floor(options?.limit ?? 25)), MAX_SEARCH_LIMIT);
     const trimmed = query.trim();
     if (!trimmed) return [];
 
@@ -96,6 +101,11 @@ export class YtDlpExtractor implements OnlineExtractor {
       // ogg-opus as fallback. Plain-webm results are rejected during verification.
       '-f',
       'bestaudio[ext=m4a]/bestaudio[ext=opus]',
+      // Enforce the duration contract BEFORE downloading anything: yt-dlp aborts
+      // right after metadata extraction instead of pulling gigabytes only to be
+      // discarded by the post-download validation.
+      '--match-filter',
+      `duration<=${ONLINE_DOWNLOADS_MAX_DURATION_SECS}`,
       '--windows-filenames',
       '--trim-filenames',
       '120',
@@ -185,6 +195,12 @@ export class YtDlpExtractor implements OnlineExtractor {
 
     const completed = findCompletedFile(outputDir);
     if (!completed) {
+      if (/does not pass filter/i.test(stderrTail)) {
+        throw new ExtractorError(
+          'The source exceeds the maximum duration allowed for downloads.',
+          'UNSUPPORTED_SOURCE'
+        );
+      }
       throw new ExtractorError('yt-dlp finished but no media file was found in staging.', 'EXTRACTION_FAILED');
     }
 
