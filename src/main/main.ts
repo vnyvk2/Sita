@@ -418,7 +418,12 @@ const createWindow = async () => {
       let attempts = 0;
       const reassertInterval = setInterval(() => {
         attempts += 1;
-        if (attempts > 8 || !mainWindow || mainWindow.isDestroyed()) {
+        if (
+          attempts > 8 ||
+          !mainWindow ||
+          mainWindow.isDestroyed() ||
+          playerType !== preCrashPlayerType
+        ) {
           clearInterval(reassertInterval);
           return;
         }
