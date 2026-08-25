@@ -422,7 +422,8 @@ const createWindow = async () => {
           attempts > 8 ||
           !mainWindow ||
           mainWindow.isDestroyed() ||
-          playerType !== preCrashPlayerType
+          playerType !== preCrashPlayerType ||
+          isChangingPlayerType
         ) {
           clearInterval(reassertInterval);
           return;
@@ -957,9 +958,14 @@ export async function restartApp(reason: string, noQuitEvents = false) {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       mainWindow.webContents.send('app/beforeQuitEvent');
     }
-    await flushPendingWritesBeforeExit(currentSongPath);
-    closeAllAbortControllers();
   }
+
+  // Pending filesystem writes (tag/lyrics queues) and in-flight operations are
+  // independent of renderer quit events; they must be settled on EVERY restart
+  // path so a relaunch never silently drops them.
+  await flushPendingWritesBeforeExit(currentSongPath);
+  closeAllAbortControllers();
+
   app.relaunch();
   app.exit(0);
 }
