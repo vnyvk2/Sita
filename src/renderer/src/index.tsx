@@ -59,6 +59,14 @@ declare module '@tanstack/react-router' {
   }
 }
 
+declare global {
+  interface Window {
+    __noraProfile?: { qc: typeof queryClient; router: typeof router };
+  }
+}
+
+window.__noraProfile = { qc: queryClient, router };
+
 const container = document.getElementById('root') as HTMLElement;
 const root = createRoot(container);
 

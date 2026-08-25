@@ -18,51 +18,85 @@ import { seedDatabase } from './seed';
 
 const DB_NAME = 'nora.pglite.db';
 const isTest = typeof process.env.VITEST !== 'undefined' || process.env.NODE_ENV === 'test';
-export const DB_PATH = isTest ? 'memory://' : app.getPath('userData') + '/' + DB_NAME;
+export const isDatabaseStubbed = !isTest && process.env.NORA_NO_PGLITE === '1';
+const useMemoryDb = !isTest && process.env.NORA_PGLITE_MEMORY === '1';
+
+const resolveUserDataDir = () => {
+  const override = process.env.NORA_USER_DATA;
+  if (override) {
+    mkdirSync(override, { recursive: true });
+    return override;
+  }
+  return app.getPath('userData');
+};
+
+export const DB_PATH =
+  isTest || useMemoryDb ? 'memory://' : resolveUserDataDir() + '/' + DB_NAME;
 const migrationsFolder = existsSync(path.join(app.getAppPath(), 'resources', 'drizzle'))
   ? path.join(app.getAppPath(), 'resources', 'drizzle')
   : path.join(process.cwd(), 'resources', 'drizzle');
 logger.debug(`Migrations folder: ${migrationsFolder}`);
 
-if (!isTest) {
+if (!isTest && !useMemoryDb && !isDatabaseStubbed) {
   mkdirSync(DB_PATH, { recursive: true });
 }
 
-ShutdownLogger.logBootMilestone('PGlite.create() start', { DB_PATH });
-const isDebugDb = process.env.DEBUG_DB === '1';
-const pgliteInstance = await PGlite.create(DB_PATH, {
-  debug: isDebugDb ? 1 : 0,
-  extensions: { pg_trgm, citext }
-});
-ShutdownLogger.logBootMilestone('PGlite.create() completed');
+let pgliteInstance: PGlite | null = null;
 
-pgliteInstance.onNotification((notification) => {
-  logger.info('Database notification:', { notification });
-});
+if (isDatabaseStubbed) {
+  ShutdownLogger.logBootMilestone('PGlite STUBBED via NORA_NO_PGLITE=1', { DB_PATH });
+} else {
+  ShutdownLogger.logBootMilestone('PGlite.create() start', { DB_PATH });
+  const isDebugDb = process.env.DEBUG_DB === '1';
+  pgliteInstance = await PGlite.create(DB_PATH, {
+    debug: isDebugDb ? 1 : 0,
+    extensions: { pg_trgm, citext }
+  });
+  ShutdownLogger.logBootMilestone('PGlite.create() completed');
 
-// Initialize extension types
-await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS citext;');
-await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+  pgliteInstance.onNotification((notification) => {
+    logger.info('Database notification:', { notification });
+  });
+
+  // Initialize extension types
+  await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS citext;');
+  await pgliteInstance.exec('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+}
 
 // Initialize Drizzle ORM
-export const db = drizzle(pgliteInstance, {
+const realDb = drizzle(pgliteInstance ?? ({} as PGlite), {
   schema
 });
-export type DB = typeof db;
+export type DB = typeof realDb;
 export type DBTransaction = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+export let db: DB;
+if (isDatabaseStubbed) {
+  db = new Proxy({} as DB, {
+    get() {
+      throw new Error('[Nora] Database is stubbed (NORA_NO_PGLITE=1). Query attempted.');
+    }
+  });
+} else {
+  db = realDb;
+}
 ShutdownLogger.logBootMilestone('Drizzle ORM initialized');
 
 export const closeDatabaseInstance = async () => {
   ShutdownLogger.logShutdownTransition(ShutdownState.ClosingDatabase, 'closeDatabaseInstance');
-  if (pgliteInstance.closed) return logger.debug('Database instance already closed.');
+  if (isDatabaseStubbed) return logger.debug('Database instance stubbed; nothing to close.');
+  if (!pgliteInstance || pgliteInstance.closed)
+    return logger.debug('Database instance already closed.');
 
   await pgliteInstance.close();
   logger.debug('Database instance closed.');
   ShutdownLogger.logShutdownTransition(ShutdownState.DatabaseClosed, 'closeDatabaseInstance');
 };
 
-await migrate(db, { migrationsFolder });
-await seedDatabase();
+if (!isDatabaseStubbed) {
+  await migrate(db, { migrationsFolder });
+  await seedDatabase();
+}
 
 export const nukeDatabase = async () => {
   try {
@@ -84,6 +118,9 @@ export const nukeDatabase = async () => {
 };
 
 export const exportDatabase = async () => {
+  if (isDatabaseStubbed || !pgliteInstance) {
+    throw new Error('[Nora] Database is stubbed; export unavailable.');
+  }
   const initialSearchPath = (
     await pgliteInstance.query<{ search_path: string }>('SHOW SEARCH_PATH;')
   ).rows[0].search_path;
@@ -111,6 +148,9 @@ export const exportDatabase = async () => {
  * @returns A promise that resolves to true when the import is successful.
  */
 export const importDatabase = async (query: string) => {
+  if (!pgliteInstance) {
+    throw new Error('[Nora] Database is stubbed; import unavailable.');
+  }
   await pgliteInstance.exec(query);
 
   logger.info('Database imported successfully.');

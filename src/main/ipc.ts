@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
 import { COMPACT_LYRICS_EXTENSION_HEIGHT } from '@common/miniPlayerConstants';
+import memProfiler from './utils/memProfiler';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import {
   playlistEngine,
@@ -288,12 +289,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/getAllSongs',
-      (
-        _,
-        sortType?: SongSortTypes,
-        filterType?: SongFilterTypes,
-        paginatingData?: PaginatingData
-      ) => getAllSongs(sortType, filterType, paginatingData)
+      (_, sortType?: SongSortTypes, filterType?: SongFilterTypes, paginatingData?: PaginatingData) =>
+        memProfiler.wrapHandler('app/getAllSongs', () =>
+          getAllSongs(sortType, filterType, paginatingData)
+        )
     );
 
     ipcMain.handle(
@@ -443,7 +442,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         filterType?: SongFilterTypes,
         limit?: number,
         preserveIdOrder = false
-      ) => getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
+      ) =>
+        memProfiler.wrapHandler('app/getSongInfo', () =>
+          getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
+        )
     );
 
     ipcMain.handle('app/getSimilarTracksForASong', (_, songId: number) => getSimilarTracks(songId));
