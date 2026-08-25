@@ -35,7 +35,8 @@ export class MutationExecutor {
       const syncResult = await this.relationalSync.syncRelationalDatabase(
         options.songId,
         options.filePath,
-        options.fieldMap
+        options.fieldMap,
+        options.tagPayload
       );
 
       return {

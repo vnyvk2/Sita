@@ -28,6 +28,7 @@ export interface MetadataFieldChanges {
   isrc?: string;
   musicBrainzRecordingId?: string;
   artworkPath?: string;
+  artworkBuffer?: Buffer;
 }
 
 export class SongMetadataBuilder {
@@ -94,7 +95,8 @@ export class SongMetadataBuilder {
           ? changes.musicBrainzRecordingId
           : (currentSong.musicBrainzRecordingId ?? undefined),
       isrc: changes.isrc !== undefined ? changes.isrc : (currentSong.isrc ?? undefined),
-      artworkPath: changes.artworkPath ?? undefined
+      artworkPath: changes.artworkPath ?? undefined,
+      ...(changes.artworkBuffer !== undefined && { artworkBuffer: changes.artworkBuffer })
     };
   }
 
