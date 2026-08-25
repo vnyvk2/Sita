@@ -12,6 +12,7 @@ import {
   type EnqueueDownloadInput,
   type DownloadsSnapshot
 } from './models/downloadTypes';
+import { assertUrlResolvesToPublicHost, UnsafeUrlError } from './services/artworkUrlGuard';
 import type { OnlineExtractor } from './services/OnlineExtractor';
 
 const CONCURRENCY = 2;
@@ -162,8 +163,6 @@ export class DownloadManager {
       if (!record.cancelRequested) cancelled += 1;
       record.cancelRequested = true;
       record.abortController?.abort();
-      // Jobs still waiting in the queue (not yet picked up by pump) settle here.
-      if (this.queue.includes(record.jobId)) this.finish(record, 'CANCELLED');
     }
     return cancelled;
   }
@@ -458,17 +457,87 @@ function toPublicState(record: JobRecord): DownloadJobState {
   };
 }
 
+/** Maximum artwork payload size (5 MB). Anything larger is almost certainly not album art. */
+const MAX_ARTWORK_BYTES = 5 * 1024 * 1024;
+
+/** Upper bound on redirects followed while fetching artwork. */
+const MAX_ARTWORK_REDIRECTS = 5;
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+/**
+ * Performs the fetch with every redirect hop validated before it is requested:
+ * scheme allowlist plus DNS/IP checks against loopback, private, link-local
+ * (cloud metadata), and other non-routable destinations. A compromised renderer
+ * must not be able to make the main process fetch internal resources.
+ */
+async function fetchArtworkResponse(url: string): Promise<Response> {
+    let currentUrl = url;
+    for (let hop = 0; ; hop += 1) {
+        await assertUrlResolvesToPublicHost(currentUrl);
+        const response = await fetch(currentUrl, { redirect: 'manual' });
+
+        if (!REDIRECT_STATUSES.has(response.status)) return response;
+        try {
+            await response.body?.cancel();
+        } catch {
+            // Drain failures are irrelevant for discarded redirect bodies.
+        }
+
+        if (hop >= MAX_ARTWORK_REDIRECTS) {
+            throw new UnsafeUrlError(`Too many redirects fetching artwork from ${url}`);
+        }
+        const location = response.headers.get('location');
+        if (!location) {
+            throw new UnsafeUrlError(`Redirect without Location header from ${currentUrl}`);
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+    }
+}
+
 async function fetchArtwork(url?: string): Promise<Buffer | null> {
-  if (!url) return null;
-  try {
-    const response = await fetch(url, { redirect: 'follow' });
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return buffer.length > 0 ? buffer : null;
-  } catch (error) {
-    logger.warn('[DownloadManager] Artwork fetch failed; continuing without cover art.', { error });
-    return null;
-  }
+    if (!url) return null;
+    try {
+        const response = await fetchArtworkResponse(url);
+        if (!response.ok) return null;
+
+        // Reject responses that are obviously not images.
+        const contentType = response.headers.get('content-type') ?? '';
+        if (contentType && !contentType.startsWith('image/')) {
+            logger.warn('[DownloadManager] Rejected artwork response with non-image content-type.', {
+                contentType
+            });
+            return null;
+        }
+
+        // Stream with a size cap to prevent OOM from unbounded payloads.
+        const chunks: Uint8Array[] = [];
+        let totalBytes = 0;
+        const reader = response.body?.getReader();
+        if (!reader) return null;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            totalBytes += value.byteLength;
+            if (totalBytes > MAX_ARTWORK_BYTES) {
+                await reader.cancel();
+                logger.warn('[DownloadManager] Artwork response exceeded size limit; discarding.', {
+                    totalBytes,
+                    limit: MAX_ARTWORK_BYTES
+                });
+                return null;
+            }
+            chunks.push(value);
+        }
+
+        const buffer = Buffer.concat(chunks);
+        return buffer.length > 0 ? buffer : null;
+    } catch (error) {
+        logger.warn('[DownloadManager] Artwork fetch failed; continuing without cover art.', { error });
+        return null;
+    }
 }
 
 function exists(filePath: string): boolean {
