@@ -53,13 +53,16 @@ export class MetadataApplyOrchestrator {
     this.getCurrentPlayingPath = options.getCurrentPlayingPath ?? (() => undefined);
   }
 
-  public execute(mutations: NormalizedMutation[], albumTitle?: string): Promise<OrchestratorResult> {
-    return runExclusiveMetadataApply(() => this.executeInternal(mutations, albumTitle));
+  public execute(
+    mutations: NormalizedMutation[],
+    opts?: { albumTitle?: string; groupUndo?: { description: string } }
+  ): Promise<OrchestratorResult> {
+    return runExclusiveMetadataApply(() => this.executeInternal(mutations, opts));
   }
 
   private async executeInternal(
     mutations: NormalizedMutation[],
-    albumTitle?: string
+    opts?: { albumTitle?: string; groupUndo?: { description: string } }
   ): Promise<OrchestratorResult> {
     const result: OrchestratorResult = {
       success: true,
@@ -69,23 +72,47 @@ export class MetadataApplyOrchestrator {
       errors: []
     };
 
+    const groupPrev: SongMetadataSnapshot[] = [];
+    const groupUpdated: SongMetadataSnapshot[] = [];
+    let groupHadFailure = false;
+
     for (const mutation of mutations) {
       try {
-        const outcome = await this.executeSingle(mutation);
+        const outcome = await this.executeSingle(mutation, {
+          groupUndo: opts?.groupUndo,
+          onSnapshots: (prev, upd) => {
+            groupPrev.push(prev);
+            groupUpdated.push(upd);
+          }
+        });
         if (outcome.deferred) result.deferredCount += 1;
         else if (outcome.success) result.updatedCount += 1;
         else {
           result.failedCount += 1;
+          groupHadFailure = true;
           result.errors.push(outcome.error ?? 'Unknown orchestrator failure');
         }
       } catch (err: unknown) {
         result.failedCount += 1;
+        groupHadFailure = true;
         const msg = err instanceof Error ? err.message : String(err);
         result.errors.push(`[${mutation.mutationId}] ${msg}`);
       }
     }
 
-    void albumTitle;
+    // Grouped undo: one journal entry covering the whole operation
+    if (opts?.groupUndo && !groupHadFailure && groupPrev.length > 0) {
+      await this.historyService.pushSnapshot({
+        id: `orch-group-${mutations[0]?.operationId ?? Date.now()}`,
+        timestamp: Date.now(),
+        description: opts.groupUndo.description,
+        ...(opts.albumTitle !== undefined && { albumTitle: opts.albumTitle }),
+        songIds: groupPrev.map((s) => s.songId),
+        previousSongs: groupPrev,
+        updatedSongs: groupUpdated
+      });
+    }
+
     result.success = result.failedCount === 0;
     return result;
   }
@@ -136,7 +163,13 @@ export class MetadataApplyOrchestrator {
     return p.replace(/^file:\/\/\/?/, '');
   }
 
-  private async executeSingle(m: NormalizedMutation): Promise<{ success: boolean; deferred?: boolean; error?: string }> {
+  private async executeSingle(
+    m: NormalizedMutation,
+    group?: {
+      groupUndo?: { description: string };
+      onSnapshots?: (prev: SongMetadataSnapshot, updated: SongMetadataSnapshot) => void;
+    }
+  ): Promise<{ success: boolean; deferred?: boolean; error?: string }> {
     // ── Phase 0: pre-state + artwork ──────────────────────────────────────
     const currentRow = await getSongById(m.songId);
     if (!currentRow) return { success: false, error: `Song ${m.songId} not found` };
@@ -252,15 +285,21 @@ export class MetadataApplyOrchestrator {
     setIf('isrc', this.fieldNew(m, 'isrc') as string | undefined);
     setIf('musicBrainzRecordingId', this.fieldNew(m, 'musicBrainzRecordingId') as string | undefined);
 
-    await this.historyService.pushSnapshot({
-      id: `orch-${m.mutationId}`,
-      timestamp: Date.now(),
-      description: m.undo.description,
-      ...(m.undo.albumTitle !== undefined && { albumTitle: m.undo.albumTitle }),
-      songIds: [m.songId],
-      previousSongs: [previous],
-      updatedSongs: [updatedSnapshot]
-    });
+    if (group?.groupUndo) {
+      // Grouped mode: snapshots are collected by executeInternal and pushed
+      // as ONE journal entry covering the whole operation.
+      group.onSnapshots?.(previous, updatedSnapshot);
+    } else {
+      await this.historyService.pushSnapshot({
+        id: `orch-${m.mutationId}`,
+        timestamp: Date.now(),
+        description: m.undo.description,
+        ...(m.undo.albumTitle !== undefined && { albumTitle: m.undo.albumTitle }),
+        songIds: [m.songId],
+        previousSongs: [previous],
+        updatedSongs: [updatedSnapshot]
+      });
+    }
 
     // ── Phase 3: file phase (atomic; deferred when playing) ───────────────
     const payload = this.buildTagPayload(m, artworkBuffer);
