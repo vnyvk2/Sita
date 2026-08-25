@@ -17,6 +17,7 @@ import type { MetadataContribution } from '@main/metadata/domain/MetadataContrib
 import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
 import type { FieldContribution } from '../../resolution/MetadataMergeEngine';
 import { MetadataQueryNormalizer } from '../../search/MetadataQueryNormalizer';
+import { escapeLuceneValue } from './luceneEscape';
 import { MetadataSearchRankingEngine } from '../../search/MetadataSearchRankingEngine';
 
 export interface MusicBrainzAdapterOptions {
@@ -159,9 +160,9 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     // MusicBrainz indexes the base release title, so searching with edition suffixes
     // often produces poor or no results.
     const searchTitle = normQuery.cleanTitle || album;
-    const queryParts: string[] = [`release:"${searchTitle}"`];
+    const queryParts: string[] = [`release:"${escapeLuceneValue(searchTitle)}"`];
     if (normQuery.cleanArtist) {
-      queryParts.push(`artist:"${normQuery.cleanArtist}"`);
+      queryParts.push(`artist:"${escapeLuceneValue(normQuery.cleanArtist)}"`);
     }
 
     let rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER, signal);
@@ -169,9 +170,9 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     // Fallback: if clean title search returned nothing and we stripped edition info,
     // retry with the original raw title
     if (rawReleases.length === 0 && searchTitle !== album) {
-      const fallbackParts: string[] = [`release:"${album}"`];
+      const fallbackParts: string[] = [`release:"${escapeLuceneValue(album)}"`];
       if (normQuery.cleanArtist) {
-        fallbackParts.push(`artist:"${normQuery.cleanArtist}"`);
+        fallbackParts.push(`artist:"${escapeLuceneValue(normQuery.cleanArtist)}"`);
       }
       rawReleases = await this.apiClient.searchReleases(fallbackParts.join(' AND '), SEARCH_BUFFER, signal);
     }
@@ -310,7 +311,9 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   }
 
   public async searchRecordings(title: string, artist?: string, limit = 10): Promise<Array<{ id: string; title: string; artist?: string; album?: string; year?: number; confidenceScore?: number }>> {
-    const query = artist ? `recording:"${title}" AND artist:"${artist}"` : `recording:"${title}"`;
+    const query = artist
+      ? `recording:"${escapeLuceneValue(title)}" AND artist:"${escapeLuceneValue(artist)}"`
+      : `recording:"${escapeLuceneValue(title)}"`;
     const recordings = await this.apiClient.searchRecordings(query, limit);
 
     return recordings.map((r) => ({
@@ -350,10 +353,10 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     const artist = identity.getSearchArtist();
 
     if (title && artist) {
-      return `recording:"${title}" AND artist:"${artist}"`;
+      return `recording:"${escapeLuceneValue(title)}" AND artist:"${escapeLuceneValue(artist)}"`;
     }
     if (title) {
-      return `recording:"${title}"`;
+      return `recording:"${escapeLuceneValue(title)}"`;
     }
     return '';
   }
