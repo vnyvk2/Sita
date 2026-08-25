@@ -6,6 +6,9 @@ import {
   linkArtworksToAlbum,
   saveArtworks
 } from '@main/db/queries/artworks';
+import { db } from '@main/db/db';
+import logger from '@main/logger';
+import { processArtworkFiles } from '@main/other/artworks';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
 
 import { ASSET_EVENTS } from '../libraryChoreography';
