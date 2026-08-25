@@ -12,9 +12,9 @@ import Song from '@renderer/components/SongsPage/Song';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queueQuery } from '@renderer/queries/queue';
-import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
 import {
   calculateQueueSuffixDurations,
@@ -112,19 +112,24 @@ function RouteComponent() {
   const queueId = viewingQueue?.id ?? queue.queues[viewingQueueIndex]?.id ?? 'active';
   const membershipVersion = viewingQueue?.membershipVersion ?? 0;
 
-  const { data: queuedSongs } = useQuery({
-    ...songQuery.queue({
-      songIds: currentQueue,
-      queueId,
-      membershipVersion
-    }),
-    enabled: currentQueue.length > 0
+  const { getItem, onRangeChange } = useWindowHydration(currentQueue, `${queueId}:${membershipVersion}`, {
+    keyPrefix: 'queue'
   });
 
-  const queuedSongsMap = useMemo(() => {
-    if (!queuedSongs || queuedSongs.length === 0) return new Map<number, SongData>();
-    return new Map(queuedSongs.map((s) => [s.songId, s]));
-  }, [queuedSongs]);
+  const durationsQuery = useQuery({
+    queryKey: ['queue', 'durations', queueId, membershipVersion],
+    queryFn: () => window.api.audioLibraryControls.getSongDurations(currentQueue),
+    enabled: currentQueue.length > 0,
+    staleTime: 60 * 1000
+  });
+
+  const durationsMap = useMemo(
+    () =>
+      new Map<number, { duration: number }>(
+        (durationsQuery.data ?? []).map((entry) => [entry.id, { duration: entry.duration }])
+      ),
+    [durationsQuery.data]
+  );
 
   const { data: queueInfo } = useQuery({
     ...queueQuery.info({
@@ -198,7 +203,11 @@ function RouteComponent() {
   //   };
   // }, [fetchAllSongsData]);
 
-  const selectAllHandler = useSelectAllHandler(queuedSongs || [], 'songs', 'songId');
+  const selectAllStubs = useMemo(
+    () => currentQueue.map((id) => ({ songId: id })),
+    [currentQueue]
+  );
+  const selectAllHandler = useSelectAllHandler(selectAllStubs, 'songs', 'songId');
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return undefined;
@@ -250,8 +259,8 @@ function RouteComponent() {
 
   // Precomputed suffix sum array and total duration in a single backward pass
   const { suffixDurations, queueDuration } = useMemo(
-    () => calculateQueueSuffixDurations(currentQueue, queuedSongsMap),
-    [currentQueue, queuedSongsMap]
+    () => calculateQueueSuffixDurations(currentQueue, durationsMap),
+    [currentQueue, durationsMap]
   );
 
   const activeQueuePosition = queue.queues[queue.currentQueueIndex]?.position ?? 0;
@@ -493,8 +502,7 @@ function RouteComponent() {
                     droppableId="droppable"
                     mode="virtual"
                     renderClone={(provided, _, rubric) => {
-                      const songId = currentQueue[rubric.source.index];
-                      const data = queuedSongsMap.get(songId);
+                      const data = getItem(rubric.source.index);
                       if (!data) return null;
                       return (
                         <Song
@@ -525,6 +533,7 @@ function RouteComponent() {
                         ref={ListRef}
                         scrollerRef={droppableProvided.innerRef}
                         scrollKey={scrollKey}
+                        onChange={onRangeChange}
                         components={{
                           Item: ({ children, ...props }: { children?: ReactNode }) => (
                             <div {...props} className="height-preserving-container">
@@ -533,7 +542,7 @@ function RouteComponent() {
                           )
                         }}
                         itemContent={(index, songId) => {
-                          const song = queuedSongsMap.get(songId);
+                          const song = getItem(index);
                           if (!song) return null;
 
                           return (

@@ -1,12 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 
-import {
-  SONG_WINDOW_GC_TIME,
-  SONG_WINDOW_SIZE,
-  SONG_WINDOW_STALE_TIME,
-  songCacheKeys
-} from '../queries/songs';
+import { SONG_WINDOW_GC_TIME, SONG_WINDOW_SIZE, SONG_WINDOW_STALE_TIME } from '../queries/songs';
 
 interface WindowRange {
   startIndex: number;
@@ -22,10 +17,17 @@ interface WindowRange {
  */
 export function useWindowHydration(
   ids: readonly number[],
-  idsVersion: number,
-  options?: { enabled?: boolean; extraRowsBefore?: number; extraRowsAfter?: number }
+  idsVersion: number | string,
+  options?: {
+    enabled?: boolean;
+    extraRowsBefore?: number;
+    extraRowsAfter?: number;
+    /** Cache-key namespace; use a distinct prefix when list order is not library order (e.g. queues). */
+    keyPrefix?: string;
+  }
 ) {
-  const { enabled = true, extraRowsBefore = 50, extraRowsAfter = 100 } = options ?? {};
+  const { enabled = true, extraRowsBefore = 50, extraRowsAfter = 100, keyPrefix = 'songs' } =
+    options ?? {};
 
   const [visibleRange, setVisibleRange] = useState<WindowRange>({ startIndex: 0, endIndex: 0 });
 
@@ -67,7 +69,7 @@ export function useWindowHydration(
 
   const queries = useQueries({
     queries: windows.map((window) => ({
-      queryKey: songCacheKeys.window(idsVersion, window.startIndex),
+      queryKey: [keyPrefix, 'window', idsVersion, window.startIndex],
       queryFn: () =>
         window.api.audioLibraryControls.getSongInfo(
           ids.slice(window.startIndex, window.endIndex),
