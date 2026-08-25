@@ -1044,7 +1044,8 @@ declare global {
     | 'RESYNC_SUCCESSFUL'
     | 'LIBRARY_SCHEDULER_UPDATE'
     | 'LIBRARY_BATCH_COMPLETE'
-    | 'SHOW_MINI_PLAYER_CONTEXT_MENU';
+    | 'SHOW_MINI_PLAYER_CONTEXT_MENU'
+    | 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY';
 
   interface RunningJobInfo {
     id: string;

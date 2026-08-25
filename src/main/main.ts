@@ -72,6 +72,7 @@ import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeEx
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
+import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
@@ -401,6 +402,33 @@ const createWindow = async () => {
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {
     shell.openExternal(data.url);
     return { action: 'deny' };
+  });
+  attachRendererRecovery(mainWindow.webContents, {
+    getPlayerType: () => playerType,
+    onRecovered: (preCrashPlayerType) => {
+      // Main's playerType and window geometry survive a renderer-only crash,
+      // so changePlayerType is a no-op safeguard here. The RENDERER store,
+      // however, resets to 'normal' after a crash-triggered reload, and mini/
+      // full presentation is store-driven (not URL-driven). Re-assert the
+      // pre-crash presentation over the existing message channel until the
+      // renderer picks it up; repeats are idempotent on the renderer side.
+      void changePlayerType(preCrashPlayerType);
+      if (preCrashPlayerType === 'normal') return;
+
+      let attempts = 0;
+      const reassertInterval = setInterval(() => {
+        attempts += 1;
+        if (attempts > 8 || !mainWindow || mainWindow.isDestroyed()) {
+          clearInterval(reassertInterval);
+          return;
+        }
+        sendMessageToRenderer({
+          messageCode: 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY',
+          data: { playerType: preCrashPlayerType }
+        });
+      }, 750);
+    },
+    onRecoveryLimitExceeded: () => restartApp('renderer-crash-loop')
   });
 
   // mainWindow.on('closed', () => {
