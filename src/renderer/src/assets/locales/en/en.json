@@ -785,7 +785,9 @@
     "artwork": "Artwork",
     "trackInfo": "Track Info",
     "panelLayout": "Panel Layout",
-    "resetToDefault": "Reset to default position"
+    "resetToDefault": "Reset to default position",
+    "searchPlaceholder": "Search songs, artists, albums…",
+    "searchHint": "Type to search your library"
   },
 
   "time": {
