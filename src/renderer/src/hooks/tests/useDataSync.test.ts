@@ -70,9 +70,31 @@ describe('useDataSync - Query Invalidation & Batching', () => {
     it('should isolate genre events to genre queries only', () => {
       const targets = getInvalidationTargetsForEvent('genres/newGenre');
 
-      expect(targets).toEqual(['genres:all', 'genres:single']);
+      expect(targets).toEqual(['genres:all', 'genres:single', 'analytics:listening']);
       expect(targets).not.toContain('songs:all');
       expect(targets).not.toContain('artists:all');
+    });
+
+    it('should bump ID lists and facets for structural song events (windowed hydration era)', () => {
+      const targets = getInvalidationTargetsForEvent('songs');
+
+      expect(targets).toContain('songs:ids');
+      expect(targets).toContain('songs:facets');
+      // transition-safety net while legacy consumers remain
+      expect(targets).toContain('songs:all');
+    });
+
+    it('should bump ID lists for tag edits (order/filter parity) without surgical windows', () => {
+      const targets = getInvalidationTargetsForEvent('songs/updatedSong');
+
+      expect(targets).toContain('songs:ids');
+      expect(targets).toContain('songs:facets');
+      expect(targets).not.toContain('songs:windows');
+    });
+
+    it('should request surgical window refresh for likes and artwork events', () => {
+      expect(getInvalidationTargetsForEvent('songs/likes')).toContain('songs:windows');
+      expect(getInvalidationTargetsForEvent('songs/artworks')).toContain('songs:windows');
     });
   });
 
@@ -134,8 +156,39 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       // Flush the scheduled frame
       scheduledCallback!();
 
-      // Minimal union: artists:all, artists:single, home:recentSongArtists, search:query (4 unique targets)
-      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(4);
+      // Minimal union: artists:all, artists:single, home:recentSongArtists, search:query,
+      // analytics:listening (5 unique targets)
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(5);
+    });
+
+    it('should surgically invalidate only the hydration windows containing changed song ids', () => {
+      const invalidateQueries = vi.fn();
+      const libraryIds = Array.from({ length: 400 }, (_, i) => i + 1);
+      const mockCacheClient = {
+        invalidateQueries,
+        getQueryCache: () => ({
+          findAll: () => [
+            {
+              state: {
+                dataUpdatedAt: 1000,
+                data: { ids: libraryIds, total: 400, blacklistedIds: [] }
+              }
+            }
+          ]
+        })
+      } as unknown as QueryClient;
+
+      const batcher = new DataSyncBatcher(testScheduler, mockCacheClient);
+      batcher.handleEvents([
+        { dataType: 'songs/likes', eventData: [{ data: [11] }] },
+        { dataType: 'songs/artworks', eventData: [{ data: [250] }] }
+      ]);
+      scheduledCallback!();
+
+      const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]?.queryKey);
+      // id 11 -> index 10 -> window 0; id 250 -> index 249 -> window 200 (version 1000)
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 1000, 0]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 1000, 200]);
     });
 
     it('should clean up and cancel scheduled frame on unmount/cleanup', () => {
