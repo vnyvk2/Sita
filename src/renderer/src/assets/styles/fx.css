@@ -1,0 +1,394 @@
+/* ==========================================================================
+   Nora Glow — FX Kit styles
+
+   Zero-dependency visual effect primitives used by components/ui fx kit
+   (src/renderer/src/components/fx). Pure CSS: no animation library, no
+   canvas, no per-frame JS.
+
+   Performance contract:
+   - Animate ONLY compositor-friendly properties (transform / opacity /
+     registered custom properties consumed by gradients).
+   - Filters appear only as STATIC paints (e.g. pre-blurred ambient art),
+     never animated.
+   - Every effect degrades to a tasteful static visual when motion is off:
+     * @media (prefers-reduced-motion: reduce)
+     * app-level ".reduced-motion" class (handled globally in styles.css)
+     * a surface marked with [data-fx-paused] or .fx-paused (master pause)
+
+   Theming contract:
+   - Tokens DERIVE from existing theme channel vars (--background-color-1,
+     --text-color, --foreground-color-1, ...) so all theme presets and the
+     dark remap block in styles.css apply automatically. No dark variants
+     needed here.
+   ========================================================================== */
+
+@property --fx-beam-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ? NORA GLOW TOKENS ------------------------------------------------------ */
+:root {
+  /* Glass recipe (HSL channels, consumed as hsl(var(--x) / <alpha>)) */
+  --fx-glass-tint: var(--background-color-1);
+  --fx-glass-line: var(--text-color);
+
+  /* Accent ramp (HSL channels) fed by dynamic theme / presets */
+  --fx-accent: var(--foreground-color-1);
+  --fx-accent-alt: var(--text-color-highlight);
+  --fx-accent-third: var(--text-color-highlight-2);
+}
+
+/* ? GLASS SURFACE ----------------------------------------------------------
+   Formalizes the app's existing glassmorphic language (translucent bg +
+   backdrop-blur utilities) into one reusable primitive. Static cost only. */
+.fx-glass {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--fx-glass-tint) / 0.72),
+    hsl(var(--fx-glass-tint) / 0.52)
+  );
+  backdrop-filter: blur(20px) saturate(1.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  border: 1px solid hsl(var(--fx-glass-line) / 0.08);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--fx-glass-tint) / 0.35),
+    0 4px 12px rgb(0 0 0 / 0.08);
+}
+
+/* ? BORDER BEAM ------------------------------------------------------------
+   Conic highlight sweeping around the border. Progressive enhancement:
+   without @property support the angle stays at its initial value and the
+   ::before simply renders an elegant STATIC gradient ring. */
+.fx-beam {
+  position: relative;
+  isolation: isolate;
+}
+
+.fx-beam::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: var(--fx-beam-width, 1.5px);
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--fx-beam-angle),
+    transparent 0turn,
+    transparent 0.66turn,
+    hsl(var(--fx-beam-from, var(--fx-accent)) / 0.85) 0.84turn,
+    hsl(var(--fx-beam-to, var(--fx-accent-alt))) 0.93turn,
+    transparent 1turn
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+.fx-beam--animate::before {
+  animation: fx-beam-spin var(--fx-beam-duration, 6s) linear infinite;
+}
+
+.fx-beam--reverse.fx-beam--animate::before {
+  animation-direction: reverse;
+}
+
+@keyframes fx-beam-spin {
+  to {
+    --fx-beam-angle: 360deg;
+  }
+}
+
+/* ? SPOTLIGHT --------------------------------------------------------------
+   Pointer-following radial sheen. Geometry lives in two custom properties
+   written by SpotlightCard (rAF-throttled, hovered only). With no JS the
+   ::after still renders a static top-edge glow on hover/focus. */
+.fx-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.fx-spotlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 250ms ease;
+  background: radial-gradient(
+    var(--fx-spotlight-size, 320px) circle at
+      var(--fx-spotlight-x, 50%)
+      var(--fx-spotlight-y, 0%),
+    hsl(
+      var(--fx-spotlight-color, var(--fx-accent)) /
+        var(--fx-spotlight-intensity, 0.14)
+    ),
+    transparent 70%
+  );
+}
+
+.fx-spotlight:hover::after,
+.fx-spotlight:focus-within::after {
+  opacity: 1;
+}
+
+/* ? SHIMMER SKELETON -------------------------------------------------------
+   Content placeholders. Sweep rides a transform (compositor-only); the
+   base plate is a static paint. Reduced motion parks the sweep off-canvas. */
+.fx-skeleton {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background: hsl(var(--fx-glass-line) / 0.07);
+  border-radius: var(--fx-skeleton-radius, 0.5rem);
+}
+
+.fx-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--fx-accent) / 0.08) 35%,
+    hsl(var(--fx-glass-tint) / 0.55) 50%,
+    transparent
+  );
+  animation: fx-shimmer var(--fx-shimmer-duration, 1.6s) ease-in-out infinite;
+}
+
+.fx-skeleton--static::after {
+  animation: none;
+}
+
+@keyframes fx-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ? DOT LOADERS ------------------------------------------------------------
+   sv-matrix-flavored loading indicators. Orbit rotates ONE element;
+   pulse/wave animate transform+opacity on tiny primitives only. */
+.fx-dots {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Orbit — a ring of dots carried by a single rotating wrapper */
+.fx-dots__orbit {
+  position: absolute;
+  inset: 0;
+  animation: fx-orbit-spin var(--fx-orbit-duration, 1.2s) linear infinite;
+}
+
+.fx-dots__orbit-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-left: calc(var(--fx-dot-size) / -2);
+  margin-top: calc(var(--fx-dot-size) / -2);
+  width: var(--fx-dot-size);
+  height: var(--fx-dot-size);
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+@keyframes fx-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulse — 3x3 grid breathing scale+opacity (geometry supplied inline) */
+.fx-dots__pulse-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: fx-pulse-dot var(--fx-pulse-duration, 1.05s) ease-in-out infinite;
+}
+
+@keyframes fx-pulse-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.72);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Wave — bars scaling from their baseline */
+.fx-dots__wave-bar {
+  display: inline-block;
+  width: var(--fx-bar-width);
+  height: 100%;
+  border-radius: 9999px;
+  background: currentColor;
+  transform-origin: 50% 100%;
+  animation: fx-wave-bar var(--fx-wave-duration, 0.72s) ease-in-out infinite
+    alternate;
+}
+
+@keyframes fx-wave-bar {
+  0% {
+    transform: scaleY(0.22);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: loaders become quiet static glyphs */
+@media (prefers-reduced-motion: reduce) {
+  .fx-dots__orbit,
+  .fx-dots__pulse-dot,
+  .fx-dots__wave-bar,
+  .fx-skeleton::after,
+  .fx-beam--animate::before {
+    animation: none !important;
+  }
+
+  .fx-dots__wave-bar {
+    transform: scaleY(0.35);
+  }
+
+  .fx-dots__pulse-dot {
+    opacity: 0.55;
+    transform: none;
+  }
+}
+
+/* ? AURORA -----------------------------------------------------------------
+   Soft color washes built from radial gradients (NO filter blur — the
+   gradient falloff IS the softness). Long transform-only drifts. */
+.fx-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-aurora__blob {
+  position: absolute;
+  width: var(--fx-blob-size, 60%);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle closest-side,
+    var(--fx-blob-color, hsl(var(--fx-accent) / 0.5)) 0%,
+    transparent 72%
+  );
+  opacity: var(--fx-blob-opacity, 0.5);
+  will-change: transform;
+}
+
+.fx-aurora--animate .fx-aurora__blob {
+  animation: fx-aurora-a var(--fx-blob-duration-a, 34s) ease-in-out infinite
+    alternate;
+}
+
+.fx-aurora--animate .fx-aurora__blob:nth-child(2) {
+  animation-name: fx-aurora-b;
+  animation-duration: var(--fx-blob-duration-b, 44s);
+}
+
+.fx-aurora--animate .fx-aurora__blob:nth-child(3) {
+  animation-name: fx-aurora-c;
+  animation-duration: var(--fx-blob-duration-c, 39s);
+}
+
+@keyframes fx-aurora-a {
+  from {
+    transform: translate3d(-7%, -5%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(9%, 7%, 0) scale(1.14);
+  }
+}
+
+@keyframes fx-aurora-b {
+  from {
+    transform: translate3d(11%, 5%, 0) scale(1.08);
+  }
+  to {
+    transform: translate3d(-9%, -7%, 0) scale(0.94);
+  }
+}
+
+@keyframes fx-aurora-c {
+  from {
+    transform: translate3d(-5%, 9%, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(7%, -8%, 0) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-aurora--animate .fx-aurora__blob {
+    animation: none !important;
+  }
+}
+
+/* ? AMBIENT GLOW -----------------------------------------------------------
+   Pre-blurred artwork ambience. The blur is a STATIC filter paint on the
+   <img>; drift animates the wrapper's transform only, so the blurred
+   raster is never recomputed per frame. Overlay fades into the page bg. */
+.fx-ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-ambient__layer {
+  position: absolute;
+  inset: -8%; /* headroom so drift never exposes edges */
+}
+
+.fx-ambient__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translateZ(0);
+}
+
+.fx-ambient__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--fx-glass-tint) / 0.2),
+    hsl(var(--fx-glass-tint) / 0.92)
+  );
+}
+
+/* ? MASTER PAUSE -----------------------------------------------------------
+   Any surface can opt out of ALL (fx + legacy) looping animations by
+   setting [data-fx-paused] or .fx-paused — e.g. minimized windows,
+   hidden tabs, battery saver. Pausing keeps current state (no jump). */
+[data-fx-paused] *,
+.fx-paused * {
+  animation-play-state: paused !important;
+}
