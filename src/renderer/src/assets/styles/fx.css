@@ -384,6 +384,40 @@
   );
 }
 
+/* ? CARD & ROW MOTION ------------------------------------------------------
+   Composable motion utilities for library surfaces.
+   - .fx-rise: mount reveal (Virtuoso mounts items as they scroll into
+     range, so grids get free staggered-feel scroll reveals with zero JS).
+     Uses `backwards` fill so the end state hands off cleanly to hover
+     transitions (animations would otherwise override them forever).
+   - .fx-press: tactile press-down. Deliberately owns ONLY the :active
+     transform — pair with a Tailwind transition utility (e.g.
+     `transition-[...,transform]`) so cascades never fight. */
+.fx-rise {
+  animation: fx-rise 0.28s ease-out backwards;
+}
+
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.fx-press:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-rise {
+    animation: none !important;
+  }
+
+  .fx-press:not(:disabled):active {
+    transform: none;
+  }
+}
+
 /* ? MASTER PAUSE -----------------------------------------------------------
    Any surface can opt out of ALL (fx + legacy) looping animations by
    setting [data-fx-paused] or .fx-paused — e.g. minimized windows,

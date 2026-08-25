@@ -458,11 +458,11 @@ const SongCard = (props: SongCardProp) => {
       style={{
         animationDelay: `${50 * (index + 1)}ms`
       }}
-      className={`song song-card appear-from-bottom ${songId} ${
+      className={`song song-card fx-spotlight appear-from-bottom ${songId} ${
         currentSongData.songId === songId && 'current-song'
       } ${
         isSongPlaying && 'playing'
-      } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color] ease-in-out ${
+      } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color,transform] duration-200 ease-out hover:-translate-y-0.5 ${
         className || ''
       } ${
         isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && 'border-4'
