@@ -544,6 +544,25 @@ export const metadataUndoSnapshots = pgTable(
   (t) => [index('metadata_undo_snapshots_seq_idx').on(t.seq)]
 );
 
+/**
+ * Durable deferred metadata file writes (2c P4): one self-contained, merged
+ * TagData payload per song path, replayed on flush triggers and deleted on
+ * success. Part of the DB-first correctness model - a crash between the DB
+ * commit and the file write is recovered from here instead of drifting.
+ */
+export const metadataPendingWrites = pgTable(
+  'metadata_pending_writes',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    songPath: text('song_path').notNull().unique(),
+    tags: jsonb('tags').$type<Record<string, unknown>>().notNull(),
+    isKnownSource: boolean('is_known_source').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (t) => [index('metadata_pending_writes_song_path_idx').on(t.songPath)]
+);
+
 export const userSettings = pgTable(
   'user_settings',
   {

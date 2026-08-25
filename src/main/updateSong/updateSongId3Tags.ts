@@ -10,6 +10,7 @@ import parseLyrics from '../../common/parseLyrics';
 import { parseGenreList } from '../../common/genreUtils';
 import { updateCachedLyrics } from '../core/getSongLyrics';
 import { syncSongRelationalData } from '../parseSong/syncSongRelationalData';
+import { MetadataPendingWritesRepository } from '../metadata/history/MetadataPendingWritesRepository';
 import saveLyricsToLRCFile from '../core/saveLyricsToLrcFile';
 import sendSongMetadata from '../core/sendSongMetadata';
 import { db } from '../db/db';
@@ -157,6 +158,7 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
         dataUpdateEvent('albums');
         dataUpdateEvent('genres');
         pendingMetadataUpdates.delete(songPath);
+        void pendingWritesRepo.deleteBySongPath(songPath).catch(() => undefined);
       } catch (error) {
         logger.error(`Failed to save pending metadata update of a song. `, { error, songPath });
       }
@@ -222,8 +224,43 @@ const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
  * P2 bridge: durable-pending storage arrives in P4. Until then the playing-
  * song deferral keeps using the existing in-memory coalescing queue.
  */
-export const queueMetadataWriteForPlayingSong = (songPath: string, tags: TagData) => {
-  addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
+const pendingWritesRepo = new MetadataPendingWritesRepository();
+
+export const queueMetadataWriteForPlayingSong = async (songPath: string, tags: TagData): Promise<void> => {
+  // Durable-first (2c P4): persist the merged payload BEFORE touching the
+  // in-memory queue so a crash right after enqueue still replays the write.
+  await pendingWritesRepo.upsert({
+    id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    songPath,
+    tags: tags as unknown as Record<string, unknown>,
+    isKnownSource: true
+  });
+  const outcome = addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
+  // When the flush ran immediately it already consumed the durable row.
+  if (!(outcome as { deferred?: boolean })?.deferred) {
+    await pendingWritesRepo.deleteBySongPath(songPath);
+  }
+};
+
+/**
+ * Boot-time recovery: replays any deferred writes persisted by a previous
+ * session. Called after DB bootstrap; nothing is playing yet, so every item
+ * can be flushed immediately.
+ */
+export const restorePersistedPendingWrites = async (): Promise<void> => {
+  const items = await pendingWritesRepo.listAll();
+  if (items.length === 0) return;
+  logger.info(`Restoring ${items.length} persisted pending metadata write(s).`);
+  for (const item of items) {
+    pendingMetadataUpdates.set(item.songPath, {
+      songPath: item.songPath,
+      tags: item.tags as unknown as TagData,
+      isKnownSource: item.isKnownSource
+    });
+    await pendingWritesRepo.deleteBySongPath(item.songPath);
+    // Hydrate first, then let the standard flush own success/retention logic
+  }
+  await savePendingMetadataUpdates('', true);
 };
 export const fetchArtworkBufferFromURL = async (url: string) => {
   try {

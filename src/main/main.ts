@@ -214,6 +214,12 @@ const APP_INFO = {
 logger.debug(`Starting up Nora`, { APP_INFO });
 ShutdownLogger.logBootMilestone('Application boot', { APP_INFO });
 
+// 2c P4: replay deferred metadata writes persisted by a previous session.
+// Nothing is playing during boot, so every item flushes immediately.
+void import('./updateSong/updateSongId3Tags')
+  .then((m) => m.restorePersistedPendingWrites())
+  .catch((err) => logger.error('Failed to restore persisted pending metadata writes', { err }));
+
 function launchExtensionBackgroundWorkers(session = electronSession.defaultSession) {
   return Promise.all(
     session.extensions.getAllExtensions().map(async (extension) => {
