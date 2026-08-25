@@ -1,3 +1,5 @@
+import { MetadataHistoryRepository } from './MetadataHistoryRepository';
+
 export interface SongMetadataSnapshot {
   songId: number;
   path: string;
@@ -23,16 +25,39 @@ export interface MetadataHistorySnapshot {
   updatedSongs: SongMetadataSnapshot[];
 }
 
+/**
+ * Undo history for metadata operations.
+ *
+ * When constructed with a {@link MetadataHistoryRepository} the undo stack is
+ * durably persisted: snapshots survive app restarts and crashes. The in-memory
+ * stack mirrors the durable rows for synchronous `canUndo` checks; it is
+ * lazily hydrated from storage on first async access.
+ *
+ * The redo stack remains intentionally memory-only.
+ */
 export class MetadataHistoryService {
-  private readonly undoStack: MetadataHistorySnapshot[] = [];
-  private readonly redoStack: MetadataHistorySnapshot[] = [];
+  private readonly repository?: MetadataHistoryRepository;
   private readonly maxStackSize: number;
+  private undoStack: MetadataHistorySnapshot[] = [];
+  private readonly redoStack: MetadataHistorySnapshot[] = [];
+  private hydrationPromise?: Promise<void>;
 
-  constructor(maxStackSize = 20) {
-    this.maxStackSize = maxStackSize;
+  constructor(repositoryOrMaxSize?: number | MetadataHistoryRepository, maxStackSize = 20) {
+    if (typeof repositoryOrMaxSize === 'number') {
+      this.maxStackSize = repositoryOrMaxSize;
+    } else {
+      this.repository = repositoryOrMaxSize;
+      this.maxStackSize = maxStackSize;
+    }
   }
 
-  public pushSnapshot(snapshot: MetadataHistorySnapshot): void {
+  public async pushSnapshot(snapshot: MetadataHistorySnapshot): Promise<void> {
+    // Durable-first: a crash between insert and mirror still leaves the row,
+    // which is re-hydrated on next launch.
+    if (this.repository) {
+      await this.repository.insert(snapshot);
+    }
+
     this.undoStack.push(snapshot);
     if (this.undoStack.length > this.maxStackSize) {
       this.undoStack.shift();
@@ -40,30 +65,39 @@ export class MetadataHistoryService {
     this.redoStack.length = 0; // Clear redo stack on new action
   }
 
-  public popUndo(targetSongId?: number): MetadataHistorySnapshot | undefined {
+  /**
+   * Returns the snapshot an undo would restore WITHOUT consuming it.
+   * Callers must invoke {@link confirmUndo} only after the restore succeeded,
+   * so a failed undo remains retryable.
+   */
+  public async peekUndo(targetSongId?: number): Promise<MetadataHistorySnapshot | undefined> {
+    await this.hydrate();
+
     if (this.undoStack.length === 0) return undefined;
 
-    let index = this.undoStack.length - 1;
     if (targetSongId !== undefined) {
       const foundIdx = this.undoStack.findLastIndex(
         (snap) => snap.songIds?.includes(targetSongId) || snap.previousSongs.some((s) => s.songId === targetSongId)
       );
-      if (foundIdx !== -1) index = foundIdx;
+      return foundIdx !== -1 ? this.undoStack[foundIdx] : undefined;
     }
 
-    const [snapshot] = this.undoStack.splice(index, 1);
-    if (snapshot) {
-      this.redoStack.push(snapshot);
-    }
-    return snapshot;
+    return this.undoStack[this.undoStack.length - 1];
   }
 
-  public popRedo(): MetadataHistorySnapshot | undefined {
-    const snapshot = this.redoStack.pop();
-    if (snapshot) {
-      this.undoStack.push(snapshot);
+  /** Removes a previously-peeked snapshot from the durable journal and stack. */
+  public async confirmUndo(id: string): Promise<void> {
+    if (this.repository) {
+      await this.repository.deleteById(id);
     }
-    return snapshot;
+
+    const index = this.undoStack.findIndex((snap) => snap.id === id);
+    if (index !== -1) {
+      const [snapshot] = this.undoStack.splice(index, 1);
+      if (snapshot) {
+        this.redoStack.push(snapshot);
+      }
+    }
   }
 
   public get canUndo(): boolean {
@@ -74,8 +108,23 @@ export class MetadataHistoryService {
     return this.redoStack.length > 0;
   }
 
-  public clear(): void {
+  public async clear(): Promise<void> {
+    if (this.repository) {
+      await this.repository.clearAll();
+    }
     this.undoStack.length = 0;
     this.redoStack.length = 0;
+  }
+
+  private hydrate(): Promise<void> {
+    if (!this.repository || this.hydrationPromise) return this.hydrationPromise ?? Promise.resolve();
+
+    this.hydrationPromise = (async () => {
+      const rows = await this.repository!.listNewestFirst(this.maxStackSize);
+      // rows are newest-first; the stack wants newest-last
+      this.undoStack = rows.reverse();
+    })();
+
+    return this.hydrationPromise;
   }
 }

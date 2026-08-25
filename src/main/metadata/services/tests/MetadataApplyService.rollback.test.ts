@@ -363,4 +363,47 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       musicBrainzRecordingId: 'mbid-abc'
     });
   });
+
+  it('keeps the undo snapshot retryable when the physical restore fails', async () => {
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi
+      .fn()
+      .mockResolvedValueOnce([{ filePath: '/m/a.mp3', success: false, error: 'EACCES: locked' }])
+      .mockResolvedValue([{ filePath: '/m/a.mp3', success: true }]);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-retry',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [{ songId: 1, path: '/m/a.mp3', title: 'Original Title' }],
+      updatedSongs: []
+    });
+
+    // First attempt fails on disk...
+    const firstAttempt = await service.undoLastAutoTag();
+    expect(firstAttempt.success).toBe(false);
+
+    // ...snapshot must NOT have been consumed by the failed attempt
+    expect(historyService.canUndo).toBe(true);
+
+    // Second attempt succeeds and now consumes the snapshot
+    const secondAttempt = await service.undoLastAutoTag();
+    expect(secondAttempt.success).toBe(true);
+    expect(secondAttempt.restoredCount).toBe(1);
+    expect(mockWriteBatch).toHaveBeenCalledTimes(2);
+    expect(historyService.canUndo).toBe(false);
+
+    // Nothing left to undo afterwards
+    const third = await service.undoLastAutoTag();
+    expect(third.success).toBe(false);
+    expect(third.errors?.[0]).toContain('No AutoTag history available');
+  });
 });

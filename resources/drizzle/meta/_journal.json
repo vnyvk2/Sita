@@ -1,160 +1,167 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1761368199897,
-      "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1768031138355,
-      "tag": "0001_add_user_preferences",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775380800000,
-      "tag": "0002_add_zoom_factor_to_user_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784692546156,
-      "tag": "0003_real_deadpool",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785070817960,
-      "tag": "0004_harmonized_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1785175089606,
-      "tag": "0005_mysterious_santa_claus",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1785176421091,
-      "tag": "0006_ambitious_vapor",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1785303490776,
-      "tag": "0007_mighty_hellfire_club",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1785338380277,
-      "tag": "0008_amusing_jackpot",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1785338380278,
-      "tag": "0009_rename_reverse_data",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1785352788264,
-      "tag": "0010_add_dependencies",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1785385500910,
-      "tag": "0011_add_pinned_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1785800000000,
-      "tag": "0012_add_metadata_overrides",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1785900000000,
-      "tag": "0013_add_album_is_favorite",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1786000000000,
-      "tag": "0014_add_mini_player_mode",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1786100000000,
-      "tag": "0015_add_library_scan_mode",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1786200000000,
-      "tag": "0016_add_mbid_isrc_to_songs",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1786300000000,
-      "tag": "0017_add_palette_unique_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1786400000000,
-      "tag": "0018_add_metadata_preferences",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1786500000000,
-      "tag": "0019_add_spotify_integrations",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1786600000000,
-      "tag": "0020_add_spotify_playlist_links",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1786700000000,
-      "tag": "0021_add_language_to_songs",
-      "breakpoints": true
-    }
-  ]
+    "version":  "7",
+    "dialect":  "postgresql",
+    "entries":  [
+                    {
+                        "idx":  0,
+                        "version":  "7",
+                        "when":  1761368199897,
+                        "tag":  "0000_init",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  1,
+                        "version":  "7",
+                        "when":  1768031138355,
+                        "tag":  "0001_add_user_preferences",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  2,
+                        "version":  "7",
+                        "when":  1775380800000,
+                        "tag":  "0002_add_zoom_factor_to_user_settings",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  3,
+                        "version":  "7",
+                        "when":  1784692546156,
+                        "tag":  "0003_real_deadpool",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  4,
+                        "version":  "7",
+                        "when":  1785070817960,
+                        "tag":  "0004_harmonized_schema",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  5,
+                        "version":  "7",
+                        "when":  1785175089606,
+                        "tag":  "0005_mysterious_santa_claus",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  6,
+                        "version":  "7",
+                        "when":  1785176421091,
+                        "tag":  "0006_ambitious_vapor",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  7,
+                        "version":  "7",
+                        "when":  1785303490776,
+                        "tag":  "0007_mighty_hellfire_club",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  8,
+                        "version":  "7",
+                        "when":  1785338380277,
+                        "tag":  "0008_amusing_jackpot",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  9,
+                        "version":  "7",
+                        "when":  1785338380278,
+                        "tag":  "0009_rename_reverse_data",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  10,
+                        "version":  "7",
+                        "when":  1785352788264,
+                        "tag":  "0010_add_dependencies",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  11,
+                        "version":  "7",
+                        "when":  1785385500910,
+                        "tag":  "0011_add_pinned_at",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  12,
+                        "version":  "7",
+                        "when":  1785800000000,
+                        "tag":  "0012_add_metadata_overrides",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  13,
+                        "version":  "7",
+                        "when":  1785900000000,
+                        "tag":  "0013_add_album_is_favorite",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  14,
+                        "version":  "7",
+                        "when":  1786000000000,
+                        "tag":  "0014_add_mini_player_mode",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  15,
+                        "version":  "7",
+                        "when":  1786100000000,
+                        "tag":  "0015_add_library_scan_mode",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  16,
+                        "version":  "7",
+                        "when":  1786200000000,
+                        "tag":  "0016_add_mbid_isrc_to_songs",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  17,
+                        "version":  "7",
+                        "when":  1786300000000,
+                        "tag":  "0017_add_palette_unique_index",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  18,
+                        "version":  "7",
+                        "when":  1786400000000,
+                        "tag":  "0018_add_metadata_preferences",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  19,
+                        "version":  "7",
+                        "when":  1786500000000,
+                        "tag":  "0019_add_spotify_integrations",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  20,
+                        "version":  "7",
+                        "when":  1786600000000,
+                        "tag":  "0020_add_spotify_playlist_links",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  21,
+                        "version":  "7",
+                        "when":  1786700000000,
+                        "tag":  "0021_add_language_to_songs",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  22,
+                        "version":  "7",
+                        "when":  1786800000000,
+                        "tag":  "0022_add_metadata_undo_snapshots",
+                        "breakpoints":  true
+                    }
+                ]
 }

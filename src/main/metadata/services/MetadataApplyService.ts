@@ -490,7 +490,7 @@ export class MetadataApplyService {
         updatedSongs
       };
 
-      this.historyService.pushSnapshot(historySnapshot);
+      await this.historyService.pushSnapshot(historySnapshot);
     } catch (err: unknown) {
       const rollbackResults = await this.tagWriter.writeBatch(rollbackPayloads);
       const failedRollbacks = rollbackResults.filter((r) => !r.success);
@@ -516,7 +516,9 @@ export class MetadataApplyService {
   }
 
   public async undoLastAutoTag(): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> {
-    const snapshot = this.historyService.popUndo();
+    // Peek without consuming: the snapshot stays in the durable journal until
+    // the restore fully succeeded, so a failed undo remains retryable.
+    const snapshot = await this.historyService.peekUndo();
     if (!snapshot) {
       return { success: false, restoredCount: 0, errors: ['No AutoTag history available to undo'] };
     }
@@ -633,6 +635,9 @@ export class MetadataApplyService {
           });
         }
       }
+
+      // Only now is the undo considered done: drop the snapshot from the journal.
+      await this.historyService.confirmUndo(snapshot.id);
 
       return { success: true, restoredCount: snapshot.previousSongs.length };
     } catch (err: unknown) {
