@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
 import Img from '../Img';
+import { AuroraBackground } from '../fx';
 import SeekBarSlider from '../SeekBarSlider';
 import TitleBar from '../TitleBar/TitleBar';
 import LyricsContainer from './containers/LyricsContainer';
@@ -50,6 +51,7 @@ const FullScreenPlayer = () => {
 
   return (
     <div
+      data-fx-paused={!isCurrentSongPlaying || undefined}
       className={`full-screen-player dark bg-dark-background-color-1! relative ${!isCurrentSongPlaying && 'paused'} ${
         preferences?.isReducedMotion ? 'reduced-motion' : ''
       } grid !h-screen w-full grid-rows-[auto_1fr] overflow-y-hidden`}
@@ -61,6 +63,13 @@ const FullScreenPlayer = () => {
           loading="eager"
           alt="Song Cover"
           className={`h-full w-full object-cover shadow-lg blur-none brightness-[.25]! transition-[filter] delay-100 duration-200 ease-in-out ${isLyricsVisible ? 'blur-[2rem]!' : 'blur-[2rem]!'}`}
+        />
+        {/* Accent aurora washes above the blurred art - compositor-only drifts,
+            paused via [data-fx-paused] while playback is paused */}
+        <AuroraBackground
+          animated={!preferences?.isReducedMotion}
+          intensity={0.32}
+          colors={['var(--fx-accent)', 'var(--fx-accent-third)', 'var(--fx-accent-alt)']}
         />
         {/* <div className="absolute inset-0 h-full w-full bg-linear-to-r from-black/50 to-black/5"></div> */}
       </div>

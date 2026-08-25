@@ -9,6 +9,7 @@ import calculateTime from '../../../utils/calculateTime';
 import Button from '../../Button';
 import LyricsIcon from '../../Icons/LyricsIcon';
 import Img from '../../Img';
+import { BorderBeam } from '../../fx';
 import UpNextSongPopup from '../../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../../VolumeSlider';
 
@@ -83,13 +84,20 @@ const SongInfoContainer = (props: Props) => {
       } ${!isCurrentSongPlaying && isLyricsVisible && 'visible! opacity-100!'}`}
     >
       <div className="song-img-controls-and-info-container text-font-color-white relative grid grid-cols-[12rem_1fr] flex-row items-center gap-8 lg:ml-4 lg:w-full">
-        <Img
-          src={currentSongData.artworkPath}
-          fallbackSrc={DefaultSongCover}
-          loading="eager"
-          alt="Song Cover"
-          className="aspect-auto w-full rounded-md object-cover shadow-md"
-        />
+        <BorderBeam
+          className="w-full rounded-md"
+          thickness={1.5}
+          duration={9}
+          animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
+        >
+          <Img
+            src={currentSongData.artworkPath}
+            fallbackSrc={DefaultSongCover}
+            loading="eager"
+            alt="Song Cover"
+            className="aspect-auto w-full rounded-md object-cover shadow-md"
+          />
+        </BorderBeam>
         <div className="song-controls-and-info-container flex h-full flex-col justify-between">
           <div className="song-controls-container flex h-fit items-center">
             <Button

@@ -418,6 +418,15 @@
   }
 }
 
+/* ? TEXT GLOW ---------------------------------------------------------------
+   Static accent halo for hero text (active lyric line). A pre-painted
+   text-shadow costs nothing per frame — it only toggles with the class. */
+.fx-glow-text {
+  text-shadow:
+    0 0 16px hsl(var(--fx-accent) / 0.35),
+    0 0 44px hsl(var(--fx-accent) / 0.2);
+}
+
 /* ? MASTER PAUSE -----------------------------------------------------------
    Any surface can opt out of ALL (fx + legacy) looping animations by
    setting [data-fx-paused] or .fx-paused — e.g. minimized windows,
