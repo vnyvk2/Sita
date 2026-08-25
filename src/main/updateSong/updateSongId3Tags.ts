@@ -66,7 +66,7 @@ import { libraryScheduler } from '../workers/jobScheduler';
 
 import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import isPathAWebURL from '../utils/isPathAWebUrl';
-import { withFileHandle } from '../utils/withFileHandle';
+import { withAtomicFileWrite } from '../utils/withAtomicFileWrite';
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
@@ -115,7 +115,7 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
 
     if (forceSave || !isACurrentlyPlayingSong) {
       try {
-        await withFileHandle(songPath, async (file) => {
+        await withAtomicFileWrite(songPath, async (file) => {
           const { tags } = pendingMetadata;
 
           // Write metadata using node-taglib-sharp
@@ -151,7 +151,7 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
             file.tag.lyrics = tags.lyrics;
           }
 
-          file.save();
+          // saved atomically by withAtomicFileWrite
         });
 
         // Save lyrics to LRC file if needed

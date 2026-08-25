@@ -2,7 +2,7 @@ import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
 import sharp from 'sharp';
 
 import { removeDefaultAppProtocolFromFilePath } from '../../fs/resolveFilePaths';
-import { withFileHandle } from '../../utils/withFileHandle';
+import { withAtomicFileWrite } from '../../utils/withAtomicFileWrite';
 
 export interface TagWritePayload {
   filePath: string;
@@ -44,7 +44,7 @@ export class TagWriterService {
 
       const realPath = removeDefaultAppProtocolFromFilePath(payload.filePath);
 
-      await withFileHandle(realPath, async (file) => {
+      await withAtomicFileWrite(realPath, async (file) => {
         if (payload.title !== undefined) file.tag.title = payload.title ?? '';
         if (payload.artist !== undefined) {
           file.tag.performers = payload.artist ? [payload.artist] : [];
@@ -98,8 +98,6 @@ export class TagWriterService {
             console.warn(`[TagWriterService] Failed to embed artwork for ${payload.filePath}:`, artErr);
           }
         }
-
-        file.save();
       });
 
       return { filePath: payload.filePath, success: true };
