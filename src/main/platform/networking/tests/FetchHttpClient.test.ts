@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FetchHttpClient } from '../FetchHttpClient';
+import { FetchHttpClient, HttpError } from '../FetchHttpClient';
 
 type FetchMock = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -74,5 +74,27 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
     const res = await client.request<{ ok: boolean }>({ url: 'https://api.example.com/ok' });
     expect(res.status).toBe(200);
     expect(res.data).toEqual({ ok: true });
+  });
+
+  it('attaches lowercase response headers to thrown HttpErrors (Retry-After visibility)', async () => {
+    const fakeResponse = {
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: new Map([
+        ['content-type', 'application/json'],
+        ['retry-after', '5']
+      ]),
+      json: async () => ({ message: 'rate limited' }),
+      text: async () => ''
+    } as unknown as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse) as unknown as typeof fetch);
+
+    const err = await client.request({ url: 'https://api.example.com/limited' }).catch((e: Error) => e);
+
+    expect(err).toBeInstanceOf(HttpError);
+    const httpError = err as HttpError;
+    expect(httpError.status).toBe(429);
+    expect(httpError.responseHeaders?.['retry-after']).toBe('5');
   });
 });

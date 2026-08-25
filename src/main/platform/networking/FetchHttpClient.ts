@@ -5,14 +5,22 @@ export class HttpError extends Error {
   public readonly statusText: string;
   public readonly responseUrl: string;
   public readonly responseBody?: unknown;
+  public readonly responseHeaders?: Record<string, string>;
 
-  constructor(status: number, statusText: string, responseUrl: string, responseBody?: unknown) {
+  constructor(
+    status: number,
+    statusText: string,
+    responseUrl: string,
+    responseBody?: unknown,
+    responseHeaders?: Record<string, string>
+  ) {
     super(`HTTP Error ${status} (${statusText}) for URL: ${responseUrl}`);
     this.name = 'HttpError';
     this.status = status;
     this.statusText = statusText;
     this.responseUrl = responseUrl;
     this.responseBody = responseBody;
+    this.responseHeaders = responseHeaders;
   }
 }
 
@@ -91,7 +99,7 @@ export class FetchHttpClient implements IHttpClient {
       }
 
       if (!response.ok) {
-        throw new HttpError(response.status, response.statusText, fullUrl, responseData);
+        throw new HttpError(response.status, response.statusText, fullUrl, responseData, responseHeaders);
       }
 
       return {
