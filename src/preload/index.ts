@@ -429,7 +429,13 @@ const settings = {
   updateSaveVerboseLogs: (enable: boolean): Promise<void> =>
     ipcRenderer.invoke('app/saveUserSettings', { saveVerboseLogs: enable }),
   updateLibraryScanMode: (mode: LibraryScanMode): Promise<void> =>
-    ipcRenderer.invoke('app/updateLibraryScanMode', mode)
+    ipcRenderer.invoke('app/updateLibraryScanMode', mode),
+  updateOnlineDownloadsFolder: (folderPath: string | null): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', { onlineDownloadsFolder: folderPath }),
+  updateDownloadsDuplicatePolicy: (policy: DuplicatePolicy): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', { downloadsDuplicatePolicy: policy }),
+  updateAddDownloadsToLibrary: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', { addDownloadsToLibrary: enabled })
 };
 
 // $ FOLDER DATA
@@ -631,6 +637,35 @@ const settingsHelpers = {
     ipcRenderer.invoke('app/getIgnoredDuplicateMetadata'),
   addIgnoredDuplicate: (duplicateGroupId: string, songId: number): Promise<void> =>
     ipcRenderer.invoke('app/addIgnoredDuplicate', duplicateGroupId, songId)
+};
+
+// $ ONLINE DOWNLOADS
+const downloads = {
+  search: (query: string, limit?: number): Promise<OnlineTrackResult[]> =>
+    ipcRenderer.invoke('downloads/search', query, limit),
+  resolvePlaylist: (urlOrId: string): Promise<OnlinePlaylistInfo> =>
+    ipcRenderer.invoke('downloads/resolvePlaylist', urlOrId),
+  enqueue: (
+    input: EnqueueDownloadInput
+  ): Promise<{ jobId: string; status: DownloadJobState['status'] }> =>
+    ipcRenderer.invoke('downloads/enqueue', input),
+  enqueueMany: (
+    inputs: EnqueueDownloadInput[],
+    playlistId?: string,
+    playlistName?: string
+  ): Promise<{ queued: number; duplicates: number }> =>
+    ipcRenderer.invoke('downloads/enqueueMany', inputs, playlistId, playlistName),
+  cancel: (jobId: string): Promise<boolean> => ipcRenderer.invoke('downloads/cancel', jobId),
+  getState: (): Promise<DownloadsSnapshot> => ipcRenderer.invoke('downloads/getState'),
+  ensureFolderRegistered: (): Promise<void> =>
+    ipcRenderer.invoke('downloads/ensureFolderRegistered'),
+  onUpdated: (callback: (snapshot: DownloadsSnapshot) => void) => {
+    const listener = (_: unknown, snapshot: DownloadsSnapshot) => callback(snapshot);
+    ipcRenderer.on('downloads/updated', listener);
+    return () => {
+      ipcRenderer.removeListener('downloads/updated', listener);
+    };
+  }
 };
 
 // $ APP RESTART OR RESET
@@ -850,6 +885,7 @@ export const api = {
   collections,
   membership,
   metadata,
+  downloads,
   metadataAutoTag: {
     searchAlbums: (albumName: string, artistName?: string, options?: MetadataSearchOptions) =>
       ipcRenderer.invoke('metadata/searchAlbums', albumName, artistName, options),

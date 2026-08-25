@@ -41,3 +41,6 @@ electron.vite.config.*.mjs
 memory_report_*.json
 phase1_mini_report.json
 
+# Downloaded external binaries for online downloads (fetched via `npm run fetch:binaries`)
+resources/bin/
+
