@@ -157,6 +157,7 @@ export class MetadataApplyService {
     // remains for direct unit tests constructed without one.
     if (this.orchestrator) {
       const opId = options?.operationId ?? 'default';
+      const albumTitle = preview.album.title;
       const normalized = targetMatches.map((match) => {
         // Contract whitelist: unknown ids (e.g. artworkUrl) are excluded -
         // artwork travels through its own normalized channel.
@@ -221,7 +222,6 @@ export class MetadataApplyService {
         };
       });
 
-      const albumTitle = preview.album.title;
       const orchRes = await this.orchestrator.execute(normalized, {
         albumTitle,
         groupUndo: { description: `AutoTag applied for ${albumTitle}` }
