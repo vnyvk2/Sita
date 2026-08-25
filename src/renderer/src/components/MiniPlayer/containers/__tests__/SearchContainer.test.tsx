@@ -158,8 +158,14 @@ describe('MiniPlayer SearchContainer', () => {
   const typeQuery = async (keyword: string) => {
     const input = screen.getByPlaceholderText('Search songs, artists, albums…');
     fireEvent.change(input, { target: { value: keyword } });
-    // Wait past the component's 250ms debounce window
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Poll past the component's 250ms debounce window instead of a fixed sleep so the
+    // suite stays deterministic under heavy CPU contention (parallel workers)
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Type to search your library')).toBeNull();
+      },
+      { timeout: 3000 }
+    );
   };
 
   it('shows the empty-library hint before a keyword is typed', () => {
@@ -183,7 +189,7 @@ describe('MiniPlayer SearchContainer', () => {
     renderContainer();
     await typeQuery('daft');
 
-    const songRow = screen.getByTestId('mini-search-song-2');
+    const songRow = await screen.findByTestId('mini-search-song-2', undefined, { timeout: 3000 });
     fireEvent.click(songRow);
 
     expect(mockContextValue.createQueue).toHaveBeenCalledWith(
@@ -207,8 +213,13 @@ describe('MiniPlayer SearchContainer', () => {
     renderContainer();
     await typeQuery('daft');
 
+    await waitFor(
+      () => {
+        expect(screen.getAllByTitle('Add to queue')).toHaveLength(2);
+      },
+      { timeout: 3000 }
+    );
     const addButtons = screen.getAllByTitle('Add to queue');
-    expect(addButtons.length).toBe(2);
     fireEvent.click(addButtons[0]);
 
     expect(addSongIdToEnd).toHaveBeenCalledWith(1);
@@ -222,7 +233,9 @@ describe('MiniPlayer SearchContainer', () => {
     renderContainer();
     await typeQuery('daft');
 
-    fireEvent.click(screen.getByTestId('mini-search-artist-11'));
+    fireEvent.click(
+      await screen.findByTestId('mini-search-artist-11', undefined, { timeout: 3000 })
+    );
 
     // Hydration fetch resolves blacklist flags; song 99 must be filtered out
     await waitFor(() => {
@@ -242,7 +255,9 @@ describe('MiniPlayer SearchContainer', () => {
     renderContainer();
     await typeQuery('daft');
 
-    fireEvent.click(screen.getByTestId('mini-search-album-21'));
+    fireEvent.click(
+      await screen.findByTestId('mini-search-album-21', undefined, { timeout: 3000 })
+    );
 
     await waitFor(() => {
       expect(mockContextValue.createQueue).toHaveBeenCalledWith(
