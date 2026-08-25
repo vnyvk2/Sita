@@ -18,7 +18,15 @@ import { seedDatabase } from './seed';
 
 const DB_NAME = 'nora.pglite.db';
 const isTest = typeof process.env.VITEST !== 'undefined' || process.env.NODE_ENV === 'test';
-export const DB_PATH = isTest ? 'memory://' : app.getPath('userData') + '/' + DB_NAME;
+// Isolation override resolved AT THE CONSUMPTION POINT (bundlers may reorder
+// module side-effects, so userDataGuard's setPath alone is not sufficient).
+const isIsolatedDev =
+  !app.isPackaged && typeof process.env.NORA_USER_DATA_DIR === 'string' && process.env.NORA_USER_DATA_DIR.length > 0;
+export const DB_PATH = isTest
+  ? 'memory://'
+  : isIsolatedDev
+    ? path.join(path.resolve(process.env.NORA_USER_DATA_DIR as string), DB_NAME)
+    : app.getPath('userData') + '/' + DB_NAME;
 const migrationsFolder = existsSync(path.join(app.getAppPath(), 'resources', 'drizzle'))
   ? path.join(app.getAppPath(), 'resources', 'drizzle')
   : path.join(process.cwd(), 'resources', 'drizzle');
