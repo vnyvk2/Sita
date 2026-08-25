@@ -80,6 +80,27 @@ vi.mock(
 );
 
 vi.mock(
+  '../../../../../../src/renderer/src/components/MiniPlayer/containers/SearchContainer',
+  () => ({
+    default: ({
+      isSearchVisible,
+      onClose
+    }: {
+      isSearchVisible: boolean;
+      onClose: () => void;
+    }) => (
+      <div
+        data-testid="search-container"
+        data-visible={String(isSearchVisible)}
+        onClick={onClose}
+      >
+        Search (Visible: {String(isSearchVisible)})
+      </div>
+    )
+  })
+);
+
+vi.mock(
   '../../../../../../src/renderer/src/components/MiniPlayer/containers/LyricsContainer',
   () => ({
     default: () => <div data-testid="lyrics-container">Lyrics</div>

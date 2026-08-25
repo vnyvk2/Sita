@@ -568,6 +568,10 @@ const miniPlayer = {
     isExpanded: boolean
   ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
     ipcRenderer.invoke('app/toggleMiniPlayerLyrics', isExpanded),
+  toggleMiniPlayerSearch: (
+    isExpanded: boolean
+  ): Promise<{ isExpanded: boolean; direction: 'up' | 'down'; height: number } | undefined> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerSearch', isExpanded),
   showContextMenu: (template: any[]): Promise<string | null> =>
     ipcRenderer.invoke('app/showMiniPlayerContextMenu', template),
   setDynamicMinimumBounds: (bounds: { minWidth: number; minHeight: number }): Promise<void> =>
