@@ -10,6 +10,7 @@ import { MetadataOperationManager } from '../operations/MetadataOperationManager
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
+import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 import { getSongById, getSongsByIds } from '../../db/queries/songs';
 
 export type SongHydrator = (songId: number) => Promise<LocalSongInput | null>;
@@ -310,6 +311,17 @@ export class AlbumAutoTagService extends EventEmitter {
    * Apply preview changes via MetadataApplyService.
    */
   public async applyPreview(
+    preview: AlbumTagPreview,
+    options?: ApplyPreviewOptions,
+    signal?: AbortSignal,
+    operationId = 'default'
+  ): Promise<ApplyResult> {
+    return runExclusiveMetadataApply(() =>
+      this.applyPreviewInternal(preview, options, signal, operationId)
+    );
+  }
+
+  private async applyPreviewInternal(
     preview: AlbumTagPreview,
     options?: ApplyPreviewOptions,
     signal?: AbortSignal,

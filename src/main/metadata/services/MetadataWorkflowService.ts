@@ -10,6 +10,7 @@ import type { MetadataTransactionManager, TransactionExecutionOptions, Transacti
 import type { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import type { ProgressEventPayload } from '../models/AlbumTagPreview';
 import type { ApplyResult } from './MetadataApplyService';
+import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 
 export interface MetadataWorkflowServiceOptions {
   transactionManager: MetadataTransactionManager;
@@ -84,6 +85,18 @@ export class MetadataWorkflowService extends EventEmitter {
   }
 
   public async applyPreview(
+    workflowType: WorkflowType,
+    preview: WorkflowPreview,
+    selectedFieldIds?: string[],
+    options?: TransactionExecutionOptions,
+    operationId = 'default'
+  ): Promise<ApplyResult> {
+    return runExclusiveMetadataApply(() =>
+      this.applyPreviewInternal(workflowType, preview, selectedFieldIds, options, operationId)
+    );
+  }
+
+  private async applyPreviewInternal(
     workflowType: WorkflowType,
     preview: WorkflowPreview,
     selectedFieldIds?: string[],
