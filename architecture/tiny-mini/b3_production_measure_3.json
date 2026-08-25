@@ -1,0 +1,40 @@
+{
+  "normalPlaying": {
+    "label": "Normal: Normally Playing",
+    "rendererWS": 0,
+    "gpuWS": 0,
+    "mainWS": 0,
+    "jsHeapMB": 14.01,
+    "listeners": 389,
+    "domNodes": 662
+  },
+  "standardMiniPlaying": {
+    "label": "Standard Mini: Normally Playing",
+    "rendererWS": 251.25,
+    "gpuWS": 108.86,
+    "mainWS": 552.75,
+    "jsHeapMB": 13.51,
+    "listeners": 421,
+    "domNodes": 775
+  },
+  "tinyDom": {
+    "tinyMounted": true,
+    "miniMounted": false,
+    "totalNodes": 90
+  },
+  "tinyPlaying": {
+    "label": "Tiny: Normally Playing",
+    "rendererWS": 166.49,
+    "gpuWS": 17.5,
+    "mainWS": 91.82,
+    "jsHeapMB": 11.75,
+    "listeners": 245,
+    "domNodes": 411
+  },
+  "resourceEntries": {
+    "totalSeen": 0,
+    "jsCount": 0,
+    "transferredJsKB": 0,
+    "lastChunks": []
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "patches": {
+    "setDiscordRpcActivity": true,
+    "sendNowPlayingSongDataToLastFM": true,
+    "songPlaybackStateChange": true
+  },
+  "calls": {
+    "setDiscordRpcActivity": [],
+    "sendNowPlayingSongDataToLastFM": [],
+    "songPlaybackStateChange": []
+  },
+  "tinyMounted": true,
+  "btnFound": true,
+  "functional": {
+    "before": {
+      "songId": 1280,
+      "src": "er%20from%20Hell/1%20-%20Afflictions.m4a",
+      "pos": 8.5119
+    },
+    "afterFirstSkip": {
+      "songId": 946,
+      "src": "0Murugesan/Premam/1%20-%20Agarottula.m4a",
+      "paused": false,
+      "pos": 4.418667
+    },
+    "afterSecondSkip": {
+      "songId": 727,
+      "paused": false,
+      "pos": 4.418667
+    },
+    "trackChangedTwice": true,
+    "engineEvents": {
+      "play": 2,
+      "pause": 0,
+      "songChange": 0
+    },
+    "playingAtEnd": true
+  },
+  "obligationLogs": [
+    "[TINY-OBLIGATION] lastfm nowplaying",
+    "[TINY-OBLIGATION] discord rpc",
+    "[TINY-OBLIGATION] playbackState=true",
+    "[TINY-OBLIGATION] discord rpc",
+    "[TINY-OBLIGATION] lastfm nowplaying",
+    "[TINY-OBLIGATION] playbackState=true",
+    "[TINY-OBLIGATION] discord rpc",
+    "[TINY-OBLIGATION] lastfm nowplaying"
+  ]
+}

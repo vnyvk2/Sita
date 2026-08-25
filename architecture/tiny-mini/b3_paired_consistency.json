@@ -1,0 +1,153 @@
+{
+  "observations": [
+    {
+      "label": "S1",
+      "mode": "standard",
+      "rendererWS": 233.7,
+      "rendererPrivateWS": 91.23,
+      "gpuWS": 131.32,
+      "mainWS": 578.11,
+      "jsHeapMB": 13.14,
+      "listeners": 266,
+      "domNodesCdp": 390,
+      "realDomNodes": 118,
+      "verified": true
+    },
+    {
+      "label": "T1",
+      "mode": "tiny",
+      "rendererWS": 229.09,
+      "rendererPrivateWS": 87.43,
+      "gpuWS": 130.77,
+      "mainWS": 575.25,
+      "jsHeapMB": 12.02,
+      "listeners": 287,
+      "domNodesCdp": 435,
+      "realDomNodes": 90,
+      "verified": true
+    },
+    {
+      "label": "S2",
+      "mode": "standard",
+      "rendererWS": 222.91,
+      "rendererPrivateWS": 81.23,
+      "gpuWS": 130.71,
+      "mainWS": 576.7,
+      "jsHeapMB": 13.14,
+      "listeners": 266,
+      "domNodesCdp": 390,
+      "realDomNodes": 118,
+      "verified": true
+    },
+    {
+      "label": "T2",
+      "mode": "tiny",
+      "rendererWS": 231.73,
+      "rendererPrivateWS": 89.88,
+      "gpuWS": 130.71,
+      "mainWS": 576.65,
+      "jsHeapMB": 19.66,
+      "listeners": 362,
+      "domNodesCdp": 981,
+      "realDomNodes": 90,
+      "verified": true
+    },
+    {
+      "label": "S3",
+      "mode": "standard",
+      "rendererWS": 223.93,
+      "rendererPrivateWS": 82.07,
+      "gpuWS": 130.88,
+      "mainWS": 577.58,
+      "jsHeapMB": 13.13,
+      "listeners": 266,
+      "domNodesCdp": 390,
+      "realDomNodes": 118,
+      "verified": true
+    },
+    {
+      "label": "T3",
+      "mode": "tiny",
+      "rendererWS": 232.57,
+      "rendererPrivateWS": 90.7,
+      "gpuWS": 130.83,
+      "mainWS": 578,
+      "jsHeapMB": 19.66,
+      "listeners": 362,
+      "domNodesCdp": 983,
+      "realDomNodes": 90,
+      "verified": true
+    }
+  ],
+  "pairs": [
+    {
+      "pair": 1,
+      "stdWS": 233.7,
+      "tinyWS": 229.09,
+      "deltaWS": -4.61,
+      "stdPriv": 91.23,
+      "tinyPriv": 87.43,
+      "deltaPriv": -3.8,
+      "stdHeap": 13.14,
+      "tinyHeap": 12.02,
+      "stdListeners": 266,
+      "tinyListeners": 287,
+      "stdRealDom": 118,
+      "tinyRealDom": 90
+    },
+    {
+      "pair": 2,
+      "stdWS": 222.91,
+      "tinyWS": 231.73,
+      "deltaWS": 8.82,
+      "stdPriv": 81.23,
+      "tinyPriv": 89.88,
+      "deltaPriv": 8.65,
+      "stdHeap": 13.14,
+      "tinyHeap": 19.66,
+      "stdListeners": 266,
+      "tinyListeners": 362,
+      "stdRealDom": 118,
+      "tinyRealDom": 90
+    },
+    {
+      "pair": 3,
+      "stdWS": 223.93,
+      "tinyWS": 232.57,
+      "deltaWS": 8.64,
+      "stdPriv": 82.07,
+      "tinyPriv": 90.7,
+      "deltaPriv": 8.63,
+      "stdHeap": 13.13,
+      "tinyHeap": 19.66,
+      "stdListeners": 266,
+      "tinyListeners": 362,
+      "stdRealDom": 118,
+      "tinyRealDom": 90
+    }
+  ],
+  "summary": {
+    "pairsTotal": 3,
+    "ws": {
+      "stdMedian": 223.93,
+      "tinyMedian": 231.73,
+      "deltaMedian": 8.64,
+      "deltaMin": -4.61,
+      "deltaMax": 8.82
+    },
+    "privateWS": {
+      "stdMedian": 82.07,
+      "tinyMedian": 89.88,
+      "deltaMedian": 8.63,
+      "deltaMin": -3.8,
+      "deltaMax": 8.65
+    },
+    "heapTinyStable": [
+      12.02,
+      19.66,
+      19.66
+    ],
+    "tinyNeverAboveStd": false,
+    "allVerified": true
+  }
+}
