@@ -158,7 +158,12 @@ export class MetadataBootstrap {
     const identityCache = new IdentityResolutionCache();
     const providerDiscovery = new MetadataProviderDiscovery(runtimeProviderRegistry);
 
-    // Dedicated isolated networking pipelines per provider domain
+    // Dedicated isolated networking pipelines per provider domain.
+    //
+    // Timeout hierarchy (see MetadataProviderRuntime.SEARCH_RACE_TIMEOUT_MS):
+    // HTTP socket 10s > metadata stage timeout 5s (execution pipeline only)
+    // > runtime search race 4s. Keep inner layers strictly smaller than
+    // outer ones so the real cause never gets masked.
     const platform = PlatformBootstrap.getInstance();
 
     // 1. MusicBrainz: strict 1 req / 1000ms token bucket with 3 retries

@@ -17,6 +17,20 @@ export interface ProviderRuntimeOptions {
   healthRecoveryTimeoutMs?: number;
 }
 
+/**
+ * Per-provider wall-clock budget for a single searchAlbums call.
+ *
+ * Timeout hierarchy (innermost -> outermost):
+ *   1. HTTP socket safety net ........ FetchHttpClient defaultTimeoutMs = 10_000ms
+ *   2. Metadata stage timeout ........ ProviderTimeoutPolicy default = 5_000ms
+ *                                      (execution-pipeline path only)
+ *   3. Runtime search race ........... SEARCH_RACE_TIMEOUT_MS = 4_000ms (this file)
+ *
+ * Each layer must stay strictly smaller than the one above it so the outer
+ * layer never fires first and masks the real cause.
+ */
+const SEARCH_RACE_TIMEOUT_MS = 4000;
+
 export class MetadataProviderRuntime {
   private readonly providers: Map<string, IMetadataProviderAdapter> = new Map();
   private readonly providerStatuses: Map<string, ProviderStatus> = new Map();
@@ -232,7 +246,7 @@ export class MetadataProviderRuntime {
       const providerId = adapter.identity.id.toLowerCase();
       if (typeof adapter.searchAlbums === 'function') {
         const startTime = Date.now();
-        const timeoutMs = 4000;
+        const timeoutMs = SEARCH_RACE_TIMEOUT_MS;
         const controller = new AbortController();
         let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
