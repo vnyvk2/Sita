@@ -25,6 +25,7 @@ export interface TrackMatchPreview {
   songPath: string;
   oldTitle: string;
   oldArtist?: string;
+  oldAlbumArtist?: string;
   oldAlbum?: string;
   oldYear?: number;
   oldTrackNumber?: number;

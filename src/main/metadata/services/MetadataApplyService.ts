@@ -245,6 +245,7 @@ export class MetadataApplyService {
         path: match.songPath,
         title: match.oldTitle,
         artist: match.oldArtist,
+        albumArtist: match.oldAlbumArtist,
         album: match.oldAlbum,
         year: match.oldYear,
         trackNumber: match.oldTrackNumber,
@@ -354,6 +355,7 @@ export class MetadataApplyService {
         filePath: match.songPath,
         title: match.oldTitle ?? '',
         artist: match.oldArtist ?? null,
+        albumArtist: match.oldAlbumArtist ?? null,
         album: match.oldAlbum ?? null,
         year: match.oldYear ?? null,
         trackNumber: match.oldTrackNumber ?? null,
@@ -440,6 +442,7 @@ export class MetadataApplyService {
         const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
         const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
         const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
+        const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
 
         await db.transaction(async (trx) => {
           for (const snap of updatedSongs) {
@@ -473,16 +476,24 @@ export class MetadataApplyService {
               await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
             }
             if (snap.album) {
-              await manageAlbumsOfParsedSong(
+              const { relevantAlbum } = await manageAlbumsOfParsedSong(
                 {
                   songId: snap.songId,
                   artists: snap.artist ? [snap.artist] : [],
-                  albumArtists: snap.artist ? [snap.artist] : [],
+                  // Release-level artist only - never derived from track artist.
+                  // Legacy snapshots without albumArtist leave the junction untouched.
+                  albumArtists: snap.albumArtist ? [snap.albumArtist] : [],
                   albumName: snap.album,
                   songYear: snap.year
                 },
                 trx
               );
+              if (snap.albumArtist && relevantAlbum) {
+                await manageAlbumArtistOfParsedSong(
+                  { albumArtists: [snap.albumArtist], albumId: relevantAlbum.id },
+                  trx
+                );
+              }
             }
             if (snap.genre) {
               await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
@@ -543,6 +554,7 @@ export class MetadataApplyService {
       filePath: s.path,
       title: s.title ?? '',
       artist: s.artist ?? null,
+      albumArtist: s.albumArtist ?? null,
       album: s.album ?? null,
       year: s.year ?? null,
       trackNumber: s.trackNumber ?? null,
@@ -604,6 +616,7 @@ export class MetadataApplyService {
           const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
           const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
           const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
+          const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
 
           await db.transaction(async (trx) => {
             for (const snap of snapshot.previousSongs) {
@@ -630,16 +643,25 @@ export class MetadataApplyService {
                 await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
               }
               if (snap.album) {
-                await manageAlbumsOfParsedSong(
+                const { relevantAlbum } = await manageAlbumsOfParsedSong(
                   {
                     songId: snap.songId,
                     artists: snap.artist ? [snap.artist] : [],
-                    albumArtists: snap.artist ? [snap.artist] : [],
+                    // Restore junction from the snapshot's release-level artist.
+                    // Snapshots captured before albumArtist existed leave the
+                    // junction untouched rather than writing track artists into it.
+                    albumArtists: [],
                     albumName: snap.album,
                     songYear: snap.year
                   },
                   trx
                 );
+                if (snap.albumArtist && relevantAlbum) {
+                  await manageAlbumArtistOfParsedSong(
+                    { albumArtists: [snap.albumArtist], albumId: relevantAlbum.id },
+                    trx
+                  );
+                }
               }
               if (snap.genre) {
                 await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);

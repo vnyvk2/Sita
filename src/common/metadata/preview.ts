@@ -28,6 +28,8 @@ export interface TrackMatchPreview {
   songPath: string;
   oldTitle: string;
   oldArtist?: string;
+  /** Release-level artist prior to apply (albums_artists junction truth) */
+  oldAlbumArtist?: string;
   oldAlbum?: string;
   oldYear?: number;
   oldTrackNumber?: number;
