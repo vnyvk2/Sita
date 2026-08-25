@@ -173,15 +173,21 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
       expect(rollbackRes.success).toBe(true);
       expect(rollbackRes.revertedCount).toBe(1);
 
-      // Verify all 7 pre-AutoTag values are accurately passed to dbUpdater
-      expect(restoredPayload).toEqual({
+      // Verify all 7 pre-AutoTag values are accurately passed to dbUpdater.
+      // Contract note: identity fields use explicit-clear semantics ('' =
+      // clear) so absent originals genuinely erase AutoTag-injected values;
+      // the sync envelope may carry additional always-present transport keys
+      // (style/artworkPath) that stay undefined here.
+      expect(restoredPayload).toMatchObject({
         title: 'Airbag (Demo)',
         artist: 'Radiohead UK',
         album: 'OK Computer (1997)',
         year: 1996,
         trackNumber: 1,
         discNumber: 1,
-        genre: 'Art Rock'
+        genre: 'Art Rock',
+        isrc: '',
+        musicBrainzRecordingId: ''
       });
     });
   });
