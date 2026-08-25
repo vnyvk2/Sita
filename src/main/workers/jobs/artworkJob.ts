@@ -1,17 +1,17 @@
 import { EventEmitter } from 'events';
 
 import { getAlbumById } from '@main/db/queries/albums';
-import { linkArtworksToAlbum } from '@main/db/queries/artworks';
-import { db } from '@main/db/db';
-import logger from '@main/logger';
-import { processArtworkFiles } from '@main/other/artworks';
-import { saveArtworks } from '@main/db/queries/artworks';
+import {
+  CURRENT_ARTWORK_GENERATOR_VERSION,
+  linkArtworksToAlbum,
+  saveArtworks
+} from '@main/db/queries/artworks';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
-import { ASSET_EVENTS } from '../libraryChoreography';
 
+import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
-export const CURRENT_ARTWORK_GENERATOR_VERSION = 1;
+export { CURRENT_ARTWORK_GENERATOR_VERSION };
 
 export class ArtworkJob implements Job {
   id: string;
@@ -51,9 +51,13 @@ export class ArtworkJob implements Job {
 
       // If it already has artworks, skip processing if version is up to date
       if (album.artworks && album.artworks.length > 0) {
-        const optimizedArtwork = album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
-        
-        if (optimizedArtwork && CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion) {
+        const optimizedArtwork =
+          album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
+
+        if (
+          optimizedArtwork &&
+          CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion
+        ) {
           logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork (up to date).`);
           this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
             albumId: this.albumId,
@@ -63,7 +67,7 @@ export class ArtworkJob implements Job {
           });
           return;
         }
-        
+
         logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
@@ -73,7 +77,7 @@ export class ArtworkJob implements Job {
       const taglib = await import('node-taglib-sharp');
       const file = taglib.File.createFromPath(this.sampleSongPath);
       let pictureData: Uint8Array | undefined;
-      
+
       try {
         const tag = file.tag;
         pictureData = extractFrontCover(tag?.pictures);
@@ -91,7 +95,7 @@ export class ArtworkJob implements Job {
       // 4. Save and link artwork in a transaction
       const artworkData = await db.transaction(async (trx) => {
         let data = processedArtwork.existing;
-        
+
         if (!data && processedArtwork.payloads) {
           data = await saveArtworks(processedArtwork.payloads, trx);
         }
@@ -112,7 +116,7 @@ export class ArtworkJob implements Job {
       if (artworkData && artworkData.length > 0) {
         // Find the optimized artwork specifically intended for palette generation
         const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
-        
+
         // 5. Post-commit guarantee: event MUST fire after successful commit
         this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
           albumId: this.albumId,

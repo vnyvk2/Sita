@@ -5,9 +5,14 @@ import path from 'path';
 import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
 import sharp from 'sharp';
 
+import { generateLocalArtworkBuffer } from '../filesystem/artworkBuffers';
+export { generateLocalArtworkBuffer };
+
+import { saveArtworks, syncAlbumArtworks, syncSongArtworks } from '@main/db/queries/artworks';
+
 import { appPreferences } from '../../../package.json';
-import parseLyrics from '../../common/parseLyrics';
 import { parseGenreList } from '../../common/genreUtils';
+import parseLyrics from '../../common/parseLyrics';
 import { updateCachedLyrics } from '../core/getSongLyrics';
 import saveLyricsToLRCFile from '../core/saveLyricsToLrcFile';
 import sendSongMetadata from '../core/sendSongMetadata';
@@ -30,11 +35,6 @@ import {
   deleteArtist
 } from '../db/queries/artists';
 import {
-  saveArtworks,
-  syncAlbumArtworks,
-  syncSongArtworks
-} from '@main/db/queries/artworks';
-import {
   createGenre,
   linkSongToGenre,
   unlinkSongFromGenre,
@@ -50,7 +50,11 @@ import {
   updateSongBasicFields
 } from '../db/queries/songs';
 import { DEFAULT_FILE_URL } from '../filesystem';
-import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
+import {
+  getArtistArtworkPath,
+  getSongArtworkPath,
+  removeDefaultAppProtocolFromFilePath
+} from '../fs/resolveFilePaths';
 import logger from '../logger';
 import {
   dataUpdateEvent,
@@ -62,11 +66,9 @@ import {
 import { createTempArtwork, processArtworkFiles } from '../other/artworks';
 import generatePalette from '../other/generatePalette';
 import { isSongBlacklisted } from '../utils/isBlacklisted';
-import { libraryScheduler } from '../workers/jobScheduler';
-
-import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import isPathAWebURL from '../utils/isPathAWebUrl';
 import { withFileHandle } from '../utils/withFileHandle';
+import { libraryScheduler } from '../workers/jobScheduler';
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
@@ -102,7 +104,8 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
   const pathExt = path.extname(currentSongPath).replace(/\W/, '');
   const isASupportedFormat = metadataEditingSupportedExtensions.includes(pathExt);
 
-  if (pendingMetadataUpdates.size === 0) return logger.verbose('No pending metadata updates found.');
+  if (pendingMetadataUpdates.size === 0)
+    return logger.verbose('No pending metadata updates found.');
 
   logger.verbose(`Started saving pending metadata updates.`, {
     pendingSongs: pendingMetadataUpdates.keys
@@ -221,7 +224,8 @@ const mergeTagData = (base: TagData, incoming: TagData): TagData => {
   if (incoming.year !== undefined) merged.year = incoming.year;
   if (incoming.artwork !== undefined) merged.artwork = incoming.artwork;
   if (incoming.lyrics !== undefined) merged.lyrics = incoming.lyrics;
-  if (incoming.musicBrainzRecordingId !== undefined) merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
+  if (incoming.musicBrainzRecordingId !== undefined)
+    merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
   if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
   return merged;
 };
@@ -264,15 +268,6 @@ export const fetchArtworkBufferFromURL = async (url: string) => {
     return undefined;
   }
 };
-
-export const generateLocalArtworkBuffer = (filePath: string) =>
-  readFile(filePath).catch((err) => {
-    logger.error(`Error occurred when trying to generate buffer of the song artwork.`, {
-      err,
-      filePath
-    });
-    return undefined;
-  });
 
 const generateArtworkBuffer = async (artworkPath?: string) => {
   if (artworkPath) {
@@ -925,7 +920,10 @@ const updateSongId3Tags = async (
       : await getSongByPath(String(songIdOrPath));
 
     if (!song && isNumericId) {
-      console.log('[updateSongId3Tags] getSongById yielded no result, attempting getSongByPath fallback for:', songIdOrPath);
+      console.log(
+        '[updateSongId3Tags] getSongById yielded no result, attempting getSongByPath fallback for:',
+        songIdOrPath
+      );
       song = await getSongByPath(String(songIdOrPath));
     }
 
@@ -953,9 +951,11 @@ const updateSongId3Tags = async (
       ? removeDefaultAppProtocolFromFilePath(tags.artworkPath)
       : undefined;
 
-    let processedArtwork: { existing?: any, payloads?: any } | undefined;
+    let processedArtwork: { existing?: any; payloads?: any } | undefined;
     if (newArtworkPath || tags.artworkBuffer) {
-      const buffer = (tags.artworkBuffer as Buffer | undefined) || (newArtworkPath ? await generateArtworkBuffer(newArtworkPath) : undefined);
+      const buffer =
+        (tags.artworkBuffer as Buffer | undefined) ||
+        (newArtworkPath ? await generateArtworkBuffer(newArtworkPath) : undefined);
       artworkBuffer = buffer || undefined;
 
       if (artworkBuffer) {
@@ -1115,7 +1115,11 @@ const updateSongId3Tags = async (
           }
 
           if (processedArtwork && artworkData && artworkData.length > 0) {
-            await syncAlbumArtworks(targetAlbumId, artworkData.map((art: any) => art.id), trx);
+            await syncAlbumArtworks(
+              targetAlbumId,
+              artworkData.map((art: any) => art.id),
+              trx
+            );
           }
         }
       } else if (song.albums && song.albums.length > 0) {
@@ -1204,7 +1208,7 @@ const updateSongId3Tags = async (
         }
       }
     });
-    
+
     libraryScheduler.requestMaintenance();
 
     // Transaction succeeded, now update the file system

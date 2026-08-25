@@ -1,30 +1,3 @@
-import { db } from '../../db/db';
-import type { MembershipService } from '../membership/MembershipService';
-import type { PlaylistRepository } from '../repositories/PlaylistRepository';
-import type { OperationExecutor } from '../operations/OperationExecutor';
-import type { OperationContext } from '../operations/types';
-
-import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
-import { processArtworkFiles } from '../../other/artworks';
-import { AddSongsOp } from '../operations/AddSongsOp';
-import { RemoveSongsOp } from '../operations/RemoveSongsOp';
-import { RenameOp } from '../operations/RenameOp';
-import { ReorderOp } from '../operations/ReorderOp';
-import { DeleteOp } from '../operations/DeleteOp';
-import { PinOp } from '../operations/PinOp';
-import { UnpinOp } from '../operations/PinOp';
-import { CreateFolderOp } from '../operations/CreateFolderOp';
-import { CreatePlaylistOp } from '../operations/CreatePlaylistOp';
-import { DuplicateOp } from '../operations/DuplicateOp';
-import { DuplicatePlanner } from '../operations/DuplicatePlanner';
-import { DuplicateExecutor } from '../operations/DuplicateExecutor';
-import { MergePlaylistsOp } from '../operations/MergePlaylistsOp';
-import { MoveCollectionOp } from '../operations/MoveCollectionOp';
-import { BulkDeleteOp, BulkRestoreOp, type BulkRestoreInput } from '../operations/BulkDeleteOp';
-import { SetArtworkOp, type SetArtworkInput } from '../operations/SetArtworkOp';
-import { FolderStatisticsService } from './FolderStatisticsService';
-import { HierarchyService } from './HierarchyService';
-import { collectionEventBus } from '../events/CollectionEventBus';
 import type {
   AddSongsInput,
   BulkDeleteInput,
@@ -40,6 +13,31 @@ import type {
   ReorderInput,
   UnpinInput
 } from '../../../common/collections/operationInputs';
+import { db } from '../../db/db';
+import { generateLocalArtworkBuffer } from '../../filesystem/artworkBuffers';
+import { processArtworkFiles } from '../../other/artworks';
+import { collectionEventBus } from '../events/CollectionEventBus';
+import type { MembershipService } from '../membership/MembershipService';
+import { AddSongsOp } from '../operations/AddSongsOp';
+import { BulkDeleteOp, BulkRestoreOp, type BulkRestoreInput } from '../operations/BulkDeleteOp';
+import { CreateFolderOp } from '../operations/CreateFolderOp';
+import { CreatePlaylistOp } from '../operations/CreatePlaylistOp';
+import { DeleteOp } from '../operations/DeleteOp';
+import { DuplicateExecutor } from '../operations/DuplicateExecutor';
+import { DuplicateOp } from '../operations/DuplicateOp';
+import { DuplicatePlanner } from '../operations/DuplicatePlanner';
+import { MergePlaylistsOp } from '../operations/MergePlaylistsOp';
+import { MoveCollectionOp } from '../operations/MoveCollectionOp';
+import type { OperationExecutor } from '../operations/OperationExecutor';
+import { PinOp, UnpinOp } from '../operations/PinOp';
+import { RemoveSongsOp } from '../operations/RemoveSongsOp';
+import { RenameOp } from '../operations/RenameOp';
+import { ReorderOp } from '../operations/ReorderOp';
+import { SetArtworkOp, type SetArtworkInput } from '../operations/SetArtworkOp';
+import type { OperationContext } from '../operations/types';
+import type { PlaylistRepository } from '../repositories/PlaylistRepository';
+import { FolderStatisticsService } from './FolderStatisticsService';
+import { HierarchyService } from './HierarchyService';
 
 export class PlaylistEngine {
   private readonly repository: PlaylistRepository;
@@ -62,7 +60,7 @@ export class PlaylistEngine {
   private readonly bulkDeleteOp: BulkDeleteOp;
   private readonly bulkRestoreOp: BulkRestoreOp;
   private readonly setArtworkOp: SetArtworkOp;
-  
+
   public readonly folderStats: FolderStatisticsService;
   private readonly hierarchyService: HierarchyService;
 
@@ -86,13 +84,16 @@ export class PlaylistEngine {
     this.unpinOp = new UnpinOp();
     this.createFolderOp = new CreateFolderOp(this.repository);
     this.createPlaylistOp = new CreatePlaylistOp(this.repository);
-    this.duplicateOp = new DuplicateOp(new DuplicatePlanner(this.hierarchyService), new DuplicateExecutor());
+    this.duplicateOp = new DuplicateOp(
+      new DuplicatePlanner(this.hierarchyService),
+      new DuplicateExecutor()
+    );
     this.mergeOp = new MergePlaylistsOp(this.repository);
     this.moveOp = new MoveCollectionOp(this.hierarchyService);
     this.bulkDeleteOp = new BulkDeleteOp(this.repository);
     this.bulkRestoreOp = new BulkRestoreOp(this.repository, this.hierarchyService);
     this.setArtworkOp = new SetArtworkOp(this.repository);
-    
+
     this.folderStats = new FolderStatisticsService();
   }
 
@@ -103,7 +104,10 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'addSongs' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'addSongs' }
+    });
     return result.data;
   }
 
@@ -114,7 +118,10 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'removeSongs' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'removeSongs' }
+    });
     return result.data;
   }
 
@@ -125,7 +132,10 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'rename' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'rename' }
+    });
     return result.data;
   }
 
@@ -136,7 +146,10 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'reorder' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'reorder' }
+    });
     return result.data;
   }
 
@@ -147,7 +160,10 @@ export class PlaylistEngine {
     });
 
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionDeleted', payload: { collectionIds: [input.playlistId] } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionDeleted',
+      payload: { collectionIds: [input.playlistId] }
+    });
     return result.data;
   }
 
@@ -156,7 +172,10 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.pinOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionPinned', payload: { collectionId: input.playlistId, isPinned: true } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionPinned',
+      payload: { collectionId: input.playlistId, isPinned: true }
+    });
     return result.data;
   }
 
@@ -165,7 +184,10 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.unpinOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionPinned', payload: { collectionId: input.playlistId, isPinned: false } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionPinned',
+      payload: { collectionId: input.playlistId, isPinned: false }
+    });
     return result.data;
   }
 
@@ -174,7 +196,10 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.createFolderOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionCreated', payload: { collectionId: result.data, parentId: input.parentId ?? null } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionCreated',
+      payload: { collectionId: result.data, parentId: input.parentId ?? null }
+    });
     return result.data;
   }
 
@@ -183,7 +208,10 @@ export class PlaylistEngine {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
       return await this.executor.execute(this.createPlaylistOp, input, ctx);
     });
-    collectionEventBus.emitEvent({ type: 'CollectionCreated', payload: { collectionId: result.data, parentId: input.parentId ?? null } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionCreated',
+      payload: { collectionId: result.data, parentId: input.parentId ?? null }
+    });
     return result.data;
   }
 
@@ -193,7 +221,10 @@ export class PlaylistEngine {
       return await this.executor.execute(this.duplicateOp, input, ctx);
     });
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'duplicate' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'duplicate' }
+    });
     return result.data;
   }
 
@@ -203,7 +234,10 @@ export class PlaylistEngine {
       return await this.executor.execute(this.mergeOp, input, ctx);
     });
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.targetPlaylistId, action: 'merge' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.targetPlaylistId, action: 'merge' }
+    });
     return result.data;
   }
 
@@ -213,7 +247,10 @@ export class PlaylistEngine {
       return await this.executor.execute(this.moveOp, input, ctx);
     });
     for (const id of input.playlistIds) {
-      collectionEventBus.emitEvent({ type: 'CollectionMoved', payload: { collectionId: id, newParentId: input.targetParentId } });
+      collectionEventBus.emitEvent({
+        type: 'CollectionMoved',
+        payload: { collectionId: id, newParentId: input.targetParentId }
+      });
     }
     return result.data;
   }
@@ -224,7 +261,10 @@ export class PlaylistEngine {
       return await this.executor.execute(this.bulkDeleteOp, input, ctx);
     });
     this.invalidateCache(result.affectedSongIds);
-    collectionEventBus.emitEvent({ type: 'CollectionDeleted', payload: { collectionIds: input.playlistIds } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionDeleted',
+      payload: { collectionIds: input.playlistIds }
+    });
     return result.data;
   }
 
@@ -250,7 +290,10 @@ export class PlaylistEngine {
       return await this.executor.execute(this.setArtworkOp, { ...input, processedArtwork }, ctx);
     });
 
-    collectionEventBus.emitEvent({ type: 'CollectionChanged', payload: { collectionId: input.playlistId, action: 'setArtwork' } });
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'setArtwork' }
+    });
     return result.data;
   }
 

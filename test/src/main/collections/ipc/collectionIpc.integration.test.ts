@@ -1,32 +1,39 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { db } from '../../../../../src/main/db/db';
-import { playlists, playlistEntries } from '../../../../../src/main/db/schema';
 import { eq } from 'drizzle-orm';
-import { setupCollectionIpc } from '../../../../../src/main/collections/ipc/setupCollectionIpc';
+import { ipcMain } from 'electron';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { PlaylistEngine } from '../../../../../src/main/collections/engine/PlaylistEngine';
 import { UndoEngine } from '../../../../../src/main/collections/engine/UndoEngine';
-import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
-import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
+import { collectionEventBus } from '../../../../../src/main/collections/events/CollectionEventBus';
+import { setupCollectionIpc } from '../../../../../src/main/collections/ipc/setupCollectionIpc';
+import { MembershipCache } from '../../../../../src/main/collections/membership/MembershipCache';
+import { MembershipService } from '../../../../../src/main/collections/membership/MembershipService';
 import { OperationExecutor } from '../../../../../src/main/collections/operations/OperationExecutor';
 import { OperationJournalWriter } from '../../../../../src/main/collections/operations/OperationJournalWriter';
 import { OperationRegistry } from '../../../../../src/main/collections/operations/OperationRegistry';
 import { OperationJournalRepository } from '../../../../../src/main/collections/repositories/OperationJournalRepository';
-import { MembershipService } from '../../../../../src/main/collections/membership/MembershipService';
-import { MembershipCache } from '../../../../../src/main/collections/membership/MembershipCache';
+import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
 import { registerDefaultOperations } from '../../../../../src/main/collections/setup';
-import { ipcMain } from 'electron';
-import { collectionEventBus } from '../../../../../src/main/collections/events/CollectionEventBus';
+import { db } from '../../../../../src/main/db/db';
+import { playlists, playlistEntries } from '../../../../../src/main/db/schema';
 
 // Mock ipcMain.handle
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn(),
+    handle: vi.fn()
+  },
+  nativeImage: {
+    createFromPath: vi.fn().mockReturnValue({})
+  },
+  dialog: {
+    showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: [] })
   },
   app: {
     isPackaged: false,
     getPath: vi.fn().mockReturnValue('/mock/path'),
-    getAppPath: vi.fn().mockReturnValue(process.cwd()),
-  },
+    getAppPath: vi.fn().mockReturnValue(process.cwd())
+  }
 }));
 
 describe('Collection IPC Integration', () => {
@@ -36,7 +43,7 @@ describe('Collection IPC Integration', () => {
   let executor: OperationExecutor;
   let hierarchyService: HierarchyService;
   let sendMessageToRenderer: ReturnType<typeof vi.fn>;
-  let handlers: Record<string, Function>;
+  let handlers: Record<string, (...args: unknown[]) => unknown>;
 
   beforeEach(async () => {
     repository = new PlaylistRepository();
@@ -45,7 +52,7 @@ describe('Collection IPC Integration', () => {
     executor = new OperationExecutor(journalWriter);
     const membershipService = new MembershipService(new MembershipCache(), []);
     engine = new PlaylistEngine(repository, membershipService, executor, hierarchyService);
-    
+
     const registry = new OperationRegistry();
     registerDefaultOperations(registry, repository, hierarchyService);
     const journalRepo = new OperationJournalRepository();
@@ -72,10 +79,13 @@ describe('Collection IPC Integration', () => {
   });
 
   it('should expose read APIs mapping to DTOs', async () => {
-    const [{ insertId }] = await db.insert(playlists).values({
-      name: 'Test Playlist',
-      playlistType: 'standard',
-    }).returning({ insertId: playlists.id });
+    const [{ insertId }] = await db
+      .insert(playlists)
+      .values({
+        name: 'Test Playlist',
+        playlistType: 'standard'
+      })
+      .returning({ insertId: playlists.id });
 
     const getCollectionHandler = handlers['collections/read/getCollection'];
     const result = await getCollectionHandler(null, insertId);
@@ -90,17 +100,20 @@ describe('Collection IPC Integration', () => {
 
   it('should forward events to the renderer', async () => {
     const createFolderHandler = handlers['collections/write/createFolder'];
-    
+
     // Trigger mutation
     const result = await createFolderHandler(null, { name: 'New Folder', parentId: null });
-    
-    expect(sendMessageToRenderer).toHaveBeenCalledWith('collections/event', expect.objectContaining({
-      type: 'CollectionChanged',
-      payload: {
-        collectionId: result.id,
-        action: 'create',
-      }
-    }));
+
+    expect(sendMessageToRenderer).toHaveBeenCalledWith(
+      'collections/event',
+      expect.objectContaining({
+        type: 'CollectionCreated',
+        payload: {
+          collectionId: result.id,
+          parentId: null
+        }
+      })
+    );
   });
 
   it('should undo an operation across the IPC boundary', async () => {
@@ -133,7 +146,9 @@ describe('Collection IPC Integration', () => {
       });
     });
 
-    await expect(createFolderHandler(null, { name: 'Will Fail', parentId: null })).rejects.toThrow('Halfway failure');
+    await expect(createFolderHandler(null, { name: 'Will Fail', parentId: null })).rejects.toThrow(
+      'Halfway failure'
+    );
 
     // Verify transaction rolled back
     const found = await db.select().from(playlists).where(eq(playlists.name, 'Partial Folder'));
