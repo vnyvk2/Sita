@@ -30,6 +30,10 @@ declare global {
     | 'app/getSong'
     | 'app/getAllSongs'
     | 'app/getAllSongIds'
+    | 'app/getFilteredSongLibraryIds'
+    | 'app/getSongListFacets'
+    | 'app/getSongDurations'
+    | 'app/getAlbumSummaries'
     | 'library/getChangeState'
     | 'library/resetChangeState'
     | 'library/diskChanged'
@@ -820,6 +824,19 @@ declare global {
 
   interface Album extends SavableAlbum {
     artworkPaths: ArtworkPaths;
+  }
+
+  interface AlbumSummary {
+    albumId: number;
+    title: string;
+    year?: number;
+    isAFavorite: boolean;
+    artists: {
+      artistId: number;
+      name: string;
+    }[];
+    artworkPaths: ArtworkPaths;
+    songCount: number;
   }
 
   // ? Artists related types

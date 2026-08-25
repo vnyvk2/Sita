@@ -1,5 +1,15 @@
 import { db } from '@db/db';
-import { musicFolders, songs } from '@db/schema';
+import {
+  albums,
+  albumsSongs,
+  artists,
+  artistsSongs,
+  genres,
+  genresSongs,
+  metadataOverrides,
+  musicFolders,
+  songs
+} from '@db/schema';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
 
@@ -426,6 +436,187 @@ export const getAllSongIds = async (
 
   const results = await query;
   return results.map((r) => r.id);
+};
+
+export interface FilteredSongIdsOptions {
+  sortType?: SongSortTypes;
+  filterType?: SongFilterTypes;
+  language?: string;
+  genre?: string;
+  onlyFavoriteArtists?: boolean;
+  onlyFavoriteAlbums?: boolean;
+}
+
+const hasTruthyLanguageOverride = sql`EXISTS (
+  SELECT 1 FROM ${metadataOverrides}
+  WHERE ${metadataOverrides.entityKind} = 'song'
+    AND ${metadataOverrides.fieldId} = 'language'
+    AND ${metadataOverrides.entityId} = ${songs.id}::text
+    AND ${metadataOverrides.stringValue} IS NOT NULL
+    AND btrim(${metadataOverrides.stringValue}) <> ''
+)`;
+
+export const getFilteredSongLibraryIds = async (
+  options: FilteredSongIdsOptions = {},
+  trx: DB | DBTransaction = db
+): Promise<{ ids: number[]; total: number }> => {
+  const {
+    sortType = 'aToZ',
+    filterType = 'notSelected',
+    language,
+    genre,
+    onlyFavoriteArtists,
+    onlyFavoriteAlbums
+  } = options;
+
+  const filters: SQL[] = [];
+
+  if (filterType === 'favorites' || filterType === 'nonFavorites') {
+    filters.push(eq(songs.isFavorite, filterType === 'favorites'));
+  }
+
+  if (filterType === 'blacklistedSongs' || filterType === 'whitelistedSongs') {
+    filters.push(eq(songs.isBlacklisted, filterType === 'blacklistedSongs'));
+  }
+
+  if (language && language !== 'all') {
+    if (language === 'unspecified') {
+      filters.push(
+        sql`(NOT ${hasTruthyLanguageOverride} AND (${songs.language} IS NULL OR btrim(${songs.language}) = ''))`
+      );
+    } else {
+      filters.push(sql`(
+        (EXISTS (
+          SELECT 1 FROM ${metadataOverrides}
+          WHERE ${metadataOverrides.entityKind} = 'song'
+            AND ${metadataOverrides.fieldId} = 'language'
+            AND ${metadataOverrides.entityId} = ${songs.id}::text
+            AND lower(${metadataOverrides.stringValue}) = lower(${language})
+        ))
+        OR (
+          NOT ${hasTruthyLanguageOverride}
+          AND lower(${songs.language}) = lower(${language})
+        )
+      )`);
+    }
+  }
+
+  if (genre && genre !== 'all') {
+    filters.push(sql`EXISTS (
+      SELECT 1 FROM ${genresSongs}
+      INNER JOIN ${genres} ON ${genres.id} = ${genresSongs.genreId}
+      WHERE ${genresSongs.songId} = ${songs.id}
+        AND lower(${genres.name}) = lower(${genre})
+    )`);
+  }
+
+  if (onlyFavoriteArtists) {
+    filters.push(sql`EXISTS (
+      SELECT 1 FROM ${artistsSongs}
+      INNER JOIN ${artists} ON ${artists.id} = ${artistsSongs.artistId}
+      WHERE ${artistsSongs.songId} = ${songs.id}
+        AND ${artists.isFavorite} = TRUE
+    )`);
+  }
+
+  if (onlyFavoriteAlbums) {
+    filters.push(sql`EXISTS (
+      SELECT 1 FROM ${albumsSongs}
+      INNER JOIN ${albums} ON ${albums.id} = ${albumsSongs.albumId}
+      WHERE ${albumsSongs.songId} = ${songs.id}
+        AND ${albums.isFavorite} = TRUE
+    )`);
+  }
+
+  let orderClauses: SQL[] = [];
+  if (sortType === 'aToZ') orderClauses = [asc(songs.title)];
+  else if (sortType === 'zToA') orderClauses = [desc(songs.title)];
+  else if (sortType === 'releasedYearAscending') orderClauses = [asc(songs.year), asc(songs.title)];
+  else if (sortType === 'releasedYearDescending')
+    orderClauses = [desc(songs.year), asc(songs.title)];
+  else if (sortType === 'trackNoAscending')
+    orderClauses = [asc(songs.trackNumber), asc(songs.title)];
+  else if (sortType === 'trackNoDescending')
+    orderClauses = [desc(songs.trackNumber), asc(songs.title)];
+  else if (sortType === 'dateAddedAscending')
+    orderClauses = [asc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'dateAddedDescending')
+    orderClauses = [desc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'dateModifiedAscending')
+    orderClauses = [asc(songs.fileModifiedAt), asc(songs.title)];
+  else if (sortType === 'dateModifiedDescending')
+    orderClauses = [desc(songs.fileModifiedAt), asc(songs.title)];
+  else if (sortType === 'addedOrder') orderClauses = [desc(songs.createdAt), asc(songs.title)];
+  else if (sortType === 'mostSkipped') orderClauses = [desc(songs.skipCount), asc(songs.title)];
+  else if (sortType === 'leastSkipped') orderClauses = [asc(songs.skipCount), asc(songs.title)];
+
+  const query = trx.select({ id: songs.id }).from(songs);
+
+  if (filters.length > 0) {
+    query.where(and(...filters));
+  }
+
+  if (orderClauses.length > 0) {
+    query.orderBy(...orderClauses);
+  }
+
+  const results = await query;
+  const ids = results.map((r) => r.id);
+  return { ids, total: ids.length };
+};
+
+export interface SongListFacets {
+  languages: string[];
+  genres: string[];
+}
+
+export const getSongListFacets = async (
+  trx: DB | DBTransaction = db
+): Promise<SongListFacets> => {
+  const languagesResult = await trx.execute<{ val: string }>(sql`
+    SELECT DISTINCT val FROM (
+      SELECT language AS val FROM songs WHERE language IS NOT NULL AND btrim(language) <> ''
+      UNION
+      SELECT string_value AS val FROM ${metadataOverrides}
+        WHERE ${metadataOverrides.entityKind} = 'song'
+          AND ${metadataOverrides.fieldId} = 'language'
+          AND ${metadataOverrides.stringValue} IS NOT NULL
+          AND btrim(${metadataOverrides.stringValue}) <> ''
+    ) t ORDER BY val ASC
+  `);
+
+  const genresResult = await trx
+    .select({ name: genres.name })
+    .from(genres)
+    .where(sql`btrim(${genres.name}) <> ''`)
+    .orderBy(asc(genres.name));
+
+  return {
+    languages: languagesResult.rows.map((r) => r.val.trim()).filter((v) => v.length > 0),
+    genres: genresResult.map((r) => r.name.trim()).filter((v) => v.length > 0)
+  };
+};
+
+export const getSongDurationsByIds = async (
+  songIds: number[],
+  trx: DB | DBTransaction = db
+): Promise<{ id: number; duration: number }[]> => {
+  if (!songIds || songIds.length === 0) return [];
+  const CHUNK_SIZE = 500;
+  const uniqueIds = Array.from(new Set(songIds));
+  const results: { id: number; duration: number }[] = [];
+
+  for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+    const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
+    const rows = await trx
+      .select({ id: songs.id, duration: songs.duration })
+      .from(songs)
+      .where(inArray(songs.id, chunk));
+    for (const row of rows) {
+      results.push({ id: row.id, duration: Number(row.duration) });
+    }
+  }
+  return results;
 };
 
 export type GetNonNullSongReturnType = NonNullable<Awaited<ReturnType<typeof getSongById>>>;

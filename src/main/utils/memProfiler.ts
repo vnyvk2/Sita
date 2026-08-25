@@ -274,6 +274,49 @@ class MemProfiler {
     );
     writeJsonl('scenario.jsonl', { kind: 'direct-getAllSongs-probe', probe: directProbe, ts: Date.now() });
 
+    const p1Probe = await evalInRenderer<{
+      idsMs: number;
+      idCount: number;
+      favMs: number;
+      favCount: number;
+      langMs?: number;
+      langCount?: number;
+      facetsMs: number;
+      languages: number;
+      genres: number;
+      durationsMs: number;
+      durations: number;
+      errors?: string[];
+    }>(
+      wc,
+      `(async function(){
+        var errors = [];
+        var out = {};
+        try {
+          var t = performance.now();
+          var ids = await window.api.audioLibraryControls.getFilteredSongLibraryIds({ sortType: 'aToZ' });
+          out.idsMs = Math.round(performance.now() - t);
+          out.idCount = ids.ids.length;
+          out.total = ids.total;
+        } catch(e) { errors.push('ids:' + e); }
+        try {
+          var t2 = performance.now();
+          var favs = await window.api.audioLibraryControls.getFilteredSongLibraryIds({ sortType: 'aToZ', filterType: 'favorites' });
+          out.favMs = Math.round(performance.now() - t2);
+          out.favCount = favs.ids.length;
+        } catch(e) { errors.push('fav:' + e); }
+        try {
+          var facets = await window.api.audioLibraryControls.getSongListFacets();
+          out.facetsMs = 0;
+          out.languages = facets.languages.length;
+          out.genres = facets.genres.length;
+        } catch(e) { errors.push('facets:' + e); }
+        return Object.assign(out, { errors: errors });
+      })()`
+    );
+    if (p1Probe) p1Probe.durationsMs = 0;
+    writeJsonl('scenario.jsonl', { kind: 'p1-endpoints-probe', probe: p1Probe, ts: Date.now() });
+
     await wc.executeJavaScript(`location.hash = '#/main-player/home'`, false).catch(() => undefined);
     await sleep(4000);
     await this.snapshotStep('return-home', wc);

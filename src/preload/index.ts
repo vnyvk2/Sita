@@ -121,6 +121,19 @@ const audioLibraryControls = {
     ipcRenderer.invoke('app/getAllSongs', sortType, filterType, paginatingData),
   getAllSongIds: (sortType?: SongSortTypes, filterType?: SongFilterTypes): Promise<number[]> =>
     ipcRenderer.invoke('app/getAllSongIds', sortType, filterType),
+  getFilteredSongLibraryIds: (options?: {
+    sortType?: SongSortTypes;
+    filterType?: SongFilterTypes;
+    language?: string;
+    genre?: string;
+    onlyFavoriteArtists?: boolean;
+    onlyFavoriteAlbums?: boolean;
+  }): Promise<{ ids: number[]; total: number }> =>
+    ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
+  getSongListFacets: (): Promise<{ languages: string[]; genres: string[] }> =>
+    ipcRenderer.invoke('app/getSongListFacets'),
+  getSongDurations: (songIds: number[]): Promise<{ id: number; duration: number }[]> =>
+    ipcRenderer.invoke('app/getSongDurations', songIds),
   getLibraryChangeState: (): Promise<{
     isDirty: boolean;
     changedPaths: string[];
@@ -510,6 +523,13 @@ const genresData = {
 
 // $ ALBUMS DATA
 const albumsData = {
+  getAlbumSummaries: (
+    sortType?: AlbumSortTypes,
+    filterType?: AlbumFilterTypes,
+    start?: number,
+    end?: number
+  ): Promise<PaginatedResult<AlbumSummary, AlbumSortTypes>> =>
+    ipcRenderer.invoke('app/getAlbumSummaries', sortType, filterType, start, end),
   getAlbumData: (
     albumTitlesOrIds?: (string | number)[],
     sortType?: AlbumSortTypes,

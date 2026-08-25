@@ -69,7 +69,14 @@ import {
 import { getDatabaseMetrics } from './db/queries/other';
 import { clearScrobbleQueue } from './db/queries/scrobble_queue';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
-import { getAllSongIds, getSongById } from './db/queries/songs';
+import {
+  getAllSongIds,
+  getFilteredSongLibraryIds,
+  getSongById,
+  getSongDurationsByIds,
+  getSongListFacets
+} from './db/queries/songs';
+import { getAlbumSummaries } from './db/queries/albums';
 import {
   getUserKeyboardShortcuts,
   saveUserKeyboardShortcuts,
@@ -542,7 +549,14 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         filterType?: AlbumFilterTypes,
         start?: number,
         end?: number
-      ) => fetchAlbumData(albumTitlesOrIds, sortType, filterType, start, end)
+      ) =>
+        memProfiler.wrapHandler('app/getAlbumData', () =>
+          fetchAlbumData(albumTitlesOrIds, sortType, filterType, start, end)
+        )
+    );
+
+    ipcMain.handle('app/getAlbumSummaries', (_, sortType?: AlbumSortTypes, filterType?: AlbumFilterTypes, start?: number, end?: number) =>
+      getAlbumSummaries({ sortType, filterType, start, end })
     );
 
     ipcMain.handle('app/getArtistDuplicates', (_, artistName: string) =>
@@ -583,6 +597,27 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       'app/getAllSongIds',
       (_, sortType?: SongSortTypes, filterType?: SongFilterTypes) =>
         getAllSongIds({ sortType, filterType })
+    );
+
+    ipcMain.handle(
+      'app/getFilteredSongLibraryIds',
+      (
+        _,
+        options?: {
+          sortType?: SongSortTypes;
+          filterType?: SongFilterTypes;
+          language?: string;
+          genre?: string;
+          onlyFavoriteArtists?: boolean;
+          onlyFavoriteAlbums?: boolean;
+        }
+      ) => getFilteredSongLibraryIds(options ?? {})
+    );
+
+    ipcMain.handle('app/getSongListFacets', () => getSongListFacets());
+
+    ipcMain.handle('app/getSongDurations', (_, songIds: number[]) =>
+      getSongDurationsByIds(songIds)
     );
 
     ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());
