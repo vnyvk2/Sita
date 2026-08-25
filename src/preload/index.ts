@@ -128,7 +128,8 @@ const audioLibraryControls = {
     genre?: string;
     onlyFavoriteArtists?: boolean;
     onlyFavoriteAlbums?: boolean;
-  }): Promise<{ ids: number[]; total: number }> =>
+    restrictToIds?: number[];
+  }): Promise<{ ids: number[]; total: number; blacklistedIds: number[] }> =>
     ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
   getSongListFacets: (): Promise<{ languages: string[]; genres: string[] }> =>
     ipcRenderer.invoke('app/getSongListFacets'),

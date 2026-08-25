@@ -344,7 +344,7 @@ class MemProfiler {
     wc.on('console-message', (_e, level, message, line, sourceId) => {
       this.stage('renderer-console', {
         level,
-        message: String(message).slice(0, 600),
+        message,
         sourceId: String(sourceId).slice(0, 160),
         line
       });

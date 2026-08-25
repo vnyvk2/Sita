@@ -1,8 +1,71 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+import { keepPreviousData } from '@tanstack/react-query';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
+export const SONG_WINDOW_SIZE = 200;
+export const SONG_WINDOW_STALE_TIME = 10 * 60 * 1000;
+export const SONG_WINDOW_GC_TIME = 5 * 60 * 1000;
+export const SONG_IDS_STALE_TIME = 5 * 60 * 1000;
+export const SONG_IDS_GC_TIME = 30 * 60 * 1000;
+
+export interface SongIdsParams {
+  sortType: SongSortTypes;
+  filterType?: SongFilterTypes;
+  keyword?: string;
+  language?: string;
+  genre?: string;
+  onlyFavoriteArtists?: boolean;
+  onlyFavoriteAlbums?: boolean;
+}
+
+export interface SongIdsResult {
+  ids: number[];
+  total: number;
+  blacklistedIds: number[];
+}
+
+export const songCacheKeys = {
+  windowsRoot: ['songs', 'window'] as const,
+  window: (version: number, start: number) => ['songs', 'window', version, start] as const
+};
+
+export const songIdsVersionFromState = (dataUpdatedAt: number | undefined): number =>
+  Math.floor(dataUpdatedAt ?? 0);
+
 export const songQuery = createQueryKeys('songs', {
+  ids: (params: SongIdsParams) => {
+    return {
+      queryKey: [`ids=${JSON.stringify(params)}`],
+      queryFn: async (): Promise<SongIdsResult> => {
+        if (params.keyword?.trim()) {
+          const res = await window.api.search.query({
+            filter: 'Songs',
+            keyword: params.keyword,
+            limit: SEARCH_LIMITS.PAGE,
+            updateSearchHistory: false
+          });
+          const ids = res.songs.map((song) => song.songId);
+          return {
+            ids,
+            total: ids.length,
+            blacklistedIds: res.songs
+              .filter((song) => song.isBlacklisted)
+              .map((song) => song.songId)
+          };
+        }
+        return window.api.audioLibraryControls.getFilteredSongLibraryIds(params);
+      },
+      placeholderData: keepPreviousData,
+      staleTime: SONG_IDS_STALE_TIME,
+      gcTime: SONG_IDS_GC_TIME
+    };
+  },
+  facets: () => ({
+    queryKey: ['facets'],
+    queryFn: () => window.api.audioLibraryControls.getSongListFacets(),
+    staleTime: 30 * 60 * 1000
+  }),
   all: (data: {
     sortType: SongSortTypes;
     filterType?: SongFilterTypes;

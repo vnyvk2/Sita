@@ -445,6 +445,7 @@ export interface FilteredSongIdsOptions {
   genre?: string;
   onlyFavoriteArtists?: boolean;
   onlyFavoriteAlbums?: boolean;
+  restrictToIds?: number[];
 }
 
 const hasTruthyLanguageOverride = sql`EXISTS (
@@ -466,10 +467,24 @@ export const getFilteredSongLibraryIds = async (
     language,
     genre,
     onlyFavoriteArtists,
-    onlyFavoriteAlbums
+    onlyFavoriteAlbums,
+    restrictToIds
   } = options;
 
   const filters: SQL[] = [];
+
+  if (restrictToIds && restrictToIds.length > 0) {
+    const CHUNK = 500;
+    const idClauses: SQL[] = [];
+    for (let i = 0; i < restrictToIds.length; i += CHUNK) {
+      idClauses.push(inArray(songs.id, restrictToIds.slice(i, i + CHUNK)));
+    }
+    if (idClauses.length === 1) filters.push(idClauses[0]);
+    else {
+      const combined = or(...idClauses);
+      if (combined) filters.push(combined);
+    }
+  }
 
   if (filterType === 'favorites' || filterType === 'nonFavorites') {
     filters.push(eq(songs.isFavorite, filterType === 'favorites'));
@@ -550,7 +565,7 @@ export const getFilteredSongLibraryIds = async (
   else if (sortType === 'mostSkipped') orderClauses = [desc(songs.skipCount), asc(songs.title)];
   else if (sortType === 'leastSkipped') orderClauses = [asc(songs.skipCount), asc(songs.title)];
 
-  const query = trx.select({ id: songs.id }).from(songs);
+  const query = trx.select({ id: songs.id, isBlacklisted: songs.isBlacklisted }).from(songs);
 
   if (filters.length > 0) {
     query.where(and(...filters));
@@ -561,8 +576,13 @@ export const getFilteredSongLibraryIds = async (
   }
 
   const results = await query;
-  const ids = results.map((r) => r.id);
-  return { ids, total: ids.length };
+  const ids: number[] = [];
+  const blacklistedIds: number[] = [];
+  for (const row of results) {
+    ids.push(row.id);
+    if (row.isBlacklisted) blacklistedIds.push(row.id);
+  }
+  return { ids, total: ids.length, blacklistedIds };
 };
 
 export interface SongListFacets {
