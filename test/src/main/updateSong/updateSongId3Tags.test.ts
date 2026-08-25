@@ -422,4 +422,52 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       file.dispose();
     });
   });
+
+  describe('5-F: Unknown-Source Deferred Queue Awaiting', () => {
+    it('awaits the immediate pending-queue flush for a non-playing unknown-source song', async () => {
+      // A different song is playing: the unknown-source write must flush NOW (not defer)
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/some-other-song.mp3');
+      vi.mocked(mainModule.getSongsOutsideLibraryData).mockReturnValue([
+        { songId: 55, path: tempSongPath, isKnownSource: false } as any
+      ]);
+      const createFromPathSpy = vi.spyOn(File, 'createFromPath');
+
+      const result = await updateSongId3Tags(tempSongPath, { title: 'Unknown Source Awaited' }, false, false);
+
+      expect(result?.success).toBe(true);
+      // The awaited flush must have completed before the call resolved
+      expect(createFromPathSpy).toHaveBeenCalledWith(tempSongPath);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+
+      const file = File.createFromPath(tempSongPath);
+      expect(file.tag.title).toBe('Unknown Source Awaited');
+      file.dispose();
+    });
+
+    it('defers the write (no flush awaited) when the unknown-source song is currently playing', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
+      vi.mocked(mainModule.getSongsOutsideLibraryData).mockReturnValue([
+        { songId: 57, path: tempSongPath, isKnownSource: false } as any
+      ]);
+
+      const result = await updateSongId3Tags(tempSongPath, { title: 'Deferred While Playing' }, false, false);
+
+      expect(result?.success).toBe(true);
+      // Deferred: queued but NOT written yet
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+      const notYetWritten = File.createFromPath(tempSongPath);
+      expect(notYetWritten.tag.title).not.toBe('Deferred While Playing');
+      notYetWritten.dispose();
+
+      // Playback moves away -> manual flush persists it
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/another.mp3');
+      await savePendingMetadataUpdates(tempSongPath, true);
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      const flushed = File.createFromPath(tempSongPath);
+      expect(flushed.tag.title).toBe('Deferred While Playing');
+      flushed.dispose();
+    });
+  });
 });
