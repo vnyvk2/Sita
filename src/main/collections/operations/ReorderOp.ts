@@ -37,6 +37,10 @@ export class ReorderOp implements CollectionOperation<ReorderInput, void> {
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.reorder',
       operationInput: { playlistId, entryId, newPosition: input.newPosition },
+      // Journal semantics boundary: since the rank-based rewrite, newPosition is
+      // a dense visual rank. Journals written by older builds stored absolute
+      // stored-position values; replaying those pre-rewrite entries interprets
+      // them as ranks (one-time historical edge for undo of pre-migration ops).
       inverseInput: {
         operationType: 'playlist.reorder',
         input: { playlistId, entryId, newPosition: sourceRank }
