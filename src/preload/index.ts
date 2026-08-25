@@ -531,6 +531,8 @@ const albumsData = {
     end?: number
   ): Promise<PaginatedResult<AlbumSummary, AlbumSortTypes>> =>
     ipcRenderer.invoke('app/getAlbumSummaries', sortType, filterType, start, end),
+  getAlbumSongIds: (albumId: number): Promise<number[]> =>
+    ipcRenderer.invoke('app/getAlbumSongIds', albumId),
   getAlbumData: (
     albumTitlesOrIds?: (string | number)[],
     sortType?: AlbumSortTypes,

@@ -12,7 +12,20 @@ import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import SongArtist from '../SongsPage/SongArtist';
 
-interface AlbumProp extends Album {
+interface AlbumProp {
+  albumId: number;
+  title: string;
+  year?: number;
+  isAFavorite?: boolean;
+  artists?: {
+    artistId: number;
+    name: string;
+  }[];
+  artworkPaths: ArtworkPaths;
+  /** Full song list when the caller already has a complete Album (detail views). */
+  songs?: Album['songs'];
+  /** Lightweight count when the caller only has an AlbumSummary (grid). */
+  songCount?: number;
   index: number;
   className?: string;
   selectAllHandler?: (_upToId?: number) => void;
@@ -28,7 +41,6 @@ export const Album = (props: AlbumProp) => {
   const {
     createQueue,
     updateContextMenuData,
-    updateQueueData,
     addNewNotifications,
     updateMultipleSelections,
     toggleMultipleSelections,
@@ -43,15 +55,30 @@ export const Album = (props: AlbumProp) => {
     setIsFavorite(props.isAFavorite);
   }, [props.isAFavorite]);
 
+  const songCount = props.songs?.length ?? props.songCount ?? 0;
+
+  const resolveSongIds = useCallback(async (): Promise<number[]> => {
+    if (props.songs) return props.songs.map((song) => song.songId);
+    return window.api.albumsData.getAlbumSongIds(props.albumId);
+  }, [props.albumId, props.songs]);
+
+  const resolveSongTitles = useCallback(async (): Promise<{ songId: number; title: string }[]> => {
+    if (props.songs) return props.songs;
+    const albums = await window.api.albumsData.getAlbumData([props.albumId]);
+    return albums?.[0]?.songs ?? [];
+  }, [props.albumId, props.songs]);
+
   const playAlbumSongs = useCallback(
     (isShuffle = false) => {
-      return window.api.audioLibraryControls
-        .getSongInfo(
-          props.songs.map((song) => song.songId),
-          undefined,
-          undefined,
-          undefined,
-          true
+      return resolveSongIds()
+        .then((songIds) =>
+          window.api.audioLibraryControls.getSongInfo(
+            songIds,
+            undefined,
+            undefined,
+            undefined,
+            true
+          )
         )
         .then((songs) => {
           if (Array.isArray(songs))
@@ -66,7 +93,7 @@ export const Album = (props: AlbumProp) => {
           return undefined;
         });
     },
-    [createQueue, props.albumId, props.songs, props.title]
+    [createQueue, props.albumId, props.title, resolveSongIds]
   );
 
   const playAlbumSongsForMultipleSelections = useCallback(
@@ -241,17 +268,18 @@ export const Album = (props: AlbumProp) => {
         handlerFunction: () => {
           if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
           else {
-            const songIdsToAdd = props.songs.map((song) => song.songId);
-            getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
-            addNewNotifications([
-              {
-                id: 'newSongsToQueue',
-                duration: 5000,
-                content: t(`notifications.addedToQueue`, {
-                  count: props.songs.length
-                })
-              }
-            ]);
+            void resolveSongIds().then((songIdsToAdd) => {
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
+              addNewNotifications([
+                {
+                  id: 'newSongsToQueue',
+                  duration: 5000,
+                  content: t(`notifications.addedToQueue`, {
+                    count: songIdsToAdd.length
+                  })
+                }
+              ]);
+            });
           }
           toggleMultipleSelections(false);
         }
@@ -278,9 +306,12 @@ export const Album = (props: AlbumProp) => {
         label: 'Auto Tag Album',
         iconName: 'auto_awesome',
         handlerFunction: () => {
-          if (openAutoTagDialog) {
-            openAutoTagDialog(props.songs, props.title, props.artists?.[0]?.name);
-          }
+          if (!openAutoTagDialog) return;
+          void resolveSongTitles().then((albumSongs) => {
+            if (albumSongs.length > 0) {
+              openAutoTagDialog(albumSongs, props.title, props.artists?.[0]?.name);
+            }
+          });
         }
       },
       {
@@ -316,7 +347,9 @@ export const Album = (props: AlbumProp) => {
     playAlbumSongs,
     playAlbumSongsForMultipleSelections,
     props.albumId,
-    props.songs,
+    resolveSongIds,
+    resolveSongTitles,
+    songCount,
     showAlbumInfoPage,
     t,
     toggleLikeAlbum,
@@ -338,7 +371,7 @@ export const Album = (props: AlbumProp) => {
         : {
             title: props.title,
             artworkPath: props?.artworkPaths?.optimizedArtworkPath,
-            subTitle: t('common.songWithCount', { count: props.songs.length }),
+            subTitle: t('common.songWithCount', { count: songCount }),
             subTitle2:
               props.artists?.map((artist) => artist.name).join(', ') || t('common.unknownArtist')
           },
@@ -349,7 +382,7 @@ export const Album = (props: AlbumProp) => {
       multipleSelectionsData.selectionType,
       props.artists,
       props?.artworkPaths?.optimizedArtworkPath,
-      props.songs.length,
+      songCount,
       props.title,
       t
     ]
@@ -445,13 +478,13 @@ export const Album = (props: AlbumProp) => {
         {props.artists && (
           <div
             className="album-artists flex w-full truncate text-sm hover:underline"
-            title={props.artists.map((artist) => artist.name).join(', ')}
+            title={props.artists?.map((artist) => artist.name).join(', ')}
           >
             {albumArtists}
           </div>
         )}
         <div className="album-no-of-songs w-full overflow-hidden text-xs text-ellipsis whitespace-nowrap">
-          {t('common.songWithCount', { count: props.songs.length })}
+          {t('common.songWithCount', { count: songCount })}
         </div>
       </div>
     </div>

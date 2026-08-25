@@ -76,7 +76,7 @@ import {
   getSongDurationsByIds,
   getSongListFacets
 } from './db/queries/songs';
-import { getAlbumSummaries } from './db/queries/albums';
+import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
 import {
   getUserKeyboardShortcuts,
   saveUserKeyboardShortcuts,
@@ -558,6 +558,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/getAlbumSummaries', (_, sortType?: AlbumSortTypes, filterType?: AlbumFilterTypes, start?: number, end?: number) =>
       getAlbumSummaries({ sortType, filterType, start, end })
     );
+
+    ipcMain.handle('app/getAlbumSongIds', (_, albumId: number) => getAlbumSongIds(albumId));
 
     ipcMain.handle('app/getArtistDuplicates', (_, artistName: string) =>
       getArtistDuplicates(artistName)

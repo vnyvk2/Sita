@@ -34,6 +34,7 @@ declare global {
     | 'app/getSongListFacets'
     | 'app/getSongDurations'
     | 'app/getAlbumSummaries'
+    | 'app/getAlbumSongIds'
     | 'library/getChangeState'
     | 'library/resetChangeState'
     | 'library/diskChanged'
@@ -838,6 +839,8 @@ declare global {
     artworkPaths: ArtworkPaths;
     songCount: number;
   }
+
+  type AlbumLike = Album | AlbumSummary;
 
   // ? Artists related types
 
