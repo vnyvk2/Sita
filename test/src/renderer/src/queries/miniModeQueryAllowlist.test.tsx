@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { CollectionClient } from '@renderer/api/CollectionClient';
-import { useUndoRedo } from '@renderer/hooks/collections/useUndoRedo';
 import { useAppUpdates } from '@renderer/hooks/useAppUpdates';
 import { useUserPreferences } from '@renderer/hooks/useUserPreferences';
 import { userPreferencesQuery } from '@renderer/queries/userPreferences';
@@ -29,7 +27,10 @@ const AppSource = readFileSync(resolve(process.cwd(), 'src/renderer/src/App.tsx'
  *
  * - UserPreferencesQuery.* (5 preference DB round-trips)
  * - Remote changelog polling (useAppUpdates timers/prompt)
- * - Collection undo/redo mutations (useUndoRedo shortcuts)
+ *
+ * Note: collection undo/redo shortcuts moved into the playlist route
+ * (useCollectionMutations), which is unmounted entirely in mini mode, so they
+ * no longer require a global playerType gate.
  */
 
 const changePromptMenuDataMock = vi.fn();
@@ -206,35 +207,6 @@ describe('Mini Mode Query Allowlist (regression guard)', () => {
       await vi.advanceTimersByTimeAsync(1000 * 60 * 10);
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('collection undo/redo shortcuts (useUndoRedo)', () => {
-    const fireShortcut = (key: string) => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true, cancelable: true }));
-    };
-
-    it('ignores Ctrl+Z / Ctrl+Y while in mini mode', () => {
-      setPlayerType('mini');
-      const Wrapper = createWrapper();
-
-      renderHook(() => useUndoRedo(), { wrapper: Wrapper });
-
-      fireShortcut('z');
-      fireShortcut('y');
-
-      expect(CollectionClient.undo).not.toHaveBeenCalled();
-      expect(CollectionClient.redo).not.toHaveBeenCalled();
-    });
-
-    it('performs undo when returning to normal mode', async () => {
-      const Wrapper = createWrapper();
-
-      renderHook(() => useUndoRedo(), { wrapper: Wrapper });
-
-      fireShortcut('z');
-
-      await waitFor(() => expect(CollectionClient.undo).toHaveBeenCalledTimes(1));
     });
   });
 
