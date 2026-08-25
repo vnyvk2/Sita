@@ -5,11 +5,12 @@ import path from 'path';
 import logger from '@main/logger';
 import { TagWriterService } from '@main/metadata/services/TagWriterService';
 
-import type {
-  DownloadJobState,
-  DuplicatePolicy,
-  EnqueueDownloadInput,
-  DownloadsSnapshot
+import {
+  ONLINE_DOWNLOADS_MAX_DURATION_SECS,
+  type DownloadJobState,
+  type DuplicatePolicy,
+  type EnqueueDownloadInput,
+  type DownloadsSnapshot
 } from './models/downloadTypes';
 import type { OnlineExtractor } from './services/OnlineExtractor';
 
@@ -39,6 +40,8 @@ export interface DownloadManagerOptions {
 type JobRecord = DownloadJobState & {
   abortController?: AbortController;
   thumbnailUrl?: string;
+  /** Expected duration from the listing, for the soft drift warning. */
+  durationSecs?: number;
   /** Internal: set right before moving so cancellation cannot race the move. */
   isFinalizing?: boolean;
   /**
@@ -197,6 +200,7 @@ export class DownloadManager {
       status: 'QUEUED',
       progress: 0,
       thumbnailUrl: input.thumbnailUrl,
+      durationSecs: input.durationSecs,
       createdAt: Date.now()
     };
     this.jobs.set(record.jobId, record);
@@ -289,6 +293,10 @@ export class DownloadManager {
         throw new Error('The downloaded audio file is suspiciously small and was discarded.');
       }
 
+      // Independent of any search/playlist filtering: the finished file itself
+      // must satisfy the duration contract (guards direct IPC enqueues).
+      await enforceDurationContract(output.filePath, record.durationSecs);
+
       const artworkBuffer = await fetchArtwork(record.thumbnailUrl);
       const tagResult = await this.tagWriter.writeTags({
         filePath: output.filePath,
@@ -313,11 +321,11 @@ export class DownloadManager {
 
       record.filePath = finalPath;
       this.finish(record, 'COMPLETED');
-      try {
-        this.options.onFileFinalized?.(finalPath);
-      } catch (hookError) {
+      // The hook may be asynchronous; a rejection inside it must never become
+      // an unhandled rejection in the main process.
+      void Promise.resolve(this.options.onFileFinalized?.(finalPath)).catch((hookError) => {
         logger.warn('[DownloadManager] onFileFinalized hook failed.', { error: hookError });
-      }
+      });
       logger.info('[DownloadManager] Download finished.', {
         jobId: record.jobId,
         title: record.title,
@@ -469,6 +477,48 @@ function exists(filePath: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Verifies the finished file against the duration contract:
+ * - hard limit: longer-than-max files (e.g. full sets uploaded as "songs")
+ *   are rejected even when they bypassed search/playlist filtering;
+ * - soft check: a mismatch against the expected duration is logged only,
+ *   since YouTube upload durations frequently differ slightly from releases.
+ */
+async function enforceDurationContract(
+  filePath: string,
+  expectedDurationSecs?: number
+): Promise<void> {
+  const { File } = await import('node-taglib-sharp');
+  let actualMs: number | undefined;
+  const file = File.createFromPath(filePath);
+  try {
+    actualMs = file.properties?.durationMilliseconds;
+  } finally {
+    file.dispose();
+  }
+
+  if (!actualMs || actualMs <= 0) return;
+
+  const actualSecs = actualMs / 1000;
+  if (actualSecs > ONLINE_DOWNLOADS_MAX_DURATION_SECS) {
+    throw new Error(
+      `The downloaded audio is ${Math.round(actualSecs / 60)} minutes long, which exceeds ` +
+        `${ONLINE_DOWNLOADS_MAX_DURATION_SECS / 60} minutes. It looks like this result was not a song.`
+    );
+  }
+
+  if (expectedDurationSecs && expectedDurationSecs > 0) {
+    const driftSecs = Math.abs(actualSecs - expectedDurationSecs);
+    if (driftSecs > Math.max(15, expectedDurationSecs * 0.25)) {
+      logger.warn('[DownloadManager] Downloaded duration differs notably from the listing.', {
+        filePath,
+        expectedDurationSecs,
+        actualDurationSecs: Math.round(actualSecs)
+      });
+    }
   }
 }
 

@@ -34,15 +34,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN_DIR = path.resolve(__dirname, '..', 'resources', 'bin');
 
 const FORCE = process.argv.includes('--force');
-const YTDLP_VERSION = process.env.NORA_YTDLP_VERSION;
+/** Pinned known-good yt-dlp release. Override with NORA_YTDLP_VERSION if needed. */
+const YTDLP_VERSION = process.env.NORA_YTDLP_VERSION ?? '2026.08.19';
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
 const EXT = IS_WIN ? '.exe' : '';
+/** Sanity floor: real yt-dlp binaries are ~15-20MB. */
+const MIN_YTDLP_BYTES = 5 * 1024 * 1024;
 
 function ytdlpUrl() {
-  const base = YTDLP_VERSION
-    ? `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}`
-    : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download';
+  const base = `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}`;
   if (IS_WIN) return `${base}/yt-dlp.exe`;
   if (IS_MAC) return `${base}/yt-dlp_macos`;
   return `${base}/yt-dlp_linux`;
@@ -81,8 +82,19 @@ function findFileByName(dir, fileName) {
 
 async function ensureYtDlp() {
   const target = path.join(BIN_DIR, `yt-dlp${EXT}`);
-  if (!FORCE && existsSync(target)) return;
-  await downloadTo(ytdlpUrl(), target);
+  if (!FORCE && existsSync(target) && statSync(target).size > MIN_YTDLP_BYTES) return;
+  // Atomic: a interrupted download must never leave a partial file that later
+  // runs would treat as valid.
+  const tmpTarget = path.join(BIN_DIR, `_yt-dlp${EXT}.tmp`);
+  try {
+    await downloadTo(ytdlpUrl(), tmpTarget);
+    if (statSync(tmpTarget).size < MIN_YTDLP_BYTES) {
+      throw new Error('Downloaded yt-dlp is suspiciously small.');
+    }
+    renameSync(tmpTarget, target);
+  } finally {
+    rmSync(tmpTarget, { force: true });
+  }
   if (!IS_WIN) chmodSync(target, 0o755);
 }
 

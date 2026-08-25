@@ -55,9 +55,8 @@ function useDownloadStates() {
   return snapshot ?? { jobs: [], activeCount: 0, queuedCount: 0 };
 }
 
-function DownloadsPanel() {
+function DownloadsPanel({ snapshot }: { snapshot: DownloadsSnapshot }) {
   const { t } = useTranslation();
-  const snapshot = useDownloadStates();
 
   const activeJobs = useMemo(() => {
     const relevant = snapshot.jobs.filter(
@@ -111,14 +110,15 @@ function DownloadsPanel() {
   );
 }
 
-function TrackRow({ track, playlist }: { track: OnlineTrackResult; playlist?: { id: string; name: string } }) {
-  const snapshot = useDownloadStates();
-  const [error, setError] = useState<string | null>(null);
+interface TrackRowProps {
+  track: OnlineTrackResult;
+  playlist?: { id: string; name: string };
+  /** Latest job state for this track's videoId, from the single page-level subscription. */
+  jobState?: DownloadJobState;
+}
 
-  const jobState = useMemo(
-    () => snapshot.jobs.find((job) => job.videoId === track.videoId),
-    [snapshot.jobs, track.videoId]
-  );
+function TrackRow({ track, playlist, jobState }: TrackRowProps) {
+  const [error, setError] = useState<string | null>(null);
 
   const thumbnail = track.thumbnails.at(-1);
 
@@ -206,6 +206,13 @@ function OnlinePage() {
   const [playlistUrl, setPlaylistUrl] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Single IPC subscription for the whole page; rows read from this snapshot.
+  const downloadStates = useDownloadStates();
+  const jobsByVideoId = useMemo(
+    () => new Map(downloadStates.jobs.map((job) => [job.videoId, job])),
+    [downloadStates.jobs]
+  );
+
   const { data: userSettings } = useQuery(settingsQuery.all);
   const hasFolder = Boolean(userSettings?.onlineDownloadsFolder);
 
@@ -264,7 +271,7 @@ function OnlinePage() {
         </div>
       )}
 
-      <DownloadsPanel />
+      <DownloadsPanel snapshot={downloadStates} />
 
       {/* Mode tabs */}
       <div className="mb-4 flex w-max items-center rounded-xl border border-background-color-2/70 bg-background-color-1/90 p-1 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90">
@@ -307,7 +314,11 @@ function OnlinePage() {
 
           <ul className="flex flex-col gap-1">
             {results.map((track) => (
-              <TrackRow key={track.videoId} track={track} />
+              <TrackRow
+                key={track.videoId}
+                track={track}
+                jobState={jobsByVideoId.get(track.videoId)}
+              />
             ))}
           </ul>
           {searchMutation.isSuccess && results.length === 0 && (
@@ -358,6 +369,7 @@ function OnlinePage() {
                     key={track.videoId}
                     track={track}
                     playlist={{ id: playlist.playlistId, name: playlist.title }}
+                    jobState={jobsByVideoId.get(track.videoId)}
                   />
                 ))}
               </ul>

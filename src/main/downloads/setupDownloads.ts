@@ -130,6 +130,14 @@ export function setupDownloadsIpc(publish: (snapshot: DownloadsSnapshot) => void
 
   ipcMain.handle('downloads/getState', () => downloadManagerInstance!.getSnapshot());
 
+  // Called by the settings page right after the user changes the download
+  // folder / library toggle so registration does not wait for a first download.
+  ipcMain.handle('downloads/ensureFolderRegistered', () =>
+    ensureDownloadsFolderInLibrary().catch((error) =>
+      logger.error('[downloads] Failed to link download folder with library.', { error })
+    )
+  );
+
   logger.info('[downloads] IPC handlers registered.');
 }
 

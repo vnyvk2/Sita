@@ -1,6 +1,9 @@
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { YtDlpExtractor } from '../YtDlpExtractor';
 import { ExtractorError } from '../OnlineExtractor';
@@ -12,27 +15,33 @@ vi.mock('child_process', () => ({
 }));
 
 vi.mock('../binaryResolver', () => ({
-  resolveBinaryPath: vi.fn(() => '/fake/bin/yt-dlp')
+  resolveBinaryPath: vi.fn((name: string) => `/fake/bin/${name}`)
 }));
 
 interface FakeChildOptions {
   stdoutData?: string;
   stderrData?: string;
   exitCode?: number;
+  /** Emitted right before close; lets a test place a "downloaded" file. */
+  beforeClose?: (outputDir?: string) => void;
 }
 
-function makeFakeChild({ stdoutData = '', stderrData = '', exitCode = 0 }: FakeChildOptions) {
+function makeFakeChild({ stdoutData = '', stderrData = '', exitCode = 0, beforeClose }: FakeChildOptions) {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter & { setEncoding: (encoding: string) => void };
     stderr: EventEmitter & { setEncoding: (encoding: string) => void };
     kill: ReturnType<typeof vi.fn>;
+    killed: boolean;
   };
   child.stdout = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
-  child.kill = vi.fn();
+  child.kill = vi.fn(() => {
+    child.killed = true;
+  });
   queueMicrotask(() => {
     if (stdoutData) child.stdout.emit('data', stdoutData);
     if (stderrData) child.stderr.emit('data', stderrData);
+    beforeClose?.();
     child.emit('close', exitCode);
   });
   return child;
@@ -147,6 +156,131 @@ describe('YtDlpExtractor', () => {
       expect(extractor.describeFileName('My: Cool "Song"?', 'abc123')).toBe(
         'My_ Cool _Song__ [abc123]'
       );
+    });
+  });
+
+  describe('download', () => {
+    let outputDir: string;
+
+    beforeEach(() => {
+      outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-ytdl-extractor-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    });
+
+    it('builds the audio-only command with progress template and staging output template', async () => {
+      spawnMock.mockImplementation((binary: string, args: string[]) => {
+        expect(binary).toBe('/fake/bin/yt-dlp');
+        // Contract flags for the most externally fragile part of the pipeline.
+        for (const flag of [
+          '--no-playlist',
+          '--windows-filenames',
+          '--trim-filenames',
+          '--newline',
+          '--progress-template'
+        ]) {
+          if (!args.includes(flag)) throw new Error(`Missing required flag: ${flag}`);
+        }
+        const formatIndex = args.indexOf('-f');
+        expect(args[formatIndex + 1]).toBe('bestaudio[ext=m4a]/bestaudio[ext=opus]');
+        const templateIndex = args.indexOf('-o');
+        expect(args[templateIndex + 1]).toContain('%(title)s [%(id)s].%(ext)s');
+        expect(args).toContain('https://www.youtube.com/watch?v=abc123');
+        return makeFakeChild({
+          beforeClose: () => fs.writeFileSync(path.join(outputDir, 'Song [abc123].m4a'), 'x')
+        });
+      });
+
+      const output = await extractor.download({
+        videoId: 'abc123',
+        outputDir,
+        abortSignal: new AbortController().signal
+      });
+
+      expect(output.filePath).toBe(path.join(outputDir, 'Song [abc123].m4a'));
+      expect(output.containerExt).toBe('m4a');
+    });
+
+    it('reports parsed progress percentages, including lines split across chunks', async () => {
+      const percents: number[] = [];
+      let firstChunkSent = false;
+      spawnMock.mockImplementation(() => {
+        const child = makeFakeChild({});
+        queueMicrotask(() => {
+          child.stdout.emit('data', 'download:NORA_PROGRESS: 12.5%\r\n');
+          firstChunkSent = true;
+          void firstChunkSent;
+          // Split mid-token across two data events.
+          child.stdout.emit('data', 'download:NORA_PRO');
+          child.stdout.emit('data', 'GRESS: 87.0%\r\n');
+          child.emit('close', 0);
+        });
+        return child;
+      });
+
+      await extractor.download({
+        videoId: 'abc123',
+        outputDir,
+        abortSignal: new AbortController().signal,
+        onProgress: (p) => percents.push(p)
+      }).catch(() => undefined);
+
+      expect(percents).toEqual([12.5, 87]);
+    });
+
+    it('kills the process when the abort signal fires', async () => {
+      let fakeChild: ReturnType<typeof makeFakeChild> | undefined;
+      spawnMock.mockImplementation(() => {
+        fakeChild = makeFakeChild({ exitCode: 1 });
+        // Keep the child "running" until killed: never auto-close.
+        fakeChild.kill.mockImplementation(() => fakeChild!.emit('close', null));
+        return fakeChild;
+      });
+
+      const controller = new AbortController();
+      const promise = extractor.download({
+        videoId: 'abc123',
+        outputDir,
+        abortSignal: controller.signal
+      });
+
+      await vi.waitFor(() => expect(fakeChild).toBeDefined());
+      controller.abort();
+
+      await expect(promise).rejects.toMatchObject({ code: 'CANCELLED' });
+      expect(fakeChild!.kill).toHaveBeenCalled();
+    });
+
+    it('rejects unsupported containers instead of returning them', async () => {
+      spawnMock.mockImplementation(() =>
+        makeFakeChild({
+          beforeClose: () => fs.writeFileSync(path.join(outputDir, 'Song [abc123].webm'), 'x')
+        })
+      );
+
+      await expect(
+        extractor.download({
+          videoId: 'abc123',
+          outputDir,
+          abortSignal: new AbortController().signal
+        })
+      ).rejects.toMatchObject({ code: 'UNSUPPORTED_SOURCE' });
+    });
+
+    it('surfaces yt-dlp errors with a summarized message', async () => {
+      spawnMock.mockImplementation(() =>
+        makeFakeChild({ stderrData: 'ERROR: Sign in to confirm your age', exitCode: 1 })
+      );
+
+      await expect(
+        extractor.download({
+          videoId: 'abc123',
+          outputDir,
+          abortSignal: new AbortController().signal
+        })
+      ).rejects.toMatchObject({ code: 'EXTRACTION_FAILED' });
     });
   });
 });

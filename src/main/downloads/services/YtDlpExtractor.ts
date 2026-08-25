@@ -106,20 +106,50 @@ export class YtDlpExtractor implements OnlineExtractor {
       watchUrlFor(videoId)
     ];
 
+    // Best effort: make bundled/user ffmpeg discoverable for edge-case
+    // post-processing when yt-dlp decides it needs it. Not required for the
+    // normal audio-only path.
+    try {
+      args.push('--ffmpeg-location', path.dirname(resolveBinaryPath('ffmpeg')));
+    } catch {
+      // ffmpeg not installed; audio-only extraction does not need it.
+    }
+
     const child = spawn(resolveBinaryPath('yt-dlp'), args, { windowsHide: true });
 
     let stderrTail = '';
+    // Pipe chunks can split mid-line; keep the remainder across events so a
+    // "NORA_PROGRESS:" line split across chunks is still parsed exactly once.
+    let stdoutRemainder = '';
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
-      for (const line of chunk.split(/\r?\n|\r/)) {
+      const data = stdoutRemainder + chunk;
+      const lines = data.split(/\r?\n|\r/);
+      stdoutRemainder = lines.pop() ?? '';
+      for (const line of lines) {
         const match = line.match(/NORA_PROGRESS:\s*([\d.]+)%/);
         if (match) onProgress?.(Number.parseFloat(match[1]));
       }
+      lastActivityAt = Date.now();
     });
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => {
       stderrTail = (stderrTail + chunk).slice(-2000);
+      lastActivityAt = Date.now();
     });
+
+    // Watchdog: a stalled connection / silent bot-check would otherwise pin a
+    // concurrency slot forever. Any stdout/stderr activity resets the timer.
+    const INACTIVITY_TIMEOUT_MS = 90_000;
+    let lastActivityAt = Date.now();
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastActivityAt > INACTIVITY_TIMEOUT_MS) {
+        logger.warn('[YtDlpExtractor] Download stalled; killing process.', { videoId });
+        killProcessTree(child);
+        stallDetected = true;
+      }
+    }, 15_000);
+    let stallDetected = false;
 
     const abortHandler = () => {
       logger.info('[YtDlpExtractor] Cancelling download', { videoId });
@@ -131,10 +161,19 @@ export class YtDlpExtractor implements OnlineExtractor {
     const exitCode = await new Promise<number | null>((resolve, reject) => {
       child.on('error', reject);
       child.on('close', (code) => resolve(code));
-    }).finally(() => abortSignal.removeEventListener('abort', abortHandler));
+    }).finally(() => {
+      clearInterval(watchdog);
+      abortSignal.removeEventListener('abort', abortHandler);
+    });
 
     if (abortSignal.aborted) {
       throw new ExtractorError('Download cancelled.', 'CANCELLED');
+    }
+    if (stallDetected) {
+      throw new ExtractorError(
+        'The download stalled with no activity and was aborted. Try again later.',
+        'EXTRACTION_FAILED'
+      );
     }
     if (exitCode !== 0) {
       logger.error('[YtDlpExtractor] yt-dlp failed', { videoId, exitCode, stderrTail });

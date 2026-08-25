@@ -20,6 +20,7 @@ const DownloadsSettings = () => {
   const { mutate: setDownloadsFolder } = useMutation({
     mutationFn: (folderPath: string | null) =>
       window.api.settings.updateOnlineDownloadsFolder(folderPath),
+    onSuccess: () => void window.api.downloads.ensureFolderRegistered(),
     onSettled: () => queryClient.invalidateQueries(settingsQuery.all)
   });
 
@@ -31,6 +32,7 @@ const DownloadsSettings = () => {
 
   const { mutate: setAddToLibrary } = useMutation({
     mutationFn: (enabled: boolean) => window.api.settings.updateAddDownloadsToLibrary(enabled),
+    onSuccess: () => void window.api.downloads.ensureFolderRegistered(),
     onSettled: () => queryClient.invalidateQueries(settingsQuery.all)
   });
 

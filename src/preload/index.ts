@@ -653,6 +653,8 @@ const downloads = {
     ipcRenderer.invoke('downloads/enqueueMany', inputs, playlistId, playlistName),
   cancel: (jobId: string): Promise<boolean> => ipcRenderer.invoke('downloads/cancel', jobId),
   getState: (): Promise<DownloadsSnapshot> => ipcRenderer.invoke('downloads/getState'),
+  ensureFolderRegistered: (): Promise<void> =>
+    ipcRenderer.invoke('downloads/ensureFolderRegistered'),
   onUpdated: (callback: (snapshot: DownloadsSnapshot) => void) => {
     const listener = (_: unknown, snapshot: DownloadsSnapshot) => callback(snapshot);
     ipcRenderer.on('downloads/updated', listener);

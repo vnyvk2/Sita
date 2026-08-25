@@ -16,8 +16,11 @@ import { TagWriterService } from '@main/metadata/services/TagWriterService';
  *   - M4A  (AAC in MP4 container, yt-dlp `-f bestaudio[ext=m4a]`)
  *   - OPUS (Opus in Ogg container, yt-dlp `-f bestaudio[ext=opus]`)
  *
- * If this test fails for a format, the download pipeline must refuse that format
- * instead of silently producing untagged files.
+ * This is a FORMAT-CAPABILITY gate: if a container listed in the extractor's
+ * SUPPORTED_EXTENSIONS cannot hold tags/artwork, the whitelist must be corrected
+ * so the pipeline never advertises a format it cannot tag. A transient runtime
+ * tagging failure on an otherwise supported file is tolerated by design — the
+ * audio is kept and library parsing falls back to the filename.
  */
 
 const FIXTURES_DIR = path.resolve(__dirname, '../../../../../test/fixtures/downloads');
