@@ -9,6 +9,7 @@ import { MusicBrainzAdapter } from '@main/metadata/providers/musicbrainz/MusicBr
 import { extractFrontCover } from '@main/utils/extractFrontCover';
 import { syncAlbumArtworks } from '@main/db/queries/artworks';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { HttpError } from '@main/platform/networking/FetchHttpClient';
 
 describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
   describe('1. Artwork Workflow & Field ID Consistency (BUG-07 & BUG-19 Wiring)', () => {
@@ -19,8 +20,9 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
         execute: vi.fn().mockImplementation(async (url: string) => {
           executedUrls.push(url);
           if (url.includes('/release/release-mbid-001')) {
-            // CAA has no artwork for this specific release (404)
-            return { status: 404, data: null, headers: {} };
+            // CAA has no artwork for this specific release - production
+            // FetchHttpClient throws HttpError for !ok responses
+            throw new HttpError(404, 'Not Found', url);
           }
           if (url.includes('/release-group/rg-mbid-999')) {
             // CAA has artwork for the release group!
@@ -39,7 +41,7 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
               headers: {}
             };
           }
-          return { status: 404, data: null, headers: {} };
+          throw new HttpError(404, 'Not Found', url);
         })
       };
 
@@ -82,7 +84,7 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
       expect(match.suggestedMetadata.artworkPath).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
       expect(match.fieldDiffs).toHaveLength(1);
       expect(match.fieldDiffs[0].fieldId).toBe('artworkPath');
-      expect(match.fieldDiffs[0].newVal).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
+      expect(match.fieldDiffs[0].suggestedValue).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
 
       // Invariant BUG-19: ArtworkWorkflow resolved release -> extracted releaseGroupId -> queried release first -> cascaded to release group on 404
       expect(mockMbAdapter.resolveRelease).toHaveBeenCalledWith('release-mbid-001');
