@@ -37,7 +37,12 @@ export interface AppUpdateContextType {
   updateVolume: (volume: number) => void;
   updateSongPosition: (position: number) => void;
   updateEqualizerOptions: (options: Equalizer) => void;
-  openAutoTagDialog?: (songs: any[], albumName?: string, artistName?: string, workflow?: import('../hooks/useMetadataWorkflow').WorkflowType) => void;
+  openAutoTagDialog?: (
+    songs: any[],
+    albumName?: string,
+    artistName?: string,
+    workflow?: import('../hooks/useMetadataWorkflow').WorkflowType
+  ) => void;
   closeAutoTagDialog?: () => void;
   createQueue: (
     songIds: number[],
@@ -47,6 +52,15 @@ export interface AppUpdateContextType {
     startPlaying?: boolean,
     queueTitle?: string
   ) => void;
+  playAllSongs: (options: {
+    songIds?: number[];
+    startSongId?: number;
+    shuffle?: boolean;
+    title?: string;
+    sortingOrder?: string;
+    builtAtLibraryVersion?: number;
+    startPlaying?: boolean;
+  }) => void;
   updateQueueData: (
     currentSongIndex?: number,
     queue?: number[],
