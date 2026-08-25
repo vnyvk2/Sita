@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Three full PGlite boots + real migration chains: observed 7-33s on this
 // machine depending on thermal/load state, hence the generous local ceiling
-vi.setConfig({ testTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000 });
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';

@@ -66,18 +66,21 @@ export interface MetadataApplyServiceOptions {
   historyService?: MetadataHistoryService;
   dbUpdater?: SongDbUpdater;
   batchChunkSize?: number;
+  orchestrator?: import('../apply/MetadataApplyOrchestrator').MetadataApplyOrchestrator;
 }
 
 export class MetadataApplyService {
   private readonly tagWriter: TagWriterService;
   private readonly historyService: MetadataHistoryService;
   private readonly dbUpdater?: SongDbUpdater;
+  private readonly orchestrator?: import('../apply/MetadataApplyOrchestrator').MetadataApplyOrchestrator;
   private readonly batchChunkSize: number;
 
   constructor(options?: MetadataApplyServiceOptions) {
     this.tagWriter = options?.tagWriter ?? new TagWriterService();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.dbUpdater = options?.dbUpdater;
+    this.orchestrator = options?.orchestrator;
     this.batchChunkSize = options?.batchChunkSize ?? 50;
   }
 
@@ -148,6 +151,100 @@ export class MetadataApplyService {
 
     // Target matches: If album-level mutations are active, all local album tracks receive album tags; otherwise only selected local tracks
     const targetMatches = hasAlbumLevelChanges ? actionableMatches : selectedMatches;
+
+    // ── 2c P3 reroute: when an orchestrator is attached, AutoTag applies flow
+    // through the single authoritative owner. The legacy chunk pipeline below
+    // remains for direct unit tests constructed without one.
+    if (this.orchestrator) {
+      const opId = options?.operationId ?? 'default';
+      const normalized = targetMatches.map((match) => {
+        // Contract whitelist: unknown ids (e.g. artworkUrl) are excluded -
+        // artwork travels through its own normalized channel.
+        const KNOWN_APPLY_FIELDS: ReadonlySet<string> = new Set([
+          'title', 'artist', 'album', 'year', 'trackNumber', 'discNumber', 'genre', 'isrc', 'musicBrainzRecordingId'
+        ]);
+        const fields: import('../apply/contract').NormalizedFieldMutation[] = (match.fieldDiffs ?? [])
+          .filter((d) => d.applyField && KNOWN_APPLY_FIELDS.has(d.fieldId))
+          .map((d) => {
+            const val = d.userValue !== undefined ? d.userValue : d.suggestedValue;
+            return {
+              fieldId: d.fieldId as never,
+              oldValue: d.oldValue ?? null,
+              newValue: val as string | number
+            };
+          })
+          .filter((f) => f.newValue !== undefined && String(f.newValue).trim() !== '');
+
+        if (globalMutations?.applyAlbumTitle && globalMutations.albumTitle) {
+          fields.push({ fieldId: 'album', oldValue: match.oldAlbum ?? null, newValue: globalMutations.albumTitle });
+        }
+        if (globalMutations?.applyYear && globalMutations.year !== undefined) {
+          fields.push({ fieldId: 'year', oldValue: match.oldYear ?? null, newValue: globalMutations.year });
+        }
+        if (globalMutations?.applyGenre && globalMutations.genre) {
+          fields.push({ fieldId: 'genre', oldValue: match.oldGenre ?? null, newValue: globalMutations.genre });
+        }
+
+        return {
+          mutationId: `${opId}:${match.localSongId}`,
+          operationId: opId,
+          songId: match.localSongId,
+          filePath: match.songPath,
+          fields,
+          ...(globalMutations?.applyAlbumArtist && globalMutations.albumArtist
+            ? { albumArtistNewValue: globalMutations.albumArtist }
+            : {}),
+          ...(artworkBuffer !== undefined && artworkBuffer !== null && artworkBuffer.length > 0
+            ? { artwork: { buffer: artworkBuffer } }
+            : {}),
+          fileWrite: { deferredIfPlaying: true },
+          undo: {
+            description: `AutoTag applied for ${albumTitle}`,
+            previousSongs: [
+              {
+                songId: match.localSongId,
+                path: match.songPath,
+                title: match.oldTitle,
+                artist: match.oldArtist,
+                albumArtist: match.oldAlbumArtist,
+                album: match.oldAlbum,
+                year: match.oldYear,
+                trackNumber: match.oldTrackNumber,
+                discNumber: match.oldDiscNumber,
+                genre: match.oldGenre,
+                isrc: match.oldIsrc,
+                musicBrainzRecordingId: match.oldMbid
+              }
+            ]
+          },
+
+        };
+      });
+
+      const albumTitle = preview.album.title;
+      const orchRes = await this.orchestrator.execute(normalized, {
+        albumTitle,
+        groupUndo: { description: `AutoTag applied for ${albumTitle}` }
+      });
+
+      if (orchRes.updatedCount > 0 || orchRes.deferredCount > 0) {
+        try {
+          const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
+          resetArtworkCache('songArtworks');
+          resetArtworkCache('albumArtworks');
+        } catch {
+          // Ignored in isolated testing environments
+        }
+      }
+
+      return {
+        success: orchRes.success,
+        updatedCount: orchRes.updatedCount,
+        deferredCount: orchRes.deferredCount > 0 ? orchRes.deferredCount : undefined,
+        failedCount: orchRes.failedCount,
+        errors: orchRes.errors
+      };
+    }
 
     // Split target matches into chunks of batchChunkSize (default 50)
     for (let i = 0; i < targetMatches.length; i += this.batchChunkSize) {
