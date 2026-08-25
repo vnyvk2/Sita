@@ -286,7 +286,13 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             ]);
             break;
           case 'appShortcutsPrompt.goToSearch':
-            navigate({ to: '/main-player/search' });
+            // In mini mode the main-player router is unmounted; route to the
+            // mini player's own search surface instead.
+            if (store.state.playerType === 'mini') {
+              void window.api.miniPlayer.toggleMiniPlayerSearch(true);
+            } else {
+              navigate({ to: '/main-player/search' });
+            }
             break;
           case 'appShortcutsPrompt.goToLyrics':
             if (location.pathname.startsWith('/main-player/lyrics')) {
@@ -296,7 +302,13 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             }
             break;
           case 'appShortcutsPrompt.goToQueue':
-            toggleOverlay('/main-player/queue');
+            // In mini mode the overlay targets the unmounted main UI; expand the
+            // mini player's queue surface instead.
+            if (store.state.playerType === 'mini') {
+              void window.api.miniPlayer.toggleMiniPlayerQueue(true);
+            } else {
+              toggleOverlay('/main-player/queue');
+            }
             break;
           case 'appShortcutsPrompt.goHome':
             navigate({ to: '/main-player/home' });
