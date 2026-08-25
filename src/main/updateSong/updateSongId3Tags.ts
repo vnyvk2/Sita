@@ -41,7 +41,7 @@ import { withAtomicFileWrite } from '../utils/withAtomicFileWrite';
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
-type TagData = {
+export type TagData = {
   title?: string;
   artists?: string[];
   album?: string;
@@ -218,6 +218,13 @@ const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
   return { deferred: true };
 };
 
+/**
+ * P2 bridge: durable-pending storage arrives in P4. Until then the playing-
+ * song deferral keeps using the existing in-memory coalescing queue.
+ */
+export const queueMetadataWriteForPlayingSong = (songPath: string, tags: TagData) => {
+  addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
+};
 export const fetchArtworkBufferFromURL = async (url: string) => {
   try {
     const res = await fetch(url);
