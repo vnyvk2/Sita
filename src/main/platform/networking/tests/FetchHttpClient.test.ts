@@ -97,4 +97,32 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
     expect(httpError.status).toBe(429);
     expect(httpError.responseHeaders?.['retry-after']).toBe('5');
   });
+
+  it('never attaches abort listeners to the caller signal (no accumulation across requests)', async () => {
+    const fakeResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Map([['content-type', 'application/json']]),
+      json: async () => ({ ok: true }),
+      text: async () => ''
+    } as unknown as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse) as unknown as typeof fetch);
+
+    const addSpy = vi.spyOn(AbortSignal.prototype, 'addEventListener');
+    try {
+      const controller = new AbortController();
+
+      for (let i = 0; i < 25; i += 1) {
+        await client.request({ url: 'https://api.example.com/ok', signal: controller.signal });
+      }
+
+      // With AbortSignal.any the source signal must receive zero listeners,
+      // regardless of how many requests share it.
+      const userSignalCalls = addSpy.mock.contexts.filter((ctx) => ctx === controller.signal);
+      expect(userSignalCalls).toHaveLength(0);
+    } finally {
+      addSpy.mockRestore();
+    }
+  });
 });

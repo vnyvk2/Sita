@@ -163,12 +163,9 @@ export class FetchHttpClient implements IHttpClient {
     if (userSignal.aborted) return userSignal;
     if (timeoutSignal.aborted) return timeoutSignal;
 
-    const controller = new AbortController();
-    const onAbort = () => controller.abort();
-
-    userSignal.addEventListener('abort', onAbort, { once: true });
-    timeoutSignal.addEventListener('abort', onAbort, { once: true });
-
-    return controller.signal;
+    // AbortSignal.any derives a signal without attaching listeners to the
+    // source signals, so reusing a long-lived caller signal across many
+    // requests never accumulates listeners.
+    return AbortSignal.any([userSignal, timeoutSignal]);
   }
 }
