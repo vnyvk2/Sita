@@ -1,17 +1,32 @@
+import { asc, eq, and, ne } from 'drizzle-orm';
+
 import { db } from '../../db/db';
-import { smartPlaylistRules, playlistEntries, songs, playlists, artistsSongs, artists, albumsSongs, albums, genresSongs, genres } from '../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import {
+  smartPlaylistRules,
+  playlistEntries,
+  songs,
+  playlists,
+  artistsSongs,
+  artists,
+  albumsSongs,
+  albums,
+  genresSongs,
+  genres
+} from '../../db/schema';
+import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, OrderDefinition } from '../query/ast';
 import { QueryPlanner } from '../query/QueryPlanner';
 import { SmartPlaylistCompiler } from '../query/SmartPlaylistCompiler';
-import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, OrderDefinition } from '../query/ast';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
 
 export class SmartPlaylistEngine {
   private planner = new QueryPlanner();
   private compiler = new SmartPlaylistCompiler();
+  // Stateless helper for position bookkeeping (accepts an explicit trx)
+  private repository = new PlaylistRepository();
 
   /**
-   * Safely regenerates the contents of a smart playlist inside a transaction.
-   * If any step fails, the entire regeneration rolls back.
+   * Safely regenerates the contents of a smart playlist inside a transaction. If any step fails,
+   * the entire regeneration rolls back.
    */
   public async regenerate(playlistId: number): Promise<boolean> {
     return await db.transaction(async (trx) => {
@@ -63,7 +78,7 @@ export class SmartPlaylistEngine {
 
       // Execute query to get matching song IDs
       const matchingSongs = await query;
-      
+
       // Deduplicate in JS to avoid SQL DISTINCT vs ORDER BY limitations
       // Preserves the first encountered element according to the ORDER BY
       const uniqueSongs = [];
@@ -78,22 +93,27 @@ export class SmartPlaylistEngine {
         }
       }
 
-      const songIds = uniqueSongs.map(s => s.id);
-      
-      // Calculate total duration
-      const totalDuration = uniqueSongs.reduce((sum, s) => sum + parseFloat(s.duration || '0'), 0);
+      const songIds = uniqueSongs.map((s) => s.id);
 
-      // 5. Delete existing smart entries
+      // 5. Capture the current visual order of non-smart entries (e.g. manually
+      // pinned tracks co-resident with the smart block) BEFORE deleting, so
+      // their relative order survives regeneration.
+      const manualEntries = await trx
+        .select({ id: playlistEntries.id })
+        .from(playlistEntries)
+        .where(and(eq(playlistEntries.playlistId, playlistId), ne(playlistEntries.source, 'smart')))
+        .orderBy(asc(playlistEntries.position), asc(playlistEntries.id));
+
+      const manualCount = manualEntries.length;
+
+      // 6. Delete existing smart entries
       await trx
         .delete(playlistEntries)
         .where(
-          and(
-            eq(playlistEntries.playlistId, playlistId),
-            eq(playlistEntries.source, 'smart')
-          )
+          and(eq(playlistEntries.playlistId, playlistId), eq(playlistEntries.source, 'smart'))
         );
 
-      // 6. Insert new entries
+      // 7. Insert new smart entries at the head (positions 0..k-1)
       if (songIds.length > 0) {
         const values = songIds.map((songId, index) => ({
           playlistId,
@@ -106,12 +126,40 @@ export class SmartPlaylistEngine {
         await trx.insert(playlistEntries).values(values);
       }
 
-      // 7. Update metadata
+      // 8. Renumber remaining non-smart entries to directly follow the smart
+      // block so stored positions stay contiguous and duplicate-free.
+      if (manualCount > 0) {
+        const smartBlockLength = songIds.length;
+        await this.repository.updatePositionsBulk(
+          playlistId,
+          manualEntries.map((entry, index) => ({
+            entryId: entry.id,
+            position: smartBlockLength + index
+          })),
+          trx
+        );
+      }
+
+      // 9. Update metadata (itemCount/totalDuration cover the whole playlist,
+      // not just the generated smart block)
+      let manualDuration = 0;
+      if (manualCount > 0) {
+        const manualSongRows = await trx
+          .select({ duration: songs.duration })
+          .from(playlistEntries)
+          .innerJoin(songs, eq(playlistEntries.songId, songs.id))
+          .where(
+            and(eq(playlistEntries.playlistId, playlistId), ne(playlistEntries.source, 'smart'))
+          );
+        manualDuration = manualSongRows.reduce((sum, s) => sum + parseFloat(s.duration || '0'), 0);
+      }
+      const totalDuration = uniqueSongs.reduce((sum, s) => sum + parseFloat(s.duration || '0'), 0);
+
       await trx
         .update(playlists)
         .set({
-          itemCount: songIds.length,
-          totalDuration: totalDuration.toString(),
+          itemCount: songIds.length + manualCount,
+          totalDuration: (totalDuration + manualDuration).toString(),
           updatedAt: new Date()
         })
         .where(eq(playlists.id, playlistId));

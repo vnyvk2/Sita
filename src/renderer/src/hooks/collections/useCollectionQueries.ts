@@ -1,13 +1,14 @@
-import type { PlaylistViewMode } from '@common/collections/types';
 import type { PlaylistDto } from '@common/collections/dtos';
+import type { PlaylistViewMode } from '@common/collections/types';
 import { useQuery, queryOptions } from '@tanstack/react-query';
+
 import { CollectionClient } from '../../api/CollectionClient';
 import { collectionKeys } from '../../api/collectionKeys';
 
 export const collectionDetailOptions = (id: number) => {
   return queryOptions({
     queryKey: collectionKeys.detail(id),
-    queryFn: () => CollectionClient.getCollection(id),
+    queryFn: () => CollectionClient.getCollection(id)
   });
 };
 
@@ -18,7 +19,7 @@ export const useCollectionDetail = (id: number) => {
 export const collectionChildrenOptions = (id: number | null) => {
   return queryOptions({
     queryKey: collectionKeys.children(id),
-    queryFn: () => CollectionClient.getChildren(id),
+    queryFn: () => CollectionClient.getChildren(id)
   });
 };
 
@@ -52,7 +53,7 @@ export const rootCollectionsOptions = (sortType?: PlaylistSortTypes) => {
         if (pinCompare !== 0) return pinCompare;
         return compareBySortType(a, b, sortType);
       });
-    },
+    }
   });
 };
 
@@ -60,16 +61,12 @@ export const useRootCollections = (sortType?: PlaylistSortTypes) => {
   return useQuery(rootCollectionsOptions(sortType));
 };
 
-export const useCollectionArtworks = (songIds: number[]) => {
-  const stringIds = songIds.map(String);
-  return useQuery({
-    queryKey: ['collectionArtworks', `songIds=${stringIds.join(',')}`],
-    queryFn: () => CollectionClient.getArtworks(songIds),
-    enabled: songIds.length > 0,
-  });
-};
-
-export const collectionEntriesOptions = (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode) => {
+export const collectionEntriesOptions = (
+  id: number,
+  offset?: number,
+  limit?: number,
+  sortType?: PlaylistViewMode
+) => {
   return queryOptions({
     queryKey: [...collectionKeys.entries(id), offset, limit, sortType],
     queryFn: () => CollectionClient.getEntries(id, offset, limit, sortType)
@@ -83,10 +80,6 @@ export const useCollectionEntries = (id: number, offset: number = 0, limit: numb
 export const collectionBreadcrumbsOptions = (id: number) => {
   return queryOptions({
     queryKey: collectionKeys.breadcrumbs(id),
-    queryFn: () => CollectionClient.getBreadcrumbs(id),
+    queryFn: () => CollectionClient.getBreadcrumbs(id)
   });
-};
-
-export const useCollectionBreadcrumbs = (id: number) => {
-  return useQuery({ ...collectionBreadcrumbsOptions(id), enabled: !!id });
 };

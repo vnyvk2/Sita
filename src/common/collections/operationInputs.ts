@@ -92,14 +92,14 @@ export interface UnpinInput {
   playlistId: number;
 }
 
+/**
+ * Canonical collection event contract. Mirrors exactly what the main process emits (see
+ * PlaylistEngine / EnginePlaylistPersistence) - variants that are not emitted anywhere must not be
+ * added back without an emitter.
+ */
 export type CollectionEvent =
   | { type: 'CollectionCreated'; payload: { collectionId: number; parentId: number | null } }
-  | { type: 'CollectionRenamed'; payload: { collectionId: number; newName: string } }
   | { type: 'CollectionMoved'; payload: { collectionId: number; newParentId: number | null } }
-  | { type: 'CollectionPinned'; payload: { collectionId: number } }
-  | { type: 'CollectionUnpinned'; payload: { collectionId: number } }
-  | { type: 'CollectionDeleted'; payload: { collectionId: number } }
-  | { type: 'CollectionChanged'; payload: { collectionId: number } }
-  | { type: 'SmartPlaylistUpdated'; payload: { collectionId: number } }
-  | { type: 'UndoExecuted'; payload: Record<string, never> }
-  | { type: 'RedoExecuted'; payload: Record<string, never> };
+  | { type: 'CollectionPinned'; payload: { collectionId: number; isPinned: boolean } }
+  | { type: 'CollectionChanged'; payload: { collectionId?: number; action?: string } }
+  | { type: 'CollectionDeleted'; payload: { collectionIds: number[] } };
