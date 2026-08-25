@@ -332,6 +332,14 @@ export class MetadataApplyService {
               payloadTags.genre = String(val);
               updatedSnapshot.genre = String(val);
               break;
+            case 'isrc':
+              payloadTags.isrc = String(val);
+              updatedSnapshot.isrc = String(val);
+              break;
+            case 'musicBrainzRecordingId':
+              payloadTags.musicBrainzRecordingId = String(val);
+              updatedSnapshot.musicBrainzRecordingId = String(val);
+              break;
           }
         }
       }
@@ -443,7 +451,8 @@ export class MetadataApplyService {
               await removeDeletedGenreDataOfSong(prevSong, trx);
             }
 
-            // 1. Update scalar fields
+            // 1. Update scalar fields (identity columns included so both file
+            //    frames and DB rows move together in the same operation)
             await trx
               .update(songs)
               .set({
@@ -451,6 +460,10 @@ export class MetadataApplyService {
                 year: snap.year,
                 trackNumber: snap.trackNumber,
                 diskNumber: snap.discNumber,
+                ...(snap.isrc !== undefined && { isrc: snap.isrc }),
+                ...(snap.musicBrainzRecordingId !== undefined && {
+                  musicBrainzRecordingId: snap.musicBrainzRecordingId
+                }),
                 updatedAt: new Date()
               })
               .where(eq(songs.id, snap.songId));

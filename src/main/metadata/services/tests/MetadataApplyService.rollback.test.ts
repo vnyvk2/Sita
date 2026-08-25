@@ -406,4 +406,108 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     expect(third.success).toBe(false);
     expect(third.errors?.[0]).toContain('No AutoTag history available');
   });
+
+  it('writes isrc and musicBrainzRecordingId to BOTH file payloads and DB scalar columns', async () => {
+    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        localSongId: 1,
+        songPath: '/music/identity.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'Old',
+        suggestedTitle: 'New',
+        fieldDiffs: [
+          { fieldId: 'isrc', fieldName: 'ISRC', oldValue: undefined, suggestedValue: 'USUM71700001', applyField: true },
+          { fieldId: 'musicBrainzRecordingId', fieldName: 'MBID', oldValue: undefined, suggestedValue: 'mbid-new', applyField: true }
+        ]
+      }
+    ];
+    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+
+    // File side: TagLib frames receive the recording identities
+    expect(mockWriteBatch.mock.calls[0][0][0]).toMatchObject({
+      isrc: 'USUM71700001',
+      musicBrainzRecordingId: 'mbid-new'
+    });
+
+    // DB side: songs columns move in the SAME operation
+    expect(setCalls[0]).toMatchObject({
+      isrc: 'USUM71700001',
+      musicBrainzRecordingId: 'mbid-new'
+    });
+  });
+
+  it('never touches identity fields when diffs are absent or effectively empty', async () => {
+    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        // No isrc/mbid diffs at all -> fields must be absent from payload AND .set()
+        localSongId: 1,
+        songPath: '/music/a.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'A',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'A', suggestedValue: 'B', applyField: true }]
+      },
+      {
+        // Whitespace-only diff value -> guarded as intentionally-empty, not written
+        localSongId: 2,
+        songPath: '/music/b.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'B',
+        fieldDiffs: [{ fieldId: 'isrc', fieldName: 'ISRC', oldValue: 'OLD', suggestedValue: '   ', applyField: true }]
+      }
+    ];
+    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+
+    const payloads = mockWriteBatch.mock.calls[0][0] as TagWritePayload[];
+    expect(payloads[0].isrc).toBeUndefined();
+    expect(payloads[0].musicBrainzRecordingId).toBeUndefined();
+    expect(payloads[1].isrc).toBeUndefined();
+    expect(setCalls[0].isrc).toBeUndefined();
+    expect(setCalls[0].musicBrainzRecordingId).toBeUndefined();
+    expect(setCalls[1].isrc).toBeUndefined();
+  });
 });
