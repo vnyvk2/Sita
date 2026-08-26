@@ -22,11 +22,18 @@ function RouteComponent() {
       (state.isOnBatteryPower && state.localStorage.preferences.removeAnimationsOnBatteryPower)
     );
   });
+  const isFxPausedBySystem = useStore(
+    store,
+    (state) =>
+      state.isOnBatteryPower &&
+      (state.localStorage.preferences.reduceVisualEffectsOnBattery ?? false)
+  );
   const { isDark } = useEffectiveAppearance();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
 
   return (
     <div
+      data-fx-paused={isFxPausedBySystem || undefined}
       className={`App relative select-none ${
         isDark ? 'dark bg-dark-background-color-1' : 'bg-background-color-1'
       } ${

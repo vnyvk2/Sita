@@ -13,6 +13,8 @@ export { BorderBeam } from './BorderBeam';
 export type { BorderBeamProps } from './BorderBeam';
 export { DotLoader } from './DotLoader';
 export type { DotLoaderProps, DotLoaderSize, DotLoaderVariant } from './DotLoader';
+export { ParticlesLayer } from './ParticlesLayer';
+export type { ParticlesLayerProps } from './ParticlesLayer';
 export { ShimmerSkeleton } from './ShimmerSkeleton';
 export type { ShimmerSkeletonProps } from './ShimmerSkeleton';
 export { SpotlightCard } from './SpotlightCard';

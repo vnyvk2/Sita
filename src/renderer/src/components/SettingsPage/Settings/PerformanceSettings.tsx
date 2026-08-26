@@ -34,6 +34,22 @@ const PerformanceSettings = () => {
             }
           />
         </li>
+        <li className="secondary-container toggle-reduce-visual-effects-on-battery mb-4">
+          <div className="description">
+            {t('settingsPage.reduceVisualEffectsOnBatteryDescription')}
+          </div>
+          <Checkbox
+            id="reduceVisualEffectsOnBattery"
+            labelContent={t('settingsPage.reduceVisualEffectsOnBattery')}
+            isChecked={
+              localStorageData !== undefined &&
+              (localStorageData.preferences.reduceVisualEffectsOnBattery ?? false)
+            }
+            checkedStateUpdateFunction={(state) =>
+              storage.preferences.setPreferences('reduceVisualEffectsOnBattery', state)
+            }
+          />
+        </li>
         <li className="secondary-container toggle-allow-to-prevent-screen-sleeping mb-4">
           <div className="description">
             {t('settingsPage.allowToPreventScreenSleepingDescription')}

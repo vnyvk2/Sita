@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
 import Img from '../Img';
-import { AuroraBackground } from '../fx';
+import { AuroraBackground, ParticlesLayer } from '../fx';
 import SeekBarSlider from '../SeekBarSlider';
 import TitleBar from '../TitleBar/TitleBar';
 import LyricsContainer from './containers/LyricsContainer';
@@ -49,6 +49,21 @@ const FullScreenPlayer = () => {
     return currentSongData.artworkPath;
   }, [currentSongData?.artists, currentSongData?.artworkPath]);
 
+  const isAmbientParticlesEnabled = useStore(
+    store,
+    (state) => state.localStorage.preferences?.ambientParticles ?? false
+  );
+  const isFxSystemPaused = useStore(
+    store,
+    (state) =>
+      state.isOnBatteryPower &&
+      (state.localStorage.preferences?.reduceVisualEffectsOnBattery ?? false)
+  );
+  const isReducedMotionPref = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isReducedMotion ?? false
+  );
+
   return (
     <div
       data-fx-paused={!isCurrentSongPlaying || undefined}
@@ -66,6 +81,12 @@ const FullScreenPlayer = () => {
         />
         {/* Accent aurora washes above the blurred art - compositor-only drifts,
             paused via [data-fx-paused] while playback is paused */}
+        {isAmbientParticlesEnabled && (
+          <ParticlesLayer
+            isActive={isCurrentSongPlaying}
+            isSystemPaused={isFxSystemPaused || isReducedMotionPref}
+          />
+        )}
         <AuroraBackground
           animated={!preferences?.isReducedMotion}
           intensity={0.32}
