@@ -214,6 +214,38 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
     });
   });
 
+  describe('5-G: Durable pending-write journal (2c P4 + audit P0 #2)', () => {
+    it('persists deferred write, hydrates WITHOUT premature deletion, cleans up on successful flush', async () => {
+      const { MetadataPendingWritesRepository } = await import('@main/metadata/history/MetadataPendingWritesRepository');
+      const { restorePersistedPendingWrites } = await import('@main/updateSong/updateSongId3Tags');
+      const repo = new (MetadataPendingWritesRepository as new () => {
+        upsert: (i: { id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }) => Promise<void>;
+        listAll: () => Promise<Array<{ songPath: string }>>;
+        clearAll: () => Promise<void>;
+      })();
+
+      await repo.clearAll();
+      await repo.upsert({ id: 'pw-test', songPath: tempSongPath, tags: { title: 'Persisted Title' }, isKnownSource: true });
+
+      // Boot recovery with a FAILING disk write: the durable row must survive
+      // (audit P0 #2 - hydration must not delete before the write lands)
+      const spy = vi.spyOn(File, 'createFromPath').mockImplementation(() => {
+        throw new Error('EIO: simulated failure during boot recovery flush');
+      });
+      await restorePersistedPendingWrites();
+      spy.mockRestore();
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(true);
+
+      // Successful flush consumes both the map entry and the durable row
+      await savePendingMetadataUpdates(tempSongPath, true);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(false);
+      await repo.clearAll();
+    });
+  });
+
   describe('5-A: Physical Write & Relational Projection across all 10 Categories', () => {
     it('writes all 10 mutable metadata categories to physical audio file and updates relational tables', async () => {
       vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/idle.mp3');

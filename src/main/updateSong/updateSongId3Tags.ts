@@ -14,6 +14,7 @@ import { MetadataPendingWritesRepository } from '../metadata/history/MetadataPen
 import saveLyricsToLRCFile from '../core/saveLyricsToLrcFile';
 import sendSongMetadata from '../core/sendSongMetadata';
 import { db } from '../db/db';
+import type { DB, DBTransaction } from '../db/db';
 import { getUserSettings } from '../db/queries/settings';
 import {
   updateSongModifiedAtByPath,
@@ -46,12 +47,21 @@ export type TagData = {
   title?: string;
   artists?: string[];
   album?: string;
+  /** Release-level artist (junction truth) - NOT derivable from track artists */
+  albumArtist?: string;
   genres?: string[];
   composer?: string;
   trackNumber?: number;
   discNumber?: number;
   year?: number;
   artwork?: Picture;
+  /**
+   * Base64-encoded artwork for DEFERRED writes. The durable pending table is
+   * jsonb - a taglib `Picture` instance cannot survive serialization there,
+   * so deferred intent travels as base64 and is embedded at flush time
+   * (P0 #4: deferred writes must carry the complete physical file intent).
+   */
+  artworkBase64?: string;
   lyrics?: string;
   musicBrainzRecordingId?: string;
   isrc?: string;
@@ -94,6 +104,11 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (tags.title) file.tag.title = tags.title;
           if (tags.artists) file.tag.performers = tags.artists;
           if (tags.album) file.tag.album = tags.album;
+          // Release-level album artist: explicit presence wins, including an
+          // empty string meaning "clear" (mirrors TagWriterService semantics)
+          if (tags.albumArtist !== undefined) {
+            file.tag.albumArtists = tags.albumArtist ? [tags.albumArtist] : [];
+          }
           if (tags.genres) file.tag.genres = tags.genres;
           if (tags.composer) file.tag.composers = [tags.composer];
           if (tags.trackNumber !== undefined) file.tag.track = tags.trackNumber;
@@ -116,6 +131,23 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           // Handle artwork
           if (tags.artwork) {
             file.tag.pictures = [tags.artwork];
+          } else if (tags.artworkBase64) {
+            // Deferred-write intent arrives jsonb-safe as base64; embed it as
+            // a front-cover picture with the same pipeline as TagWriterService
+            try {
+              const rawBuffer = Buffer.from(tags.artworkBase64, 'base64');
+              const jpegBuffer = await sharp(rawBuffer)
+                .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality: 85 })
+                .toBuffer();
+              const picture = Picture.fromData(ByteVector.fromByteArray(new Uint8Array(jpegBuffer)));
+              picture.mimeType = 'image/jpeg';
+              picture.type = PictureType.FrontCover;
+              picture.description = 'artwork';
+              file.tag.pictures = [picture];
+            } catch (artworkError) {
+              logger.warn(`Failed to embed deferred artwork for '${songPath}'.`, { artworkError });
+            }
           }
 
           // Handle lyrics - only unsynchronized (taglib-sharp doesn't support SYLT frames)
@@ -187,12 +219,14 @@ const mergeTagData = (base: TagData, incoming: TagData): TagData => {
   if (incoming.title !== undefined) merged.title = incoming.title;
   if (incoming.artists !== undefined) merged.artists = incoming.artists;
   if (incoming.album !== undefined) merged.album = incoming.album;
+  if (incoming.albumArtist !== undefined) merged.albumArtist = incoming.albumArtist;
   if (incoming.genres !== undefined) merged.genres = incoming.genres;
   if (incoming.composer !== undefined) merged.composer = incoming.composer;
   if (incoming.trackNumber !== undefined) merged.trackNumber = incoming.trackNumber;
   if (incoming.discNumber !== undefined) merged.discNumber = incoming.discNumber;
   if (incoming.year !== undefined) merged.year = incoming.year;
   if (incoming.artwork !== undefined) merged.artwork = incoming.artwork;
+  if (incoming.artworkBase64 !== undefined) merged.artworkBase64 = incoming.artworkBase64;
   if (incoming.lyrics !== undefined) merged.lyrics = incoming.lyrics;
   if (incoming.musicBrainzRecordingId !== undefined) merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
   if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
@@ -219,27 +253,40 @@ const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
 
   return { deferred: true };
 };
-
 /**
- * P2 bridge: durable-pending storage arrives in P4. Until then the playing-
- * song deferral keeps using the existing in-memory coalescing queue.
+ * Durable-pending storage for deferred metadata writes (2c P4 + P0 #1/#4).
+ * Split into two halves so the orchestrator can commit the durable row inside
+ * its own DB transaction and hydrate the coalescing queue only afterwards.
  */
 const pendingWritesRepo = new MetadataPendingWritesRepository();
 
-export const queueMetadataWriteForPlayingSong = async (songPath: string, tags: TagData): Promise<void> => {
-  // Durable-first (2c P4): persist the merged payload BEFORE touching the
-  // in-memory queue so a crash right after enqueue still replays the write.
-  await pendingWritesRepo.upsert({
-    id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    songPath,
-    tags: tags as unknown as Record<string, unknown>,
-    isKnownSource: true
-  });
-  const outcome = addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
-  // When the flush ran immediately it already consumed the durable row.
-  if (!(outcome as { deferred?: boolean })?.deferred) {
-    await pendingWritesRepo.deleteBySongPath(songPath);
-  }
+/**
+ * P0 #1/#4: merges the incoming deferred intent with any already-durable row
+ * for this path and upserts the FULL merged payload (optionally within a
+ * caller-owned transaction so it commits atomically WITH the DB mutation).
+ */
+export const persistDeferredMetadataWrite = async (
+  songPath: string,
+  incomingTags: TagData,
+  trx?: DB | DBTransaction
+): Promise<void> => {
+  const rows = await pendingWritesRepo.listAll(trx);
+  const existing = rows.find((r) => r.songPath === songPath);
+  const mergedTags = existing ? mergeTagData(existing.tags as unknown as TagData, incomingTags) : incomingTags;
+  await pendingWritesRepo.upsert(
+    {
+      id: existing?.id ?? `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      songPath,
+      tags: mergedTags as unknown as Record<string, unknown>,
+      isKnownSource: true
+    },
+    trx ?? db
+  );
+};
+
+/** Registers the intent in the in-memory coalescing queue WITHOUT touching durable state. */
+export const enqueueDeferredMetadataInMemory = (songPath: string, tags: TagData): void => {
+  addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
 };
 
 /**

@@ -1,3 +1,5 @@
+import type { DBTransaction } from '../../db/db';
+
 import { MetadataHistoryRepository } from './MetadataHistoryRepository';
 
 export interface SongMetadataSnapshot {
@@ -63,6 +65,51 @@ export class MetadataHistoryService {
       this.undoStack.shift();
     }
     this.redoStack.length = 0; // Clear redo stack on new action
+  }
+
+  /**
+   * P0 #3: durable-only journal insert inside a caller-owned DB transaction.
+   * The orchestrator stages the undo row in the SAME transaction as the
+   * mutation, then mirrors it into the memory stack via {@link adoptSnapshot}
+   * only after the commit succeeded. A crash can therefore never produce
+   * DB=new with undo=missing (and a rolled-back mutation never leaves a
+   * phantom journal entry behind).
+   */
+  public async persistSnapshotInTransaction(
+    snapshot: MetadataHistorySnapshot,
+    trx: DBTransaction
+  ): Promise<void> {
+    if (!this.repository) return; // memory-only service: nothing durable to stage
+    await this.repository.insert(snapshot, trx);
+  }
+
+  /**
+   * P0 #2: grouped variant of {@link persistSnapshotInTransaction}. Appends one
+   * song's snapshots to the operation's single journal row, creating the row on
+   * first sight, so every committed song is journaled even when a later song
+   * in the group fails.
+   */
+  public async appendToGroupSnapshotInTransaction(
+    args: {
+      id: string;
+      description: string;
+      albumTitle?: string;
+      previousSong: MetadataHistorySnapshot['previousSongs'][number];
+      updatedSong: MetadataHistorySnapshot['updatedSongs'][number];
+    },
+    trx: DBTransaction
+  ): Promise<void> {
+    if (!this.repository) return;
+    await this.repository.appendToSnapshot(args, trx);
+  }
+
+  /** Memory-stack mirror of an already-committed durable snapshot. */
+  public adoptSnapshot(snapshot: MetadataHistorySnapshot): void {
+    this.undoStack.push(snapshot);
+    if (this.undoStack.length > this.maxStackSize) {
+      this.undoStack.shift();
+    }
+    this.redoStack.length = 0;
   }
 
   /**

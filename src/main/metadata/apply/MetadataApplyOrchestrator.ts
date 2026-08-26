@@ -32,8 +32,11 @@ export interface MetadataApplyOrchestratorOptions {
  * Phase order per mutation:
  *   0. pre-state capture + artwork acquisition (size-capped download,
  *      palette, artwork file processing)
- *   1. DB phase - one transaction: scalars (incl. isrc/mbid) + relational sync
- *   2. durable undo journal push - a crash between DB & file stays undoable
+ *   1. ONE DB transaction: scalars (incl. isrc/mbid) + relational sync +
+ *      durable undo journal + (when deferred) the COMPLETE pending-write
+ *      intent incl. albumArtist/artwork. Journal and deferral commit or
+ *      roll back atomically WITH the mutation (audit P0 #1/#2/#3).
+ *   2. memory-stack adoption of the committed journal entry
  *   3. file phase - atomic write; deferred when the song is playing
  *
  * Compensation: a hard (non-deferred) file-phase failure reverts DB scalars
@@ -74,12 +77,13 @@ export class MetadataApplyOrchestrator {
 
     const groupPrev: SongMetadataSnapshot[] = [];
     const groupUpdated: SongMetadataSnapshot[] = [];
-    let groupHadFailure = false;
-
+    const groupId = `orch-group-${mutations[0]?.operationId ?? Date.now()}`;
     for (const mutation of mutations) {
       try {
         const outcome = await this.executeSingle(mutation, {
           groupUndo: opts?.groupUndo,
+          groupId,
+          albumTitle: opts?.albumTitle,
           onSnapshots: (prev, upd) => {
             groupPrev.push(prev);
             groupUpdated.push(upd);
@@ -89,21 +93,22 @@ export class MetadataApplyOrchestrator {
         else if (outcome.success) result.updatedCount += 1;
         else {
           result.failedCount += 1;
-          groupHadFailure = true;
           result.errors.push(outcome.error ?? 'Unknown orchestrator failure');
         }
       } catch (err: unknown) {
         result.failedCount += 1;
-        groupHadFailure = true;
         const msg = err instanceof Error ? err.message : String(err);
         result.errors.push(`[${mutation.mutationId}] ${msg}`);
       }
     }
 
-    // Grouped undo: one journal entry covering the whole operation
-    if (opts?.groupUndo && !groupHadFailure && groupPrev.length > 0) {
-      await this.historyService.pushSnapshot({
-        id: `orch-group-${mutations[0]?.operationId ?? Date.now()}`,
+    // Grouped undo: ONE journal entry covering the operation. The durable row
+    // was appended per-mutation INSIDE each DB transaction (so a partial
+    // failure keeps coverage for every song that actually committed -
+    // audit P0 #2); here we only mirror the committed result into memory.
+    if (opts?.groupUndo && groupPrev.length > 0) {
+      this.historyService.adoptSnapshot({
+        id: groupId,
         timestamp: Date.now(),
         description: opts.groupUndo.description,
         ...(opts.albumTitle !== undefined && { albumTitle: opts.albumTitle }),
@@ -151,8 +156,15 @@ export class MetadataApplyOrchestrator {
     if (payload.trackNumber != null) td.trackNumber = payload.trackNumber;
     if (payload.discNumber != null) td.discNumber = payload.discNumber;
     if (payload.year != null) td.year = payload.year;
-    // NOTE(P2): artwork deferral for the playing song is not representable in
-    // the pending TagData yet - it lands with the durable queue in P4.
+    // Complete physical-file intent (audit P0 #4): the deferred write must be
+    // able to reproduce EXACTLY what an immediate write would have done -
+    // including release-level album artist and artwork.
+    if (payload.albumArtist !== undefined) td.albumArtist = payload.albumArtist ?? '';
+    if (payload.artworkBuffer && payload.artworkBuffer.length > 0) {
+      // taglib Picture instances are not jsonb-serializable; travel as base64
+      // and get embedded by savePendingMetadataUpdates at flush time.
+      td.artworkBase64 = payload.artworkBuffer.toString('base64');
+    }
     if (payload.musicBrainzRecordingId !== undefined)
       td.musicBrainzRecordingId = payload.musicBrainzRecordingId ?? '';
     if (payload.isrc != null) td.isrc = payload.isrc;
@@ -167,6 +179,8 @@ export class MetadataApplyOrchestrator {
     m: NormalizedMutation,
     group?: {
       groupUndo?: { description: string };
+      groupId?: string;
+      albumTitle?: string;
       onSnapshots?: (prev: SongMetadataSnapshot, updated: SongMetadataSnapshot) => void;
     }
   ): Promise<{ success: boolean; deferred?: boolean; error?: string }> {
@@ -208,7 +222,38 @@ export class MetadataApplyOrchestrator {
       processedArtwork = await processArtworkFiles('songs', artworkBuffer);
     }
 
-    // ── Phase 1: DB transaction (scalars + relational projection) ─────────
+    // Deferral decision happens BEFORE the transaction: the durable pending
+    // write must be committed atomically WITH the DB mutation (audit P0 #1),
+    // never as an unawaited fire-and-forget afterwards.
+    const playingPath = this.getCurrentPlayingPath();
+    const normalizedPlaying = playingPath ? this.stripProtocol(playingPath) : undefined;
+    const normalizedTarget = this.stripProtocol(m.filePath);
+    const deferToPlaying =
+      m.fileWrite.deferredIfPlaying && normalizedPlaying !== undefined && normalizedPlaying === normalizedTarget;
+
+    const payload = this.buildTagPayload(m, artworkBuffer);
+
+    // Post-state snapshot for the undo journal (built ahead of the transaction
+    // so the journal row can be staged INSIDE it - audit P0 #2/#3).
+    const updatedSnapshot: SongMetadataSnapshot = { songId: m.songId, path: m.filePath, title: currentRow.title };
+    const setIf = <K extends keyof SongMetadataSnapshot>(key: K, value: SongMetadataSnapshot[K] | undefined): void => {
+      if (value !== undefined) updatedSnapshot[key] = value;
+    };
+    setIf('title', this.fieldNew(m, 'title') as string | undefined);
+    setIf('artist', this.fieldNew(m, 'artist') as string | undefined);
+    setIf('albumArtist', m.albumArtistNewValue);
+    setIf('album', this.fieldNew(m, 'album') as string | undefined);
+    setIf('year', this.fieldNew(m, 'year') as number | undefined);
+    setIf('trackNumber', this.fieldNew(m, 'trackNumber') as number | undefined);
+    setIf('discNumber', this.fieldNew(m, 'discNumber') as number | undefined);
+    setIf('genre', this.fieldNew(m, 'genre') as string | undefined);
+    setIf('isrc', this.fieldNew(m, 'isrc') as string | undefined);
+    setIf('musicBrainzRecordingId', this.fieldNew(m, 'musicBrainzRecordingId') as string | undefined);
+
+    let deferredTagData: TagData | undefined;
+
+    // ── ONE DB transaction: scalars + relational projection + undo journal +
+    //    (deferred) durable pending-write intent (audit P0 #1/#2/#3) ────────
     try {
       await db.transaction(async (trx: DBTransaction) => {
         await updateSongBasicFields(
@@ -267,34 +312,58 @@ export class MetadataApplyOrchestrator {
             await manageAlbumArtistOfParsedSong({ albumArtists: [m.albumArtistNewValue], albumId }, trx);
           }
         }
+
+        // Durable undo journal - SAME transaction as the mutation: a crash can
+        // never leave DB=new with undo=missing (audit P0 #3), and a partial
+        // group failure still journals every song that committed (P0 #2).
+        if (group?.groupUndo && group.groupId) {
+          await this.historyService.appendToGroupSnapshotInTransaction(
+            {
+              id: group.groupId,
+              description: group.groupUndo.description,
+              ...(group.albumTitle !== undefined && { albumTitle: group.albumTitle }),
+              previousSong: previous,
+              updatedSong: updatedSnapshot
+            },
+            trx
+          );
+        } else {
+          await this.historyService.persistSnapshotInTransaction(
+            {
+              id: `orch-${m.mutationId}`,
+              timestamp: Date.now(),
+              description: m.undo.description,
+              ...(m.undo.albumTitle !== undefined && { albumTitle: m.undo.albumTitle }),
+              songIds: [m.songId],
+              previousSongs: [previous],
+              updatedSongs: [updatedSnapshot]
+            },
+            trx
+          );
+        }
+
+        // Complete physical-file intent for the deferred write, committed in
+        // the SAME transaction (audit P0 #4): includes albumArtist + artwork,
+        // unlike the legacy TagData subset. A rejected insert rolls back the
+        // whole mutation instead of reporting success while unpersisted.
+        if (deferToPlaying) {
+          const mod = await import('@main/updateSong/updateSongId3Tags');
+          deferredTagData = this.payloadToPendingTagData(payload);
+          await mod.persistDeferredMetadataWrite(normalizedTarget, deferredTagData, trx);
+        }
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { success: false, error: `DB phase failed: ${msg}` };
     }
 
-    // ── Phase 2: durable undo journal ─────────────────────────────────────
-    const updatedSnapshot: SongMetadataSnapshot = { songId: m.songId, path: m.filePath, title: currentRow.title };
-    const setIf = <K extends keyof SongMetadataSnapshot>(key: K, value: SongMetadataSnapshot[K] | undefined): void => {
-      if (value !== undefined) updatedSnapshot[key] = value;
-    };
-    setIf('title', this.fieldNew(m, 'title') as string | undefined);
-    setIf('artist', this.fieldNew(m, 'artist') as string | undefined);
-    setIf('albumArtist', m.albumArtistNewValue);
-    setIf('album', this.fieldNew(m, 'album') as string | undefined);
-    setIf('year', this.fieldNew(m, 'year') as number | undefined);
-    setIf('trackNumber', this.fieldNew(m, 'trackNumber') as number | undefined);
-    setIf('discNumber', this.fieldNew(m, 'discNumber') as number | undefined);
-    setIf('genre', this.fieldNew(m, 'genre') as string | undefined);
-    setIf('isrc', this.fieldNew(m, 'isrc') as string | undefined);
-    setIf('musicBrainzRecordingId', this.fieldNew(m, 'musicBrainzRecordingId') as string | undefined);
-
+    // Transaction committed: mirror the journal entry into the memory stack
+    // and collect group snapshots. Only reached on success - a failed
+    // transaction returned above, so no phantom memory entries can exist.
     if (group?.groupUndo) {
-      // Grouped mode: snapshots are collected by executeInternal and pushed
-      // as ONE journal entry covering the whole operation.
       group.onSnapshots?.(previous, updatedSnapshot);
     } else {
-      await this.historyService.pushSnapshot({
+      this.historyService.adoptSnapshot({
         id: `orch-${m.mutationId}`,
         timestamp: Date.now(),
         description: m.undo.description,
@@ -305,16 +374,13 @@ export class MetadataApplyOrchestrator {
       });
     }
 
-    // ── Phase 3: file phase (atomic; deferred when playing) ───────────────
-    const payload = this.buildTagPayload(m, artworkBuffer);
-
-    const playingPath = this.getCurrentPlayingPath();
-    const normalizedPlaying = playingPath ? this.stripProtocol(playingPath) : undefined;
-    const normalizedTarget = this.stripProtocol(m.filePath);
-
-    if (m.fileWrite.deferredIfPlaying && normalizedPlaying === normalizedTarget) {
+    // ── File phase (atomic; deferred when playing) ─────────────────────────
+    if (deferToPlaying && deferredTagData) {
+      // Hydrate the coalescing queue WITHOUT touching the durable row - it
+      // was committed atomically above and must survive until the flush
+      // actually succeeds (savePendingMetadataUpdates deletes it on success).
       const mod = await import('@main/updateSong/updateSongId3Tags');
-      mod.queueMetadataWriteForPlayingSong(normalizedTarget, this.payloadToPendingTagData(payload));
+      mod.enqueueDeferredMetadataInMemory(normalizedTarget, deferredTagData);
       logger.info('[Orchestrator] deferred file write for currently-playing song', {
         songPath: normalizedTarget
       });

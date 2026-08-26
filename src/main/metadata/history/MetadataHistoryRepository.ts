@@ -1,5 +1,6 @@
 import { desc, eq, inArray } from 'drizzle-orm';
 
+import type { DB, DBTransaction } from '../../db/db';
 import { db } from '../../db/db';
 import { metadataUndoSnapshots } from '../../db/schema';
 import type { MetadataHistorySnapshot } from './MetadataHistoryService';
@@ -23,14 +24,22 @@ export class MetadataHistoryRepository {
     this.database = database;
   }
 
-  public async insert(snapshot: MetadataHistorySnapshot): Promise<void> {
+  /**
+   * Inserts a snapshot. When `trx` is provided the row joins the caller's
+   * transaction, so an undo journal entry is committed atomically with the
+   * mutation it covers (P0 #3) - a crash can never leave DB=new / undo=missing.
+   */
+  public async insert(
+    snapshot: MetadataHistorySnapshot,
+    trx: DB | DBTransaction = this.database
+  ): Promise<void> {
     const payload: StoredSnapshotPayload = {
       previousSongs: snapshot.previousSongs,
       updatedSongs: snapshot.updatedSongs,
       ...(snapshot.songIds !== undefined && { songIds: snapshot.songIds })
     };
 
-    await this.database
+    await trx
       .insert(metadataUndoSnapshots)
       .values({
         id: snapshot.id,
@@ -39,6 +48,52 @@ export class MetadataHistoryRepository {
         payload
       })
       .onConflictDoNothing({ target: metadataUndoSnapshots.id });
+  }
+
+  /**
+   * Grouped mode: appends one song's pre/post snapshots to a single journal
+   * row, creating the row on first sight. Called inside each per-song
+   * transaction so partial group failures still leave durable undo coverage
+   * for every song that actually committed (P0 #2).
+   */
+  public async appendToSnapshot(
+    args: {
+      id: string;
+      description: string;
+      albumTitle?: string;
+      previousSong: MetadataHistorySnapshot['previousSongs'][number];
+      updatedSong: MetadataHistorySnapshot['updatedSongs'][number];
+    },
+    trx: DB | DBTransaction = this.database
+  ): Promise<void> {
+    const [row] = await trx.select().from(metadataUndoSnapshots).where(eq(metadataUndoSnapshots.id, args.id));
+
+    if (!row) {
+      const payload: StoredSnapshotPayload = {
+        previousSongs: [args.previousSong],
+        updatedSongs: [args.updatedSong],
+        songIds: [args.previousSong.songId]
+      };
+      await trx.insert(metadataUndoSnapshots).values({
+        id: args.id,
+        description: args.description,
+        albumTitle: args.albumTitle,
+        payload
+      });
+      return;
+    }
+
+    const existing = row.payload ?? { previousSongs: [], updatedSongs: [] };
+    await trx
+      .update(metadataUndoSnapshots)
+      .set({
+        payload: {
+          previousSongs: [...existing.previousSongs, args.previousSong],
+          updatedSongs: [...existing.updatedSongs, args.updatedSong],
+          songIds: [...(existing.songIds ?? []), args.previousSong.songId]
+        } as never
+      })
+      .where(eq(metadataUndoSnapshots.id, args.id));
   }
 
   /** Newest first. */
