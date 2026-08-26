@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import ErrorBoundary from '../ErrorBoundary';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
+import InsightsIcon from './InsightsIcon';
 import SideBarItem from './SideBarItem';
 
 const Sidebar = memo(() => {
@@ -98,6 +99,7 @@ const Sidebar = memo(() => {
           id: 'Insights',
           parentClassName: 'insights',
           icon: 'auto_graph',
+          customIcon: <InsightsIcon className="mr-5" />,
           content: t('sideBar.insights', { defaultValue: 'Insights' }),
           isActive: false
         },

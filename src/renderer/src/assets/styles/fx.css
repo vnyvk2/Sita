@@ -418,6 +418,64 @@
   }
 }
 
+/* ? INSIGHTS NAV ICON ------------------------------------------------------
+   Dot-trend mark for the Insights sidebar item. Permanently wider than the
+   standard glyph slot; parent hover = staggered ripple of the column peaks.
+   No hover scaling - the size statement is the resting state. */
+.fx-insights {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 1.9rem;
+  height: 1.5rem;
+}
+
+.fx-insights__col {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.fx-insights__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.insights:hover .fx-insights__col:nth-child(odd) .fx-insights__dot:last-child {
+  animation: fx-insights-ripple 0.9s ease-in-out infinite alternate;
+}
+
+.insights:hover
+  .fx-insights__col:nth-child(even)
+  .fx-insights__dot:last-child {
+  animation: fx-insights-ripple 0.9s ease-in-out -0.45s infinite alternate-reverse;
+}
+
+.insights:hover .fx-insights__col:nth-child(3) .fx-insights__dot:last-child {
+  animation-delay: -0.2s;
+}
+
+@keyframes fx-insights-ripple {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights :is(.fx-insights__dot) {
+    animation: none !important;
+  }
+}
+
 /* ? MASTER PAUSE -----------------------------------------------------------
    Any surface can opt out of ALL (fx + legacy) looping animations by
    setting [data-fx-paused] or .fx-paused — e.g. minimized windows,
