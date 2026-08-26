@@ -66,18 +66,21 @@ export interface MetadataApplyServiceOptions {
   historyService?: MetadataHistoryService;
   dbUpdater?: SongDbUpdater;
   batchChunkSize?: number;
+  orchestrator?: import('../apply/MetadataApplyOrchestrator').MetadataApplyOrchestrator;
 }
 
 export class MetadataApplyService {
   private readonly tagWriter: TagWriterService;
   private readonly historyService: MetadataHistoryService;
   private readonly dbUpdater?: SongDbUpdater;
+  private readonly orchestrator?: import('../apply/MetadataApplyOrchestrator').MetadataApplyOrchestrator;
   private readonly batchChunkSize: number;
 
   constructor(options?: MetadataApplyServiceOptions) {
     this.tagWriter = options?.tagWriter ?? new TagWriterService();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.dbUpdater = options?.dbUpdater;
+    this.orchestrator = options?.orchestrator;
     this.batchChunkSize = options?.batchChunkSize ?? 50;
   }
 
@@ -148,6 +151,100 @@ export class MetadataApplyService {
 
     // Target matches: If album-level mutations are active, all local album tracks receive album tags; otherwise only selected local tracks
     const targetMatches = hasAlbumLevelChanges ? actionableMatches : selectedMatches;
+
+    // ── 2c P3 reroute: when an orchestrator is attached, AutoTag applies flow
+    // through the single authoritative owner. The legacy chunk pipeline below
+    // remains for direct unit tests constructed without one.
+    if (this.orchestrator) {
+      const opId = options?.operationId ?? 'default';
+      const albumTitle = preview.album.title;
+      const normalized = targetMatches.map((match) => {
+        // Contract whitelist: unknown ids (e.g. artworkUrl) are excluded -
+        // artwork travels through its own normalized channel.
+        const KNOWN_APPLY_FIELDS: ReadonlySet<string> = new Set([
+          'title', 'artist', 'album', 'year', 'trackNumber', 'discNumber', 'genre', 'isrc', 'musicBrainzRecordingId'
+        ]);
+        const fields: import('../apply/contract').NormalizedFieldMutation[] = (match.fieldDiffs ?? [])
+          .filter((d) => d.applyField && KNOWN_APPLY_FIELDS.has(d.fieldId))
+          .map((d) => {
+            const val = d.userValue !== undefined ? d.userValue : d.suggestedValue;
+            return {
+              fieldId: d.fieldId as never,
+              oldValue: d.oldValue ?? null,
+              newValue: val as string | number
+            };
+          })
+          .filter((f) => f.newValue !== undefined && String(f.newValue).trim() !== '');
+
+        if (globalMutations?.applyAlbumTitle && globalMutations.albumTitle) {
+          fields.push({ fieldId: 'album', oldValue: match.oldAlbum ?? null, newValue: globalMutations.albumTitle });
+        }
+        if (globalMutations?.applyYear && globalMutations.year !== undefined) {
+          fields.push({ fieldId: 'year', oldValue: match.oldYear ?? null, newValue: globalMutations.year });
+        }
+        if (globalMutations?.applyGenre && globalMutations.genre) {
+          fields.push({ fieldId: 'genre', oldValue: match.oldGenre ?? null, newValue: globalMutations.genre });
+        }
+
+        return {
+          mutationId: `${opId}:${match.localSongId}`,
+          operationId: opId,
+          songId: match.localSongId,
+          filePath: match.songPath,
+          fields,
+          ...(globalMutations?.applyAlbumArtist && globalMutations.albumArtist
+            ? { albumArtistNewValue: globalMutations.albumArtist }
+            : {}),
+          ...(artworkBuffer !== undefined && artworkBuffer !== null && artworkBuffer.length > 0
+            ? { artwork: { buffer: artworkBuffer } }
+            : {}),
+          fileWrite: { deferredIfPlaying: true },
+          undo: {
+            description: `AutoTag applied for ${albumTitle}`,
+            previousSongs: [
+              {
+                songId: match.localSongId,
+                path: match.songPath,
+                title: match.oldTitle,
+                artist: match.oldArtist,
+                albumArtist: match.oldAlbumArtist,
+                album: match.oldAlbum,
+                year: match.oldYear,
+                trackNumber: match.oldTrackNumber,
+                discNumber: match.oldDiscNumber,
+                genre: match.oldGenre,
+                isrc: match.oldIsrc,
+                musicBrainzRecordingId: match.oldMbid
+              }
+            ]
+          },
+
+        };
+      });
+
+      const orchRes = await this.orchestrator.execute(normalized, {
+        albumTitle,
+        groupUndo: { description: `AutoTag applied for ${albumTitle}` }
+      });
+
+      if (orchRes.updatedCount > 0 || orchRes.deferredCount > 0) {
+        try {
+          const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
+          resetArtworkCache('songArtworks');
+          resetArtworkCache('albumArtworks');
+        } catch {
+          // Ignored in isolated testing environments
+        }
+      }
+
+      return {
+        success: orchRes.success,
+        updatedCount: orchRes.updatedCount,
+        deferredCount: orchRes.deferredCount > 0 ? orchRes.deferredCount : undefined,
+        failedCount: orchRes.failedCount,
+        errors: orchRes.errors
+      };
+    }
 
     // Split target matches into chunks of batchChunkSize (default 50)
     for (let i = 0; i < targetMatches.length; i += this.batchChunkSize) {
@@ -245,6 +342,7 @@ export class MetadataApplyService {
         path: match.songPath,
         title: match.oldTitle,
         artist: match.oldArtist,
+        albumArtist: match.oldAlbumArtist,
         album: match.oldAlbum,
         year: match.oldYear,
         trackNumber: match.oldTrackNumber,
@@ -332,6 +430,14 @@ export class MetadataApplyService {
               payloadTags.genre = String(val);
               updatedSnapshot.genre = String(val);
               break;
+            case 'isrc':
+              payloadTags.isrc = String(val);
+              updatedSnapshot.isrc = String(val);
+              break;
+            case 'musicBrainzRecordingId':
+              payloadTags.musicBrainzRecordingId = String(val);
+              updatedSnapshot.musicBrainzRecordingId = String(val);
+              break;
           }
         }
       }
@@ -346,6 +452,7 @@ export class MetadataApplyService {
         filePath: match.songPath,
         title: match.oldTitle ?? '',
         artist: match.oldArtist ?? null,
+        albumArtist: match.oldAlbumArtist ?? null,
         album: match.oldAlbum ?? null,
         year: match.oldYear ?? null,
         trackNumber: match.oldTrackNumber ?? null,
@@ -432,6 +539,7 @@ export class MetadataApplyService {
         const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
         const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
         const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
+        const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
 
         await db.transaction(async (trx) => {
           for (const snap of updatedSongs) {
@@ -443,7 +551,8 @@ export class MetadataApplyService {
               await removeDeletedGenreDataOfSong(prevSong, trx);
             }
 
-            // 1. Update scalar fields
+            // 1. Update scalar fields (identity columns included so both file
+            //    frames and DB rows move together in the same operation)
             await trx
               .update(songs)
               .set({
@@ -451,6 +560,10 @@ export class MetadataApplyService {
                 year: snap.year,
                 trackNumber: snap.trackNumber,
                 diskNumber: snap.discNumber,
+                ...(snap.isrc !== undefined && { isrc: snap.isrc }),
+                ...(snap.musicBrainzRecordingId !== undefined && {
+                  musicBrainzRecordingId: snap.musicBrainzRecordingId
+                }),
                 updatedAt: new Date()
               })
               .where(eq(songs.id, snap.songId));
@@ -460,16 +573,24 @@ export class MetadataApplyService {
               await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
             }
             if (snap.album) {
-              await manageAlbumsOfParsedSong(
+              const { relevantAlbum } = await manageAlbumsOfParsedSong(
                 {
                   songId: snap.songId,
                   artists: snap.artist ? [snap.artist] : [],
-                  albumArtists: snap.artist ? [snap.artist] : [],
+                  // Release-level artist only - never derived from track artist.
+                  // Legacy snapshots without albumArtist leave the junction untouched.
+                  albumArtists: snap.albumArtist ? [snap.albumArtist] : [],
                   albumName: snap.album,
                   songYear: snap.year
                 },
                 trx
               );
+              if (snap.albumArtist && relevantAlbum) {
+                await manageAlbumArtistOfParsedSong(
+                  { albumArtists: [snap.albumArtist], albumId: relevantAlbum.id },
+                  trx
+                );
+              }
             }
             if (snap.genre) {
               await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
@@ -490,7 +611,7 @@ export class MetadataApplyService {
         updatedSongs
       };
 
-      this.historyService.pushSnapshot(historySnapshot);
+      await this.historyService.pushSnapshot(historySnapshot);
     } catch (err: unknown) {
       const rollbackResults = await this.tagWriter.writeBatch(rollbackPayloads);
       const failedRollbacks = rollbackResults.filter((r) => !r.success);
@@ -516,7 +637,9 @@ export class MetadataApplyService {
   }
 
   public async undoLastAutoTag(): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> {
-    const snapshot = this.historyService.popUndo();
+    // Peek without consuming: the snapshot stays in the durable journal until
+    // the restore fully succeeded, so a failed undo remains retryable.
+    const snapshot = await this.historyService.peekUndo();
     if (!snapshot) {
       return { success: false, restoredCount: 0, errors: ['No AutoTag history available to undo'] };
     }
@@ -528,6 +651,7 @@ export class MetadataApplyService {
       filePath: s.path,
       title: s.title ?? '',
       artist: s.artist ?? null,
+      albumArtist: s.albumArtist ?? null,
       album: s.album ?? null,
       year: s.year ?? null,
       trackNumber: s.trackNumber ?? null,
@@ -538,19 +662,32 @@ export class MetadataApplyService {
     }));
 
     const tagWriteResults = await this.tagWriter.writeBatch(restorePayloads);
-    const failedWrite = tagWriteResults.find((r) => !r.success);
 
-    if (failedWrite) {
+    // Audit P1 #5: partition by per-file outcome. Tracks whose physical
+    // restore SUCCEEDED must get their DB restore too (otherwise disk=old /
+    // DB=new desyncs permanently); failed tracks keep new values everywhere
+    // and remain covered by the retained snapshot for retry.
+    const succeededSnaps: SongMetadataSnapshot[] = [];
+    const restoreFailures: string[] = [];
+    tagWriteResults.forEach((r, i) => {
+      const snap = snapshot.previousSongs[i];
+      if (!snap) return;
+      if (r.success) succeededSnaps.push(snap);
+      else restoreFailures.push(`Undo physical file tag restore failed for ${r.filePath}: ${r.error}`);
+    });
+
+    if (succeededSnaps.length === 0) {
       return {
         success: false,
         restoredCount: 0,
-        errors: [`Undo physical file tag restore failed for ${failedWrite.filePath}: ${failedWrite.error}`]
+        errors: restoreFailures.length > 0 ? restoreFailures : ['No restore payloads succeeded']
       };
     }
+    const hadPhysicalFailures = restoreFailures.length > 0;
 
     try {
       if (this.dbUpdater) {
-        for (const snap of snapshot.previousSongs) {
+        for (const snap of succeededSnaps) {
           await this.dbUpdater(snap.songId, {
             title: snap.title,
             artist: snap.artist,
@@ -570,7 +707,7 @@ export class MetadataApplyService {
         }
 
         if (reParseSongModule) {
-          for (const snap of snapshot.previousSongs) {
+          for (const snap of succeededSnaps) {
             await reParseSongModule(snap.path);
           }
         } else {
@@ -589,9 +726,10 @@ export class MetadataApplyService {
           const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
           const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
           const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
+          const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
 
           await db.transaction(async (trx) => {
-            for (const snap of snapshot.previousSongs) {
+            for (const snap of succeededSnaps) {
               const prevSongData = await getSongById(snap.songId, trx);
               if (prevSongData) {
                 const prevSong = convertToSongData(prevSongData);
@@ -615,16 +753,25 @@ export class MetadataApplyService {
                 await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
               }
               if (snap.album) {
-                await manageAlbumsOfParsedSong(
+                const { relevantAlbum } = await manageAlbumsOfParsedSong(
                   {
                     songId: snap.songId,
                     artists: snap.artist ? [snap.artist] : [],
-                    albumArtists: snap.artist ? [snap.artist] : [],
+                    // Restore junction from the snapshot's release-level artist.
+                    // Snapshots captured before albumArtist existed leave the
+                    // junction untouched rather than writing track artists into it.
+                    albumArtists: [],
                     albumName: snap.album,
                     songYear: snap.year
                   },
                   trx
                 );
+                if (snap.albumArtist && relevantAlbum) {
+                  await manageAlbumArtistOfParsedSong(
+                    { albumArtists: [snap.albumArtist], albumId: relevantAlbum.id },
+                    trx
+                  );
+                }
               }
               if (snap.genre) {
                 await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
@@ -634,13 +781,27 @@ export class MetadataApplyService {
         }
       }
 
-      return { success: true, restoredCount: snapshot.previousSongs.length };
+      // Partial physical failure: DB was restored only for the succeeded
+      // subset (disk & DB agree there). The snapshot stays retained so a
+      // retry can attempt the remaining tracks.
+      if (hadPhysicalFailures) {
+        return {
+          success: false,
+          restoredCount: succeededSnaps.length,
+          errors: [...restoreFailures, 'Partial undo applied - retry to restore the remaining tracks.']
+        };
+      }
+
+      // Only now is the undo considered done: drop the snapshot from the journal.
+      await this.historyService.confirmUndo(snapshot.id);
+
+      return { success: true, restoredCount: succeededSnaps.length };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         restoredCount: 0,
-        errors: [`Undo DB transaction failed: ${msg}`]
+        errors: [`Undo DB transaction failed: ${msg}`, ...restoreFailures]
       };
     }
   }

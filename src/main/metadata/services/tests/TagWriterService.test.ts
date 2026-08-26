@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TagWriterService } from '../TagWriterService';
-import * as withFileHandleModule from '../../../utils/withFileHandle';
+import * as atomicModule from '../../../utils/withAtomicFileWrite';
 
 describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
   it('preserves strict separation between albumArtist and track artist (performers)', async () => {
@@ -9,7 +9,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
     let savedFileTag: any = null;
     let savedCalled = false;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: '',
@@ -26,7 +26,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {
@@ -55,7 +55,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
 
     let savedFileTag: any = null;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: '',
@@ -67,7 +67,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {
@@ -90,7 +90,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
 
     let savedFileTag: any = null;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: 'Old Title',
@@ -106,7 +106,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {

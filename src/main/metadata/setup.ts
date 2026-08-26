@@ -50,6 +50,12 @@ import { LocalMetadataAdapter } from './providers/adapters/LocalMetadataAdapter'
 import { UserMetadataAdapter } from './providers/adapters/UserMetadataAdapter';
 import { MusicBrainzAdapter, MusicBrainzApiClient } from './providers/musicbrainz';
 import { DiscogsAdapter } from './providers/discogs/DiscogsAdapter';
+import { MetadataApplyOrchestrator } from './apply/MetadataApplyOrchestrator';
+import { MetadataHistoryService } from './history/MetadataHistoryService';
+import { MetadataHistoryRepository } from './history/MetadataHistoryRepository';
+import { TagWriterService } from './services/TagWriterService';
+import { ArtworkDownloaderService } from './transactions/ArtworkDownloaderService';
+import { getCurrentSongPath } from '../main';
 import type { MetadataProviderId } from '../../common/metadata/types';
 import { DiscogsApiClient } from './providers/discogs/DiscogsApiClient';
 import {
@@ -268,7 +274,16 @@ export class MetadataBootstrap {
     await providerRuntime.initialize();
 
     const albumMetadataService = new AlbumMetadataService(providerRuntime);
-    const applyService = new MetadataApplyService();
+    const applyHistoryService = new MetadataHistoryService(
+      new MetadataHistoryRepository()
+    );
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter: new TagWriterService(),
+      historyService: applyHistoryService,
+      artworkDownloader: new ArtworkDownloaderService(caaPipeline),
+      getCurrentPlayingPath: () => getCurrentSongPath()
+    });
+    const applyService = new MetadataApplyService({ historyService: applyHistoryService, orchestrator });
 
     const healthManager = new ProviderHealthManager(eventBus);
     const circuitBreakerRegistry = new ProviderCircuitBreakerRegistry(eventBus);
@@ -314,8 +329,11 @@ export class MetadataBootstrap {
       requestPipeline: caaPipeline
     });
 
+
+
     const workflowService = new MetadataWorkflowService({
-      transactionManager
+      transactionManager,
+      orchestrator
     });
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));

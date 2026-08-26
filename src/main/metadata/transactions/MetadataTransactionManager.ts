@@ -198,7 +198,7 @@ export class MetadataTransactionManager {
 
     if (draftSnapshots.length > 0) {
       const historySnapshot = SnapshotBuilder.buildHistorySnapshot(operationId, undoToken, draftSnapshots);
-      this.historyService.pushSnapshot(historySnapshot);
+      await this.historyService.pushSnapshot(historySnapshot);
     }
 
     return {
@@ -214,9 +214,12 @@ export class MetadataTransactionManager {
 
   /**
    * Executes a rollback operation using the history snapshot stack.
+   * The snapshot is only consumed after a fully successful revert; reverts are
+   * idempotent (same target values rewritten), so a partially-failed rollback
+   * can simply be retried.
    */
   public async rollbackLastTransaction(targetSongId?: number): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
-    const lastSnapshot = this.historyService.popUndo(targetSongId);
+    const lastSnapshot = await this.historyService.peekUndo(targetSongId);
     if (!lastSnapshot) {
       return { success: true, revertedCount: 0, errors: [] };
     }
@@ -248,6 +251,10 @@ export class MetadataTransactionManager {
       } else {
         errors.push(res.error ?? `Failed to revert tags for ${song.path}`);
       }
+    }
+
+    if (errors.length === 0) {
+      await this.historyService.confirmUndo(lastSnapshot.id);
     }
 
     return {

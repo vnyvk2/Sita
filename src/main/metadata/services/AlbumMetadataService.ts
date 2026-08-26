@@ -7,6 +7,7 @@ export interface LocalSongInput {
   songId: number;
   title: string;
   artist?: string;
+  albumArtist?: string;
   album?: string;
   year?: number;
   path: string;

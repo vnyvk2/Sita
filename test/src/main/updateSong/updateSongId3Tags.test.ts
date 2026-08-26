@@ -3,6 +3,11 @@ import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { File } from 'node-taglib-sharp';
+
+// Measured: ~2.3s of test time standalone, but these real-file + real-DB
+// tests exceed the 5s default when the full suite runs in parallel on
+// slower machines. Scoped here instead of raising the global timeout.
+vi.setConfig({ testTimeout: 30_000 });
 import updateSongId3Tags, {
   clearPendingMetadataUpdates,
   isMetadataUpdatesPending,
@@ -206,6 +211,38 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       // Orphaned Artist 200 must be safely deleted
       expect(artistDeleted).toBe(true);
       expect(deletedArtistId).toBe(200);
+    });
+  });
+
+  describe('5-G: Durable pending-write journal (2c P4 + audit P0 #2)', () => {
+    it('persists deferred write, hydrates WITHOUT premature deletion, cleans up on successful flush', async () => {
+      const { MetadataPendingWritesRepository } = await import('@main/metadata/history/MetadataPendingWritesRepository');
+      const { restorePersistedPendingWrites } = await import('@main/updateSong/updateSongId3Tags');
+      const repo = new (MetadataPendingWritesRepository as new () => {
+        upsert: (i: { id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }) => Promise<void>;
+        listAll: () => Promise<Array<{ songPath: string }>>;
+        clearAll: () => Promise<void>;
+      })();
+
+      await repo.clearAll();
+      await repo.upsert({ id: 'pw-test', songPath: tempSongPath, tags: { title: 'Persisted Title' }, isKnownSource: true });
+
+      // Boot recovery with a FAILING disk write: the durable row must survive
+      // (audit P0 #2 - hydration must not delete before the write lands)
+      const spy = vi.spyOn(File, 'createFromPath').mockImplementation(() => {
+        throw new Error('EIO: simulated failure during boot recovery flush');
+      });
+      await restorePersistedPendingWrites();
+      spy.mockRestore();
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(true);
+
+      // Successful flush consumes both the map entry and the durable row
+      await savePendingMetadataUpdates(tempSongPath, true);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(false);
+      await repo.clearAll();
     });
   });
 

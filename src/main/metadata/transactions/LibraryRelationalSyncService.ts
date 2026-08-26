@@ -14,6 +14,7 @@ export type SongDbUpdater = (
     isrc?: string;
     musicBrainzRecordingId?: string;
     artworkPath?: string;
+    artworkBuffer?: Buffer;
   }
 ) => Promise<unknown>;
 
@@ -37,7 +38,8 @@ export class LibraryRelationalSyncService {
   public async syncRelationalDatabase(
     songId: number,
     filePath: string,
-    fieldMutations: Record<string, string | number>
+    fieldMutations: Record<string, string | number>,
+    tagPayload?: Record<string, string | number | Buffer>
   ): Promise<SyncResult> {
     if (this.dbUpdater) {
       try {
@@ -52,7 +54,8 @@ export class LibraryRelationalSyncService {
           discNumber: fieldMutations.discNumber as number | undefined,
           isrc: fieldMutations.isrc as string | undefined,
           musicBrainzRecordingId: fieldMutations.musicBrainzRecordingId as string | undefined,
-          artworkPath: fieldMutations.artworkPath as string | undefined
+          artworkPath: fieldMutations.artworkPath as string | undefined,
+          artworkBuffer: tagPayload?.artworkBuffer as Buffer | undefined
         });
         const isDeferred =
           typeof updateRes === 'object' && updateRes !== null && 'deferred' in updateRes

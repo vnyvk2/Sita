@@ -2,11 +2,16 @@ import http from 'http';
 import https from 'https';
 import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 
+/** Hard ceiling for downloaded artwork before it enters the write pipeline. */
+export const MAX_ARTWORK_BYTES = 8 * 1024 * 1024;
+
 export class ArtworkDownloaderService {
   private readonly requestPipeline?: RequestPipeline;
+  private readonly maxBytes: number;
 
-  constructor(requestPipeline?: RequestPipeline) {
+  constructor(requestPipeline?: RequestPipeline, maxBytes = MAX_ARTWORK_BYTES) {
     this.requestPipeline = requestPipeline;
+    this.maxBytes = maxBytes;
   }
 
   public async fetchAndValidateArtwork(url: string, timeoutMs = 15000): Promise<Buffer | null> {
@@ -16,6 +21,25 @@ export class ArtworkDownloaderService {
 
     if (this.requestPipeline) {
       try {
+        // Audit P1 #6: the pipeline buffers the whole body before we can look
+        // at it, so probe the declared size first and refuse oversized targets
+        // without ever allocating (servers may still lie - the post-check and
+        // streaming fallback remain the hard guarantees).
+        try {
+          const head = await this.requestPipeline.execute<unknown>({
+            url,
+            method: 'HEAD',
+            timeoutMs
+          });
+          const headers = (head as unknown as { headers?: Record<string, string> }).headers ?? {};
+          const declared = Number(headers['content-length']);
+          if (Number.isFinite(declared) && declared > this.maxBytes) {
+            return null;
+          }
+        } catch {
+          // HEAD unsupported/blocked -> proceed to GET; post-check guards.
+        }
+
         const res = await this.requestPipeline.execute<Buffer>({
           url,
           method: 'GET',
@@ -23,6 +47,11 @@ export class ArtworkDownloaderService {
           timeoutMs
         });
         if (res.data && this.validateMagicBytes(res.data)) {
+          // Pipeline path buffers the whole body before we see it; enforce the
+          // cap on the result so oversized payloads never reach the writer.
+          if (res.data.length > this.maxBytes) {
+            return null;
+          }
           return res.data;
         }
       } catch (_err) {
@@ -38,8 +67,26 @@ export class ArtworkDownloaderService {
           return;
         }
 
+        // Reject early when the server declares an oversized payload
+        const declaredLength = Number(res.headers['content-length']);
+        if (Number.isFinite(declaredLength) && declaredLength > this.maxBytes) {
+          res.destroy();
+          resolve(null);
+          return;
+        }
+
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        let totalBytes = 0;
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          // Hard stop mid-stream for servers that lie about (or omit) size
+          if (totalBytes > this.maxBytes) {
+            res.destroy();
+            resolve(null);
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on('end', () => {
           const buffer = Buffer.concat(chunks);
           if (this.validateMagicBytes(buffer)) {

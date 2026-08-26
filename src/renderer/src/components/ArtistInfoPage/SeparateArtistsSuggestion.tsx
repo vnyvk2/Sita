@@ -1,7 +1,7 @@
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
@@ -36,8 +36,11 @@ const SeparateArtistsSuggestion = (props: Props) => {
 
   const separatedArtistsNames = useMemo(() => {
     const artists = splitFeaturingArtists(name);
-    const filterArtists = artists.filter((x) => x !== undefined && x.trim() !== '');
-    const trimmedArtists = filterArtists.map((x) => x.trim());
+    // Coerce to strings: a non-string entry (e.g. an artist object passed as
+    // name) would otherwise stringify to '[object Object]' and produce
+    // colliding React keys below.
+    const filterArtists = artists.filter((x) => x !== undefined && String(x).trim() !== '');
+    const trimmedArtists = filterArtists.map((x) => String(x).trim());
 
     return [...new Set(trimmedArtists)];
   }, [name]);
@@ -46,19 +49,18 @@ const SeparateArtistsSuggestion = (props: Props) => {
     if (separatedArtistsNames.length > 0) {
       const artists = separatedArtistsNames.map((artist, i, arr) => {
         return (
-          <>
+          <Fragment key={`artist-${i}-${artist}`}>
             <span
               className="text-font-color-highlight dark:text-dark-font-color-highlight"
-              key={artist}
             >
               {artist}
             </span>
             {i !== arr.length - 1 && (
-              <span key={`${arr[i]}=>${arr[i + 1]}`}>
+              <span key={`sep-${i}`}>
                 {i === arr.length - 2 ? ` ${t('common.and')} ` : ', '}
               </span>
             )}
-          </>
+          </Fragment>
         );
       });
 

@@ -7,11 +7,11 @@ import { AlbumMetadataService, getConfidenceLevel } from './AlbumMetadataService
 import { MetadataDiffBuilder } from '../diff/MetadataDiffBuilder';
 import { MetadataApplyService, type ApplyResult } from './MetadataApplyService';
 import { MetadataOperationManager } from '../operations/MetadataOperationManager';
-import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
 import type { MetadataPreferencesService } from './MetadataPreferencesService';
 import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
+import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 import { getSongById, getSongsByIds } from '../../db/queries/songs';
 
 export type SongHydrator = (songId: number) => Promise<LocalSongInput | null>;
@@ -31,7 +31,6 @@ export class AlbumAutoTagService extends EventEmitter {
   private readonly preferencesService?: MetadataPreferencesService;
   private readonly songHydrator?: SongHydrator;
   private readonly operationManager: MetadataOperationManager;
-  private readonly transactionManager: MetadataTransactionManager;
   private readonly activeOperations: Map<string, AbortController> = new Map();
   private readonly operationStages: Map<string, AutoTagStage> = new Map();
 
@@ -43,10 +42,6 @@ export class AlbumAutoTagService extends EventEmitter {
     this.preferencesService = options.preferencesService;
     this.songHydrator = options.songHydrator;
     this.operationManager = new MetadataOperationManager();
-    this.transactionManager = new MetadataTransactionManager({
-      dbUpdater: this.applyService.updater,
-      historyService: this.applyService.history
-    });
   }
 
   public getStage(operationId = 'default'): AutoTagStage {
@@ -59,10 +54,6 @@ export class AlbumAutoTagService extends EventEmitter {
 
   public get operations(): MetadataOperationManager {
     return this.operationManager;
-  }
-
-  public get transactions(): MetadataTransactionManager {
-    return this.transactionManager;
   }
 
   /**
@@ -353,6 +344,17 @@ export class AlbumAutoTagService extends EventEmitter {
    * Apply preview changes via MetadataApplyService.
    */
   public async applyPreview(
+    preview: AlbumTagPreview,
+    options?: ApplyPreviewOptions,
+    signal?: AbortSignal,
+    operationId = 'default'
+  ): Promise<ApplyResult> {
+    return runExclusiveMetadataApply(() =>
+      this.applyPreviewInternal(preview, options, signal, operationId)
+    );
+  }
+
+  private async applyPreviewInternal(
     preview: AlbumTagPreview,
     options?: ApplyPreviewOptions,
     signal?: AbortSignal,

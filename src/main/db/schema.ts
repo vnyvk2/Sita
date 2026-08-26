@@ -8,6 +8,7 @@ import {
   index,
   integer,
   json,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -20,6 +21,7 @@ import {
 
 import type { CollectionContextData } from '../collections/context/types';
 import type { OperationInverseInput, OperationType } from '../collections/operations/types';
+import type { MetadataHistorySnapshot } from '../metadata/history/MetadataHistoryService';
 import type {
   SmartPlaylistRuleAST,
   OrderDefinition,
@@ -516,6 +518,49 @@ export const metadataOverrides = pgTable(
     uniqueIndex('idx_metadata_overrides_lookup').on(t.entityKind, t.entityId, t.fieldId),
     index('idx_metadata_overrides_entity').on(t.entityKind, t.entityId)
   ]
+);
+
+/**
+ * Durable undo journal for AutoTag / metadata operations.
+ * Snapshots are bounded (kept to the newest N by MetadataHistoryService);
+ * payload holds { previousSongs, updatedSongs, songIds? } as JSON.
+ */
+export const metadataUndoSnapshots = pgTable(
+  'metadata_undo_snapshots',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    seq: integer('seq').generatedAlwaysAsIdentity(),
+    description: text('description').notNull().default(''),
+    albumTitle: text('album_title'),
+    payload: jsonb('payload')
+      .$type<{
+        previousSongs: MetadataHistorySnapshot['previousSongs'];
+        updatedSongs: MetadataHistorySnapshot['updatedSongs'];
+        songIds?: number[];
+      }>()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (t) => [index('metadata_undo_snapshots_seq_idx').on(t.seq)]
+);
+
+/**
+ * Durable deferred metadata file writes (2c P4): one self-contained, merged
+ * TagData payload per song path, replayed on flush triggers and deleted on
+ * success. Part of the DB-first correctness model - a crash between the DB
+ * commit and the file write is recovered from here instead of drifting.
+ */
+export const metadataPendingWrites = pgTable(
+  'metadata_pending_writes',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    songPath: text('song_path').notNull().unique(),
+    tags: jsonb('tags').$type<Record<string, unknown>>().notNull(),
+    isKnownSource: boolean('is_known_source').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (t) => [index('metadata_pending_writes_song_path_idx').on(t.songPath)]
 );
 
 export const userSettings = pgTable(
