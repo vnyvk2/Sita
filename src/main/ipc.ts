@@ -615,14 +615,20 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
           genre?: string;
           onlyFavoriteArtists?: boolean;
           onlyFavoriteAlbums?: boolean;
+          restrictToIds?: number[];
         }
-      ) => getFilteredSongLibraryIds(options ?? {})
+      ) =>
+        memProfiler.wrapHandler('app/getFilteredSongLibraryIds', () =>
+          getFilteredSongLibraryIds(options ?? {})
+        )
     );
 
-    ipcMain.handle('app/getSongListFacets', () => getSongListFacets());
+    ipcMain.handle('app/getSongListFacets', () =>
+      memProfiler.wrapHandler('app/getSongListFacets', () => getSongListFacets())
+    );
 
     ipcMain.handle('app/getSongDurations', (_, songIds: number[]) =>
-      getSongDurationsByIds(songIds)
+      memProfiler.wrapHandler('app/getSongDurations', () => getSongDurationsByIds(songIds))
     );
 
     ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());
