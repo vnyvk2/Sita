@@ -427,9 +427,9 @@ export const Playlist = (props: PlaylistProp) => {
       to={'/main-player/playlists/$playlistId'}
       params={{ playlistId: String(props.id) }}
       preload={isMultipleSelectionEnabled ? false : undefined}
-      className={`playlist group hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 ${
+      className={`playlist fx-rise fx-spotlight group hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 ${
         props.id
-      } text-font-color-black dark:text-font-color-white mr-12 mb-8 flex h-fit max-h-52 min-h-48 w-36 flex-col justify-between rounded-md p-4 ${
+      } text-font-color-black dark:text-font-color-white mr-12 mb-8 flex h-fit max-h-52 min-h-48 w-36 flex-col justify-between rounded-md p-4 transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:-translate-y-0.5 ${
         isAMultipleSelection
           ? 'bg-background-color-3! text-font-color-black! dark:bg-dark-background-color-3! dark:text-font-color-black!'
           : ''
@@ -482,7 +482,7 @@ export const Playlist = (props: PlaylistProp) => {
         <div className="playlist-cover-container h-full cursor-pointer overflow-hidden">
           <PlaylistCover
             playlist={props}
-            className="aspect-square w-full"
+            className="aspect-square w-full transition-transform duration-300 ease-out group-hover:scale-[1.04] group-focus-within:scale-[1.04]"
             enableImgFadeIns={!isMultipleSelectionEnabled}
           />
         </div>

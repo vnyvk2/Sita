@@ -6,6 +6,7 @@
   * This file previously had 3200+ lines.
 */
 @import 'tailwindcss';
+@import './fx.css';
 
 @config '../../../../../tailwind.config.js';
 

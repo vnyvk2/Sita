@@ -576,6 +576,8 @@ declare global {
     lyricsArtworkAnimation?: boolean;
     isSongCardDynamicArtworkBackgroundEnabled?: boolean;
     showEqualizerOnTracklist?: boolean;
+    reduceVisualEffectsOnBattery?: boolean;
+    ambientParticles?: boolean;
   }
 
   interface CurrentSong {

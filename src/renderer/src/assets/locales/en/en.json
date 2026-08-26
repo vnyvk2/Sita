@@ -519,6 +519,10 @@
     "performance": "Performance",
     "removeAnimationOnBatteryDescription": "Removes the animations in the app when your system is on battery power.",
     "removeAnimationOnBattery": "Remove animations when on battery power.",
+    "reduceVisualEffectsOnBatteryDescription": "Pauses looping visual effects (ambient drifts, beams, particles) while on battery power, keeping the static polish.",
+    "reduceVisualEffectsOnBattery": "Reduce visual effects when on battery power.",
+    "ambientParticlesDescription": "Adds a subtle drifting dust layer behind the artwork in the fullscreen player. Automatically paused on battery saver or reduced motion.",
+    "ambientParticles": "Enable ambient particles in the fullscreen player.",
     "allowToPreventScreenSleepingDescription": "Allow Nora to prevent the display from going to sleep in situations with no user activity like displaying lyrics.",
     "allowToPreventScreenSleeping": "Allow preventing the display from going to sleep.",
 

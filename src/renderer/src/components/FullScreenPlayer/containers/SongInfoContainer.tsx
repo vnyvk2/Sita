@@ -7,6 +7,7 @@ import DefaultSongCover from '../../../assets/images/webp/song_cover_default.web
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import calculateTime from '../../../utils/calculateTime';
 import Button from '../../Button';
+import BorderBeam from '../../fx/BorderBeam';
 import LyricsIcon from '../../Icons/LyricsIcon';
 import Img from '../../Img';
 import UpNextSongPopup from '../../SongsControlsContainer/UpNextSongPopup';
@@ -83,13 +84,20 @@ const SongInfoContainer = (props: Props) => {
       } ${!isCurrentSongPlaying && isLyricsVisible && 'visible! opacity-100!'}`}
     >
       <div className="song-img-controls-and-info-container text-font-color-white relative grid grid-cols-[12rem_1fr] flex-row items-center gap-8 lg:ml-4 lg:w-full">
-        <Img
-          src={currentSongData.artworkPath}
-          fallbackSrc={DefaultSongCover}
-          loading="eager"
-          alt="Song Cover"
-          className="aspect-auto w-full rounded-md object-cover shadow-md"
-        />
+        <BorderBeam
+          className="w-full rounded-md"
+          thickness={1.5}
+          duration={9}
+          animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
+        >
+          <Img
+            src={currentSongData.artworkPath}
+            fallbackSrc={DefaultSongCover}
+            loading="eager"
+            alt="Song Cover"
+            className="aspect-auto w-full rounded-md object-cover shadow-md"
+          />
+        </BorderBeam>
         <div className="song-controls-and-info-container flex h-full flex-col justify-between">
           <div className="song-controls-container flex h-fit items-center">
             <Button
@@ -139,7 +147,7 @@ const SongInfoContainer = (props: Props) => {
             />
             <button
               type="button"
-              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white h-fit cursor-pointer !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline mr-4 flex items-center justify-center rounded-3xl ${
+              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white mr-4 flex h-fit cursor-pointer items-center justify-center rounded-3xl !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline ${
                 isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
               }`}
               onClick={() => setIsLyricsVisible((prevState) => !prevState)}

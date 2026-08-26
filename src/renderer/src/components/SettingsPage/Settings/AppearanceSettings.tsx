@@ -66,6 +66,10 @@ const ThemeSettings = () => {
     store,
     (state) => state.localStorage.preferences?.isSongCardDynamicArtworkBackgroundEnabled ?? false
   );
+  const ambientParticles = useStore(
+    store,
+    (state) => state.localStorage.preferences?.ambientParticles ?? false
+  );
 
   const { t } = useTranslation();
 
@@ -245,6 +249,18 @@ const ThemeSettings = () => {
               storage.preferences.setPreferences('isSongCardDynamicArtworkBackgroundEnabled', state)
             }
             labelContent={t('settingsPage.enableSongCardDynamicArtworkBackground')}
+          />
+        </li>
+
+        <li className="secondary-container enable-ambient-particles mb-4">
+          <div className="description">{t('settingsPage.ambientParticlesDescription')}</div>
+          <Checkbox
+            id="toggleAmbientParticles"
+            isChecked={ambientParticles}
+            checkedStateUpdateFunction={(state) =>
+              storage.preferences.setPreferences('ambientParticles', state)
+            }
+            labelContent={t('settingsPage.ambientParticles')}
           />
         </li>
       </ul>
