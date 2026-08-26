@@ -176,7 +176,7 @@ const LyricLine = (props: LyricProp) => {
         isSynced
           ? `cursor-pointer blur-[1px] ${
               isActive
-                ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! fx-glow-text [&>div>span]:mr-3!'
+                ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! [&>div>span]:mr-3!'
                 : 'scale-75!'
             }`
           : 'text-font-color-black! dark:text-font-color-white! scale-100! text-4xl! font-medium blur-none! [&>div>span]:mr-3'
