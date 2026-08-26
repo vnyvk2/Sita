@@ -662,19 +662,32 @@ export class MetadataApplyService {
     }));
 
     const tagWriteResults = await this.tagWriter.writeBatch(restorePayloads);
-    const failedWrite = tagWriteResults.find((r) => !r.success);
 
-    if (failedWrite) {
+    // Audit P1 #5: partition by per-file outcome. Tracks whose physical
+    // restore SUCCEEDED must get their DB restore too (otherwise disk=old /
+    // DB=new desyncs permanently); failed tracks keep new values everywhere
+    // and remain covered by the retained snapshot for retry.
+    const succeededSnaps: SongMetadataSnapshot[] = [];
+    const restoreFailures: string[] = [];
+    tagWriteResults.forEach((r, i) => {
+      const snap = snapshot.previousSongs[i];
+      if (!snap) return;
+      if (r.success) succeededSnaps.push(snap);
+      else restoreFailures.push(`Undo physical file tag restore failed for ${r.filePath}: ${r.error}`);
+    });
+
+    if (succeededSnaps.length === 0) {
       return {
         success: false,
         restoredCount: 0,
-        errors: [`Undo physical file tag restore failed for ${failedWrite.filePath}: ${failedWrite.error}`]
+        errors: restoreFailures.length > 0 ? restoreFailures : ['No restore payloads succeeded']
       };
     }
+    const hadPhysicalFailures = restoreFailures.length > 0;
 
     try {
       if (this.dbUpdater) {
-        for (const snap of snapshot.previousSongs) {
+        for (const snap of succeededSnaps) {
           await this.dbUpdater(snap.songId, {
             title: snap.title,
             artist: snap.artist,
@@ -694,7 +707,7 @@ export class MetadataApplyService {
         }
 
         if (reParseSongModule) {
-          for (const snap of snapshot.previousSongs) {
+          for (const snap of succeededSnaps) {
             await reParseSongModule(snap.path);
           }
         } else {
@@ -716,7 +729,7 @@ export class MetadataApplyService {
           const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
 
           await db.transaction(async (trx) => {
-            for (const snap of snapshot.previousSongs) {
+            for (const snap of succeededSnaps) {
               const prevSongData = await getSongById(snap.songId, trx);
               if (prevSongData) {
                 const prevSong = convertToSongData(prevSongData);
@@ -768,16 +781,27 @@ export class MetadataApplyService {
         }
       }
 
+      // Partial physical failure: DB was restored only for the succeeded
+      // subset (disk & DB agree there). The snapshot stays retained so a
+      // retry can attempt the remaining tracks.
+      if (hadPhysicalFailures) {
+        return {
+          success: false,
+          restoredCount: succeededSnaps.length,
+          errors: [...restoreFailures, 'Partial undo applied - retry to restore the remaining tracks.']
+        };
+      }
+
       // Only now is the undo considered done: drop the snapshot from the journal.
       await this.historyService.confirmUndo(snapshot.id);
 
-      return { success: true, restoredCount: snapshot.previousSongs.length };
+      return { success: true, restoredCount: succeededSnaps.length };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         restoredCount: 0,
-        errors: [`Undo DB transaction failed: ${msg}`]
+        errors: [`Undo DB transaction failed: ${msg}`, ...restoreFailures]
       };
     }
   }

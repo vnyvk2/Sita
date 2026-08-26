@@ -22,7 +22,8 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     const metadataService = new AlbumMetadataService(runtime);
     const tagWriter = new TagWriterService();
-    vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: '01.mp3', success: true }]);
+    vi.spyOn(tagWriter, 'writeBatch').mockImplementation(async (payloads) =>
+      payloads.map((p) => ({ filePath: p.filePath, success: true })));
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
     const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });

@@ -10,7 +10,6 @@ import type { MetadataTransactionManager, TransactionExecutionOptions } from '..
 import type { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import type { ProgressEventPayload } from '../models/AlbumTagPreview';
 import type { ApplyResult } from './MetadataApplyService';
-import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 import type { MetadataApplyOrchestrator } from '../apply/MetadataApplyOrchestrator';
 import type { ApplyFieldId } from '../apply/contract';
 
@@ -96,9 +95,9 @@ export class MetadataWorkflowService extends EventEmitter {
     options?: TransactionExecutionOptions,
     operationId = 'default'
   ): Promise<ApplyResult> {
-    return runExclusiveMetadataApply(() =>
-      this.applyPreviewInternal(workflowType, preview, selectedFieldIds, options, operationId)
-    );
+    // Mutex ownership belongs solely to MetadataApplyOrchestrator.execute -
+    // wrapping here too self-rejected every workflow apply (audit P0 #1).
+    return this.applyPreviewInternal(workflowType, preview, selectedFieldIds, options, operationId);
   }
 
   private async applyPreviewInternal(

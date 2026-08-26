@@ -241,10 +241,14 @@ export class MetadataApplyOrchestrator {
           trx
         });
 
-        // Release-level junction truth (2a semantics). When the album itself
-        // changed, resolve-or-create it so the junction lands on target.
+        // Release-level junction truth (2a semantics). `fresh` above was
+        // captured BEFORE syncSongRelationalData - when the album itself
+        // changed, that snapshot still points at the old (possibly deleted)
+        // album, so re-read the post-sync state and resolve-or-create only
+        // when the song still has no album (audit P1 #4).
         if (m.albumArtistNewValue !== undefined) {
-          let albumId = fresh.albums?.[0]?.album?.id;
+          const postSync = await getSongById(m.songId, trx);
+          let albumId = postSync?.albums?.[0]?.album?.id;
           if (albumId === undefined && this.fieldNew(m, 'album') !== undefined) {
             const albumTitleStr = String(this.fieldNew(m, 'album'));
             const existingAlbum = await getAlbumWithTitle(albumTitleStr, trx);

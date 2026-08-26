@@ -257,8 +257,10 @@ export const restorePersistedPendingWrites = async (): Promise<void> => {
       tags: item.tags as unknown as TagData,
       isKnownSource: item.isKnownSource
     });
-    await pendingWritesRepo.deleteBySongPath(item.songPath);
-    // Hydrate first, then let the standard flush own success/retention logic
+    // Hydrate ONLY - the durable row must survive until the flush actually
+    // succeeds (savePendingMetadataUpdates deletes it on success). Deleting
+    // here would permanently lose the write if the flush fails and the
+    // process later exits (audit P0 #2).
   }
   await savePendingMetadataUpdates('', true);
 };

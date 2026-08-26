@@ -1,7 +1,7 @@
 import http from 'http';
 import type { AddressInfo } from 'net';
 import { createHash } from 'crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ArtworkDownloaderService, MAX_ARTWORK_BYTES } from '../ArtworkDownloaderService';
 
 const makeJpeg = (sizeBytes: number): Buffer => {
@@ -70,5 +70,23 @@ describe('ArtworkDownloaderService — hard size ceiling', () => {
     const downloader = new ArtworkDownloaderService(undefined);
     const result = await downloader.fetchAndValidateArtwork(`${baseUrl}/huge-chunked.jpg`);
     expect(result).toBeNull();
+  });
+
+  it('HEAD pre-check refuses declared-oversized targets without a GET allocation (audit P1 #6)', async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-length': String(100 * 1024 * 1024) },
+        data: undefined
+      })
+      .mockResolvedValue({ status: 200, headers: {}, data: makeJpeg(64) });
+
+    const downloader = new ArtworkDownloaderService({ execute } as never);
+    const result = await downloader.fetchAndValidateArtwork(`${baseUrl}/huge-head.jpg`);
+
+    expect(result).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0].method).toBe('HEAD'); // GET never allocated
   });
 });

@@ -702,4 +702,44 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     // Unknown pre-state -> no invented link, junction simply untouched
     expect(manageAlbumArtistOfParsedSong).not.toHaveBeenCalled();
   });
+
+  it('partial physical failure: DB restored ONLY for succeeded tracks, snapshot retained for retry', async () => {
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi.fn().mockResolvedValue([
+      { filePath: '/m/a.mp3', success: true },
+      { filePath: '/m/b.mp3', success: false, error: 'EACCES: locked by player' }
+    ]);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-partial',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [
+        { songId: 1, path: '/m/a.mp3', title: 'A-old' },
+        { songId: 2, path: '/m/b.mp3', title: 'B-old' }
+      ],
+      updatedSongs: []
+    });
+
+    const res = await service.undoLastAutoTag();
+
+    expect(res.success).toBe(false);
+    expect(res.restoredCount).toBe(1);
+    expect((res.errors ?? []).join(' ')).toContain('EACCES');
+
+    // DB restore ran for the SUCCEEDED track only - no desync
+    expect(dbUpdater).toHaveBeenCalledTimes(1);
+    expect(dbUpdater.mock.calls[0][0]).toBe(1);
+
+    // Snapshot retained so retry can attempt the failed track
+    expect(historyService.canUndo).toBe(true);
+  });
 });

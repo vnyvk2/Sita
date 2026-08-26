@@ -21,6 +21,25 @@ export class ArtworkDownloaderService {
 
     if (this.requestPipeline) {
       try {
+        // Audit P1 #6: the pipeline buffers the whole body before we can look
+        // at it, so probe the declared size first and refuse oversized targets
+        // without ever allocating (servers may still lie - the post-check and
+        // streaming fallback remain the hard guarantees).
+        try {
+          const head = await this.requestPipeline.execute<unknown>({
+            url,
+            method: 'HEAD',
+            timeoutMs
+          });
+          const headers = (head as unknown as { headers?: Record<string, string> }).headers ?? {};
+          const declared = Number(headers['content-length']);
+          if (Number.isFinite(declared) && declared > this.maxBytes) {
+            return null;
+          }
+        } catch {
+          // HEAD unsupported/blocked -> proceed to GET; post-check guards.
+        }
+
         const res = await this.requestPipeline.execute<Buffer>({
           url,
           method: 'GET',
