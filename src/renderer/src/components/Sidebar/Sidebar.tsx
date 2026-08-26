@@ -5,9 +5,9 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
+import InsightsIcon from './InsightsIcon';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
-import InsightsIcon from './InsightsIcon';
 import SideBarItem from './SideBarItem';
 
 const Sidebar = memo(() => {
@@ -134,6 +134,7 @@ const Sidebar = memo(() => {
           key={link.id}
           parentClassName={link.parentClassName}
           icon={link.icon}
+          customIcon={'customIcon' in link ? link.customIcon : undefined}
           content={link.content}
         />
       )),

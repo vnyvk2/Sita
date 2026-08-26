@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
+// Direct imports (not the fx barrel) keep unused primitives out of this chunk.
+import AuroraBackground from '../fx/AuroraBackground';
+import ParticlesLayer from '../fx/ParticlesLayer';
 import Img from '../Img';
-import { AuroraBackground, ParticlesLayer } from '../fx';
 import SeekBarSlider from '../SeekBarSlider';
 import TitleBar from '../TitleBar/TitleBar';
 import LyricsContainer from './containers/LyricsContainer';

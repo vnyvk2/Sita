@@ -7,9 +7,9 @@ import DefaultSongCover from '../../../assets/images/webp/song_cover_default.web
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import calculateTime from '../../../utils/calculateTime';
 import Button from '../../Button';
+import BorderBeam from '../../fx/BorderBeam';
 import LyricsIcon from '../../Icons/LyricsIcon';
 import Img from '../../Img';
-import { BorderBeam } from '../../fx';
 import UpNextSongPopup from '../../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../../VolumeSlider';
 
@@ -147,7 +147,7 @@ const SongInfoContainer = (props: Props) => {
             />
             <button
               type="button"
-              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white h-fit cursor-pointer !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline mr-4 flex items-center justify-center rounded-3xl ${
+              className={`lyrics-btn !bg-background-color-3/15 text-font-color-white hover:!bg-background-color-3/30 dark:text-font-color-white mr-4 flex h-fit cursor-pointer items-center justify-center rounded-3xl !border-0 !p-3 outline-offset-1 !backdrop-blur-lg transition-[background] after:absolute after:h-1 focus-visible:!outline ${
                 isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
               }`}
               onClick={() => setIsLyricsVisible((prevState) => !prevState)}

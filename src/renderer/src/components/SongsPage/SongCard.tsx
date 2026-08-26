@@ -462,7 +462,7 @@ const SongCard = (props: SongCardProp) => {
         currentSongData.songId === songId && 'current-song'
       } ${
         isSongPlaying && 'playing'
-      } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color,transform] duration-200 ease-out hover:-translate-y-0.5 ${
+      } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color,translate] duration-200 ease-out hover:-translate-y-0.5 ${
         className || ''
       } ${
         isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && 'border-4'

@@ -58,9 +58,15 @@
 }
 
 /* ? BORDER BEAM ------------------------------------------------------------
-   Conic highlight sweeping around the border. Progressive enhancement:
-   without @property support the angle stays at its initial value and the
-   ::before simply renders an elegant STATIC gradient ring. */
+   Conic highlight sweeping around the border. COST DISCLOSURE: unlike the
+   other primitives this one repaints its (small) pseudo-element every
+   frame while spinning - the registered @property feeds a conic-gradient,
+   which cannot live on the compositor. Kept because the surface area is
+   tiny; gate it away if that ever changes.
+   Progressive enhancement: without @property support the angle falls back
+   to 0deg and renders an elegant STATIC gradient ring (unregistered custom
+   properties would otherwise animate discretely or invalidate the whole
+   background). */
 .fx-beam {
   position: relative;
   isolation: isolate;
@@ -75,7 +81,7 @@
   padding: var(--fx-beam-width, 1.5px);
   pointer-events: none;
   background: conic-gradient(
-    from var(--fx-beam-angle),
+    from var(--fx-beam-angle, 0deg),
     transparent 0turn,
     transparent 0.66turn,
     hsl(var(--fx-beam-from, var(--fx-accent)) / 0.85) 0.84turn,
@@ -477,10 +483,30 @@
 }
 
 /* ? MASTER PAUSE -----------------------------------------------------------
-   Any surface can opt out of ALL (fx + legacy) looping animations by
-   setting [data-fx-paused] or .fx-paused — e.g. minimized windows,
-   hidden tabs, battery saver. Pausing keeps current state (no jump). */
-[data-fx-paused] *,
-.fx-paused * {
+   Any surface can opt out of ALL looping fx animations by setting
+   [data-fx-paused] or .fx-paused — e.g. minimized windows, battery saver.
+   Deliberately ENUMERATES looping animations only (this list includes the
+   pre-existing ambient-drift / marquee utilities): pausing with a bare `*`
+   would also freeze one-shot entrance animations (appear-from-bottom,
+   dialogAppear, animate-in...) that start at opacity:0, leaving content
+   invisible until unpause. Pausing keeps current state (no jump). */
+[data-fx-paused] .animate-ambient-drift,
+[data-fx-paused] .animate-marquee-scroll,
+[data-fx-paused] .fx-aurora__blob,
+[data-fx-paused] .fx-dots__orbit,
+[data-fx-paused] .fx-dots__pulse-dot,
+[data-fx-paused] .fx-dots__wave-bar,
+[data-fx-paused] .fx-insights__dot,
+[data-fx-paused] .fx-skeleton::after,
+[data-fx-paused] .fx-beam--animate::before,
+.fx-paused .animate-ambient-drift,
+.fx-paused .animate-marquee-scroll,
+.fx-paused .fx-aurora__blob,
+.fx-paused .fx-dots__orbit,
+.fx-paused .fx-dots__pulse-dot,
+.fx-paused .fx-dots__wave-bar,
+.fx-paused .fx-insights__dot,
+.fx-paused .fx-skeleton::after,
+.fx-paused .fx-beam--animate::before {
   animation-play-state: paused !important;
 }

@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
-import { DotLoader } from './fx';
+// Direct import (not the fx barrel) keeps unused primitives out of the
+// entry chunk — top-level displayName assignments defeat tree-shaking.
+import DotLoader from './fx/DotLoader';
 
 const SuspenseLoader = () => {
   const { t } = useTranslation();

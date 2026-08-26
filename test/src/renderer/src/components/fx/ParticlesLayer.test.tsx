@@ -18,21 +18,22 @@ let rafSpy: ReturnType<typeof vi.fn>;
 let cancelSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  processedCalls = 0;
   fakeCtx = createFake2d();
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     fakeCtx as unknown as CanvasRenderingContext2D
   );
-  // Drive the loop manually: each rAF schedules nothing further unless the
-  // component re-requests; we simply count requests and flush synchronously.
+  // Id-keyed rAF registry: robust regardless of scheduling order or count.
   let handle = 1;
-  const pending: FrameRequestCallback[] = [];
+  const callbacks = new Map<number, FrameRequestCallback>();
   rafSpy = vi.fn((cb: FrameRequestCallback) => {
-    pending.push(cb);
-    return handle++;
+    const id = handle;
+    handle += 1;
+    callbacks.set(id, cb);
+    return id;
   });
   cancelSpy = vi.fn((id: number) => {
-    const idx = id - 1;
-    if (pending[idx]) pending[idx] = () => undefined;
+    callbacks.delete(id);
   });
   vi.stubGlobal('requestAnimationFrame', rafSpy);
   vi.stubGlobal('cancelAnimationFrame', cancelSpy);
@@ -46,13 +47,17 @@ beforeEach(() => {
   );
 });
 
+/** Offset cursor: vitest 4's mock.calls array must not be mutated directly. */
+let processedCalls = 0;
+
+/** Runs every pending callback once (they may re-schedule new ones). */
 const flushFrames = (times: number) => {
   for (let i = 0; i < times; i += 1) {
-    const pending: FrameRequestCallback[] = (rafSpy.mock.calls as unknown[][]).map(
-      (call) => call[0] as FrameRequestCallback
-    );
-    (rafSpy.mock as { calls: unknown[][] }).calls.length = 0;
-    pending.forEach((cb) => cb(performance.now()));
+    const all = rafSpy.mock.calls as unknown[][];
+    const batch = all.slice(processedCalls).map((call) => call[0] as FrameRequestCallback);
+    processedCalls = all.length;
+    if (batch.length === 0) break;
+    batch.forEach((cb) => cb(performance.now()));
   }
 };
 
@@ -81,6 +86,21 @@ describe('ParticlesLayer', () => {
 
     unmount();
     expect(cancelSpy).toHaveBeenCalled();
+  });
+
+  it('cancels the running loop when isActive flips to false', () => {
+    const view = render(<ParticlesLayer isActive />);
+
+    flushFrames(2);
+    const drawsWhileActive = (fakeCtx.drawImage as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(drawsWhileActive).toBeGreaterThan(0);
+
+    view.rerender(<ParticlesLayer isActive={false} />);
+
+    // The pending frame must be cancelled, not left to fire once more.
+    flushFrames(5);
+    const drawsAfterDeactivate = (fakeCtx.drawImage as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(drawsAfterDeactivate).toBe(drawsWhileActive);
   });
 
   it('skips drawing work while system-paused', () => {
