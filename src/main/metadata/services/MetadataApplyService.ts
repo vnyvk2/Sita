@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { AlbumTagPreview, ApplyPreviewOptions, GlobalAlbumMutations, TrackMatchPreview } from '../../../common/metadata/types';
 import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
@@ -156,7 +157,7 @@ export class MetadataApplyService {
     // through the single authoritative owner. The legacy chunk pipeline below
     // remains for direct unit tests constructed without one.
     if (this.orchestrator) {
-      const opId = options?.operationId ?? 'default';
+      const opId = options?.operationId ?? `apply-${randomUUID()}`;
       const albumTitle = preview.album.title;
       const normalized = targetMatches.map((match) => {
         // Contract whitelist: unknown ids (e.g. artworkUrl) are excluded -
@@ -519,7 +520,9 @@ export class MetadataApplyService {
             genre: snap.genre,
             year: snap.year,
             trackNumber: snap.trackNumber,
-            discNumber: snap.discNumber
+            discNumber: snap.discNumber,
+            isrc: snap.isrc,
+            musicBrainzRecordingId: snap.musicBrainzRecordingId
           });
         }
       } else {
@@ -695,7 +698,9 @@ export class MetadataApplyService {
             genre: snap.genre,
             year: snap.year,
             trackNumber: snap.trackNumber,
-            discNumber: snap.discNumber
+            discNumber: snap.discNumber,
+            isrc: snap.isrc,
+            musicBrainzRecordingId: snap.musicBrainzRecordingId
           });
         }
       } else {
@@ -742,9 +747,11 @@ export class MetadataApplyService {
                 .update(songs)
                 .set({
                   title: snap.title,
-                  year: snap.year,
-                  trackNumber: snap.trackNumber,
-                  diskNumber: snap.discNumber,
+                  year: snap.year ?? null,
+                  trackNumber: snap.trackNumber ?? null,
+                  diskNumber: snap.discNumber ?? null,
+                  isrc: snap.isrc ?? null,
+                  musicBrainzRecordingId: snap.musicBrainzRecordingId ?? null,
                   updatedAt: new Date()
                 })
                 .where(eq(songs.id, snap.songId));

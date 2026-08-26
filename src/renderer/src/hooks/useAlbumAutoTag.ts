@@ -509,7 +509,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
           !effectiveReplaceArtwork || artworkSource === 'local'
             ? undefined
             : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0],
-        globalMutations
+        globalMutations,
+        operationId
       };
 
       const res = await metadataApi.applyPreview(payload, options, operationId);

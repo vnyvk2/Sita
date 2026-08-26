@@ -12,6 +12,8 @@ import { AlbumAutoTagService } from '../AlbumAutoTagService';
 import { AlbumMetadataService } from '../AlbumMetadataService';
 import { MetadataApplyService } from '../MetadataApplyService';
 import { TagWriterService } from '../TagWriterService';
+import { MetadataApplyOrchestrator } from '../../apply/MetadataApplyOrchestrator';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 
 describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () => {
   it('executes search -> buildPreview -> user edits -> transactional apply -> complete undo flow', async () => {
@@ -896,5 +898,56 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     expect(resolveSpy).toHaveBeenCalledTimes(1);
     expect(resolveSpy.mock.calls[0][0].policy).toBeUndefined();
     expect(preview.album.genre).toBe('Federated Genre');
+  });
+
+  it('G2-01 regression: production composition with attached orchestrator successfully applies without nested mutex self-rejection', async () => {
+    const mockMetadataService = {
+      search: vi.fn(),
+      resolveRelease: vi.fn(),
+      buildAlbumMatch: vi.fn(),
+      applyAlbum: vi.fn()
+    };
+
+    const historyService = new MetadataHistoryService();
+    const tagWriter = new TagWriterService();
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter,
+      historyService,
+      getCurrentPlayingPath: () => undefined
+    });
+
+    vi.spyOn(orchestrator as any, 'executeInternal').mockResolvedValue({
+      success: true,
+      updatedCount: 1,
+      failedCount: 0,
+      deferredCount: 0,
+      errors: []
+    });
+
+    // Production composition as in setup.ts:286
+    const applyService = new MetadataApplyService({ historyService, orchestrator });
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: mockMetadataService as any,
+      applyService
+    });
+
+    const preview: any = {
+      album: { title: 'SOUR', artists: ['Olivia Rodrigo'] },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: '/music/01.mp3',
+          oldTitle: 'Old brutal',
+          applyTrack: true,
+          fieldDiffs: [
+            { fieldId: 'title', applyField: true, suggestedValue: 'brutal', oldValue: 'Old brutal' }
+          ]
+        }
+      ]
+    };
+
+    const result = await autoTagService.applyPreview(preview);
+    expect(result.success).toBe(true);
+    expect(result.updatedCount).toBe(1);
   });
 });

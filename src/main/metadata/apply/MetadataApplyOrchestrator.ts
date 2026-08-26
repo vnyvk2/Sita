@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { DBTransaction } from '@main/db/db';
 import { db } from '@main/db/db';
 import { getSongById, updateSongBasicFields } from '@main/db/queries/songs';
@@ -77,7 +78,11 @@ export class MetadataApplyOrchestrator {
 
     const groupPrev: SongMetadataSnapshot[] = [];
     const groupUpdated: SongMetadataSnapshot[] = [];
-    const groupId = `orch-group-${mutations[0]?.operationId ?? Date.now()}`;
+    const opId = mutations[0]?.operationId;
+    const groupId =
+      opId && opId !== 'default'
+        ? `orch-group-${opId}`
+        : `orch-group-${randomUUID()}`;
     for (const mutation of mutations) {
       try {
         const outcome = await this.executeSingle(mutation, {
@@ -188,21 +193,22 @@ export class MetadataApplyOrchestrator {
     const currentRow = await getSongById(m.songId);
     if (!currentRow) return { success: false, error: `Song ${m.songId} not found` };
 
-    const previous: SongMetadataSnapshot =
-      m.undo.previousSongs?.[0] ?? {
-        songId: m.songId,
-        path: m.filePath,
-        title: currentRow.title,
-        artist: currentRow.artists?.[0]?.artist?.name,
-        albumArtist: currentRow.albums?.[0]?.album?.artists?.[0]?.artist?.name,
-        album: currentRow.albums?.[0]?.album?.title,
-        year: currentRow.year ?? undefined,
-        trackNumber: currentRow.trackNumber ?? undefined,
-        discNumber: currentRow.diskNumber ?? undefined,
-        genre: currentRow.genres?.[0]?.genre?.name,
-        isrc: currentRow.isrc ?? undefined,
-        musicBrainzRecordingId: currentRow.musicBrainzRecordingId ?? undefined
-      };
+    // Authoritative pre-apply baseline: derived strictly from trusted main-process DB state.
+    // Renderer-supplied previousSongs cannot spoof or replace the real baseline (G2-02 / G2-04).
+    const previous: SongMetadataSnapshot = {
+      songId: m.songId,
+      path: m.filePath || currentRow.path,
+      title: currentRow.title,
+      artist: currentRow.artists?.[0]?.artist?.name,
+      albumArtist: currentRow.albums?.[0]?.album?.artists?.[0]?.artist?.name,
+      album: currentRow.albums?.[0]?.album?.title,
+      year: currentRow.year ?? undefined,
+      trackNumber: currentRow.trackNumber ?? undefined,
+      discNumber: currentRow.diskNumber ?? undefined,
+      genre: currentRow.genres?.[0]?.genre?.name,
+      isrc: currentRow.isrc ?? undefined,
+      musicBrainzRecordingId: currentRow.musicBrainzRecordingId ?? undefined
+    };
 
     let artworkBuffer = m.artwork?.buffer;
     if (!artworkBuffer) {

@@ -11,7 +11,6 @@ import type { MetadataResolutionManager } from '../resolution/MetadataResolution
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
 import type { MetadataPreferencesService } from './MetadataPreferencesService';
 import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
-import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 import { getSongById, getSongsByIds } from '../../db/queries/songs';
 
 export type SongHydrator = (songId: number) => Promise<LocalSongInput | null>;
@@ -349,9 +348,9 @@ export class AlbumAutoTagService extends EventEmitter {
     signal?: AbortSignal,
     operationId = 'default'
   ): Promise<ApplyResult> {
-    return runExclusiveMetadataApply(() =>
-      this.applyPreviewInternal(preview, options, signal, operationId)
-    );
+    // Mutex ownership belongs solely to MetadataApplyOrchestrator.execute -
+    // wrapping here too self-rejected every album apply (audit P0 #1 / G2-01).
+    return this.applyPreviewInternal(preview, options, signal, operationId);
   }
 
   private async applyPreviewInternal(
@@ -360,9 +359,13 @@ export class AlbumAutoTagService extends EventEmitter {
     signal?: AbortSignal,
     operationId = 'default'
   ): Promise<ApplyResult> {
+    const resolvedOpId =
+      options?.operationId ??
+      (operationId !== 'default' ? operationId : undefined) ??
+      `op-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     this.checkCancelled(signal);
-    this.operationManager.updateState(operationId, 'Applying', `Applying metadata updates for ${preview.album.title}...`, 20);
-    this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, operationId);
+    this.operationManager.updateState(resolvedOpId, 'Applying', `Applying metadata updates for ${preview.album.title}...`, 20);
+    this.emitProgress('applying', `Applying metadata updates for ${preview.album.title}...`, 20, resolvedOpId);
 
     try {
       // Defensive sanitization: Pass only local, non-missing tracks to applyService
@@ -372,7 +375,11 @@ export class AlbumAutoTagService extends EventEmitter {
           (m) => !m.isMissingLocally && m.localSongId !== undefined && m.localSongId > 0
         )
       };
-      const result = await this.applyService.applyPreview(sanitizedPreview, options, signal);
+      const applyOptions: ApplyPreviewOptions = {
+        ...options,
+        operationId: resolvedOpId
+      };
+      const result = await this.applyService.applyPreview(sanitizedPreview, applyOptions, signal);
       this.checkCancelled(signal);
 
       if (result.success) {
@@ -380,11 +387,11 @@ export class AlbumAutoTagService extends EventEmitter {
           result.deferredCount && result.deferredCount > 0
             ? `Successfully updated ${result.updatedCount} songs (${result.deferredCount} file writes pending playback change).`
             : `Successfully updated ${result.updatedCount} songs.`;
-        this.operationManager.updateState(operationId, 'Completed', msg, 100);
-        this.emitProgress('completed', msg, 100, operationId);
+        this.operationManager.updateState(resolvedOpId, 'Completed', msg, 100);
+        this.emitProgress('completed', msg, 100, resolvedOpId);
       } else {
-        this.operationManager.updateState(operationId, 'Failed', `Applied with errors: ${result.errors.join('; ')}`, 100);
-        this.emitProgress('failed', `Applied with errors: ${result.errors.join('; ')}`, 100, operationId);
+        this.operationManager.updateState(resolvedOpId, 'Failed', `Applied with errors: ${result.errors.join('; ')}`, 100);
+        this.emitProgress('failed', `Applied with errors: ${result.errors.join('; ')}`, 100, resolvedOpId);
       }
 
       return result;

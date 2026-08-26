@@ -33,7 +33,9 @@ describe('MetadataDiffBuilder', () => {
           album: 'OK Computer',
           year: 1997,
           trackNumber: 1,
-          discNumber: 1
+          discNumber: 1,
+          isrc: 'GBAYE9700010',
+          musicBrainzRecordingId: 'mb-rec-001'
         },
         remoteTrack: {
           recording: {
@@ -61,6 +63,8 @@ describe('MetadataDiffBuilder', () => {
       expect(titleDiff).toBeDefined();
       expect(titleDiff?.suggestedValue).toBe('Airbag');
       expect(titleDiff?.suggestedValue).not.toBe('OK Computer');
+      expect(preview.oldIsrc).toBe('GBAYE9700010');
+      expect(preview.oldMbid).toBe('mb-rec-001');
     });
 
     it('falls back to merged.title when songOrPair is a LocalSongInput', () => {

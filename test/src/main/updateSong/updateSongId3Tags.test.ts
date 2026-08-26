@@ -10,6 +10,7 @@ import { File } from 'node-taglib-sharp';
 vi.setConfig({ testTimeout: 30_000 });
 import updateSongId3Tags, {
   clearPendingMetadataUpdates,
+  enqueueDeferredMetadataInMemory,
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
 } from '@main/updateSong/updateSongId3Tags';
@@ -505,6 +506,93 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       const flushed = File.createFromPath(tempSongPath);
       expect(flushed.tag.title).toBe('Deferred While Playing');
       flushed.dispose();
+    });
+  });
+
+  describe('G2-05: Pending-write flusher fixes', () => {
+    it('does not advance DB modifiedAt if physical file write throws an error', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/other.mp3');
+      const updateModifiedAtSpy = vi.spyOn(songsDb, 'updateSongModifiedAtByPath').mockResolvedValue(undefined as any);
+
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 201,
+        path: tempSongPath,
+        title: 'Original Song'
+      } as any);
+      vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => cb({}));
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
+      await updateSongId3Tags(201, { title: 'Failing File Write' }, false);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+      vi.spyOn(File, 'createFromPath').mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/other.mp3');
+      await savePendingMetadataUpdates('/other.mp3', true);
+
+      expect(updateModifiedAtSpy).not.toHaveBeenCalled();
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+    });
+
+    it('continues flushing remaining queue even when encountering playing song without stranding queue', async () => {
+      const tempSong2 = path.join(os.tmpdir(), `update_id3_q2_${Date.now()}.mp3`);
+      const tempSong3 = path.join(os.tmpdir(), `update_id3_q3_${Date.now()}.mp3`);
+      fs.copyFileSync(fixtureSource, tempSong2);
+      fs.copyFileSync(fixtureSource, tempSong3);
+
+      try {
+        enqueueDeferredMetadataInMemory(tempSongPath, { title: 'New Playing Title' });
+        enqueueDeferredMetadataInMemory(tempSong2, { title: 'New Song 2 Title' });
+        enqueueDeferredMetadataInMemory(tempSong3, { title: 'New Song 3 Title' });
+
+        expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+        expect(isMetadataUpdatesPending(tempSong2)).toBe(true);
+        expect(isMetadataUpdatesPending(tempSong3)).toBe(true);
+
+        // Flush while tempSongPath is currently playing (forceSave = false)
+        await savePendingMetadataUpdates(tempSongPath, false);
+
+        // Playing song was skipped
+        expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+        // Both Song 2 and Song 3 were NOT stranded: they were flushed!
+        expect(isMetadataUpdatesPending(tempSong2)).toBe(false);
+        expect(isMetadataUpdatesPending(tempSong3)).toBe(false);
+
+        const f2 = File.createFromPath(tempSong2);
+        expect(f2.tag.title).toBe('New Song 2 Title');
+        f2.dispose();
+
+        const f3 = File.createFromPath(tempSong3);
+        expect(f3.tag.title).toBe('New Song 3 Title');
+        f3.dispose();
+      } finally {
+        try { fs.unlinkSync(tempSong2); } catch {}
+        try { fs.unlinkSync(tempSong3); } catch {}
+      }
+    });
+
+    it('uses entry songPath for format detection rather than currentSongPath', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/music/playing.wav');
+      vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => cb({}));
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 204,
+        path: tempSongPath,
+        title: 'Original Song'
+      } as any);
+
+      await updateSongId3Tags(204, { title: 'MP3 Format Title' }, false);
+
+      await savePendingMetadataUpdates('/music/playing.wav', true);
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      const f = File.createFromPath(tempSongPath);
+      expect(f.tag.title).toBe('MP3 Format Title');
+      f.dispose();
     });
   });
 });

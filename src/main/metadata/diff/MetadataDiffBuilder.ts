@@ -129,6 +129,8 @@ export class MetadataDiffBuilder {
       oldTrackNumber: song.trackNumber,
       oldDiscNumber: song.discNumber,
       oldGenre: rawSongGenre,
+      oldIsrc: song.isrc,
+      oldMbid: song.musicBrainzRecordingId,
       confidence: conf,
       confidenceLevel: pair?.confidenceLevel ?? 'Excellent',
       why: pair?.why ?? 'Multi-Provider Merged Resolution',

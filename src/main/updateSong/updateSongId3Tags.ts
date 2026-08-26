@@ -83,8 +83,6 @@ export const clearPendingMetadataUpdates = () => pendingMetadataUpdates.clear();
 
 export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave = false) => {
   const { saveLyricsInLrcFilesForSupportedSongs } = await getUserSettings();
-  const pathExt = path.extname(currentSongPath).replace(/\W/, '');
-  const isASupportedFormat = metadataEditingSupportedExtensions.includes(pathExt);
 
   if (pendingMetadataUpdates.size === 0) return logger.verbose('No pending metadata updates found.');
 
@@ -92,12 +90,14 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
     pendingSongs: pendingMetadataUpdates.keys
   });
 
-  const entries = pendingMetadataUpdates.entries();
+  const entries = Array.from(pendingMetadataUpdates.entries());
 
   for (const [songPath, pendingMetadata] of entries) {
     const isACurrentlyPlayingSong = songPath === currentSongPath;
 
     if (forceSave || !isACurrentlyPlayingSong) {
+      const pathExt = path.extname(songPath).replace(/\W/, '');
+      const isASupportedFormat = metadataEditingSupportedExtensions.includes(pathExt);
       try {
         await withAtomicFileWrite(songPath, async (file) => {
           const { tags } = pendingMetadata;
@@ -193,23 +193,22 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
         dataUpdateEvent('genres');
         pendingMetadataUpdates.delete(songPath);
         void pendingWritesRepo.deleteBySongPath(songPath).catch(() => undefined);
-      } catch (error) {
-        logger.error(`Failed to save pending metadata update of a song. `, { error, songPath });
-      }
 
-      try {
-        const stats = statSync(songPath);
-        if (stats?.mtime) {
-          const modifiedDate = stats.mtime.getTime();
-          if (isACurrentlyPlayingSong) return { modifiedDate };
-
-          await updateSongModifiedAtByPath(songPath, new Date(modifiedDate));
-          dataUpdateEvent('songs/updatedSong');
+        try {
+          const stats = statSync(songPath);
+          if (stats?.mtime) {
+            const modifiedDate = stats.mtime.getTime();
+            await updateSongModifiedAtByPath(songPath, new Date(modifiedDate));
+            dataUpdateEvent('songs/updatedSong');
+          }
+        } catch (error) {
+          logger.error(`FAILED TO GET SONG STATS AFTER UPDATING THE SONG WITH NEWER METADATA.`, {
+            error
+          });
         }
       } catch (error) {
-        logger.error(`FAILED TO GET SONG STATS AFTER UPDATING THE SONG WITH NEWER METADATA.`, {
-          error
-        });
+        logger.error(`Failed to save pending metadata update of a song. `, { error, songPath });
+        continue;
       }
     }
   }
@@ -288,7 +287,23 @@ export const persistDeferredMetadataWrite = async (
 
 /** Registers the intent in the in-memory coalescing queue WITHOUT touching durable state. */
 export const enqueueDeferredMetadataInMemory = (songPath: string, tags: TagData): void => {
-  addMetadataToPendingQueue({ songPath, tags, isKnownSource: true, sendUpdatedData: false });
+  const existing = pendingMetadataUpdates.get(songPath);
+  if (existing) {
+    pendingMetadataUpdates.set(songPath, {
+      ...existing,
+      songPath,
+      tags: mergeTagData(existing.tags, tags),
+      isKnownSource: true,
+      sendUpdatedData: false
+    });
+  } else {
+    pendingMetadataUpdates.set(songPath, {
+      songPath,
+      tags,
+      isKnownSource: true,
+      sendUpdatedData: false
+    });
+  }
 };
 
 /**
@@ -1094,8 +1109,8 @@ const updateSongId3Tags = async (
       });
     }
 
-    if (queueResult && 'modifiedDate' in queueResult) {
-      await updateSongModifiedAtByPath(song.path, new Date(queueResult.modifiedDate));
+    if ((queueResult as any)?.modifiedDate) {
+      await updateSongModifiedAtByPath(song.path, new Date((queueResult as any).modifiedDate));
     }
 
     // Emit data update events
