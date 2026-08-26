@@ -1,6 +1,38 @@
 import React from 'react';
-import type { AlbumMetadata } from '../../../../common/metadata/types';
+import type { AlbumMetadata, MatchQualityBandName } from '../../../../common/metadata/types';
 import { getProviderDisplayName } from '../../../../common/metadata/displayNames';
+
+const QUALITY_BAND_CHIP_CLASS: Record<MatchQualityBandName, string> = {
+  Definitive: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
+  Probable: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400',
+  Weak: 'bg-rose-500/15 border-rose-500/30 text-rose-500 dark:text-rose-400'
+};
+
+function signed(value: number): string {
+  return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
+}
+
+function formatScoreTooltip(cand: AlbumMetadata): string | undefined {
+  const b = cand.rankingBreakdown;
+  if (!b) {
+    return cand.rankingScore !== undefined ? `Total score ${cand.rankingScore}` : undefined;
+  }
+
+  const parts = [
+    `Base ${Math.round(b.baseScore)}`,
+    `Artist ${signed(b.artistScore)}`,
+    `Title ${signed(b.titleScore)}`,
+    `Status ${signed(b.statusScore)}`,
+    `Type ${signed(b.primaryTypeScore)}`
+  ];
+  if (b.secondaryTypePenalty !== 0) parts.push(`Secondary ${signed(b.secondaryTypePenalty)}`);
+  if (b.trackCountBonus !== 0) parts.push(`Tracks ${signed(b.trackCountBonus)}`);
+  if (b.editionBoost !== 0) parts.push(`Edition ${signed(b.editionBoost)}`);
+  parts.push(`= ${cand.rankingScore ?? Math.round(cand.rankingScore ?? 0)}`);
+
+  if (cand.qualityBand) parts.push(`(${cand.qualityBand})`);
+  return parts.join(' · ');
+}
 
 export interface CandidateMatchesTableProps {
   candidates: AlbumMetadata[];
@@ -114,8 +146,19 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                           >
                             {idx === 0 ? 'Best Match' : `#${idx + 1}`}
                           </span>
+                          {cand.qualityBand && (
+                            <span
+                              className={`text-[0.65rem] font-semibold px-1.5 py-0.5 rounded border ${QUALITY_BAND_CHIP_CLASS[cand.qualityBand]}`}
+                              title={`Match quality: ${cand.qualityBand}`}
+                            >
+                              {cand.qualityBand}
+                            </span>
+                          )}
                           {cand.rankingScore !== undefined && (
-                            <span className="text-[0.72rem] font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                            <span
+                              className="text-[0.72rem] font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed cursor-help"
+                              title={formatScoreTooltip(cand)}
+                            >
                               Score {cand.rankingScore}
                             </span>
                           )}

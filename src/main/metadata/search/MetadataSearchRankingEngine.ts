@@ -1,4 +1,10 @@
 import { MetadataQueryNormalizer, type NormalizedQuery } from './MetadataQueryNormalizer';
+import {
+  DEFAULT_SEARCH_RANKING_WEIGHTS,
+  type SearchRankingWeights
+} from '../../../common/metadata/preferences';
+
+export type { SearchRankingWeights };
 
 export interface SearchCandidate {
   id: string;
@@ -13,33 +19,7 @@ export interface SearchCandidate {
   rawItem?: unknown;
 }
 
-export interface SearchRankingWeights {
-  artistMatch: number;
-  titleMatch: number;
-  officialStatus: number;
-  bootlegPenalty: number;
-  primaryTypeAlbum: number;
-  primaryTypeEP: number;
-  compilationPenalty: number;
-  livePenalty: number;
-  trackCountMatch: number;
-  editionBoost: number;
-  remasterBoost: number;
-}
-
-export const DEFAULT_RANKING_WEIGHTS: SearchRankingWeights = {
-  artistMatch: 30,
-  titleMatch: 30,
-  officialStatus: 20,
-  bootlegPenalty: -25,
-  primaryTypeAlbum: 15,
-  primaryTypeEP: 10,
-  compilationPenalty: -15,
-  livePenalty: -15,
-  trackCountMatch: 10,
-  editionBoost: 12,
-  remasterBoost: 10
-};
+export const DEFAULT_RANKING_WEIGHTS: SearchRankingWeights = DEFAULT_SEARCH_RANKING_WEIGHTS;
 
 export interface ScoredSearchCandidate {
   candidate: SearchCandidate;

@@ -1,10 +1,16 @@
 import type { MetadataProviderId } from '../../../common/metadata/provider';
-import type { AlbumMetadata } from '../../../common/metadata/release';
+import type { AlbumMetadata, MatchQualityBandName } from '../../../common/metadata/release';
 import {
   type ScoredSearchCandidate,
   MatchQualityBand,
   classifyQualityBand
 } from './MetadataSearchRankingEngine';
+
+const MATCH_QUALITY_BAND_NAME: Record<MatchQualityBand, MatchQualityBandName> = {
+  [MatchQualityBand.Definitive]: 'Definitive',
+  [MatchQualityBand.Probable]: 'Probable',
+  [MatchQualityBand.Weak]: 'Weak'
+};
 
 export interface RankedDiscoveryCandidate {
   album: AlbumMetadata;
@@ -45,7 +51,9 @@ export class DiscoveryCandidateSorter {
       return {
         album: {
           ...album,
-          rankingScore: Math.round(scored.totalScore)
+          rankingScore: Math.round(scored.totalScore),
+          rankingBreakdown: { ...scored.breakdown },
+          qualityBand: MATCH_QUALITY_BAND_NAME[qualityBand]
         },
         scored,
         qualityBand,

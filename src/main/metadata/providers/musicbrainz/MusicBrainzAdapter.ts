@@ -108,18 +108,44 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }
 
     const artistName = mbRelease['artist-credit']?.[0]?.name ?? query.artist ?? '';
+    const genreValue = this.extractGenre(mbRelease);
+
+    const contributions: FieldContribution[] = [
+      { fieldId: 'title', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('title', 0.95) },
+      { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
+      { fieldId: 'album', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('album', 0.90) },
+      { fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
+    ];
+
+    if (genreValue) {
+      contributions.push({
+        fieldId: 'genre',
+        providerId: 'musicbrainz',
+        value: genreValue,
+        confidenceScore: this.getConfidence('genre', 0.7)
+      });
+    }
 
     return {
       providerId: 'musicbrainz',
       providerName: 'MusicBrainz',
       confidenceScore: 0.95,
-      contributions: [
-        { fieldId: 'title', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('title', 0.95) },
-        { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
-        { fieldId: 'album', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('album', 0.90) },
-        { fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
-      ]
+      contributions
     };
+  }
+
+  private extractGenre(release: MusicBrainzReleaseDto): string | undefined {
+    const source = release.genres && release.genres.length > 0 ? release.genres : release.tags;
+    if (!source || source.length === 0) return undefined;
+
+    const ranked = [...source]
+      .filter((t) => t.name && t.name.trim().length > 0)
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+      .slice(0, 4)
+      .map((t) => t.name.trim());
+
+    const deduped = Array.from(new Set(ranked));
+    return deduped.length > 0 ? deduped.join(', ') : undefined;
   }
 
   public async searchAlbums(

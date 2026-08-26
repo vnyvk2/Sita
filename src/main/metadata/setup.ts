@@ -302,7 +302,8 @@ export class MetadataBootstrap {
     const autoTagService = new AlbumAutoTagService({
       albumMetadataService,
       applyService,
-      resolutionManager
+      resolutionManager,
+      preferencesService
     });
 
     const transactionManager = new MetadataTransactionManager({

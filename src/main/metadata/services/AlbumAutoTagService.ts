@@ -9,6 +9,8 @@ import { MetadataApplyService, type ApplyResult } from './MetadataApplyService';
 import { MetadataOperationManager } from '../operations/MetadataOperationManager';
 import { MetadataTransactionManager } from '../transactions/MetadataTransactionManager';
 import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
+import type { MetadataPolicy } from '../domain/MetadataPolicy';
+import type { MetadataPreferencesService } from './MetadataPreferencesService';
 import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
 import { getSongById, getSongsByIds } from '../../db/queries/songs';
 
@@ -18,6 +20,7 @@ export interface AlbumAutoTagServiceOptions {
   albumMetadataService: AlbumMetadataService;
   applyService?: MetadataApplyService;
   resolutionManager?: MetadataResolutionManager;
+  preferencesService?: MetadataPreferencesService;
   songHydrator?: SongHydrator;
 }
 
@@ -25,6 +28,7 @@ export class AlbumAutoTagService extends EventEmitter {
   private readonly metadataService: AlbumMetadataService;
   private readonly applyService: MetadataApplyService;
   private readonly resolutionManager?: MetadataResolutionManager;
+  private readonly preferencesService?: MetadataPreferencesService;
   private readonly songHydrator?: SongHydrator;
   private readonly operationManager: MetadataOperationManager;
   private readonly transactionManager: MetadataTransactionManager;
@@ -36,6 +40,7 @@ export class AlbumAutoTagService extends EventEmitter {
     this.metadataService = options.albumMetadataService;
     this.applyService = options.applyService ?? new MetadataApplyService();
     this.resolutionManager = options.resolutionManager;
+    this.preferencesService = options.preferencesService;
     this.songHydrator = options.songHydrator;
     this.operationManager = new MetadataOperationManager();
     this.transactionManager = new MetadataTransactionManager({
@@ -58,6 +63,38 @@ export class AlbumAutoTagService extends EventEmitter {
 
   public get transactions(): MetadataTransactionManager {
     return this.transactionManager;
+  }
+
+  /**
+   * Builds an operation-level merge policy from user preferences so specialized
+   * field federation (genre / artwork) honors the configured enrichment providers.
+   */
+  private async buildMergePolicy(): Promise<MetadataPolicy | undefined> {
+    if (!this.preferencesService || !this.resolutionManager) return undefined;
+
+    try {
+      const prefs = await this.preferencesService.getPreferences();
+      return {
+        level: 'operation',
+        selection: { enabledProviderIds: [], maxCandidates: 20 },
+        merge: {
+          providerPriorities: {
+            user: 1000,
+            musicbrainz: 900,
+            coverartarchive: 850,
+            discogs: 800
+          },
+          fieldPolicies: {
+            genre: { fieldId: 'genre', preferredProviderId: prefs.defaultGenreProvider },
+            artworkUrl: { fieldId: 'artworkUrl', preferredProviderId: prefs.defaultArtworkProvider }
+          }
+        },
+        fallback: { allowLocalFallback: true, allowEmptyFallbacks: true },
+        validation: { strictMode: false, requireTitle: false, requireArtist: false }
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -191,12 +228,14 @@ export class AlbumAutoTagService extends EventEmitter {
 
       const tFedStart = performance.now();
       if (this.resolutionManager) {
+        const mergePolicy = await this.buildMergePolicy();
         const resolution = await this.resolutionManager.resolve({
           operationId,
           targetResourceIds,
           albumTitle: resolved.album.title,
           artistName: resolved.album.artist,
           mbid: resolved.providerReleaseId,
+          policy: mergePolicy,
           canonicalContext: {
             mbid: resolved.providerReleaseId,
             title: resolved.album.title,
@@ -214,6 +253,10 @@ export class AlbumAutoTagService extends EventEmitter {
               primaryPath: merged.artworkUrl,
               onlineUrls: [merged.artworkUrl]
             };
+          }
+
+          if (merged.genre) {
+            resolved.album.genre = merged.genre;
           }
 
           if (merged.fieldAttributions) {

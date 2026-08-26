@@ -38,6 +38,19 @@ export interface OfficialTrackInput {
   genres?: string[];
 }
 
+export interface RankingScoreBreakdown {
+  baseScore: number;
+  artistScore: number;
+  titleScore: number;
+  statusScore: number;
+  primaryTypeScore: number;
+  secondaryTypePenalty: number;
+  trackCountBonus: number;
+  editionBoost: number;
+}
+
+export type MatchQualityBandName = 'Definitive' | 'Probable' | 'Weak';
+
 export interface AlbumMetadata {
   title: string;
   artist: string;
@@ -53,6 +66,10 @@ export interface AlbumMetadata {
   provider?: MetadataProviderId;
   /** Raw additive ranking score computed by MetadataSearchRankingEngine (heuristic range: ~-55 to 227). */
   rankingScore?: number;
+  /** Per-component breakdown of rankingScore, when the search runtime provides it. */
+  rankingBreakdown?: RankingScoreBreakdown;
+  /** Intrinsic quality band derived from the ranked score (Definitive / Probable / Weak). */
+  qualityBand?: MatchQualityBandName;
 }
 
 export interface ResolvedAlbumRelease {
