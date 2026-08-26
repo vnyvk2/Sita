@@ -226,6 +226,74 @@ class MemProfiler {
     return Date.now() - start;
   }
 
+  private async runGoldenMaster(wc: WebContents) {
+    this.stage('golden-master:start');
+    const result = await evalInRenderer<{
+      combos: number;
+      mismatches: { combo: string; reason: string }[];
+      durationMs: number;
+      error?: string;
+    }>(
+      wc,
+      `(async function(){
+        var t0 = performance.now();
+        var sorts = ['aToZ','zToA','releasedYearAscending','releasedYearDescending','trackNoAscending','dateAddedDescending','addedOrder','mostSkipped'];
+        var facets = await window.api.audioLibraryControls.getSongListFacets();
+        var genre = facets.genres && facets.genres[0];
+        var language = facets.languages && facets.languages[0];
+        var subCombos = [
+          {},
+          { onlyFavoriteAlbums: true },
+          { language: 'unspecified' }
+        ];
+        if (genre) subCombos.push({ genre: genre });
+        if (language) subCombos.push({ language: language });
+        function clientFilter(song, c){
+          if (c.language && c.language !== 'all'){
+            if (c.language === 'unspecified'){ if (song.language && song.language.trim() !== '') return false; }
+            else if ((song.language||'').toLowerCase() !== c.language.toLowerCase()) return false;
+          }
+          if (c.genre && c.genre !== 'all'){
+            var has = false;
+            var gs = song.genres || [];
+            for (var gi=0; gi<gs.length; gi++){ if (gs[gi].name.toLowerCase() === c.genre.toLowerCase()){ has = true; break; } }
+            if (!has) return false;
+          }
+          if (c.onlyFavoriteAlbums){ if (!(song.album && song.album.isAFavorite)) return false; }
+          return true;
+        }
+        var mismatches = [];
+        var combos = 0;
+        try {
+          for (var si=0; si<sorts.length; si++){
+            for (var ci=0; ci<subCombos.length; ci++){
+              var c = subCombos[ci];
+              var comboLabel = sorts[si] + '|' + JSON.stringify(c);
+              var oldRes = await window.api.audioLibraryControls.getAllSongs(sorts[si], 'notSelected', {start:0,end:0});
+              var oldIds = [];
+              for (var oi=0; oi<oldRes.data.length; oi++){ if (clientFilter(oldRes.data[oi], c)) oldIds.push(oldRes.data[oi].songId); }
+              var newParams = Object.assign({ sortType: sorts[si], filterType: 'notSelected' }, c);
+              var newRes = await window.api.audioLibraryControls.getFilteredSongLibraryIds(newParams);
+              combos++;
+              if (oldIds.length !== newRes.ids.length){
+                mismatches.push({combo:comboLabel, reason:'len '+oldIds.length+' vs '+newRes.ids.length});
+              } else {
+                for (var k=0;k<oldIds.length;k++){ if (oldIds[k]!==newRes.ids[k]){ mismatches.push({combo:comboLabel,reason:'order@'+k}); break; } }
+              }
+            }
+          }
+        } catch(e){ return { error: String(e), combos: combos, mismatches: mismatches.slice(0,10), durationMs: Math.round(performance.now()-t0) }; }
+        return { combos: combos, mismatches: mismatches.slice(0,10), durationMs: Math.round(performance.now()-t0) };
+      })()`
+    );
+    writeJsonl('golden-master.jsonl', { kind: 'golden-master', result, ts: Date.now() });
+    this.stage('golden-master:end', {
+      combos: result?.combos,
+      mismatchCount: result?.mismatches?.length,
+      error: result?.error
+    });
+  }
+
   async runBootScenario(mainWindowRef: BrowserWindow) {
     if (!this.enabled) return;
     this.stage('scenario:start');
@@ -250,6 +318,32 @@ class MemProfiler {
       navToSettleMs: Date.now() - settleStart
     });
 
+    if (process.env.NORA_GOLDEN === '1') {
+      await this.runGoldenMaster(wc);
+      await sleep(500);
+      await this.snapshotStep('post-golden-master', wc);
+    }
+
+    const likeProbe = await evalInRenderer<{ id: number; ms: number; isFavorite?: boolean; error?: string }>(
+      wc,
+      `(async function(){
+        try {
+          var qc = window.__noraProfile && window.__noraProfile.qc;
+          var lists = qc ? qc.getQueryCache().findAll({ queryKey: ['songs','ids'] }) : [];
+          var source = null;
+          for (var i=0;i<lists.length;i++){ if (lists[i].state.data && lists[i].state.data.ids && lists[i].state.data.ids.length>5){ source = lists[i]; break; } }
+          if (!source) return { error: 'no ids list cached' };
+          var id = source.state.data.ids[5];
+          var t0 = performance.now();
+          await window.api.playerControls.toggleLikeSongs([id], true);          await new Promise(function(r){ setTimeout(r, 2500); });
+          var info = await window.api.audioLibraryControls.getSongInfo([id]);
+          return { id: id, ms: Math.round(performance.now()-t0), isFavorite: !!(info && info[0] && info[0].isAFavorite) };
+        } catch(e) { return { error: String(e) }; }
+      })()`
+    );
+    writeJsonl('scenario.jsonl', { kind: 'like-probe', probe: likeProbe, ts: Date.now() });
+    await this.snapshotStep('post-like-probe', wc);
+
     const refetchT0 = Date.now();
     const refetchResult = await evalInRenderer<string>(
       wc,
@@ -266,6 +360,15 @@ class MemProfiler {
     await this.snapshotStep('albums-loaded', wc, {
       settleMs: albumsSettleMs,
       navToSettleMs: Date.now() - albumsNavT0
+    });
+
+    const queueNavT0 = Date.now();
+    await wc.executeJavaScript(`location.hash = '#/main-player/queue'`, false).catch(() => undefined);
+    const queueSettleMs = await this.waitForQueriesSettled(wc, 15000);
+    await sleep(2000);
+    await this.snapshotStep('queue-loaded', wc, {
+      settleMs: queueSettleMs,
+      navToSettleMs: Date.now() - queueNavT0
     });
 
     const directProbe = await evalInRenderer<{ ms: number; count: number; error?: string }>(

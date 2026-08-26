@@ -48,10 +48,10 @@ export const Route = createFileRoute('/main-player/songs/')({
       sortType: deps.sortingOrder ?? sortingState ?? 'aToZ',
       filterType: deps.filteringOrder ?? 'notSelected',
       keyword: deps.keyword ?? '',
-      language: deps.language,
-      genre: deps.genre,
-      onlyFavoriteArtists: deps.onlyFavoriteArtists,
-      onlyFavoriteAlbums: deps.onlyFavoriteAlbums
+      language: deps.language ?? 'all',
+      genre: deps.genre ?? 'all',
+      onlyFavoriteArtists: deps.onlyFavoriteArtists ?? false,
+      onlyFavoriteAlbums: deps.onlyFavoriteAlbums ?? false
     };
     const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
     const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);

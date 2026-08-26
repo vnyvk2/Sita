@@ -572,10 +572,36 @@ export const getFilteredSongLibraryIds = async (
   }
 
   if (orderClauses.length > 0) {
-    query.orderBy(...orderClauses);
+    query.orderBy(...orderClauses, asc(songs.id));
+  } else {
+    query.orderBy(asc(songs.id));
+  }
+
+  if (process.env.NORA_DEBUG_IDS === '1') {
+    try {
+      const sqlPreview = query.toSQL();
+      const { default: logger } = await import('@main/logger');
+      logger.debug('[B-ids] getFilteredSongLibraryIds SQL preview', {
+        sql: sqlPreview.sql.substring(0, 800),
+        params: sqlPreview.params?.slice(0, 5),
+        filters: filters.length,
+        orderClauses: orderClauses.length,
+        options
+      });
+    } catch {}
   }
 
   const results = await query;
+  if (process.env.NORA_DEBUG_IDS === '1') {
+    try {
+      const { default: logger } = await import('@main/logger');
+      logger.debug('[B-ids] getFilteredSongLibraryIds result', {
+        count: results.length,
+        firstIds: results.slice(0, 3).map((r) => r.id),
+        options
+      });
+    } catch {}
+  }
   const ids: number[] = [];
   const blacklistedIds: number[] = [];
   for (const row of results) {

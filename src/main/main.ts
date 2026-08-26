@@ -389,7 +389,7 @@ const createWindow = async () => {
   }
   mainWindow.once('ready-to-show', () => {
     memProfiler.stage('ready-to-show');
-    if (app.hasSingleInstanceLock() && !isDatabaseStubbed) {
+    if (app.hasSingleInstanceLock() && !isDatabaseStubbed && process.env.NORA_NO_SCAN !== '1') {
       logger.info('Initializing library lifecycle controller on startup.');
       void libraryLifecycleController.initialize();
     }

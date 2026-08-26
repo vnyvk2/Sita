@@ -149,16 +149,19 @@ import { registerLibraryChoreography } from './workers/libraryChoreography';
 import { libraryObservability } from './workers/libraryObservability';
 
 export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSignal) {
-  // Start the Library Builder Scheduler
-  libraryScheduler.start();
-  adaptivePolicyEngine.start();
+  const skipBackgroundWork = process.env.NORA_NO_SCAN === '1';
+  if (!skipBackgroundWork) {
+    // Start the Library Builder Scheduler
+    libraryScheduler.start();
+    adaptivePolicyEngine.start();
 
-  // Enqueue Garbage Collection on startup
-  libraryScheduler.requestMaintenance();
+    // Enqueue Garbage Collection on startup
+    libraryScheduler.requestMaintenance();
 
-  // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
-  // Register background asset generation pipelines (e.g., palettes)
-  registerLibraryChoreography();
+    // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
+    // Register background asset generation pipelines (e.g., palettes)
+    registerLibraryChoreography();
+  }
 
   const sendSchedulerUpdate = () => {
     sendMessageToRenderer({
@@ -170,7 +173,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   libraryObservability.on('METRICS_UPDATED', sendSchedulerUpdate);
 
   // Fire and forget startup recovery sync
-  recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
+  if (!skipBackgroundWork) recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
 
   // Setup Collection IPC, Playlist Import IPC, & Playlist Export IPC
   setupCollectionIpc(
