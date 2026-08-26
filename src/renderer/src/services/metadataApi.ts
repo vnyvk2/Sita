@@ -38,10 +38,7 @@ export const metadataApi = {
   getAvailableSearchProviders: async (): Promise<AvailableSearchProviderInfo[]> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api || typeof api.getAvailableSearchProviders !== 'function') {
-      return [
-        { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
-        { id: 'discogs', displayName: 'Discogs', isOnline: true }
-      ];
+      return [{ id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }];
     }
     return api.getAvailableSearchProviders();
   },

@@ -164,7 +164,9 @@ export const SearchCriteriaBar: React.FC<SearchCriteriaBarProps> = ({
               <span className="font-medium text-font-color-black dark:text-font-color-white">Discovery Strategy:</span>
               <span>{selectedSource === 'auto' ? 'Settings-driven multi-source ranking' : `Direct ${selectedSource} query`}</span>
               <span className="opacity-40">•</span>
-              <span>Field Federation: Discogs Genres · CAA Artwork</span>
+              <span>
+                Field Federation:{availableProviders.some((prov) => prov.id === 'discogs') ? ' Discogs Genres ·' : ''} CAA Artwork
+              </span>
             </div>
 
             <button

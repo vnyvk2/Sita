@@ -68,10 +68,7 @@ export function registerMetadataHandlers(
     if (providerRuntime) {
       return providerRuntime.getAvailableSearchProviders();
     }
-    return [
-      { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
-      { id: 'discogs', displayName: 'Discogs', isOnline: true }
-    ];
+    return [{ id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }];
   });
 
   ipcMain.handle(

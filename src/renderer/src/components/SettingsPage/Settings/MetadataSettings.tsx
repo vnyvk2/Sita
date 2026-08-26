@@ -43,8 +43,7 @@ const numberInputClass =
 const MetadataSettings: React.FC = () => {
   const [preferences, setPreferences] = useState<MetadataProviderPreferences | null>(null);
   const [availableProviders, setAvailableProviders] = useState<AvailableSearchProviderInfo[]>([
-    { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
-    { id: 'discogs', displayName: 'Discogs', isOnline: true }
+    { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }
   ]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -249,20 +248,36 @@ const MetadataSettings: React.FC = () => {
             <div className="font-semibold text-base mb-1">Release Discovery Sources & Priority</div>
             <div className="description text-xs text-font-color-dim mb-3">
               Enable providers to participate in &quot;Best Match&quot; searches. Candidates are ranked primarily by match
-              quality (Definitive &gt; Probable &gt; Weak); your ordering breaks ties between equally-matched candidates.
+              quality (Definitive &gt; Probable &gt; Weak); the list order below only decides ties between equally-matched
+              candidates — #1 is preferred first. Disabled sources sit at the bottom.
             </div>
 
             <div className="flex flex-col gap-2 max-w-md">
-              {availableProviders.map((prov) => {
+              {[
+                ...preferences.searchProviderPriority
+                  .map((id) => availableProviders.find((p) => p.id === id))
+                  .filter((p): p is AvailableSearchProviderInfo => Boolean(p)),
+                ...availableProviders.filter((p) => !preferences.searchProviderPriority.includes(p.id))
+              ].map((prov) => {
                 const isEnabled = preferences.enabledSearchProviders.includes(prov.id);
                 const priorityIndex = preferences.searchProviderPriority.indexOf(prov.id);
 
                 return (
                   <div
                     key={prov.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20"
+                    className={`flex items-center justify-between p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20 transition-opacity ${
+                      isEnabled ? '' : 'opacity-60'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
+                      {isEnabled && priorityIndex >= 0 && (
+                        <span
+                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-full text-xs font-bold bg-background-color-3 text-font-color-highlight"
+                          title={`Tie-break priority ${priorityIndex + 1}`}
+                        >
+                          {priorityIndex + 1}
+                        </span>
+                      )}
                       <Checkbox
                         id={`search-prov-${prov.id}`}
                         isChecked={isEnabled}
@@ -272,17 +287,15 @@ const MetadataSettings: React.FC = () => {
                     </div>
 
                     {isEnabled && priorityIndex >= 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-background-color-3 text-font-color-highlight">
-                          Priority #{priorityIndex + 1}
-                        </span>
-                        <div className="flex gap-1">
+                      <div className="flex items-center">
+                        <div className="flex flex-col gap-0.5">
                           <button
                             type="button"
                             disabled={priorityIndex === 0 || saving}
                             onClick={() => handleMovePriority(priorityIndex, 'up')}
-                            className="p-1 text-xs rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
-                            title="Move Up"
+                            className="px-1.5 leading-none text-[0.6rem] rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
+                            title="Higher priority — wins ties against the provider below"
+                            aria-label={`Raise ${prov.displayName} priority`}
                           >
                             ▲
                           </button>
@@ -290,8 +303,9 @@ const MetadataSettings: React.FC = () => {
                             type="button"
                             disabled={priorityIndex === preferences.searchProviderPriority.length - 1 || saving}
                             onClick={() => handleMovePriority(priorityIndex, 'down')}
-                            className="p-1 text-xs rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
-                            title="Move Down"
+                            className="px-1.5 leading-none text-[0.6rem] rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
+                            title="Lower priority — loses ties against the provider above"
+                            aria-label={`Lower ${prov.displayName} priority`}
                           >
                             ▼
                           </button>
@@ -302,6 +316,16 @@ const MetadataSettings: React.FC = () => {
                 );
               })}
             </div>
+
+            {!availableProviders.some((prov) => prov.id === 'discogs') && (
+              <div className="mt-2 text-xs text-font-color-dim max-w-md">
+                Discogs appears here once a personal access token is configured via{' '}
+                <code className="px-1 py-0.5 rounded bg-background-color-2 text-[0.7rem]">
+                  MAIN_VITE_DISCOGS_PERSONAL_ACCESS_TOKEN
+                </code>{' '}
+                in your .env file, followed by an app restart. See .env.example.
+              </div>
+            )}
           </div>
         </li>
 
