@@ -25,10 +25,10 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
   const confidencePercent = Math.round(preview.overallConfidence * 100);
 
   return (
-    <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/50 rounded-xl border border-background-color-2 dark:border-dark-background-color-2 p-5 grid grid-cols-[130px_1fr] gap-5 items-center">
+    <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/50 rounded-xl border border-background-color-2 dark:border-dark-background-color-2 p-4 grid grid-cols-[144px_1fr] gap-4.5 items-center">
       {/* Left: Artwork & Source Selector */}
-      <div className="flex flex-col gap-2 items-center">
-        <div className="w-[110px] h-[110px] rounded-lg overflow-hidden bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 flex items-center justify-center relative shadow-sm">
+      <div className="flex flex-col gap-1.5 items-center">
+        <div className="w-[134px] h-[134px] rounded-lg overflow-hidden bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 flex items-center justify-center relative shadow-sm">
           {artworkUrl && artworkSource !== 'local' ? (
             <img
               src={artworkUrl}
@@ -40,13 +40,13 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
             />
           ) : (
             <div className="flex flex-col items-center gap-1 text-font-color-dimmed dark:text-dark-font-color-dimmed">
-              <span className="text-2xl">🎵</span>
+              <span className="text-3xl">🎵</span>
               <span className="text-xs font-medium">No Cover</span>
             </div>
           )}
         </div>
 
-        <label className="flex items-center gap-1.5 text-xs text-font-color-black dark:text-font-color-white font-medium cursor-pointer">
+        <label className="flex items-center gap-1.5 text-xs text-font-color-black dark:text-font-color-white font-medium cursor-pointer select-none">
           <input
             type="checkbox"
             checked={replaceArtwork}

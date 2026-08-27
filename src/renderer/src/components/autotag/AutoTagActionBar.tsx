@@ -29,7 +29,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
   onClose
 }) => {
   return (
-    <div className="flex justify-between items-center px-6 py-4 border-t border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2 dark:bg-dark-background-color-2">
+    <div className="flex justify-between items-center px-5 py-2.5 border-t border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2 dark:bg-dark-background-color-2">
       {/* Metrics Summary & Undo Link */}
       <div className="flex items-center gap-3 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
         {totalTracksCount > 0 && (
@@ -70,11 +70,11 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
       </div>
 
       {/* Primary Action Buttons */}
-      <div className="flex gap-2.5 items-center">
+      <div className="flex gap-2 items-center">
         <button
           type="button"
           onClick={step === 'complete' ? onClose : onCancel}
-          className="px-4 py-2 rounded-lg bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-sm font-medium transition-colors cursor-pointer"
+          className="px-3.5 py-1.5 rounded-lg bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
         >
           {step === 'complete' ? 'Close' : 'Cancel'}
         </button>
@@ -84,7 +84,7 @@ export const AutoTagActionBar: React.FC<AutoTagActionBarProps> = ({
             type="button"
             onClick={onApply}
             disabled={totalChanges === 0 || loading}
-            className="px-5 py-2 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-4 py-1.5 rounded-lg bg-background-color-3 hover:bg-background-color-3/80 dark:bg-dark-background-color-3 dark:hover:bg-dark-background-color-3/80 text-font-color-black dark:text-font-color-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             {loading
               ? 'Applying Changes...'
