@@ -92,7 +92,7 @@ describe('Gate D1 Hardening: End-to-End Streaming Waveform Integration', () => {
     expect(fileExists).toBe(false);
   });
 
-  it('explicitly marks fallback metadata as synthetic when format is unsupported', async () => {
+  it('returns explicit failure when format is unsupported without generating fake synthetic output', async () => {
     const unsupportedPath = path.join(tempDir, 'sample.unsupported_audio');
     const destPath = path.join(tempDir, 'cache', 'sample_unsupported_v1.bin');
 
@@ -107,10 +107,11 @@ describe('Gate D1 Hardening: End-to-End Streaming Waveform Integration', () => {
       }
     });
 
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-
-    expect(result.metadata.method).toBe('synthetic_unsupported_codec');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/Unsupported audio codec/i);
+      expect(result.metadata?.method).toBe('unsupported_codec');
+    }
   });
 
   it('aborts cleanly and unlinks temp files when cancelled during execution', async () => {

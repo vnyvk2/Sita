@@ -5,7 +5,7 @@ import {
   getKWeightingCoefficients
 } from '../../../../../src/main/workers/process/audio/BS1770LoudnessEngine';
 
-describe('Gate D2-R1: BS1770LoudnessEngine (ITU-R BS.1770-4 Conformance & Unit Verification)', () => {
+describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Boundaries & Calibration)', () => {
   it('matches ITU-R BS.1770-4 Table 1 & Table 2 filter coefficients at 48 kHz', () => {
     const { stage1, stage2 } = getKWeightingCoefficients(48000);
 
@@ -51,7 +51,114 @@ describe('Gate D2-R1: BS1770LoudnessEngine (ITU-R BS.1770-4 Conformance & Unit V
     }
   });
 
-  describe('Authoritative BS.1770 Reference Test Vectors', () => {
+  describe('Chunk Boundary Invariants & Exact Duration Boundaries', () => {
+    it('produces identical loudness when audio is processed in a single chunk vs arbitrary small chunks', () => {
+      const sampleRate = 48000;
+      const totalFrames = sampleRate * 3; // 3 seconds
+
+      const left = new Float32Array(totalFrames);
+      const right = new Float32Array(totalFrames);
+      for (let i = 0; i < totalFrames; i++) {
+        const s = 0.5 * Math.sin(2 * Math.PI * 440 * (i / sampleRate));
+        left[i] = s;
+        right[i] = s;
+      }
+
+      // 1. Single chunk execution
+      const engineSingle = new BS1770LoudnessEngine(sampleRate, 2);
+      engineSingle.processChunk({ channelData: [left, right], sampleOffset: 0, frameCount: totalFrames, totalSamples: totalFrames });
+      const resultSingle = engineSingle.finish();
+
+      // 2. Fragmented execution across arbitrary chunk sizes (e.g. 512 frames, 16384 frames, 73 frames)
+      const engineChunked = new BS1770LoudnessEngine(sampleRate, 2);
+      const chunkSizes = [512, 16384, 1024, 73, 8192, 2048];
+      let offset = 0;
+      let sizeIdx = 0;
+
+      while (offset < totalFrames) {
+        const size = Math.min(chunkSizes[sizeIdx % chunkSizes.length], totalFrames - offset);
+        const chunkL = left.subarray(offset, offset + size);
+        const chunkR = right.subarray(offset, offset + size);
+
+        engineChunked.processChunk({
+          channelData: [chunkL, chunkR],
+          sampleOffset: offset,
+          frameCount: size,
+          totalSamples: totalFrames
+        });
+
+        offset += size;
+        sizeIdx++;
+      }
+
+      const resultChunked = engineChunked.finish();
+
+      expect(resultChunked.integratedLoudness).toBe(resultSingle.integratedLoudness);
+      expect(resultChunked.samplePeak).toBe(resultSingle.samplePeak);
+      expect(resultChunked.blocksProcessed).toBe(resultSingle.blocksProcessed);
+      expect(resultChunked.blocksSurvivingGate).toBe(resultSingle.blocksSurvivingGate);
+    });
+
+    it('evaluates exactly 1 block at 400ms, 400ms + 1 frame, and 499ms, and 2 blocks at 500ms (48 kHz)', () => {
+      const sampleRate = 48000;
+      const blockSize = Math.floor(0.4 * sampleRate); // 19,200 frames (400ms)
+      const hopSize = Math.floor(0.1 * sampleRate); // 4,800 frames (100ms)
+
+      // Test 1: Exactly 400ms (19,200 frames) -> 1 block
+      const engine400 = new BS1770LoudnessEngine(sampleRate, 2);
+      const audio400 = new Float32Array(blockSize).fill(0.1);
+      engine400.processChunk({ channelData: [audio400, audio400], sampleOffset: 0, frameCount: blockSize, totalSamples: blockSize });
+      const res400 = engine400.finish();
+      expect(res400.blocksProcessed).toBe(1);
+      expect(res400.blocksSurvivingGate).toBe(1);
+
+      // Test 2: Exactly 400ms + 1 frame (19,201 frames) -> 1 block
+      const engine400Plus1 = new BS1770LoudnessEngine(sampleRate, 2);
+      const audio400Plus1 = new Float32Array(blockSize + 1).fill(0.1);
+      engine400Plus1.processChunk({ channelData: [audio400Plus1, audio400Plus1], sampleOffset: 0, frameCount: blockSize + 1, totalSamples: blockSize + 1 });
+      const res400Plus1 = engine400Plus1.finish();
+      expect(res400Plus1.blocksProcessed).toBe(1);
+
+      // Test 3: 499ms (19,200 + 4,752 = 23,952 frames) -> 1 block
+      const frames499 = Math.floor(0.499 * sampleRate);
+      const engine499 = new BS1770LoudnessEngine(sampleRate, 2);
+      const audio499 = new Float32Array(frames499).fill(0.1);
+      engine499.processChunk({ channelData: [audio499, audio499], sampleOffset: 0, frameCount: frames499, totalSamples: frames499 });
+      const res499 = engine499.finish();
+      expect(res499.blocksProcessed).toBe(1);
+
+      // Test 4: Exactly 500ms (19,200 + 4,800 = 24,000 frames) -> 2 blocks (first block + 1st hop)
+      const frames500 = blockSize + hopSize;
+      const engine500 = new BS1770LoudnessEngine(sampleRate, 2);
+      const audio500 = new Float32Array(frames500);
+      for (let i = 0; i < frames500; i++) {
+        audio500[i] = 0.1 * Math.sin(2 * Math.PI * 1000 * (i / sampleRate));
+      }
+      engine500.processChunk({ channelData: [audio500, audio500], sampleOffset: 0, frameCount: frames500, totalSamples: frames500 });
+      const res500 = engine500.finish();
+      expect(res500.blocksProcessed).toBe(2);
+      expect(res500.blocksSurvivingGate).toBe(2);
+    });
+
+    it('evaluates blocks across 400ms split evenly across 2 chunks (200ms + 200ms)', () => {
+      const sampleRate = 48000;
+      const frames200ms = Math.floor(0.2 * sampleRate);
+      const audio200 = new Float32Array(frames200ms).fill(0.1);
+
+      const engine = new BS1770LoudnessEngine(sampleRate, 2);
+      // Chunk 1: 200ms
+      engine.processChunk({ channelData: [audio200, audio200], sampleOffset: 0, frameCount: frames200ms, totalSamples: frames200ms * 2 });
+      // Chunk 2: 200ms (completes 400ms block)
+      engine.processChunk({ channelData: [audio200, audio200], sampleOffset: frames200ms, frameCount: frames200ms, totalSamples: frames200ms * 2 });
+
+      const res = engine.finish();
+      expect(res.blocksProcessed).toBe(1);
+      expect(res.blocksSurvivingGate).toBe(1);
+      expect(Number.isFinite(res.integratedLoudness)).toBe(true);
+    });
+  });
+
+  describe('BS.1770 Mathematical / Calibration Verification Vectors', () => {
     it('measures 1 kHz Stereo Sine calibrated for -23.00 LUFS target (EBU R128 reference level)', () => {
       const sampleRate = 48000;
       const durationSeconds = 3;

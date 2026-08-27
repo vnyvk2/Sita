@@ -100,9 +100,11 @@ export function getChannelWeighting(position?: ChannelPosition): number {
 }
 
 /**
- * Pure, streaming ITU-R BS.1770-4 / EBU R128 Loudness Engine.
- * Operates with O(1) memory and O(1) computation per frame using Transposed Direct Form II
- * and a sliding rolling energy accumulator.
+ * Streaming ITU-R BS.1770-4 / EBU R128 Loudness Engine.
+ * - Frame processing is strictly O(1) computation and O(1) DSP state using Transposed Direct Form II
+ *   and a sliding O(1) rolling energy ring buffer.
+ * - Dual-stage gating stores block energies at O(N_blocks) where N_blocks ~= 10 per second
+ *   (e.g. ~280 KB for a 1-hour audio track), eliminating any whole-file raw PCM buffering.
  */
 export class BS1770LoudnessEngine {
   private readonly sampleRate: number;

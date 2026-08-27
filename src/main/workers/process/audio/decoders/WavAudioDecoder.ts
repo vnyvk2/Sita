@@ -5,9 +5,13 @@ const WAVE_FORMAT_PCM = 1;
 const WAVE_FORMAT_IEEE_FLOAT = 3;
 const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
 
-// SubFormat GUID first 4 bytes for PCM and IEEE Float in WAVE_FORMAT_EXTENSIBLE
+// SubFormat GUID prefix and standard 12-byte postfix for PCM and IEEE Float in WAVE_FORMAT_EXTENSIBLE
+// Standard GUID: {XXXXXXXX-0000-0010-8000-00AA00389B71}
 const KSDATAFORMAT_SUBTYPE_PCM_GUID_PREFIX = 0x00000001;
 const KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX = 0x00000003;
+const KSDATAFORMAT_SUBTYPE_GUID_POSTFIX = Buffer.from([
+  0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71
+]);
 
 interface ParsedWavHeader {
   audioFormat: number;
@@ -22,7 +26,7 @@ interface ParsedWavHeader {
   codec: string;
 }
 
-function deriveChannelLayout(channels: number, channelMask = 0): ChannelPosition[] {
+export function deriveChannelLayout(channels: number, channelMask = 0): ChannelPosition[] {
   if (channelMask > 0) {
     const layout: ChannelPosition[] = [];
     if (channelMask & 0x1) layout.push('L');
@@ -36,11 +40,10 @@ function deriveChannelLayout(channels: number, channelMask = 0): ChannelPosition
 
   if (channels === 1) return ['Mono'];
   if (channels === 2) return ['L', 'R'];
-  if (channels === 3) return ['L', 'R', 'C'];
-  if (channels === 4) return ['L', 'R', 'Ls', 'Rs'];
-  if (channels === 6) return ['L', 'R', 'C', 'LFE', 'Ls', 'Rs'];
 
-  return Array.from({ length: channels }, (_, i) => (i === 0 ? 'L' : i === 1 ? 'R' : 'Unknown'));
+  // For channels > 2 without explicit channelMask, return Unknown positions
+  // so BS1770LoudnessEngine explicitly rejects ambiguous/unmapped multichannel layouts
+  return Array.from({ length: channels }, () => 'Unknown');
 }
 
 /**
@@ -222,15 +225,24 @@ export class WavAudioDecoder implements AudioDecoder {
           isFloat = false;
         } else if (audioFormat === WAVE_FORMAT_IEEE_FLOAT) {
           isFloat = true;
-        } else if (audioFormat === WAVE_FORMAT_EXTENSIBLE && fmtSize >= 24) {
+        } else if (audioFormat === WAVE_FORMAT_EXTENSIBLE) {
+          if (fmtSize < 40) {
+            throw new Error(`Invalid WAVE_FORMAT_EXTENSIBLE header size (${fmtSize} < 40 bytes).`);
+          }
           channelMask = fmtBuf.readUInt32LE(20);
-          const subFormat = fmtBuf.readUInt32LE(24);
-          if (subFormat === KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX) {
+          const subFormatTag = fmtBuf.readUInt32LE(24);
+          const isKsGuidMatch = fmtBuf.subarray(28, 40).equals(KSDATAFORMAT_SUBTYPE_GUID_POSTFIX);
+
+          if (!isKsGuidMatch) {
+            throw new Error(`Unsupported WAVE_FORMAT_EXTENSIBLE SubFormat GUID.`);
+          }
+
+          if (subFormatTag === KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX) {
             isFloat = true;
-          } else if (subFormat === KSDATAFORMAT_SUBTYPE_PCM_GUID_PREFIX) {
+          } else if (subFormatTag === KSDATAFORMAT_SUBTYPE_PCM_GUID_PREFIX) {
             isFloat = false;
           } else {
-            throw new Error(`Unsupported WAVE_FORMAT_EXTENSIBLE subFormat (${subFormat}).`);
+            throw new Error(`Unsupported WAVE_FORMAT_EXTENSIBLE subFormat tag (${subFormatTag}).`);
           }
         } else {
           throw new Error(`Unsupported WAV compression format tag: ${audioFormat}`);

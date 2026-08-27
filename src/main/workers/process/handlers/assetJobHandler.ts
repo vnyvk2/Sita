@@ -142,16 +142,13 @@ async function generateWaveformInWorker(
       };
     }
   } else {
-    // Unsupported audio codec: explicit fallback for formats awaiting native decoder implementation
-    const stats = await fs.stat(sourceFilePath);
-    peaks = new Float32Array(WAVEFORM_RESOLUTION);
-    for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
-      peaks[i] = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
-    }
-    metadata = {
-      resolution: WAVEFORM_RESOLUTION,
-      generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION,
-      method: 'synthetic_unsupported_codec'
+    // Unsupported audio codec: return explicit failure rather than generating fake synthetic peaks
+    return {
+      success: false,
+      error: `Unsupported audio codec for waveform generation: ${sourceFilePath}`,
+      metadata: {
+        method: 'unsupported_codec'
+      }
     };
   }
 
@@ -381,29 +378,12 @@ async function generateReplayGainInWorker(
       };
     }
   } else {
-    // Unsupported audio codec: explicit fallback for formats awaiting native decoder implementation
-    const stats = await fs.stat(sourceFilePath);
-    if (abortSignal?.aborted) {
-      return {
-        success: false,
-        error: `ReplayGain analysis for task ${taskId} cancelled before processing.`,
-        cancelled: true
-      };
-    }
-
-    const mockTrackGain = Math.sin(stats.size) * -5 - 5;
-    const mockTrackPeak = 0.9 + Math.cos(stats.size) * 0.1;
-
+    // Unsupported audio codec: return explicit failure rather than generating fake synthetic loudness
     return {
-      success: true,
-      outputFilePath: '',
+      success: false,
+      error: `Unsupported audio codec for ReplayGain analysis: ${sourceFilePath}`,
       metadata: {
-        trackGain: mockTrackGain,
-        trackPeak: mockTrackPeak,
-        albumGain: mockTrackGain,
-        albumPeak: mockTrackPeak,
-        generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
-        method: 'synthetic_unsupported_codec'
+        method: 'unsupported_codec'
       }
     };
   }

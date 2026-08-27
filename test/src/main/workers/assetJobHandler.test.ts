@@ -7,6 +7,7 @@ import {
   executeAssetJob,
   WAVEFORM_RESOLUTION
 } from '@main/workers/process/handlers/assetJobHandler';
+import { defaultAudioDecoderRegistry } from '@main/workers/process/audio/AudioDecoderRegistry';
 
 vi.mock('fs/promises');
 vi.mock('sharp');
@@ -16,6 +17,27 @@ vi.mock('@main/utils/extractFrontCover');
 describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    defaultAudioDecoderRegistry.registerDecoder({
+      codec: 'mock_decoder',
+      supports: (f) => /\.mp3$/i.test(f) || /\.wav$/i.test(f),
+      probe: async () => ({
+        sampleRate: 44100,
+        channels: 2,
+        bitDepth: 16,
+        duration: 1,
+        totalSamples: 44100,
+        codec: 'mock_codec'
+      }),
+      decodeStream: async (_file, _opts, onChunk) => {
+        const samples = new Float32Array(44100).fill(0.5);
+        await onChunk({
+          channelData: [samples, samples],
+          sampleOffset: 0,
+          frameCount: 44100,
+          totalSamples: 44100
+        });
+      }
+    });
   });
 
   describe('Waveform Generation', () => {
@@ -316,8 +338,8 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       if (result.success) {
         expect(typeof result.metadata.trackGain).toBe('number');
         expect(typeof result.metadata.trackPeak).toBe('number');
-        expect(typeof result.metadata.albumGain).toBe('number');
-        expect(typeof result.metadata.albumPeak).toBe('number');
+        expect(typeof result.metadata.samplePeak).toBe('number');
+        expect(typeof result.metadata.integratedLoudness).toBe('number');
         expect(result.metadata.generatorVersion).toBe(CURRENT_REPLAYGAIN_GENERATOR_VERSION);
       }
     });

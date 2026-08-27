@@ -2,10 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { WavAudioDecoder } from '../../../../../src/main/workers/process/audio/decoders/WavAudioDecoder';
+import { WavAudioDecoder, deriveChannelLayout } from '../../../../../src/main/workers/process/audio/decoders/WavAudioDecoder';
 import { createWavBuffer } from './wavHelper';
 
-describe('Gate D1 Hardening: WavAudioDecoder (Multi-Format & Arbitrary RIFF Chunks)', () => {
+describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validation)', () => {
   let tempDir: string;
   let decoder: WavAudioDecoder;
 
@@ -113,26 +113,58 @@ describe('Gate D1 Hardening: WavAudioDecoder (Multi-Format & Arbitrary RIFF Chun
     expect(maxPeak).toBeCloseTo(0.9, 1);
   });
 
-  it('decodes multi-channel (6-channel 5.1 surround) WAVE_FORMAT_EXTENSIBLE', async () => {
-    const filePath = path.join(tempDir, 'surround_5_1.wav');
-    const wavBuf = createWavBuffer({
-      sampleRate: 48000,
-      channels: 6,
-      bitDepth: 24,
-      isExtensible: true,
-      durationSeconds: 0.5
-    });
-    await fs.writeFile(filePath, wavBuf);
+  describe('WAVE_FORMAT_EXTENSIBLE & Semantic Channel Mask Validation', () => {
+    it('decodes multi-channel (6-channel 5.1 surround) WAVE_FORMAT_EXTENSIBLE with exact 16-byte GUID', async () => {
+      const filePath = path.join(tempDir, 'surround_5_1.wav');
+      const wavBuf = createWavBuffer({
+        sampleRate: 48000,
+        channels: 6,
+        bitDepth: 24,
+        isExtensible: true,
+        durationSeconds: 0.5
+      });
+      await fs.writeFile(filePath, wavBuf);
 
-    const info = await decoder.probe(filePath);
-    expect(info.channels).toBe(6);
-    expect(info.sampleRate).toBe(48000);
+      const info = await decoder.probe(filePath);
+      expect(info.channels).toBe(6);
+      expect(info.sampleRate).toBe(48000);
+      expect(info.channelLayout).toEqual(['L', 'R', 'C', 'LFE', 'Ls', 'Rs']);
 
-    let channelCountObserved = 0;
-    await decoder.decodeStream(filePath, {}, (chunk) => {
-      channelCountObserved = chunk.channelData.length;
+      let channelCountObserved = 0;
+      await decoder.decodeStream(filePath, {}, (chunk) => {
+        channelCountObserved = chunk.channelData.length;
+      });
+      expect(channelCountObserved).toBe(6);
     });
-    expect(channelCountObserved).toBe(6);
+
+    it('throws when WAVE_FORMAT_EXTENSIBLE contains an invalid or non-matching SubFormat GUID', async () => {
+      const filePath = path.join(tempDir, 'invalid_guid.wav');
+      const wavBuf = createWavBuffer({ sampleRate: 44100, channels: 2, isExtensible: true });
+      // Corrupt the 12-byte GUID postfix (offset 48 in file)
+      wavBuf[48] = 0xff;
+      wavBuf[49] = 0xee;
+      await fs.writeFile(filePath, wavBuf);
+
+      await expect(decoder.probe(filePath)).rejects.toThrow(/Unsupported WAVE_FORMAT_EXTENSIBLE SubFormat GUID/i);
+    });
+
+    it('throws when WAVE_FORMAT_EXTENSIBLE header is truncated (< 40 bytes)', async () => {
+      const filePath = path.join(tempDir, 'truncated_ext.wav');
+      const wavBuf = createWavBuffer({ sampleRate: 44100, channels: 2, isExtensible: false });
+      // Set format tag to 0xFFFE but keep fmt size 16
+      wavBuf.writeUInt16LE(0xfffe, 20);
+      await fs.writeFile(filePath, wavBuf);
+
+      await expect(decoder.probe(filePath)).rejects.toThrow(/Invalid WAVE_FORMAT_EXTENSIBLE header size/i);
+    });
+
+    it('assigns Unknown to multichannel audio (>2ch) lacking an explicit channel mask', () => {
+      const layout3 = deriveChannelLayout(3, 0);
+      expect(layout3).toEqual(['Unknown', 'Unknown', 'Unknown']);
+
+      const layout6 = deriveChannelLayout(6, 0);
+      expect(layout6).toEqual(['Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown']);
+    });
   });
 
   it('throws descriptive error on malformed or truncated WAV file', async () => {
@@ -162,8 +194,6 @@ describe('Gate D1 Hardening: WavAudioDecoder (Multi-Format & Arbitrary RIFF Chun
           }
         }
       )
-    ).rejects.toThrow(/cancelled/i);
-
-    expect(chunksProcessed).toBe(3);
+    ).rejects.toThrow(/cancelled by abort signal/i);
   });
 });

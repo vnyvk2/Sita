@@ -70,7 +70,7 @@ describe('Gate D2-R1: End-to-End ReplayGain BS.1770 Integration', () => {
     }
   });
 
-  it('explicitly marks fallback metadata as synthetic when format is unsupported', async () => {
+  it('returns explicit failure when format is unsupported without generating fake synthetic output', async () => {
     const unsupportedPath = path.join(tempDir, 'sample.unsupported_codec');
     await fs.writeFile(unsupportedPath, Buffer.alloc(1000));
 
@@ -83,10 +83,11 @@ describe('Gate D2-R1: End-to-End ReplayGain BS.1770 Integration', () => {
       }
     });
 
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-
-    expect(result.metadata.method).toBe('synthetic_unsupported_codec');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/Unsupported audio codec/i);
+      expect(result.metadata?.method).toBe('unsupported_codec');
+    }
   });
 
   it('aborts cleanly when cancelled before or during ReplayGain analysis', async () => {
