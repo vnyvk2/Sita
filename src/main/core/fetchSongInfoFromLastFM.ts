@@ -13,7 +13,7 @@ const fetchSongInfoFromLastFM = async (
       const LAST_FM_API_KEY = import.meta.env.MAIN_VITE_LAST_FM_API_KEY;
       if (!LAST_FM_API_KEY) throw new Error('LastFM api key not found.');
 
-      const url = new URL(LAST_FM_BASE_URL);
+      const url = new URL(LASTFM_BASE_URL);
       url.searchParams.set('method', 'track.getInfo');
       url.searchParams.set('format', 'json');
       url.searchParams.set('autocorrect', '1');

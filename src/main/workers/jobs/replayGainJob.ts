@@ -35,6 +35,10 @@ export class ReplayGainJob implements Job {
     this.description = `Analyzing loudness for "${songTitle}"`;
   }
 
+  private isCancelled(): boolean {
+    return (this.state as JobState) === 'cancelled';
+  }
+
   async execute(): Promise<void> {
     try {
       // 1. Check idempotency and version
@@ -54,7 +58,7 @@ export class ReplayGainJob implements Job {
       const song = await getSongById(this.songId);
       if (!song) return;
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 2. Perform EBU R128 loudness analysis
       // Note: Full LUFS analysis requires decoding the audio (e.g. ffmpeg or Web Audio API).
@@ -62,7 +66,7 @@ export class ReplayGainJob implements Job {
       // TODO: Replace with real LUFS analysis algorithm
       const lufsData = await this.analyzeLoudness(song.path);
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 3. Save to DB (One row per song containing track and album values)
       await db.transaction(async (trx) => {

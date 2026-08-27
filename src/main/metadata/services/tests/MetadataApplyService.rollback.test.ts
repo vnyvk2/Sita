@@ -113,38 +113,58 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       {
         localSongId: 1,
         songPath: '/music/track1.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 1',
-        suggestedTitle: 'New Title 1',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', applyField: true }]
+        remoteTitle: 'New Title 1',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true }]
       },
       {
         localSongId: 2,
         songPath: '/music/track2.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 2',
-        suggestedTitle: 'New Title 2',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', applyField: true }]
+        remoteTitle: 'New Title 2',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true }]
       },
       {
         localSongId: 3,
         songPath: '/music/track3.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 3',
-        suggestedTitle: 'New Title 3',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 3', suggestedValue: 'New Title 3', applyField: true }]
+        remoteTitle: 'New Title 3',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 3', suggestedValue: 'New Title 3', status: 'changed', applyField: true }]
       },
       {
         localSongId: 4,
         songPath: '/music/track4.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 4',
-        suggestedTitle: 'New Title 4',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 4', suggestedValue: 'New Title 4', applyField: true }]
+        remoteTitle: 'New Title 4',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 4', suggestedValue: 'New Title 4', status: 'changed', applyField: true }]
       }
     ];
 
@@ -242,25 +262,35 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       {
         localSongId: 1,
         songPath: '/music/track1.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 1',
-        suggestedTitle: 'New Title 1',
+        remoteTitle: 'New Title 1',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 1', suggestedValue: 'New Artist 1', applyField: true }
+          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true },
+          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 1', suggestedValue: 'New Artist 1', status: 'changed', applyField: true }
         ]
       },
       {
         localSongId: 2,
         songPath: '/music/track2.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 2',
-        suggestedTitle: 'New Title 2',
+        remoteTitle: 'New Title 2',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 2', suggestedValue: 'New Artist 2', applyField: true }
+          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true },
+          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 2', suggestedValue: 'New Artist 2', status: 'changed', applyField: true }
         ]
       }
     ];

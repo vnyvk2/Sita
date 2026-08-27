@@ -12,6 +12,7 @@ export interface DiscogsSearchReleaseDto {
   thumb?: string;
   cover_image?: string;
   resource_url?: string;
+  format?: string[];
 }
 
 export interface DiscogsReleaseDetailsDto {

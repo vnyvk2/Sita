@@ -1,60 +1,14 @@
-import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from './RecordingMetadata';
-import type { MetadataFieldDiff } from './MetadataDiff';
-import type { ConfidenceLevel } from '../services/AlbumMetadataService';
+export type {
+  AutoTagStage,
+  ProgressEventPayload,
+  TrackMatchPreview,
+  GlobalAlbumMutations,
+  ApplyPreviewOptions,
+  AlbumTagPreview,
+  WorkflowCandidate,
+  WorkflowMatch,
+  WorkflowSupportedField,
+  MetadataPreview
+} from '../../../common/metadata/preview';
 
-export type AutoTagStage =
-  | 'idle'
-  | 'searching'
-  | 'resolving'
-  | 'matching'
-  | 'diffing'
-  | 'applying'
-  | 'completed'
-  | 'cancelled'
-  | 'failed';
-
-export interface ProgressEventPayload {
-  stage: AutoTagStage;
-  message: string;
-  progressPercent?: number;
-  operationId?: string;
-}
-
-export interface TrackMatchPreview {
-  localSongId: number;
-  songPath: string;
-  oldTitle: string;
-  oldArtist?: string;
-  oldAlbumArtist?: string;
-  oldAlbum?: string;
-  oldYear?: number;
-  oldTrackNumber?: number;
-  oldDiscNumber?: number;
-  oldGenre?: string;
-  oldIsrc?: string;
-  oldMbid?: string;
-  confidence: number;
-  confidenceLevel: ConfidenceLevel;
-  why: string;
-  reasons: string[];
-  fieldDiffs: MetadataFieldDiff[];
-  applyTrack: boolean; // Track-level apply toggle
-}
-
-export interface ApplyPreviewOptions {
-  replaceArtwork?: boolean;
-  artworkUrl?: string;
-  operationId?: string;
-}
-
-export interface AlbumTagPreview {
-  album: AlbumMetadata;
-  matches: TrackMatchPreview[];
-  warnings: string[];
-  overallConfidence: number;
-  confidenceLevel: ConfidenceLevel;
-  provider: MetadataProviderId;
-  providerReleaseId: string;
-  contributingProviders?: MetadataProviderId[];
-  resolvedRelease?: ResolvedAlbumRelease;
-}
+export { getTrackPreviewKey } from '../../../common/metadata/preview';

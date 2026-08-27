@@ -39,6 +39,10 @@ export class WaveformJob implements Job {
     this.description = `Generating waveform for "${songTitle}"`;
   }
 
+  private isCancelled(): boolean {
+    return (this.state as JobState) === 'cancelled';
+  }
+
   async execute(): Promise<void> {
     try {
       // 1. Check idempotency and version
@@ -63,7 +67,7 @@ export class WaveformJob implements Job {
       // TODO: Replace with real peak extraction algorithm
       const peaks = await this.generatePeaks(this.songPath);
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 3. Serialize to .tmp file first (in-flight files invisible to GC)
       const cacheDir = path.join(app.getPath('userData'), 'cache', 'waveforms');
@@ -76,7 +80,7 @@ export class WaveformJob implements Job {
       const buffer = Buffer.from(peaks.buffer);
       await fs.writeFile(tempPath, buffer);
 
-      if (this.state === 'cancelled') {
+      if (this.isCancelled()) {
         await fs.unlink(tempPath).catch(() => {});
         return;
       }

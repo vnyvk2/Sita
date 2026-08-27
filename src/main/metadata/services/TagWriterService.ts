@@ -69,15 +69,19 @@ export class TagWriterService {
         if (payload.musicBrainzRecordingId !== undefined) {
           if (payload.musicBrainzRecordingId) {
             if (file.tag.musicBrainzTrackId) {
-              file.tag.musicBrainzTrackId = undefined;
+              file.tag.musicBrainzTrackId = '';
             }
             file.tag.musicBrainzTrackId = payload.musicBrainzRecordingId;
           } else if (file.tag.musicBrainzTrackId) {
-            file.tag.musicBrainzTrackId = undefined;
+            file.tag.musicBrainzTrackId = '';
           }
         }
         if (payload.isrc !== undefined) {
-          file.tag.isrc = payload.isrc || undefined;
+          if (payload.isrc) {
+            file.tag.isrc = payload.isrc;
+          } else if (file.tag.isrc) {
+            file.tag.isrc = '';
+          }
         }
 
         if (payload.artworkBuffer && payload.artworkBuffer.length > 0) {

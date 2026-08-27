@@ -429,7 +429,7 @@ export class MetadataProviderRuntime {
       state: newState,
       consecutiveFailures: consecutive,
       lastHealthCheck: Date.now(),
-      lastError: error
+      lastErrorMessage: error
     });
   }
 

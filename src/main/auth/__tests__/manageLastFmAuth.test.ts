@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
-import * as settingsQueries from '@main/db/queries/settings';
-import * as flushModule from '@main/other/lastFm/flushScrobbleQueue';
 import manageLastFmAuth from '../manageLastFmAuth';
 
 vi.mock('@main/db/db', () => ({

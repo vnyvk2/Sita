@@ -216,6 +216,7 @@ export const normalizeErrorPayload = (
 export interface Logger {
   info: (message: string, data?: object) => void;
   error: {
+    (message: string): void;
     (message: string, error: unknown): void;
     (message: string, data: Record<string, unknown>, error?: unknown): void;
   };

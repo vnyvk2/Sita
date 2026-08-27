@@ -79,9 +79,6 @@ describe('JobScheduler', () => {
     it('should prioritize interactive jobs over background jobs', async () => {
       const executionOrder: string[] = [];
 
-      let resolveJobA: () => void;
-      let resolveJobB: () => void;
-
       const jobA = new MockJob('job_bg', 'background', async () => {
         executionOrder.push('job_bg');
       });

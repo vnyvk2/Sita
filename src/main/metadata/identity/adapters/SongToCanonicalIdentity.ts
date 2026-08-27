@@ -5,23 +5,28 @@ export type SongArtistRecord =
   | { name?: string; [key: string]: unknown }
   | { artist?: { name?: string; [key: string]: unknown }; [key: string]: unknown };
 
+export type SongGenreRecord =
+  | string
+  | { name?: string; [key: string]: unknown }
+  | { genre?: { name?: string; [key: string]: unknown }; [key: string]: unknown };
+
 export interface MinimalSongRecord {
   id?: number;
   songId?: number;
   title: string;
-  artists?: SongArtistRecord[] | string;
-  album?: { name?: string; title?: string } | string;
-  albumArtist?: string;
-  duration?: number | string;
-  year?: number;
-  trackNumber?: number;
-  trackNo?: number;
-  discNumber?: number;
-  isrc?: string;
-  musicBrainzRecordingId?: string;
-  genre?: string;
-  genres?: Array<{ name?: string } | string>;
-  path?: string;
+  artists?: SongArtistRecord[] | string | null;
+  album?: { name?: string; title?: string } | string | null;
+  albumArtist?: string | null;
+  duration?: number | string | null;
+  year?: number | null;
+  trackNumber?: number | null;
+  trackNo?: number | null;
+  discNumber?: number | null;
+  isrc?: string | null;
+  musicBrainzRecordingId?: string | null;
+  genre?: string | null;
+  genres?: SongGenreRecord[] | null;
+  path?: string | null;
 }
 
 function extractArtistName(record: SongArtistRecord | null | undefined): string | undefined {
@@ -33,11 +38,13 @@ function extractArtistName(record: SongArtistRecord | null | undefined): string 
   if (typeof record === 'object') {
     if ('name' in record && typeof record.name === 'string') {
       const trimmed = record.name.trim();
-      if (trimmed) return trimmed;
+      return trimmed || undefined;
     }
-    if ('artist' in record && record.artist && typeof record.artist === 'object' && typeof record.artist.name === 'string') {
-      const trimmed = record.artist.name.trim();
-      if (trimmed) return trimmed;
+    if ('artist' in record && record.artist && typeof record.artist === 'object') {
+      if ('name' in record.artist && typeof record.artist.name === 'string') {
+        const trimmed = record.artist.name.trim();
+        return trimmed || undefined;
+      }
     }
   }
   return undefined;
@@ -49,11 +56,15 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
   if (Array.isArray(song.artists)) {
     for (const a of song.artists) {
       const name = extractArtistName(a);
-      if (name) artists.push(name);
+      if (name && !artists.includes(name)) {
+        artists.push(name);
+      }
     }
   } else if (typeof song.artists === 'string') {
     const trimmed = song.artists.trim();
-    if (trimmed) artists.push(trimmed);
+    if (trimmed && !artists.includes(trimmed)) {
+      artists.push(trimmed);
+    }
   }
 
   let album: string | undefined;
@@ -68,7 +79,15 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
     genre = song.genre.trim() || undefined;
   } else if (Array.isArray(song.genres) && song.genres.length > 0) {
     const first = song.genres[0];
-    genre = (typeof first === 'string' ? first : first?.name)?.trim() || undefined;
+    if (typeof first === 'string') {
+      genre = first.trim() || undefined;
+    } else if (first && typeof first === 'object') {
+      if ('genre' in first && first.genre && typeof first.genre === 'object' && typeof (first.genre as { name?: unknown }).name === 'string') {
+        genre = ((first.genre as { name: string }).name).trim() || undefined;
+      } else if ('name' in first && typeof (first as { name?: unknown }).name === 'string') {
+        genre = ((first as { name: string }).name).trim() || undefined;
+      }
+    }
   }
 
   return {
@@ -77,13 +96,13 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
     artists,
     album,
     albumArtist: song.albumArtist?.trim() || undefined,
-    durationSecs: song.duration !== undefined ? Number(song.duration) : undefined,
+    durationSecs: song.duration !== undefined && song.duration !== null ? Number(song.duration) : undefined,
     releaseYear: song.year || undefined,
-    trackNumber: song.trackNumber ?? song.trackNo,
-    discNumber: song.discNumber,
+    trackNumber: (song.trackNumber ?? song.trackNo) ?? undefined,
+    discNumber: song.discNumber ?? undefined,
     isrc: song.isrc?.trim() || undefined,
     musicBrainzRecordingId: song.musicBrainzRecordingId?.trim() || undefined,
     genre,
-    pathOrUri: song.path
+    pathOrUri: song.path ?? undefined
   };
 }

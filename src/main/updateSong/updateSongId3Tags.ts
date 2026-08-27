@@ -119,15 +119,19 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (tags.musicBrainzRecordingId !== undefined) {
             if (tags.musicBrainzRecordingId) {
               if (file.tag.musicBrainzTrackId) {
-                file.tag.musicBrainzTrackId = undefined;
+                file.tag.musicBrainzTrackId = '';
               }
               file.tag.musicBrainzTrackId = tags.musicBrainzRecordingId;
             } else if (file.tag.musicBrainzTrackId) {
-              file.tag.musicBrainzTrackId = undefined;
+              file.tag.musicBrainzTrackId = '';
             }
           }
           if (tags.isrc !== undefined) {
-            file.tag.isrc = tags.isrc || undefined;
+            if (tags.isrc) {
+              file.tag.isrc = tags.isrc;
+            } else if (file.tag.isrc) {
+              file.tag.isrc = '';
+            }
           }
 
           // Handle artwork

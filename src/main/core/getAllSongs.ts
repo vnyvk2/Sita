@@ -1,16 +1,20 @@
 import { db } from '@main/db/db';
-import { getAllSongs as getAllSavedSongs } from '@main/db/queries/songs';
+import { getAllSongs as getAllSavedSongs, getPlayableSongById } from '@main/db/queries/songs';
 import { metadataOverrides } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
 import { and, eq, inArray } from 'drizzle-orm';
 
 import logger from '../logger';
 
-type SongArtwork = Awaited<
-  ReturnType<typeof getAllSavedSongs>
->['data'][number]['artworks'][number]['artwork'];
-export const parsePaletteFromArtworks = (artworks: SongArtwork[]): PaletteData | undefined => {
-  const artworkWithPalette = artworks.find((artwork) => !!artwork.palette);
+type SongArtwork = NonNullable<
+  NonNullable<Awaited<ReturnType<typeof getPlayableSongById>>>['artworks'][number]['artwork']
+>;
+export const parsePaletteFromArtworks = (
+  artworks: (Partial<SongArtwork> | { path: string; id: number })[]
+): PaletteData | undefined => {
+  const artworkWithPalette = artworks.find(
+    (artwork): artwork is SongArtwork => 'palette' in artwork && Boolean(artwork.palette)
+  );
 
   if (artworkWithPalette) {
     const palette: PaletteData = { paletteId: String(artworkWithPalette.palette?.id) };

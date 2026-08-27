@@ -45,7 +45,7 @@ export class MetadataDiffBuilder {
       oldTrackNumber: trackNum,
       oldDiscNumber: discNum,
       confidence: 0,
-      confidenceLevel: 'Low',
+      confidenceLevel: 'Poor',
       why: 'Not in local library',
       reasons: ['missing_locally'],
       fieldDiffs: [], // Semantically honest: no local audio file means no fabricated metadata diffs

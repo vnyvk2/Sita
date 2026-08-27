@@ -43,6 +43,10 @@ export class ArtworkJob implements Job {
     this.description = `Generating artwork for "${albumTitle}"`;
   }
 
+  private isCancelled(): boolean {
+    return (this.state as JobState) === 'cancelled';
+  }
+
   async execute(): Promise<void> {
     try {
       // 1. Check idempotency: Does the album already have artwork?
@@ -74,7 +78,7 @@ export class ArtworkJob implements Job {
         logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 2. Read ID3 tags
       const taglib = await import('node-taglib-sharp');
@@ -88,12 +92,12 @@ export class ArtworkJob implements Job {
         file.dispose();
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 3. Store artwork (process outside transaction)
       const processedArtwork = await processArtworkFiles('album', pictureData);
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 4. Save and link artwork in a transaction
       const artworkData = await db.transaction(async (trx) => {

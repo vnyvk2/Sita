@@ -33,13 +33,17 @@ vi.mock('@main/core/songWorkerPool', () => ({
   songWorkerPool: vi.fn()
 }));
 
-let testDb: any;
+import type { PGlite } from '@electric-sql/pglite';
+import type { DB } from '@main/db/db';
+
+let testDb: DB;
 
 // Note: reParseSong is mocked to isolate and validate PGlite transaction concurrency
 // and monotonic progress reporting under 8 concurrent reconciliation workers.
 describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
   beforeAll(async () => {
-    const { db, client } = await import('@main/db/db');
+    const mockedModule = (await import('@main/db/db')) as unknown as { db: DB; client: PGlite };
+    const { db, client } = mockedModule;
     testDb = db;
 
     await client.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
@@ -59,7 +63,7 @@ describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
   it('should process 100 concurrent reconciliation operations with 8 workers under real PGlite transactions with zero surfaced errors', async () => {
     vi.mocked(reParseSong).mockImplementation(async (songPath: string) => {
       const fileName = path.basename(songPath, path.extname(songPath));
-      await testDb.transaction(async (trx: any) => {
+      await testDb.transaction(async (trx) => {
         await trx
           .update(songs)
           .set({
@@ -70,17 +74,23 @@ describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
           .where(eq(songs.path, songPath));
       });
 
-      return {
-        songData: { id: 1, title: 'Updated' },
-        relevantAlbum: undefined,
-        newAlbum: undefined,
-        newArtists: [],
-        relevantArtists: [],
-        newGenres: [],
-        relevantGenres: [],
-        relevantAlbumArtists: [],
-        newAlbumArtists: []
+      const mockSong: SongData = {
+        songId: 1,
+        title: `Updated_${fileName}`,
+        artists: [],
+        duration: 240,
+        path: songPath,
+        isAFavorite: false,
+        isBlacklisted: false,
+        isArtworkAvailable: false,
+        addedDate: Date.now(),
+        artworkPaths: {
+          isDefaultArtwork: true,
+          artworkPath: '',
+          optimizedArtworkPath: ''
+        }
       };
+      return mockSong;
     });
 
     const songCount = 100;

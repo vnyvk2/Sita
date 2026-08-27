@@ -1,6 +1,7 @@
 export type MetadataFieldId =
   | 'title'
   | 'artist'
+  | 'albumArtist'
   | 'album'
   | 'year'
   | 'trackNumber'

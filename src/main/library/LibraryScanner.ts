@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 
 import { db } from '@main/db/db';
 import { songs } from '@main/db/schema';
-import { eq } from 'drizzle-orm';
 
 import logger from '../logger';
 import {

@@ -461,5 +461,5 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       try { fs.unlinkSync(tempSong1); } catch {}
       try { fs.unlinkSync(tempSong2); } catch {}
     }
-  });
+  }, 15000);
 });

@@ -55,7 +55,6 @@ export class GarbageCollectionJob implements Job {
 
       const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
       const validBinPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
-      const validTmpPaths = new Set(dbWaveforms.map((w) => `${path.basename(w.path)}.tmp`));
 
       // 1. Crash recovery & in-flight protection for DB rows
       for (const row of dbWaveforms) {

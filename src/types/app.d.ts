@@ -181,6 +181,7 @@ declare global {
     duration: number;
     artwork?: string | Buffer | Uint8Array;
     artworkPath?: string;
+    artworkPaths?: ArtworkPaths;
     path: string;
     isAFavorite: boolean;
     album?: { albumId: number; name: string };

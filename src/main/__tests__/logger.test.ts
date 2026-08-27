@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import logger, { normalizeErrorPayload, serializeError } from '../logger';
+import { normalizeErrorPayload, serializeError } from '../logger';
 
 describe('Logger error normalization and serialization', () => {
   it('should extract error properties including code, errno, syscall, and path', () => {

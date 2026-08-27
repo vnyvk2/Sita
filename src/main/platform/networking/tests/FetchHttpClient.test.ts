@@ -28,7 +28,7 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
   });
 
   it('preserves AbortError when the caller signal is already aborted', async () => {
-    vi.stubGlobal('fetch', vi.fn<ReturnType<FetchMock>>());
+    vi.stubGlobal('fetch', vi.fn());
     const controller = new AbortController();
     controller.abort();
 

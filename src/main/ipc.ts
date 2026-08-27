@@ -342,9 +342,15 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     // ipcMain.handle('app/saveUserData', (_, dataType: UserDataTypes, data: string) =>
     //   saveUserData(dataType, data)
     // );
-    ipcMain.handle('app/saveUserSettings', (_, settings: Partial<UserSettings>) =>
-      saveUserSettings(settings)
-    );
+    ipcMain.handle('app/saveUserSettings', (_, settings: Partial<UserSettings>) => {
+      const { lastScanTime, ...rest } = settings;
+      const parsedLastScanTime =
+        typeof lastScanTime === 'string' ? new Date(lastScanTime) : lastScanTime;
+      return saveUserSettings({
+        ...rest,
+        ...(parsedLastScanTime !== undefined ? { lastScanTime: parsedLastScanTime } : {})
+      });
+    });
 
     // User Keyboard Shortcuts Handlers
     ipcMain.handle('app/getUserKeyboardShortcuts', async () => {

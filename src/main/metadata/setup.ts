@@ -82,6 +82,7 @@ import { GenreWorkflow } from './workflows/strategies/GenreWorkflow';
 import { ArtworkWorkflow } from './workflows/strategies/ArtworkWorkflow';
 import { TrackWorkflow } from './workflows/strategies/TrackWorkflow';
 import { MetadataTransactionManager } from './transactions/MetadataTransactionManager';
+import { MetadataMergeEngine } from './resolution/MetadataMergeEngine';
 
 export interface MetadataContainer {
   engine: MetadataEngine;
@@ -365,6 +366,7 @@ export class MetadataBootstrap {
     });
 
     const searchGateway = new MetadataSearchGateway({ gateway: engine });
+    const mergeEngine = new MetadataMergeEngine(resolutionProviderRegistry);
 
     libraryEventBus.onEvent('SongMetadataChanged', (event) => {
       const identity = new MetadataIdentity({
@@ -391,6 +393,7 @@ export class MetadataBootstrap {
     return {
       engine,
       searchGateway,
+      mergeEngine,
       repository,
       userRepository,
       userProvider,

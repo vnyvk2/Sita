@@ -1,10 +1,8 @@
-import fs from 'fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LibraryScanner } from '../LibraryScanner';
 import { getLibraryScanRoots } from '../getLibraryScanRoots';
 import { fastDiskWalk } from '../fastDiskWalk';
-import libraryChangeTracker from '../LibraryChangeTracker';
 
 vi.mock('fs/promises', () => ({
   default: {

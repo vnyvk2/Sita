@@ -53,7 +53,6 @@ if (memProfiler.enabled) {
 import { version, appPreferences } from '../../package.json';
 import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import {
-  COMPACT_LYRICS_EXTENSION_HEIGHT,
   COMPACT_MINI_PLAYER_HEIGHT,
   COMPACT_MINI_PLAYER_MIN_WIDTH,
   MINI_PLAYER_DEFAULT_SIZE_X,

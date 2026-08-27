@@ -20,6 +20,7 @@ export interface TransactionResult {
   success: boolean;
   cancelled?: boolean;
   updatedCount: number;
+  deferredCount?: number;
   failedCount: number;
   errors: string[];
   undoToken?: UndoToken;
