@@ -34,6 +34,7 @@ export const theme = {
       'font-color-white': 'hsl(var(--text-color-white) / <alpha-value>)',
       'font-color-highlight': 'hsl(var(--text-color-highlight) / <alpha-value>)',
       'font-color-crimson': 'hsl(var(--text-color-crimson) / <alpha-value>)',
+      'font-color-favorite': 'var(--color-favorite, #FF2D55)',
       'seekbar-background-color': 'hsl(var(--seekbar-background-color) / <alpha-value>)',
       'seekbar-track-background-color':
         'hsl(var(--seekbar-track-background-color) / <alpha-value>)',

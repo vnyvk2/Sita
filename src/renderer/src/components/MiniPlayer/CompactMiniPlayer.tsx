@@ -294,7 +294,7 @@ const CompactMiniPlayer = (props: Props) => {
               iconName="favorite"
               iconClassName={`material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100 ${
                 isAFavorite
-                  ? 'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
+                  ? 'text-[#FF2D55]! opacity-100! dark:text-[#FF2D55]!'
                   : 'text-font-color-white dark:text-font-color-white'
               }`}
               clickHandler={() => toggleIsFavorite(!isAFavorite)}

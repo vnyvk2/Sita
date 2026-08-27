@@ -845,7 +845,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               iconClassName={`text-lg! ${
                 isAFavorite
-                  ? 'material-icons-round text-dark-background-color-3!'
+                  ? 'material-icons-round text-[#FF2D55]! dark:text-[#FF2D55]!'
                   : 'material-icons-round-outlined'
               }`}
               isDisabled={!currentSongData.isKnownSource}

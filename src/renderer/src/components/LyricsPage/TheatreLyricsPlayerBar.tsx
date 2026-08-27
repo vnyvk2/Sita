@@ -110,7 +110,7 @@ const TheatreLyricsPlayerBar = () => {
               iconName="favorite"
               iconClassName={`${
                 isAFavorite
-                  ? 'material-icons-round text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100!'
+                  ? 'material-icons-round text-[#FF2D55]! dark:text-[#FF2D55]! opacity-100!'
                   : 'material-icons-round-outlined text-white/70 hover:text-white'
               } icon cursor-pointer !text-xl transition-colors`}
               clickHandler={() => isKnownSource && toggleIsFavorite(!isAFavorite)}

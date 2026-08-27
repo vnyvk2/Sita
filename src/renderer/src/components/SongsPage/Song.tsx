@@ -11,6 +11,7 @@ import {
   memo,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef
 } from 'react';
@@ -20,11 +21,13 @@ import { appPreferences } from '../../../../../package.json';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
+import useHeartBurst from '../../hooks/useHeartBurst';
 import { useQueueOperations } from '../../hooks/useQueueOperations';
 import { songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
+import HeartBurst from '../HeartBurst';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
@@ -146,6 +149,7 @@ const Song = memo(
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
     // Monotonic counter to prevent race conditions on rapid successive favorite toggles
     const likeMutationSeqRef = useRef(0);
+    const { isBursting, triggerBurst } = useHeartBurst();
 
     // Single source of truth: derived strictly from player state or cached song props,
     // avoiding row-local useState that could carry over during Virtuoso row recycling.
@@ -161,6 +165,10 @@ const Song = memo(
     const toggleSingleSongFavorite = useCallback(() => {
       const nextFav = !isAFavorite;
       const currentSeq = ++likeMutationSeqRef.current;
+
+      if (nextFav) {
+        triggerBurst();
+      }
 
       // Optimistically update React Query cache so the source of truth is immediately updated
       queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
@@ -649,7 +657,7 @@ const Song = memo(
         data-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`${songId} fx-press group relative mr-4 mb-2 flex h-13 w-[98%] overflow-hidden rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity,scale] duration-150 ease-in-out focus-visible:outline! ${
+        className={`${songId} group relative mr-4 mb-2 flex h-13 w-[98%] overflow-hidden rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${
           isCurrentSong || isAMultipleSelection
             ? bodyBackgroundImage
               ? `bg-background-color-3/70 text-font-color-black dark:bg-dark-background-color-3/70 shadow-lg backdrop-blur-md`
@@ -846,26 +854,29 @@ const Song = memo(
               : (year ?? '----')}
           </div>
           <div className="song-duration flex w-full! items-center justify-between pr-4 pl-2 text-center transition-none sm:pr-1">
-            <Button
-              className="mt-1 mr-0! rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent"
-              iconName="favorite"
-              iconClassName={`${
-                isAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
-              } leading-none! text-xl! font-light! md:hidden ${
-                isAFavorite
-                  ? isCurrentSong || isAMultipleSelection
-                    ? 'text-font-color-black! dark:text-font-color-black!'
-                    : 'text-font-color-highlight! dark:text-dark-background-color-3!'
-                  : isCurrentSong || isAMultipleSelection
-                    ? 'text-font-color-black! dark:text-font-color-black!'
-                    : 'text-font-color-highlight! dark:text-dark-background-color-3!'
-              }`}
-              tooltipLabel={t(`song.${isAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
-              clickHandler={(e) => {
-                e.stopPropagation();
-                toggleSingleSongFavorite();
-              }}
-            />
+            <div className="relative flex items-center justify-center">
+              <Button
+                className="mt-1 mr-0! rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent"
+                iconName="favorite"
+                iconClassName={`${
+                  isAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
+                } ${isBursting ? 'fx-heart-pop' : ''} leading-none! text-xl! font-light! ${
+                  isAFavorite
+                    ? isCurrentSong || isAMultipleSelection
+                      ? 'text-font-color-black! dark:text-font-color-black!'
+                      : 'text-[#FF2D55]! dark:text-[#FF2D55]!'
+                    : isCurrentSong || isAMultipleSelection
+                      ? 'text-font-color-black! dark:text-font-color-black!'
+                      : 'text-font-color-highlight! dark:text-dark-background-color-3!'
+                }`}
+                tooltipLabel={t(`song.${isAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
+                clickHandler={(e) => {
+                  e.stopPropagation();
+                  toggleSingleSongFavorite();
+                }}
+              />
+              <HeartBurst isBursting={isBursting} />
+            </div>
             <span className="">
               {minutes ?? '--'}:{seconds ?? '--'}
             </span>

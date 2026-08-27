@@ -527,8 +527,8 @@ const SongCard = (props: SongCardProp) => {
               className="order-2 m-0! rounded-none! border-0! bg-transparent p-1! text-inherit! opacity-50 outline-offset-1 transition-opacity group-focus-within/songCard:opacity-100 group-hover/songCard:opacity-100 hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
               iconName="favorite"
               iconClassName={`${
-                isSongAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
-              } !text-2xl !text-font-color-white !leading-none`}
+                isSongAFavorite ? 'material-icons-round !text-[#FF2D55]' : 'material-icons-round-outlined !text-font-color-white'
+              } !text-2xl !leading-none`}
               tooltipLabel={isSongAFavorite ? t('song.likedThisSong') : undefined}
               clickHandler={(e) => {
                 e.stopPropagation();

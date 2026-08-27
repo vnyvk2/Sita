@@ -510,3 +510,144 @@
 .fx-paused .fx-beam--animate::before {
   animation-play-state: paused !important;
 }
+
+/* — LOVE SYMBOL BURST ANIMATION (DESIGN 3 - MULTI-TIER FLOAT) --------------
+   Fired when a user favorites/likes a track. Main heart pops with spring
+   tactile arc while 6 diverse mini hearts float upward in parameterized S-curves. */
+:root {
+  --color-favorite: #FF2D55;
+}
+
+.fx-heart-pop {
+  animation: fx-heart-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.35) forwards;
+}
+
+@keyframes fx-heart-pop {
+  0% {
+    transform: scale(0.72) rotate(-8deg);
+  }
+  40% {
+    transform: scale(1.38) rotate(6deg);
+  }
+  75% {
+    transform: scale(0.92) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.fx-heart-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 50;
+}
+
+.fx-float-heart {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  transform: translate(0, 0) scale(0);
+  transform-origin: center center;
+  user-select: none;
+  font-size: var(--heart-size, 12px);
+  color: var(--heart-color, var(--color-favorite));
+  animation: fx-heart-float var(--heart-duration, 0.75s) ease-out var(--heart-delay, 0ms) forwards;
+}
+
+@keyframes fx-heart-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.2) rotate(0deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(var(--heart-x1), var(--heart-y1)) scale(var(--heart-scale1, 1.25)) rotate(var(--heart-rot1, 10deg));
+  }
+  65% {
+    opacity: 0.9;
+    transform: translate(var(--heart-x2), var(--heart-y2)) scale(var(--heart-scale2, 0.95)) rotate(var(--heart-rot2, 6deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--heart-x3), var(--heart-y3)) scale(var(--heart-scale3, 0.2)) rotate(var(--heart-rot3, 12deg));
+  }
+}
+
+/* Parameterized Design 3 Tiers */
+.fx-float-heart.m-hero {
+  --heart-size: 18px;
+  --heart-color: var(--color-favorite);
+  --heart-duration: 0.85s;
+  --heart-delay: 0ms;
+  --heart-x1: 8px; --heart-y1: -18px; --heart-scale1: 1.35; --heart-rot1: 14deg;
+  --heart-x2: 2px; --heart-y2: -36px; --heart-scale2: 1;    --heart-rot2: 6deg;
+  --heart-x3: 6px; --heart-y3: -52px; --heart-scale3: 0.3;  --heart-rot3: 12deg;
+  filter: drop-shadow(0 0 4px rgba(255, 45, 85, 0.5));
+}
+
+.fx-float-heart.m-mid1 {
+  --heart-size: 13px;
+  --heart-color: #FF6584;
+  --heart-duration: 0.76s;
+  --heart-delay: 40ms;
+  --heart-x1: -15px; --heart-y1: -15px; --heart-scale1: 1.25; --heart-rot1: -18deg;
+  --heart-x2: -20px; --heart-y2: -32px; --heart-scale2: 0.95; --heart-rot2: -26deg;
+  --heart-x3: -24px; --heart-y3: -46px; --heart-scale3: 0.2;  --heart-rot3: -34deg;
+}
+
+.fx-float-heart.m-mid2 {
+  --heart-size: 11px;
+  --heart-color: #FF5E3A;
+  --heart-duration: 0.72s;
+  --heart-delay: 70ms;
+  --heart-x1: 16px; --heart-y1: -14px; --heart-scale1: 1.2;  --heart-rot1: 22deg;
+  --heart-x2: 22px; --heart-y2: -28px; --heart-scale2: 0.85; --heart-rot2: 28deg;
+  --heart-x3: 26px; --heart-y3: -40px; --heart-scale3: 0.2;  --heart-rot3: 35deg;
+}
+
+.fx-float-heart.m-tiny1 {
+  --heart-size: 8px;
+  --heart-color: #AF52DE;
+  --heart-duration: 0.6s;
+  --heart-delay: 20ms;
+  --heart-x1: -20px; --heart-y1: -10px; --heart-scale1: 1.2;  --heart-rot1: -30deg;
+  --heart-x2: -24px; --heart-y2: -18px; --heart-scale2: 0.8;  --heart-rot2: -38deg;
+  --heart-x3: -28px; --heart-y3: -24px; --heart-scale3: 0.15; --heart-rot3: -45deg;
+}
+
+.fx-float-heart.m-tiny2 {
+  --heart-size: 9px;
+  --heart-color: #FF375F;
+  --heart-duration: 0.65s;
+  --heart-delay: 90ms;
+  --heart-x1: 11px; --heart-y1: -12px; --heart-scale1: 1.15; --heart-rot1: 15deg;
+  --heart-x2: 14px; --heart-y2: -22px; --heart-scale2: 0.7;  --heart-rot2: 20deg;
+  --heart-x3: 16px; --heart-y3: -34px; --heart-scale3: 0.2;  --heart-rot3: 25deg;
+}
+
+.fx-float-heart.m-micro {
+  --heart-size: 6px;
+  --heart-color: #FFD60A;
+  --heart-duration: 0.55s;
+  --heart-delay: 110ms;
+  --heart-x1: -6px;  --heart-y1: -10px; --heart-scale1: 1.2; --heart-rot1: 0deg;
+  --heart-x2: -8px;  --heart-y2: -18px; --heart-scale2: 0.6; --heart-rot2: 0deg;
+  --heart-x3: -10px; --heart-y3: -26px; --heart-scale3: 0;   --heart-rot3: 0deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-heart-pop {
+    animation: none !important;
+  }
+  .fx-float-heart {
+    animation: none !important;
+    display: none !important;
+  }
+}
+
+
