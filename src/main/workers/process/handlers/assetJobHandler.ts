@@ -76,7 +76,7 @@ export async function executeAssetJob(options: ExecuteAssetOptions): Promise<Ass
     } else if (jobType === 'artwork') {
       return await generateArtworkInWorker(taskId, input.sourceFilePath, input.destinationPath, abortSignal);
     } else if (jobType === 'replaygain') {
-      return await generateReplayGainInWorker(taskId, input.sourceFilePath, abortSignal);
+      return await generateReplayGainInWorker(taskId, input.sourceFilePath, input.destinationPath, abortSignal);
     } else {
       return {
         success: false,
@@ -330,6 +330,7 @@ async function generateArtworkInWorker(
 async function generateReplayGainInWorker(
   taskId: string,
   sourceFilePath: string,
+  destinationPath?: string,
   abortSignal?: AbortSignal
 ): Promise<AssetExecutionResult> {
   const decoder = defaultAudioDecoderRegistry.getDecoderForFile(sourceFilePath);
@@ -349,9 +350,32 @@ async function generateReplayGainInWorker(
       const loudness = engine.finish();
       const metrics = calculateReplayGainMetrics(loudness);
 
+      let publishedPath = '';
+      if (destinationPath) {
+        const cacheDir = path.dirname(destinationPath);
+        await fs.mkdir(cacheDir, { recursive: true });
+
+        const blockEnergies = engine.getBlockEnergies();
+        const buffer = Buffer.from(blockEnergies.buffer, blockEnergies.byteOffset, blockEnergies.byteLength);
+        const tempPath = `${destinationPath}.${process.pid}.${taskId}.tmp`;
+        await fs.writeFile(tempPath, buffer);
+
+        if (abortSignal?.aborted) {
+          await fs.unlink(tempPath).catch(() => {});
+          return {
+            success: false,
+            error: `ReplayGain analysis for task ${taskId} cancelled after disk write.`,
+            cancelled: true
+          };
+        }
+
+        await atomicPublishFile(tempPath, destinationPath);
+        publishedPath = destinationPath;
+      }
+
       return {
         success: true,
-        outputFilePath: '',
+        outputFilePath: publishedPath,
         metadata: {
           trackGain: metrics.trackGain,
           trackPeak: metrics.trackPeak,
@@ -397,9 +421,10 @@ async function generateReplayGainInWorker(
 async function atomicPublishFile(tempPath: string, destinationPath: string): Promise<void> {
   try {
     await fs.rename(tempPath, destinationPath);
-  } catch (renameErr: any) {
+  } catch (renameErr: unknown) {
+    const errCode = (renameErr as { code?: string })?.code;
     const isCollisionCandidate =
-      renameErr?.code === 'EEXIST' || renameErr?.code === 'EBUSY' || renameErr?.code === 'EPERM';
+      errCode === 'EEXIST' || errCode === 'EBUSY' || errCode === 'EPERM';
 
     if (isCollisionCandidate) {
       try {

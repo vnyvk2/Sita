@@ -192,6 +192,12 @@ declare global {
     paletteData?: PaletteData;
     isKnownSource: boolean;
     isBlacklisted: boolean;
+    replayGain?: {
+      trackGain: number | null;
+      trackPeak: number | null;
+      albumGain: number | null;
+      albumPeak: number | null;
+    };
   }
 
   interface AudioInfo {
@@ -597,6 +603,11 @@ declare global {
     currentSong: CurrentSong;
     volume: Volume;
     playbackRate: number;
+    replayGain?: {
+      mode: 'track' | 'album' | 'off';
+      preampDb: number;
+      preventClipping: boolean;
+    };
   }
 
   type EqualizerBandFilters =

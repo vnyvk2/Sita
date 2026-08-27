@@ -96,7 +96,15 @@ const sendAudioData = async (
         album,
         paletteData: parsePaletteFromArtworks(artworks),
         isKnownSource: true, // this is always true here because the song is from the library
-        isBlacklisted
+        isBlacklisted,
+        replayGain: song.replayGain
+          ? {
+              trackGain: song.replayGain.trackGain,
+              trackPeak: song.replayGain.trackPeak,
+              albumGain: song.replayGain.albumGain,
+              albumPeak: song.replayGain.albumPeak
+            }
+          : undefined
       };
 
       if (updateListeningRate) {

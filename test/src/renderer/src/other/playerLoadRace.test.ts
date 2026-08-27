@@ -11,6 +11,7 @@ class MockAudioContext {
         value: 1,
         setValueAtTime: vi.fn(),
         exponentialRampToValueAtTime: vi.fn(),
+        setTargetAtTime: vi.fn(),
         cancelScheduledValues: vi.fn()
       },
       connect: vi.fn()

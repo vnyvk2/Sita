@@ -16,6 +16,9 @@ vi.mock('@main/db/db', () => ({
     query: {
       replayGain: {
         findFirst: vi.fn()
+      },
+      albumsSongs: {
+        findFirst: vi.fn()
       }
     },
     transaction: vi.fn()

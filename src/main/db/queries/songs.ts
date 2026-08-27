@@ -1052,7 +1052,8 @@ export const getPlayableSongById = async (songId: number, trx: DB | DBTransactio
             }
           }
         }
-      }
+      },
+      replayGain: true
     }
   });
   return song;

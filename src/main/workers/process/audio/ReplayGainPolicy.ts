@@ -22,6 +22,22 @@ export interface ReplayGainMetrics {
 }
 
 /**
+ * Pure policy calculation of ReplayGain adjustment (dB) from integrated loudness (LUFS).
+ * Gain (dB) = Target (LUFS) - Integrated Loudness (LUFS)
+ * If integrated loudness is -Infinity (e.g. silence or <400ms), returns 0.0 dB.
+ */
+export function calculateLoudnessGain(
+  integratedLoudness: number,
+  options?: ReplayGainOptions
+): number {
+  const targetLufs = options?.targetLufs ?? -18.0;
+  if (!Number.isFinite(integratedLoudness)) {
+    return 0.0;
+  }
+  return Math.round((targetLufs - integratedLoudness) * 100) / 100;
+}
+
+/**
  * Pure policy conversion from BS.1770 LoudnessResult to Nora ReplayGain metrics.
  */
 export function calculateReplayGainMetrics(
@@ -29,15 +45,10 @@ export function calculateReplayGainMetrics(
   options?: ReplayGainOptions
 ): ReplayGainMetrics {
   const targetLufs = options?.targetLufs ?? -18.0;
-
-  let trackGain = 0.0;
-  if (Number.isFinite(loudness.integratedLoudness)) {
-    // Gain (dB) = Target (LUFS) - Integrated Loudness (LUFS)
-    trackGain = targetLufs - loudness.integratedLoudness;
-  }
+  const trackGain = calculateLoudnessGain(loudness.integratedLoudness, options);
 
   return {
-    trackGain: Math.round(trackGain * 100) / 100,
+    trackGain,
     trackPeak: Math.round(loudness.samplePeak * 10000) / 10000,
     targetLufs,
     integratedLoudness: loudness.integratedLoudness,

@@ -1,3 +1,5 @@
+import path from 'path';
+import { app } from 'electron';
 import { EventEmitter } from 'events';
 import { eq } from 'drizzle-orm';
 import { db } from '@main/db/db';
@@ -60,10 +62,14 @@ export class ReplayGainJob implements Job {
       if (this.state === 'cancelled') return;
 
       // 2. Delegate CPU loudness analysis to utilityProcess worker
+      const destinationPath = app?.getPath
+        ? path.join(app.getPath('userData'), 'loudness_blocks', `${this.songId}_v${CURRENT_REPLAYGAIN_GENERATOR_VERSION}.bin`)
+        : '';
+
       const result = await mediaWorkerBridge.generateAsset({
         jobType: 'replaygain',
         sourceFilePath: song.path,
-        destinationPath: '',
+        destinationPath,
         metadata: {
           songId: this.songId,
           version: CURRENT_REPLAYGAIN_GENERATOR_VERSION
@@ -78,8 +84,12 @@ export class ReplayGainJob implements Job {
 
       const trackGain = result.metadata?.trackGain as number;
       const trackPeak = result.metadata?.trackPeak as number;
-      const albumGain = result.metadata?.albumGain as number;
-      const albumPeak = result.metadata?.albumPeak as number;
+
+      // Check if song is linked to an album
+      const albumSong = await db.query.albumsSongs.findFirst({
+        where: (as, { eq }) => eq(as.songId, this.songId)
+      });
+      const albumId = albumSong?.albumId;
 
       // 3. Save to DB in Main process
       await db.transaction(async (trx) => {
@@ -89,8 +99,8 @@ export class ReplayGainJob implements Job {
             .set({
               trackGain,
               trackPeak,
-              albumGain,
-              albumPeak,
+              albumGain: existing.albumGain,
+              albumPeak: existing.albumPeak,
               generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
               updatedAt: new Date()
             })
@@ -100,8 +110,8 @@ export class ReplayGainJob implements Job {
             songId: this.songId,
             trackGain,
             trackPeak,
-            albumGain,
-            albumPeak,
+            albumGain: null,
+            albumPeak: null,
             generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION
           });
         }
@@ -110,6 +120,7 @@ export class ReplayGainJob implements Job {
       // 4. Post-commit event emission
       this.eventBus.emit(ASSET_EVENTS.REPLAYGAIN_CREATED, {
         songId: this.songId,
+        albumId,
         trackGain,
         trackPeak
       });

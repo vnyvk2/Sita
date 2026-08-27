@@ -223,6 +223,14 @@ export class BS1770LoudnessEngine {
   }
 
   /**
+   * Returns a defensive snapshot of the accumulated 400ms block energies.
+   * Preserves full 64-bit IEEE 754 precision for album aggregation and testing.
+   */
+  public getBlockEnergies(): Float64Array {
+    return Float64Array.from(this.blockEnergies);
+  }
+
+  /**
    * Finalizes the calculation and returns the pure LoudnessResult with dual-stage gating.
    * This method is idempotent: subsequent calls return the cached final result.
    */
@@ -235,97 +243,106 @@ export class BS1770LoudnessEngine {
     const samplePeak = this.maxSamplePeak;
     const samplePeakDb = samplePeak > 0 ? 20 * Math.log10(samplePeak) : -Infinity;
 
-    // Strict BS.1770-4 Compliance: If audio is shorter than the 400ms gating block window,
-    // a valid BS.1770 integrated loudness cannot be formed. Return -Infinity.
-    if (this.blockEnergies.length === 0) {
-      this.finalizedResult = {
-        integratedLoudness: -Infinity,
-        samplePeak: Math.round(samplePeak * 10000) / 10000,
-        samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
-        truePeak: null,
-        duration: Math.round(duration * 100) / 100,
-        totalSamples: this.totalFramesProcessed,
-        blocksProcessed: 0,
-        blocksSurvivingGate: 0
-      };
-      return this.finalizedResult;
-    }
-
-    // Step 1: Absolute Threshold Gating (-70.0 LKFS)
-    const absoluteGatedEnergies: number[] = [];
-    for (const z of this.blockEnergies) {
-      if (z <= 0) continue;
-      const lkfs = -0.691 + (10 * Math.log10(z));
-      if (lkfs >= -70.0) {
-        absoluteGatedEnergies.push(z);
-      }
-    }
-
-    if (absoluteGatedEnergies.length === 0) {
-      this.finalizedResult = {
-        integratedLoudness: -Infinity,
-        samplePeak: Math.round(samplePeak * 10000) / 10000,
-        samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
-        truePeak: null,
-        duration: Math.round(duration * 100) / 100,
-        totalSamples: this.totalFramesProcessed,
-        blocksProcessed: this.blockEnergies.length,
-        blocksSurvivingGate: 0
-      };
-      return this.finalizedResult;
-    }
-
-    // Step 2: Calculate un-gated loudness from absolute surviving blocks
-    let absEnergySum = 0.0;
-    for (const z of absoluteGatedEnergies) {
-      absEnergySum += z;
-    }
-    const ungatedMeanEnergy = absEnergySum / absoluteGatedEnergies.length;
-    const ungatedLoudness = -0.691 + (10 * Math.log10(ungatedMeanEnergy));
-
-    // Step 3: Relative Threshold Gating (ungatedLoudness - 10.0 LU)
-    const relativeThresholdLkfs = ungatedLoudness - 10.0;
-    const relativeGatedEnergies: number[] = [];
-    for (const z of absoluteGatedEnergies) {
-      const lkfs = -0.691 + (10 * Math.log10(z));
-      if (lkfs >= relativeThresholdLkfs) {
-        relativeGatedEnergies.push(z);
-      }
-    }
-
-    if (relativeGatedEnergies.length === 0) {
-      this.finalizedResult = {
-        integratedLoudness: -Infinity,
-        samplePeak: Math.round(samplePeak * 10000) / 10000,
-        samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
-        truePeak: null,
-        duration: Math.round(duration * 100) / 100,
-        totalSamples: this.totalFramesProcessed,
-        blocksProcessed: this.blockEnergies.length,
-        blocksSurvivingGate: 0
-      };
-      return this.finalizedResult;
-    }
-
-    // Step 4: Integrated Loudness over relative surviving blocks
-    let relEnergySum = 0.0;
-    for (const z of relativeGatedEnergies) {
-      relEnergySum += z;
-    }
-    const finalMeanEnergy = relEnergySum / relativeGatedEnergies.length;
-    const integratedLoudness = -0.691 + (10 * Math.log10(finalMeanEnergy));
+    const gated = calculateIntegratedLoudnessFromBlocks(this.blockEnergies);
 
     this.finalizedResult = {
-      integratedLoudness: Math.round(integratedLoudness * 100) / 100,
+      integratedLoudness: gated.integratedLoudness,
       samplePeak: Math.round(samplePeak * 10000) / 10000,
       samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
       truePeak: null,
       duration: Math.round(duration * 100) / 100,
       totalSamples: this.totalFramesProcessed,
-      blocksProcessed: this.blockEnergies.length,
-      blocksSurvivingGate: relativeGatedEnergies.length
+      blocksProcessed: gated.blocksProcessed,
+      blocksSurvivingGate: gated.blocksSurvivingGate
     };
-
     return this.finalizedResult;
   }
+}
+
+export interface GatedLoudnessResult {
+  integratedLoudness: number;
+  blocksProcessed: number;
+  blocksSurvivingGate: number;
+}
+
+/**
+ * Pure ITU-R BS.1770-4 / EBU R128 dual-stage gating calculation over an array of 400ms block energies.
+ * Used for both per-track loudness finalization and multi-track album aggregation.
+ *
+ * 1. Absolute Threshold Gating: -70.0 LKFS over all blocks.
+ * 2. Ungated mean loudness over blocks surviving the absolute gate.
+ * 3. Relative Threshold Gating: ungated loudness - 10.0 LU.
+ * 4. Final mean energy over blocks surviving the relative gate -> integrated LUFS.
+ */
+export function calculateIntegratedLoudnessFromBlocks(
+  blockEnergies: ArrayLike<number>
+): GatedLoudnessResult {
+  const blocksProcessed = blockEnergies.length;
+  if (blocksProcessed === 0) {
+    return {
+      integratedLoudness: -Infinity,
+      blocksProcessed: 0,
+      blocksSurvivingGate: 0
+    };
+  }
+
+  // Step 1: Absolute Threshold Gating (-70.0 LKFS)
+  const absoluteGatedEnergies: number[] = [];
+  for (let i = 0; i < blocksProcessed; i++) {
+    const z = blockEnergies[i];
+    if (z <= 0) continue;
+    const lkfs = -0.691 + (10 * Math.log10(z));
+    if (lkfs >= -70.0) {
+      absoluteGatedEnergies.push(z);
+    }
+  }
+
+  if (absoluteGatedEnergies.length === 0) {
+    return {
+      integratedLoudness: -Infinity,
+      blocksProcessed,
+      blocksSurvivingGate: 0
+    };
+  }
+
+  // Step 2: Calculate un-gated loudness from absolute surviving blocks
+  let absEnergySum = 0.0;
+  for (let i = 0; i < absoluteGatedEnergies.length; i++) {
+    absEnergySum += absoluteGatedEnergies[i];
+  }
+  const ungatedMeanEnergy = absEnergySum / absoluteGatedEnergies.length;
+  const ungatedLoudness = -0.691 + (10 * Math.log10(ungatedMeanEnergy));
+
+  // Step 3: Relative Threshold Gating (ungatedLoudness - 10.0 LU)
+  const relativeThresholdLkfs = ungatedLoudness - 10.0;
+  const relativeGatedEnergies: number[] = [];
+  for (let i = 0; i < absoluteGatedEnergies.length; i++) {
+    const z = absoluteGatedEnergies[i];
+    const lkfs = -0.691 + (10 * Math.log10(z));
+    if (lkfs >= relativeThresholdLkfs) {
+      relativeGatedEnergies.push(z);
+    }
+  }
+
+  if (relativeGatedEnergies.length === 0) {
+    return {
+      integratedLoudness: -Infinity,
+      blocksProcessed,
+      blocksSurvivingGate: 0
+    };
+  }
+
+  // Step 4: Integrated Loudness over relative surviving blocks
+  let relEnergySum = 0.0;
+  for (let i = 0; i < relativeGatedEnergies.length; i++) {
+    relEnergySum += relativeGatedEnergies[i];
+  }
+  const finalMeanEnergy = relEnergySum / relativeGatedEnergies.length;
+  const integratedLoudness = -0.691 + (10 * Math.log10(finalMeanEnergy));
+
+  return {
+    integratedLoudness: Math.round(integratedLoudness * 100) / 100,
+    blocksProcessed,
+    blocksSurvivingGate: relativeGatedEnergies.length
+  };
 }

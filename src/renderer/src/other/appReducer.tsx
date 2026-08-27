@@ -445,7 +445,12 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
       isMuted: false,
       value: 50
     },
-    playbackRate: 1.0
+    playbackRate: 1.0,
+    replayGain: {
+      mode: 'track',
+      preampDb: 0,
+      preventClipping: true
+    }
   },
   queue: {
     queues: [{ id: 'default-queue', position: 0, songIds: [] }],
