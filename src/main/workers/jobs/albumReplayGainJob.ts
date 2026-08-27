@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@main/db/db';
 import { albumsSongs, replayGain } from '@main/db/schema';
 import logger from '@main/logger';
@@ -14,6 +14,23 @@ import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from './replayGainJob';
 
+/**
+ * AlbumReplayGainJob
+ *
+ * Orchestrates album-level loudness aggregation across all tracks belonging to an album.
+ *
+ * Architectural & Invalidation Invariants:
+ * 1. Generator Version: Both track DSP analysis and album aggregation share CURRENT_REPLAYGAIN_GENERATOR_VERSION (1).
+ *    Whenever a track is analyzed or re-analyzed by ReplayGainJob, its albumGain and albumPeak are set to null,
+ *    which immediately invalidates the album's cached metrics and triggers fresh aggregation.
+ * 2. Block Cache Contract: Block caches on disk (loudness_blocks/${songId}_v1.bin) are intermediate 64-bit
+ *    DSP artifacts used exclusively during album aggregation. When an album is already synchronized in DB
+ *    (isUpToDate === true), the DB rows are authoritative. When aggregation is needed, block files must be
+ *    valid and divisible by 8 bytes. Missing or corrupt caches defer aggregation until tracks are re-analyzed.
+ * 3. True Optimistic Concurrency: Within the DB transaction, the row count is strictly verified against
+ *    album songs, and every row is updated with a conditional `WHERE song_id = ? AND updated_at = ?` check.
+ *    If any concurrent transaction updated a track between validation and commit, the transaction aborts and rolls back.
+ */
 export class AlbumReplayGainJob implements Job {
   id: string;
   type = 'album_replaygain';
@@ -107,8 +124,21 @@ export class AlbumReplayGainJob implements Job {
 
         try {
           const buf = await fs.readFile(blockFilePath);
-          // 64-bit IEEE 754 Float64Array (8 bytes per block)
-          const blockEnergies = new Float64Array(buf.buffer, buf.byteOffset, buf.byteLength / 8);
+
+          // Robust validation: must be non-empty and evenly divisible by 8 bytes (Float64)
+          if (buf.byteLength === 0 || buf.byteLength % 8 !== 0) {
+            logger.warn(
+              `[AlbumReplayGainJob] Corrupt or unaligned loudness block cache for song ${rg.songId} (${buf.byteLength} bytes). Deferring album aggregation.`
+            );
+            return;
+          }
+
+          const numBlocks = buf.byteLength / 8;
+          const blockEnergies = new Float64Array(numBlocks);
+          const dataView = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+          for (let i = 0; i < numBlocks; i++) {
+            blockEnergies[i] = dataView.getFloat64(i * 8, true); // little-endian
+          }
 
           tracksData.push({
             songId: rg.songId,
@@ -130,45 +160,74 @@ export class AlbumReplayGainJob implements Job {
       const albumResult = AlbumLoudnessAggregator.aggregate(tracksData);
 
       // Snapshot validation timestamp to guard against stale album updates (Constraint #6)
-      const snapshotSongIds = new Set(rgRows.map((r) => r.songId));
       const snapshotMap = new Map(rgRows.map((r) => [r.songId, r.updatedAt.getTime()]));
 
       let committed = false;
-      await db.transaction(async (trx) => {
-        // Re-verify current DB state hasn't changed during aggregation
-        const currentRows = await trx.query.replayGain.findMany({
-          where: inArray(replayGain.songId, songIds)
-        });
+      try {
+        await db.transaction(async (trx) => {
+          // Re-query inside transaction and verify exact row count and presence
+          const currentRows = await trx.query.replayGain.findMany({
+            where: inArray(replayGain.songId, songIds)
+          });
 
-        for (const cur of currentRows) {
-          const originalTime = snapshotMap.get(cur.songId);
-          if (originalTime === undefined || cur.updatedAt.getTime() !== originalTime) {
+          if (currentRows.length !== songIds.length) {
             logger.warn(
-              `[AlbumReplayGainJob] Stale aggregation detected for album ${this.albumId} (song ${cur.songId} changed). Aborting commit.`
+              `[AlbumReplayGainJob] Aborting commit for album ${this.albumId}: row count mismatch (expected ${songIds.length}, found ${currentRows.length}).`
             );
             return;
           }
-        }
 
-        const now = new Date();
-        await trx
-          .update(replayGain)
-          .set({
-            albumGain: albumResult.albumGain,
-            albumPeak: albumResult.albumPeak,
-            generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
-            updatedAt: now
-          })
-          .where(inArray(replayGain.songId, songIds));
+          // Verify every song is still present and matches the snapshot timestamp
+          for (const cur of currentRows) {
+            const originalTime = snapshotMap.get(cur.songId);
+            if (originalTime === undefined || cur.updatedAt.getTime() !== originalTime) {
+              logger.warn(
+                `[AlbumReplayGainJob] Stale aggregation detected for album ${this.albumId} (song ${cur.songId} changed). Aborting commit.`
+              );
+              return;
+            }
+          }
 
-        committed = true;
-      });
+          // Execute truly atomic conditional updates per row
+          const now = new Date();
+          for (const rg of rgRows) {
+            const expectedUpdatedAt = rg.updatedAt;
+            const updateResult = await trx
+              .update(replayGain)
+              .set({
+                albumGain: albumResult.albumGain,
+                albumPeak: albumResult.albumPeak,
+                generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
+                updatedAt: now
+              })
+              .where(
+                and(
+                  eq(replayGain.songId, rg.songId),
+                  eq(replayGain.updatedAt, expectedUpdatedAt)
+                )
+              )
+              .returning({ id: replayGain.id });
+
+            if (!updateResult || updateResult.length === 0) {
+              logger.warn(
+                `[AlbumReplayGainJob] Atomic update condition failed for song ${rg.songId} in album ${this.albumId}. Concurrent write occurred.`
+              );
+              throw new Error(`Optimistic concurrency conflict on song ${rg.songId}`);
+            }
+          }
+
+          committed = true;
+        });
+      } catch (trxErr) {
+        logger.warn(`[AlbumReplayGainJob] Transaction rolled back for album ${this.albumId}:`, { trxErr });
+        committed = false;
+      }
 
       if (!committed) {
         return;
       }
 
-      // 7. Post-commit event emission
+      // 6. Post-commit event emission
       this.eventBus.emit(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, {
         albumId: this.albumId,
         albumGain: albumResult.albumGain,

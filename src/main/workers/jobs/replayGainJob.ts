@@ -99,8 +99,8 @@ export class ReplayGainJob implements Job {
             .set({
               trackGain,
               trackPeak,
-              albumGain: existing.albumGain,
-              albumPeak: existing.albumPeak,
+              albumGain: null,
+              albumPeak: null,
               generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
               updatedAt: new Date()
             })

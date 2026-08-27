@@ -154,7 +154,70 @@ describe('ReplayGainJob (Phase C4-C)', () => {
       expect.objectContaining({
         trackGain: -8.2,
         trackPeak: 0.98,
+        albumGain: null,
+        albumPeak: null,
         generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION
+      })
+    );
+  });
+
+  it('invalidates existing albumGain and albumPeak to null on track re-analysis to force album recomputation', async () => {
+    // Existing record with previously computed album metrics
+    vi.mocked(db.query.replayGain.findFirst).mockResolvedValue({
+      id: 5,
+      songId: 20,
+      trackGain: -6.0,
+      trackPeak: 0.8,
+      albumGain: -7.5,
+      albumPeak: 0.95,
+      generatorVersion: 0 // forces re-analysis
+    } as any);
+
+    vi.mocked(db.query.albumsSongs.findFirst).mockResolvedValue({
+      albumId: 42,
+      songId: 20
+    } as any);
+
+    vi.mocked(getSongById).mockResolvedValue({ id: 20, path: 'C:/Music/track_reanalyzed.wav' } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: true,
+      outputFilePath: 'C:/loudness_blocks/20_v1.bin',
+      metadata: {
+        trackGain: -9.1,
+        trackPeak: 0.99,
+        generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION
+      }
+    });
+
+    const setMock = vi.fn().mockReturnValue({ where: vi.fn() });
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({
+        update: vi.fn().mockReturnValue({ set: setMock })
+      } as any);
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new ReplayGainJob(20, 'Track 20', eventBus);
+    await job.execute();
+
+    // Invariant: albumGain and albumPeak MUST be reset to null
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trackGain: -9.1,
+        trackPeak: 0.99,
+        albumGain: null,
+        albumPeak: null
+      })
+    );
+
+    // Event must carry albumId so choreography can re-trigger AlbumReplayGainJob
+    expect(emitSpy).toHaveBeenCalledWith(
+      ASSET_EVENTS.REPLAYGAIN_CREATED,
+      expect.objectContaining({
+        songId: 20,
+        albumId: 42,
+        trackGain: -9.1,
+        trackPeak: 0.99
       })
     );
   });

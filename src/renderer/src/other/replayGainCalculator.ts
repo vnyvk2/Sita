@@ -11,6 +11,9 @@ export interface ReplayGainCalculationParams {
 export interface ReplayGainCalculationResult {
   targetLinearGain: number;
   appliedGainDb: number;
+  /** True if the requested gain had to be clamped to protect the peak from exceeding 1.0 */
+  peakLimited: boolean;
+  /** Backward compatible alias for peakLimited */
   isClipped: boolean;
 }
 
@@ -39,7 +42,7 @@ export function computeEffectiveReplayGain(
   const preventClipping = params.preventClipping ?? true;
 
   if (mode === 'off') {
-    return { targetLinearGain: 1.0, appliedGainDb: 0, isClipped: false };
+    return { targetLinearGain: 1.0, appliedGainDb: 0, peakLimited: false, isClipped: false };
   }
 
   // 1. Determine base gain (dB) and corresponding discrete peak according to fallback hierarchy
@@ -63,7 +66,7 @@ export function computeEffectiveReplayGain(
 
   // Constraint #9: If both album and track gain are unavailable, resolve strictly to 0 dB (linear 1.0)
   if (baseGainDb === null) {
-    return { targetLinearGain: 1.0, appliedGainDb: 0, isClipped: false };
+    return { targetLinearGain: 1.0, appliedGainDb: 0, peakLimited: false, isClipped: false };
   }
 
   // 2. Add pre-amp
@@ -87,6 +90,7 @@ export function computeEffectiveReplayGain(
   return {
     targetLinearGain: Math.max(0, linearGain),
     appliedGainDb: totalGainDb,
+    peakLimited: isClipped,
     isClipped
   };
 }

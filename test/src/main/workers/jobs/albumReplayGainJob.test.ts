@@ -22,7 +22,7 @@ vi.mock('@main/db/db', () => ({
   }
 }));
 
-describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Stale Guard, Idempotency)', () => {
+describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurrency, Invariants)', () => {
   let eventBus: EventEmitter;
 
   beforeEach(() => {
@@ -110,7 +110,10 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Stale Guard, Ide
       throw new Error('ENOENT');
     });
 
-    const updateSetMock = vi.fn().mockReturnValue({ where: vi.fn() });
+    const returningMock = vi.fn().mockResolvedValue([{ id: 1 }]);
+    const whereMock = vi.fn().mockReturnValue({ returning: returningMock });
+    const updateSetMock = vi.fn().mockReturnValue({ where: whereMock });
+
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
       return callback({
         query: {
@@ -146,7 +149,48 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Stale Guard, Ide
     );
   });
 
-  it('detects stale aggregation and aborts commit if a song was updated during calculation (Constraint #6)', async () => {
+  it('detects missing rows during transaction validation and aborts commit', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
+      { albumId: 1, songId: 101 },
+      { albumId: 1, songId: 102 }
+    ] as any);
+
+    const initialTime = new Date('2026-08-27T10:00:00Z');
+    const rgRows = [
+      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
+      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+    ];
+    vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
+
+    const blocks = new Float64Array(10).fill(0.04);
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.from(blocks.buffer));
+
+    const updateSetMock = vi.fn();
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      // Row 102 disappeared during aggregation!
+      const currentRows = [
+        { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+      ];
+
+      return callback({
+        query: {
+          replayGain: {
+            findMany: vi.fn().mockResolvedValue(currentRows)
+          }
+        },
+        update: vi.fn().mockReturnValue({ set: updateSetMock })
+      } as any);
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new AlbumReplayGainJob(1, eventBus);
+    await job.execute();
+
+    expect(updateSetMock).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+  });
+
+  it('detects stale aggregation and aborts commit if a song was updated before transaction validation', async () => {
     vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
       { albumId: 1, songId: 101 },
       { albumId: 1, songId: 102 }
@@ -188,6 +232,80 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Stale Guard, Ide
     // Verify commit was aborted due to stale detection
     expect(updateSetMock).not.toHaveBeenCalled();
     expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+  });
+
+  it('aborts commit when a race occurs after validation but before atomic update (True Optimistic Concurrency)', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
+      { albumId: 1, songId: 101 },
+      { albumId: 1, songId: 102 }
+    ] as any);
+
+    const initialTime = new Date('2026-08-27T10:00:00Z');
+    const rgRows = [
+      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
+      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+    ];
+    vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
+
+    const blocks = new Float64Array(10).fill(0.04);
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.from(blocks.buffer));
+
+    // Simulate: validation passed, but during update for song 102, the WHERE condition
+    // (updatedAt = initialTime) failed because another transaction sneaked in, returning []
+    let callCount = 0;
+    const returningMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) return [{ id: 1 }]; // Song 101 updated
+      return []; // Song 102 failed optimistic WHERE check!
+    });
+    const whereMock = vi.fn().mockReturnValue({ returning: returningMock });
+    const updateSetMock = vi.fn().mockReturnValue({ where: whereMock });
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({
+        query: {
+          replayGain: {
+            findMany: vi.fn().mockResolvedValue(rgRows) // Validation initially sees matching rows
+          }
+        },
+        update: vi.fn().mockReturnValue({ set: updateSetMock })
+      } as any);
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new AlbumReplayGainJob(1, eventBus);
+    await job.execute();
+
+    // Verify event was NOT emitted because optimistic concurrency update conflict rolled back
+    expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+  });
+
+  it('safely rejects corrupt, truncated, or misaligned block caches (0, 7, 15 bytes) without throwing', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
+      { albumId: 1, songId: 101 }
+    ] as any);
+
+    vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
+      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+    ] as any);
+
+    // Test 1: 0 bytes (empty file)
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(0));
+    const job1 = new AlbumReplayGainJob(1, eventBus);
+    await job1.execute();
+    expect(db.transaction).not.toHaveBeenCalled();
+
+    // Test 2: 7 bytes (truncated float)
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(7));
+    const job2 = new AlbumReplayGainJob(1, eventBus);
+    await job2.execute();
+    expect(db.transaction).not.toHaveBeenCalled();
+
+    // Test 3: 15 bytes (misaligned: not divisible by 8)
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(15));
+    const job3 = new AlbumReplayGainJob(1, eventBus);
+    await job3.execute();
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 
   it('defers aggregation gracefully when a block cache file is missing on disk', async () => {
