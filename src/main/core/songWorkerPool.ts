@@ -1,6 +1,7 @@
 import path from 'path';
 
 import { db } from '@main/db/db';
+import { processArtworkFiles } from '@main/other/artworks';
 import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
 import { tryToParseSong } from '@main/parseSong/parseSong';
 import { ArtworkJob } from '@main/workers/jobs/artworkJob';
@@ -23,6 +24,39 @@ export interface WorkerPoolResult {
   errors: Array<{ path: string; error: string }>;
 }
 
+export interface SongIngestionMetrics {
+  workerParseCount: number;
+  localParseFallbackCount: number;
+  workerPid?: number;
+  batchesProcessed: number;
+  totalArtworkBytes: number;
+  dbTxDurations: number[];
+  artworkDurations: number[];
+}
+
+export const songIngestionMetrics: SongIngestionMetrics = {
+  workerParseCount: 0,
+  localParseFallbackCount: 0,
+  batchesProcessed: 0,
+  totalArtworkBytes: 0,
+  dbTxDurations: [],
+  artworkDurations: []
+};
+
+export function getSongIngestionMetrics(): Readonly<SongIngestionMetrics> {
+  return { ...songIngestionMetrics };
+}
+
+export function resetSongIngestionMetrics(): void {
+  songIngestionMetrics.workerParseCount = 0;
+  songIngestionMetrics.localParseFallbackCount = 0;
+  songIngestionMetrics.workerPid = undefined;
+  songIngestionMetrics.batchesProcessed = 0;
+  songIngestionMetrics.totalArtworkBytes = 0;
+  songIngestionMetrics.dbTxDurations = [];
+  songIngestionMetrics.artworkDurations = [];
+}
+
 /**
  * Local in-process fallback implementation.
  * Used in Vitest unit test environments or if the utilityProcess worker is unavailable.
@@ -33,6 +67,9 @@ export const processSongsWithWorkerPoolLocal = async (
   updateProgress?: (current: number, total: number) => void,
   maxConcurrency = 8
 ): Promise<WorkerPoolResult> => {
+  songIngestionMetrics.localParseFallbackCount += songs.length;
+  performance.mark('songWorkerPool:executionMode:local_fallback');
+
   const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
   const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
   const errors: Array<{ path: string; error: string }> = [];
@@ -138,9 +175,11 @@ export const processSongsWithWorkerPoolLocal = async (
  * In Electron runtime (Phase C3):
  * 1. Delegates CPU-heavy ID3 tag parsing and file stats to the utilityProcess.
  * 2. Streams parsed tracks to Main in bounded 100-track batches with explicit backpressure.
- * 3. Commits 100 tracks per Drizzle transaction in Main, measuring P50/P95 latencies.
- * 4. Yields to the libuv event loop (setImmediate) between transactions to prevent UI starvation.
- * 5. Aggregates error reports cleanly without generating log storms.
+ * 3. Pre-processes artwork files (Sharp decode + disk writes) OUTSIDE of the DB transaction.
+ * 4. Commits pure DB operations within a single Drizzle transaction per 100 tracks.
+ * 5. Measures DB transaction latency and artwork duration separately (P50/P95).
+ * 6. Yields to the libuv event loop (setImmediate) between transactions to prevent UI starvation.
+ * 7. Enforces batch-boundary cancellation: active batch commits atomically; subsequent batches are discarded.
  */
 export const processSongsWithWorkerPool = async (
   songs: SongPoolInput[],
@@ -156,6 +195,12 @@ export const processSongsWithWorkerPool = async (
     try {
       const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
 
+      performance.mark('songWorkerPool:executionMode:worker');
+      const workerPid = mediaWorkerBridge.getWorkerPid();
+      songIngestionMetrics.workerPid = workerPid;
+
+      logger.info(`[songWorkerPool] Ingesting ${songs.length} tracks via utilityProcess worker (pid: ${workerPid ?? 'unknown'})...`);
+
       const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
       const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
       const errors: Array<{ path: string; error: string }> = [];
@@ -163,20 +208,49 @@ export const processSongsWithWorkerPool = async (
       const newArtistIds: number[] = [];
       const newAlbumIds: number[] = [];
       const newGenreIds: number[] = [];
-      const batchTxDurations: number[] = [];
       let successCount = 0;
 
       await mediaWorkerBridge.parseTrackBatchStream(songs, {
         batchSize: 100,
         abortSignal,
         onBatch: async (batch) => {
-          if (batch.tracks.length > 0) {
-            const txStart = performance.now();
+          // BATCH-BOUNDARY CANCELLATION SEMANTICS:
+          // If the user cancelled the scan while this batch was in transit,
+          // discard this and all subsequent batches immediately without touching DB.
+          if (abortSignal?.aborted) {
+            logger.info(`[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`);
+            return;
+          }
 
+          if (batch.tracks.length > 0) {
+            songIngestionMetrics.batchesProcessed++;
+            songIngestionMetrics.workerParseCount += batch.tracks.length;
+
+            // 1. Calculate batch artwork payload size
+            const batchArtworkBytes = batch.tracks.reduce(
+              (acc, t) => acc + (t.rawPictureBytes?.byteLength ?? 0),
+              0
+            );
+            songIngestionMetrics.totalArtworkBytes += batchArtworkBytes;
+
+            // 2. Pre-process artwork files OUTSIDE of the DB transaction
+            // This prevents Sharp image decoding and disk I/O from holding the SQLite/PGlite lock
+            const artworkStart = performance.now();
+            const preprocessedArtworks = await Promise.all(
+              batch.tracks.map((t) => processArtworkFiles('songs', t.rawPictureBytes))
+            );
+            const artworkDuration = performance.now() - artworkStart;
+            songIngestionMetrics.artworkDurations.push(artworkDuration);
+
+            // 3. Execute pure DB transaction (no filesystem/sharp work inside transaction lock)
+            const dbTxStart = performance.now();
             await db.transaction(async (trx) => {
-              for (const track of batch.tracks) {
+              for (let i = 0; i < batch.tracks.length; i++) {
+                const track = batch.tracks[i];
+                const artwork = preprocessedArtworks[i];
+
                 try {
-                  const res = await ingestTrackDTO(track, trx);
+                  const res = await ingestTrackDTO(track, trx, artwork);
                   if (res) {
                     successCount++;
                     newSongIds.push(res.songData.id);
@@ -208,9 +282,12 @@ export const processSongsWithWorkerPool = async (
                 }
               }
             });
+            const dbTxDuration = performance.now() - dbTxStart;
+            songIngestionMetrics.dbTxDurations.push(dbTxDuration);
 
-            const txDuration = performance.now() - txStart;
-            batchTxDurations.push(txDuration);
+            logger.info(
+              `[songWorkerPool] Batch ${batch.batchId} (${batch.tracks.length} tracks, ${(batchArtworkBytes / 1024 / 1024).toFixed(2)} MB artwork): artwork=${artworkDuration.toFixed(1)}ms, pureDbTx=${dbTxDuration.toFixed(1)}ms`
+            );
           }
 
           if (batch.errors.length > 0) {
@@ -228,13 +305,19 @@ export const processSongsWithWorkerPool = async (
         }
       });
 
-      // Log transaction performance metrics
-      if (batchTxDurations.length > 0) {
-        const sorted = [...batchTxDurations].sort((a, b) => a - b);
-        const p50 = sorted[Math.floor(sorted.length * 0.5)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+      // Log isolated transaction and artwork latency percentiles
+      if (songIngestionMetrics.dbTxDurations.length > 0) {
+        const sortedDb = [...songIngestionMetrics.dbTxDurations].sort((a, b) => a - b);
+        const sortedArt = [...songIngestionMetrics.artworkDurations].sort((a, b) => a - b);
+        const dbP50 = sortedDb[Math.floor(sortedDb.length * 0.5)];
+        const dbP95 = sortedDb[Math.floor(sortedDb.length * 0.95)];
+        const artP50 = sortedArt[Math.floor(sortedArt.length * 0.5)];
+        const artP95 = sortedArt[Math.floor(sortedArt.length * 0.95)];
+
         logger.info(
-          `[songWorkerPool] Ingestion completed: ${successCount} tracks in ${batchTxDurations.length} batches. Tx duration P50: ${p50.toFixed(1)}ms, P95: ${p95.toFixed(1)}ms.`
+          `[songWorkerPool] Ingestion complete: ${successCount} tracks in ${songIngestionMetrics.batchesProcessed} batches (${(songIngestionMetrics.totalArtworkBytes / 1024 / 1024).toFixed(1)} MB total artwork).\n` +
+          `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
+          `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
         );
       }
 
@@ -269,9 +352,10 @@ export const processSongsWithWorkerPool = async (
         errors
       };
     } catch (workerErr) {
-      logger.warn('[songWorkerPool] Worker batch parsing failed, falling back to local ingestion in Main.', {
-        error: workerErr
-      });
+      logger.error(
+        '[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed. Falling back to local ingestion in Main.',
+        { error: workerErr }
+      );
     }
   }
 

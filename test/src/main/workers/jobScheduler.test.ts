@@ -28,7 +28,7 @@ describe('JobScheduler', () => {
       state: 'queued',
       retries: 0,
       execute: async () => {
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
     };
 
@@ -66,7 +66,7 @@ describe('JobScheduler', () => {
     scheduler.start();
 
     // Give it a moment to start running
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     
     // Job is now running, so we cancel it
     scheduler.cancelJob('test_cancel');
@@ -75,7 +75,7 @@ describe('JobScheduler', () => {
     rejectJob!(new Error('Aborted'));
     
     // Give it a moment to hit the catch block
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     
     const metrics = scheduler.getRawMetrics();
     expect(metrics.queuedJobs).toBe(0);

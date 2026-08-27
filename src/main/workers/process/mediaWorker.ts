@@ -154,6 +154,14 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
               await new Promise<void>((resolve) => {
                 const timeoutTimer = setTimeout(() => {
                   pendingBatchAcks.delete(ackKey);
+                  console.warn(
+                    `[MediaWorker] Backpressure safety timeout triggered (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}. Resuming worker.`
+                  );
+                  postToMain({
+                    protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                    type: 'EVT_ERROR_SUMMARY',
+                    message: `Backpressure safety timeout triggered (30s) on task '${cmd.taskId}', batch ${batch.batchId}.`
+                  });
                   resolve();
                 }, 30000); // 30s safety timeout to prevent permanent worker stalls
 
@@ -197,7 +205,8 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       const controller = activeTaskControllers.get(cmd.taskId);
       if (controller) {
         controller.abort();
-        activeTaskControllers.delete(cmd.taskId);
+        // NOTE: Do not delete activeTaskControllers here.
+        // The executing task's finally block owns registration cleanup.
       }
       // Unblock any pending batch acks for this task
       for (const [key, resolve] of pendingBatchAcks.entries()) {

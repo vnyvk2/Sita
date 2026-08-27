@@ -26,19 +26,21 @@ export interface IngestedTrackResult {
  *
  * CRITICAL ARCHITECTURAL INVARIANTS:
  * 1. Runs strictly in the Main process using the provided transaction handle (trx).
- * 2. Artwork files are generated using atomic .tmp + rename semantics via processArtworkFiles.
+ * 2. If preprocessedArtwork is provided, NO filesystem/image decoding work occurs inside trx.
  * 3. Never instantiates a new database connection.
  */
 export async function ingestTrackDTO(
   track: ParsedTrackDTO,
-  trx: Parameters<Parameters<typeof import('@main/db/db').db.transaction>[0]>[0]
+  trx: Parameters<Parameters<typeof import('@main/db/db').db.transaction>[0]>[0],
+  preprocessedArtwork?: Awaited<ReturnType<typeof processArtworkFiles>>
 ): Promise<IngestedTrackResult | undefined> {
   const isAvailable = await isSongWithPathAvailable(track.songPath);
   if (isAvailable) {
     return undefined;
   }
 
-  const processedArtwork = await processArtworkFiles('songs', track.rawPictureBytes);
+  const processedArtwork =
+    preprocessedArtwork ?? (await processArtworkFiles('songs', track.rawPictureBytes));
 
   const songInfo: typeof songs.$inferInsert = {
     title: track.title,

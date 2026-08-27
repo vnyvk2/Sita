@@ -83,15 +83,23 @@ describe('tagParserHandler (Phase C3)', () => {
       expect(mockFileInstance.dispose).toHaveBeenCalledTimes(1);
     });
 
-    it('should dispose taglib handle even if reading properties fails', async () => {
-      vi.mocked(fs.stat).mockRejectedValueOnce(new Error('EACCES: permission denied'));
+    it('should dispose taglib handle in finally block even if tag reading throws', async () => {
+      const failingFile = {
+        get tag(): unknown {
+          throw new Error('Corrupted ID3 header');
+        },
+        dispose: vi.fn()
+      };
+      const { File } = await import('node-taglib-sharp');
+      vi.mocked(File.createFromPath).mockReturnValueOnce(failingFile as unknown as typeof mockFileInstance);
 
-      await expect(parseTrackMetadata('C:/Music/denied.mp3')).rejects.toThrow('EACCES');
+      await expect(parseTrackMetadata('C:/Music/corrupt.mp3')).rejects.toThrow('Corrupted ID3 header');
+      expect(failingFile.dispose).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('parseTracksStreaming with 100-track backpressure', () => {
-    it('should stream tracks in 100-item chunks and pause until ACK resolves', async () => {
+    it('should stream tracks in 100-item chunks and pause until ACK resolves (last batch completes without ACK)', async () => {
       // 250 test tracks
       const testTracks = Array.from({ length: 250 }, (_, i) => ({
         songPath: `C:/Music/track_${i}.mp3`,
@@ -117,10 +125,12 @@ describe('tagParserHandler (Phase C3)', () => {
             trackCount: batch.tracks.length
           });
 
-          // Wait for ACK simulation
-          await new Promise<void>((resolve) => {
-            ackResolvers.push(resolve);
-          });
+          // Production contract: only non-final batches wait for CMD_ACK_BATCH
+          if (!batch.isLastBatch) {
+            await new Promise<void>((resolve) => {
+              ackResolvers.push(resolve);
+            });
+          }
         }
       });
 
@@ -166,10 +176,7 @@ describe('tagParserHandler (Phase C3)', () => {
         trackCount: 50
       });
 
-      // Acknowledge final batch
-      const ack3 = ackResolvers.shift()!;
-      ack3();
-
+      // The final batch MUST NOT wait for an ACK; worker streaming finishes immediately
       await streamPromise;
       expect(ackResolvers).toHaveLength(0);
     });
@@ -198,6 +205,39 @@ describe('tagParserHandler (Phase C3)', () => {
 
       // Only batch 1 should have dispatched before abort stopped the loop
       expect(dispatchedBatches).toEqual([1]);
+    });
+
+    it('should obey batch-boundary cancellation: finish in-flight batch and discard subsequent batches', async () => {
+      const testTracks = Array.from({ length: 300 }, (_, i) => ({
+        songPath: `C:/Music/track_${i}.mp3`,
+        folderId: 1
+      }));
+
+      const abortController = new AbortController();
+      const processedBatches: number[] = [];
+
+      const streamPromise = parseTracksStreaming(testTracks, {
+        taskId: 'task_boundary_abort',
+        batchSize: 100,
+        abortSignal: abortController.signal,
+        onBatchReady: async (batch) => {
+          // Check cancellation at batch boundary (mimicking Main-side onBatch check)
+          if (abortController.signal.aborted) {
+            return;
+          }
+          processedBatches.push(batch.batchId);
+
+          if (batch.batchId === 1) {
+            // Abort while batch 1 is committing
+            abortController.abort();
+          }
+        }
+      });
+
+      await streamPromise;
+
+      // Batch 1 completed atomically; batches 2 and 3 were never processed
+      expect(processedBatches).toEqual([1]);
     });
   });
 });
