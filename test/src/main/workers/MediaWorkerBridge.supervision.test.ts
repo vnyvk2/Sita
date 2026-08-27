@@ -13,11 +13,19 @@ import type { Job } from '@main/workers/types';
 
 class MockUtilityProcess extends EventEmitter {
   public pid: number;
-  public postMessage = vi.fn((msg?: { type?: string }) => {
+  public onAssetCommand?: (cmd: MainToWorkerCommand) => void;
+
+  public postMessage = vi.fn((msg?: MainToWorkerCommand) => {
     if (msg?.type === 'CMD_SHUTDOWN') {
       setTimeout(() => this.simulateExit(0), 5);
     }
+    if (msg?.type === 'CMD_GENERATE_ASSET') {
+      if (this.onAssetCommand) {
+        this.onAssetCommand(msg);
+      }
+    }
   });
+
   public kill = vi.fn(() => {
     this.simulateExit(0);
   });
@@ -39,6 +47,7 @@ class MockUtilityProcess extends EventEmitter {
 let mockProcess: MockUtilityProcess;
 let nextPid = 20000;
 let autoSendReadyOnFork = false;
+let customOnAssetCommand: ((cmd: MainToWorkerCommand) => void) | undefined;
 
 vi.mock('electron', () => ({
   app: {
@@ -48,6 +57,9 @@ vi.mock('electron', () => ({
   utilityProcess: {
     fork: vi.fn(() => {
       mockProcess = new MockUtilityProcess(nextPid++);
+      if (customOnAssetCommand) {
+        mockProcess.onAssetCommand = customOnAssetCommand;
+      }
       if (autoSendReadyOnFork) {
         setTimeout(() => {
           mockProcess.simulateWorkerMessage({
@@ -69,12 +81,15 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     autoSendReadyOnFork = false;
+    customOnAssetCommand = undefined;
     bridge = new MediaWorkerBridge();
     bridge.resetSupervisionStateForTesting();
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     autoSendReadyOnFork = false;
+    customOnAssetCommand = undefined;
     await bridge.terminate();
   });
 
@@ -115,111 +130,313 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
     });
   });
 
-  describe('Rolling 60s Crash Window & Exact Crash Threshold', () => {
-    it('should auto-restart on crashes 1, 2, and 3, but suppress restart on crash 4 within 60s', async () => {
-      // 1. Boot worker
-      await completeHandshake(bridge.start(2000), 10001);
-      expect(bridge.getState()).toBe('READY');
+  describe('Fake-Timer Backoff Timing & Exact Threshold Contract', () => {
+    it('verifies exact backoff delays (100ms -> 250ms -> 500ms) without manual start() intervention', async () => {
+      vi.useFakeTimers();
+      const { utilityProcess } = await import('electron');
 
-      // Crash #1 -> schedules restart with backoff
+      // 1. Initial boot
+      const startP = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10001,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+      await startP;
+      expect(bridge.getState()).toBe('READY');
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(1);
+
+      // --- CRASH #1 ---
       mockProcess.simulateExit(1);
       expect(bridge.hasPendingRestartTimer()).toBe(true);
       expect(bridge.getConsecutiveCrashCount()).toBe(1);
-      expect(bridge.getCrashTimestamps()).toHaveLength(1);
 
-      // Complete restart #1
-      await completeHandshake(bridge.start(2000), 10002);
+      // At 99ms, no new process spawned yet
+      vi.advanceTimersByTime(99);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(1);
+
+      // At 100ms, automatic spawn occurs
+      vi.advanceTimersByTime(1);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(2);
+
+      // Complete handshake for restart #1
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10002,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
       expect(bridge.getState()).toBe('READY');
 
-      // Crash #2 -> schedules restart with backoff
+      // --- CRASH #2 ---
       mockProcess.simulateExit(1);
       expect(bridge.hasPendingRestartTimer()).toBe(true);
       expect(bridge.getConsecutiveCrashCount()).toBe(2);
-      expect(bridge.getCrashTimestamps()).toHaveLength(2);
 
-      // Complete restart #2
-      await completeHandshake(bridge.start(2000), 10003);
+      // At 249ms, no new process spawned yet
+      vi.advanceTimersByTime(249);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(2);
+
+      // At 250ms, automatic spawn occurs
+      vi.advanceTimersByTime(1);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(3);
+
+      // Complete handshake for restart #2
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10003,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
       expect(bridge.getState()).toBe('READY');
 
-      // Crash #3 -> schedules restart with backoff
+      // --- CRASH #3 ---
       mockProcess.simulateExit(1);
       expect(bridge.hasPendingRestartTimer()).toBe(true);
       expect(bridge.getConsecutiveCrashCount()).toBe(3);
-      expect(bridge.getCrashTimestamps()).toHaveLength(3);
 
-      // Complete restart #3
-      await completeHandshake(bridge.start(2000), 10004);
+      // At 499ms, no new process spawned yet
+      vi.advanceTimersByTime(499);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(3);
+
+      // At 500ms, automatic spawn occurs
+      vi.advanceTimersByTime(1);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(4);
+
+      // Complete handshake for restart #3
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10004,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
       expect(bridge.getState()).toBe('READY');
 
-      // Crash #4 within rolling 60s -> MUST NOT RESTART
+      // --- CRASH #4 within rolling 60s ---
       const crashLimitSpy = vi.fn();
       bridge.once('crash_limit_exceeded', crashLimitSpy);
 
       mockProcess.simulateExit(1);
 
+      // Crash #4 MUST NOT schedule a restart
       expect(crashLimitSpy).toHaveBeenCalledWith(
         expect.objectContaining({ code: 1, crashCount: 4 })
       );
       expect(bridge.getState()).toBe('CRASHED');
       expect(bridge.hasPendingRestartTimer()).toBe(false);
+
+      // Advance 10000ms: verify NO process spawned
+      vi.advanceTimersByTime(10000);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(4);
     });
-  });
 
-  describe('Shutdown / Restart Race Protection', () => {
-    it('terminate() must cancel pending restart timer and prevent spawning during shutdown', async () => {
+    it('proves generateAsset() awaiting during backoff does NOT bypass backoff delay or spawn duplicate processes', async () => {
+      vi.useFakeTimers();
       const { utilityProcess } = await import('electron');
-      await completeHandshake(bridge.start(2000), 10001);
-      const forksAfterBoot = vi.mocked(utilityProcess.fork).mock.calls.length;
 
-      // Worker crashes -> restart is scheduled
+      // 1. Initial boot
+      const startP = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10001,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+      await startP;
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(1);
+
+      // 2. Crash -> 100ms restart timer scheduled
       mockProcess.simulateExit(1);
       expect(bridge.hasPendingRestartTimer()).toBe(true);
 
-      // Application initiates shutdown before restart timer fires
-      await bridge.terminate();
+      // 3. Caller calls generateAsset() at 50ms into backoff window
+      vi.advanceTimersByTime(50);
+      let assetCompleted = false;
+      const assetPromise = bridge
+        .generateAsset({
+          jobType: 'waveform',
+          sourceFilePath: 'C:/Music/test.mp3',
+          destinationPath: 'C:/Cache/test.bin'
+        })
+        .then((res) => {
+          assetCompleted = true;
+          return res;
+        });
 
-      // Pending restart timer MUST have been cancelled
-      expect(bridge.hasPendingRestartTimer()).toBe(false);
-      expect(bridge.getState()).toBe('TERMINATED');
+      // PROVE: generateAsset() did NOT bypass the backoff timer
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(1);
+      expect(assetCompleted).toBe(false);
 
-      // Wait beyond the backoff delay to verify no new process was spawned
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(forksAfterBoot);
+      // 4. Advance remaining 50ms to reach 100ms
+      vi.advanceTimersByTime(50);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(2);
+
+      // 5. Complete handshake for the restarted process
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10002,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+
+      // Allow microtask to run so generateAsset sends command
+      await vi.advanceTimersByTimeAsync(0);
+
+      // 6. Complete the asset task
+      const cmdCall = mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as MainToWorkerCommand).type === 'CMD_GENERATE_ASSET'
+      );
+      expect(cmdCall).toBeDefined();
+      const taskId = (cmdCall![0] as { taskId: string }).taskId;
+
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_ASSET_COMPLETE',
+        taskId,
+        jobType: 'waveform',
+        success: true,
+        outputFilePath: 'C:/Cache/test.bin',
+        metadata: {}
+      });
+
+      const res = await assetPromise;
+      expect(res.success).toBe(true);
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(2);
     });
   });
 
-  describe('Single-Flight Startup & Restart', () => {
-    it('concurrent start() calls await the same startup promise without spawning duplicate processes', async () => {
+  describe('Concurrent generateAsset() Single-Flight Coverage', () => {
+    it('multiple concurrent generateAsset() calls while worker is starting spawn exactly ONE utilityProcess', async () => {
       const { utilityProcess } = await import('electron');
       const initialForks = vi.mocked(utilityProcess.fork).mock.calls.length;
 
-      // Dispatch 3 concurrent start calls
-      const p1 = bridge.start(2000);
-      const p2 = bridge.start(2000);
-      const p3 = bridge.start(2000);
+      // Dispatch 3 concurrent asset generation calls while bridge is UNINITIALIZED
+      const p1 = bridge.generateAsset({
+        jobType: 'artwork',
+        sourceFilePath: 'C:/Music/1.mp3',
+        destinationPath: 'C:/Cache/1.webp'
+      });
+      const p2 = bridge.generateAsset({
+        jobType: 'artwork',
+        sourceFilePath: 'C:/Music/2.mp3',
+        destinationPath: 'C:/Cache/2.webp'
+      });
+      const p3 = bridge.generateAsset({
+        jobType: 'waveform',
+        sourceFilePath: 'C:/Music/3.mp3',
+        destinationPath: 'C:/Cache/3.bin'
+      });
 
-      // Exactly 1 fork call should have been initiated
+      // PROVE: exactly ONE utilityProcess.fork was initiated
       expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(initialForks + 1);
 
-      // Complete handshake
-      await completeHandshake(p1, 10001);
-      await Promise.all([p2, p3]);
+      // Complete worker startup handshake
+      const readyEvt: EvtReady = {
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10001,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      };
+      mockProcess.simulateWorkerMessage(readyEvt);
 
-      expect(bridge.getState()).toBe('READY');
+      // Allow event loop to dispatch the 3 commands
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const postCalls = mockProcess.postMessage.mock.calls.filter(
+        (c) => (c[0] as MainToWorkerCommand).type === 'CMD_GENERATE_ASSET'
+      );
+      expect(postCalls).toHaveLength(3);
+
+      // Respond with EVT_ASSET_COMPLETE for each
+      for (const call of postCalls) {
+        const cmd = call[0] as { taskId: string; jobType: 'artwork' | 'waveform'; input: { destinationPath: string } };
+        mockProcess.simulateWorkerMessage({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_ASSET_COMPLETE',
+          taskId: cmd.taskId,
+          jobType: cmd.jobType,
+          success: true,
+          outputFilePath: cmd.input.destinationPath,
+          metadata: {}
+        });
+      }
+
+      const results = await Promise.all([p1, p2, p3]);
+      expect(results).toHaveLength(3);
+      expect(results.every((r) => r.success)).toBe(true);
+
+      // PROVE: STILL exactly one process spawned
       expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(initialForks + 1);
     });
   });
 
-  describe('Consecutive Backoff & Task Completion Reset', () => {
-    it('resets consecutiveCrashCount only upon successful task completion', async () => {
-      await completeHandshake(bridge.start(2000), 10001);
+  describe('10-Second Stable READY Reset Path', () => {
+    it('resets consecutiveCrashCount only after 10 full seconds in READY state', async () => {
+      vi.useFakeTimers();
+
+      // 1. Initial boot
+      const startP = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10001,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+      await startP;
+
+      // 2. Crash -> consecutiveCrashCount becomes 1
+      mockProcess.simulateExit(1);
+      expect(bridge.getConsecutiveCrashCount()).toBe(1);
+
+      // Advance 100ms to allow restart spawn
+      vi.advanceTimersByTime(100);
+
+      // Complete handshake
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10002,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+      expect(bridge.getState()).toBe('READY');
+
+      // PROVE: consecutiveCrashCount is NOT reset immediately upon EVT_READY
+      expect(bridge.getConsecutiveCrashCount()).toBe(1);
+
+      // Advance 9999ms: count MUST remain 1
+      vi.advanceTimersByTime(9999);
+      expect(bridge.getConsecutiveCrashCount()).toBe(1);
+
+      // Advance final 1ms (reaching 10,000ms total): count MUST reset to 0
+      vi.advanceTimersByTime(1);
+      expect(bridge.getConsecutiveCrashCount()).toBe(0);
+    });
+
+    it('resets consecutiveCrashCount upon successful task completion', async () => {
+      vi.useFakeTimers();
+
+      const startP = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10001,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
+      await startP;
 
       // Crash #1
       mockProcess.simulateExit(1);
       expect(bridge.getConsecutiveCrashCount()).toBe(1);
 
-      // Restart worker
-      await completeHandshake(bridge.start(2000), 10002);
+      // Advance 100ms for restart
+      vi.advanceTimersByTime(100);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 10002,
+        supportedOps: ['CMD_PING', 'CMD_GENERATE_ASSET', 'CMD_SHUTDOWN']
+      });
 
       // Consecutive crash count is NOT reset merely because EVT_READY arrived
       expect(bridge.getConsecutiveCrashCount()).toBe(1);
@@ -230,6 +447,8 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
         sourceFilePath: 'C:/Music/song.mp3',
         destinationPath: 'C:/Cache/artworks/song.webp'
       });
+
+      await vi.advanceTimersByTimeAsync(0);
 
       const cmdCall = mockProcess.postMessage.mock.calls.find(
         (c) => (c[0] as MainToWorkerCommand).type === 'CMD_GENERATE_ASSET'
@@ -256,15 +475,62 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
     });
   });
 
+  describe('Shutdown / Restart Race Protection', () => {
+    it('terminate() must cancel pending restart timer and prevent spawning during shutdown', async () => {
+      const { utilityProcess } = await import('electron');
+      await completeHandshake(bridge.start(2000), 10001);
+      const forksAfterBoot = vi.mocked(utilityProcess.fork).mock.calls.length;
+
+      // Worker crashes -> restart is scheduled
+      mockProcess.simulateExit(1);
+      expect(bridge.hasPendingRestartTimer()).toBe(true);
+
+      // Application initiates shutdown before restart timer fires
+      await bridge.terminate();
+
+      // Pending restart timer MUST have been cancelled
+      expect(bridge.hasPendingRestartTimer()).toBe(false);
+      expect(bridge.getState()).toBe('TERMINATED');
+
+      // Wait beyond the backoff delay to verify no new process was spawned
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(vi.mocked(utilityProcess.fork).mock.calls.length).toBe(forksAfterBoot);
+    });
+  });
+
   describe('JobScheduler Integration & Failure Recovery', () => {
     it('Scheduler catches Bridge rejection, increments retries, and retries the job naturally', async () => {
       autoSendReadyOnFork = true;
+
+      let attempts = 0;
+      customOnAssetCommand = (cmd) => {
+        const c = cmd as { taskId: string; jobType: 'artwork' | 'waveform' };
+        if (attempts === 1) {
+          // Attempt 1: crash worker while job is executing
+          setTimeout(() => {
+            mockProcess.simulateExit(1);
+          }, 5);
+        } else {
+          // Attempt 2 (retry): succeed
+          setTimeout(() => {
+            mockProcess.simulateWorkerMessage({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_ASSET_COMPLETE',
+              taskId: c.taskId,
+              jobType: c.jobType,
+              success: true,
+              outputFilePath: 'C:/Cache/test.bin',
+              metadata: {}
+            });
+          }, 5);
+        }
+      };
+
       await bridge.start(2000);
 
       const scheduler = new JobScheduler();
       scheduler.start();
 
-      let attempts = 0;
       const jobCompletedPromise = new Promise<void>((resolve) => {
         scheduler.once('JOB_COMPLETED', (job) => {
           if (job.id === 'asset_job_resilience_test') {
@@ -283,39 +549,11 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
         maxRetries: 2,
         execute: async () => {
           attempts++;
-          if (attempts === 1) {
-            // First attempt: dispatch to bridge, but worker crashes mid-task
-            const p = bridge.generateAsset({
-              jobType: 'waveform',
-              sourceFilePath: 'C:/Music/test.mp3',
-              destinationPath: 'C:/Cache/test.bin'
-            });
-            setTimeout(() => {
-              mockProcess.simulateExit(1);
-            }, 10);
-            return p;
-          } else {
-            // Retry attempt: succeeds
-            const p = bridge.generateAsset({
-              jobType: 'waveform',
-              sourceFilePath: 'C:/Music/test.mp3',
-              destinationPath: 'C:/Cache/test.bin'
-            });
-            setTimeout(() => {
-              const cmdCall = mockProcess.postMessage.mock.calls[mockProcess.postMessage.mock.calls.length - 1];
-              const taskId = (cmdCall[0] as { taskId: string }).taskId;
-              mockProcess.simulateWorkerMessage({
-                protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-                type: 'EVT_ASSET_COMPLETE',
-                taskId,
-                jobType: 'waveform',
-                success: true,
-                outputFilePath: 'C:/Cache/test.bin',
-                metadata: {}
-              });
-            }, 20);
-            return p;
-          }
+          return bridge.generateAsset({
+            jobType: 'waveform',
+            sourceFilePath: 'C:/Music/test.mp3',
+            destinationPath: 'C:/Cache/test.bin'
+          });
         }
       };
 
@@ -335,6 +573,22 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
 
     it('Job that fails continuously reaches maxRetries and is marked failed without crashing scheduler', async () => {
       autoSendReadyOnFork = true;
+
+      customOnAssetCommand = (cmd) => {
+        const c = cmd as { taskId: string; jobType: 'artwork' | 'waveform' };
+        setTimeout(() => {
+          mockProcess.simulateWorkerMessage({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_ASSET_COMPLETE',
+            taskId: c.taskId,
+            jobType: c.jobType,
+            success: false,
+            error: 'Malformed audio header',
+            cancelled: false
+          });
+        }, 5);
+      };
+
       await bridge.start(2000);
 
       const scheduler = new JobScheduler();
@@ -356,25 +610,11 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
         maxRetries: 2,
         execute: async () => {
           attempts++;
-          const p = bridge.generateAsset({
+          return bridge.generateAsset({
             jobType: 'waveform',
             sourceFilePath: 'C:/Music/corrupt.mp3',
             destinationPath: 'C:/Cache/corrupt.bin'
           });
-          setTimeout(() => {
-            const cmdCall = mockProcess.postMessage.mock.calls[mockProcess.postMessage.mock.calls.length - 1];
-            const taskId = (cmdCall[0] as { taskId: string }).taskId;
-            mockProcess.simulateWorkerMessage({
-              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-              type: 'EVT_ASSET_COMPLETE',
-              taskId,
-              jobType: 'waveform',
-              success: false,
-              error: 'Malformed audio header',
-              cancelled: false
-            });
-          }, 10);
-          return p;
         }
       };
 

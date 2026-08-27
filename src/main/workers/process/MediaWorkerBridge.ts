@@ -205,10 +205,6 @@ export class MediaWorkerBridge extends EventEmitter {
    * Idempotent: returns existing in-flight startup promise if already launching.
    */
   public async start(timeoutMs = 5000): Promise<void> {
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-      this.restartTimer = null;
-    }
     if (this.state === 'READY') return;
     if (this.startPromise) return this.startPromise;
 
@@ -806,23 +802,30 @@ export class MediaWorkerBridge extends EventEmitter {
       // Schedule controlled restart with consecutive backoff:
       // consecutiveCrashCount = 1 -> 100ms, 2 -> 250ms, 3 -> 500ms
       this.consecutiveCrashCount++;
-      const delayMs = Math.min(1000, Math.round(100 * (2.5 ** (this.consecutiveCrashCount - 1))));
+      const backoffDelaysMs = [100, 250, 500];
+      const delayMs = backoffDelaysMs[this.consecutiveCrashCount - 1] ?? 1000;
 
       this.state = 'STARTING';
       logger.info(
         `[MediaWorkerBridge] Scheduling auto-restart in ${delayMs}ms (crash #${this.crashTimestamps.length} in rolling 60s, consecutive: ${this.consecutiveCrashCount})...`
       );
 
-      this.restartTimer = setTimeout(() => {
-        this.restartTimer = null;
-        this.start()
-          .then(() => {
-            this.emit('restarted', { pid: this.workerPid });
-          })
-          .catch((err) => {
-            logger.error('[MediaWorkerBridge] Auto-restart failed:', { error: err });
-          });
-      }, delayMs);
+      this.startPromise = new Promise<void>((resolve, reject) => {
+        this.restartTimer = setTimeout(() => {
+          this.restartTimer = null;
+          this.executeStart(5000)
+            .then(() => {
+              this.emit('restarted', { pid: this.workerPid });
+              resolve();
+            })
+            .catch((err) => {
+              logger.error('[MediaWorkerBridge] Auto-restart failed:', { error: err });
+              reject(err);
+            });
+        }, delayMs);
+      }).finally(() => {
+        this.startPromise = null;
+      });
     } else {
       this.state = 'TERMINATED';
     }
