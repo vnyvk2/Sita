@@ -235,6 +235,143 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
     });
   });
 
+  describe('walkDirectory (Phase C2)', () => {
+    it('should send CMD_WALK_DIRECTORY and resolve snapshots on EVT_WALK_COMPLETE', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const onFileDiscovered = vi.fn();
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }], {
+        onFileDiscovered
+      });
+
+      expect(mockProcess.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'CMD_WALK_DIRECTORY',
+          roots: [{ id: 1, path: 'C:/Music' }]
+        })
+      );
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_WALK_DIRECTORY'
+      );
+      expect(postCall).toBeDefined();
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Simulate progress event
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_PROGRESS',
+        taskId,
+        discoveredCount: 1,
+        currentPath: 'C:/Music/track1.mp3'
+      });
+
+      expect(onFileDiscovered).toHaveBeenCalledWith(1, 'C:/Music/track1.mp3');
+
+      // Simulate completion event
+      const mockDate = new Date();
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_COMPLETE',
+        taskId,
+        snapshots: [
+          {
+            path: 'C:/Music/track1.mp3',
+            fileModifiedAt: mockDate,
+            size: 1024,
+            rootId: 1,
+            dirPath: 'C:/Music'
+          }
+        ],
+        failedSubtrees: [],
+        failedPaths: []
+      });
+
+      const result = await walkPromise;
+      expect(result.snapshots).toHaveLength(1);
+      expect(result.snapshots[0].path).toBe('C:/Music/track1.mp3');
+      expect(result.snapshots[0].fileModifiedAt).toBeInstanceOf(Date);
+      expect(result.failedSubtrees).toEqual([]);
+      expect(result.failedPaths).toEqual([]);
+    });
+
+    it('should send CMD_CANCEL_TASK when abortSignal fires', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const abortController = new AbortController();
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }], {
+        abortSignal: abortController.signal
+      });
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_WALK_DIRECTORY'
+      );
+      expect(postCall).toBeDefined();
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Trigger abort
+      abortController.abort();
+
+      expect(mockProcess.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'CMD_CANCEL_TASK',
+          taskId
+        })
+      );
+
+      // Complete walk with cancelled
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_COMPLETE',
+        taskId,
+        snapshots: [],
+        failedSubtrees: [],
+        failedPaths: [],
+        cancelled: true
+      });
+
+      const result = await walkPromise;
+      expect(result.snapshots).toHaveLength(0);
+    });
+
+    it('should reject walkDirectory if worker exits during walk', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }]);
+      await Promise.resolve();
+
+      // Simulate unexpected crash during walk
+      mockProcess.simulateExit(1);
+
+      await expect(walkPromise).rejects.toThrow(
+        'Worker process exited with code 1 during directory walk.'
+      );
+    });
+  });
+
   describe('getMediaWorkerPath', () => {
     it('should return a resolved non-empty string path for mediaWorker.js', () => {
       const resolvedPath = getMediaWorkerPath();

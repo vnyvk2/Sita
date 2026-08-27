@@ -38,13 +38,14 @@ export interface CmdAckBatch {
   batchId: number;
 }
 
-// Reserved for Phase C2
+// Phase C2: Directory walking
 export interface CmdWalkDirectory {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'CMD_WALK_DIRECTORY';
   taskId: string;
   roots: Array<{ id: number; path: string }>;
   supportedExtensions: string[];
+  maxConcurrency?: number;
 }
 
 // Reserved for Phase C3
@@ -119,7 +120,7 @@ export interface EvtErrorSummary {
   sampleMessages: string[];
 }
 
-// Reserved for Phase C2
+// Phase C2: Directory walking events
 export interface EvtWalkProgress {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'EVT_WALK_PROGRESS';
@@ -141,6 +142,8 @@ export interface EvtWalkComplete {
   }>;
   failedSubtrees: string[];
   failedPaths: string[];
+  cancelled?: boolean;
+  error?: string;
 }
 
 // Reserved for Phase C3

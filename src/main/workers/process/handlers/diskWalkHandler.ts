@@ -1,35 +1,53 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-import { supportedMusicExtensions } from '../filesystem';
-import logger from '../logger';
-import type { DiskSongSnapshot, ScanRoot } from './diffEngine';
+export interface DiskWalkRoot {
+  id: number;
+  path: string;
+}
 
-export interface DiskWalkOptions {
+export interface DiskSongSnapshotDTO {
+  path: string;
+  fileModifiedAt: Date;
+  size: number;
+  rootId: number;
+  dirPath?: string;
+}
+
+export interface DiskWalkHandlerOptions {
+  supportedExtensions: string[];
   abortSignal?: AbortSignal;
-  onFileDiscovered?: (totalDiscovered: number, currentPath: string) => void;
+  onProgress?: (totalDiscovered: number, currentPath?: string) => void;
   maxConcurrency?: number;
 }
 
-export interface DiskWalkResult {
-  snapshots: DiskSongSnapshot[];
+export interface DiskWalkHandlerResult {
+  snapshots: DiskSongSnapshotDTO[];
   failedSubtrees: string[];
   failedPaths: string[];
 }
 
 /**
- * Local in-process directory traversal.
- * Used in Vitest unit test suites or as an emergency fallback if the utilityProcess is unavailable.
+ * Worker-side asynchronous directory walker.
+ * Runs inside the Electron utilityProcess.
+ *
+ * CRITICAL ARCHITECTURAL INVARIANTS:
+ * 1. Zero database dependencies, zero ORM imports.
+ * 2. 100% read-only filesystem operations.
+ * 3. Does NOT read ID3 tags (only directory entries and stat metadata).
+ * 4. Error isolation: records failedSubtrees and failedPaths without throwing,
+ *    preventing false deletion cascades in the Main diffEngine.
  */
-export const fastDiskWalkLocal = async (
-  roots: ScanRoot[],
-  options: DiskWalkOptions = {}
-): Promise<DiskWalkResult> => {
-  const { abortSignal, onFileDiscovered, maxConcurrency = 8 } = options;
-  const snapshots: DiskSongSnapshot[] = [];
+export async function executeDiskWalk(
+  roots: DiskWalkRoot[],
+  options: DiskWalkHandlerOptions
+): Promise<DiskWalkHandlerResult> {
+  const { supportedExtensions, abortSignal, onProgress, maxConcurrency = 8 } = options;
+
+  const snapshots: DiskSongSnapshotDTO[] = [];
   const failedSubtrees: string[] = [];
   const failedPaths: string[] = [];
-  const supportedExtSet = new Set(supportedMusicExtensions.map((ext) => ext.toLowerCase()));
+  const supportedExtSet = new Set(supportedExtensions.map((ext) => ext.toLowerCase()));
 
   const queue: Array<{ dirPath: string; rootId: number }> = roots.map((r) => ({
     dirPath: r.path,
@@ -39,6 +57,20 @@ export const fastDiskWalkLocal = async (
   let activeWorkers = 0;
   let hasAborted = false;
   const waiters: Array<() => void> = [];
+
+  // Throttle progress updates to avoid IPC message channel flooding
+  let lastProgressReportTime = 0;
+  let lastReportedCount = 0;
+
+  const maybeEmitProgress = (count: number, currentPath?: string, force = false) => {
+    if (!onProgress) return;
+    const now = Date.now();
+    if (force || count - lastReportedCount >= 100 || now - lastProgressReportTime >= 100) {
+      lastProgressReportTime = now;
+      lastReportedCount = count;
+      onProgress(count, currentPath);
+    }
+  };
 
   const notifyWaiters = () => {
     while (waiters.length > 0) {
@@ -61,6 +93,7 @@ export const fastDiskWalkLocal = async (
           break;
         }
 
+        // Wait for active workers to push subdirectories or finish
         await new Promise<void>((resolve) => {
           waiters.push(resolve);
         });
@@ -75,10 +108,6 @@ export const fastDiskWalkLocal = async (
         try {
           entries = await fs.readdir(item.dirPath, { withFileTypes: true });
         } catch (error) {
-          logger.warn(
-            `[fastDiskWalk] Failed to read directory '${item.dirPath}', marking subtree as unscanned.`,
-            { error }
-          );
           failedSubtrees.push(item.dirPath);
           continue;
         }
@@ -86,6 +115,7 @@ export const fastDiskWalkLocal = async (
         for (const entry of entries) {
           if (abortSignal?.aborted || hasAborted) break;
 
+          // Skip hidden directories/files (.git, .DS_Store, etc.)
           if (entry.name.startsWith('.')) continue;
 
           const fullPath = path.join(item.dirPath, entry.name);
@@ -106,14 +136,8 @@ export const fastDiskWalkLocal = async (
                   dirPath: item.dirPath
                 });
 
-                if (onFileDiscovered) {
-                  onFileDiscovered(snapshots.length, fullPath);
-                }
-              } catch (statError) {
-                logger.warn(
-                  `[fastDiskWalk] Failed to stat file '${fullPath}', marking path as unverified.`,
-                  { error: statError }
-                );
+                maybeEmitProgress(snapshots.length, fullPath);
+              } catch {
                 failedPaths.push(fullPath);
               }
             }
@@ -134,40 +158,12 @@ export const fastDiskWalkLocal = async (
 
   await Promise.all(workers);
 
+  // Emit final progress update
+  maybeEmitProgress(snapshots.length, undefined, true);
+
   return {
     snapshots,
     failedSubtrees,
     failedPaths
   };
-};
-
-/**
- * Performs a 100% read-only, bounded-concurrency asynchronous directory traversal over accessible
- * scan roots.
- *
- * In Electron runtime (Phase C2), delegates directory traversal to the utilityProcess media worker
- * via MediaWorkerBridge, keeping all fs.readdir and fs.stat operations off the Main process event loop.
- * In Vitest or non-Electron environments, transparently falls back to fastDiskWalkLocal.
- */
-export const fastDiskWalk = async (
-  roots: ScanRoot[],
-  options: DiskWalkOptions = {}
-): Promise<DiskWalkResult> => {
-  if (typeof process !== 'undefined' && process.versions?.electron && !process.env.VITEST) {
-    try {
-      const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
-      return await mediaWorkerBridge.walkDirectory(roots, {
-        abortSignal: options.abortSignal,
-        onFileDiscovered: options.onFileDiscovered,
-        maxConcurrency: options.maxConcurrency,
-        supportedExtensions: supportedMusicExtensions
-      });
-    } catch (workerError) {
-      logger.warn('[fastDiskWalk] Worker directory walk failed, falling back to local walk.', {
-        error: workerError
-      });
-    }
-  }
-
-  return fastDiskWalkLocal(roots, options);
-};
+}

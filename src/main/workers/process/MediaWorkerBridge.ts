@@ -3,10 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 
+import { appPreferences } from '../../../../package.json';
 import logger from '../../logger';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   isValidProtocolEnvelope,
+  type EvtWalkComplete,
+  type EvtWalkProgress,
   type MainToWorkerCommand,
   type WorkerToMainEvent
 } from './workerProtocol';
@@ -18,6 +21,28 @@ export type MediaWorkerState =
   | 'DRAINING'
   | 'TERMINATED'
   | 'CRASHED';
+
+export interface DiskSongSnapshotDTO {
+  path: string;
+  fileModifiedAt: Date;
+  size: number;
+  rootId: number;
+  dirPath?: string;
+}
+
+export interface DiskWalkBridgeResult {
+  snapshots: DiskSongSnapshotDTO[];
+  failedSubtrees: string[];
+  failedPaths: string[];
+}
+
+export interface DiskWalkBridgeOptions {
+  abortSignal?: AbortSignal;
+  onFileDiscovered?: (totalDiscovered: number, currentPath: string) => void;
+  supportedExtensions?: string[];
+  maxConcurrency?: number;
+  timeoutMs?: number;
+}
 
 /**
  * Resolves the location of the compiled mediaWorker script.
@@ -45,7 +70,20 @@ export class MediaWorkerBridge extends EventEmitter {
   private startPromise: Promise<void> | null = null;
   private pendingPingResolvers: Map<number, (latencyMs: number) => void> = new Map();
 
+  // Active directory walk task resolvers (Phase C2)
+  private activeWalkResolvers: Map<
+    string,
+    {
+      resolve: (result: DiskWalkBridgeResult) => void;
+      reject: (error: Error) => void;
+      onProgress?: (totalDiscovered: number, currentPath: string) => void;
+    }
+  > = new Map();
+
   // Crash tracking for supervision
+  // NOTE: Automatic crash restart supervision is intentionally deferred to Phase C4
+  // when persistent asynchronous asset jobs are active. In C1-C3, worker crashes
+  // fail the active in-flight task cleanly and alert callers without destabilizing Main.
   private crashTimestamps: number[] = [];
   private readonly MAX_CRASHES_PER_MINUTE = 3;
 
@@ -132,6 +170,94 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
+   * Delegates directory walking and stat gathering to the utilityProcess.
+   * Phase C2: Moves fastDiskWalk off the Main process event loop.
+   */
+  public async walkDirectory(
+    roots: Array<{ id: number; path: string }>,
+    options: DiskWalkBridgeOptions = {}
+  ): Promise<DiskWalkBridgeResult> {
+    const {
+      abortSignal,
+      onFileDiscovered,
+      supportedExtensions = appPreferences.supportedMusicExtensions.map((x) => `.${x}`),
+      maxConcurrency = 8,
+      timeoutMs
+    } = options;
+
+    if (abortSignal?.aborted) {
+      return { snapshots: [], failedSubtrees: [], failedPaths: [] };
+    }
+
+    if (this.state !== 'READY') {
+      await this.start();
+    }
+
+    if (!this.childProcess || this.state !== 'READY') {
+      throw new Error('[MediaWorkerBridge] Unable to walk directory: worker failed to start.');
+    }
+
+    const taskId = `walk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    return new Promise<DiskWalkBridgeResult>((resolve, reject) => {
+      let timeoutTimer: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        this.activeWalkResolvers.delete(taskId);
+        if (abortSignal) {
+          abortSignal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const onAbort = () => {
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore if process already exited
+        }
+      };
+
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      if (timeoutMs && timeoutMs > 0) {
+        timeoutTimer = setTimeout(() => {
+          onAbort();
+          cleanup();
+          reject(new Error(`[MediaWorkerBridge] Directory walk timed out after ${timeoutMs}ms.`));
+        }, timeoutMs);
+      }
+
+      this.activeWalkResolvers.set(taskId, {
+        resolve: (result) => {
+          cleanup();
+          resolve(result);
+        },
+        reject: (error) => {
+          cleanup();
+          reject(error);
+        },
+        onProgress: onFileDiscovered
+      });
+
+      this.sendCommand({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'CMD_WALK_DIRECTORY',
+        taskId,
+        roots,
+        supportedExtensions,
+        maxConcurrency
+      });
+    });
+  }
+
+  /**
    * Sends a ping to the worker and measures roundtrip IPC latency in milliseconds.
    */
   public async ping(timeoutMs = 3000): Promise<number> {
@@ -199,6 +325,35 @@ export class MediaWorkerBridge extends EventEmitter {
         break;
       }
 
+      case 'EVT_WALK_PROGRESS': {
+        const walk = this.activeWalkResolvers.get((event as EvtWalkProgress).taskId);
+        if (walk?.onProgress) {
+          walk.onProgress((event as EvtWalkProgress).discoveredCount, (event as EvtWalkProgress).currentPath ?? '');
+        }
+        break;
+      }
+
+      case 'EVT_WALK_COMPLETE': {
+        const walk = this.activeWalkResolvers.get((event as EvtWalkComplete).taskId);
+        if (walk) {
+          this.activeWalkResolvers.delete((event as EvtWalkComplete).taskId);
+          const raw = event as EvtWalkComplete;
+
+          // Ensure fileModifiedAt dates are Date objects across structured cloning
+          const snapshots = raw.snapshots.map((s) => ({
+            ...s,
+            fileModifiedAt: s.fileModifiedAt instanceof Date ? s.fileModifiedAt : new Date(s.fileModifiedAt)
+          }));
+
+          walk.resolve({
+            snapshots,
+            failedSubtrees: raw.failedSubtrees ?? [],
+            failedPaths: raw.failedPaths ?? []
+          });
+        }
+        break;
+      }
+
       case 'EVT_SHUTDOWN_DRAINED': {
         logger.info('[MediaWorkerBridge] Worker confirmed orderly shutdown drained.');
         this.emit('drained');
@@ -228,6 +383,12 @@ export class MediaWorkerBridge extends EventEmitter {
       resolver(-1);
     }
     this.pendingPingResolvers.clear();
+
+    // Fail any in-flight walk promises
+    for (const walk of this.activeWalkResolvers.values()) {
+      walk.reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during directory walk.`));
+    }
+    this.activeWalkResolvers.clear();
 
     const wasDraining = this.state === 'DRAINING' || this.state === 'TERMINATED';
     this.childProcess = null;

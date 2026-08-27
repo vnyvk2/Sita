@@ -8,6 +8,7 @@
  * Database ownership belongs strictly to the Main process.
  */
 
+import { executeDiskWalk } from './handlers/diskWalkHandler';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   isValidProtocolEnvelope,
@@ -18,10 +19,13 @@ import {
 const parentPort = process.parentPort;
 
 if (!parentPort) {
-  // If spawned without Electron parentPort (e.g. standalone node), fail early
   console.error('[MediaWorker] Fatal: process.parentPort is not available. Must be spawned as utilityProcess.');
   process.exit(1);
 }
+
+// Active task tracking for cancellation and true drain semantics
+const activeTaskControllers = new Map<string, AbortController>();
+let isDraining = false;
 
 function postToMain(event: WorkerToMainEvent): void {
   try {
@@ -31,7 +35,7 @@ function postToMain(event: WorkerToMainEvent): void {
   }
 }
 
-function handleCommand(cmd: MainToWorkerCommand): void {
+async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
   switch (cmd.type) {
     case 'CMD_PING': {
       postToMain({
@@ -43,38 +47,112 @@ function handleCommand(cmd: MainToWorkerCommand): void {
       break;
     }
 
+    case 'CMD_WALK_DIRECTORY': {
+      if (isDraining) {
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_WALK_COMPLETE',
+          taskId: cmd.taskId,
+          snapshots: [],
+          failedSubtrees: [],
+          failedPaths: [],
+          cancelled: true,
+          error: 'Worker is currently draining for shutdown.'
+        });
+        return;
+      }
+
+      const controller = new AbortController();
+      activeTaskControllers.set(cmd.taskId, controller);
+
+      try {
+        const result = await executeDiskWalk(cmd.roots, {
+          supportedExtensions: cmd.supportedExtensions,
+          abortSignal: controller.signal,
+          maxConcurrency: cmd.maxConcurrency ?? 8,
+          onProgress: (count, currentPath) => {
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_WALK_PROGRESS',
+              taskId: cmd.taskId,
+              discoveredCount: count,
+              currentPath
+            });
+          }
+        });
+
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_WALK_COMPLETE',
+          taskId: cmd.taskId,
+          snapshots: result.snapshots,
+          failedSubtrees: result.failedSubtrees,
+          failedPaths: result.failedPaths,
+          cancelled: controller.signal.aborted
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_WALK_COMPLETE',
+          taskId: cmd.taskId,
+          snapshots: [],
+          failedSubtrees: [],
+          failedPaths: [],
+          cancelled: controller.signal.aborted,
+          error: msg
+        });
+      } finally {
+        activeTaskControllers.delete(cmd.taskId);
+      }
+      break;
+    }
+
+    case 'CMD_CANCEL_TASK': {
+      const controller = activeTaskControllers.get(cmd.taskId);
+      if (controller) {
+        controller.abort();
+        activeTaskControllers.delete(cmd.taskId);
+      }
+      break;
+    }
+
     case 'CMD_SHUTDOWN': {
-      // Orderly shutdown: drain in-flight operations, signal main, and exit
+      // True drain semantics: stop accepting new work, abort active operations
+      isDraining = true;
+
+      for (const controller of activeTaskControllers.values()) {
+        try {
+          controller.abort();
+        } catch {
+          // Ignore
+        }
+      }
+      activeTaskControllers.clear();
+
       postToMain({
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
         type: 'EVT_SHUTDOWN_DRAINED'
       });
 
-      // Small delay to allow MessagePort buffer to flush before exiting
       setTimeout(() => {
         process.exit(0);
       }, 20);
       break;
     }
 
-    case 'CMD_CANCEL_TASK': {
-      // C1 scaffold: no long-running tasks active yet
-      break;
-    }
-
     case 'CMD_ACK_BATCH': {
-      // C1 scaffold: backpressure ACK reserved for C3
+      // Reserved for Phase C3 backpressure
       break;
     }
 
-    case 'CMD_WALK_DIRECTORY':
     case 'CMD_PARSE_TRACK_BATCH':
     case 'CMD_GENERATE_ASSET': {
-      // Reserved for C2, C3, C4
+      // Reserved for C3, C4
       postToMain({
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
         type: 'EVT_PROTOCOL_ERROR',
-        error: `Command '${cmd.type}' is reserved for future implementation phase and not yet enabled in C1.`
+        error: `Command '${cmd.type}' is reserved for future implementation phase and not yet enabled.`
       });
       break;
     }
@@ -111,7 +189,7 @@ parentPort.on('message', (event: Electron.MessageEvent) => {
     return;
   }
 
-  handleCommand(data as MainToWorkerCommand);
+  void handleCommand(data as MainToWorkerCommand);
 });
 
 // Signal to Main that the worker is booted, listening, and ready
@@ -119,5 +197,5 @@ postToMain({
   protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
   type: 'EVT_READY',
   pid: process.pid,
-  supportedOps: ['CMD_PING', 'CMD_SHUTDOWN']
+  supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_CANCEL_TASK', 'CMD_SHUTDOWN']
 });
