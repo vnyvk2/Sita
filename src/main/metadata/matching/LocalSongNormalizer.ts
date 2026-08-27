@@ -180,6 +180,15 @@ export class LocalSongNormalizer {
       ? dbSong.albums[0]?.album?.title ?? dbSong.albums[0]?.album?.name ?? dbSong.albums[0]?.title
       : dbSong.album?.title ?? dbSong.album?.name ?? undefined;
 
+    // Release-level artist from the albums_artists junction - distinct from
+    // the per-track artists above.
+    const albumArtists = Array.isArray(dbSong.albums) && dbSong.albums.length > 0
+      ? dbSong.albums[0]?.album?.artists
+      : undefined;
+    const albumArtist = Array.isArray(albumArtists)
+      ? albumArtists.map((a: any) => a?.artist?.name ?? a?.name).filter(Boolean).join(', ') || undefined
+      : undefined;
+
     const genres = Array.isArray(dbSong.genres)
       ? dbSong.genres.map((g: any) => g?.genre?.name ?? g?.name).filter(Boolean).join(', ')
       : undefined;
@@ -189,6 +198,7 @@ export class LocalSongNormalizer {
       path: dbSong.path ?? '',
       title: dbSong.title ?? '',
       artist: artists || undefined,
+      albumArtist: albumArtist || undefined,
       album: album || undefined,
       genre: genres || undefined,
       year: dbSong.year ?? undefined,

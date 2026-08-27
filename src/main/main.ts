@@ -1,3 +1,6 @@
+// MUST remain the first import: redirects userData before any module
+// (including the database bootstrap) reads Electron paths.
+import './lifecycle/userDataGuard';
 import fs from 'fs';
 import os from 'os';
 import path, { join } from 'path';
@@ -50,7 +53,6 @@ if (memProfiler.enabled) {
 import { version, appPreferences } from '../../package.json';
 import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import {
-  COMPACT_LYRICS_EXTENSION_HEIGHT,
   COMPACT_MINI_PLAYER_HEIGHT,
   COMPACT_MINI_PLAYER_MIN_WIDTH,
   MINI_PLAYER_DEFAULT_SIZE_X,
@@ -72,6 +74,7 @@ import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeEx
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
+import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
@@ -230,6 +233,12 @@ const APP_INFO = {
 
 logger.debug(`Starting up Nora`, { APP_INFO });
 ShutdownLogger.logBootMilestone('Application boot', { APP_INFO });
+
+// 2c P4: replay deferred metadata writes persisted by a previous session.
+// Nothing is playing during boot, so every item flushes immediately.
+void import('./updateSong/updateSongId3Tags')
+  .then((m) => m.restorePersistedPendingWrites())
+  .catch((err) => logger.error('Failed to restore persisted pending metadata writes', { err }));
 
 function launchExtensionBackgroundWorkers(session = electronSession.defaultSession) {
   return Promise.all(
@@ -401,6 +410,39 @@ const createWindow = async () => {
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {
     shell.openExternal(data.url);
     return { action: 'deny' };
+  });
+  attachRendererRecovery(mainWindow.webContents, {
+    getPlayerType: () => playerType,
+    onRecovered: (preCrashPlayerType) => {
+      // Main's playerType and window geometry survive a renderer-only crash,
+      // so changePlayerType is a no-op safeguard here. The RENDERER store,
+      // however, resets to 'normal' after a crash-triggered reload, and mini/
+      // full presentation is store-driven (not URL-driven). Re-assert the
+      // pre-crash presentation over the existing message channel until the
+      // renderer picks it up; repeats are idempotent on the renderer side.
+      void changePlayerType(preCrashPlayerType);
+      if (preCrashPlayerType === 'normal') return;
+
+      let attempts = 0;
+      const reassertInterval = setInterval(() => {
+        attempts += 1;
+        if (
+          attempts > 8 ||
+          !mainWindow ||
+          mainWindow.isDestroyed() ||
+          playerType !== preCrashPlayerType ||
+          isChangingPlayerType
+        ) {
+          clearInterval(reassertInterval);
+          return;
+        }
+        sendMessageToRenderer({
+          messageCode: 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY',
+          data: { playerType: preCrashPlayerType }
+        });
+      }, 750);
+    },
+    onRecoveryLimitExceeded: () => restartApp('renderer-crash-loop')
   });
 
   // mainWindow.on('closed', () => {
@@ -924,9 +966,14 @@ export async function restartApp(reason: string, noQuitEvents = false) {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       mainWindow.webContents.send('app/beforeQuitEvent');
     }
-    await flushPendingWritesBeforeExit(currentSongPath);
-    closeAllAbortControllers();
   }
+
+  // Pending filesystem writes (tag/lyrics queues) and in-flight operations are
+  // independent of renderer quit events; they must be settled on EVERY restart
+  // path so a relaunch never silently drops them.
+  await flushPendingWritesBeforeExit(currentSongPath);
+  closeAllAbortControllers();
+
   app.relaunch();
   app.exit(0);
 }

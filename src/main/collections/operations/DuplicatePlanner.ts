@@ -1,8 +1,9 @@
-import { HierarchyService, type PlaylistNode } from '../engine/HierarchyService';
-import { CollectionNamingStrategy } from './CollectionNamingStrategy';
+import { eq } from 'drizzle-orm';
+
 import { db } from '../../db/db';
 import { playlists } from '../../db/schema';
-import { eq } from 'drizzle-orm';
+import { HierarchyService, type PlaylistNode } from '../engine/HierarchyService';
+import { CollectionNamingStrategy } from './CollectionNamingStrategy';
 
 export interface PlannedNode {
   node: PlaylistNode;
@@ -15,11 +16,18 @@ export class DuplicatePlanner {
     private namingStrategy: CollectionNamingStrategy = new CollectionNamingStrategy()
   ) {}
 
-  public async plan(playlistId: number): Promise<{ nodes: PlannedNode[]; rootNode: PlaylistNode }> {
-    const descendants = await this.hierarchyService.getDescendants(playlistId);
-    
+  /**
+   * @param trx Transaction-scoped connection. MUST be provided when planning inside an open
+   *   transaction - PGlite has a single connection, so global-db queries here would self-deadlock.
+   */
+  public async plan(
+    playlistId: number,
+    trx: any = db
+  ): Promise<{ nodes: PlannedNode[]; rootNode: PlaylistNode }> {
+    const descendants = await this.hierarchyService.getDescendants(playlistId, trx);
+
     // Fetch the root node itself to start the plan
-    const [rootNode] = await db
+    const [rootNode] = await trx
       .select({
         id: playlists.id,
         parentId: playlists.parentId,
@@ -33,16 +41,15 @@ export class DuplicatePlanner {
     if (!rootNode) throw new Error(`Playlist ${playlistId} not found`);
 
     const nodesToDuplicate = [rootNode, ...descendants];
-    
+
     // Use topological sort to ensure parents are processed before children
     const sortedNodes = this.hierarchyService.topologicalOrder(nodesToDuplicate);
 
-    const plannedNodes: PlannedNode[] = sortedNodes.map(node => {
+    const plannedNodes: PlannedNode[] = sortedNodes.map((node) => {
       // Only rename the root node
-      const newName = node.id === playlistId 
-        ? this.namingStrategy.generateDuplicateName(node.name) 
-        : node.name;
-        
+      const newName =
+        node.id === playlistId ? this.namingStrategy.generateDuplicateName(node.name) : node.name;
+
       return {
         node,
         newName

@@ -145,8 +145,7 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const [searchExpanded, setSearchExpanded] = useState(true);
   const [selectedSource, setSelectedSource] = useState('auto');
   const [availableProviders, setAvailableProviders] = useState<AvailableSearchProviderInfo[]>([
-    { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
-    { id: 'discogs', displayName: 'Discogs', isOnline: true }
+    { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }
   ]);
 
   useEffect(() => {
@@ -510,7 +509,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
           !effectiveReplaceArtwork || artworkSource === 'local'
             ? undefined
             : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0],
-        globalMutations
+        globalMutations,
+        operationId
       };
 
       const res = await metadataApi.applyPreview(payload, options, operationId);

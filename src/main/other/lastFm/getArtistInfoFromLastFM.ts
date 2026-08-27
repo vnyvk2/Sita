@@ -14,7 +14,7 @@ const getArtistInfoFromLastFM = async (artistName: string) => {
         throw new Error('LAST_FM_API_KEY not found');
       }
 
-      const url = new URL(LAST_FM_BASE_URL);
+      const url = new URL(LASTFM_BASE_URL);
       url.searchParams.set('method', 'artist.getinfo');
       url.searchParams.set('format', 'json');
       url.searchParams.set('autocorrect', '1');

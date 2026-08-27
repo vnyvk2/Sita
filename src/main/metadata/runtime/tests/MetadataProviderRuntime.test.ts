@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { IMetadataProviderAdapter, IProviderLifecycle } from '../../contracts/IMetadataProviderAdapter';
+
+import { DEFAULT_SEARCH_RANKING_WEIGHTS } from '../../../../common/metadata/preferences';
+import type {
+  IMetadataProviderAdapter,
+  IProviderLifecycle
+} from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import { ProviderState } from '../../contracts/ProviderStatus';
 import { MetadataProviderRuntime } from '../MetadataProviderRuntime';
@@ -59,14 +64,33 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
 
   describe('Multi-Source Discovery Engine & Zero-Regression Verification', () => {
     const mbSearchSpy = vi.fn().mockResolvedValue([
-      { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-1', provider: 'musicbrainz', rankingScore: 195 }
+      {
+        title: 'SOUR',
+        artist: 'Olivia Rodrigo',
+        year: 2021,
+        releaseId: 'mb-1',
+        provider: 'musicbrainz',
+        rankingScore: 195
+      }
     ]);
     const discogsSearchSpy = vi.fn().mockResolvedValue([
-      { title: 'SOUR (Deluxe)', artist: 'Olivia Rodrigo', year: 2022, releaseId: 'dg-1', provider: 'discogs', rankingScore: 185 }
+      {
+        title: 'SOUR (Deluxe)',
+        artist: 'Olivia Rodrigo',
+        year: 2022,
+        releaseId: 'dg-1',
+        provider: 'discogs',
+        rankingScore: 185
+      }
     ]);
 
     const musicBrainzMock: IMetadataProviderAdapter = {
-      identity: { id: 'musicbrainz', name: 'MusicBrainz', version: '1.0.0', providerType: 'online' },
+      identity: {
+        id: 'musicbrainz',
+        name: 'MusicBrainz',
+        version: '1.0.0',
+        providerType: 'online'
+      },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
@@ -102,7 +126,10 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
       );
       await runtime.initialize();
 
-      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11 });
+      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 10,
+        targetTrackCount: 11
+      });
 
       expect(mbSearchSpy).toHaveBeenCalledTimes(1);
       expect(discogsSearchSpy).not.toHaveBeenCalled();
@@ -129,7 +156,10 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
       );
       await runtime.initialize();
 
-      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11 });
+      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 10,
+        targetTrackCount: 11
+      });
 
       expect(mbSearchSpy).toHaveBeenCalledTimes(1);
       expect(discogsSearchSpy).toHaveBeenCalledTimes(1);
@@ -204,11 +234,27 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
     it('Cross-Source Resolution: higher quality candidate wins deduplication cluster regardless of provider order', async () => {
       // MB returns a candidate with lower base score / track mismatch (Probable/Weak)
       const mbWeakSpy = vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-1', provider: 'musicbrainz', rankingScore: 50, trackCount: 5 }
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'mb-1',
+          provider: 'musicbrainz',
+          rankingScore: 50,
+          trackCount: 5
+        }
       ]);
       // Discogs returns identical album edition with higher base score and matching track count (Definitive)
       const discogsStrongSpy = vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'dg-1', provider: 'discogs', rankingScore: 95, trackCount: 11 }
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'dg-1',
+          provider: 'discogs',
+          rankingScore: 95,
+          trackCount: 11
+        }
       ]);
 
       const mbAdapter: IMetadataProviderAdapter = {
@@ -236,7 +282,10 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
       );
       await runtime.initialize();
 
-      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11 });
+      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 10,
+        targetTrackCount: 11
+      });
 
       expect(results).toHaveLength(1);
       expect(results[0].provider).toBe('discogs');
@@ -245,13 +294,30 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
 
     it('Priority Tie-Breaker: when candidates share identical quality band, user source priority decides winner', async () => {
       const mbDefinitiveSpy = vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-1', provider: 'musicbrainz', rankingScore: 180 }
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'mb-1',
+          provider: 'musicbrainz',
+          rankingScore: 180
+        }
       ]);
       const dgDefinitiveSpy = vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'dg-1', provider: 'discogs', rankingScore: 180 }
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'dg-1',
+          provider: 'discogs',
+          rankingScore: 180
+        }
       ]);
 
-      const mbAdapter: IMetadataProviderAdapter = { ...musicBrainzMock, searchAlbums: mbDefinitiveSpy };
+      const mbAdapter: IMetadataProviderAdapter = {
+        ...musicBrainzMock,
+        searchAlbums: mbDefinitiveSpy
+      };
       const dgAdapter: IMetadataProviderAdapter = { ...discogsMock, searchAlbums: dgDefinitiveSpy };
 
       // Case A: User priority has Discogs first
@@ -262,9 +328,17 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
         })
       };
 
-      const runtimeA = new MetadataProviderRuntime([mbAdapter, dgAdapter], undefined, undefined, mockPrefsDiscogsFirst as any);
+      const runtimeA = new MetadataProviderRuntime(
+        [mbAdapter, dgAdapter],
+        undefined,
+        undefined,
+        mockPrefsDiscogsFirst as any
+      );
       await runtimeA.initialize();
-      const resultsA = await runtimeA.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11 });
+      const resultsA = await runtimeA.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 10,
+        targetTrackCount: 11
+      });
 
       expect(resultsA).toHaveLength(1);
       expect(resultsA[0].provider).toBe('discogs');
@@ -277,12 +351,129 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
         })
       };
 
-      const runtimeB = new MetadataProviderRuntime([mbAdapter, dgAdapter], undefined, undefined, mockPrefsMbFirst as any);
+      const runtimeB = new MetadataProviderRuntime(
+        [mbAdapter, dgAdapter],
+        undefined,
+        undefined,
+        mockPrefsMbFirst as any
+      );
       await runtimeB.initialize();
-      const resultsB = await runtimeB.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11 });
+      const resultsB = await runtimeB.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 10,
+        targetTrackCount: 11
+      });
 
       expect(resultsB).toHaveLength(1);
       expect(resultsB[0].provider).toBe('musicbrainz');
+    });
+
+    it('Custom Ranking Weights: user-tuned weights change candidate ordering', async () => {
+      const dualCandidateSpy = vi.fn().mockResolvedValue([
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'a-1',
+          provider: 'musicbrainz',
+          rankingScore: 100,
+          trackCount: 11
+        },
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2022,
+          releaseId: 'b-1',
+          provider: 'musicbrainz',
+          rankingScore: 100
+        }
+      ]);
+
+      const mbAdapter: IMetadataProviderAdapter = {
+        ...musicBrainzMock,
+        searchAlbums: dualCandidateSpy
+      };
+
+      const defaultPrefs = {
+        getPreferences: vi.fn().mockResolvedValue({
+          enabledSearchProviders: ['musicbrainz'],
+          searchProviderPriority: ['musicbrainz']
+        })
+      };
+
+      const runtimeDefaults = new MetadataProviderRuntime(
+        [mbAdapter],
+        undefined,
+        undefined,
+        defaultPrefs as any
+      );
+      await runtimeDefaults.initialize();
+      const defaultResults = await runtimeDefaults.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 5,
+        targetTrackCount: 11
+      });
+
+      expect(defaultResults).toHaveLength(2);
+      expect(defaultResults[0].releaseId).toBe('a-1');
+
+      const tunedPrefs = {
+        getPreferences: vi.fn().mockResolvedValue({
+          enabledSearchProviders: ['musicbrainz'],
+          searchProviderPriority: ['musicbrainz'],
+          searchRankingWeights: { ...DEFAULT_SEARCH_RANKING_WEIGHTS, trackCountMatch: -10 }
+        })
+      };
+
+      const runtimeTuned = new MetadataProviderRuntime(
+        [{ ...musicBrainzMock, searchAlbums: dualCandidateSpy }],
+        undefined,
+        undefined,
+        tunedPrefs as any
+      );
+      await runtimeTuned.initialize();
+      const tunedResults = await runtimeTuned.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 5,
+        targetTrackCount: 11
+      });
+
+      expect(tunedResults).toHaveLength(2);
+      expect(tunedResults[0].releaseId).toBe('b-1');
+    });
+
+    it('attaches ranking breakdown and quality band to returned candidates', async () => {
+      const breakdownSpy = vi.fn().mockResolvedValue([
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          year: 2021,
+          releaseId: 'mb-bd',
+          provider: 'musicbrainz',
+          rankingScore: 170,
+          trackCount: 11
+        }
+      ]);
+
+      const adapter: IMetadataProviderAdapter = { ...musicBrainzMock, searchAlbums: breakdownSpy };
+      const prefs = {
+        getPreferences: vi.fn().mockResolvedValue({
+          enabledSearchProviders: ['musicbrainz'],
+          searchProviderPriority: ['musicbrainz']
+        })
+      };
+
+      const runtime = new MetadataProviderRuntime([adapter], undefined, undefined, prefs as any);
+      await runtime.initialize();
+
+      const results = await runtime.searchAlbums('SOUR', 'Olivia Rodrigo', {
+        limit: 5,
+        targetTrackCount: 11
+      });
+
+      expect(results).toHaveLength(1);
+      const breakdown = results[0].rankingBreakdown;
+      expect(breakdown).toBeDefined();
+      expect(typeof breakdown!.baseScore).toBe('number');
+      expect(breakdown!.trackCountBonus).toBe(10);
+      expect(['Definitive', 'Probable', 'Weak']).toContain(results[0].qualityBand);
     });
 
     it('Dynamic Provider Capabilities: dynamically discovers all registered search providers', async () => {
@@ -325,14 +516,12 @@ describe('Metadata Runtime — MetadataProviderRuntime & Health State', () => {
         supports: () => true,
         lookup: vi.fn(),
         search: vi.fn(),
-        searchAlbums: vi
-          .fn()
-          .mockImplementation((_alb, _art, _opts, signal) => {
-            const abortErr = new Error('Operation aborted');
-            abortErr.name = 'AbortError';
-            void signal;
-            return Promise.reject(abortErr);
-          })
+        searchAlbums: vi.fn().mockImplementation((_alb, _art, _opts, signal) => {
+          const abortErr = new Error('Operation aborted');
+          abortErr.name = 'AbortError';
+          void signal;
+          return Promise.reject(abortErr);
+        })
       };
 
       const runtime = new MetadataProviderRuntime([abortableAdapter]);

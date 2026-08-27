@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 
 import * as schema from '@main/db/schema';
@@ -57,7 +56,9 @@ vi.mock('@main/main', () => ({
 }));
 
 
-import { client, db } from '@main/db/db';
+import type { PGlite } from '@electric-sql/pglite';
+import { db } from '@main/db/db';
+const client = (db as unknown as { $client: PGlite }).$client;
 import { diffFilesystemSnapshot, type DbSongSnapshot } from '../diffEngine';
 import { fastDiskWalk } from '../fastDiskWalk';
 import { LibraryReconciler } from '../LibraryReconciler';
@@ -65,7 +66,6 @@ import { LibraryReconciler } from '../LibraryReconciler';
 describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
   let tempDir: string;
   let reconciler: LibraryReconciler;
-  const rootId = 1;
 
   beforeAll(async () => {
     await client.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
@@ -107,8 +107,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     // Create scan root in DB
     const [rootFolder] = await db.insert(musicFolders).values({
       path: tempDir,
-      name: path.basename(tempDir) || 'Root',
-      isScanRoot: true
+      name: path.basename(tempDir) || 'Root'
     }).returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
@@ -148,8 +147,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
 
     const [rootFolder] = await db.insert(musicFolders).values({
       path: tempDir,
-      name: path.basename(tempDir) || 'Root',
-      isScanRoot: true
+      name: path.basename(tempDir) || 'Root'
     }).returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
@@ -181,8 +179,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     // 1. Initial DB state has only the scan root
     const [rootFolder] = await db.insert(musicFolders).values({
       path: tempDir,
-      name: path.basename(tempDir) || 'Root',
-      isScanRoot: true
+      name: path.basename(tempDir) || 'Root'
     }).returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
@@ -242,14 +239,12 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     // 2. Insert scan roots into DB
     const [root1Folder] = await db.insert(musicFolders).values({
       path: root1Dir,
-      name: 'Root1',
-      isScanRoot: true
+      name: 'Root1'
     }).returning();
 
     const [root2Folder] = await db.insert(musicFolders).values({
       path: root2Dir,
-      name: 'Root2',
-      isScanRoot: true
+      name: 'Root2'
     }).returning();
 
     // 3. Setup existing Artist (Adele) and Album (21) in DB under Root 1
@@ -381,8 +376,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     // 1. Setup scan root in DB
     const [rootFolder] = await db.insert(musicFolders).values({
       path: tempDir,
-      name: 'Root',
-      isScanRoot: true
+      name: 'Root'
     }).returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };

@@ -439,8 +439,7 @@ class MemProfiler {
     wc.on('render-process-gone', (_e, details) => {
       this.stage('render-process-gone', {
         reason: details.reason,
-        exitCode: details.exitCode,
-        serviceWorkerCrashed: details.serviceWorkerCrashed
+        exitCode: details.exitCode
       });
     });
     wc.on('did-navigate', (_e, url) => this.stage('did-navigate', { url }));

@@ -1,12 +1,12 @@
+import type { PlaylistDto } from '@common/collections/dtos';
 /* eslint-disable jsx-a11y/no-autofocus */
 import { useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useRenameCollection } from '../../hooks/collections/useCollectionMutations';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useRenameCollection } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
 import PlaylistCover from './PlaylistCover';
-import type { PlaylistDto } from '@common/collections/dtos';
 
 interface Props {
   playlistData: PlaylistDto;
@@ -14,7 +14,7 @@ interface Props {
 
 const RenamePlaylistPrompt = (props: Props) => {
   const { playlistData } = props;
-  const { changePromptMenuData } = useContext(AppUpdateContext);
+  const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const { id, name } = playlistData;
@@ -26,8 +26,21 @@ const RenamePlaylistPrompt = (props: Props) => {
   const renamePlaylist = useCallback(
     (newName: string) => {
       if (!id) return;
+      // IPC validation rejects empty names - surface that here instead of
+      // failing silently in the mutation's console error.
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        addNewNotifications([
+          {
+            id: 'EmptyPlaylistName',
+            duration: 5000,
+            content: t('newPlaylistPrompt.playlistNameEmpty')
+          }
+        ]);
+        return;
+      }
       renameCollection.mutate(
-        { playlistId: id, newName: newName.trim() },
+        { playlistId: id, newName: trimmedName },
         {
           onSuccess: () => {
             changePromptMenuData(false);
@@ -38,7 +51,7 @@ const RenamePlaylistPrompt = (props: Props) => {
         }
       );
     },
-    [changePromptMenuData, id, renameCollection]
+    [addNewNotifications, changePromptMenuData, id, renameCollection, t]
   );
 
   return (

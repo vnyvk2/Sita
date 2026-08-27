@@ -62,4 +62,48 @@ describe('Platform Networking — RetryPolicy Retry-After handling', () => {
       vi.useRealTimers();
     }
   });
+
+  it('rejects with AbortError when the signal aborts during a long Retry-After backoff', async () => {
+    vi.useFakeTimers();
+    try {
+      const policy = new RetryPolicy({ maxRetries: 3, initialDelayMs: 10, useJitter: false });
+      const controller = new AbortController();
+      let calls = 0;
+      const fn = vi.fn().mockImplementation(async () => {
+        calls += 1;
+        if (calls === 1) throw make429({ 'retry-after': '30' });
+        return 'ok';
+      });
+
+      const pending = policy.execute(fn, { signal: controller.signal });
+      // Let the first attempt fail and the 30s server-provided sleep begin.
+      await vi.advanceTimersByTimeAsync(1);
+
+      controller.abort();
+
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      // The cancellation must not be retried and the abandoned timer must stay dead.
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(calls).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects immediately when the signal is already aborted at backoff time', async () => {
+    vi.useFakeTimers();
+    try {
+      const policy = new RetryPolicy({ maxRetries: 3, initialDelayMs: 10_000, useJitter: false });
+      const controller = new AbortController();
+      const fn = vi.fn().mockRejectedValueOnce(make429({ 'retry-after': '30' }));
+
+      const pending = policy.execute(fn, { signal: controller.signal });
+      controller.abort();
+
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fn).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

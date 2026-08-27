@@ -9,6 +9,9 @@ export interface MusicBrainzReleaseDto {
   barcode?: string;
   score?: number;
   'media-count'?: number;
+  'track-count'?: number;
+  tags?: Array<{ name: string; count?: number }>;
+  genres?: Array<{ name: string; count?: number }>;
   'artist-credit'?: MusicBrainzArtistCreditDto[];
   'label-info'?: Array<{
     label?: {
@@ -40,11 +43,13 @@ export interface MusicBrainzReleaseDto {
       title?: string;
       length?: number;
       'artist-credit'?: MusicBrainzArtistCreditDto[];
+      isrc?: string;
       recording?: {
         id: string;
         title: string;
         length?: number;
         'artist-credit'?: MusicBrainzArtistCreditDto[];
+        isrcs?: string[];
       };
     }>;
   }>;

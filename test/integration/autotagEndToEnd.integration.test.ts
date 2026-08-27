@@ -3,6 +3,10 @@ import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { ByteVector, File, Picture, PictureType } from 'node-taglib-sharp';
+
+// Measured: ~1.1s standalone but >5s under full-suite parallel load
+// (real files + real PGlite + provider mocks). Scoped to this file.
+vi.setConfig({ testTimeout: 30_000 });
 import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
 import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';

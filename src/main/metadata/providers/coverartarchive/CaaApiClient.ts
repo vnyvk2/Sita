@@ -1,4 +1,5 @@
 import type { RequestPipeline } from '../../../platform/networking/RequestPipeline';
+import { HttpError } from '../../../platform/networking/FetchHttpClient';
 
 export interface CaaThumbnailDto {
   250?: string;
@@ -45,6 +46,11 @@ export class CaaApiClient {
     const url = `${this.baseUrl}/release/${encodeURIComponent(mbid)}`;
 
     try {
+      // FetchHttpClient throws HttpError for !ok responses, so the resolved
+      // status checks below are only reachable through pipelines/mocks that
+      // resolve error-shaped results - they intentionally preserve the same
+      // contract (404 => isNotFound, other non-2xx => NOT found-flagged, no
+      // release-group fallback).
       const response = await this.pipeline.execute<CaaReleaseResponseDto>(url, {
         headers: { 'User-Agent': 'NoraMusicPlayer/1.0' }
       });
@@ -56,11 +62,8 @@ export class CaaApiClient {
         return { data: response.data ?? null, isNotFound: !hasImages };
       }
       return { data: null, isNotFound: false };
-    } catch (err: any) {
-      if (err?.status === 404 || err?.statusCode === 404 || err?.response?.status === 404) {
-        return { data: null, isNotFound: true };
-      }
-      return { data: null, isNotFound: false };
+    } catch (err: unknown) {
+      return { data: null, isNotFound: err instanceof HttpError && err.status === 404 };
     }
   }
 
@@ -81,11 +84,8 @@ export class CaaApiClient {
         return { data: response.data ?? null, isNotFound: !hasImages };
       }
       return { data: null, isNotFound: false };
-    } catch (err: any) {
-      if (err?.status === 404 || err?.statusCode === 404 || err?.response?.status === 404) {
-        return { data: null, isNotFound: true };
-      }
-      return { data: null, isNotFound: false };
+    } catch (err: unknown) {
+      return { data: null, isNotFound: err instanceof HttpError && err.status === 404 };
     }
   }
 

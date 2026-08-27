@@ -72,6 +72,14 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
   const { changePromptMenuData, isOnline, isEnabled = true } = dependencies;
 
   /**
+   * Latest `isEnabled` value readable from async resolutions. A changelog fetch started before
+   * entering mini mode must not spawn its release-notes prompt over a passive presentation mode
+   * when it settles afterwards.
+   */
+  const isEnabledRef = useRef(isEnabled);
+  isEnabledRef.current = isEnabled;
+
+  /**
    * Tracks whether the one-time post-startup changelog check has been scheduled. Without this,
    * every transition back to normal mode re-arms the 5s startup timer and spams the remote
    * changelog with duplicate requests during rapid mini/normal toggling.
@@ -126,8 +134,10 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
               isUpdateIgnored
             });
 
-            // Show release notes prompt if update not ignored
-            if (isUpdateIgnored) {
+            // Show release notes prompt if update not ignored AND update activity
+            // is still enabled at resolution time (mini mode may have been
+            // entered while the fetch was in flight).
+            if (isUpdateIgnored && isEnabledRef.current) {
               changePromptMenuData(true, <ReleaseNotesPrompt />, 'release-notes px-8 py-4');
             }
           } else {

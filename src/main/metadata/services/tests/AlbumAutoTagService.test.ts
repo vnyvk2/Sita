@@ -1,15 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
+
+import { DEFAULT_METADATA_PREFERENCES } from '../../../../common/metadata/preferences';
 import { getTrackPreviewKey } from '../../../../common/metadata/preview';
-import { AlbumAutoTagService } from '../AlbumAutoTagService';
-import { AlbumMetadataService } from '../AlbumMetadataService';
-import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
-import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
-import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
 import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
+import type { AutoTagStage } from '../../models/AlbumTagPreview';
+import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
+import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
+import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
+import { AlbumAutoTagService } from '../AlbumAutoTagService';
+import { AlbumMetadataService } from '../AlbumMetadataService';
 import { MetadataApplyService } from '../MetadataApplyService';
 import { TagWriterService } from '../TagWriterService';
-import type { AutoTagStage } from '../../models/AlbumTagPreview';
+import { MetadataApplyOrchestrator } from '../../apply/MetadataApplyOrchestrator';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 
 describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () => {
   it('executes search -> buildPreview -> user edits -> transactional apply -> complete undo flow', async () => {
@@ -22,10 +26,14 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     const metadataService = new AlbumMetadataService(runtime);
     const tagWriter = new TagWriterService();
-    vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: '01.mp3', success: true }]);
+    vi.spyOn(tagWriter, 'writeBatch').mockImplementation(async (payloads) =>
+      payloads.map((p) => ({ filePath: p.filePath, success: true })));
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
-    const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: metadataService,
+      applyService
+    });
 
     // Mock API search releases
     vi.spyOn(apiClient, 'searchReleases').mockResolvedValueOnce([
@@ -52,7 +60,13 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
           tracks: [
             { id: 't1', title: 'brutal', length: 203000, position: 1, recording: { id: 'rec-1' } },
             { id: 't2', title: 'traitor', length: 229000, position: 2, recording: { id: 'rec-2' } },
-            { id: 't3', title: 'drivers license', length: 242000, position: 3, recording: { id: 'rec-3' } }
+            {
+              id: 't3',
+              title: 'drivers license',
+              length: 242000,
+              position: 3,
+              recording: { id: 'rec-3' }
+            }
           ]
         }
       ]
@@ -77,19 +91,51 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     // 2. Build Preview
     const localSongs = [
-      { songId: 101, title: 'brutal (audio)', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203, trackNumber: 1 },
-      { songId: 102, title: 'traitor', artist: 'Olivia Rodrigo', path: '02.mp3', duration: 229, trackNumber: 2 },
-      { songId: 103, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242, trackNumber: 3 }
+      {
+        songId: 101,
+        title: 'brutal (audio)',
+        artist: 'Olivia Rodrigo',
+        path: '01.mp3',
+        duration: 203,
+        trackNumber: 1
+      },
+      {
+        songId: 102,
+        title: 'traitor',
+        artist: 'Olivia Rodrigo',
+        path: '02.mp3',
+        duration: 229,
+        trackNumber: 2
+      },
+      {
+        songId: 103,
+        title: 'drivers license',
+        artist: 'Olivia Rodrigo',
+        path: '03.mp3',
+        duration: 242,
+        trackNumber: 3
+      }
     ];
 
-    const preview = await autoTagService.buildPreview(localSongs, releases[0].releaseId!, releases[0].provider, undefined, 'op-preview');
+    const preview = await autoTagService.buildPreview(
+      localSongs,
+      releases[0].releaseId!,
+      releases[0].provider,
+      undefined,
+      'op-preview'
+    );
     expect(preview.matches).toHaveLength(3);
-    expect(preview.overallConfidence).toBeGreaterThanOrEqual(0.90);
+    expect(preview.overallConfidence).toBeGreaterThanOrEqual(0.9);
     expect(preview.confidenceLevel).toBe('Excellent');
     expect(preview.resolvedRelease).not.toBeUndefined();
 
     // 3. Apply Preview
-    const applyResult = await autoTagService.applyPreview(preview, undefined, undefined, 'op-apply');
+    const applyResult = await autoTagService.applyPreview(
+      preview,
+      undefined,
+      undefined,
+      'op-apply'
+    );
     expect(applyResult.success).toBe(true);
     expect(applyResult.updatedCount).toBe(3);
 
@@ -101,7 +147,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
   it('rolls back physical file tags and reports errors on DB update failure', async () => {
     const tagWriter = new TagWriterService();
-    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const writeBatchSpy = vi
+      .spyOn(tagWriter, 'writeBatch')
+      .mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
     const dbUpdater = vi.fn().mockRejectedValue(new Error('SQLite lock exception'));
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
 
@@ -158,7 +206,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       applyAlbum: vi.fn()
     };
 
-    const autoTagService = new AlbumAutoTagService({ albumMetadataService: mockMetadataService as any });
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: mockMetadataService as any
+    });
     await autoTagService.searchReleases('SOUR', 'Olivia Rodrigo', {
       limit: 10,
       targetTrackCount: 11,
@@ -215,7 +265,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
   it('omits artworkBuffer when replaceArtwork is false', async () => {
     const tagWriter = new TagWriterService();
-    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const writeBatchSpy = vi
+      .spyOn(tagWriter, 'writeBatch')
+      .mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
 
@@ -240,7 +292,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
   it('applies text metadata successfully even when artwork download fails or times out', async () => {
     const tagWriter = new TagWriterService();
-    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
+    const writeBatchSpy = vi
+      .spyOn(tagWriter, 'writeBatch')
+      .mockResolvedValue([{ filePath: 'song.mp3', success: true }]);
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
 
@@ -260,7 +314,10 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       ]
     };
 
-    const result = await applyService.applyPreview(preview, { replaceArtwork: true, artworkUrl: 'http://invalid.url/404.jpg' });
+    const result = await applyService.applyPreview(preview, {
+      replaceArtwork: true,
+      artworkUrl: 'http://invalid.url/404.jpg'
+    });
     expect(result.success).toBe(true);
     expect(result.updatedCount).toBe(1);
 
@@ -333,7 +390,8 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     const tagWriter = new TagWriterService();
 
     // First call: writeBatch for apply — song1 succeeds, song2 succeeds, song3 fails
-    const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch')
+    const writeBatchSpy = vi
+      .spyOn(tagWriter, 'writeBatch')
       .mockResolvedValueOnce([
         { filePath: 'song1.mp3', success: true },
         { filePath: 'song2.mp3', success: true },
@@ -420,7 +478,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
             oldArtist: 'Olivia Rodrigo',
             oldAlbum: 'SOUR',
             applyTrack: false, // 0 tracks selected!
-            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'brutal (remastered)' }]
+            fieldDiffs: [
+              { fieldId: 'title', applyField: true, suggestedValue: 'brutal (remastered)' }
+            ]
           },
           {
             localSongId: 102,
@@ -429,7 +489,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
             oldArtist: 'Olivia Rodrigo',
             oldAlbum: 'SOUR',
             applyTrack: false, // 0 tracks selected!
-            fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'traitor (remastered)' }]
+            fieldDiffs: [
+              { fieldId: 'title', applyField: true, suggestedValue: 'traitor (remastered)' }
+            ]
           }
         ]
       };
@@ -460,9 +522,9 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
     it('applies track-level mutations when tracks are selected and global mutations are empty', async () => {
       const tagWriter = new TagWriterService();
-      const writeBatchSpy = vi.spyOn(tagWriter, 'writeBatch').mockResolvedValue([
-        { filePath: '01.mp3', success: true }
-      ]);
+      const writeBatchSpy = vi
+        .spyOn(tagWriter, 'writeBatch')
+        .mockResolvedValue([{ filePath: '01.mp3', success: true }]);
       const dbUpdater = vi.fn().mockResolvedValue(undefined);
       const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
 
@@ -565,7 +627,10 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       ]);
       const dbUpdater = vi.fn().mockResolvedValue(undefined);
       const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
-      const autoTagService = new AlbumAutoTagService({ albumMetadataService: metadataService, applyService });
+      const autoTagService = new AlbumAutoTagService({
+        albumMetadataService: metadataService,
+        applyService
+      });
 
       // Mock multi-disc release (2 discs, 2 tracks each: D1T1, D1T2, D2T1, D2T2)
       vi.spyOn(apiClient, 'getReleaseById').mockResolvedValue({
@@ -578,15 +643,39 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
           {
             position: 1,
             tracks: [
-              { id: 't101', title: 'Intro (Speakerboxxx)', length: 89000, position: 1, recording: { id: 'rec-101' } },
-              { id: 't102', title: 'GhettoMusick', length: 236000, position: 2, recording: { id: 'rec-102' } }
+              {
+                id: 't101',
+                title: 'Intro (Speakerboxxx)',
+                length: 89000,
+                position: 1,
+                recording: { id: 'rec-101' }
+              },
+              {
+                id: 't102',
+                title: 'GhettoMusick',
+                length: 236000,
+                position: 2,
+                recording: { id: 'rec-102' }
+              }
             ]
           },
           {
             position: 2,
             tracks: [
-              { id: 't201', title: 'The Love Below (Intro)', length: 87000, position: 1, recording: { id: 'rec-201' } },
-              { id: 't202', title: 'Love Hater', length: 169000, position: 2, recording: { id: 'rec-202' } }
+              {
+                id: 't201',
+                title: 'The Love Below (Intro)',
+                length: 87000,
+                position: 1,
+                recording: { id: 'rec-201' }
+              },
+              {
+                id: 't202',
+                title: 'Love Hater',
+                length: 169000,
+                position: 2,
+                recording: { id: 'rec-202' }
+              }
             ]
           }
         ]
@@ -594,8 +683,24 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
 
       // User has only 2 local tracks: Disc 1 Track 2 (#102) and Disc 2 Track 2 (#202)
       const localSongs = [
-        { songId: 102, title: 'GhettoMusick', artist: 'OutKast', path: 'd1_t2.mp3', duration: 236, trackNumber: 2, discNumber: 1 },
-        { songId: 202, title: 'Love Hater', artist: 'OutKast', path: 'd2_t2.mp3', duration: 169, trackNumber: 2, discNumber: 2 }
+        {
+          songId: 102,
+          title: 'GhettoMusick',
+          artist: 'OutKast',
+          path: 'd1_t2.mp3',
+          duration: 236,
+          trackNumber: 2,
+          discNumber: 1
+        },
+        {
+          songId: 202,
+          title: 'Love Hater',
+          artist: 'OutKast',
+          path: 'd2_t2.mp3',
+          duration: 169,
+          trackNumber: 2,
+          discNumber: 2
+        }
       ];
 
       const preview = await autoTagService.buildPreview(localSongs, 'mb-rel-multi', 'musicbrainz');
@@ -659,5 +764,190 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
       expect(dbUpdater).toHaveBeenCalledWith(102, expect.any(Object));
       expect(dbUpdater).toHaveBeenCalledWith(202, expect.any(Object));
     });
+  });
+
+  it('builds federation merge policy from preferences and propagates federated genre/artwork onto the album preview', async () => {
+    const resolvedAlbum: {
+      title: string;
+      artist: string;
+      year: number;
+      genre?: string;
+      artwork?: unknown;
+    } = {
+      title: 'SOUR',
+      artist: 'Olivia Rodrigo',
+      year: 2021
+    };
+
+    const mockMetadataService = {
+      search: vi.fn().mockResolvedValue([]),
+      searchAlbums: vi.fn().mockResolvedValue([]),
+      resolveRelease: vi.fn().mockResolvedValue({
+        album: resolvedAlbum,
+        tracks: [],
+        provider: 'musicbrainz',
+        providerReleaseId: 'mb-rel-policy'
+      }),
+      buildAlbumMatch: vi.fn().mockImplementation(async (_songs: unknown[], album: unknown) => ({
+        album,
+        trackList: [],
+        warnings: [],
+        confidence: 1,
+        changesCount: 0
+      })),
+      applyAlbum: vi.fn()
+    };
+
+    const resolveSpy = vi.fn().mockResolvedValue({
+      operationId: 'op-policy',
+      resourceId: 1,
+      candidates: [],
+      mergedResult: {
+        title: 'SOUR',
+        artist: 'Olivia Rodrigo',
+        genre: 'Pop, Alternative Rock',
+        artworkUrl: 'https://coverartarchive.org/release/mb-rel-policy/front.jpg',
+        fieldAttributions: {},
+        fieldAlternatives: {}
+      },
+      resolvedAt: Date.now()
+    });
+
+    const mockPreferencesService = {
+      getPreferences: vi.fn().mockResolvedValue({
+        ...DEFAULT_METADATA_PREFERENCES,
+        defaultGenreProvider: 'musicbrainz'
+      })
+    };
+
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: mockMetadataService as any,
+      resolutionManager: { resolve: resolveSpy } as any,
+      preferencesService: mockPreferencesService as any
+    });
+
+    const preview = await autoTagService.buildPreview(
+      [{ songId: 1, title: 'brutal', path: 'C:\\music\\01-brutal.mp3' }],
+      'mb-rel-policy'
+    );
+
+    expect(resolveSpy).toHaveBeenCalledTimes(1);
+    const policy = resolveSpy.mock.calls[0][0].policy;
+    expect(policy).toBeDefined();
+    expect(policy.level).toBe('operation');
+    expect(policy.merge.providerPriorities.musicbrainz).toBe(900);
+    expect(policy.merge.providerPriorities.coverartarchive).toBe(850);
+    expect(policy.merge.fieldPolicies.genre.preferredProviderId).toBe('musicbrainz');
+    expect(policy.merge.fieldPolicies.artworkUrl.preferredProviderId).toBe('coverartarchive');
+
+    expect(preview.album.genre).toBe('Pop, Alternative Rock');
+    expect(preview.album.artwork?.primaryPath).toBe(
+      'https://coverartarchive.org/release/mb-rel-policy/front.jpg'
+    );
+  });
+
+  it('omits the merge policy without a preferences service but still propagates merged fields', async () => {
+    const resolvedAlbum: { title: string; artist: string; genre?: string } = {
+      title: 'SOUR',
+      artist: 'Olivia Rodrigo'
+    };
+
+    const mockMetadataService = {
+      search: vi.fn().mockResolvedValue([]),
+      searchAlbums: vi.fn().mockResolvedValue([]),
+      resolveRelease: vi.fn().mockResolvedValue({
+        album: resolvedAlbum,
+        tracks: [],
+        provider: 'musicbrainz',
+        providerReleaseId: 'mb-rel-nopolicy'
+      }),
+      buildAlbumMatch: vi.fn().mockImplementation(async (_songs: unknown[], album: unknown) => ({
+        album,
+        trackList: [],
+        warnings: [],
+        confidence: 1,
+        changesCount: 0
+      })),
+      applyAlbum: vi.fn()
+    };
+
+    const resolveSpy = vi.fn().mockResolvedValue({
+      operationId: 'op-nopolicy',
+      resourceId: 1,
+      candidates: [],
+      mergedResult: {
+        title: 'SOUR',
+        artist: 'Olivia Rodrigo',
+        genre: 'Federated Genre',
+        fieldAttributions: {},
+        fieldAlternatives: {}
+      },
+      resolvedAt: Date.now()
+    });
+
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: mockMetadataService as any,
+      resolutionManager: { resolve: resolveSpy } as any
+    });
+
+    const preview = await autoTagService.buildPreview(
+      [{ songId: 1, title: 'brutal', path: 'C:\\music\\01-brutal.mp3' }],
+      'mb-rel-nopolicy'
+    );
+
+    expect(resolveSpy).toHaveBeenCalledTimes(1);
+    expect(resolveSpy.mock.calls[0][0].policy).toBeUndefined();
+    expect(preview.album.genre).toBe('Federated Genre');
+  });
+
+  it('G2-01 regression: production composition with attached orchestrator successfully applies without nested mutex self-rejection', async () => {
+    const mockMetadataService = {
+      search: vi.fn(),
+      resolveRelease: vi.fn(),
+      buildAlbumMatch: vi.fn(),
+      applyAlbum: vi.fn()
+    };
+
+    const historyService = new MetadataHistoryService();
+    const tagWriter = new TagWriterService();
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter,
+      historyService,
+      getCurrentPlayingPath: () => undefined
+    });
+
+    vi.spyOn(orchestrator as any, 'executeInternal').mockResolvedValue({
+      success: true,
+      updatedCount: 1,
+      failedCount: 0,
+      deferredCount: 0,
+      errors: []
+    });
+
+    // Production composition as in setup.ts:286
+    const applyService = new MetadataApplyService({ historyService, orchestrator });
+    const autoTagService = new AlbumAutoTagService({
+      albumMetadataService: mockMetadataService as any,
+      applyService
+    });
+
+    const preview: any = {
+      album: { title: 'SOUR', artists: ['Olivia Rodrigo'] },
+      matches: [
+        {
+          localSongId: 1,
+          songPath: '/music/01.mp3',
+          oldTitle: 'Old brutal',
+          applyTrack: true,
+          fieldDiffs: [
+            { fieldId: 'title', applyField: true, suggestedValue: 'brutal', oldValue: 'Old brutal' }
+          ]
+        }
+      ]
+    };
+
+    const result = await autoTagService.applyPreview(preview);
+    expect(result.success).toBe(true);
+    expect(result.updatedCount).toBe(1);
   });
 });

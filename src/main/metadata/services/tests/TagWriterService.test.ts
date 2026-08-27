@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TagWriterService } from '../TagWriterService';
-import * as withFileHandleModule from '../../../utils/withFileHandle';
+import * as atomicModule from '../../../utils/withAtomicFileWrite';
 
 describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
   it('preserves strict separation between albumArtist and track artist (performers)', async () => {
@@ -9,7 +9,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
     let savedFileTag: any = null;
     let savedCalled = false;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: '',
@@ -26,7 +26,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {
@@ -55,7 +55,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
 
     let savedFileTag: any = null;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: '',
@@ -67,7 +67,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {
@@ -90,7 +90,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
 
     let savedFileTag: any = null;
 
-    vi.spyOn(withFileHandleModule, 'withFileHandle').mockImplementation(async (_path, fn) => {
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
       const mockFile = {
         tag: {
           title: 'Old Title',
@@ -106,7 +106,7 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      return await fn(mockFile as any);
+      const __result = await fn(mockFile as any); mockFile.save(); return __result;
     });
 
     const payload = {
@@ -129,5 +129,95 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
     // undefined fields keep their prior on-disk values
     expect(savedFileTag.album).toBe('Old Album');
     expect(savedFileTag.track).toBe(3);
+  });
+
+  it('handles musicBrainzRecordingId (UFID) and isrc (TSRC) safely across absent, replace, and clear', async () => {
+    const service = new TagWriterService();
+
+    let savedFileTag: any = null;
+
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
+      const mockFile = {
+        tag: {
+          title: 'Track',
+          performers: [] as string[],
+          albumArtists: [] as string[],
+          album: '',
+          genres: [] as string[],
+          year: 0,
+          track: 0,
+          disc: 0,
+          musicBrainzTrackId: undefined as string | undefined,
+          isrc: undefined as string | undefined
+        },
+        save: () => {
+          savedFileTag = { ...mockFile.tag };
+        }
+      };
+      const __result = await fn(mockFile as any);
+      mockFile.save();
+      return __result;
+    });
+
+    // 1. Write new MBID and ISRC onto virgin tags (absent -> write new)
+    const writeRes = await service.writeTags({
+      filePath: 'C:/Music/test.mp3',
+      musicBrainzRecordingId: 'mbid-uuid-1',
+      isrc: 'USRC12345678'
+    });
+    expect(writeRes.success).toBe(true);
+    expect(savedFileTag.musicBrainzTrackId).toBe('mbid-uuid-1');
+    expect(savedFileTag.isrc).toBe('USRC12345678');
+
+    // 2. Clear request on virgin tags (absent -> clear does not throw)
+    const clearAbsentRes = await service.writeTags({
+      filePath: 'C:/Music/test.mp3',
+      musicBrainzRecordingId: '',
+      isrc: ''
+    });
+    expect(clearAbsentRes.success).toBe(true);
+
+    // 3. Replace existing MBID and ISRC
+    vi.spyOn(atomicModule, 'withAtomicFileWrite').mockImplementation(async (_path, fn) => {
+      const mockFile = {
+        tag: {
+          title: 'Track',
+          performers: [] as string[],
+          albumArtists: [] as string[],
+          album: '',
+          genres: [] as string[],
+          year: 0,
+          track: 0,
+          disc: 0,
+          musicBrainzTrackId: 'mbid-uuid-1',
+          isrc: 'USRC12345678'
+        },
+        save: () => {
+          savedFileTag = { ...mockFile.tag };
+        }
+      };
+      const __result = await fn(mockFile as any);
+      mockFile.save();
+      return __result;
+    });
+
+    const replaceRes = await service.writeTags({
+      filePath: 'C:/Music/test.mp3',
+      musicBrainzRecordingId: 'mbid-uuid-2',
+      isrc: 'USRC87654321'
+    });
+    expect(replaceRes.success).toBe(true);
+    expect(savedFileTag.musicBrainzTrackId).toBe('mbid-uuid-2');
+    expect(savedFileTag.isrc).toBe('USRC87654321');
+
+    // 4. Clear existing MBID and ISRC
+    const clearExistingRes = await service.writeTags({
+      filePath: 'C:/Music/test.mp3',
+      musicBrainzRecordingId: '',
+      isrc: ''
+    });
+    expect(clearExistingRes.success).toBe(true);
+    expect(savedFileTag.musicBrainzTrackId).toBe('');
+    expect(savedFileTag.isrc).toBe('');
   });
 });

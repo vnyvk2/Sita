@@ -57,4 +57,66 @@ describe('Metadata Transaction Manager Blueprint Test Suite', () => {
     expect(result.failedCount).toBe(1);
     expect(result.errors[0]).toContain('missing file path');
   });
+
+  it('delivers artwork through the full chain: tagPayload reaches dbUpdater as artworkBuffer', async () => {
+    const artworkBuffer = Buffer.from('fake-image-bytes');
+    const mockDbUpdater = vi.fn().mockResolvedValue(true);
+    const fakeDownloader = {
+      fetchAndValidateArtwork: vi.fn().mockResolvedValue(artworkBuffer)
+    };
+
+    const txManager = new MetadataTransactionManager({
+      dbUpdater: mockDbUpdater,
+      artworkDownloader: fakeDownloader as any
+    });
+
+    const mutations: ResourceMutationPayload[] = [
+      {
+        resourceId: 103,
+        filePath: 'song-with-art.mp3',
+        fieldMutations: [
+          { fieldId: 'title', oldValue: 'old', newValue: 'with art', providerId: 'musicbrainz', confidenceScore: 0.95 }
+        ]
+      }
+    ];
+
+    const result = await txManager.executeTransaction('op-art', mutations, {
+      replaceArtwork: true,
+      artworkUrl: 'https://coverartarchive.org/release/xyz/front.jpg'
+    });
+
+    expect(result.success).toBe(true);
+    expect(fakeDownloader.fetchAndValidateArtwork).toHaveBeenCalledWith(
+      'https://coverartarchive.org/release/xyz/front.jpg'
+    );
+
+    // The four-link chain must deliver the buffer to the persistence owner
+    expect(mockDbUpdater).toHaveBeenCalledTimes(1);
+    const updaterData = mockDbUpdater.mock.calls[0][1];
+    expect(updaterData.artworkBuffer).toBe(artworkBuffer);
+  });
+
+  it('does NOT fabricate artworkBuffer for transactions without artwork changes', async () => {
+    const mockDbUpdater = vi.fn().mockResolvedValue(true);
+
+    const txManager = new MetadataTransactionManager({
+      dbUpdater: mockDbUpdater
+    });
+
+    const mutations: ResourceMutationPayload[] = [
+      {
+        resourceId: 104,
+        filePath: 'plain-song.mp3',
+        fieldMutations: [
+          { fieldId: 'title', oldValue: 'a', newValue: 'b', providerId: 'musicbrainz', confidenceScore: 0.9 }
+        ]
+      }
+    ];
+
+    const result = await txManager.executeTransaction('op-plain', mutations);
+
+    expect(result.success).toBe(true);
+    const updaterData = mockDbUpdater.mock.calls[0][1];
+    expect(updaterData.artworkBuffer).toBeUndefined();
+  });
 });

@@ -75,22 +75,34 @@ const checkLocalStorage = () => {
   if (!isAValidStore) {
     repairInvalidLocalStorage(isASupportedStoreVersion, store);
   } else {
-    const jsonStore = JSON.parse(store);
-    const { migratedLocalStorage, migratedVersion } = migrateLocalStorage(
-      localStorageMigrationData,
-      jsonStore
-    );
+    let jsonStore: LocalStorage | null = null;
+    try {
+      jsonStore = JSON.parse(store) as LocalStorage;
+    } catch (error) {
+      // A corrupted payload must not crash startup with a white screen; recover
+      // by resetting to the default template like any other invalid store.
+      log('Local storage contains malformed JSON. Resetting local storage.', { error }, 'ERROR');
+    }
 
-    const updatedStore = addMissingPropsToAnObject(
-      LOCAL_STORAGE_DEFAULT_TEMPLATE,
-      migratedLocalStorage,
-      (key) => console.warn(`Added missing '${key}' property to localStorage.`)
-    );
+    if (jsonStore === null) {
+      repairInvalidLocalStorage(isASupportedStoreVersion, store);
+    } else {
+      const { migratedLocalStorage, migratedVersion } = migrateLocalStorage(
+        localStorageMigrationData,
+        jsonStore
+      );
 
-    const normalizedStore = normalizeShortcutLabelsToKeys(updatedStore);
+      const updatedStore = addMissingPropsToAnObject(
+        LOCAL_STORAGE_DEFAULT_TEMPLATE,
+        migratedLocalStorage,
+        (key) => console.warn(`Added missing '${key}' property to localStorage.`)
+      );
 
-    localStorage.setItem('localStorage', JSON.stringify(normalizedStore));
-    localStorage.setItem('version', migratedVersion);
+      const normalizedStore = normalizeShortcutLabelsToKeys(updatedStore);
+
+      localStorage.setItem('localStorage', JSON.stringify(normalizedStore));
+      localStorage.setItem('version', migratedVersion);
+    }
   }
   return console.log('local storage check successful.');
 };

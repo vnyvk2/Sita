@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+import {
+  DEFAULT_METADATA_PREFERENCES,
+  DEFAULT_SEARCH_RANKING_WEIGHTS
+} from '../../../../common/metadata/preferences';
 import { MetadataPreferencesService } from '../MetadataPreferencesService';
-import { DEFAULT_METADATA_PREFERENCES } from '../../../../common/metadata/preferences';
 
 vi.mock('../../../db/queries/settings', () => ({
   getUserSettings: vi.fn(),
@@ -20,7 +24,10 @@ describe('MetadataPreferencesService', () => {
   it('returns default preferences when database settings are missing or throw', async () => {
     vi.mocked(getUserSettings).mockRejectedValueOnce(new Error('DB not found'));
     const prefs = await service.getPreferences();
-    expect(prefs).toEqual(DEFAULT_METADATA_PREFERENCES);
+    expect(prefs).toEqual({
+      ...DEFAULT_METADATA_PREFERENCES,
+      searchRankingWeights: DEFAULT_SEARCH_RANKING_WEIGHTS
+    });
   });
 
   it('returns stored preferences when valid settings exist', async () => {
@@ -68,9 +75,9 @@ describe('MetadataPreferencesService', () => {
       metadataPreferences: DEFAULT_METADATA_PREFERENCES
     } as any);
 
-    await expect(
-      service.savePreferences({ enabledSearchProviders: [] })
-    ).rejects.toThrow(/at least one valid provider/);
+    await expect(service.savePreferences({ enabledSearchProviders: [] })).rejects.toThrow(
+      /at least one valid provider/
+    );
   });
 
   it('throws error when priority contains duplicates', async () => {
@@ -115,5 +122,128 @@ describe('MetadataPreferencesService', () => {
     // Non-existent provider filtered out; fallback to registered musicbrainz
     expect(prefs.enabledSearchProviders).toEqual(['musicbrainz']);
     expect(prefs.searchProviderPriority).toEqual(['musicbrainz']);
+  });
+
+  it('persists custom ranking weights within the allowed range', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+    vi.mocked(saveUserSettings).mockResolvedValueOnce(undefined as any);
+
+    const saved = await service.savePreferences({
+      searchRankingWeights: {
+        ...DEFAULT_SEARCH_RANKING_WEIGHTS,
+        bootlegPenalty: -40,
+        trackCountMatch: 25
+      }
+    });
+
+    expect(saved.searchRankingWeights?.bootlegPenalty).toBe(-40);
+    expect(saved.searchRankingWeights?.trackCountMatch).toBe(25);
+    expect(saved.searchRankingWeights?.artistMatch).toBe(
+      DEFAULT_SEARCH_RANKING_WEIGHTS.artistMatch
+    );
+  });
+
+  it('throws when a ranking weight is outside the allowed range', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+
+    await expect(
+      service.savePreferences({
+        searchRankingWeights: { ...DEFAULT_SEARCH_RANKING_WEIGHTS, titleMatch: 999 }
+      })
+    ).rejects.toThrow(/between -100 and 200/);
+  });
+
+  it('throws when a ranking weight is not a finite number', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+
+    await expect(
+      service.savePreferences({
+        searchRankingWeights: { ...DEFAULT_SEARCH_RANKING_WEIGHTS, artistMatch: Number.NaN }
+      })
+    ).rejects.toThrow(/finite number/);
+  });
+
+  it('throws when a ranking weight is not an integer', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+
+    await expect(
+      service.savePreferences({
+        searchRankingWeights: { ...DEFAULT_SEARCH_RANKING_WEIGHTS, trackCountMatch: 25.5 }
+      })
+    ).rejects.toThrow(/must be an integer/);
+  });
+
+  it('tolerates unknown ranking weight keys by dropping them during sanitization', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+    vi.mocked(saveUserSettings).mockResolvedValueOnce(undefined as any);
+
+    const junk = { ...DEFAULT_SEARCH_RANKING_WEIGHTS, futureWeightKey: 42 } as any;
+    const saved = await service.savePreferences({ searchRankingWeights: junk });
+
+    expect((saved.searchRankingWeights as unknown as Record<string, unknown>).futureWeightKey).toBeUndefined();
+    expect(saved.searchRankingWeights?.artistMatch).toBe(
+      DEFAULT_SEARCH_RANKING_WEIGHTS.artistMatch
+    );
+  });
+
+  it('rounds floating-point persisted weights to integers on read', async () => {
+    vi.mocked(getUserSettings).mockResolvedValueOnce({
+      metadataPreferences: {
+        enabledSearchProviders: ['musicbrainz'],
+        searchProviderPriority: ['musicbrainz'],
+        searchRankingWeights: { artistMatch: 10.7 }
+      }
+    } as any);
+
+    const prefs = await service.getPreferences();
+    expect(prefs.searchRankingWeights?.artistMatch).toBe(11);
+  });
+
+  it('repairs invalid persisted ranking weights by falling back per key on read', async () => {
+    vi.mocked(getUserSettings).mockResolvedValueOnce({
+      metadataPreferences: {
+        enabledSearchProviders: ['musicbrainz'],
+        searchProviderPriority: ['musicbrainz'],
+        searchRankingWeights: { titleMatch: 500, artistMatch: 10 }
+      }
+    } as any);
+
+    const prefs = await service.getPreferences();
+    expect(prefs.searchRankingWeights?.titleMatch).toBe(DEFAULT_SEARCH_RANKING_WEIGHTS.titleMatch);
+    expect(prefs.searchRankingWeights?.artistMatch).toBe(10);
+  });
+
+  it('throws when saving an unknown enrichment provider', async () => {
+    vi.mocked(getUserSettings).mockResolvedValue({
+      metadataPreferences: DEFAULT_METADATA_PREFERENCES
+    } as any);
+
+    await expect(
+      service.savePreferences({ defaultGenreProvider: 'spotify' as any })
+    ).rejects.toThrow(/not a known enrichment source/);
+  });
+
+  it('falls back to defaults when persisted enrichment providers are invalid on read', async () => {
+    vi.mocked(getUserSettings).mockResolvedValueOnce({
+      metadataPreferences: {
+        ...DEFAULT_METADATA_PREFERENCES,
+        defaultGenreProvider: 'spotify',
+        defaultArtworkProvider: 'discogs'
+      }
+    } as any);
+
+    const prefs = await service.getPreferences();
+    expect(prefs.defaultGenreProvider).toBe(DEFAULT_METADATA_PREFERENCES.defaultGenreProvider);
+    expect(prefs.defaultArtworkProvider).toBe(DEFAULT_METADATA_PREFERENCES.defaultArtworkProvider);
   });
 });

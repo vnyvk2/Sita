@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultAlbumCover from '../../assets/images/webp/album_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import useHeartBurst from '../../hooks/useHeartBurst';
 import Button from '../Button';
+import HeartBurst from '../HeartBurst';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import SongArtist from '../SongsPage/SongArtist';
@@ -50,6 +52,7 @@ export const Album = (props: AlbumProp) => {
   const navigate = useNavigate();
 
   const [isFavorite, setIsFavorite] = useState(props.isAFavorite);
+  const { isBursting, triggerBurst } = useHeartBurst();
 
   useEffect(() => {
     setIsFavorite(props.isAFavorite);
@@ -187,13 +190,16 @@ export const Album = (props: AlbumProp) => {
 
   const toggleLikeAlbum = useCallback(async () => {
     const nextValue = !isFavorite;
+    if (nextValue) {
+      triggerBurst();
+    }
     setIsFavorite(nextValue);
     try {
       await window.api.albumsData.toggleLikeAlbums([props.albumId], nextValue);
     } catch {
       setIsFavorite(!nextValue);
     }
-  }, [isFavorite, props.albumId]);
+  }, [isFavorite, props.albumId, triggerBurst]);
 
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;
@@ -392,8 +398,7 @@ export const Album = (props: AlbumProp) => {
     <div
       role="button"
       tabIndex={0}
-      // style={{ animationDelay: `${50 * (props.index + 1)}ms` }}
-      className={`album group mr-6 mb-2 flex h-68 w-48 flex-col justify-between overflow-hidden rounded-md p-4 ${
+      className={`album fx-rise fx-spotlight group mr-6 mb-2 flex h-68 w-48 flex-col justify-between overflow-hidden rounded-md p-4 transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:-translate-y-0.5 ${
         props.className ?? ''
       } ${
         isAMultipleSelection
@@ -423,24 +428,27 @@ export const Album = (props: AlbumProp) => {
           />
         ) : (
           <>
-            <Button
-              className={`absolute top-[5%] right-[5%] z-2 m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
-                isFavorite
-                  ? 'opacity-100'
-                  : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
-              }`}
-              iconName="favorite"
-              iconClassName={`${
-                isFavorite
-                  ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
-                  : 'material-icons-round material-icons-round-outlined text-font-color-white'
-              } text-xl! leading-none!`}
-              tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}
-              clickHandler={(e) => {
-                e.stopPropagation();
-                toggleLikeAlbum();
-              }}
-            />
+            <div className="absolute top-[5%] right-[5%] z-2 flex items-center justify-center">
+              <Button
+                className={`m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
+                  isFavorite
+                    ? 'opacity-100'
+                    : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
+                }`}
+                iconName="favorite"
+                iconClassName={`${
+                  isFavorite
+                    ? 'material-icons-round text-[#FF2D55]!'
+                    : 'material-icons-round-outlined text-font-color-white'
+                } ${isBursting ? 'fx-heart-pop' : ''} text-xl! leading-none!`}
+                tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}
+                clickHandler={(e) => {
+                  e.stopPropagation();
+                  toggleLikeAlbum();
+                }}
+              />
+              <HeartBurst isBursting={isBursting} />
+            </div>
             <Button
               className="text-font-color-white! absolute right-[5%] bottom-[5%] z-1 m-0! rounded-none! border-0! bg-transparent p-0! opacity-0 outline-offset-1 transition-opacity group-focus-within:opacity-75 group-hover:opacity-75 hover:bg-transparent hover:opacity-100! focus-visible:opacity-100! focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
               iconName="play_circle"
@@ -458,7 +466,7 @@ export const Album = (props: AlbumProp) => {
             fallbackSrc={DefaultAlbumCover}
             loading="lazy"
             alt="Album Cover"
-            className="aspect-square h-full max-h-full w-full object-cover object-center"
+            className="aspect-square h-full max-h-full w-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.04] group-focus-within:scale-[1.04]"
             enableImgFadeIns={!isMultipleSelectionEnabled}
           />
         </div>

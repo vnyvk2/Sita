@@ -23,10 +23,6 @@ describe('collectionKeys Factory', () => {
     expect(collectionKeys.entries(42)).toEqual(['collections', 'entries', 42]);
   });
 
-  it('should generate sidebar keys', () => {
-    expect(collectionKeys.sidebar()).toEqual(['collections', 'sidebar']);
-  });
-
   it('should generate breadcrumbs keys', () => {
     expect(collectionKeys.breadcrumbs(10)).toEqual(['collections', 'breadcrumbs', 10]);
   });

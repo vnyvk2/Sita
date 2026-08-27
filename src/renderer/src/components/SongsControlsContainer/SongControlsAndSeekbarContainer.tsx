@@ -5,8 +5,10 @@ import { useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import useHeartBurst from '../../hooks/useHeartBurst';
 import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
+import HeartBurst from '../HeartBurst';
 import LyricsIcon from '../Icons/LyricsIcon';
 import SeekBarContainer from './SeekBarContainer';
 
@@ -34,6 +36,15 @@ const SongControlsAndSeekbarContainer = () => {
   const { t } = useTranslation();
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isBursting, triggerBurst } = useHeartBurst();
+
+  const handleFavoriteClick = useCallback(() => {
+    if (!isKnownSource) return;
+    if (!isAFavorite) {
+      triggerBurst();
+    }
+    toggleIsFavorite(!isAFavorite);
+  }, [isAFavorite, isKnownSource, toggleIsFavorite, triggerBurst]);
 
   useEffect(() => {
     return () => {
@@ -47,19 +58,22 @@ const SongControlsAndSeekbarContainer = () => {
   return (
     <div className="song-controls-and-seekbar-container flex flex-col items-center justify-center py-2">
       <div className="controls-container [&>div.active_span.icon]:text-font-color-highlight! dark:[&>div.active_span.icon]:text-dark-font-color-highlight! flex w-2/3 max-w-sm items-center justify-around px-2 lg:w-4/5 lg:p-0 [&>div.active_span.icon]:opacity-100">
-        <Button
-          className={`like-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !mr-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
-            isAFavorite && 'active after:opacity-100'
-          } ${!isKnownSource && 'cursor-none! brightness-50'}`}
-          tooltipLabel={isKnownSource ? t('player.likeDislike') : t('player.likeDislikeDisabled')}
-          iconName="favorite"
-          iconClassName={`${
-            isAFavorite
-              ? 'material-icons-round text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100!'
-              : 'material-icons-round-outlined'
-          } icon cursor-pointer !text-2xl leading-none text-font-color-black opacity-60 transition-opacity hover:opacity-80 dark:text-font-color-white`}
-          clickHandler={() => isKnownSource && toggleIsFavorite(!isAFavorite)}
-        />
+        <div className="relative flex items-center justify-center">
+          <Button
+            className={`like-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !mr-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
+              isAFavorite && 'active after:opacity-100'
+            } ${!isKnownSource && 'cursor-none! brightness-50'}`}
+            tooltipLabel={isKnownSource ? t('player.likeDislike') : t('player.likeDislikeDisabled')}
+            iconName="favorite"
+            iconClassName={`${
+              isAFavorite
+                ? 'material-icons-round text-[#FF2D55]! dark:text-[#FF2D55]! opacity-100!'
+                : 'material-icons-round-outlined'
+            } ${isBursting ? 'fx-heart-pop' : ''} icon cursor-pointer !text-2xl leading-none text-font-color-black opacity-60 transition-opacity hover:opacity-80 dark:text-font-color-white`}
+            clickHandler={handleFavoriteClick}
+          />
+          <HeartBurst isBursting={isBursting} />
+        </div>
 
         <Button
           className={`shuffle-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${

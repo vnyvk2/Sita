@@ -186,6 +186,7 @@ declare global {
     duration: number;
     artwork?: string | Buffer | Uint8Array;
     artworkPath?: string;
+    artworkPaths?: ArtworkPaths;
     path: string;
     isAFavorite: boolean;
     album?: { albumId: number; name: string };
@@ -488,6 +489,9 @@ declare global {
     miniPlayerPinnedControls: string[];
     miniPlayerMode?: 'standard' | 'compact';
     customLrcFilesSaveLocation: string | null;
+    onlineDownloadsFolder?: string | null;
+    downloadsDuplicatePolicy?: 'SKIP' | 'OVERWRITE' | 'KEEP_BOTH';
+    addDownloadsToLibrary?: boolean;
     lastFmSessionName: string | null;
     lastFmSessionKey: string | null;
     libraryScanMode?: LibraryScanMode;
@@ -584,6 +588,8 @@ declare global {
     lyricsArtworkAnimation?: boolean;
     isSongCardDynamicArtworkBackgroundEnabled?: boolean;
     showEqualizerOnTracklist?: boolean;
+    reduceVisualEffectsOnBattery?: boolean;
+    ambientParticles?: boolean;
   }
 
   interface CurrentSong {
@@ -721,6 +727,15 @@ declare global {
     queueType?: QueueTypes;
     title?: string;
     isLocked?: boolean;
+    /**
+     * True for the single canonical All Songs playback projection (see
+     * docs/canonical-queue-architecture.md)
+     */
+    isCanonical?: boolean;
+    /** LibraryVersion stamp captured when canonical songIds were last derived from the library */
+    builtAtLibraryVersion?: number;
+    /** Sort order the canonical projection was built from */
+    sortingOrder?: string;
   }
 
   type QueueEventType =
@@ -1075,7 +1090,8 @@ declare global {
     | 'RESYNC_SUCCESSFUL'
     | 'LIBRARY_SCHEDULER_UPDATE'
     | 'LIBRARY_BATCH_COMPLETE'
-    | 'SHOW_MINI_PLAYER_CONTEXT_MENU';
+    | 'SHOW_MINI_PLAYER_CONTEXT_MENU'
+    | 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY';
 
   interface RunningJobInfo {
     id: string;

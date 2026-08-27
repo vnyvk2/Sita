@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { ipcMain, type BrowserWindow } from 'electron';
 import type { MetadataSearchOptions, AvailableSearchProviderInfo } from '../../common/metadata/api';
 import type { MetadataProviderPreferences } from '../../common/metadata/preferences';
@@ -68,10 +69,7 @@ export function registerMetadataHandlers(
     if (providerRuntime) {
       return providerRuntime.getAvailableSearchProviders();
     }
-    return [
-      { id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true },
-      { id: 'discogs', displayName: 'Discogs', isOnline: true }
-    ];
+    return [{ id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }];
   });
 
   ipcMain.handle(
@@ -83,8 +81,13 @@ export function registerMetadataHandlers(
   );
 
   ipcMain.handle('metadata/applyPreview', async (_, preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId = 'default') => {
-    const signal = autoTagService.createAbortSignal(operationId);
-    return autoTagService.applyPreview(preview, options, signal, operationId);
+    const resolvedOpId = options?.operationId ?? (operationId !== 'default' ? operationId : undefined) ?? `op-${randomUUID()}`;
+    const applyOpts: ApplyPreviewOptions = {
+      ...options,
+      operationId: resolvedOpId
+    };
+    const signal = autoTagService.createAbortSignal(resolvedOpId);
+    return autoTagService.applyPreview(preview, applyOpts, signal, resolvedOpId);
   });
 
   ipcMain.handle('metadata/undoLastAutoTag', async (_, operationId = 'default') => {

@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getAlbumById } from '@main/db/queries/albums';
-import { linkArtworksToAlbum, saveArtworks } from '@main/db/queries/artworks';
+import { saveArtworks } from '@main/db/queries/artworks';
 import { db } from '@main/db/db';
 import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
@@ -14,6 +14,9 @@ vi.mock('@main/db/queries/albums', () => ({
 }));
 
 vi.mock('@main/db/queries/artworks', () => ({
+  // artworkJob re-exports CURRENT_ARTWORK_GENERATOR_VERSION from this module,
+  // so the mock must provide it (value mirrors the real export).
+  CURRENT_ARTWORK_GENERATOR_VERSION: 1,
   linkArtworksToAlbum: vi.fn(),
   saveArtworks: vi.fn()
 }));

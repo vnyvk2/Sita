@@ -3,6 +3,7 @@ import path from 'path';
 
 import { shell } from 'electron';
 
+import { getSongByPath } from '../db/queries/songs';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
@@ -35,10 +36,37 @@ const deleteSongsFromSystem = async (
   }
 
   try {
-    const res = await removeSongsFromLibrary(absoluteFilePaths, abortSignal);
+    // The paths arrive over IPC, so the extension check alone cannot be trusted:
+    // only files that actually belong to a library song may be removed. Anything
+    // else is skipped instead of being irreversibly deleted.
+    const verifiedPaths: string[] = [];
+    for (const filePath of absoluteFilePaths) {
+      if (abortSignal.aborted) {
+        throw new Error('Song deletion process aborted because abort event triggered.');
+      }
+
+      const song = await getSongByPath(filePath);
+      if (song == null) {
+        logger.warn(
+          'Skipping deletion of a file that does not belong to any song in the library.',
+          { filePath }
+        );
+        continue;
+      }
+      verifiedPaths.push(filePath);
+    }
+
+    if (verifiedPaths.length === 0) {
+      return {
+        success: true,
+        message: `No files matching library songs were found to delete.`
+      };
+    }
+
+    const res = await removeSongsFromLibrary(verifiedPaths, abortSignal);
 
     if (res?.success) {
-      for (const filePath of absoluteFilePaths) {
+      for (const filePath of verifiedPaths) {
         if (isPermanentDelete) await fs.unlink(filePath);
         else await shell.trashItem(filePath);
       }
@@ -48,8 +76,8 @@ const deleteSongsFromSystem = async (
       success: true,
       message: `Successfully ${
         isPermanentDelete
-          ? `deleted ${absoluteFilePaths.length} songs from the system`
-          : `moved ${absoluteFilePaths.length} songs to the recycle bin`
+          ? `deleted ${verifiedPaths.length} songs from the system`
+          : `moved ${verifiedPaths.length} songs to the recycle bin`
       }.`
     };
   } catch (error) {

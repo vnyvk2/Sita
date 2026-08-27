@@ -34,6 +34,7 @@ export const theme = {
       'font-color-white': 'hsl(var(--text-color-white) / <alpha-value>)',
       'font-color-highlight': 'hsl(var(--text-color-highlight) / <alpha-value>)',
       'font-color-crimson': 'hsl(var(--text-color-crimson) / <alpha-value>)',
+      'font-color-favorite': 'var(--color-favorite, #FF2D55)',
       'seekbar-background-color': 'hsl(var(--seekbar-background-color) / <alpha-value>)',
       'seekbar-track-background-color':
         'hsl(var(--seekbar-track-background-color) / <alpha-value>)',
@@ -97,7 +98,15 @@ export const theme = {
       'inner-md': 'inset 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
       'inner-lg': 'inset 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
       'inner-xl': 'inset 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-      'inner-2xl': 'inset 0 25px 50px -12px rgb(0 0 0 / 0.25)'
+      'inner-2xl': 'inset 0 25px 50px -12px rgb(0 0 0 / 0.25)',
+      // ? Nora Glow elevation ramp (static shadows only — never animate these)
+      'elevation-1': '0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.06)',
+      'elevation-2': '0 4px 12px rgb(0 0 0 / 0.08), 0 12px 32px rgb(0 0 0 / 0.08)',
+      'elevation-3': '0 8px 24px rgb(0 0 0 / 0.1), 0 24px 64px rgb(0 0 0 / 0.1)',
+      // Accent glows driven by the dynamic theme accent (--foreground-color-1)
+      'glow-sm': '0 0 12px hsl(var(--foreground-color-1) / 0.18)',
+      'glow-md': '0 4px 24px hsl(var(--foreground-color-1) / 0.28)',
+      'glow-lg': '0 8px 48px hsl(var(--foreground-color-1) / 0.38)'
     }
   }
 };

@@ -2,8 +2,10 @@ import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
+import useHeartBurst from '../../hooks/useHeartBurst';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import Button from '../Button';
+import HeartBurst from '../HeartBurst';
 import Img from '../Img';
 import SongArtist from '../SongsPage/SongArtist';
 
@@ -17,6 +19,7 @@ const AlbumImgAndInfoContainer = (props: Props) => {
   const { openAutoTagDialog } = useContext(AppUpdateContext);
 
   const [isFavorite, setIsFavorite] = useState(albumData?.isAFavorite ?? false);
+  const { isBursting, triggerBurst } = useHeartBurst();
 
   useEffect(() => {
     setIsFavorite(albumData?.isAFavorite ?? false);
@@ -25,13 +28,16 @@ const AlbumImgAndInfoContainer = (props: Props) => {
   const toggleLikeAlbum = useCallback(async () => {
     if (!albumData) return;
     const nextValue = !isFavorite;
+    if (nextValue) {
+      triggerBurst();
+    }
     setIsFavorite(nextValue);
     try {
       await window.api.albumsData.toggleLikeAlbums([albumData.albumId], nextValue);
     } catch {
       setIsFavorite(!nextValue);
     }
-  }, [albumData, isFavorite]);
+  }, [albumData, isFavorite, triggerBurst]);
 
   const albumDuration = useMemo(
     () =>
@@ -75,19 +81,22 @@ const AlbumImgAndInfoContainer = (props: Props) => {
                 alt="Album Cover"
               />
             )}
-            <Button
-              className="bg-background-color-1 text-font-color-highlight hover:bg-background-color-1 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-2 absolute -bottom-4 right-4 m-0! flex rounded-full border-0! p-2.5! shadow-xl -outline-offset-[6px] focus-visible:outline!"
-              tooltipLabel={t(
-                `common.${isFavorite ? 'dislike' : 'like'}`
-              )}
-              iconName="favorite"
-              iconClassName={`text-3xl! leading-none! ${
-                isFavorite
-                  ? 'material-icons-round'
-                  : 'material-icons-round material-icons-round-outlined'
-              }`}
-              clickHandler={toggleLikeAlbum}
-            />
+            <div className="absolute -bottom-4 right-4 flex items-center justify-center">
+              <Button
+                className="bg-background-color-1 text-font-color-highlight hover:bg-background-color-1 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-2 m-0! flex rounded-full border-0! p-2.5! shadow-xl -outline-offset-[6px] focus-visible:outline!"
+                tooltipLabel={t(
+                  `common.${isFavorite ? 'dislike' : 'like'}`
+                )}
+                iconName="favorite"
+                iconClassName={`text-3xl! leading-none! ${
+                  isFavorite
+                    ? 'material-icons-round text-[#FF2D55]!'
+                    : 'material-icons-round-outlined'
+                } ${isBursting ? 'fx-heart-pop' : ''}`}
+                clickHandler={toggleLikeAlbum}
+              />
+              <HeartBurst isBursting={isBursting} />
+            </div>
           </div>
           {albumData.title && albumData.artists && (
             <div className="album-info-container text-font-color-black dark:text-font-color-white max-w-[70%]">

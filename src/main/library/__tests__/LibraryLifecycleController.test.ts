@@ -4,7 +4,7 @@ import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
 import { closeAllAbortControllers } from '../../fs/controlAbortControllers';
 import { initializePassiveWatchers } from '../../fs/initializePassiveWatchers';
 import libraryChangeTracker from '../LibraryChangeTracker';
-import { LibraryLifecycleController, type LibraryScanMode } from '../LibraryLifecycleController';
+import { LibraryLifecycleController } from '../LibraryLifecycleController';
 import type { LibraryScanner, ScanSummary } from '../LibraryScanner';
 
 vi.mock('../LibraryScanner', () => ({
@@ -90,13 +90,62 @@ describe('LibraryLifecycleController', () => {
     error: 'Disk unmounted'
   };
 
+  type UserSettingsSelect = Awaited<ReturnType<typeof getUserSettings>>;
+  const createMockUserSettings = (overrides: Partial<UserSettingsSelect> = {}): UserSettingsSelect =>
+    ({
+      id: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      language: 'en',
+      isDarkMode: false,
+      useSystemTheme: true,
+      autoLaunchApp: false,
+      openWindowMaximizedOnStart: false,
+      openWindowAsHiddenOnSystemStart: false,
+      isMiniPlayerAlwaysOnTop: false,
+      sendSongNotification: false,
+      sendSongChangeNotification: false,
+      sendSongPlaybackNotification: false,
+      sendSongPlayPauseNotification: false,
+      sendSongStopNotification: false,
+      sendAppUpdateNotification: false,
+      theme: 'system',
+      jumpInterval: 10,
+      volume: 100,
+      isMuted: false,
+      playbackSpeed: 1,
+      playbackQuality: 'high',
+      enableCrossfade: false,
+      crossfadeDuration: 3,
+      enableGaplessPlayback: false,
+      enableEqualizer: false,
+      equalizerPreset: 'flat',
+      equalizerGains: [],
+      enableReplayGain: false,
+      replayGainMode: 'track',
+      replayGainPreamp: 0,
+      enableDiscordRPC: false,
+      enableLastFmScrobbling: false,
+      lastFmSessionKey: null,
+      lastFmSessionName: null,
+      libraryScanMode: 'automatic',
+      lastScanTime: null,
+      metadataPreferences: {
+        albumResolutionPriority: 'accurate',
+        preferMusicBrainz: true,
+        preferDiscogs: false,
+        preferCoverArtArchive: true,
+        autoTagThreshold: 'balanced',
+        autoWriteTagsToFile: false
+      },
+      ...overrides
+    }) as UserSettingsSelect;
+
   beforeEach(() => {
     vi.clearAllMocks();
     libraryChangeTracker.reset();
 
-    vi.mocked(getUserSettings).mockResolvedValue({
-      libraryScanMode: 'automatic'
-    } as unknown as UserSettings);
+    vi.mocked(getUserSettings).mockResolvedValue(createMockUserSettings({ libraryScanMode: 'automatic' }));
     vi.mocked(saveUserSettings).mockResolvedValue(undefined as unknown as void);
     vi.mocked(initializePassiveWatchers).mockResolvedValue(undefined);
 
@@ -111,9 +160,9 @@ describe('LibraryLifecycleController', () => {
 
   describe('Startup Initialization', () => {
     it('initializes in automatic mode: starts watchers and triggers startup scan', async () => {
-      vi.mocked(getUserSettings).mockResolvedValueOnce({
-        libraryScanMode: 'automatic'
-      } as unknown as UserSettings);
+      vi.mocked(getUserSettings).mockResolvedValueOnce(
+        createMockUserSettings({ libraryScanMode: 'automatic' })
+      );
 
       await controller.initialize();
 
@@ -124,9 +173,9 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('initializes in startup mode: ensures watchers stopped and triggers startup scan', async () => {
-      vi.mocked(getUserSettings).mockResolvedValueOnce({
-        libraryScanMode: 'startup'
-      } as unknown as UserSettings);
+      vi.mocked(getUserSettings).mockResolvedValueOnce(
+        createMockUserSettings({ libraryScanMode: 'startup' })
+      );
 
       await controller.initialize();
 
@@ -138,9 +187,9 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('initializes in manual mode: ensures watchers stopped and does NOT trigger scan', async () => {
-      vi.mocked(getUserSettings).mockResolvedValueOnce({
-        libraryScanMode: 'manual'
-      } as unknown as UserSettings);
+      vi.mocked(getUserSettings).mockResolvedValueOnce(
+        createMockUserSettings({ libraryScanMode: 'manual' })
+      );
 
       await controller.initialize();
 
@@ -163,9 +212,9 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('ignores second initialize call idempotently', async () => {
-      vi.mocked(getUserSettings).mockResolvedValue({
-        libraryScanMode: 'automatic'
-      } as unknown as UserSettings);
+      vi.mocked(getUserSettings).mockResolvedValue(
+        createMockUserSettings({ libraryScanMode: 'automatic' })
+      );
 
       await controller.initialize();
       await controller.initialize();
@@ -264,9 +313,9 @@ describe('LibraryLifecycleController', () => {
     });
 
     it('no-ops when transitioning to the current mode after initialization', async () => {
-      vi.mocked(getUserSettings).mockResolvedValueOnce({
-        libraryScanMode: 'automatic'
-      } as unknown as UserSettings);
+      vi.mocked(getUserSettings).mockResolvedValueOnce(
+        createMockUserSettings({ libraryScanMode: 'automatic' })
+      );
       await controller.initialize();
 
       vi.mocked(saveUserSettings).mockClear();
@@ -317,11 +366,11 @@ describe('LibraryLifecycleController', () => {
     it('coalesces rapid burst change events into a single scan execution', async () => {
       await controller.startWatchers();
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(500);
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(500);
-      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(500);
 
       expect(mockScanner.scan).not.toHaveBeenCalled();
@@ -342,12 +391,12 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       // File changes while Scan A is running (increments generation)
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
 
       // Ensure no concurrent second scan was started yet
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
@@ -374,7 +423,7 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
@@ -400,14 +449,14 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       // Multiple files change during Scan A
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
-      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
-      libraryChangeTracker.markDirty({ path: 'C:/Music/4.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3', source: 'folder-watcher' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/4.mp3', source: 'folder-watcher' });
 
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
@@ -423,7 +472,7 @@ describe('LibraryLifecycleController', () => {
     it('clears pending debounce timer and avoids duplicate scan when user clicks Scan Now during debounce', async () => {
       await controller.startWatchers();
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(500);
 
       // User triggers manual scanNow while debounce is pending
@@ -442,7 +491,7 @@ describe('LibraryLifecycleController', () => {
     it('does NOT trigger live scan on filesystem change when in startup mode', async () => {
       await controller.setScanMode('startup');
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockScanner.scan).not.toHaveBeenCalled();
@@ -451,7 +500,7 @@ describe('LibraryLifecycleController', () => {
     it('does NOT trigger live scan on filesystem change when in manual mode', async () => {
       await controller.setScanMode('manual');
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockScanner.scan).not.toHaveBeenCalled();
@@ -460,7 +509,7 @@ describe('LibraryLifecycleController', () => {
     it('clears pending debounce timer and pending state when transitioning automatic -> manual', async () => {
       await controller.startWatchers();
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(1000);
 
       await controller.setScanMode('manual');
@@ -472,7 +521,7 @@ describe('LibraryLifecycleController', () => {
     it('clears pending debounce timer and pending state when transitioning automatic -> startup', async () => {
       await controller.startWatchers();
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(1000);
 
       await controller.setScanMode('startup');
@@ -484,7 +533,7 @@ describe('LibraryLifecycleController', () => {
     it('clears pending debounce timer and removes listener during shutdown', async () => {
       await controller.startWatchers();
 
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(1000);
 
       await controller.shutdown();
@@ -507,7 +556,7 @@ describe('LibraryLifecycleController', () => {
       });
 
       // Filesystem change arrives during startup scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/NewSong.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/NewSong.mp3', source: 'folder-watcher' });
 
       // Startup scan finishes
       mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
@@ -531,12 +580,12 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       // Filesystem change arrives during scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
 
       // User transitions to manual mode while scan is in flight
       await controller.setScanMode('manual');
@@ -562,12 +611,12 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       // Filesystem change arrives during scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
 
       // Scan A finishes with CANCELLED status
       mockScanner.scan.mockResolvedValueOnce(mockCancelledSummary);
@@ -590,12 +639,12 @@ describe('LibraryLifecycleController', () => {
       mockScanner.scan.mockReturnValueOnce(scanAPromise);
 
       // Trigger first scan
-      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/1.mp3', source: 'folder-watcher' });
       await vi.advanceTimersByTimeAsync(2000);
       expect(mockScanner.scan).toHaveBeenCalledTimes(1);
 
       // Change arrives during Scan A
-      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/2.mp3', source: 'folder-watcher' });
 
       // Scan A finishes
       mockScanner.scan.mockResolvedValueOnce(mockCompletedSummary);
@@ -603,7 +652,7 @@ describe('LibraryLifecycleController', () => {
 
       // 1000ms into the follow-up debounce window, another change arrives
       await vi.advanceTimersByTimeAsync(1000);
-      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3' });
+      libraryChangeTracker.markDirty({ path: 'C:/Music/3.mp3', source: 'folder-watcher' });
 
       // At 2000ms total (1000ms after new change), Scan B should NOT have fired yet
       await vi.advanceTimersByTimeAsync(1000);

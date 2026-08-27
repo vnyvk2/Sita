@@ -64,6 +64,7 @@ describe('CollectionEventProvider', () => {
 
   it('should invalidate queries on CollectionDeleted', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const removeSpy = vi.spyOn(queryClient, 'removeQueries');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -76,15 +77,14 @@ describe('CollectionEventProvider', () => {
     act(() => {
       registeredCallback!(null, {
         type: 'CollectionDeleted',
-        payload: {
-          collectionId: 'deleted-id',
-          deletedCount: 1
-        }
+        payload: { collectionIds: [42] }
       });
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.tree() });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.sidebar() });
+    // Deleted collections are evicted from the cache, not merely invalidated.
+    expect(removeSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.detail(42) });
+    expect(removeSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.entries(42) });
   });
 
   it('should invalidate queries on CollectionMoved', () => {

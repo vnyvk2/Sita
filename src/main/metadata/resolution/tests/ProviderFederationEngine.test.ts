@@ -257,10 +257,14 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
 
     const gateway = new DefaultMetadataLookupGateway(undefined, registry);
     const result = await gateway.resolveFederated({
+      resources: { primaryType: 'album', targetResources: [{ id: 1, type: 'album', attributes: {} }] },
+      execution: { mode: 'Batch' },
       request: {
+        id: 'req-concurrency',
         operationId: 'op-concurrency',
         resourceId: 1,
-        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' }
+        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' },
+        requestedAt: Date.now()
       }
     });
 
@@ -291,10 +295,14 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     const gateway = new DefaultMetadataLookupGateway(undefined, registry);
 
     const context: MetadataContext = {
+      resources: { primaryType: 'album', targetResources: [{ id: 1, type: 'album', attributes: {} }] },
+      execution: { mode: 'Batch' },
       request: {
+        id: 'req-legacy-dup-test',
         operationId: 'op-legacy-dup-test',
         resourceId: 1,
-        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' }
+        query: { albumTitle: 'SOUR', artistName: 'Olivia Rodrigo' },
+        requestedAt: Date.now()
       }
     };
 

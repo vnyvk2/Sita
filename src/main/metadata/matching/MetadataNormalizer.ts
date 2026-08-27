@@ -141,8 +141,4 @@ export class MetadataNormalizer {
 
     return normalizeForMatching(cleaned);
   }
-
-  private static cleanWhitespace(str: string): string {
-    return str.replace(/\s+/g, ' ').trim();
-  }
 }

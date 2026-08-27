@@ -1,4 +1,5 @@
 import { collectionKeys } from '@renderer/api/collectionKeys';
+import { notifyLibraryStructureChanged } from '@renderer/other/libraryVersion';
 import { albumQuery } from '@renderer/queries/albums';
 import { analyticsQuery } from '@renderer/queries/analytics';
 import { artistQuery } from '@renderer/queries/artists';
@@ -113,7 +114,13 @@ export function getInvalidationTargetsForEvent(
     case 'artists/newArtist':
     case 'artists/updatedArtist':
     case 'artists/deletedArtist':
-      return ['artists:all', 'artists:single', 'home:recentSongArtists', 'search:query', 'analytics:listening'];
+      return [
+        'artists:all',
+        'artists:single',
+        'home:recentSongArtists',
+        'search:query',
+        'analytics:listening'
+      ];
     case 'artists/likes':
     case 'artists/artworks':
       return ['artists:all', 'artists:single'];
@@ -359,6 +366,9 @@ export function useDataSync(scheduler: SchedulerFn = defaultRafScheduler): void 
     const batcher = batcherRef.current!;
 
     const noticeDataUpdateEvents = (_: unknown, dataEvents: DataUpdateEvent[]) => {
+      // Structural song events invalidate the canonical All Songs projection
+      // (docs/canonical-queue-architecture.md, Invariant 7).
+      notifyLibraryStructureChanged(dataEvents);
       batcher.handleEvents(dataEvents);
     };
 

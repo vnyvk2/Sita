@@ -282,5 +282,36 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
 
       expect(backSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('routes goToSearch to the mini player search surface while in mini mode', async () => {
+      setPlayerType('mini');
+      const toggleMiniPlayerSearch = vi.fn().mockResolvedValue(undefined);
+      window.api = {
+        ...window.api,
+        miniPlayer: { ...window.api?.miniPlayer, toggleMiniPlayerSearch }
+      } as unknown as typeof window.api;
+      await setupShortcuts();
+
+      // goToSearch default binding is Ctrl+F
+      fireKey('F', { ctrlKey: true });
+
+      expect(toggleMiniPlayerSearch).toHaveBeenCalledWith(true);
+      expect(window.location.pathname).not.toContain('/main-player/search');
+    });
+
+    it('routes goToQueue to the mini player queue surface while in mini mode', async () => {
+      setPlayerType('mini');
+      const toggleMiniPlayerQueue = vi.fn().mockResolvedValue(undefined);
+      window.api = {
+        ...window.api,
+        miniPlayer: { ...window.api?.miniPlayer, toggleMiniPlayerQueue }
+      } as unknown as typeof window.api;
+      await setupShortcuts();
+
+      // goToQueue default binding is Ctrl+Q
+      fireKey('Q', { ctrlKey: true });
+
+      expect(toggleMiniPlayerQueue).toHaveBeenCalledWith(true);
+    });
   });
 });

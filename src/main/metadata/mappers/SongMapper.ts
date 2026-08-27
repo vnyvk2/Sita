@@ -102,6 +102,21 @@ export class SongMapper implements IMetadataMapper<SongPersistenceDTO> {
       );
     }
 
+    const discNo = dto.discNumber ?? dto.diskNumber;
+    if (discNo != null) {
+      entity.setField(
+        MetadataFields.DiscNumber,
+        new MetadataValue<number>({ value: Number(discNo), source, confidence })
+      );
+    }
+
+    if (dto.trackNumber != null) {
+      entity.setField(
+        MetadataFields.TrackNumber,
+        new MetadataValue<number>({ value: Number(dto.trackNumber), source, confidence })
+      );
+    }
+
     return entity;
   }
 }

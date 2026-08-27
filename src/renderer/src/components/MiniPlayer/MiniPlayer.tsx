@@ -23,6 +23,7 @@ import CompactLyricsPanel from './CompactLyricsPanel';
 import CompactMiniPlayer from './CompactMiniPlayer';
 import LyricsContainer from './containers/LyricsContainer';
 import QueueContainer from './containers/QueueContainer';
+import SearchContainer from './containers/SearchContainer';
 import TitleBarContainer from './containers/TitleBarContainer';
 
 type MiniPlayerProps = {
@@ -98,8 +99,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const [isNextSongPopupVisible, setIsNextSongPopupVisible] = useState(false);
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const [isQueueVisible, setIsQueueVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [queueDirection, setQueueDirection] = useState<'down' | 'up'>('down');
+  const [searchDirection, setSearchDirection] = useState<'down' | 'up'>('down');
 
   const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -146,6 +149,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       prevModeRef.current = miniPlayerMode;
       setIsQueueVisible(false);
       setIsLyricsVisible(false);
+      setIsSearchVisible(false);
     }
   }, [miniPlayerMode]);
 
@@ -252,6 +256,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const isQueueTransitioningRef = useRef(false);
   const [compactLyricsDirection, setCompactLyricsDirection] = useState<'up' | 'down'>('down');
   const isLyricsTransitioningRef = useRef(false);
+  const isSearchTransitioningRef = useRef(false);
 
   const handleToggleCompactLyrics = useCallback(async () => {
     if (isLyricsTransitioningRef.current) return;
@@ -267,6 +272,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           setQueueDirection('down');
         }
 
+        // Mutually exclusive: collapse Search if open
+        if (isSearchVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerSearch(false);
+          setIsSearchVisible(false);
+          setSearchDirection('down');
+        }
+
         const result = await window.api.miniPlayer.toggleMiniPlayerLyrics(true);
         if (result?.direction) {
           setCompactLyricsDirection(result.direction);
@@ -280,7 +292,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     } finally {
       isLyricsTransitioningRef.current = false;
     }
-  }, [isLyricsVisible, isQueueVisible, queueLength]);
+    }, [isLyricsVisible, isQueueVisible, isSearchVisible, queueLength]);
 
   const handleToggleLyrics = useCallback(() => {
     if (miniPlayerMode === 'compact') {
@@ -291,13 +303,54 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     setIsLyricsVisible((prev) => !prev);
   }, [miniPlayerMode, handleToggleCompactLyrics]);
 
+  const handleToggleSearch = useCallback(async () => {
+    if (isSearchTransitioningRef.current) return;
+    isSearchTransitioningRef.current = true;
+
+    try {
+      const nextVisible = !isSearchVisible;
+      if (nextVisible) {
+        // Mutually exclusive: collapse Queue if currently open
+        if (isQueueVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerQueue(false, queueLength);
+          setIsQueueVisible(false);
+          setQueueDirection('down');
+        }
+
+        // Mutually exclusive: collapse Lyrics (compact mode uses spatial panel)
+        if (miniPlayerMode === 'compact' && isLyricsVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerLyrics(false);
+          setIsLyricsVisible(false);
+          setCompactLyricsDirection('down');
+        }
+
+        const result = await window.api.miniPlayer.toggleMiniPlayerSearch(true);
+        if (result?.direction) {
+          setSearchDirection(result.direction);
+        }
+        setIsSearchVisible(true);
+      } else {
+        await window.api.miniPlayer.toggleMiniPlayerSearch(false);
+        setIsSearchVisible(false);
+        setSearchDirection('down');
+      }
+    } finally {
+      isSearchTransitioningRef.current = false;
+    }
+  }, [isSearchVisible, isQueueVisible, isLyricsVisible, miniPlayerMode, queueLength]);
+
   const manageKeyboardShortcuts = useCallback(
     (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'l') {
         handleToggleLyrics();
       }
+
+      if (e.ctrlKey && (e.key === 'f' || e.key === 'k')) {
+        e.preventDefault();
+        handleToggleSearch();
+      }
     },
-    [handleToggleLyrics]
+    [handleToggleLyrics, handleToggleSearch]
   );
 
   useEffect(() => {
@@ -321,6 +374,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           setCompactLyricsDirection('down');
         }
 
+        // Mutually exclusive: collapse Search if open
+        if (isSearchVisible) {
+          await window.api.miniPlayer.toggleMiniPlayerSearch(false);
+          setIsSearchVisible(false);
+          setSearchDirection('down');
+        }
+
         const result = await window.api.miniPlayer.toggleMiniPlayerQueue(true, queueLength);
         if (result?.direction) {
           setQueueDirection(result.direction);
@@ -334,7 +394,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     } finally {
       isQueueTransitioningRef.current = false;
     }
-  }, [isQueueVisible, isLyricsVisible, miniPlayerMode, queueLength]);
+  }, [isQueueVisible, isLyricsVisible, isSearchVisible, miniPlayerMode, queueLength]);
 
   const handleSkipForwardClickWithParams = () => {
     handleSkipForwardClick('USER_SKIP');
@@ -442,6 +502,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               checked: pinnedControls.includes('queue')
             },
             {
+              id: 'pin_search',
+              label: t('player.search', 'Search'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('search')
+            },
+            {
               id: 'pin_shuffle',
               label: t('player.shuffle', 'Shuffle'),
               type: 'checkbox',
@@ -470,6 +536,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           const nextMode = miniPlayerMode === 'compact' ? 'standard' : 'compact';
           setIsQueueVisible(false);
           setIsLyricsVisible(false);
+          setIsSearchVisible(false);
+          setSearchDirection('down');
           await window.api.miniPlayer.setMiniPlayerMode(nextMode);
           queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
@@ -493,7 +561,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           handleToggleLyrics();
           break;
         case 'search':
-          /* TODO: open search */
+          handleToggleSearch();
           break;
         case 'toggleAlwaysOnTop':
           toggleAlwaysOnTop(!settings?.isMiniPlayerAlwaysOnTop);
@@ -518,6 +586,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           break;
         case 'pin_queue':
           handleTogglePinnedControl('queue');
+          break;
+        case 'pin_search':
+          handleTogglePinnedControl('search');
           break;
         case 'pin_shuffle':
           handleTogglePinnedControl('shuffle');
@@ -545,6 +616,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       toggleAlwaysOnTop,
       handleToggleQueue,
       handleToggleLyrics,
+      handleToggleSearch,
       miniPlayerMode
     ]
   );
@@ -575,7 +647,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     <div
       className={`mini-player dark group !bg-dark-background-color-1 dark:!bg-dark-background-color-1 relative flex h-full flex-col overflow-hidden !transition-none select-none ${
         (isQueueVisible && queueDirection === 'up') ||
-        (miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up')
+        (miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up') ||
+        (isSearchVisible && searchDirection === 'up')
           ? 'justify-end'
           : 'justify-start'
       } ${
@@ -592,7 +665,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             loading="eager"
             alt="Song Cover"
             className={`h-full w-full object-cover transition-[filter] delay-100 duration-200 ease-in-out group-focus-within:blur-[2px] group-focus-within:brightness-75 group-hover:blur-[2px] group-hover:brightness-75 group-focus:blur-[4px] group-focus:brightness-75 ${
-              isLyricsVisible || isQueueVisible ? 'blur-[1rem]! brightness-[.25]!' : ''
+              isLyricsVisible || isQueueVisible || isSearchVisible
+                ? 'blur-[1rem]! brightness-[.25]!'
+                : ''
             } ${!isCurrentSongPlaying ? 'blur-[1rem] brightness-75' : 'blur-0 brightness-100'}`}
           />
 
@@ -601,7 +676,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             className={`absolute inset-0 transition-opacity duration-200 ${
               isLyricsVisible
                 ? 'opacity-0'
-                : showControls || isQueueVisible
+                : showControls || isQueueVisible || isSearchVisible
                   ? 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-100'
                   : 'bg-[linear-gradient(180deg,_rgba(2,_0,_36,_0)_0%,_rgba(33,_34,_38,_0.9)_90%)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
             }`}
@@ -612,6 +687,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {/* ── Spatial Queue Container (Placed above deck when expanding upward) ── */}
       {isQueueVisible && queueDirection === 'up' && (
         <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
+
+      {/* ── Spatial Search Container (Placed above deck when expanding upward) ── */}
+      {isSearchVisible && searchDirection === 'up' && (
+        <SearchContainer isSearchVisible={isSearchVisible} onClose={handleToggleSearch} />
       )}
 
       {/* ── Compact Floating Lyrics Panel (Placed above strip when expanding upward) ── */}
@@ -627,8 +707,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <CompactMiniPlayer
           isQueueVisible={isQueueVisible}
           isLyricsVisible={isLyricsVisible}
+          isSearchVisible={isSearchVisible}
           onToggleQueue={handleToggleQueue}
           onToggleLyrics={handleToggleLyrics}
+          onToggleSearch={handleToggleSearch}
           pinnedControls={pinnedControls}
         />
       ) : (
@@ -763,7 +845,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               }`}
               iconClassName={`text-lg! ${
                 isAFavorite
-                  ? 'material-icons-round text-dark-background-color-3!'
+                  ? 'material-icons-round text-[#FF2D55]! dark:text-[#FF2D55]!'
                   : 'material-icons-round-outlined'
               }`}
               isDisabled={!currentSongData.isKnownSource}
@@ -932,6 +1014,25 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
             </button>
           )}
+
+          {/* Optional: Search Toggle */}
+          {pinnedControls.includes('search') && (
+            <button
+              type="button"
+              className={`search-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
+                isSearchVisible ? 'text-dark-background-color-3!' : ''
+              }`}
+              title={t('player.search', 'Search')}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                handleToggleSearch();
+              }}
+            >
+              <span className="material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100">
+                search
+              </span>
+            </button>
+          )}
           </div>
         </div>
       </div>
@@ -941,6 +1042,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {/* ── Spatial Queue Container (Placed below deck when expanding downward) ── */}
       {isQueueVisible && queueDirection === 'down' && (
         <QueueContainer isQueueVisible={isQueueVisible} />
+      )}
+
+      {/* ── Spatial Search Container (Placed below deck when expanding downward) ── */}
+      {isSearchVisible && searchDirection === 'down' && (
+        <SearchContainer isSearchVisible={isSearchVisible} onClose={handleToggleSearch} />
       )}
 
       {/* ── Compact Floating Lyrics Panel (Placed below strip when expanding downward) ── */}

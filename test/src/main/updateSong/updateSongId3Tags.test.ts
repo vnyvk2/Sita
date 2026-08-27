@@ -3,8 +3,14 @@ import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { File } from 'node-taglib-sharp';
+
+// Measured: ~2.3s of test time standalone, but these real-file + real-DB
+// tests exceed the 5s default when the full suite runs in parallel on
+// slower machines. Scoped here instead of raising the global timeout.
+vi.setConfig({ testTimeout: 30_000 });
 import updateSongId3Tags, {
   clearPendingMetadataUpdates,
+  enqueueDeferredMetadataInMemory,
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
 } from '@main/updateSong/updateSongId3Tags';
@@ -206,6 +212,38 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       // Orphaned Artist 200 must be safely deleted
       expect(artistDeleted).toBe(true);
       expect(deletedArtistId).toBe(200);
+    });
+  });
+
+  describe('5-G: Durable pending-write journal (2c P4 + audit P0 #2)', () => {
+    it('persists deferred write, hydrates WITHOUT premature deletion, cleans up on successful flush', async () => {
+      const { MetadataPendingWritesRepository } = await import('@main/metadata/history/MetadataPendingWritesRepository');
+      const { restorePersistedPendingWrites } = await import('@main/updateSong/updateSongId3Tags');
+      const repo = new (MetadataPendingWritesRepository as new () => {
+        upsert: (i: { id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }) => Promise<void>;
+        listAll: () => Promise<Array<{ songPath: string }>>;
+        clearAll: () => Promise<void>;
+      })();
+
+      await repo.clearAll();
+      await repo.upsert({ id: 'pw-test', songPath: tempSongPath, tags: { title: 'Persisted Title' }, isKnownSource: true });
+
+      // Boot recovery with a FAILING disk write: the durable row must survive
+      // (audit P0 #2 - hydration must not delete before the write lands)
+      const spy = vi.spyOn(File, 'createFromPath').mockImplementation(() => {
+        throw new Error('EIO: simulated failure during boot recovery flush');
+      });
+      await restorePersistedPendingWrites();
+      spy.mockRestore();
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(true);
+
+      // Successful flush consumes both the map entry and the durable row
+      await savePendingMetadataUpdates(tempSongPath, true);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      expect((await repo.listAll()).some((r) => r.songPath === tempSongPath)).toBe(false);
+      await repo.clearAll();
     });
   });
 
@@ -468,6 +506,93 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       const flushed = File.createFromPath(tempSongPath);
       expect(flushed.tag.title).toBe('Deferred While Playing');
       flushed.dispose();
+    });
+  });
+
+  describe('G2-05: Pending-write flusher fixes', () => {
+    it('does not advance DB modifiedAt if physical file write throws an error', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/other.mp3');
+      const updateModifiedAtSpy = vi.spyOn(songsDb, 'updateSongModifiedAtByPath').mockResolvedValue(undefined as any);
+
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 201,
+        path: tempSongPath,
+        title: 'Original Song'
+      } as any);
+      vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => cb({}));
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue(tempSongPath);
+      await updateSongId3Tags(201, { title: 'Failing File Write' }, false);
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+      vi.spyOn(File, 'createFromPath').mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/other.mp3');
+      await savePendingMetadataUpdates('/other.mp3', true);
+
+      expect(updateModifiedAtSpy).not.toHaveBeenCalled();
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+    });
+
+    it('continues flushing remaining queue even when encountering playing song without stranding queue', async () => {
+      const tempSong2 = path.join(os.tmpdir(), `update_id3_q2_${Date.now()}.mp3`);
+      const tempSong3 = path.join(os.tmpdir(), `update_id3_q3_${Date.now()}.mp3`);
+      fs.copyFileSync(fixtureSource, tempSong2);
+      fs.copyFileSync(fixtureSource, tempSong3);
+
+      try {
+        enqueueDeferredMetadataInMemory(tempSongPath, { title: 'New Playing Title' });
+        enqueueDeferredMetadataInMemory(tempSong2, { title: 'New Song 2 Title' });
+        enqueueDeferredMetadataInMemory(tempSong3, { title: 'New Song 3 Title' });
+
+        expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+        expect(isMetadataUpdatesPending(tempSong2)).toBe(true);
+        expect(isMetadataUpdatesPending(tempSong3)).toBe(true);
+
+        // Flush while tempSongPath is currently playing (forceSave = false)
+        await savePendingMetadataUpdates(tempSongPath, false);
+
+        // Playing song was skipped
+        expect(isMetadataUpdatesPending(tempSongPath)).toBe(true);
+
+        // Both Song 2 and Song 3 were NOT stranded: they were flushed!
+        expect(isMetadataUpdatesPending(tempSong2)).toBe(false);
+        expect(isMetadataUpdatesPending(tempSong3)).toBe(false);
+
+        const f2 = File.createFromPath(tempSong2);
+        expect(f2.tag.title).toBe('New Song 2 Title');
+        f2.dispose();
+
+        const f3 = File.createFromPath(tempSong3);
+        expect(f3.tag.title).toBe('New Song 3 Title');
+        f3.dispose();
+      } finally {
+        try { fs.unlinkSync(tempSong2); } catch {}
+        try { fs.unlinkSync(tempSong3); } catch {}
+      }
+    });
+
+    it('uses entry songPath for format detection rather than currentSongPath', async () => {
+      vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/music/playing.wav');
+      vi.spyOn(db, 'transaction').mockImplementation(async (cb: any) => cb({}));
+      vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
+      vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
+        id: 204,
+        path: tempSongPath,
+        title: 'Original Song'
+      } as any);
+
+      await updateSongId3Tags(204, { title: 'MP3 Format Title' }, false);
+
+      await savePendingMetadataUpdates('/music/playing.wav', true);
+
+      expect(isMetadataUpdatesPending(tempSongPath)).toBe(false);
+      const f = File.createFromPath(tempSongPath);
+      expect(f.tag.title).toBe('MP3 Format Title');
+      f.dispose();
     });
   });
 });

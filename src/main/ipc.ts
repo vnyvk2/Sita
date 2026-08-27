@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
-import { COMPACT_LYRICS_EXTENSION_HEIGHT } from '@common/miniPlayerConstants';
+import {
+  COMPACT_LYRICS_EXTENSION_HEIGHT,
+  MINI_PLAYER_SEARCH_EXTENSION_HEIGHT
+} from '@common/miniPlayerConstants';
 import memProfiler from './utils/memProfiler';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import {
@@ -86,6 +89,7 @@ import {
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
+import { setupDownloadsIpc } from './downloads/setupDownloads';
 import libraryChangeTracker from './library/LibraryChangeTracker';
 import libraryLifecycleController, {
   type LibraryScanMode
@@ -189,6 +193,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   setupPlaylistExportIpc(playlistRepository);
   setupSpotifyIpc();
   registerMembershipIPCHandlers();
+  setupDownloadsIpc((snapshot) => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+      mainWindow.webContents.send('downloads/updated', snapshot);
+    }
+  });
 
   MetadataBootstrap.getInstance()
     .then(async (metadataContainer) => {
@@ -343,9 +352,15 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     // ipcMain.handle('app/saveUserData', (_, dataType: UserDataTypes, data: string) =>
     //   saveUserData(dataType, data)
     // );
-    ipcMain.handle('app/saveUserSettings', (_, settings: Partial<UserSettings>) =>
-      saveUserSettings(settings)
-    );
+    ipcMain.handle('app/saveUserSettings', (_, settings: Partial<UserSettings>) => {
+      const { lastScanTime, ...rest } = settings;
+      const parsedLastScanTime =
+        typeof lastScanTime === 'string' ? new Date(lastScanTime) : lastScanTime;
+      return saveUserSettings({
+        ...rest,
+        ...(parsedLastScanTime !== undefined ? { lastScanTime: parsedLastScanTime } : {})
+      });
+    });
 
     // User Keyboard Shortcuts Handlers
     ipcMain.handle('app/getUserKeyboardShortcuts', async () => {
@@ -904,6 +919,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/toggleMiniPlayerLyrics', (_, isExpanded: boolean) =>
       expandMiniPlayer(isExpanded, 0, COMPACT_LYRICS_EXTENSION_HEIGHT)
+    );
+
+    ipcMain.handle('app/toggleMiniPlayerSearch', (_, isExpanded: boolean) =>
+      expandMiniPlayer(isExpanded, 0, MINI_PLAYER_SEARCH_EXTENSION_HEIGHT)
     );
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>

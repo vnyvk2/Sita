@@ -3,12 +3,12 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
+import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
 import MiniPlayer from './components/MiniPlayer/MiniPlayer';
 import PromptMenu from './components/PromptMenu/PromptMenu';
-import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 // ? CONTEXTS
 import { AppUpdateContext, type AppUpdateContextType } from './contexts/AppUpdateContext';
 // import { SongPositionContext } from './contexts/SongPositionContext';
@@ -226,6 +226,7 @@ export default function App() {
   // Queue management hook handles queue creation, updates, and shuffle operations
   const {
     createQueue,
+    playAllSongs,
     updateQueueData,
     toggleQueueShuffle,
     toggleShuffling,
@@ -262,6 +263,30 @@ export default function App() {
       }
     }
   }, []);
+
+  // ? RESTORE PRESENTATION AFTER RENDERER CRASH RECOVERY
+  // Main re-asserts the pre-crash playerType after a crash-triggered reload
+  // (the renderer store resets to 'normal' on reload). Repeats are harmless:
+  // updatePlayerType no-ops when the store already matches.
+  useEffect(() => {
+    if (!window.api?.messages?.getMessageFromMain) return undefined;
+    const handleRestoreMessage = (
+      _: unknown,
+      messageCode: MessageCodes,
+      data: Record<string, unknown>
+    ) => {
+      if (messageCode === 'RESTORE_PLAYER_TYPE_AFTER_RECOVERY') {
+        const type = data?.playerType;
+        if (type === 'mini' || type === 'normal' || type === 'full') {
+          void updatePlayerType(type);
+        }
+      }
+    };
+    window.api.messages.getMessageFromMain(handleRestoreMessage);
+    return () => {
+      window.api.messages.removeMessageToRendererEventListener?.(handleRestoreMessage);
+    };
+  }, [updatePlayerType]);
 
   // ? INITIALIZE MEDIA SESSION
   // Media session hook handles OS-level media controls and browser media notifications
@@ -301,7 +326,6 @@ export default function App() {
     toggleRepeat,
     playSongFromUnknownSource,
     playSong,
-    createQueue,
     changeUpNextSongData,
     managePlaybackErrors,
     toggleSongPlayback,
@@ -322,6 +346,7 @@ export default function App() {
       addNewNotifications,
       updateNotifications,
       createQueue,
+      playAllSongs,
       changeQueueCurrentSongIndex,
       updateCurrentSongPlaybackState,
       updatePlayerType,
@@ -355,6 +380,7 @@ export default function App() {
     addNewNotifications,
     updateNotifications,
     createQueue,
+    playAllSongs,
     changeQueueCurrentSongIndex,
     updateCurrentSongPlaybackState,
     updatePlayerType,

@@ -1,7 +1,7 @@
-import { getAlbumById, getAllAlbums } from '@main/db/queries/albums';
+import { getAllAlbums } from '@main/db/queries/albums';
 import { getArtistById } from '@main/db/queries/artists';
-import { ITunesApiClient, type ITunesAlbumDto } from '@main/platform/networking/ITunesApiClient';
-import { DeezerApiClient, type DeezerAlbumDto } from '@main/platform/networking/DeezerApiClient';
+import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
+import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
 import type {
   ArtistDiscographyPayload,

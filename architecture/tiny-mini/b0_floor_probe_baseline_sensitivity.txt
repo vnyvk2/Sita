@@ -1,0 +1,4 @@
+﻿    "i18next.js?v=b62da73e",
+    "react-i18next.js?v=12bc7fc1"
+  ],
+Baseline worktree (HEAD 8f2b35f8, pre-B0): probe exit code 3, CONTAMINATION detected: /locales/, /i18n., i18next.js, react-i18next.js in boot closure (24 modules). Sensitivity check PASSED.

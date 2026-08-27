@@ -17,6 +17,8 @@ export interface MergedCandidateResult {
   year?: number;
   genre?: string;
   artworkUrl?: string;
+  isrc?: string;
+  musicBrainzRecordingId?: string;
   fieldAttributions: Record<string, ProviderAttribution>;
   fieldAlternatives: Record<string, FieldContribution[]>;
 }
@@ -129,6 +131,11 @@ export class MetadataMergeEngine {
       year: winningResult.year,
       genre: winningResult.genre,
       artworkUrl: winningResult.artworkUrl,
+      isrc: typeof winningResult.isrc === 'string' ? winningResult.isrc : undefined,
+      musicBrainzRecordingId:
+        typeof winningResult.musicBrainzRecordingId === 'string'
+          ? winningResult.musicBrainzRecordingId
+          : undefined,
       fieldAttributions,
       fieldAlternatives
     };

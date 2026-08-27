@@ -9,6 +9,13 @@ export interface RetryPolicyOptions {
   retryableStatusCodes?: number[];
 }
 
+export interface ExecuteOptions {
+  method?: string;
+  allowNonIdempotentRetry?: boolean;
+  /** Aborts the wait immediately instead of sleeping out the full backoff. */
+  signal?: AbortSignal;
+}
+
 export const isIdempotentMethod = (method?: string): boolean => {
   if (!method) return true;
   const m = method.toUpperCase();
@@ -36,7 +43,7 @@ export class RetryPolicy {
 
   public async execute<T>(
     fn: (attempt: number) => Promise<T>,
-    options?: { method?: string; allowNonIdempotentRetry?: boolean }
+    options?: ExecuteOptions
   ): Promise<T> {
     let attempt = 0;
 
@@ -53,7 +60,7 @@ export class RetryPolicy {
         }
 
         const delay = this.calculateDelay(attempt, err);
-        await this.delay(delay);
+        await this.delay(delay, options?.signal);
       }
     }
   }
@@ -119,7 +126,36 @@ export class RetryPolicy {
     return seconds * 1000;
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  private delay(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      return Promise.reject(createAbortError());
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      // A large Retry-After must not keep a cancelled operation pinned for the
+      // full duration; race the timer against the caller's signal.
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, ms);
+
+      const onAbort = () => {
+        cleanup();
+        reject(createAbortError());
+      };
+
+      function cleanup() {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+      }
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
   }
+}
+
+function createAbortError(): Error {
+  const abortError = new Error('The operation was aborted');
+  abortError.name = 'AbortError';
+  return abortError;
 }

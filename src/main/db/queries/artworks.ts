@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { CURRENT_ARTWORK_GENERATOR_VERSION } from '../../workers/jobs/artworkJob';
+
+export const CURRENT_ARTWORK_GENERATOR_VERSION = 1;
 
 import { db } from '../db';
 import {
@@ -24,24 +25,18 @@ export const saveArtworks = async (
 ) => {
   const res = await trx
     .insert(artworks)
-    .values(data.map(d => ({ ...d, generatorVersion: CURRENT_ARTWORK_GENERATOR_VERSION })))
+    .values(data.map((d) => ({ ...d, generatorVersion: CURRENT_ARTWORK_GENERATOR_VERSION })))
     .onConflictDoNothing({ target: artworks.hash })
     .returning();
 
   // For rows that conflicted and were skipped, we need to fetch them manually
   // so the caller still gets the full list of artwork records.
   if (res.length < data.length) {
-    const hashes = data.map(d => d.hash);
-    const existing = await trx
-      .select()
-      .from(artworks)
-      .where(inArray(artworks.hash, hashes));
-    
+    const hashes = data.map((d) => d.hash);
+    const existing = await trx.select().from(artworks).where(inArray(artworks.hash, hashes));
+
     // Merge inserted and existing records
-    return [
-      ...res,
-      ...existing.filter(e => !res.some(r => r.id === e.id))
-    ];
+    return [...res, ...existing.filter((e) => !res.some((r) => r.id === e.id))];
   }
 
   return res;
@@ -116,7 +111,9 @@ export const syncAlbumArtworks = async (
   if (remoteToRemove.length > 0) {
     await trx
       .delete(albumsArtworks)
-      .where(and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, remoteToRemove)));
+      .where(
+        and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, remoteToRemove))
+      );
   }
 
   // 3. Add new links
@@ -158,7 +155,10 @@ export const linkArtworkToPlaylist = async (
   artworkId: number,
   trx: DB | DBTransaction = db
 ) => {
-  return await trx.insert(artworksPlaylists).values({ playlistId, artworkId }).onConflictDoNothing();
+  return await trx
+    .insert(artworksPlaylists)
+    .values({ playlistId, artworkId })
+    .onConflictDoNothing();
 };
 
 export const getArtistOnlineArtworksCount = async (

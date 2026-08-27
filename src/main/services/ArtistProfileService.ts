@@ -1,6 +1,5 @@
 import { getArtistById, getArtistsByName } from '@main/db/queries/artists';
 import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
-import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
 import getArtistInfoFromLastFM from '@main/other/lastFm/getArtistInfoFromLastFM';
 import getArtistTopTracksFromLastFM, { type LastFmTopTrack } from '@main/other/lastFm/getArtistTopTracksFromLastFM';
@@ -9,16 +8,14 @@ import type {
   ArtistOnlineProfilePayload,
   ArtistPopularTrack
 } from '../../types/artist_discography';
-import type { SimilarArtist, SimilarArtistInfo } from '../../types/last_fm_artist_info_api';
+import type { SimilarArtist } from '../../types/last_fm_artist_info_api';
 import logger from '../logger';
 
 export class ArtistProfileService {
   private readonly itunesClient: ITunesApiClient;
-  private readonly deezerClient: DeezerApiClient;
 
-  constructor(itunesClient?: ITunesApiClient, deezerClient?: DeezerApiClient) {
+  constructor(itunesClient?: ITunesApiClient) {
     this.itunesClient = itunesClient ?? new ITunesApiClient();
-    this.deezerClient = deezerClient ?? new DeezerApiClient();
   }
 
   /**

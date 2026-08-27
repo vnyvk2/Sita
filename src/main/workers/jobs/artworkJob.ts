@@ -3,17 +3,21 @@ import { inArray } from 'drizzle-orm';
 
 import { db } from '@main/db/db';
 import { getAlbumById } from '@main/db/queries/albums';
-import { linkArtworksToAlbum, saveArtworks } from '@main/db/queries/artworks';
+import {
+  CURRENT_ARTWORK_GENERATOR_VERSION,
+  linkArtworksToAlbum,
+  saveArtworks
+} from '@main/db/queries/artworks';
 import { artworks } from '@main/db/schema';
 import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import logger from '@main/logger';
 import type { ArtworkPayload } from '@main/other/artworks';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
-import { ASSET_EVENTS } from '../libraryChoreography';
 
+import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
-export const CURRENT_ARTWORK_GENERATOR_VERSION = 1;
+export { CURRENT_ARTWORK_GENERATOR_VERSION };
 
 export class ArtworkJob implements Job {
   id: string;
@@ -66,7 +70,10 @@ export class ArtworkJob implements Job {
         const optimizedArtwork =
           album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
 
-        if (optimizedArtwork && CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion) {
+        if (
+          optimizedArtwork &&
+          CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion
+        ) {
           logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork (up to date).`);
           this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
             albumId: this.albumId,

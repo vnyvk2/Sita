@@ -81,7 +81,8 @@ export class RequestPipeline {
       },
       {
         method: opts.method,
-        allowNonIdempotentRetry: opts.allowNonIdempotentRetry
+        allowNonIdempotentRetry: opts.allowNonIdempotentRetry,
+        signal: opts.signal
       }
     );
   }

@@ -1,13 +1,11 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
 import { createCollectionId } from '../../../common/collections/id';
+import type { BulkDeleteInput } from '../../../common/collections/operationInputs';
+import logger from '../../logger';
+import { HierarchyService } from '../engine/HierarchyService';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { DeleteOp } from './DeleteOp';
 import { RestorePlaylistOp, type RestorePlaylistInput } from './RestorePlaylistOp';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { HierarchyService } from '../engine/HierarchyService';
-
-import logger from '../../logger';
-
-import type { BulkDeleteInput } from '../../../common/collections/operationInputs';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export interface BulkRestoreInput {
   restores: RestorePlaylistInput[];
@@ -33,7 +31,7 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
 
     // 1. Gather all descendants (flatten the tree)
     const allIdsToDelete = new Set<number>();
-    
+
     for (const id of playlistIds) {
       allIdsToDelete.add(id);
       const descendants = await this.resolver.getDescendants(id, ctx.trx);
@@ -45,18 +43,30 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
     const idsArray = Array.from(allIdsToDelete);
     logger.info('[BulkDeleteOp] Executing bulk delete', { playlistIds, idsArray });
     const deleteOp = new DeleteOp(this.repository);
-    const inverseInputs: RestorePlaylistInput[] = [];
     const allAffectedSongIds = new Set<number>();
 
-    // 2. Delete bottom-up (simplifies constraint handling, though DB cascade handles it)
-    // Actually we can just rely on the DB, but to get all the data for restore we iterate.
+    // Phase 1 - capture pristine pre-delete state for EVERY id before any
+    // destructive statement runs. Deleting a parent fires FK `ON DELETE SET NULL`
+    // against its children, so per-delete snapshots (captured during the delete
+    // loop) recorded already-null parentIds and undo flattened hierarchies.
+    // The journal inverse must reflect the database as it existed immediately
+    // before the operation, not after FK side effects.
+    const inverseInputs: RestorePlaylistInput[] = [];
     for (const id of idsArray) {
-      // Execute individual DeleteOps and aggregate their inverses
+      const playlist = await this.repository.getById(id, ctx.trx);
+      if (!playlist) continue;
+      const entries = await this.repository.getEntries(id, {}, ctx.trx);
+      inverseInputs.push({
+        playlist,
+        entries: entries.map((e) => e.entry)
+      } as unknown as RestorePlaylistInput);
+    }
+
+    // Phase 2 - perform deletions. Stats propagation and song aggregation
+    // behavior is intentionally unchanged from DeleteOp's original contract.
+    for (const id of idsArray) {
       const result = await deleteOp.execute({ playlistId: id }, ctx);
-      
-      const restoreInput = result.inverseInput as { input: RestorePlaylistInput };
-      inverseInputs.push(restoreInput.input);
-      
+
       if (result.affectedSongIds) {
         for (const songId of result.affectedSongIds) {
           allAffectedSongIds.add(songId);
@@ -79,7 +89,6 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
   }
 }
 
-
 export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void> {
   private repository: PlaylistRepository;
   private resolver: HierarchyService;
@@ -100,17 +109,17 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
     const allAffectedSongIds = new Set<number>();
 
     // 1. Use HierarchyService to determine topological order
-    const nodes = input.restores.map(r => ({
+    const nodes = input.restores.map((r) => ({
       id: r.playlist.id,
       parentId: r.playlist.parentId ?? null,
       name: r.playlist.name,
       playlistType: r.playlist.playlistType
     }));
-    
+
     const sortedNodes = this.resolver.topologicalOrder(nodes);
-    
+
     // Create a map for quick lookup
-    const restoreMap = new Map(input.restores.map(r => [r.playlist.id, r]));
+    const restoreMap = new Map(input.restores.map((r) => [r.playlist.id, r]));
 
     // 2. Execute restores top-down sequentially
     for (const node of sortedNodes) {
@@ -130,7 +139,7 @@ export class BulkRestoreOp implements CollectionOperation<BulkRestoreInput, void
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.bulkDelete',
-        input: { playlistIds: input.restores.map(r => r.playlist.id) }
+        input: { playlistIds: input.restores.map((r) => r.playlist.id) }
       },
       version: 1,
       affectedSongIds: Array.from(allAffectedSongIds)

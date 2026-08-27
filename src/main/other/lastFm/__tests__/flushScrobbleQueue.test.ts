@@ -94,7 +94,7 @@ describe('flushScrobbleQueue Durable Outbox', () => {
       genres: [],
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    } as unknown as Awaited<ReturnType<typeof songQueries.getSongById>>);
   });
 
   afterEach(() => {

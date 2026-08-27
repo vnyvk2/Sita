@@ -1,7 +1,7 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
-import { parseGenreList, GENRE_SEPARATOR_REGEX } from '../../../common/genreUtils';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { parseGenreList } from '../../../common/genreUtils';
 import { linkArtworksToGenre } from './artworks';
 
 export const isGenreWithIdAvailable = async (genreId: number, trx: DB | DBTransaction = db) => {
@@ -121,7 +121,18 @@ export const createGenre = async (
   genre: typeof genres.$inferInsert,
   trx: DB | DBTransaction = db
 ) => {
-  const data = await trx.insert(genres).values(genre).returning();
+  // Upsert: insert if new, otherwise perform a no-op update so RETURNING
+  // always yields the row. This prevents duplicate genre creation from
+  // concurrent song parsing (the unique index on nameCI deduplicates at
+  // the DB level) and avoids a separate fallback lookup.
+  const data = await trx
+    .insert(genres)
+    .values(genre)
+    .onConflictDoUpdate({
+      target: genres.nameCI,
+      set: { updatedAt: sql`now()` }
+    })
+    .returning();
 
   return data[0];
 };
@@ -190,11 +201,12 @@ const reconcileExistingMultiGenresInTrx = async (trx: DBTransaction | DB) => {
 
   for (const genre of allExistingGenres) {
     const splitNames = parseGenreList(genre.name);
-    // If the genre name splits into more than 1 distinct genre (or contains delimiters that should be trimmed/normalized)
-    if (
-      splitNames.length > 1 ||
-      (splitNames.length === 1 && splitNames[0] !== genre.name && GENRE_SEPARATOR_REGEX.test(genre.name))
-    ) {
+    // If the genre name splits into more than 1 distinct genre, or the parsed
+    // form differs from the stored name in any way (delimiters, surrounding
+    // whitespace), migrate to the canonical name. parseGenreList trims tokens,
+    // so a single parsed name differing from the stored value is sufficient —
+    // no separator check is needed.
+    if (splitNames.length > 1 || (splitNames.length === 1 && splitNames[0] !== genre.name)) {
       for (const canonicalName of splitNames) {
         let canonicalGenre = await getGenreWithTitle(canonicalName, trx);
         if (!canonicalGenre) {

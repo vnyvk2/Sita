@@ -519,6 +519,10 @@
     "performance": "Performance",
     "removeAnimationOnBatteryDescription": "Removes the animations in the app when your system is on battery power.",
     "removeAnimationOnBattery": "Remove animations when on battery power.",
+    "reduceVisualEffectsOnBatteryDescription": "Pauses looping visual effects (ambient drifts, beams, particles) while on battery power, keeping the static polish.",
+    "reduceVisualEffectsOnBattery": "Reduce visual effects when on battery power.",
+    "ambientParticlesDescription": "Adds a subtle drifting dust layer behind the artwork in the fullscreen player. Automatically paused on battery saver or reduced motion.",
+    "ambientParticles": "Enable ambient particles in the fullscreen player.",
     "allowToPreventScreenSleepingDescription": "Allow Nora to prevent the display from going to sleep in situations with no user activity like displaying lyrics.",
     "allowToPreventScreenSleeping": "Allow preventing the display from going to sleep.",
 
@@ -785,7 +789,9 @@
     "artwork": "Artwork",
     "trackInfo": "Track Info",
     "panelLayout": "Panel Layout",
-    "resetToDefault": "Reset to default position"
+    "resetToDefault": "Reset to default position",
+    "searchPlaceholder": "Search songs, artists, albums…",
+    "searchHint": "Type to search your library"
   },
 
   "time": {
@@ -1244,11 +1250,44 @@
   "sideBar": {
     "home": "Home",
     "search": "Search",
-    "insights": "Insights"
+    "insights": "Insights",
+    "online": "Online"
   },
 
   "insightsPage": {
     "title": "Insights & Audio Stats",
     "subtitle": "Listening trends, format breakdown, and circadian rhythm analysis"
+  },
+
+  "onlinePage": {
+    "title": "Online",
+    "subtitle": "Search YouTube for songs or paste a playlist URL to download them into your library.",
+    "searchTab": "Search",
+    "playlistTab": "Playlist URL",
+    "searchPlaceholder": "Search songs, artists, albums...",
+    "search": "Search",
+    "searching": "Searching...",
+    "noResults": "No results found.",
+    "playlistPlaceholder": "Paste a YouTube playlist URL",
+    "loadPlaylist": "Load",
+    "loadingPlaylist": "Loading...",
+    "songsCount_one": "{{count}} song",
+    "songsCount_other": "{{count}} songs",
+    "excludedCount": "{{count}} entries skipped (too long / live)",
+    "download": "Download",
+    "downloadAll": "Download all",
+    "queued": "Queued",
+    "downloading": "Downloading {{progress}}%",
+    "finalizing": "Finalizing...",
+    "completed": "Downloaded",
+    "skippedDuplicate": "Already downloaded",
+    "cancelled": "Cancelled",
+    "failed": "Failed",
+    "activeDownloads": "Active downloads",
+    "noActiveDownloads": "No downloads yet.",
+    "cancelDownload": "Cancel",
+    "clearFinished": "Hide finished",
+    "configureFolderWarning": "Set a download folder in Settings before downloading.",
+    "binaryMissingError": "The download backend is not installed. Run \"npm run fetch:binaries\" and restart the app."
   }
 }

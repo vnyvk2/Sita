@@ -4,6 +4,7 @@ import type { MetadataProviderId } from './provider';
 export const METADATA_FIELD_DISPLAY_NAMES: Record<MetadataFieldId, string> = {
   title: 'Title',
   artist: 'Artist',
+  albumArtist: 'Album Artist',
   album: 'Album',
   year: 'Year',
   trackNumber: 'Track Number',

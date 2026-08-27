@@ -10,8 +10,7 @@ import logger from '@main/logger';
 import libraryScanner, {
   type LibraryScanner,
   type ScanOptions,
-  type ScanSummary,
-  type ScannerState
+  type ScanSummary
 } from './LibraryScanner';
 
 export type LibraryScanMode = 'automatic' | 'startup' | 'manual';
@@ -248,10 +247,11 @@ export class LibraryLifecycleController {
       );
       return {
         status: 'CANCELLED',
-        totalSongsFound: 0,
-        newSongsAdded: 0,
-        updatedSongs: 0,
-        removedSongs: 0,
+        added: 0,
+        modified: 0,
+        removed: 0,
+        unchanged: 0,
+        skippedRoots: [],
         durationMs: 0
       };
     }

@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { artworks, artworksPlaylists } from '../../db/schema';
+
+import { createCollectionId } from '../../../common/collections/id';
 import { linkArtworkToPlaylist, saveArtworks } from '../../db/queries/artworks';
-import { generateLocalArtworkBuffer } from '../../updateSong/updateSongId3Tags';
+import { artworks, artworksPlaylists } from '../../db/schema';
+import { generateLocalArtworkBuffer } from '../../filesystem/artworkBuffers';
 import logger from '../../logger';
 import { processArtworkFiles, type ArtworkPayload } from '../../other/artworks';
-import { createCollectionId } from '../../../common/collections/id';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
@@ -71,7 +72,12 @@ export class SetArtworkOp implements CollectionOperation<SetArtworkInput, void> 
         }
       }
     } catch (error) {
-      logger.error('Failed to set artwork for playlist', { playlistId, artworkPath, artworkId, error });
+      logger.error('Failed to set artwork for playlist', {
+        playlistId,
+        artworkPath,
+        artworkId,
+        error
+      });
       throw error;
     }
 

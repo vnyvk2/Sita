@@ -211,6 +211,7 @@ export class MetadataProviderRuntime {
     const limit = options?.limit ?? 10;
     const targetTrackCount = options?.targetTrackCount;
     const sourceOverride = options?.source;
+    const prefs = this.preferencesService ? await this.preferencesService.getPreferences() : undefined;
 
     let targetAdapters: IMetadataProviderAdapter[] = [];
     let providerPriority: MetadataProviderId[] = ['musicbrainz'];
@@ -224,7 +225,6 @@ export class MetadataProviderRuntime {
       providerPriority = [sourceOverride];
     } else {
       if (!this.isAvailable()) return [];
-      const prefs = this.preferencesService ? await this.preferencesService.getPreferences() : undefined;
       if (prefs) {
         const enabledSet = new Set((prefs.enabledSearchProviders ?? ['musicbrainz']).map((s) => s.toLowerCase()));
         providerPriority = prefs.searchProviderPriority ?? ['musicbrainz'];
@@ -320,7 +320,12 @@ export class MetadataProviderRuntime {
         primaryType: alb.releaseType,
         rawItem: alb
       };
-      const scored = MetadataSearchRankingEngine.scoreCandidate(candidate, normQuery, targetTrackCount);
+      const scored = MetadataSearchRankingEngine.scoreCandidate(
+        candidate,
+        normQuery,
+        targetTrackCount,
+        prefs?.searchRankingWeights
+      );
       return { album: alb, scored };
     });
 
@@ -424,7 +429,7 @@ export class MetadataProviderRuntime {
       state: newState,
       consecutiveFailures: consecutive,
       lastHealthCheck: Date.now(),
-      lastError: error
+      lastErrorMessage: error
     });
   }
 

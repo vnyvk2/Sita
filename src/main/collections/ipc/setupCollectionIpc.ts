@@ -1,11 +1,10 @@
-import { ipcMain } from 'electron';
+import { ipcMain, dialog } from 'electron';
 import type { OpenDialogOptions } from 'electron';
 import { z } from 'zod';
 
 import { parseCollectionUri } from '../../../common/collections/id';
 import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
-import { showOpenDialog } from '../../main';
 import type { HierarchyService } from '../engine/HierarchyService';
 import type { PlaylistEngine } from '../engine/PlaylistEngine';
 import type { UndoEngine } from '../engine/UndoEngine';
@@ -184,6 +183,6 @@ export function setupCollectionIpc(
   });
 
   ipcMain.handle('utils/showOpenDialog', async (_, options?: OpenDialogOptions) => {
-    return await showOpenDialog(options);
+    return await dialog.showOpenDialog(options || {});
   });
 }

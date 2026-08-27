@@ -12,13 +12,6 @@ export interface AppLifecycleDependencies {
   toggleRepeat: (newState?: RepeatTypes) => void;
   playSongFromUnknownSource: (audioPlayerData: AudioPlayerData, isStartPlay?: boolean) => void;
   playSong: (songId: number, isStartPlay?: boolean, playAsCurrentSongIndex?: boolean) => void;
-  createQueue: (
-    newQueue: number[],
-    queueType: QueueTypes,
-    isShuffleQueue?: boolean,
-    queueId?: string,
-    startPlaying?: boolean
-  ) => void;
   changeUpNextSongData: (upNextSongData?: AudioPlayerData) => void;
   managePlaybackErrors: (error: unknown) => void;
   toggleSongPlayback: (startPlay?: boolean) => void;
@@ -38,7 +31,6 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     toggleRepeat,
     playSongFromUnknownSource,
     playSong,
-    createQueue,
     changeUpNextSongData,
     managePlaybackErrors,
     toggleSongPlayback,
@@ -93,7 +85,12 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
         .getAllSongIds()
         .then((songIds) => {
           if (songIds && songIds.length > 0) {
-            createQueue(songIds, 'songs');
+            // Startup default queue is the canonical All Songs projection
+            // (docs/canonical-queue-architecture.md).
+            const startupQueue = manager.getOrCreateCanonicalQueue({ songIds });
+            if (startupQueue?.currentSongId) {
+              playSong(startupQueue.currentSongId, true);
+            }
           }
           return undefined;
         })

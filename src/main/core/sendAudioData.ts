@@ -5,7 +5,6 @@ import { setDiscordRpcActivity } from '@main/other/discordRPC';
 import {
   parseArtistOnlineArtworks,
   parseSongArtworks,
-  removeDefaultAppProtocolFromFilePath,
   resolveSongFilePath
 } from '../fs/resolveFilePaths';
 import logger from '../logger';

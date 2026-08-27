@@ -26,6 +26,7 @@ const COMPACT_OPTIONAL_PRIORITY = [
   'love',
   'volume',
   'queue',
+  'search',
   'lyrics',
   'shuffle',
   'repeat'
@@ -37,8 +38,10 @@ const METADATA_MIN_FLOOR = 60; // 60px minimum text breathing room before trunca
 type Props = {
   isQueueVisible: boolean;
   isLyricsVisible: boolean;
+  isSearchVisible: boolean;
   onToggleQueue: () => void;
   onToggleLyrics: () => void;
+  onToggleSearch: () => void;
   pinnedControls: string[];
 };
 
@@ -46,8 +49,10 @@ const CompactMiniPlayer = (props: Props) => {
   const {
     isQueueVisible,
     isLyricsVisible,
+    isSearchVisible,
     onToggleQueue,
     onToggleLyrics,
+    onToggleSearch,
     pinnedControls
   } = props;
 
@@ -289,7 +294,7 @@ const CompactMiniPlayer = (props: Props) => {
               iconName="favorite"
               iconClassName={`material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100 ${
                 isAFavorite
-                  ? 'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
+                  ? 'text-[#FF2D55]! opacity-100! dark:text-[#FF2D55]!'
                   : 'text-font-color-white dark:text-font-color-white'
               }`}
               clickHandler={() => toggleIsFavorite(!isAFavorite)}
@@ -355,6 +360,24 @@ const CompactMiniPlayer = (props: Props) => {
             >
               <span className="material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100">
                 queue_music
+              </span>
+            </button>
+          )}
+
+          {visibleOptionalControls.includes('search') && (
+            <button
+              type="button"
+              className={`search-btn text-font-color-white dark:text-font-color-white m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
+                isSearchVisible ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!' : ''
+              }`}
+              title={t('player.search', 'Search')}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onToggleSearch();
+              }}
+            >
+              <span className="material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100">
+                search
               </span>
             </button>
           )}

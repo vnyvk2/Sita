@@ -22,7 +22,15 @@ export const isDatabaseStubbed = !isTest && process.env.NORA_NO_PGLITE === '1';
 const useMemoryDb = !isTest && process.env.NORA_PGLITE_MEMORY === '1';
 
 const resolveUserDataDir = () => {
-  const override = process.env.NORA_USER_DATA;
+  // Isolation override resolved AT THE CONSUMPTION POINT (bundlers may reorder
+  // module side-effects, so userDataGuard's setPath alone is not sufficient).
+  const isolationOverride =
+    !app.isPackaged &&
+    typeof process.env.NORA_USER_DATA_DIR === 'string' &&
+    process.env.NORA_USER_DATA_DIR.length > 0
+      ? path.resolve(process.env.NORA_USER_DATA_DIR)
+      : undefined;
+  const override = process.env.NORA_USER_DATA ?? isolationOverride;
   if (override) {
     mkdirSync(override, { recursive: true });
     return override;

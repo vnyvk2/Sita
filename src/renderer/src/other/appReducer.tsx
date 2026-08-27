@@ -432,7 +432,9 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     lyricsArtworkDarkness: 50,
     lyricsArtworkAnimation: true,
     isSongCardDynamicArtworkBackgroundEnabled: false,
-    showEqualizerOnTracklist: true
+    showEqualizerOnTracklist: true,
+    reduceVisualEffectsOnBattery: false,
+    ambientParticles: false
   },
   playback: {
     currentSong: {

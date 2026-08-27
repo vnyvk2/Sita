@@ -6,6 +6,27 @@ import type { TrackMatchPreview } from '../../../../common/metadata/types';
 import { db } from '../../../db/db';
 import { getSongById } from '../../../db/queries/songs';
 import manageArtistsOfParsedSong from '../../../parseSong/manageArtistsOfParsedSong';
+import manageAlbumArtistOfParsedSongModule from '../../../parseSong/manageAlbumArtistOfParsedSong';
+import manageAlbumsOfParsedSongModule from '../../../parseSong/manageAlbumsOfParsedSong';
+import manageGenresOfParsedSongModule from '../../../parseSong/manageGenresOfParsedSong';
+
+/**
+ * Earlier tests embed trx-identity assertions inside shared mock
+ * implementations, which leak across tests (only .calls are cleared).
+ * New tests reset them so stale expectations cannot fail unrelated paths.
+ */
+const resetSharedDbMocks = () => {
+  vi.mocked(getSongById).mockReset();
+  (db.transaction as any).mockReset();
+  vi.mocked(manageArtistsOfParsedSong).mockReset().mockResolvedValue({ newArtists: [], relevantArtists: [] });
+  vi.mocked(manageAlbumArtistOfParsedSongModule).mockReset().mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] });
+  vi.mocked(manageAlbumsOfParsedSongModule).mockReset().mockResolvedValue({
+    relevantAlbum: undefined,
+    newAlbum: undefined,
+    relevantAlbumArtists: []
+  });
+  vi.mocked(manageGenresOfParsedSongModule).mockReset().mockResolvedValue({ newGenres: [], relevantGenres: [] });
+};
 
 vi.mock('../../../db/db', () => ({
   db: {
@@ -31,13 +52,29 @@ vi.mock('../../../parseSong/manageArtistsOfParsedSong', () => ({
   default: vi.fn()
 }));
 
+const { manageAlbumArtistOfParsedSong, manageAlbumsOfParsedSong } = vi.hoisted(() => ({
+  // Default: album resolved but no id - keeps legacy tests on the no-link path
+  manageAlbumsOfParsedSong: vi.fn().mockResolvedValue({ relevantAlbum: undefined, newAlbum: undefined }),
+  manageAlbumArtistOfParsedSong: vi.fn().mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] })
+}));
+
+vi.mock('../../../parseSong/manageAlbumArtistOfParsedSong', () => ({
+  default: manageAlbumArtistOfParsedSong
+}));
+
 vi.mock('../../../parseSong/manageAlbumsOfParsedSong', () => ({
-  default: vi.fn()
+  default: manageAlbumsOfParsedSong
 }));
 
 vi.mock('../../../parseSong/manageGenresOfParsedSong', () => ({
   default: vi.fn()
 }));
+
+// Makes the dynamic import inside undoLastAutoTag fail -> exercises the inline
+// drizzle fallback that owns junction restoration without reParseSong.
+vi.mock('../../../parseSong/reParseSong', () => {
+  throw new Error('reParseSong unavailable in unit tests');
+});
 
 describe('MetadataApplyService — Production Drizzle Transaction & Rollback Invariant', () => {
   beforeEach(() => {
@@ -76,38 +113,58 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       {
         localSongId: 1,
         songPath: '/music/track1.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 1',
-        suggestedTitle: 'New Title 1',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', applyField: true }]
+        remoteTitle: 'New Title 1',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true }]
       },
       {
         localSongId: 2,
         songPath: '/music/track2.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 2',
-        suggestedTitle: 'New Title 2',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', applyField: true }]
+        remoteTitle: 'New Title 2',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true }]
       },
       {
         localSongId: 3,
         songPath: '/music/track3.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 3',
-        suggestedTitle: 'New Title 3',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 3', suggestedValue: 'New Title 3', applyField: true }]
+        remoteTitle: 'New Title 3',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 3', suggestedValue: 'New Title 3', status: 'changed', applyField: true }]
       },
       {
         localSongId: 4,
         songPath: '/music/track4.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 4',
-        suggestedTitle: 'New Title 4',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 4', suggestedValue: 'New Title 4', applyField: true }]
+        remoteTitle: 'New Title 4',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 4', suggestedValue: 'New Title 4', status: 'changed', applyField: true }]
       }
     ];
 
@@ -205,25 +262,35 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       {
         localSongId: 1,
         songPath: '/music/track1.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 1',
-        suggestedTitle: 'New Title 1',
+        remoteTitle: 'New Title 1',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 1', suggestedValue: 'New Artist 1', applyField: true }
+          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true },
+          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 1', suggestedValue: 'New Artist 1', status: 'changed', applyField: true }
         ]
       },
       {
         localSongId: 2,
         songPath: '/music/track2.mp3',
-        matchConfidence: 0.9,
+        confidence: 0.9,
+        confidenceLevel: 'Good',
+        why: 'Exact match',
+        reasons: [],
+        hasWarnings: false,
+        warningCount: 0,
         applyTrack: true,
         oldTitle: 'Old Title 2',
-        suggestedTitle: 'New Title 2',
+        remoteTitle: 'New Title 2',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 2', suggestedValue: 'New Artist 2', applyField: true }
+          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true },
+          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 2', suggestedValue: 'New Artist 2', status: 'changed', applyField: true }
         ]
       }
     ];
@@ -362,5 +429,347 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       isrc: 'USUM71700001',
       musicBrainzRecordingId: 'mbid-abc'
     });
+  });
+
+  it('keeps the undo snapshot retryable when the physical restore fails', async () => {
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi
+      .fn()
+      .mockResolvedValueOnce([{ filePath: '/m/a.mp3', success: false, error: 'EACCES: locked' }])
+      .mockResolvedValue([{ filePath: '/m/a.mp3', success: true }]);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-retry',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [{ songId: 1, path: '/m/a.mp3', title: 'Original Title' }],
+      updatedSongs: []
+    });
+
+    // First attempt fails on disk...
+    const firstAttempt = await service.undoLastAutoTag();
+    expect(firstAttempt.success).toBe(false);
+
+    // ...snapshot must NOT have been consumed by the failed attempt
+    expect(historyService.canUndo).toBe(true);
+
+    // Second attempt succeeds and now consumes the snapshot
+    const secondAttempt = await service.undoLastAutoTag();
+    expect(secondAttempt.success).toBe(true);
+    expect(secondAttempt.restoredCount).toBe(1);
+    expect(mockWriteBatch).toHaveBeenCalledTimes(2);
+    expect(historyService.canUndo).toBe(false);
+
+    // Nothing left to undo afterwards
+    const third = await service.undoLastAutoTag();
+    expect(third.success).toBe(false);
+    expect(third.errors?.[0]).toContain('No AutoTag history available');
+  });
+
+  it('writes isrc and musicBrainzRecordingId to BOTH file payloads and DB scalar columns', async () => {
+    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        localSongId: 1,
+        songPath: '/music/identity.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'Old',
+        suggestedTitle: 'New',
+        fieldDiffs: [
+          { fieldId: 'isrc', fieldName: 'ISRC', oldValue: undefined, suggestedValue: 'USUM71700001', applyField: true },
+          { fieldId: 'musicBrainzRecordingId', fieldName: 'MBID', oldValue: undefined, suggestedValue: 'mbid-new', applyField: true }
+        ]
+      }
+    ];
+    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+
+    // File side: TagLib frames receive the recording identities
+    expect(mockWriteBatch.mock.calls[0][0][0]).toMatchObject({
+      isrc: 'USUM71700001',
+      musicBrainzRecordingId: 'mbid-new'
+    });
+
+    // DB side: songs columns move in the SAME operation
+    expect(setCalls[0]).toMatchObject({
+      isrc: 'USUM71700001',
+      musicBrainzRecordingId: 'mbid-new'
+    });
+  });
+
+  it('never touches identity fields when diffs are absent or effectively empty', async () => {
+    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        // No isrc/mbid diffs at all -> fields must be absent from payload AND .set()
+        localSongId: 1,
+        songPath: '/music/a.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'A',
+        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'A', suggestedValue: 'B', applyField: true }]
+      },
+      {
+        // Whitespace-only diff value -> guarded as intentionally-empty, not written
+        localSongId: 2,
+        songPath: '/music/b.mp3',
+        matchConfidence: 0.9,
+        applyTrack: true,
+        oldTitle: 'B',
+        fieldDiffs: [{ fieldId: 'isrc', fieldName: 'ISRC', oldValue: 'OLD', suggestedValue: '   ', applyField: true }]
+      }
+    ];
+    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+
+    const payloads = mockWriteBatch.mock.calls[0][0] as TagWritePayload[];
+    expect(payloads[0].isrc).toBeUndefined();
+    expect(payloads[0].musicBrainzRecordingId).toBeUndefined();
+    expect(payloads[1].isrc).toBeUndefined();
+    expect(setCalls[0].isrc).toBeUndefined();
+    expect(setCalls[0].musicBrainzRecordingId).toBeUndefined();
+    expect(setCalls[1].isrc).toBeUndefined();
+  });
+
+  it('links albums_artists from the release-level albumArtist, never the track artist', async () => {
+    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+    });
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+
+    // Album resolution returns a concrete album so the junction linker runs
+    resetSharedDbMocks();
+    manageAlbumsOfParsedSong.mockResolvedValue({ relevantAlbum: { id: 55 }, newAlbum: undefined });
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      batchChunkSize: 10
+    });
+
+    const matches: any[] = [
+      {
+        localSongId: 1,
+        songPath: '/music/comp.mp3',
+        matchConfidence: 0.95,
+        applyTrack: true,
+        oldTitle: 'Track',
+        oldArtist: 'Track Guy', // per-track artist - must NOT reach albums_artists
+        oldAlbumArtist: 'Various Artists',
+        oldAlbum: 'Compilation',
+        fieldDiffs: [
+          { fieldId: 'title', fieldName: 'Title', oldValue: 'Track', suggestedValue: 'Track (Remastered)', applyField: true }
+        ]
+      }
+    ];
+    const previewResult: any = await service.applyPreview(
+      {
+        album: { title: 'Compilation' },
+        matches,
+        unmatchedFiles: []
+      } as any,
+      { globalMutations: { applyAlbumArtist: true, albumArtist: 'Various Artists' } }
+    );
+    expect(previewResult.errors ?? []).toEqual([]);
+
+    // Relational input carries the RELEASE artist, not the track artist
+    expect(manageAlbumsOfParsedSong).toHaveBeenCalledWith(
+      expect.objectContaining({ albumArtists: ['Various Artists'], artists: ['Track Guy'] }),
+      expect.anything()
+    );
+    // Junction link executed against the resolved album
+    expect(manageAlbumArtistOfParsedSong).toHaveBeenCalledWith(
+      { albumArtists: ['Various Artists'], albumId: 55 },
+      expect.anything()
+    );
+  });
+
+  it('undo restores the junction from snapshot albumArtist and never invents track artists', async () => {
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi.fn().mockResolvedValue([{ filePath: '/m/a.mp3', success: true }]);
+    manageAlbumsOfParsedSong.mockResolvedValue({ relevantAlbum: { id: 77 }, newAlbum: undefined });
+    resetSharedDbMocks();
+    manageAlbumsOfParsedSong.mockResolvedValue({ relevantAlbum: { id: 77 }, newAlbum: undefined });
+
+    const setCalls: Array<Record<string, unknown>> = [];
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+          setCalls.push(payload);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater: undefined // force the inline drizzle fallback that owns the junction
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-junction',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [
+        {
+          songId: 1,
+          path: '/m/a.mp3',
+          title: 'Original Title',
+          artist: 'Old Track Artist',
+          albumArtist: 'Original VA',
+          album: 'Original Compilation'
+        }
+      ],
+      updatedSongs: []
+    });
+
+    const result = await service.undoLastAutoTag();
+    expect(result.success).toBe(true);
+
+    // No track-artist conflation in the relational input...
+    expect(manageAlbumsOfParsedSong).toHaveBeenCalledWith(
+      expect.objectContaining({ albumArtists: [], artists: ['Old Track Artist'] }),
+      expect.anything()
+    );
+    // ...junction explicitly restored from the snapshot's release-level artist
+    expect(manageAlbumArtistOfParsedSong).toHaveBeenCalledWith(
+      { albumArtists: ['Original VA'], albumId: 77 },
+      expect.anything()
+    );
+  });
+
+  it('legacy snapshots without albumArtist leave the junction untouched during undo', async () => {
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi.fn().mockResolvedValue([{ filePath: '/m/a.mp3', success: true }]);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService
+    });
+
+    // Inline fallback path requires a functioning transaction
+    resetSharedDbMocks();
+    const mockTrx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) })
+      })
+    };
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => callback(mockTrx));
+    vi.mocked(getSongById).mockResolvedValue({ id: 1, title: 'Old' } as any);
+
+    historyService.pushSnapshot({
+      id: 'snap-legacy',
+      timestamp: Date.now(),
+      description: 'AutoTag apply (pre-albumArtist capture)',
+      previousSongs: [{ songId: 1, path: '/m/a.mp3', title: 'Original Title', artist: 'Some Artist', album: 'Album' }],
+      updatedSongs: []
+    });
+
+    const result = await service.undoLastAutoTag();
+    expect(result.success).toBe(true);
+
+    // Unknown pre-state -> no invented link, junction simply untouched
+    expect(manageAlbumArtistOfParsedSong).not.toHaveBeenCalled();
+  });
+
+  it('partial physical failure: DB restored ONLY for succeeded tracks, snapshot retained for retry', async () => {
+    const dbUpdater = vi.fn().mockResolvedValue(undefined);
+    const historyService = new MetadataHistoryService();
+
+    const mockWriteBatch = vi.fn().mockResolvedValue([
+      { filePath: '/m/a.mp3', success: true },
+      { filePath: '/m/b.mp3', success: false, error: 'EACCES: locked by player' }
+    ]);
+
+    const service = new MetadataApplyService({
+      tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
+      historyService,
+      dbUpdater
+    });
+
+    historyService.pushSnapshot({
+      id: 'snap-partial',
+      timestamp: Date.now(),
+      description: 'AutoTag apply',
+      previousSongs: [
+        { songId: 1, path: '/m/a.mp3', title: 'A-old' },
+        { songId: 2, path: '/m/b.mp3', title: 'B-old' }
+      ],
+      updatedSongs: []
+    });
+
+    const res = await service.undoLastAutoTag();
+
+    expect(res.success).toBe(false);
+    expect(res.restoredCount).toBe(1);
+    expect((res.errors ?? []).join(' ')).toContain('EACCES');
+
+    // DB restore ran for the SUCCEEDED track only - no desync
+    expect(dbUpdater).toHaveBeenCalledTimes(1);
+    expect(dbUpdater.mock.calls[0][0]).toBe(1);
+
+    // Snapshot retained so retry can attempt the failed track
+    expect(historyService.canUndo).toBe(true);
   });
 });

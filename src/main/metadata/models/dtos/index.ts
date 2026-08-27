@@ -6,6 +6,8 @@ export interface SongPersistenceDTO {
   genres?: { genre: { id: number; name: string } }[];
   year?: number | null;
   trackNumber?: number | null;
+  discNumber?: number | null;
+  diskNumber?: number | null;
   duration?: string | null;
   bitrate?: number | null;
   sampleRate?: number | null;

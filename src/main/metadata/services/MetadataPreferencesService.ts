@@ -1,6 +1,12 @@
 import type { MetadataProviderId } from '../../../common/metadata/provider';
 import {
   DEFAULT_METADATA_PREFERENCES,
+  DEFAULT_SEARCH_RANKING_WEIGHTS,
+  ENRICHMENT_FIELD_CAPABILITIES,
+  RANKING_WEIGHT_MAX,
+  RANKING_WEIGHT_MIN,
+  type EnrichmentFieldKind,
+  type SearchRankingWeights,
   type MetadataProviderPreferences
 } from '../../../common/metadata/preferences';
 import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
@@ -102,6 +108,44 @@ export class MetadataPreferencesService {
         }
       }
     }
+
+    this.validateRankingWeights(prefs.searchRankingWeights);
+    this.validateEnrichmentProviders(prefs);
+  }
+
+  private validateRankingWeights(weights?: SearchRankingWeights): void {
+    if (!weights) return;
+
+    for (const key of Object.keys(DEFAULT_SEARCH_RANKING_WEIGHTS) as (keyof SearchRankingWeights)[]) {
+      const value = weights[key];
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`Ranking weight '${key}' must be a finite number.`);
+      }
+      if (!Number.isInteger(value)) {
+        throw new Error(`Ranking weight '${key}' must be an integer.`);
+      }
+      if (value < RANKING_WEIGHT_MIN || value > RANKING_WEIGHT_MAX) {
+        throw new Error(
+          `Ranking weight '${key}' must be between ${RANKING_WEIGHT_MIN} and ${RANKING_WEIGHT_MAX}.`
+        );
+      }
+    }
+  }
+
+  private validateEnrichmentProviders(prefs: MetadataProviderPreferences): void {
+    const checks: Array<[EnrichmentFieldKind, MetadataProviderId]> = [
+      ['artwork', prefs.defaultArtworkProvider],
+      ['genre', prefs.defaultGenreProvider],
+      ['lyrics', prefs.defaultLyricsProvider]
+    ];
+
+    for (const [kind, providerId] of checks) {
+      if (!ENRICHMENT_FIELD_CAPABILITIES[kind].includes(providerId)) {
+        throw new Error(
+          `Default ${kind} provider '${providerId}' is not a known enrichment source for ${kind}.`
+        );
+      }
+    }
   }
 
   public sanitizeAndValidate(
@@ -134,13 +178,61 @@ export class MetadataPreferencesService {
       priority = [...enabled];
     }
 
+    const searchRankingWeights = this.sanitizeRankingWeights(raw.searchRankingWeights);
+
+    const artworkProvider = this.sanitizeEnrichmentProvider(
+      raw.defaultArtworkProvider,
+      'artwork',
+      DEFAULT_METADATA_PREFERENCES.defaultArtworkProvider
+    );
+    const genreProvider = this.sanitizeEnrichmentProvider(
+      raw.defaultGenreProvider,
+      'genre',
+      DEFAULT_METADATA_PREFERENCES.defaultGenreProvider
+    );
+    const lyricsProvider = this.sanitizeEnrichmentProvider(
+      raw.defaultLyricsProvider,
+      'lyrics',
+      DEFAULT_METADATA_PREFERENCES.defaultLyricsProvider
+    );
+
     return {
       enabledSearchProviders: enabled,
       searchProviderPriority: priority,
-      defaultArtworkProvider: raw.defaultArtworkProvider ?? DEFAULT_METADATA_PREFERENCES.defaultArtworkProvider,
-      defaultGenreProvider: raw.defaultGenreProvider ?? DEFAULT_METADATA_PREFERENCES.defaultGenreProvider,
-      defaultLyricsProvider: raw.defaultLyricsProvider ?? DEFAULT_METADATA_PREFERENCES.defaultLyricsProvider
+      defaultArtworkProvider: artworkProvider,
+      defaultGenreProvider: genreProvider,
+      defaultLyricsProvider: lyricsProvider,
+      searchRankingWeights
     };
+  }
+
+  private sanitizeRankingWeights(rawWeights?: Partial<SearchRankingWeights>): SearchRankingWeights {
+    const merged: SearchRankingWeights = { ...DEFAULT_SEARCH_RANKING_WEIGHTS };
+    if (!rawWeights || typeof rawWeights !== 'object') return merged;
+
+    for (const key of Object.keys(merged) as (keyof SearchRankingWeights)[]) {
+      const value = rawWeights[key];
+      if (
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= RANKING_WEIGHT_MIN &&
+        value <= RANKING_WEIGHT_MAX
+      ) {
+        merged[key] = Math.round(value);
+      }
+    }
+    return merged;
+  }
+
+  private sanitizeEnrichmentProvider(
+    providerId: MetadataProviderId | undefined,
+    kind: EnrichmentFieldKind,
+    fallback: MetadataProviderId
+  ): MetadataProviderId {
+    if (providerId && ENRICHMENT_FIELD_CAPABILITIES[kind].includes(providerId)) {
+      return providerId;
+    }
+    return fallback;
   }
 
   public clearCache(): void {

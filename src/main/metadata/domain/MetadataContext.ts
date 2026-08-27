@@ -40,6 +40,8 @@ export interface SelectionContext {
 
 export interface MetadataRequest {
   id: string;
+  operationId?: string;
+  resourceId?: number | string;
   query: QueryContext;
   selection?: SelectionContext;
   policy?: MetadataPolicy;
