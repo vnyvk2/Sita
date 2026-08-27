@@ -225,14 +225,26 @@ describe('ReplayGainJob (Phase C4-C)', () => {
   it('throws error when worker asset generation fails so scheduler can handle retries', async () => {
     vi.mocked(db.query.replayGain.findFirst).mockResolvedValue(null as any);
     vi.mocked(getSongById).mockResolvedValue({ id: 10, path: 'C:/Music/song.mp3' } as any);
-    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
-      success: false,
-      error: 'Worker process crashed'
-    });
+    vi.mocked(mediaWorkerBridge.generateAsset).mockRejectedValue(
+      new Error('Worker process crashed')
+    );
 
     const job = new ReplayGainJob(10, 'Test Song', eventBus);
 
     await expect(job.execute()).rejects.toThrow('Worker process crashed');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws error when generateAsset returns success: false without cancelled flag', async () => {
+    vi.mocked(db.query.replayGain.findFirst).mockResolvedValue(null as any);
+    vi.mocked(getSongById).mockResolvedValue({ id: 10, path: 'C:/Music/song.mp3' } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: false
+    });
+
+    const job = new ReplayGainJob(10, 'Test Song', eventBus);
+
+    await expect(job.execute()).rejects.toThrow('Failed to analyze loudness for song 10');
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
@@ -260,5 +272,42 @@ describe('ReplayGainJob (Phase C4-C)', () => {
     await job.execute();
 
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborts immediately without calling worker if cancelled before execution', async () => {
+    vi.mocked(db.query.replayGain.findFirst).mockResolvedValue(null as any);
+    vi.mocked(getSongById).mockResolvedValue({ id: 10, path: 'C:/Music/song.mp3' } as any);
+
+    const job = new ReplayGainJob(10, 'Test Song', eventBus);
+    job.cancel();
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts and suppresses DB persistence and events when cancel() is called mid-flight', async () => {
+    vi.mocked(db.query.replayGain.findFirst).mockResolvedValue(null as any);
+    vi.mocked(getSongById).mockResolvedValue({ id: 10, path: 'C:/Music/song.mp3' } as any);
+
+    const job = new ReplayGainJob(10, 'Test Song', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async (opts) => {
+      job.cancel();
+      expect(opts.abortSignal?.aborted).toBe(true);
+      return {
+        success: false,
+        cancelled: true
+      };
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 });

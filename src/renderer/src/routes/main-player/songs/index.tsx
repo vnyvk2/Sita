@@ -1,4 +1,4 @@
-﻿import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
+import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 import Img from '@renderer/components/Img';
@@ -16,6 +16,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import {
   SONG_WINDOW_SIZE,
   SONG_WINDOW_STALE_TIME,
+  getSongListIdentity,
   songCacheKeys,
   songIdsVersionFromState,
   songQuery,
@@ -56,9 +57,9 @@ export const Route = createFileRoute('/main-player/songs/')({
     const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
     const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
     const version = songIdsVersionFromState(state?.dataUpdatedAt);
-
+    const listIdentity = getSongListIdentity(idsParams);
     await queryClient.ensureQueryData({
-      queryKey: songCacheKeys.window(version, 0),
+      queryKey: songCacheKeys.window(listIdentity, version, 0),
       queryFn: () =>
         window.api.audioLibraryControls.getSongInfo(
           idsData.ids.slice(0, Math.min(SONG_WINDOW_SIZE, idsData.ids.length)),
@@ -138,8 +139,8 @@ function SongsPage() {
     ]
   );
 
-  const idsQuery = useSuspenseQuery(
-    songQuery.ids({
+  const songIdsParams = useMemo(
+    () => ({
       sortType: sortingOrder,
       filterType: filteringOrder,
       keyword: keyword ?? '',
@@ -147,8 +148,12 @@ function SongsPage() {
       genre,
       onlyFavoriteArtists,
       onlyFavoriteAlbums
-    })
+    }),
+    [sortingOrder, filteringOrder, keyword, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums]
   );
+
+  const idsQuery = useSuspenseQuery(songQuery.ids(songIdsParams));
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
 
   const filteredSongIds = idsQuery.data.ids;
   const blacklistedIds = idsQuery.data.blacklistedIds;
@@ -285,7 +290,9 @@ function SongsPage() {
     [createQueue, updateQueueData, t]
   );
 
-  const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion);
+  const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    listIdentity
+  });
 
   const renderSong = useCallback(
     (index: number) => {

@@ -1,0 +1,167 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
+import { getSongListIdentity, songCacheKeys } from '@renderer/queries/songs';
+
+describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false
+        }
+      }
+    });
+
+    (window as any).api = {
+      audioLibraryControls: {
+        getSongInfo: vi.fn().mockImplementation(async (ids: number[]) => {
+          return ids.map((id) => ({
+            id,
+            title: `Song ${id}`,
+            artists: ['Artist'],
+            album: 'Album',
+            duration: 200,
+            songPath: `/music/${id}.mp3`
+          }));
+        })
+      }
+    };
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+
+  it('guarantees two distinct queries with identical dataUpdatedAt timestamps have distinct cache keys', async () => {
+    const timestamp = 1700000000000;
+    const idsA = [1, 2, 3];
+    const idsB = [4, 5, 6];
+
+    const identityA = getSongListIdentity({ sortType: 'aToZ' } as any);
+    const identityB = getSongListIdentity({ sortType: 'zToA' } as any);
+
+    expect(identityA).not.toBe(identityB);
+
+    const { result: resultA } = renderHook(
+      () =>
+        useWindowHydration(idsA, timestamp, {
+          listIdentity: identityA,
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    const { result: resultB } = renderHook(
+      () =>
+        useWindowHydration(idsB, timestamp, {
+          listIdentity: identityB,
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(resultA.current.getItem(0)).toBeDefined();
+      expect(resultB.current.getItem(0)).toBeDefined();
+    });
+
+    // Verify item 0 from query A is song 1, and item 0 from query B is song 4
+    expect(resultA.current.getItem(0)?.id).toBe(1);
+    expect(resultB.current.getItem(0)?.id).toBe(4);
+
+    // Verify cache keys exist under their respective unique query identities
+    const queryCache = queryClient.getQueryCache().getAll();
+    const queryKeys = queryCache.map((q) => q.queryKey);
+
+    expect(queryKeys).toContainEqual(['songs', 'window', identityA, timestamp, 0]);
+    expect(queryKeys).toContainEqual(['songs', 'window', identityB, timestamp, 0]);
+  });
+
+  it('produces identical cache keys for identical query params and timestamps', () => {
+    const timestamp = 1700000000000;
+    const identity1 = getSongListIdentity({ sortType: 'aToZ' } as any);
+    const identity2 = getSongListIdentity({ sortType: 'aToZ' } as any);
+
+    const key1 = songCacheKeys.window(identity1, timestamp, 0);
+    const key2 = songCacheKeys.window(identity2, timestamp, 0);
+
+    expect(key1).toEqual(key2);
+  });
+
+  it('produces distinct cache keys for same query params when version/timestamp changes', () => {
+    const identity = getSongListIdentity({ sortType: 'aToZ' } as any);
+
+    const key1 = songCacheKeys.window(identity, 1000, 0);
+    const key2 = songCacheKeys.window(identity, 2000, 0);
+
+    expect(key1).not.toEqual(key2);
+  });
+
+  it('invalidates ONLY the corresponding list window cache when an ID changes in one list', async () => {
+    const { invalidateWindowsContainingIds } = await import('@renderer/hooks/useDataSync');
+    const { songQuery } = await import('@renderer/queries/songs');
+
+    const timestampA = 1700000000000;
+    const timestampB = 1700000000000;
+    const paramsA = { sortType: 'aToZ' as const };
+    const paramsB = { sortType: 'zToA' as const };
+
+    const identityA = getSongListIdentity(paramsA);
+    const identityB = getSongListIdentity(paramsB);
+
+    // Populate QueryCache with list queries
+    queryClient.setQueryData(songQuery.ids(paramsA).queryKey, {
+      ids: [101, 102],
+      total: 2,
+      blacklistedIds: []
+    });
+    const queryA = queryClient.getQueryCache().find({ queryKey: songQuery.ids(paramsA).queryKey });
+    queryA?.setState({ dataUpdatedAt: timestampA });
+
+    queryClient.setQueryData(songQuery.ids(paramsB).queryKey, {
+      ids: [201, 202],
+      total: 2,
+      blacklistedIds: []
+    });
+    const queryB = queryClient.getQueryCache().find({ queryKey: songQuery.ids(paramsB).queryKey });
+    queryB?.setState({ dataUpdatedAt: timestampB });
+
+    // Seed window caches for both lists
+    const windowKeyA = songCacheKeys.window(identityA, timestampA, 0);
+    const windowKeyB = songCacheKeys.window(identityB, timestampB, 0);
+
+    queryClient.setQueryData(windowKeyA, [
+      { id: 101, title: 'Song 101' },
+      { id: 102, title: 'Song 102' }
+    ]);
+    queryClient.setQueryData(windowKeyB, [
+      { id: 201, title: 'Song 201' },
+      { id: 202, title: 'Song 202' }
+    ]);
+
+    const getWindowA = () => queryClient.getQueryCache().find({ queryKey: windowKeyA });
+    const getWindowB = () => queryClient.getQueryCache().find({ queryKey: windowKeyB });
+
+    expect(getWindowA()?.state.isInvalidated).toBe(false);
+    expect(getWindowB()?.state.isInvalidated).toBe(false);
+
+    // Invalidate ID 101 (only in List A)
+    invalidateWindowsContainingIds(queryClient, new Set([101]));
+
+    expect(getWindowA()?.state.isInvalidated).toBe(true);
+    expect(getWindowB()?.state.isInvalidated).toBe(false);
+
+    // Reset and invalidate ID 201 (only in List B)
+    getWindowA()?.setState({ isInvalidated: false });
+    invalidateWindowsContainingIds(queryClient, new Set([201]));
+
+    expect(getWindowA()?.state.isInvalidated).toBe(false);
+    expect(getWindowB()?.state.isInvalidated).toBe(true);
+  });
+});

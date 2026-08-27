@@ -23,6 +23,7 @@ export class WaveformJob implements Job {
   public songId: number;
   public songPath: string;
   private eventBus: EventEmitter;
+  private abortController = new AbortController();
 
   constructor(
     songId: number,
@@ -37,6 +38,15 @@ export class WaveformJob implements Job {
     this.id = `waveform_${songId}`;
     this.jobClass = jobClass;
     this.description = `Generating waveform for "${songTitle}"`;
+  }
+
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
   }
 
   async execute(): Promise<void> {
@@ -59,7 +69,7 @@ export class WaveformJob implements Job {
         logger.debug(`[WaveformJob] Song ${this.songId} waveform is outdated. Regenerating.`);
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 2. Determine target destination file path
       const cacheDir = path.join(app.getPath('userData'), 'cache', 'waveforms');
@@ -71,17 +81,17 @@ export class WaveformJob implements Job {
         jobType: 'waveform',
         sourceFilePath: this.songPath,
         destinationPath: filePath,
+        abortSignal: this.abortController.signal,
         metadata: {
           songId: this.songId,
           version: CURRENT_WAVEFORM_GENERATOR_VERSION
         }
       });
 
+      if (result.cancelled || this.isCancelled()) return;
       if (!result.success) {
-        throw new Error(result.error || `Failed to generate waveform for song ${this.songId}`);
+        throw new Error(`[WaveformJob] Failed to generate waveform for song ${this.songId}`);
       }
-
-      if (this.state === 'cancelled') return;
 
       // 4. Save to DB (Main owns all database mutations)
       await db.transaction(async (trx) => {

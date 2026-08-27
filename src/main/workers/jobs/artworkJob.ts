@@ -26,6 +26,7 @@ export class ArtworkJob implements Job {
   public albumId: number;
   public sampleSongPath: string;
   private eventBus: EventEmitter;
+  private abortController = new AbortController();
 
   constructor(
     albumId: number,
@@ -40,6 +41,15 @@ export class ArtworkJob implements Job {
     this.id = `artwork_${albumId}`;
     this.jobClass = jobClass;
     this.description = `Generating artwork for "${albumTitle}"`;
+  }
+
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
   }
 
   async execute(): Promise<void> {
@@ -70,27 +80,27 @@ export class ArtworkJob implements Job {
         logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 2. Delegate CPU ID3 Taglib extraction & Sharp WebP resizing to utilityProcess worker
       const result = await mediaWorkerBridge.generateAsset({
         jobType: 'artwork',
         sourceFilePath: this.sampleSongPath,
         destinationPath: DEFAULT_ARTWORK_SAVE_LOCATION,
+        abortSignal: this.abortController.signal,
         metadata: {
           albumId: this.albumId,
           version: CURRENT_ARTWORK_GENERATOR_VERSION
         }
       });
 
+      if (result.cancelled || this.isCancelled()) return;
       if (!result.success) {
-        throw new Error(result.error || `Failed to generate artwork for album ${this.albumId}`);
+        throw new Error(`[ArtworkJob] Failed to generate artwork for album ${this.albumId}`);
       }
 
-      if (this.state === 'cancelled') return;
-
       // 3. Save and link artwork in a DB transaction with complete hash-level deduplication
-      if (result.metadata.hasEmbeddedArtwork && result.metadata.payloads) {
+      if (result.metadata?.hasEmbeddedArtwork && result.metadata?.payloads) {
         const fullHash = result.metadata.fullHash as string;
         const optHash = result.metadata.optHash as string;
         const generatedPayloads = result.metadata.payloads as ArtworkPayload[];

@@ -111,14 +111,25 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
 
   it('throws error when worker asset generation fails so scheduler can handle retries', async () => {
     vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
-    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
-      success: false,
-      error: 'Worker process crashed'
-    });
+    vi.mocked(mediaWorkerBridge.generateAsset).mockRejectedValue(
+      new Error('Worker process crashed')
+    );
 
     const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
 
     await expect(job.execute()).rejects.toThrow('Worker process crashed');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws error when generateAsset returns success: false without cancelled flag', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: false
+    });
+
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    await expect(job.execute()).rejects.toThrow('Failed to generate waveform for song 123');
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
@@ -138,6 +149,39 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     await job.execute();
 
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborts immediately without calling worker if cancelled before execution', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+    job.cancel();
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts and suppresses DB persistence and events when cancel() is called mid-flight', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async (opts) => {
+      job.cancel();
+      expect(opts.abortSignal?.aborted).toBe(true);
+      return {
+        success: false,
+        cancelled: true
+      };
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('A-3 REGRESSION Race A: In-flight GC must NOT delete DB row while temp file is fresh (<60s)', async () => {

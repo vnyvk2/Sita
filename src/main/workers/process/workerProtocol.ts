@@ -23,6 +23,7 @@ export interface CmdPing {
 export interface CmdShutdown {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'CMD_SHUTDOWN';
+  drainTimeoutMs?: number;
 }
 
 export interface CmdCancelTask {
@@ -55,6 +56,7 @@ export interface CmdParseTrackBatch {
   taskId: string;
   tracks: Array<{ songPath: string; folderId?: number }>;
   batchSize?: number;
+  artworkSaveLocation?: string;
 }
 
 // Phase C4: Persistent asset jobs
@@ -145,6 +147,15 @@ export interface EvtWalkComplete {
   error?: string;
 }
 
+export interface ArtworkPayloadDTO {
+  hash: string;
+  path: string;
+  width: number;
+  height: number;
+  isOptimized: boolean;
+  source: 'LOCAL';
+}
+
 // Phase C3: Tag parsing events and DTOs
 export interface ParsedTrackDTO {
   songPath: string;
@@ -167,6 +178,7 @@ export interface ParsedTrackDTO {
   fileCreatedAt: Date | string;
   fileModifiedAt: Date | string;
   rawPictureBytes?: Uint8Array;
+  artworkPayloads?: ArtworkPayloadDTO[];
 }
 
 export interface EvtTracksParsedBatch {

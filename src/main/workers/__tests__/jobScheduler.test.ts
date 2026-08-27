@@ -49,6 +49,10 @@ describe('JobScheduler', () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('Enqueue & Duplicate Protection', () => {
     it('should enqueue new jobs and reject duplicates with same ID', () => {
       const job1 = new MockJob('job_1', 'background');
@@ -78,9 +82,6 @@ describe('JobScheduler', () => {
   describe('Priority & Concurrency', () => {
     it('should prioritize interactive jobs over background jobs', async () => {
       const executionOrder: string[] = [];
-
-      let resolveJobA: () => void;
-      let resolveJobB: () => void;
 
       const jobA = new MockJob('job_bg', 'background', async () => {
         executionOrder.push('job_bg');
@@ -218,6 +219,53 @@ describe('JobScheduler', () => {
       const metrics = scheduler.getRawMetrics();
       expect(metrics.queuedJobs).toBe(0);
       expect(metrics.runningJobs).toBe(0);
+    });
+
+    it('should cancel surviving running jobs, await their termination, and prevent post-stop DB mutations', async () => {
+      vi.useFakeTimers();
+      try {
+        let postStopWorkExecuted = false;
+        const cancelSpy = vi.fn();
+
+        const job = new MockJob('hanging_db_job', 'interactive', async () => {
+          // Simulate long async read
+          await new Promise<void>((resolve) => setTimeout(resolve, 30000));
+          // Simulated DB mutation guarded by cancellation
+          if (job.state !== 'cancelled') {
+            postStopWorkExecuted = true;
+          }
+        });
+        job.cancelFn = cancelSpy;
+
+        scheduler.start();
+        scheduler.enqueue(job);
+
+        // Advance enough for job to be popped and moved to runningJobs
+        await vi.advanceTimersByTimeAsync(50);
+        expect(scheduler.getRawMetrics().runningJobs).toBe(1);
+
+        // Initiate stop() drain in background
+        const stopPromise = scheduler.stop();
+
+        // Advance timers past the 15,000ms drain timeout and drain grace period
+        for (let i = 0; i < 180; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+        }
+        await stopPromise;
+
+        // Verify surviving job was cancelled and cleared from active bookkeeping
+        expect(cancelSpy).toHaveBeenCalledTimes(1);
+        expect(job.state).toBe('cancelled');
+        expect(scheduler.getRawMetrics().runningJobs).toBe(0);
+
+        // Advance time further to simulate time after scheduler shutdown
+        await vi.advanceTimersByTimeAsync(20000);
+
+        // Invariant: No mutation or work executed after shutdown
+        expect(postStopWorkExecuted).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

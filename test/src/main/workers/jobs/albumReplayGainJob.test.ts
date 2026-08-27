@@ -324,4 +324,89 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     expect(db.transaction).not.toHaveBeenCalled();
   });
+
+  it('aborts immediately without querying DB if cancelled before execution', async () => {
+    const job = new AlbumReplayGainJob(1, eventBus);
+    job.cancel();
+
+    expect(job.isCancelled()).toBe(true);
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(db.query.albumsSongs.findMany).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts mid-flight and prevents DB transaction commit when cancel() is called', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockImplementation(async () => {
+      job.cancel();
+      return [{ albumId: 1, songId: 101 }] as any;
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new AlbumReplayGainJob(1, eventBus);
+    await job.execute();
+
+    expect(job.isCancelled()).toBe(true);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts after track replayGain rows query if cancelled mid-flight', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
+      { albumId: 1, songId: 101 }
+    ] as any);
+
+    vi.mocked(db.query.replayGain.findMany).mockImplementation(async () => {
+      job.cancel();
+      return [
+        { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+      ] as any;
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new AlbumReplayGainJob(1, eventBus);
+    await job.execute();
+
+    expect(job.isCancelled()).toBe(true);
+    expect(fs.readFile).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts inside transaction if cancelled before transaction commit', async () => {
+    vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
+      { albumId: 1, songId: 101 }
+    ] as any);
+
+    const now = new Date();
+    vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
+      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: now }
+    ] as any);
+
+    const blocks = new Float64Array(10).fill(0.04);
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.from(blocks.buffer));
+
+    const updateMock = vi.fn();
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      job.cancel(); // cancel right as transaction callback is entered
+      return callback({
+        query: {
+          replayGain: {
+            findMany: vi.fn()
+          }
+        },
+        update: updateMock
+      } as any);
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new AlbumReplayGainJob(1, eventBus);
+    await job.execute();
+
+    expect(job.isCancelled()).toBe(true);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
 });

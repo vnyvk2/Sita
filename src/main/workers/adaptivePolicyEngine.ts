@@ -13,8 +13,6 @@ export class AdaptivePolicyEngine {
   private readonly boundEvaluatePolicy = () => this.evaluatePolicies('power-event');
   private readonly boundSuspendPolicy = () => this.evaluatePolicies('suspend');
 
-  constructor() {}
-
   public start() {
     this.stop(); // Prevent duplicate starts
     this.setupEventListeners();

@@ -5,6 +5,10 @@ vi.mock('../../src/main/db/queries/recovery', () => ({
   getAlbumsWithoutArtwork: vi.fn(),
 }));
 
+vi.mock('../../src/main/db/queries/genres', () => ({
+  reconcileExistingMultiGenres: vi.fn().mockResolvedValue({ reconciledCount: 0 })
+}));
+
 vi.mock('../../src/main/workers/jobs/artworkJob', () => {
   return {
     ArtworkJob: class {

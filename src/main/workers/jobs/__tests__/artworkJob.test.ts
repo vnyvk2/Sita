@@ -236,14 +236,25 @@ describe('ArtworkJob (Phase C4-B)', () => {
 
   it('throws error when worker asset generation fails so scheduler can handle retries', async () => {
     vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
-    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
-      success: false,
-      error: 'Worker process crashed'
-    });
+    vi.mocked(mediaWorkerBridge.generateAsset).mockRejectedValue(
+      new Error('Worker process crashed')
+    );
 
     const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
 
     await expect(job.execute()).rejects.toThrow('Worker process crashed');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws error when generateAsset returns success: false without cancelled flag', async () => {
+    vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: false
+    });
+
+    const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
+
+    await expect(job.execute()).rejects.toThrow('Failed to generate artwork for album 1');
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
@@ -263,6 +274,40 @@ describe('ArtworkJob (Phase C4-B)', () => {
     await job.execute();
 
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborts immediately without calling worker if cancelled before execution', async () => {
+    vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+    const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
+    job.cancel();
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts and suppresses DB persistence and events when cancel() is called mid-flight', async () => {
+    vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+    const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async (opts) => {
+      // Calling cancel() aborts controller and updates state
+      job.cancel();
+      expect(opts.abortSignal?.aborted).toBe(true);
+      return {
+        success: false,
+        cancelled: true
+      };
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('A-1 REGRESSION: must emit ARTWORK_CREATED even if job state is cancelled post-commit', async () => {

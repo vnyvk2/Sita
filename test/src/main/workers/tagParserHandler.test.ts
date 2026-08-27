@@ -38,12 +38,27 @@ vi.mock('node-taglib-sharp', () => ({
   }
 }));
 
+vi.mock('sharp', () => {
+  const sharpMock = vi.fn().mockImplementation(() => ({
+    metadata: vi.fn().mockResolvedValue({ width: 500, height: 500 }),
+    resize: vi.fn().mockReturnThis(),
+    webp: vi.fn().mockReturnThis(),
+    toFile: vi.fn().mockResolvedValue({ width: 500, height: 500 }),
+    toBuffer: vi.fn().mockResolvedValue(Buffer.from([0x52, 0x49, 0x46, 0x46]))
+  }));
+  return { default: sharpMock };
+});
+
 vi.mock('fs/promises', () => ({
   default: {
     stat: vi.fn().mockResolvedValue({
       birthtime: new Date(100000),
       mtime: new Date(200000)
-    })
+    }),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    rename: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined)
   }
 }));
 
@@ -238,6 +253,135 @@ describe('tagParserHandler (Phase C3)', () => {
 
       // Batch 1 completed atomically; batches 2 and 3 were never processed
       expect(processedBatches).toEqual([1]);
+    });
+  });
+
+  describe('Artwork IPC memory elimination (Phase C3/Audit remediation)', () => {
+    it('generates WebP on worker disk and emits lightweight artworkPayloads without rawPictureBytes', async () => {
+      const pictureFileInstance = {
+        tag: {
+          title: 'Artwork Song',
+          performers: ['Artist Artwork'],
+          albumArtists: [],
+          album: 'Album With Art',
+          genres: ['Pop'],
+          year: 2025,
+          track: 1,
+          disc: 1,
+          pictures: [
+            {
+              pictureType: 3, // FrontCover
+              data: { toByteArray: () => new Uint8Array([10, 20, 30, 40, 50]) }
+            }
+          ]
+        },
+        properties: {
+          durationMilliseconds: 200000,
+          audioSampleRate: 44100,
+          audioBitrate: 320,
+          audioChannels: 2
+        },
+        dispose: vi.fn()
+      };
+
+      const { File } = await import('node-taglib-sharp');
+      vi.mocked(File.createFromPath).mockReturnValueOnce(
+        pictureFileInstance as unknown as typeof mockFileInstance
+      );
+
+      const parsed = await parseTrackMetadata('C:/Music/art_track.mp3', 1, 'C:/Artworks');
+
+      // Invariant 1: rawPictureBytes must NOT be attached to parsed track
+      expect(parsed.rawPictureBytes).toBeUndefined();
+
+      // Invariant 2: artworkPayloads contains lightweight metadata (hash, paths)
+      expect(parsed.artworkPayloads).toBeDefined();
+      expect(parsed.artworkPayloads).toHaveLength(2); // full and optimized
+      expect(parsed.artworkPayloads![0]).toEqual(
+        expect.objectContaining({
+          hash: expect.any(String),
+          path: expect.stringContaining('.webp'),
+          isOptimized: false
+        })
+      );
+      expect(parsed.artworkPayloads![1]).toEqual(
+        expect.objectContaining({
+          hash: expect.any(String),
+          path: expect.stringContaining('-optimized.webp'),
+          isOptimized: true
+        })
+      );
+
+      // Invariant 3: Streaming batch also carries lightweight artworkPayloads with undefined rawPictureBytes
+      vi.mocked(File.createFromPath).mockReturnValueOnce(
+        pictureFileInstance as unknown as typeof mockFileInstance
+      );
+
+      let batchReceived: any;
+      await parseTracksStreaming([{ songPath: 'C:/Music/art_track.mp3', folderId: 1 }], {
+        taskId: 'art_batch_task',
+        batchSize: 10,
+        artworkSaveLocation: 'C:/Artworks',
+        onBatchReady: async (batch) => {
+          batchReceived = batch;
+        }
+      });
+
+      expect(batchReceived).toBeDefined();
+      expect(batchReceived.tracks[0].rawPictureBytes).toBeUndefined();
+      expect(batchReceived.tracks[0].artworkPayloads).toHaveLength(2);
+    });
+
+    it('guarantees rawPictureBytes remains undefined even if Sharp conversion fails', async () => {
+      const pictureFileInstance = {
+        tag: {
+          title: 'Corrupt Art Song',
+          performers: ['Artist Artwork'],
+          albumArtists: [],
+          album: 'Album With Corrupt Art',
+          genres: ['Pop'],
+          year: 2025,
+          track: 1,
+          disc: 1,
+          pictures: [
+            {
+              pictureType: 3,
+              data: { toByteArray: () => new Uint8Array([1, 2, 3]) }
+            }
+          ]
+        },
+        properties: {
+          durationMilliseconds: 200000,
+          audioSampleRate: 44100,
+          audioBitrate: 320,
+          audioChannels: 2
+        },
+        dispose: vi.fn()
+      };
+
+      const { File } = await import('node-taglib-sharp');
+      vi.mocked(File.createFromPath).mockReturnValueOnce(
+        pictureFileInstance as unknown as typeof mockFileInstance
+      );
+
+      const fsPromises = (await import('fs/promises')).default;
+      vi.mocked(fsPromises.stat).mockImplementation(async (filePath: any) => {
+        if (filePath.includes('corrupt_art.mp3')) {
+          return { birthtime: new Date(100000), mtime: new Date(200000) } as any;
+        }
+        throw new Error('ENOENT: file not found');
+      });
+
+      const sharp = (await import('sharp')).default;
+      vi.mocked(sharp).mockImplementation(() => {
+        throw new Error('VipsJpeg: Corrupted JPEG header');
+      });
+
+      const parsed = await parseTrackMetadata('C:/Music/corrupt_art.mp3', 1, 'C:/Artworks');
+
+      // Invariant: zero raw picture bytes over IPC even on conversion failure
+      expect(parsed.rawPictureBytes).toBeUndefined();
+      expect(parsed.artworkPayloads).toBeUndefined();
     });
   });
 });

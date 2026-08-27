@@ -27,6 +27,7 @@ if (!parentPort) {
 
 // Active task tracking for cancellation and true drain semantics
 const activeTaskControllers = new Map<string, AbortController>();
+const activeTaskPromises = new Map<string, Promise<unknown>>();
 const pendingBatchAcks = new Map<string, () => void>();
 let isDraining = false;
 
@@ -68,46 +69,52 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       const controller = new AbortController();
       activeTaskControllers.set(cmd.taskId, controller);
 
-      try {
-        const result = await executeDiskWalk(cmd.roots, {
-          supportedExtensions: cmd.supportedExtensions,
-          abortSignal: controller.signal,
-          maxConcurrency: cmd.maxConcurrency ?? 8,
-          onProgress: (count, currentPath) => {
-            postToMain({
-              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-              type: 'EVT_WALK_PROGRESS',
-              taskId: cmd.taskId,
-              discoveredCount: count,
-              currentPath
-            });
-          }
-        });
+      const taskPromise = (async () => {
+        try {
+          const result = await executeDiskWalk(cmd.roots, {
+            supportedExtensions: cmd.supportedExtensions,
+            abortSignal: controller.signal,
+            maxConcurrency: cmd.maxConcurrency ?? 8,
+            onProgress: (count, currentPath) => {
+              postToMain({
+                protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                type: 'EVT_WALK_PROGRESS',
+                taskId: cmd.taskId,
+                discoveredCount: count,
+                currentPath
+              });
+            }
+          });
 
-        postToMain({
-          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-          type: 'EVT_WALK_COMPLETE',
-          taskId: cmd.taskId,
-          snapshots: result.snapshots,
-          failedSubtrees: result.failedSubtrees,
-          failedPaths: result.failedPaths,
-          cancelled: controller.signal.aborted
-        });
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        postToMain({
-          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-          type: 'EVT_WALK_COMPLETE',
-          taskId: cmd.taskId,
-          snapshots: [],
-          failedSubtrees: [],
-          failedPaths: [],
-          cancelled: controller.signal.aborted,
-          error: msg
-        });
-      } finally {
-        activeTaskControllers.delete(cmd.taskId);
-      }
+          postToMain({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_WALK_COMPLETE',
+            taskId: cmd.taskId,
+            snapshots: result.snapshots,
+            failedSubtrees: result.failedSubtrees,
+            failedPaths: result.failedPaths,
+            cancelled: controller.signal.aborted
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          postToMain({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_WALK_COMPLETE',
+            taskId: cmd.taskId,
+            snapshots: [],
+            failedSubtrees: [],
+            failedPaths: [],
+            cancelled: controller.signal.aborted,
+            error: msg
+          });
+        } finally {
+          activeTaskControllers.delete(cmd.taskId);
+          activeTaskPromises.delete(cmd.taskId);
+        }
+      })();
+
+      activeTaskPromises.set(cmd.taskId, taskPromise);
+      await taskPromise;
       break;
     }
 
@@ -129,66 +136,78 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       const controller = new AbortController();
       activeTaskControllers.set(cmd.taskId, controller);
 
-      try {
-        await parseTracksStreaming(cmd.tracks, {
-          taskId: cmd.taskId,
-          batchSize: cmd.batchSize ?? 100,
-          abortSignal: controller.signal,
-          onBatchReady: async (batch) => {
-            if (controller.signal.aborted) return;
+      const taskPromise = (async () => {
+        try {
+          await parseTracksStreaming(cmd.tracks, {
+            taskId: cmd.taskId,
+            batchSize: cmd.batchSize ?? 100,
+            abortSignal: controller.signal,
+            artworkSaveLocation: cmd.artworkSaveLocation,
+            onBatchReady: async (batch) => {
+              if (controller.signal.aborted) return;
 
-            // Send parsed batch to Main
-            postToMain({
-              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-              type: 'EVT_TRACKS_PARSED_BATCH',
-              taskId: cmd.taskId,
-              batchId: batch.batchId,
-              isLastBatch: batch.isLastBatch,
-              tracks: batch.tracks,
-              errors: batch.errors,
-              cancelled: false
-            });
-
-            // Backpressure: pause until Main sends CMD_ACK_BATCH for this batch
-            if (!batch.isLastBatch) {
-              const ackKey = `${cmd.taskId}:${batch.batchId}`;
-              await new Promise<void>((resolve) => {
-                const timeoutTimer = setTimeout(() => {
-                  pendingBatchAcks.delete(ackKey);
-                  console.warn(
-                    `[MediaWorker] Backpressure safety timeout triggered (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}. Resuming worker.`
-                  );
-                  postToMain({
-                    protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-                    type: 'EVT_ERROR_SUMMARY',
-                    message: `Backpressure safety timeout triggered (30s) on task '${cmd.taskId}', batch ${batch.batchId}.`
-                  });
-                  resolve();
-                }, 30000); // 30s safety timeout to prevent permanent worker stalls
-
-                pendingBatchAcks.set(ackKey, () => {
-                  clearTimeout(timeoutTimer);
-                  resolve();
-                });
+              // Send parsed batch to Main
+              postToMain({
+                protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                type: 'EVT_TRACKS_PARSED_BATCH',
+                taskId: cmd.taskId,
+                batchId: batch.batchId,
+                isLastBatch: batch.isLastBatch,
+                tracks: batch.tracks,
+                errors: batch.errors,
+                cancelled: false
               });
+
+              // Backpressure: pause until Main sends CMD_ACK_BATCH for this batch
+              if (!batch.isLastBatch) {
+                const ackKey = `${cmd.taskId}:${batch.batchId}`;
+                await new Promise<void>((resolve) => {
+                  const timeoutTimer = setTimeout(() => {
+                    pendingBatchAcks.delete(ackKey);
+                    console.warn(
+                      `[MediaWorker] Backpressure safety timeout triggered (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}. Resuming worker.`
+                    );
+                    postToMain({
+                      protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                      type: 'EVT_ERROR_SUMMARY',
+                      taskId: cmd.taskId,
+                      category: 'IO_ERROR',
+                      count: 1,
+                      sampleMessages: [
+                        `Backpressure safety timeout triggered (30s) on task '${cmd.taskId}', batch ${batch.batchId}.`
+                      ]
+                    });
+                    resolve();
+                  }, 30000); // 30s safety timeout to prevent permanent worker stalls
+
+                  pendingBatchAcks.set(ackKey, () => {
+                    clearTimeout(timeoutTimer);
+                    resolve();
+                  });
+                });
+              }
             }
-          }
-        });
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        postToMain({
-          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-          type: 'EVT_TRACKS_PARSED_BATCH',
-          taskId: cmd.taskId,
-          batchId: -1,
-          isLastBatch: true,
-          tracks: [],
-          errors: [{ path: '', error: msg }],
-          cancelled: controller.signal.aborted
-        });
-      } finally {
-        activeTaskControllers.delete(cmd.taskId);
-      }
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          postToMain({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_TRACKS_PARSED_BATCH',
+            taskId: cmd.taskId,
+            batchId: -1,
+            isLastBatch: true,
+            tracks: [],
+            errors: [{ path: '', error: msg }],
+            cancelled: controller.signal.aborted
+          });
+        } finally {
+          activeTaskControllers.delete(cmd.taskId);
+          activeTaskPromises.delete(cmd.taskId);
+        }
+      })();
+
+      activeTaskPromises.set(cmd.taskId, taskPromise);
+      await taskPromise;
       break;
     }
 
@@ -230,12 +249,29 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
           // Ignore
         }
       }
-      activeTaskControllers.clear();
 
       for (const resolve of pendingBatchAcks.values()) {
         resolve();
       }
       pendingBatchAcks.clear();
+
+      const drainTimeoutMs = cmd.drainTimeoutMs ?? 2000;
+      if (activeTaskPromises.size > 0) {
+        let timer: NodeJS.Timeout | null = null;
+        const timeoutPromise = new Promise<'timeout'>((resolve) => {
+          timer = setTimeout(() => resolve('timeout'), drainTimeoutMs);
+        });
+
+        const allSettledPromise = Promise.allSettled(Array.from(activeTaskPromises.values()));
+        const raceResult = await Promise.race([allSettledPromise, timeoutPromise]);
+        if (timer) clearTimeout(timer);
+
+        if (raceResult === 'timeout' && activeTaskPromises.size > 0) {
+          console.warn(
+            `[MediaWorker] Shutdown drain timed out (${drainTimeoutMs}ms) with ${activeTaskPromises.size} active tasks: [${Array.from(activeTaskPromises.keys()).join(', ')}]`
+          );
+        }
+      }
 
       postToMain({
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -265,50 +301,56 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       const controller = new AbortController();
       activeTaskControllers.set(cmd.taskId, controller);
 
-      try {
-        const result = await executeAssetJob({
-          taskId: cmd.taskId,
-          jobType: cmd.jobType,
-          input: cmd.input,
-          abortSignal: controller.signal
-        });
-
-        if (result.success) {
-          postToMain({
-            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-            type: 'EVT_ASSET_COMPLETE',
+      const taskPromise = (async () => {
+        try {
+          const result = await executeAssetJob({
             taskId: cmd.taskId,
             jobType: cmd.jobType,
-            success: true,
-            outputFilePath: result.outputFilePath,
-            metadata: result.metadata,
-            cancelled: false
+            input: cmd.input,
+            abortSignal: controller.signal
           });
-        } else {
+
+          if (result.success) {
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_ASSET_COMPLETE',
+              taskId: cmd.taskId,
+              jobType: cmd.jobType,
+              success: true,
+              outputFilePath: result.outputFilePath,
+              metadata: result.metadata,
+              cancelled: false
+            });
+          } else {
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_ASSET_COMPLETE',
+              taskId: cmd.taskId,
+              jobType: cmd.jobType,
+              success: false,
+              error: result.error,
+              cancelled: result.cancelled
+            });
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
           postToMain({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
             type: 'EVT_ASSET_COMPLETE',
             taskId: cmd.taskId,
             jobType: cmd.jobType,
             success: false,
-            error: result.error,
-            cancelled: result.cancelled
+            error: msg,
+            cancelled: controller.signal.aborted
           });
+        } finally {
+          activeTaskControllers.delete(cmd.taskId);
+          activeTaskPromises.delete(cmd.taskId);
         }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        postToMain({
-          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-          type: 'EVT_ASSET_COMPLETE',
-          taskId: cmd.taskId,
-          jobType: cmd.jobType,
-          success: false,
-          error: msg,
-          cancelled: controller.signal.aborted
-        });
-      } finally {
-        activeTaskControllers.delete(cmd.taskId);
-      }
+      })();
+
+      activeTaskPromises.set(cmd.taskId, taskPromise);
+      await taskPromise;
       break;
     }
 

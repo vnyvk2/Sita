@@ -191,24 +191,25 @@ export const processSongsWithWorkerPool = async (
     return { successCount: 0, errorCount: 0, errors: [] };
   }
 
-  if (typeof process !== 'undefined' && process.versions?.electron && !process.env.VITEST) {
-    try {
-      const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
+  const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
 
+  if (mediaWorkerBridge.isReady()) {
+    const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
+    const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
+    const errors: Array<{ path: string; error: string }> = [];
+    const newSongIds: number[] = [];
+    const newArtistIds: number[] = [];
+    const newAlbumIds: number[] = [];
+    const newGenreIds: number[] = [];
+    let successCount = 0;
+    let durablyCommittedSongCount = 0;
+
+    try {
       performance.mark('songWorkerPool:executionMode:worker');
       const workerPid = mediaWorkerBridge.getWorkerPid();
       songIngestionMetrics.workerPid = workerPid;
 
       logger.info(`[songWorkerPool] Ingesting ${songs.length} tracks via utilityProcess worker (pid: ${workerPid ?? 'unknown'})...`);
-
-      const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
-      const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
-      const errors: Array<{ path: string; error: string }> = [];
-      const newSongIds: number[] = [];
-      const newArtistIds: number[] = [];
-      const newAlbumIds: number[] = [];
-      const newGenreIds: number[] = [];
-      let successCount = 0;
 
       await mediaWorkerBridge.parseTrackBatchStream(songs, {
         batchSize: 100,
@@ -234,10 +235,16 @@ export const processSongsWithWorkerPool = async (
             songIngestionMetrics.totalArtworkBytes += batchArtworkBytes;
 
             // 2. Pre-process artwork files OUTSIDE of the DB transaction
-            // This prevents Sharp image decoding and disk I/O from holding the SQLite/PGlite lock
+            // If worker already generated artwork files, reuse the lightweight payloads directly.
+            // Only fall back to local processArtworkFiles if rawPictureBytes was passed without preprocessed payloads.
             const artworkStart = performance.now();
             const preprocessedArtworks = await Promise.all(
-              batch.tracks.map((t) => processArtworkFiles('songs', t.rawPictureBytes))
+              batch.tracks.map(async (t) => {
+                if (t.artworkPayloads && t.artworkPayloads.length > 0) {
+                  return { payloads: t.artworkPayloads };
+                }
+                return processArtworkFiles('songs', t.rawPictureBytes);
+              })
             );
             const artworkDuration = performance.now() - artworkStart;
             songIngestionMetrics.artworkDurations.push(artworkDuration);
@@ -284,6 +291,9 @@ export const processSongsWithWorkerPool = async (
             });
             const dbTxDuration = performance.now() - dbTxStart;
             songIngestionMetrics.dbTxDurations.push(dbTxDuration);
+
+            // Invariant: Durably committed boundary advances ONLY AFTER the DB transaction succeeds
+            durablyCommittedSongCount += batch.tracks.length + batch.errors.length;
 
             logger.info(
               `[songWorkerPool] Batch ${batch.batchId} (${batch.tracks.length} tracks, ${(batchArtworkBytes / 1024 / 1024).toFixed(2)} MB artwork): artwork=${artworkDuration.toFixed(1)}ms, pureDbTx=${dbTxDuration.toFixed(1)}ms`
@@ -353,9 +363,55 @@ export const processSongsWithWorkerPool = async (
       };
     } catch (workerErr) {
       logger.error(
-        '[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed. Falling back to local ingestion in Main.',
+        `[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed at committed count ${durablyCommittedSongCount}/${songs.length}. Falling back to local ingestion in Main.`,
         { error: workerErr }
       );
+
+      // Enqueue background asset jobs and fire data update events for already committed tracks
+      if (!abortSignal?.aborted) {
+        if (albumAssetsToQueue.size > 0) {
+          for (const [albumId, data] of albumAssetsToQueue.entries()) {
+            libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+          }
+        }
+        if (songAssetsToQueue.length > 0) {
+          for (const song of songAssetsToQueue) {
+            libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+            libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
+            );
+          }
+        }
+        if (newSongIds.length > 0) dataUpdateEvent('songs/newSong', newSongIds);
+        if (newArtistIds.length > 0) dataUpdateEvent('artists/newArtist', newArtistIds);
+        if (newAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', newAlbumIds);
+        if (newGenreIds.length > 0) dataUpdateEvent('genres/newGenre', newGenreIds);
+      }
+
+      const remainingSongs = songs.slice(durablyCommittedSongCount);
+      if (remainingSongs.length === 0) {
+        return {
+          successCount,
+          errorCount: errors.length,
+          errors
+        };
+      }
+
+      const localResult = await processSongsWithWorkerPoolLocal(
+        remainingSongs,
+        abortSignal,
+        updateProgress
+          ? (current, _total) => updateProgress(durablyCommittedSongCount + current, songs.length)
+          : undefined,
+        maxConcurrency
+      );
+
+      return {
+        successCount: successCount + localResult.successCount,
+        errorCount: errors.length + localResult.errorCount,
+        errors: [...errors, ...localResult.errors]
+      };
     }
   }
 

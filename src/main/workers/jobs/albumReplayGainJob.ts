@@ -4,7 +4,7 @@ import { app } from 'electron';
 import { EventEmitter } from 'events';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@main/db/db';
-import { albumsSongs, replayGain } from '@main/db/schema';
+import { replayGain } from '@main/db/schema';
 import logger from '@main/logger';
 import {
   AlbumLoudnessAggregator,
@@ -55,14 +55,27 @@ export class AlbumReplayGainJob implements Job {
     this.description = `Aggregating album loudness for album ${albumId}`;
   }
 
+  private abortController = new AbortController();
+
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
+  }
+
   async execute(): Promise<void> {
     try {
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 1. Fetch all songs associated with this album
       const albumSongRows = await db.query.albumsSongs.findMany({
         where: (as, { eq: eq_ }) => eq_(as.albumId, this.albumId)
       });
+
+      if (this.isCancelled()) return;
 
       if (albumSongRows.length === 0) {
         logger.debug(`[AlbumReplayGainJob] No songs found for album ${this.albumId}, skipping.`);
@@ -75,6 +88,8 @@ export class AlbumReplayGainJob implements Job {
       const rgRows = await db.query.replayGain.findMany({
         where: (rg, { inArray: inArray_ }) => inArray_(rg.songId, songIds)
       });
+
+      if (this.isCancelled()) return;
 
       // Completeness check: All songs in the album must have finished track ReplayGain analysis
       if (rgRows.length < songIds.length) {
@@ -109,7 +124,7 @@ export class AlbumReplayGainJob implements Job {
         return;
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 4. Load 64-bit loudness block caches from disk (Constraint #1, #3)
       const tracksData: TrackLoudnessData[] = [];
@@ -154,7 +169,7 @@ export class AlbumReplayGainJob implements Job {
         }
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 5. Aggregate album loudness using pure ITU-R BS.1770-4 pooled gating (Constraints #4, #5)
       const albumResult = AlbumLoudnessAggregator.aggregate(tracksData);
@@ -165,6 +180,10 @@ export class AlbumReplayGainJob implements Job {
       let committed = false;
       try {
         await db.transaction(async (trx) => {
+          if (this.isCancelled()) {
+            return;
+          }
+
           // Re-query inside transaction and verify exact row count and presence
           const currentRows = await trx.query.replayGain.findMany({
             where: inArray(replayGain.songId, songIds)

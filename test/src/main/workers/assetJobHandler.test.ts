@@ -205,7 +205,7 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       expect(fs.rename).toHaveBeenCalledTimes(2);
     });
 
-    it('rolls back previously published file if full-image publication fails (Dual Publication Atomicity)', async () => {
+    it('rolls back newly published optimized file if full-image publication fails (Dual Publication Atomicity)', async () => {
       const mockDispose = vi.fn();
       const taglib = await import('node-taglib-sharp');
       vi.mocked(taglib.File.createFromPath).mockReturnValue({
@@ -226,6 +226,7 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
 
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
       // First rename (optimized) succeeds, second rename (full) fails
       let renameCallCount = 0;
@@ -248,10 +249,106 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       });
 
       expect(result.success).toBe(false);
-      // PROVE: rollback unlinked the successfully published optimized file to avoid half-state
+      // PROVE: rollback unlinked the newly published optimized file to avoid half-state
       expect(fs.unlink).toHaveBeenCalledWith(
         expect.stringMatching(/-optimized\.webp$/)
       );
+    });
+
+    it('preserves pre-existing optimized webp when collision occurs and full webp publish fails', async () => {
+      const mockDispose = vi.fn();
+      const taglib = await import('node-taglib-sharp');
+      vi.mocked(taglib.File.createFromPath).mockReturnValue({
+        tag: { pictures: [{ data: { toByteArray: () => new Uint8Array([1, 2, 3, 4]) } }] },
+        dispose: mockDispose
+      } as any);
+
+      const { extractFrontCover } = await import('@main/utils/extractFrontCover');
+      vi.mocked(extractFrontCover).mockReturnValue(new Uint8Array([1, 2, 3, 4]));
+
+      const sharp = (await import('sharp')).default;
+      const mockSharpInstance = {
+        webp: vi.fn().mockReturnThis(),
+        resize: vi.fn().mockReturnThis(),
+        toFile: vi.fn().mockResolvedValue({ width: 500, height: 500 })
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharpInstance as any);
+
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      // Destination for optimized webp already exists (collision)
+      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+        if (filePath.endsWith('-optimized.webp')) return { size: 4096 } as any;
+        throw new Error('ENOENT');
+      });
+
+      const eexistError: any = new Error('EEXIST: file already exists');
+      eexistError.code = 'EEXIST';
+
+      // First rename gets EEXIST (collision with existing file), second rename gets EIO fatal error
+      vi.mocked(fs.rename)
+        .mockRejectedValueOnce(eexistError)
+        .mockRejectedValueOnce(new Error('EIO: Disk I/O error on full webp'));
+
+      const result = await executeAssetJob({
+        taskId: 'task-artwork-existing-opt-fail',
+        jobType: 'artwork',
+        input: {
+          sourceFilePath: 'C:/Music/test.mp3',
+          destinationPath: 'C:/Cache/artworks'
+        }
+      });
+
+      expect(result.success).toBe(false);
+      // PROVE: rollback NEVER unlinks the pre-existing optimized webp (only temp files unlinked)
+      expect(fs.unlink).not.toHaveBeenCalledWith(
+        expect.stringMatching(/artworks[\\\/][a-f0-9]+-optimized\.webp$/)
+      );
+    });
+
+    it('rethrows error and unlinks temp if rename fails with collision code but destination stat fails', async () => {
+      const mockDispose = vi.fn();
+      const taglib = await import('node-taglib-sharp');
+      vi.mocked(taglib.File.createFromPath).mockReturnValue({
+        tag: { pictures: [{ data: { toByteArray: () => new Uint8Array([1, 2, 3, 4]) } }] },
+        dispose: mockDispose
+      } as any);
+
+      const { extractFrontCover } = await import('@main/utils/extractFrontCover');
+      vi.mocked(extractFrontCover).mockReturnValue(new Uint8Array([1, 2, 3, 4]));
+
+      const sharp = (await import('sharp')).default;
+      const mockSharpInstance = {
+        webp: vi.fn().mockReturnThis(),
+        resize: vi.fn().mockReturnThis(),
+        toFile: vi.fn().mockResolvedValue({ width: 500, height: 500 })
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharpInstance as any);
+
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      // Stat fails (e.g. destination does NOT exist or permission error)
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+
+      const epermError: any = new Error('EPERM: operation not permitted');
+      epermError.code = 'EPERM';
+      vi.mocked(fs.rename).mockRejectedValue(epermError);
+
+      const result = await executeAssetJob({
+        taskId: 'task-artwork-eperm-no-dest',
+        jobType: 'artwork',
+        input: {
+          sourceFilePath: 'C:/Music/test.mp3',
+          destinationPath: 'C:/Cache/artworks'
+        }
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('EPERM');
+      }
     });
 
     it('returns isDefaultArtwork = true when song has no embedded artwork', async () => {

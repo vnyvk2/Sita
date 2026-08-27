@@ -33,6 +33,7 @@ export type AssetExecutionResult =
   | {
       success: false;
       error: string;
+      metadata?: Record<string, unknown>;
       cancelled?: boolean;
     };
 
@@ -268,16 +269,20 @@ async function generateArtworkInWorker(
       };
     }
 
-    // 3. Atomic publication with rollback tracking
+    // 3. Atomic publication with verified ownership tracking
     const publishedPaths: string[] = [];
     try {
-      await atomicPublishFile(optTmpPath, optPath);
-      publishedPaths.push(optPath);
+      const optStatus = await atomicPublishFile(optTmpPath, optPath);
+      if (optStatus === 'published') {
+        publishedPaths.push(optPath);
+      }
 
-      await atomicPublishFile(imgTmpPath, imgPath);
-      publishedPaths.push(imgPath);
+      const imgStatus = await atomicPublishFile(imgTmpPath, imgPath);
+      if (imgStatus === 'published') {
+        publishedPaths.push(imgPath);
+      }
     } catch (pubError) {
-      // Rollback any partially published files in this batch
+      // Rollback only files newly published by this invocation
       for (const p of publishedPaths) {
         await fs.unlink(p).catch(() => {});
       }
@@ -415,12 +420,17 @@ async function generateReplayGainInWorker(
 
 /**
  * Atomically publishes a temp file to destination path.
- * Only treats known collision error codes (EEXIST, EBUSY, EPERM) on non-empty destinations as idempotent collisions.
- * Fatal permissions, ENOENT on source, or other I/O errors clean up temp and rethrow.
+ * Returns 'published' if this process successfully renamed the temp file to destination.
+ * Returns 'already_existed' if destination already exists and is non-empty (idempotent collision).
+ * Cleans up tempPath and rethrows on real I/O or permissions failures where destination is absent.
  */
-async function atomicPublishFile(tempPath: string, destinationPath: string): Promise<void> {
+export async function atomicPublishFile(
+  tempPath: string,
+  destinationPath: string
+): Promise<'published' | 'already_existed'> {
   try {
     await fs.rename(tempPath, destinationPath);
+    return 'published';
   } catch (renameErr: unknown) {
     const errCode = (renameErr as { code?: string })?.code;
     const isCollisionCandidate =
@@ -431,7 +441,7 @@ async function atomicPublishFile(tempPath: string, destinationPath: string): Pro
         const destStat = await fs.stat(destinationPath);
         if (destStat.size > 0) {
           await fs.unlink(tempPath).catch(() => {});
-          return; // Valid existing file, idempotent collision
+          return 'already_existed'; // Valid existing file, idempotent collision
         }
       } catch {
         // Destination check failed, fall through to cleanup and throw

@@ -25,9 +25,20 @@ export interface SongIdsResult {
   blacklistedIds: number[];
 }
 
+export const getSongListIdentity = (params: SongIdsParams | unknown): string => {
+  if (typeof params === 'string') {
+    return params.startsWith('ids=') ? params : `ids=${params}`;
+  }
+  if (params && typeof params === 'object') {
+    return `ids=${JSON.stringify(params)}`;
+  }
+  return 'ids=default';
+};
+
 export const songCacheKeys = {
   windowsRoot: ['songs', 'window'] as const,
-  window: (version: number, start: number) => ['songs', 'window', version, start] as const
+  window: (listIdentity: string, version: number | string, start: number) =>
+    ['songs', 'window', listIdentity, version, start] as const
 };
 
 export const songIdsVersionFromState = (dataUpdatedAt: number | undefined): number =>
@@ -36,7 +47,7 @@ export const songIdsVersionFromState = (dataUpdatedAt: number | undefined): numb
 export const songQuery = createQueryKeys('songs', {
   ids: (params: SongIdsParams) => {
     return {
-      queryKey: [`ids=${JSON.stringify(params)}`],
+      queryKey: [params],
       queryFn: async (): Promise<SongIdsResult> => {
         if (params.keyword?.trim()) {
           const res = await window.api.search.query({

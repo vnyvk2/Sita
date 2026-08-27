@@ -456,6 +456,131 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       expect(result.cancelled).toBe(false);
       expect(receivedBatches).toEqual([1, 2]);
     });
+
+    it('should send CMD_CANCEL_TASK, reject Main promise, and clean up task resolver when onBatch rejects', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH', 'CMD_CANCEL_TASK']
+      });
+      await startPromise;
+
+      const batchError = new Error('Database transaction lock failed in Main');
+      const streamPromise = bridge.parseTrackBatchStream(
+        [{ songPath: 'C:/Music/song1.mp3', folderId: 1 }],
+        {
+          batchSize: 100,
+          onBatch: async () => {
+            throw batchError;
+          }
+        }
+      );
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_PARSE_TRACK_BATCH'
+      );
+      expect(postCall).toBeDefined();
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Simulate worker sending batch 1
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_BATCH',
+        taskId,
+        batchId: 1,
+        isLastBatch: false,
+        tracks: [
+          {
+            songPath: 'C:/Music/song1.mp3',
+            folderId: 1,
+            title: 'Song 1',
+            duration: '180.00',
+            artists: ['Artist 1'],
+            albumArtists: [],
+            genres: ['Rock'],
+            fileCreatedAt: new Date(),
+            fileModifiedAt: new Date()
+          }
+        ],
+        errors: []
+      });
+
+      // 1. Verify streamPromise rejects with original error
+      await expect(streamPromise).rejects.toThrow('Database transaction lock failed in Main');
+
+      // 2. Verify Main sent CMD_CANCEL_TASK to prevent worker from hanging on pendingBatchAcks
+      expect(mockProcess.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'CMD_CANCEL_TASK',
+          taskId
+        })
+      );
+    });
+
+    it('verifies streaming batches received over IPC carry only lightweight artworkPayloads with zero raw image buffers', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      let receivedTrack: any;
+      const streamPromise = bridge.parseTrackBatchStream(
+        [{ songPath: 'C:/Music/song1.mp3', folderId: 1 }],
+        {
+          batchSize: 100,
+          onBatch: async (batch) => {
+            receivedTrack = batch.tracks[0];
+          }
+        }
+      );
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_PARSE_TRACK_BATCH'
+      );
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Simulate worker sending lightweight payload
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_BATCH',
+        taskId,
+        batchId: 1,
+        isLastBatch: true,
+        tracks: [
+          {
+            songPath: 'C:/Music/song1.mp3',
+            folderId: 1,
+            title: 'Song 1',
+            duration: '180.00',
+            artists: ['Artist 1'],
+            albumArtists: [],
+            genres: ['Rock'],
+            fileCreatedAt: new Date(),
+            fileModifiedAt: new Date(),
+            rawPictureBytes: undefined,
+            artworkPayloads: [
+              { hash: 'abc', path: 'C:/Artworks/abc.webp', width: 500, height: 500, isOptimized: false, source: 'LOCAL' },
+              { hash: 'abc-optimized', path: 'C:/Artworks/abc-optimized.webp', width: 50, height: 50, isOptimized: true, source: 'LOCAL' }
+            ]
+          }
+        ],
+        errors: []
+      });
+
+      await streamPromise;
+
+      expect(receivedTrack).toBeDefined();
+      expect(receivedTrack.rawPictureBytes).toBeUndefined();
+      expect(receivedTrack.artworkPayloads).toHaveLength(2);
+      expect(receivedTrack.artworkPayloads[0].path).toBe('C:/Artworks/abc.webp');
+    });
   });
 
   describe('getMediaWorkerPath', () => {

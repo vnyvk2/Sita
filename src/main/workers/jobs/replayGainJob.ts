@@ -23,6 +23,7 @@ export class ReplayGainJob implements Job {
 
   public songId: number;
   private eventBus: EventEmitter;
+  private abortController = new AbortController();
 
   constructor(
     songId: number,
@@ -35,6 +36,15 @@ export class ReplayGainJob implements Job {
     this.id = `replaygain_${songId}`;
     this.jobClass = jobClass;
     this.description = `Analyzing loudness for "${songTitle}"`;
+  }
+
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
   }
 
   async execute(): Promise<void> {
@@ -59,7 +69,7 @@ export class ReplayGainJob implements Job {
         return;
       }
 
-      if (this.state === 'cancelled') return;
+      if (this.isCancelled()) return;
 
       // 2. Delegate CPU loudness analysis to utilityProcess worker
       const destinationPath = app?.getPath
@@ -70,17 +80,17 @@ export class ReplayGainJob implements Job {
         jobType: 'replaygain',
         sourceFilePath: song.path,
         destinationPath,
+        abortSignal: this.abortController.signal,
         metadata: {
           songId: this.songId,
           version: CURRENT_REPLAYGAIN_GENERATOR_VERSION
         }
       });
 
+      if (result.cancelled || this.isCancelled()) return;
       if (!result.success) {
-        throw new Error(result.error || `Failed to analyze ReplayGain for song ${this.songId}`);
+        throw new Error(`[ReplayGainJob] Failed to analyze loudness for song ${this.songId}`);
       }
-
-      if (this.state === 'cancelled') return;
 
       const trackGain = result.metadata?.trackGain as number;
       const trackPeak = result.metadata?.trackPeak as number;

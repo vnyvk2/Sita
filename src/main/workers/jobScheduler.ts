@@ -8,6 +8,7 @@ export class JobScheduler extends EventEmitter {
   private maintenanceQueue: Job[] = [];
   
   private runningJobs = new Map<string, Job>();
+  private inFlightJobPromises = new Map<string, Promise<void>>();
   private failedJobsList: Job[] = [];
   
   // To protect against duplicates across all queues and running state
@@ -168,23 +169,50 @@ export class JobScheduler extends EventEmitter {
   }
 
   /**
-   * Gracefully shuts down the scheduler, preventing new jobs from starting
-   * while letting existing ones finish.
+   * Shuts down the scheduler through a two-phase bounded drain:
+   * 1. Graceful Drain Phase (up to 15s): Prevents new jobs from starting while waiting
+   *    for running jobs to complete naturally.
+   * 2. Forced Abort & Grace Phase (up to 2s): If jobs survive the drain timeout, broadcasts
+   *    cancellation (job.state = 'cancelled', job.cancel()) and awaits up to a 2-second grace
+   *    period for in-flight tasks to yield and terminate before clearing tracking and completing stop().
    */
   public async stop(): Promise<void> {
     this.isRunning = false;
     this.isDraining = true;
     log.info('[JobScheduler] Draining... waiting for running jobs to finish.');
 
-    // Simple wait until all running jobs complete (with timeout)
+    // 1. Drain wait: wait up to timeout for running jobs to naturally finish
     const timeoutMs = 15000;
     const start = Date.now();
-    while (this.runningJobs.size > 0 && Date.now() - start < timeoutMs) {
+    while (this.inFlightJobPromises.size > 0 && Date.now() - start < timeoutMs) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    if (this.runningJobs.size > 0) {
-      log.warn(`[JobScheduler] Timed out waiting for ${this.runningJobs.size} jobs to finish during drain.`);
+    if (this.inFlightJobPromises.size > 0 || this.runningJobs.size > 0) {
+      log.warn(
+        `[JobScheduler] Timed out waiting for ${this.runningJobs.size} jobs to finish during drain. Aborting surviving jobs.`
+      );
+      for (const [id, job] of this.runningJobs.entries()) {
+        job.state = 'cancelled';
+        if (job.cancel) {
+          try {
+            job.cancel();
+          } catch (e) {
+            log.warn(`[JobScheduler] Error cancelling job ${id} during stop:`, { error: e });
+          }
+        }
+      }
+
+      // Hard await to ensure all executing job promises have yielded and returned before shutdown proceeds
+      const survivingPromises = Array.from(this.inFlightJobPromises.values());
+      await Promise.race([
+        Promise.allSettled(survivingPromises),
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
+
+      this.runningJobs.clear();
+      this.activeJobIds.clear();
+      this.inFlightJobPromises.clear();
     }
     
     this.isDraining = false;
@@ -217,6 +245,7 @@ export class JobScheduler extends EventEmitter {
     
     this.runningJobs.clear();
     this.activeJobIds.clear();
+    this.inFlightJobPromises.clear();
     this.failedJobsList = [];
     
     // Remove listeners last, so cancellation callbacks can still emit if needed
@@ -289,8 +318,14 @@ export class JobScheduler extends EventEmitter {
     const startTime = Date.now();
     this.emit('JOB_STARTED', job);
 
-    // Execute without blocking the loop
-    this.executeJob(job, startTime);
+    // Execute without blocking the loop, but track in-flight promise for deterministic drain
+    const jobPromise = this.executeJob(job, startTime);
+    this.inFlightJobPromises.set(job.id, jobPromise);
+    jobPromise
+      .finally(() => {
+        this.inFlightJobPromises.delete(job.id);
+      })
+      .catch(() => {});
   }
 
   private async executeJob(job: Job, startTime: number) {

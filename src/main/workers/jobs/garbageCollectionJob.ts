@@ -7,6 +7,7 @@ import { collectGarbageArtworks } from '@main/core/garbageCollector';
 import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
+import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
 import type { Job, JobClass, JobState } from '../types';
 
 export class GarbageCollectionJob implements Job {
@@ -45,8 +46,8 @@ export class GarbageCollectionJob implements Job {
       let files: string[] = [];
       try {
         files = await fs.readdir(cacheDir);
-      } catch (e: any) {
-        if (e.code === 'ENOENT') return 0;
+      } catch (e) {
+        if (isAnErrorWithCode(e) && e.code === 'ENOENT') return 0;
         throw e;
       }
       
@@ -55,7 +56,6 @@ export class GarbageCollectionJob implements Job {
 
       const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
       const validBinPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
-      const validTmpPaths = new Set(dbWaveforms.map((w) => `${path.basename(w.path)}.tmp`));
 
       // 1. Crash recovery & in-flight protection for DB rows
       for (const row of dbWaveforms) {

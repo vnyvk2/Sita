@@ -6,6 +6,7 @@ import { genreQuery } from '@renderer/queries/genres';
 import { homeQuery } from '@renderer/queries/home';
 import {
   SONG_WINDOW_SIZE,
+  getSongListIdentity,
   songCacheKeys,
   songQuery,
   type SongIdsResult
@@ -258,6 +259,9 @@ export function invalidateWindowsContainingIds(
     const dataUpdatedAt = listQuery.state.dataUpdatedAt;
     if (!data?.ids?.length || !dataUpdatedAt) continue;
 
+    // listQuery.queryKey is ['songs', 'ids', params]
+    const params = listQuery.queryKey[2];
+    const listIdentity = getSongListIdentity(params);
     const version = Math.floor(dataUpdatedAt);
     const indexById = new Map<number, number>();
     for (let i = 0; i < data.ids.length; i += 1) {
@@ -268,7 +272,7 @@ export function invalidateWindowsContainingIds(
       const index = indexById.get(id);
       if (index === undefined) continue;
       const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
-      client.invalidateQueries({ queryKey: songCacheKeys.window(version, windowStart) });
+      client.invalidateQueries({ queryKey: songCacheKeys.window(listIdentity, version, windowStart) });
     }
   }
 }

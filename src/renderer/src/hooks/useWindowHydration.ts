@@ -24,10 +24,17 @@ export function useWindowHydration(
     extraRowsAfter?: number;
     /** Cache-key namespace; use a distinct prefix when list order is not library order (e.g. queues). */
     keyPrefix?: string;
+    /** Logical query/list identity to prevent cache collision across distinct filters/sorts */
+    listIdentity?: string;
   }
 ) {
-  const { enabled = true, extraRowsBefore = 50, extraRowsAfter = 100, keyPrefix = 'songs' } =
-    options ?? {};
+  const {
+    enabled = true,
+    extraRowsBefore = 50,
+    extraRowsAfter = 100,
+    keyPrefix = 'songs',
+    listIdentity = 'default'
+  } = options ?? {};
 
   const [visibleRange, setVisibleRange] = useState<WindowRange>({ startIndex: 0, endIndex: 0 });
 
@@ -68,11 +75,11 @@ export function useWindowHydration(
   }, [ids, idsVersion, visibleRange, enabled, extraRowsBefore, extraRowsAfter]);
 
   const queries = useQueries({
-    queries: windows.map((window) => ({
-      queryKey: [keyPrefix, 'window', idsVersion, window.startIndex],
+    queries: windows.map((win) => ({
+      queryKey: [keyPrefix, 'window', listIdentity, idsVersion, win.startIndex],
       queryFn: () =>
         window.api.audioLibraryControls.getSongInfo(
-          ids.slice(window.startIndex, window.endIndex),
+          ids.slice(win.startIndex, win.endIndex),
           undefined,
           undefined,
           undefined,
@@ -87,11 +94,11 @@ export function useWindowHydration(
   const itemsByIndex = useMemo(() => {
     const map = new Map<number, SongData>();
     queries.forEach((query, i) => {
-      const window = windows[i];
+      const win = windows[i];
       const data = query.data;
-      if (!window || !data) return;
+      if (!win || !data) return;
       for (let k = 0; k < data.length; k += 1) {
-        map.set(window.startIndex + k, data[k]);
+        map.set(win.startIndex + k, data[k]);
       }
     });
     return map;

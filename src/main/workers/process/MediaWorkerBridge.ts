@@ -4,6 +4,7 @@ import path from 'path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 
 import { appPreferences } from '../../../../package.json';
+import { DEFAULT_ARTWORK_SAVE_LOCATION } from '../../filesystem';
 import logger from '../../logger';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
@@ -51,6 +52,7 @@ export interface DiskWalkBridgeOptions {
 export interface ParseBatchStreamOptions {
   batchSize?: number;
   abortSignal?: AbortSignal;
+  artworkSaveLocation?: string;
   onBatch: (batch: {
     batchId: number;
     isLastBatch: boolean;
@@ -141,7 +143,7 @@ export class MediaWorkerBridge extends EventEmitter {
     {
       resolve: (result: AssetBridgeResult) => void;
       reject: (error: Error) => void;
-      jobType: 'artwork' | 'waveform';
+      jobType: 'artwork' | 'waveform' | 'replaygain';
     }
   > = new Map();
 
@@ -375,7 +377,12 @@ export class MediaWorkerBridge extends EventEmitter {
     tracks: Array<{ songPath: string; folderId?: number }>,
     options: ParseBatchStreamOptions
   ): Promise<ParseStreamResult> {
-    const { batchSize = 100, abortSignal, onBatch } = options;
+    const {
+      batchSize = 100,
+      abortSignal,
+      artworkSaveLocation = DEFAULT_ARTWORK_SAVE_LOCATION,
+      onBatch
+    } = options;
 
     if (abortSignal?.aborted || tracks.length === 0) {
       return { totalParsed: 0, totalErrors: 0, cancelled: Boolean(abortSignal?.aborted) };
@@ -434,7 +441,8 @@ export class MediaWorkerBridge extends EventEmitter {
         type: 'CMD_PARSE_TRACK_BATCH',
         taskId,
         tracks,
-        batchSize
+        batchSize,
+        artworkSaveLocation
       });
     });
   }
@@ -686,6 +694,17 @@ export class MediaWorkerBridge extends EventEmitter {
               }
             })
             .catch((err) => {
+              if (this.childProcess) {
+                try {
+                  this.sendCommand({
+                    protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                    type: 'CMD_CANCEL_TASK',
+                    taskId: batchEvt.taskId
+                  });
+                } catch {
+                  // Ignore if child process exited
+                }
+              }
               parseTask.reject(err instanceof Error ? err : new Error(String(err)));
             });
         }
@@ -794,7 +813,10 @@ export class MediaWorkerBridge extends EventEmitter {
       // Crash #1, #2, #3 restart; Crash #4 within rolling 60s suppresses auto-restart
       if (this.crashTimestamps.length > this.MAX_CRASHES_PER_MINUTE) {
         this.state = 'CRASHED';
-        logger.error('[MediaWorkerBridge] Worker exceeded crash limit (4 crashes within 60s). Auto-restart suppressed.');
+        logger.error(
+          '[MediaWorkerBridge] Worker exceeded crash limit (4 crashes within 60s). Auto-restart suppressed.',
+          { code }
+        );
         this.emit('crash_limit_exceeded', { code, crashCount: this.crashTimestamps.length });
         return;
       }
