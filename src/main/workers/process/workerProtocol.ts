@@ -62,7 +62,7 @@ export interface CmdGenerateAsset {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'CMD_GENERATE_ASSET';
   taskId: string;
-  jobType: 'artwork' | 'waveform';
+  jobType: 'artwork' | 'waveform' | 'replaygain';
   input: {
     sourceFilePath: string;
     destinationPath: string;
@@ -186,7 +186,7 @@ export type EvtAssetComplete =
       protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
       type: 'EVT_ASSET_COMPLETE';
       taskId: string;
-      jobType: 'artwork' | 'waveform';
+      jobType: 'artwork' | 'waveform' | 'replaygain';
       success: true;
       outputFilePath: string;
       metadata: Record<string, unknown>;
@@ -196,7 +196,7 @@ export type EvtAssetComplete =
       protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
       type: 'EVT_ASSET_COMPLETE';
       taskId: string;
-      jobType: 'artwork' | 'waveform';
+      jobType: 'artwork' | 'waveform' | 'replaygain';
       success: false;
       error: string;
       cancelled?: boolean;

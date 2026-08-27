@@ -66,7 +66,7 @@ export interface ParseStreamResult {
 }
 
 export interface GenerateAssetBridgeOptions {
-  jobType: 'artwork' | 'waveform';
+  jobType: 'artwork' | 'waveform' | 'replaygain';
   sourceFilePath: string;
   destinationPath: string;
   metadata?: Record<string, unknown>;

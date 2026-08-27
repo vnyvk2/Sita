@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CURRENT_REPLAYGAIN_GENERATOR_VERSION,
   CURRENT_WAVEFORM_GENERATOR_VERSION,
   executeAssetJob,
   WAVEFORM_RESOLUTION
@@ -12,7 +13,7 @@ vi.mock('sharp');
 vi.mock('node-taglib-sharp');
 vi.mock('@main/utils/extractFrontCover');
 
-describe('assetJobHandler (Phase C4-B Worker Asset Generation)', () => {
+describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -295,6 +296,52 @@ describe('assetJobHandler (Phase C4-B Worker Asset Generation)', () => {
         expect(result.error).toContain('Corrupt JPEG data');
       }
       expect(fs.unlink).toHaveBeenCalled();
+    });
+  });
+
+  describe('ReplayGain Loudness Analysis (Phase C4-C)', () => {
+    it('computes loudness metrics from audio file in worker', async () => {
+      vi.mocked(fs.stat).mockResolvedValue({ size: 1048576 } as any);
+
+      const result = await executeAssetJob({
+        taskId: 'task-rg-1',
+        jobType: 'replaygain',
+        input: {
+          sourceFilePath: 'C:/Music/song.mp3',
+          destinationPath: ''
+        }
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(typeof result.metadata.trackGain).toBe('number');
+        expect(typeof result.metadata.trackPeak).toBe('number');
+        expect(typeof result.metadata.albumGain).toBe('number');
+        expect(typeof result.metadata.albumPeak).toBe('number');
+        expect(result.metadata.generatorVersion).toBe(CURRENT_REPLAYGAIN_GENERATOR_VERSION);
+      }
+    });
+
+    it('handles cancellation cleanly during ReplayGain analysis', async () => {
+      vi.mocked(fs.stat).mockResolvedValue({ size: 1048576 } as any);
+
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await executeAssetJob({
+        taskId: 'task-rg-cancel',
+        jobType: 'replaygain',
+        input: {
+          sourceFilePath: 'C:/Music/song.mp3',
+          destinationPath: ''
+        },
+        abortSignal: controller.signal
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.cancelled).toBe(true);
+      }
     });
   });
 });

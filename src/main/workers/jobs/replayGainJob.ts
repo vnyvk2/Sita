@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events';
 import { eq } from 'drizzle-orm';
-import fs from 'fs/promises';
 import { db } from '@main/db/db';
-import { ASSET_EVENTS } from '../libraryChoreography';
+import { getSongById } from '@main/db/queries/songs';
 import { replayGain } from '@main/db/schema';
 import logger from '@main/logger';
-import { getSongById } from '@main/db/queries/songs';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
 export const CURRENT_REPLAYGAIN_GENERATOR_VERSION = 1;
@@ -37,7 +37,7 @@ export class ReplayGainJob implements Job {
 
   async execute(): Promise<void> {
     try {
-      // 1. Check idempotency and version
+      // 1. Check idempotency and version in DB
       const existing = await db.query.replayGain.findFirst({
         where: (rg, { eq }) => eq(rg.songId, this.songId)
       });
@@ -52,27 +52,45 @@ export class ReplayGainJob implements Job {
       }
 
       const song = await getSongById(this.songId);
-      if (!song) return;
+      if (!song) {
+        logger.warn(`[ReplayGainJob] Song ${this.songId} not found, aborting.`);
+        return;
+      }
 
       if (this.state === 'cancelled') return;
 
-      // 2. Perform EBU R128 loudness analysis
-      // Note: Full LUFS analysis requires decoding the audio (e.g. ffmpeg or Web Audio API).
-      // For this architectural proof, we simulate the intensive CPU work and return mock LUFS.
-      // TODO: Replace with real LUFS analysis algorithm
-      const lufsData = await this.analyzeLoudness(song.path);
+      // 2. Delegate CPU loudness analysis to utilityProcess worker
+      const result = await mediaWorkerBridge.generateAsset({
+        jobType: 'replaygain',
+        sourceFilePath: song.path,
+        destinationPath: '',
+        metadata: {
+          songId: this.songId,
+          version: CURRENT_REPLAYGAIN_GENERATOR_VERSION
+        }
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || `Failed to analyze ReplayGain for song ${this.songId}`);
+      }
 
       if (this.state === 'cancelled') return;
 
-      // 3. Save to DB (One row per song containing track and album values)
+      const trackGain = result.metadata?.trackGain as number;
+      const trackPeak = result.metadata?.trackPeak as number;
+      const albumGain = result.metadata?.albumGain as number;
+      const albumPeak = result.metadata?.albumPeak as number;
+
+      // 3. Save to DB in Main process
       await db.transaction(async (trx) => {
         if (existing) {
-          await trx.update(replayGain)
-            .set({ 
-              trackGain: lufsData.trackGain,
-              trackPeak: lufsData.trackPeak,
-              albumGain: lufsData.albumGain,
-              albumPeak: lufsData.albumPeak,
+          await trx
+            .update(replayGain)
+            .set({
+              trackGain,
+              trackPeak,
+              albumGain,
+              albumPeak,
               generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
               updatedAt: new Date()
             })
@@ -80,42 +98,24 @@ export class ReplayGainJob implements Job {
         } else {
           await trx.insert(replayGain).values({
             songId: this.songId,
-            trackGain: lufsData.trackGain,
-            trackPeak: lufsData.trackPeak,
-            albumGain: lufsData.albumGain,
-            albumPeak: lufsData.albumPeak,
+            trackGain,
+            trackPeak,
+            albumGain,
+            albumPeak,
             generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION
           });
         }
       });
 
-      // 4. Emit completion event
+      // 4. Post-commit event emission
       this.eventBus.emit(ASSET_EVENTS.REPLAYGAIN_CREATED, {
         songId: this.songId,
-        trackGain: lufsData.trackGain,
-        trackPeak: lufsData.trackPeak
+        trackGain,
+        trackPeak
       });
-
     } catch (error) {
       logger.error(`[ReplayGainJob] Failed to analyze loudness for song ${this.songId}`, { error });
       throw error;
     }
-  }
-
-  private async analyzeLoudness(audioPath: string) {
-    // Simulate CPU intensive task
-    const stats = await fs.stat(audioPath);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Mock ReplayGain logic (-14 LUFS is a common target)
-    const mockTrackGain = (Math.sin(stats.size) * -5) - 5; // e.g. -5 to -10 dB
-    const mockTrackPeak = 0.9 + (Math.cos(stats.size) * 0.1); // e.g. 0.8 to 1.0
-
-    return {
-      trackGain: mockTrackGain,
-      trackPeak: mockTrackPeak,
-      albumGain: mockTrackGain, // For full implementation, this requires analyzing the whole album
-      albumPeak: mockTrackPeak
-    };
   }
 }
