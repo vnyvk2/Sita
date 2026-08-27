@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
+import { defaultAudioDecoderRegistry } from '../audio/AudioDecoderRegistry';
+import { WaveformAccumulator } from '../audio/WaveformAccumulator';
 
 export const CURRENT_WAVEFORM_GENERATOR_VERSION = 1;
 export const WAVEFORM_RESOLUTION = 200;
@@ -90,6 +92,8 @@ export async function executeAssetJob(options: ExecuteAssetOptions): Promise<Ass
 
 /**
  * Generates deterministic waveform peaks and writes atomically to destination.
+ * Uses incremental streaming audio decoding (O(1) memory) when supported,
+ * falling back to synthetic peaks if format is unsupported or file is corrupted.
  */
 async function generateWaveformInWorker(
   taskId: string,
@@ -97,12 +101,44 @@ async function generateWaveformInWorker(
   destinationPath: string,
   abortSignal?: AbortSignal
 ): Promise<AssetExecutionResult> {
-  const stats = await fs.stat(sourceFilePath);
-  const peaks = new Float32Array(WAVEFORM_RESOLUTION);
+  let peaks: Float32Array;
 
-  for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
-    const val = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
-    peaks[i] = val;
+  const decoder = defaultAudioDecoderRegistry.getDecoderForFile(sourceFilePath);
+  if (decoder) {
+    try {
+      const info = await decoder.probe(sourceFilePath);
+      const accumulator = new WaveformAccumulator(info.totalSamples, WAVEFORM_RESOLUTION);
+
+      await decoder.decodeStream(
+        sourceFilePath,
+        { abortSignal, chunkSize: 16384 },
+        (chunk) => {
+          accumulator.processChunk(chunk);
+        }
+      );
+
+      peaks = accumulator.finish();
+    } catch (err) {
+      if (abortSignal?.aborted) {
+        return {
+          success: false,
+          error: `Waveform generation for task ${taskId} cancelled during audio decode.`,
+          cancelled: true
+        };
+      }
+      // Fallback to deterministic synthetic waveform if decoding encounters non-fatal format issues
+      const stats = await fs.stat(sourceFilePath);
+      peaks = new Float32Array(WAVEFORM_RESOLUTION);
+      for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
+        peaks[i] = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
+      }
+    }
+  } else {
+    const stats = await fs.stat(sourceFilePath);
+    peaks = new Float32Array(WAVEFORM_RESOLUTION);
+    for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
+      peaks[i] = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
+    }
   }
 
   if (abortSignal?.aborted) {
