@@ -122,6 +122,24 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  it('aborts cleanly before DB transaction if cancelled during worker generation', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async () => {
+      job.state = 'cancelled';
+      return {
+        success: true,
+        outputFilePath: 'C:/Cache/waveforms/123_v1.bin',
+        metadata: { resolution: WAVEFORM_RESOLUTION, generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION }
+      };
+    });
+
+    await job.execute();
+
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('A-3 REGRESSION Race A: In-flight GC must NOT delete DB row while temp file is fresh (<60s)', async () => {
     vi.mocked(fs.readdir).mockResolvedValue(['100_v1.bin.tmp'] as any);
 
@@ -187,5 +205,26 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
       expect.stringMatching(/200_v1\.bin$/)
     );
     expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('A-3 REGRESSION Orphan Cleanup: Orphaned DB row without existing file or fresh temp file is cleaned up', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue([] as any); // no files in cache dir
+
+    vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT')); // .bin does not exist
+
+    vi.mocked(db.select).mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        { id: 300, path: '/cache/waveforms/300_v1.bin' }
+      ])
+    } as any);
+
+    const deleteWhereMock = vi.fn();
+    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
+
+    const gcJob = new GarbageCollectionJob();
+    await gcJob.execute();
+
+    // Invariant: Missing file on disk causes orphaned DB row to be purged
+    expect(db.delete).toHaveBeenCalled();
   });
 });

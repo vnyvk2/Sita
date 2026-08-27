@@ -34,11 +34,17 @@ export type AssetExecutionResult =
 /**
  * Worker-side asset generation handler for Phase C4-B.
  *
+ * NOTE ON WAVEFORM ALGORITHM:
+ * This handler executes the migrated Nora deterministic synthetic waveform algorithm
+ * (file-size sinusoidal peak distribution over Float32Array(200)) in utilityProcess.
+ * Full audio decoding (e.g. via FFmpeg/WebAudio) is decoupled and reserved for future pipeline phases.
+ *
  * CRITICAL ARCHITECTURAL INVARIANTS:
  * 1. Zero database dependencies, zero ORM imports.
  * 2. CPU / filesystem intensive work runs exclusively in utilityProcess.
  * 3. Atomic file writes (${dest}.${pid}.${taskId}.tmp -> fs.rename).
  * 4. Cooperative cancellation check via abortSignal.
+ * 5. Rollback on partial multi-file publication failures.
  */
 export async function executeAssetJob(options: ExecuteAssetOptions): Promise<AssetExecutionResult> {
   const { taskId, jobType, input, abortSignal } = options;
@@ -120,23 +126,7 @@ async function generateWaveformInWorker(
     };
   }
 
-  try {
-    await fs.rename(tempPath, destinationPath);
-  } catch (renameErr) {
-    // Collision handling: if destination already exists and is non-empty, consider success
-    try {
-      const destStat = await fs.stat(destinationPath);
-      if (destStat.size > 0) {
-        await fs.unlink(tempPath).catch(() => {});
-      } else {
-        await fs.copyFile(tempPath, destinationPath);
-        await fs.unlink(tempPath).catch(() => {});
-      }
-    } catch {
-      await fs.unlink(tempPath).catch(() => {});
-      throw renameErr;
-    }
-  }
+  await atomicPublishFile(tempPath, destinationPath);
 
   return {
     success: true,
@@ -149,12 +139,13 @@ async function generateWaveformInWorker(
 }
 
 /**
- * Extracts ID3 front cover, generates full WebP and 50x50 optimized WebP atomically.
+ * Extracts ID3 front cover, generates full WebP and 50x50 optimized WebP images atomically.
+ * Rolled back if any part of the dual-image publication fails.
  */
 async function generateArtworkInWorker(
   taskId: string,
   sourceFilePath: string,
-  destinationPath: string,
+  destinationDirectory: string,
   abortSignal?: AbortSignal
 ): Promise<AssetExecutionResult> {
   const taglib = await import('node-taglib-sharp');
@@ -190,11 +181,11 @@ async function generateArtworkInWorker(
   const fullHash = hashKey;
   const optHash = `${hashKey}-optimized`;
 
-  const cacheDir = path.dirname(destinationPath);
-  await fs.mkdir(cacheDir, { recursive: true });
+  // destinationDirectory is the target artwork cache folder (DEFAULT_ARTWORK_SAVE_LOCATION)
+  await fs.mkdir(destinationDirectory, { recursive: true });
 
-  const imgPath = path.join(cacheDir, `${hashKey}.webp`);
-  const optPath = path.join(cacheDir, `${hashKey}-optimized.webp`);
+  const imgPath = path.join(destinationDirectory, `${hashKey}.webp`);
+  const optPath = path.join(destinationDirectory, `${hashKey}-optimized.webp`);
 
   const imgTmpPath = `${imgPath}.${process.pid}.${taskId}.tmp`;
   const optTmpPath = `${optPath}.${process.pid}.${taskId}.tmp`;
@@ -230,9 +221,21 @@ async function generateArtworkInWorker(
       };
     }
 
-    // 3. Atomic publication
-    await atomicPublishFile(optTmpPath, optPath);
-    await atomicPublishFile(imgTmpPath, imgPath);
+    // 3. Atomic publication with rollback tracking
+    const publishedPaths: string[] = [];
+    try {
+      await atomicPublishFile(optTmpPath, optPath);
+      publishedPaths.push(optPath);
+
+      await atomicPublishFile(imgTmpPath, imgPath);
+      publishedPaths.push(imgPath);
+    } catch (pubError) {
+      // Rollback any partially published files in this batch
+      for (const p of publishedPaths) {
+        await fs.unlink(p).catch(() => {});
+      }
+      throw pubError;
+    }
 
     return {
       success: true,
@@ -275,23 +278,30 @@ async function generateArtworkInWorker(
 }
 
 /**
- * Atomically publishes a temp file to destination path with collision fallback.
+ * Atomically publishes a temp file to destination path.
+ * Only treats known collision error codes (EEXIST, EBUSY, EPERM) on non-empty destinations as idempotent collisions.
+ * Fatal permissions, ENOENT on source, or other I/O errors clean up temp and rethrow.
  */
 async function atomicPublishFile(tempPath: string, destinationPath: string): Promise<void> {
   try {
     await fs.rename(tempPath, destinationPath);
-  } catch (renameErr) {
-    try {
-      const destStat = await fs.stat(destinationPath);
-      if (destStat.size > 0) {
-        await fs.unlink(tempPath).catch(() => {});
-      } else {
-        await fs.copyFile(tempPath, destinationPath);
-        await fs.unlink(tempPath).catch(() => {});
+  } catch (renameErr: any) {
+    const isCollisionCandidate =
+      renameErr?.code === 'EEXIST' || renameErr?.code === 'EBUSY' || renameErr?.code === 'EPERM';
+
+    if (isCollisionCandidate) {
+      try {
+        const destStat = await fs.stat(destinationPath);
+        if (destStat.size > 0) {
+          await fs.unlink(tempPath).catch(() => {});
+          return; // Valid existing file, idempotent collision
+        }
+      } catch {
+        // Destination check failed, fall through to cleanup and throw
       }
-    } catch {
-      await fs.unlink(tempPath).catch(() => {});
-      throw renameErr;
     }
+
+    await fs.unlink(tempPath).catch(() => {});
+    throw renameErr;
   }
 }

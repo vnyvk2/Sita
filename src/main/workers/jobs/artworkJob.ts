@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import path from 'path';
 import { inArray } from 'drizzle-orm';
 
 import { db } from '@main/db/db';
@@ -54,8 +53,9 @@ export class ArtworkJob implements Job {
 
       // If it already has artworks, skip processing if version is up to date
       if (album.artworks && album.artworks.length > 0) {
-        const optimizedArtwork = album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
-        
+        const optimizedArtwork =
+          album.artworks.find((a) => a.artwork?.isOptimized)?.artwork || album.artworks[0].artwork;
+
         if (optimizedArtwork && CURRENT_ARTWORK_GENERATOR_VERSION <= optimizedArtwork.generatorVersion) {
           logger.debug(`[ArtworkJob] Album ${this.albumId} already has artwork (up to date).`);
           this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
@@ -66,18 +66,17 @@ export class ArtworkJob implements Job {
           });
           return;
         }
-        
+
         logger.debug(`[ArtworkJob] Album ${this.albumId} artwork is outdated. Regenerating.`);
       }
 
       if (this.state === 'cancelled') return;
 
       // 2. Delegate CPU ID3 Taglib extraction & Sharp WebP resizing to utilityProcess worker
-      const targetPath = path.join(DEFAULT_ARTWORK_SAVE_LOCATION, 'sample.webp');
       const result = await mediaWorkerBridge.generateAsset({
         jobType: 'artwork',
         sourceFilePath: this.sampleSongPath,
-        destinationPath: targetPath,
+        destinationPath: DEFAULT_ARTWORK_SAVE_LOCATION,
         metadata: {
           albumId: this.albumId,
           version: CURRENT_ARTWORK_GENERATOR_VERSION
@@ -90,38 +89,46 @@ export class ArtworkJob implements Job {
 
       if (this.state === 'cancelled') return;
 
-      // 3. Save and link artwork in a DB transaction (Main owns all DB state)
+      // 3. Save and link artwork in a DB transaction with complete hash-level deduplication
       if (result.metadata.hasEmbeddedArtwork && result.metadata.payloads) {
         const fullHash = result.metadata.fullHash as string;
         const optHash = result.metadata.optHash as string;
+        const generatedPayloads = result.metadata.payloads as ArtworkPayload[];
 
         const artworkData = await db.transaction(async (trx) => {
-          // Check if existing artwork with hash exists
-          const existingArtworks = await trx.select().from(artworks).where(
-            inArray(artworks.hash, [fullHash, optHash])
-          );
+          // Query existing artworks by hash
+          const existingArtworks = await trx
+            .select()
+            .from(artworks)
+            .where(inArray(artworks.hash, [fullHash, optHash]));
 
-          let data = existingArtworks.length > 0 ? existingArtworks : undefined;
-          if (!data && result.metadata.payloads) {
-            data = await saveArtworks(result.metadata.payloads as ArtworkPayload[], trx);
+          const existingHashes = new Set(existingArtworks.map((a) => a.hash));
+          const missingPayloads = generatedPayloads.filter((p) => !existingHashes.has(p.hash));
+
+          let newlySavedArtworks: (typeof artworks.$inferSelect)[] = [];
+          if (missingPayloads.length > 0) {
+            newlySavedArtworks = await saveArtworks(missingPayloads, trx);
           }
 
-          // Link artwork to album
-          if (data && data.length > 0) {
+          const combinedArtworks = [...existingArtworks, ...newlySavedArtworks];
+
+          // Link all artwork components (full + optimized) to album
+          if (combinedArtworks.length > 0) {
             await linkArtworksToAlbum(
-              data.map((artwork) => ({
+              combinedArtworks.map((artwork) => ({
                 albumId: this.albumId,
                 artworkId: artwork.id
               })),
               trx
             );
           }
-          return data;
+
+          return combinedArtworks;
         });
 
         if (artworkData && artworkData.length > 0) {
           const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
-          
+
           // 4. Post-commit guarantee: event MUST fire after successful commit
           this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
             albumId: this.albumId,
