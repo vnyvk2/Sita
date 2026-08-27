@@ -48,13 +48,13 @@ export interface CmdWalkDirectory {
   maxConcurrency?: number;
 }
 
-// Reserved for Phase C3
+// Phase C3: Tag parsing and batch ingestion
 export interface CmdParseTrackBatch {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'CMD_PARSE_TRACK_BATCH';
   taskId: string;
-  batchId: number;
-  tracks: Array<{ songPath: string; folderId: number }>;
+  tracks: Array<{ songPath: string; folderId?: number }>;
+  batchSize?: number;
 }
 
 // Reserved for Phase C4
@@ -146,34 +146,39 @@ export interface EvtWalkComplete {
   error?: string;
 }
 
-// Reserved for Phase C3
+// Phase C3: Tag parsing events and DTOs
+export interface ParsedTrackDTO {
+  songPath: string;
+  folderId?: number;
+  title: string;
+  duration: string;
+  artists: string[];
+  albumArtists: string[];
+  album?: string;
+  genres: string[];
+  year?: number;
+  trackNumber?: number;
+  diskNumber?: number;
+  bitRate?: number;
+  sampleRate?: number;
+  noOfChannels?: number;
+  musicBrainzRecordingId?: string;
+  isrc?: string;
+  language?: string;
+  fileCreatedAt: Date | string;
+  fileModifiedAt: Date | string;
+  rawPictureBytes?: Uint8Array;
+}
+
 export interface EvtTracksParsedBatch {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'EVT_TRACKS_PARSED_BATCH';
   taskId: string;
   batchId: number;
-  tracks: Array<{
-    path: string;
-    folderId: number;
-    title: string;
-    duration: number;
-    artists: string[];
-    albumArtists: string[];
-    album?: string;
-    genres: string[];
-    year?: number;
-    trackNumber?: number;
-    diskNumber?: number;
-    bitRate?: number;
-    sampleRate?: number;
-    noOfChannels?: number;
-    language?: string;
-    artworkHash?: string;
-    artworkTempPath?: string;
-    optimizedArtworkTempPath?: string;
-    artworkWidth?: number;
-    artworkHeight?: number;
-  }>;
+  isLastBatch: boolean;
+  tracks: ParsedTrackDTO[];
+  errors: Array<{ path: string; error: string; code?: string }>;
+  cancelled?: boolean;
 }
 
 // Reserved for Phase C4

@@ -373,6 +373,89 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
     });
   });
 
+  describe('parseTrackBatchStream (Phase C3)', () => {
+    it('should send CMD_PARSE_TRACK_BATCH and respond with CMD_ACK_BATCH after onBatch', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_PARSE_TRACK_BATCH', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const receivedBatches: number[] = [];
+      const streamPromise = bridge.parseTrackBatchStream(
+        [{ songPath: 'C:/Music/song1.mp3', folderId: 1 }],
+        {
+          batchSize: 100,
+          onBatch: async (batch) => {
+            receivedBatches.push(batch.batchId);
+          }
+        }
+      );
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_PARSE_TRACK_BATCH'
+      );
+      expect(postCall).toBeDefined();
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Simulate worker sending batch 1 (not last batch)
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_BATCH',
+        taskId,
+        batchId: 1,
+        isLastBatch: false,
+        tracks: [
+          {
+            songPath: 'C:/Music/song1.mp3',
+            folderId: 1,
+            title: 'Song 1',
+            duration: '180.00',
+            artists: ['Artist 1'],
+            albumArtists: [],
+            genres: ['Rock'],
+            fileCreatedAt: new Date(),
+            fileModifiedAt: new Date()
+          }
+        ],
+        errors: []
+      });
+
+      // Allow microtask to run onBatch and send ACK
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Verify Main sent CMD_ACK_BATCH for batch 1
+      expect(mockProcess.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'CMD_ACK_BATCH',
+          taskId,
+          batchId: 1
+        })
+      );
+
+      // Simulate worker sending batch 2 (isLastBatch: true)
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_BATCH',
+        taskId,
+        batchId: 2,
+        isLastBatch: true,
+        tracks: [],
+        errors: []
+      });
+
+      const result = await streamPromise;
+      expect(result.totalParsed).toBe(1);
+      expect(result.totalErrors).toBe(0);
+      expect(result.cancelled).toBe(false);
+      expect(receivedBatches).toEqual([1, 2]);
+    });
+  });
+
   describe('getMediaWorkerPath', () => {
     it('should return a resolved non-empty string path for mediaWorker.js', () => {
       const resolvedPath = getMediaWorkerPath();

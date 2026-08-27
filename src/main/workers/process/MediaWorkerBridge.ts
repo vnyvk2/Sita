@@ -8,9 +8,11 @@ import logger from '../../logger';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   isValidProtocolEnvelope,
+  type EvtTracksParsedBatch,
   type EvtWalkComplete,
   type EvtWalkProgress,
   type MainToWorkerCommand,
+  type ParsedTrackDTO,
   type WorkerToMainEvent
 } from './workerProtocol';
 
@@ -43,6 +45,23 @@ export interface DiskWalkBridgeOptions {
   supportedExtensions?: string[];
   maxConcurrency?: number;
   timeoutMs?: number;
+}
+
+export interface ParseBatchStreamOptions {
+  batchSize?: number;
+  abortSignal?: AbortSignal;
+  onBatch: (batch: {
+    batchId: number;
+    isLastBatch: boolean;
+    tracks: ParsedTrackDTO[];
+    errors: Array<{ path: string; error: string; code?: string }>;
+  }) => Promise<void>;
+}
+
+export interface ParseStreamResult {
+  totalParsed: number;
+  totalErrors: number;
+  cancelled: boolean;
 }
 
 /**
@@ -79,6 +98,23 @@ export class MediaWorkerBridge extends EventEmitter {
       resolve: (result: DiskWalkBridgeResult) => void;
       reject: (error: Error) => void;
       onProgress?: (totalDiscovered: number, currentPath: string) => void;
+    }
+  > = new Map();
+
+  // Active streaming parse task resolvers (Phase C3)
+  private activeParseResolvers: Map<
+    string,
+    {
+      resolve: (result: ParseStreamResult) => void;
+      reject: (error: Error) => void;
+      onBatch: (batch: {
+        batchId: number;
+        isLastBatch: boolean;
+        tracks: ParsedTrackDTO[];
+        errors: Array<{ path: string; error: string; code?: string }>;
+      }) => Promise<void>;
+      totalParsed: number;
+      totalErrors: number;
     }
   > = new Map();
 
@@ -264,6 +300,78 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
+   * Streams track batch parsing through the utilityProcess with backpressure.
+   * Phase C3: Worker parses 100-track batches and pauses until Main commits each batch.
+   */
+  public async parseTrackBatchStream(
+    tracks: Array<{ songPath: string; folderId?: number }>,
+    options: ParseBatchStreamOptions
+  ): Promise<ParseStreamResult> {
+    const { batchSize = 100, abortSignal, onBatch } = options;
+
+    if (abortSignal?.aborted || tracks.length === 0) {
+      return { totalParsed: 0, totalErrors: 0, cancelled: Boolean(abortSignal?.aborted) };
+    }
+
+    if (this.state !== 'READY') {
+      await this.start();
+    }
+
+    if (!this.childProcess || this.state !== 'READY') {
+      throw new Error('[MediaWorkerBridge] Unable to parse track batch: worker failed to start.');
+    }
+
+    const taskId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    return new Promise<ParseStreamResult>((resolve, reject) => {
+      const cleanup = () => {
+        this.activeParseResolvers.delete(taskId);
+        if (abortSignal) {
+          abortSignal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const onAbort = () => {
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore
+        }
+      };
+
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      this.activeParseResolvers.set(taskId, {
+        resolve: (res) => {
+          cleanup();
+          resolve(res);
+        },
+        reject: (err) => {
+          cleanup();
+          reject(err);
+        },
+        onBatch,
+        totalParsed: 0,
+        totalErrors: 0
+      });
+
+      this.sendCommand({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'CMD_PARSE_TRACK_BATCH',
+        taskId,
+        tracks,
+        batchSize
+      });
+    });
+  }
+
+  /**
    * Sends a ping to the worker and measures roundtrip IPC latency in milliseconds.
    */
   public async ping(timeoutMs = 3000): Promise<number> {
@@ -365,6 +473,58 @@ export class MediaWorkerBridge extends EventEmitter {
         break;
       }
 
+      case 'EVT_TRACKS_PARSED_BATCH': {
+        const batchEvt = event as EvtTracksParsedBatch;
+        const parseTask = this.activeParseResolvers.get(batchEvt.taskId);
+        if (parseTask) {
+          parseTask.totalParsed += batchEvt.tracks.length;
+          parseTask.totalErrors += batchEvt.errors.length;
+
+          // Normalize Date instances across IPC boundary
+          const normalizedTracks: ParsedTrackDTO[] = batchEvt.tracks.map((t) => ({
+            ...t,
+            fileCreatedAt: t.fileCreatedAt instanceof Date ? t.fileCreatedAt : new Date(t.fileCreatedAt),
+            fileModifiedAt: t.fileModifiedAt instanceof Date ? t.fileModifiedAt : new Date(t.fileModifiedAt)
+          }));
+
+          // Process batch in Main process (Drizzle transaction + artwork write)
+          parseTask
+            .onBatch({
+              batchId: batchEvt.batchId,
+              isLastBatch: batchEvt.isLastBatch,
+              tracks: normalizedTracks,
+              errors: batchEvt.errors
+            })
+            .then(() => {
+              // Send backpressure ACK to unblock worker for the next batch
+              if (!batchEvt.isLastBatch && !batchEvt.cancelled && this.childProcess) {
+                try {
+                  this.sendCommand({
+                    protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+                    type: 'CMD_ACK_BATCH',
+                    taskId: batchEvt.taskId,
+                    batchId: batchEvt.batchId
+                  });
+                } catch {
+                  // Ignore if child process exited
+                }
+              }
+
+              if (batchEvt.isLastBatch || batchEvt.cancelled) {
+                parseTask.resolve({
+                  totalParsed: parseTask.totalParsed,
+                  totalErrors: parseTask.totalErrors,
+                  cancelled: Boolean(batchEvt.cancelled)
+                });
+              }
+            })
+            .catch((err) => {
+              parseTask.reject(err instanceof Error ? err : new Error(String(err)));
+            });
+        }
+        break;
+      }
+
       case 'EVT_SHUTDOWN_DRAINED': {
         logger.info('[MediaWorkerBridge] Worker confirmed orderly shutdown drained.');
         this.emit('drained');
@@ -400,6 +560,12 @@ export class MediaWorkerBridge extends EventEmitter {
       walk.reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during directory walk.`));
     }
     this.activeWalkResolvers.clear();
+
+    // Fail any in-flight parse streaming promises
+    for (const parseTask of this.activeParseResolvers.values()) {
+      parseTask.reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during track parsing.`));
+    }
+    this.activeParseResolvers.clear();
 
     const wasDraining = this.state === 'DRAINING' || this.state === 'TERMINATED';
     this.childProcess = null;

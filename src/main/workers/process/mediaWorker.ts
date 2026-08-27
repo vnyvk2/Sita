@@ -9,6 +9,7 @@
  */
 
 import { executeDiskWalk } from './handlers/diskWalkHandler';
+import { parseTracksStreaming } from './handlers/tagParserHandler';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   isValidProtocolEnvelope,
@@ -25,6 +26,7 @@ if (!parentPort) {
 
 // Active task tracking for cancellation and true drain semantics
 const activeTaskControllers = new Map<string, AbortController>();
+const pendingBatchAcks = new Map<string, () => void>();
 let isDraining = false;
 
 function postToMain(event: WorkerToMainEvent): void {
@@ -108,11 +110,101 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       break;
     }
 
+    case 'CMD_PARSE_TRACK_BATCH': {
+      if (isDraining) {
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_TRACKS_PARSED_BATCH',
+          taskId: cmd.taskId,
+          batchId: 0,
+          isLastBatch: true,
+          tracks: [],
+          errors: [],
+          cancelled: true
+        });
+        return;
+      }
+
+      const controller = new AbortController();
+      activeTaskControllers.set(cmd.taskId, controller);
+
+      try {
+        await parseTracksStreaming(cmd.tracks, {
+          taskId: cmd.taskId,
+          batchSize: cmd.batchSize ?? 100,
+          abortSignal: controller.signal,
+          onBatchReady: async (batch) => {
+            if (controller.signal.aborted) return;
+
+            // Send parsed batch to Main
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_TRACKS_PARSED_BATCH',
+              taskId: cmd.taskId,
+              batchId: batch.batchId,
+              isLastBatch: batch.isLastBatch,
+              tracks: batch.tracks,
+              errors: batch.errors,
+              cancelled: false
+            });
+
+            // Backpressure: pause until Main sends CMD_ACK_BATCH for this batch
+            if (!batch.isLastBatch) {
+              const ackKey = `${cmd.taskId}:${batch.batchId}`;
+              await new Promise<void>((resolve) => {
+                const timeoutTimer = setTimeout(() => {
+                  pendingBatchAcks.delete(ackKey);
+                  resolve();
+                }, 30000); // 30s safety timeout to prevent permanent worker stalls
+
+                pendingBatchAcks.set(ackKey, () => {
+                  clearTimeout(timeoutTimer);
+                  resolve();
+                });
+              });
+            }
+          }
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_TRACKS_PARSED_BATCH',
+          taskId: cmd.taskId,
+          batchId: -1,
+          isLastBatch: true,
+          tracks: [],
+          errors: [{ path: '', error: msg }],
+          cancelled: controller.signal.aborted
+        });
+      } finally {
+        activeTaskControllers.delete(cmd.taskId);
+      }
+      break;
+    }
+
+    case 'CMD_ACK_BATCH': {
+      const ackKey = `${cmd.taskId}:${cmd.batchId}`;
+      const resolveAck = pendingBatchAcks.get(ackKey);
+      if (resolveAck) {
+        pendingBatchAcks.delete(ackKey);
+        resolveAck();
+      }
+      break;
+    }
+
     case 'CMD_CANCEL_TASK': {
       const controller = activeTaskControllers.get(cmd.taskId);
       if (controller) {
         controller.abort();
         activeTaskControllers.delete(cmd.taskId);
+      }
+      // Unblock any pending batch acks for this task
+      for (const [key, resolve] of pendingBatchAcks.entries()) {
+        if (key.startsWith(`${cmd.taskId}:`)) {
+          pendingBatchAcks.delete(key);
+          resolve();
+        }
       }
       break;
     }
@@ -130,6 +222,11 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       }
       activeTaskControllers.clear();
 
+      for (const resolve of pendingBatchAcks.values()) {
+        resolve();
+      }
+      pendingBatchAcks.clear();
+
       postToMain({
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
         type: 'EVT_SHUTDOWN_DRAINED'
@@ -141,14 +238,8 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
       break;
     }
 
-    case 'CMD_ACK_BATCH': {
-      // Reserved for Phase C3 backpressure
-      break;
-    }
-
-    case 'CMD_PARSE_TRACK_BATCH':
     case 'CMD_GENERATE_ASSET': {
-      // Reserved for C3, C4
+      // Reserved for C4
       postToMain({
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
         type: 'EVT_PROTOCOL_ERROR',
@@ -197,5 +288,12 @@ postToMain({
   protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
   type: 'EVT_READY',
   pid: process.pid,
-  supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_CANCEL_TASK', 'CMD_SHUTDOWN']
+  supportedOps: [
+    'CMD_PING',
+    'CMD_WALK_DIRECTORY',
+    'CMD_PARSE_TRACK_BATCH',
+    'CMD_ACK_BATCH',
+    'CMD_CANCEL_TASK',
+    'CMD_SHUTDOWN'
+  ]
 });
