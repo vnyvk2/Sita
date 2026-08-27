@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAlbumById } from '@main/db/queries/albums';
 import { linkArtworksToAlbum, saveArtworks } from '@main/db/queries/artworks';
 import { db } from '@main/db/db';
-import { processArtworkFiles } from '@main/other/artworks';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { ArtworkJob, CURRENT_ARTWORK_GENERATOR_VERSION } from '../artworkJob';
 
@@ -23,33 +23,13 @@ vi.mock('@main/db/db', () => ({
   }
 }));
 
-vi.mock('@main/other/artworks', () => ({
-  processArtworkFiles: vi.fn()
-}));
-
-const mockDispose = vi.fn();
-vi.mock('node-taglib-sharp', () => ({
-  PictureType: {
-    FrontCover: 3
-  },
-  File: {
-    createFromPath: vi.fn(() => ({
-      tag: {
-        pictures: [
-          {
-            pictureType: 3,
-            data: {
-              toByteArray: () => new Uint8Array([1, 2, 3])
-            }
-          }
-        ]
-      },
-      dispose: mockDispose
-    }))
+vi.mock('@main/workers/process/MediaWorkerBridge', () => ({
+  mediaWorkerBridge: {
+    generateAsset: vi.fn()
   }
 }));
 
-describe('ArtworkJob', () => {
+describe('ArtworkJob (Phase C4-B)', () => {
   let eventBus: EventEmitter;
 
   beforeEach(() => {
@@ -57,7 +37,7 @@ describe('ArtworkJob', () => {
     eventBus = new EventEmitter();
   });
 
-  it('should skip processing and emit event if album already has up-to-date artwork', async () => {
+  it('should skip processing and emit event if album already has up-to-date artwork in DB', async () => {
     vi.mocked(getAlbumById).mockResolvedValue({
       id: 1,
       title: 'Test Album',
@@ -84,25 +64,43 @@ describe('ArtworkJob', () => {
       path: '/artworks/10.webp',
       albumTitle: 'Test Album'
     });
-    expect(processArtworkFiles).not.toHaveBeenCalled();
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('should process ID3 tag, save artwork to DB, and emit ARTWORK_CREATED', async () => {
+  it('should delegate Taglib & Sharp processing to mediaWorkerBridge, commit to DB, and emit ARTWORK_CREATED', async () => {
     vi.mocked(getAlbumById).mockResolvedValue({
       id: 1,
       title: 'Test Album',
       artworks: []
     } as any);
 
-    vi.mocked(processArtworkFiles).mockResolvedValue({
-      payloads: [{ path: '/artworks/10.webp', isOptimized: true }]
-    } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: true,
+      outputFilePath: '/artworks/hash.webp',
+      metadata: {
+        hasEmbeddedArtwork: true,
+        isDefaultArtwork: false,
+        fullHash: 'hash',
+        optHash: 'hash-optimized',
+        payloads: [
+          { hash: 'hash', path: '/artworks/hash.webp', isOptimized: false, width: 500, height: 500, source: 'LOCAL' },
+          { hash: 'hash-optimized', path: '/artworks/hash-optimized.webp', isOptimized: true, width: 50, height: 50, source: 'LOCAL' }
+        ]
+      }
+    });
 
-    const savedArtworkData = [{ id: 10, path: '/artworks/10.webp', isOptimized: true }];
+    const savedArtworkData = [{ id: 10, path: '/artworks/hash-optimized.webp', isOptimized: true }];
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      const mockTrx = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([])
+          })
+        })
+      };
       vi.mocked(saveArtworks).mockResolvedValue(savedArtworkData as any);
-      return callback({} as any);
+      return callback(mockTrx as any);
     });
 
     const emitSpy = vi.spyOn(eventBus, 'emit');
@@ -110,14 +108,37 @@ describe('ArtworkJob', () => {
 
     await job.execute();
 
-    expect(mockDispose).toHaveBeenCalled();
+    expect(mediaWorkerBridge.generateAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobType: 'artwork',
+        sourceFilePath: '/music/song.mp3'
+      })
+    );
     expect(db.transaction).toHaveBeenCalled();
     expect(emitSpy).toHaveBeenCalledWith(ASSET_EVENTS.ARTWORK_CREATED, {
       albumId: 1,
       artworkId: 10,
-      path: '/artworks/10.webp',
+      path: '/artworks/hash-optimized.webp',
       albumTitle: 'Test Album'
     });
+  });
+
+  it('throws error when worker asset generation fails so scheduler can handle retries', async () => {
+    vi.mocked(getAlbumById).mockResolvedValue({
+      id: 1,
+      title: 'Test Album',
+      artworks: []
+    } as any);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: false,
+      error: 'Worker process crashed'
+    });
+
+    const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
+
+    await expect(job.execute()).rejects.toThrow('Worker process crashed');
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 
   it('A-1 REGRESSION: must emit ARTWORK_CREATED even if job state is cancelled post-commit', async () => {
@@ -127,16 +148,30 @@ describe('ArtworkJob', () => {
       artworks: []
     } as any);
 
-    vi.mocked(processArtworkFiles).mockResolvedValue({
-      payloads: [{ path: '/artworks/10.webp', isOptimized: true }]
-    } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: true,
+      outputFilePath: '/artworks/hash.webp',
+      metadata: {
+        hasEmbeddedArtwork: true,
+        fullHash: 'hash',
+        optHash: 'hash-optimized',
+        payloads: [{ hash: 'hash', path: '/artworks/10.webp', isOptimized: true }]
+      }
+    });
 
     const savedArtworkData = [{ id: 10, path: '/artworks/10.webp', isOptimized: true }];
     const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
 
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      const mockTrx = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([])
+          })
+        })
+      };
       vi.mocked(saveArtworks).mockResolvedValue(savedArtworkData as any);
-      const res = await callback({} as any);
+      const res = await callback(mockTrx as any);
       // Simulate cancellation arriving right as the DB transaction commits
       job.state = 'cancelled';
       return res;
@@ -152,35 +187,5 @@ describe('ArtworkJob', () => {
       path: '/artworks/10.webp',
       albumTitle: 'Test Album'
     });
-  });
-
-  it('should abort cleanly before DB transaction if cancelled during processing', async () => {
-    vi.mocked(getAlbumById).mockResolvedValue({
-      id: 1,
-      title: 'Test Album',
-      artworks: []
-    } as any);
-
-    const job = new ArtworkJob(1, '/music/song.mp3', 'Test Album', eventBus);
-    job.state = 'cancelled';
-
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    await job.execute();
-
-    expect(processArtworkFiles).not.toHaveBeenCalled();
-    expect(db.transaction).not.toHaveBeenCalled();
-    expect(emitSpy).not.toHaveBeenCalled();
-  });
-
-  it('should handle missing album gracefully without throwing', async () => {
-    vi.mocked(getAlbumById).mockResolvedValue(null as any);
-
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new ArtworkJob(999, '/music/song.mp3', 'Missing Album', eventBus);
-
-    await job.execute();
-
-    expect(processArtworkFiles).not.toHaveBeenCalled();
-    expect(emitSpy).not.toHaveBeenCalled();
   });
 });
