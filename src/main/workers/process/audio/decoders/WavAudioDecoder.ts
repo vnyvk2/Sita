@@ -35,7 +35,13 @@ export function deriveChannelLayout(channels: number, channelMask = 0): ChannelP
     if (channelMask & 0x8) layout.push('LFE');
     if (channelMask & 0x10) layout.push('Ls');
     if (channelMask & 0x20) layout.push('Rs');
-    if (layout.length === channels) return layout;
+
+    if (layout.length === channels) {
+      return layout;
+    }
+    // Inconsistent or incomplete channelMask: number of mask bits does not match channel count.
+    // Return Unknown positions so BS1770LoudnessEngine explicitly rejects the layout.
+    return Array.from({ length: channels }, () => 'Unknown');
   }
 
   if (channels === 1) return ['Mono'];

@@ -165,6 +165,18 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
       const layout6 = deriveChannelLayout(6, 0);
       expect(layout6).toEqual(['Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown']);
     });
+
+    it('rejects inconsistent channel masks where bit count does not equal channel count', () => {
+      // 6 channels with only 2 mask bits set (0x3) -> inconsistent, must return 6 Unknowns
+      const layoutInconsistent = deriveChannelLayout(6, 0x3);
+      expect(layoutInconsistent).toHaveLength(6);
+      expect(layoutInconsistent).toEqual(['Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown']);
+
+      // 2 channels with only 1 mask bit set (0x1) -> inconsistent, must return 2 Unknowns
+      const layoutInconsistentStereo = deriveChannelLayout(2, 0x1);
+      expect(layoutInconsistentStereo).toHaveLength(2);
+      expect(layoutInconsistentStereo).toEqual(['Unknown', 'Unknown']);
+    });
   });
 
   it('throws descriptive error on malformed or truncated WAV file', async () => {
