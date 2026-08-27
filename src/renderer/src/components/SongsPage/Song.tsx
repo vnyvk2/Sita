@@ -13,7 +13,8 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef
+  useRef,
+  useState
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,7 +24,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { useQueueOperations } from '../../hooks/useQueueOperations';
-import { songQuery } from '../../queries/songs';
+import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
@@ -151,10 +152,25 @@ const Song = memo(
     const likeMutationSeqRef = useRef(0);
     const { isBursting, triggerBurst } = useHeartBurst();
 
-    // Single source of truth: derived strictly from player state or cached song props,
-    // avoiding row-local useState that could carry over during Virtuoso row recycling.
+    // Immediate optimistic favorite state for instant 0ms visual feedback on clicks,
+    // safely bound to songId to prevent virtualization row-recycling bleed.
+    const [optimisticFavorite, setOptimisticFavorite] = useState<{
+      songId: number;
+      isFavorite: boolean;
+    } | null>(null);
+
+    // Clear optimistic override once props catch up or row recycled to another song
+    useEffect(() => {
+      setOptimisticFavorite(null);
+    }, [props.isAFavorite, songId]);
+
+    // Single source of truth: player state (if active song) > local optimistic click > props
     const isAFavorite =
-      isCurrentSong && currentSongFavorite !== undefined ? currentSongFavorite : props.isAFavorite;
+      isCurrentSong && currentSongFavorite !== undefined
+        ? currentSongFavorite
+        : optimisticFavorite && optimisticFavorite.songId === songId
+          ? optimisticFavorite.isFavorite
+          : props.isAFavorite;
 
     const handlePlayBtnClick = useCallback(() => {
       if (onPlayClick) return onPlayClick(songId);
@@ -166,11 +182,31 @@ const Song = memo(
       const nextFav = !isAFavorite;
       const currentSeq = ++likeMutationSeqRef.current;
 
+      // 1. Immediate synchronous visual feedback on this row (0ms latency)
+      setOptimisticFavorite({ songId, isFavorite: nextFav });
+
       if (nextFav) {
         triggerBurst();
       }
 
-      // Optimistically update React Query cache so the source of truth is immediately updated
+      // 2. Optimistically update all hydrated window caches in React Query
+      queryClient.setQueriesData<SongData[]>(
+        { queryKey: songCacheKeys.windowsRoot },
+        (old) => {
+          if (!Array.isArray(old)) return old;
+          let changed = false;
+          const updated = old.map((s) => {
+            if (s && s.songId === songId) {
+              changed = true;
+              return { ...s, isAFavorite: nextFav };
+            }
+            return s;
+          });
+          return changed ? updated : old;
+        }
+      );
+
+      // 3. Optimistically update legacy/non-windowed song queries
       queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
         { queryKey: songQuery.all._def },
         (old) => {
@@ -194,6 +230,16 @@ const Song = memo(
 
           if (res && res.likes.length + res.dislikes.length === 0) {
             // Revert cache if DB rejected
+            setOptimisticFavorite({ songId, isFavorite: !nextFav });
+            queryClient.setQueriesData<SongData[]>(
+              { queryKey: songCacheKeys.windowsRoot },
+              (old) => {
+                if (!Array.isArray(old)) return old;
+                return old.map((s) =>
+                  s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
+                );
+              }
+            );
             queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
               { queryKey: songQuery.all._def },
               (old) => {
@@ -217,6 +263,16 @@ const Song = memo(
 
           console.error(err);
           // Revert cache on error
+          setOptimisticFavorite({ songId, isFavorite: !nextFav });
+          queryClient.setQueriesData<SongData[]>(
+            { queryKey: songCacheKeys.windowsRoot },
+            (old) => {
+              if (!Array.isArray(old)) return old;
+              return old.map((s) =>
+                s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
+              );
+            }
+          );
           queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
             { queryKey: songQuery.all._def },
             (old) => {

@@ -10,7 +10,7 @@ import {
   AppUpdateContext,
   type AppUpdateContextType
 } from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
-import { songQuery } from '../../../../../../src/renderer/src/queries/songs';
+import { songCacheKeys, songQuery } from '../../../../../../src/renderer/src/queries/songs';
 import { queryClient } from '../../../../../../src/renderer/src/queryClient';
 import { dispatch } from '../../../../../../src/renderer/src/store/store';
 
@@ -932,5 +932,105 @@ describe('Song Component - Detailed Render Instrumentation & Correctness Audit',
     // Active mutation seq 2 rolls back to true!
     cache = queryClient.getQueryData<any>(testQuery.queryKey);
     expect(cache?.data[0].isAFavorite).toBe(true);
+  });
+
+  it('Test J (Immediate Optimistic Favorite & Window Cache Sync): Clicking favorite or unfavorite updates visual icon synchronously (0ms) and updates window cache without waiting for IPC resolution', async () => {
+    // Unresolved IPC promise: proves that UI update happens synchronously before IPC finishes
+    let resolveIpc: (res: any) => void = () => {};
+    window.api.playerControls.toggleLikeSongs = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveIpc = resolve;
+        })
+    );
+
+    const initialWindowData = [
+      {
+        songId: 42,
+        title: 'Instant Favorite Song',
+        artists: [{ artistId: 1, name: 'Artist' }],
+        album: { albumId: 1, name: 'Album' },
+        duration: 180,
+        isAFavorite: false
+      } as any
+    ];
+
+    const windowKey = songCacheKeys.window('ids=default', 1, 0);
+    queryClient.setQueryData(windowKey, initialWindowData);
+
+    const songProps = {
+      index: 0,
+      songId: 42,
+      title: 'Instant Favorite Song',
+      artists: [{ artistId: 1, name: 'Artist' }],
+      album: { albumId: 1, name: 'Album' },
+      duration: 180,
+      isAFavorite: false
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue}>
+          <Song {...songProps} />
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    const songElement = screen.getByText('Instant Favorite Song').closest('.group') as HTMLElement;
+    const favBtn = songElement.querySelector(
+      'button[title*="disliked"], button[title*="liked"]'
+    ) as HTMLButtonElement;
+    const iconSpan = favBtn.querySelector('span.icon') as HTMLElement;
+
+    // Initially unfavorited (outlined)
+    expect(iconSpan.className).toContain('material-icons-round-outlined');
+    expect(iconSpan.className).not.toContain('text-font-color-favorite');
+
+    // 1. Click to FAVORITE: Instant 0ms visual state change
+    act(() => {
+      fireEvent.click(favBtn);
+    });
+
+    // Icon updates IMMEDIATELY without waiting for resolveIpc
+    expect(iconSpan.className).toContain('material-icons-round');
+    expect(iconSpan.className).toContain('text-font-color-favorite');
+
+    // Window cache updated IMMEDIATELY
+    const windowCacheAfterLike = queryClient.getQueryData<any[]>(windowKey);
+    expect(windowCacheAfterLike?.[0].isAFavorite).toBe(true);
+
+    // Now resolve IPC in the background
+    await act(async () => {
+      resolveIpc({ likes: [42], dislikes: [] });
+    });
+
+    // Remains favorited
+    expect(iconSpan.className).toContain('text-font-color-favorite');
+
+    // 2. Click to UNFAVORITE: Instant 0ms visual state change
+    let resolveUnfavoriteIpc: (res: any) => void = () => {};
+    window.api.playerControls.toggleLikeSongs = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUnfavoriteIpc = resolve;
+        })
+    );
+
+    act(() => {
+      fireEvent.click(favBtn);
+    });
+
+    // Icon reverts to outlined IMMEDIATELY (0ms) without waiting for IPC
+    expect(iconSpan.className).toContain('material-icons-round-outlined');
+    expect(iconSpan.className).not.toContain('text-font-color-favorite');
+
+    // Window cache reverted IMMEDIATELY
+    const windowCacheAfterUnlike = queryClient.getQueryData<any[]>(windowKey);
+    expect(windowCacheAfterUnlike?.[0].isAFavorite).toBe(false);
+
+    // Complete background IPC
+    await act(async () => {
+      resolveUnfavoriteIpc({ likes: [], dislikes: [42] });
+    });
   });
 });
