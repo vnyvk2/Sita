@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JobScheduler } from '../jobScheduler';
 import type { Job, JobClass, JobState } from '../types';

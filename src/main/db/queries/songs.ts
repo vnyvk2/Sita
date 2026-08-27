@@ -460,7 +460,7 @@ const hasTruthyLanguageOverride = sql`EXISTS (
 export const getFilteredSongLibraryIds = async (
   options: FilteredSongIdsOptions = {},
   trx: DB | DBTransaction = db
-): Promise<{ ids: number[]; total: number }> => {
+): Promise<{ ids: number[]; total: number; blacklistedIds: number[] }> => {
   const {
     sortType = 'aToZ',
     filterType = 'notSelected',

@@ -101,6 +101,9 @@ describe('mediaWorker.ts - Task Lifecycle & Shutdown Drain Semantics', () => {
       );
       expect(drainedCalls).toHaveLength(1);
     });
+
+    // Wait for the exit timeout
+    await new Promise((r) => setTimeout(r, 50));
   });
 
   it('dispatches EVT_SHUTDOWN_DRAINED when hard drain timeout expires for unyielding tasks', async () => {
@@ -144,6 +147,9 @@ describe('mediaWorker.ts - Task Lifecycle & Shutdown Drain Semantics', () => {
       expect.stringContaining('Shutdown drain timed out (50ms) with 1 active tasks: [task_hang_1]')
     );
     warnSpy.mockRestore();
+
+    // Wait for the exit timeout
+    await new Promise((r) => setTimeout(r, 50));
   });
 
   it('immediately rejects new commands when worker is in draining state', async () => {
@@ -181,5 +187,8 @@ describe('mediaWorker.ts - Task Lifecycle & Shutdown Drain Semantics', () => {
         })
       );
     });
+
+    // Wait for the exit timeout
+    await new Promise((r) => setTimeout(r, 50));
   });
 });

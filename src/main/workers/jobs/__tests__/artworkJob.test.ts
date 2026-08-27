@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getAlbumById } from '@main/db/queries/albums';
-import { saveArtworks } from '@main/db/queries/artworks';
+import { linkArtworksToAlbum, saveArtworks } from '@main/db/queries/artworks';
 import { db } from '@main/db/db';
 import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
