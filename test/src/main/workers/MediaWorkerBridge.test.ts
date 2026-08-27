@@ -231,8 +231,10 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       // Unexpected crash
       mockProcess.simulateExit(139); // e.g. SIGSEGV
 
-      expect(bridge.getState()).toBe('CRASHED');
-      expect(crashListener).toHaveBeenCalledWith({ code: 139 });
+      expect(bridge.hasPendingRestartTimer()).toBe(true);
+      expect(crashListener).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 139 })
+      );
     });
   });
 

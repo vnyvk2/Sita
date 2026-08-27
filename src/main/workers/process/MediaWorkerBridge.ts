@@ -8,6 +8,7 @@ import logger from '../../logger';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   isValidProtocolEnvelope,
+  type EvtAssetComplete,
   type EvtTracksParsedBatch,
   type EvtWalkComplete,
   type EvtWalkProgress,
@@ -64,6 +65,22 @@ export interface ParseStreamResult {
   cancelled: boolean;
 }
 
+export interface GenerateAssetBridgeOptions {
+  jobType: 'artwork' | 'waveform';
+  sourceFilePath: string;
+  destinationPath: string;
+  metadata?: Record<string, unknown>;
+  abortSignal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export interface AssetBridgeResult {
+  success: boolean;
+  outputFilePath?: string;
+  metadata?: Record<string, unknown>;
+  cancelled?: boolean;
+}
+
 /**
  * Resolves the location of the compiled mediaWorker script.
  * Defensively probes multiple candidate paths to ensure reliable execution in both
@@ -118,12 +135,22 @@ export class MediaWorkerBridge extends EventEmitter {
     }
   > = new Map();
 
-  // Crash tracking for supervision
-  // NOTE: Automatic crash restart supervision is intentionally deferred to Phase C4
-  // when persistent asynchronous asset jobs are active. In C1-C3, worker crashes
-  // fail the active in-flight task cleanly and alert callers without destabilizing Main.
+  // Active asset generation task resolvers (Phase C4)
+  private activeAssetResolvers: Map<
+    string,
+    {
+      resolve: (result: AssetBridgeResult) => void;
+      reject: (error: Error) => void;
+      jobType: 'artwork' | 'waveform';
+    }
+  > = new Map();
+
+  // Crash tracking and supervision state (Phase C4-A)
   private crashTimestamps: number[] = [];
+  private consecutiveCrashCount = 0;
   private readonly MAX_CRASHES_PER_MINUTE = 3;
+  private restartTimer: NodeJS.Timeout | null = null;
+  private healthTimer: NodeJS.Timeout | null = null;
 
   public getState(): MediaWorkerState {
     return this.state;
@@ -137,11 +164,51 @@ export class MediaWorkerBridge extends EventEmitter {
     return this.workerPid;
   }
 
+  public getConsecutiveCrashCount(): number {
+    return this.consecutiveCrashCount;
+  }
+
+  public getCrashTimestamps(): number[] {
+    return [...this.crashTimestamps];
+  }
+
+  public hasPendingRestartTimer(): boolean {
+    return this.restartTimer !== null;
+  }
+
+  public resetSupervisionStateForTesting(): void {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    if (this.healthTimer) {
+      clearTimeout(this.healthTimer);
+      this.healthTimer = null;
+    }
+    this.crashTimestamps = [];
+    this.consecutiveCrashCount = 0;
+  }
+
+  /**
+   * Called when a worker task completes successfully.
+   * Resets consecutive crash count back to 0.
+   */
+  private onTaskCompletedSuccessfully(): void {
+    if (this.consecutiveCrashCount > 0) {
+      this.consecutiveCrashCount = 0;
+      logger.debug('[MediaWorkerBridge] Task completed successfully. Reset consecutiveCrashCount to 0.');
+    }
+  }
+
   /**
    * Spawns the utilityProcess and completes the versioned EVT_READY handshake.
    * Idempotent: returns existing in-flight startup promise if already launching.
    */
   public async start(timeoutMs = 5000): Promise<void> {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
     if (this.state === 'READY') return;
     if (this.startPromise) return this.startPromise;
 
@@ -200,6 +267,11 @@ export class MediaWorkerBridge extends EventEmitter {
           if (!resolved) {
             resolved = true;
             clearTimeout(timer);
+            if (this.restartTimer) {
+              clearTimeout(this.restartTimer);
+              this.restartTimer = null;
+            }
+            this.state = 'CRASHED';
             reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during startup.`));
           }
         });
@@ -372,6 +444,89 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
+   * Dispatches persistent asset generation (artwork or waveform) to the utilityProcess.
+   * Phase C4: Rejects cleanly on worker crash to let JobScheduler own retry.
+   * NEVER retries or replays jobs inside the Bridge.
+   */
+  public async generateAsset(options: GenerateAssetBridgeOptions): Promise<AssetBridgeResult> {
+    const { jobType, sourceFilePath, destinationPath, metadata, abortSignal, timeoutMs } = options;
+
+    if (abortSignal?.aborted) {
+      return { success: false, cancelled: true };
+    }
+
+    if (this.state !== 'READY') {
+      await this.start();
+    }
+
+    if (!this.childProcess || this.state !== 'READY') {
+      throw new Error('[MediaWorkerBridge] Unable to generate asset: worker failed to start.');
+    }
+
+    const taskId = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    return new Promise<AssetBridgeResult>((resolve, reject) => {
+      let timeoutTimer: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        this.activeAssetResolvers.delete(taskId);
+        if (abortSignal) {
+          abortSignal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const onAbort = () => {
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore
+        }
+      };
+
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      if (timeoutMs && timeoutMs > 0) {
+        timeoutTimer = setTimeout(() => {
+          onAbort();
+          cleanup();
+          reject(new Error(`[MediaWorkerBridge] Asset generation timed out after ${timeoutMs}ms.`));
+        }, timeoutMs);
+      }
+
+      this.activeAssetResolvers.set(taskId, {
+        resolve: (result) => {
+          cleanup();
+          resolve(result);
+        },
+        reject: (error) => {
+          cleanup();
+          reject(error);
+        },
+        jobType
+      });
+
+      this.sendCommand({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'CMD_GENERATE_ASSET',
+        taskId,
+        jobType,
+        input: {
+          sourceFilePath,
+          destinationPath,
+          metadata
+        }
+      });
+    });
+  }
+
+  /**
    * Sends a ping to the worker and measures roundtrip IPC latency in milliseconds.
    */
   public async ping(timeoutMs = 3000): Promise<number> {
@@ -427,6 +582,15 @@ export class MediaWorkerBridge extends EventEmitter {
         });
         if (onReadyCallback) onReadyCallback();
         this.emit('ready', event);
+
+        // Reset consecutiveCrashCount only once the worker maintains READY state stably for >= 10s
+        if (this.healthTimer) clearTimeout(this.healthTimer);
+        this.healthTimer = setTimeout(() => {
+          if (this.state === 'READY') {
+            this.consecutiveCrashCount = 0;
+            logger.debug('[MediaWorkerBridge] Worker demonstrated 10s stability. Reset consecutiveCrashCount to 0.');
+          }
+        }, 10000);
         break;
       }
 
@@ -454,6 +618,10 @@ export class MediaWorkerBridge extends EventEmitter {
           this.activeWalkResolvers.delete((event as EvtWalkComplete).taskId);
           const raw = event as EvtWalkComplete;
           const isCancelled = Boolean(raw.cancelled);
+
+          if (!isCancelled && !raw.error) {
+            this.onTaskCompletedSuccessfully();
+          }
 
           // If cancelled, snapshots MUST be empty so partial walk results CANNOT be consumed
           const snapshots = isCancelled
@@ -511,6 +679,9 @@ export class MediaWorkerBridge extends EventEmitter {
               }
 
               if (batchEvt.isLastBatch || batchEvt.cancelled) {
+                if (!batchEvt.cancelled) {
+                  this.onTaskCompletedSuccessfully();
+                }
                 parseTask.resolve({
                   totalParsed: parseTask.totalParsed,
                   totalErrors: parseTask.totalErrors,
@@ -521,6 +692,32 @@ export class MediaWorkerBridge extends EventEmitter {
             .catch((err) => {
               parseTask.reject(err instanceof Error ? err : new Error(String(err)));
             });
+        }
+        break;
+      }
+
+      case 'EVT_ASSET_COMPLETE': {
+        const assetEvt = event as EvtAssetComplete;
+        const assetTask = this.activeAssetResolvers.get(assetEvt.taskId);
+        if (assetTask) {
+          this.activeAssetResolvers.delete(assetEvt.taskId);
+          if (assetEvt.success) {
+            this.onTaskCompletedSuccessfully();
+            assetTask.resolve({
+              success: true,
+              outputFilePath: assetEvt.outputFilePath,
+              metadata: assetEvt.metadata
+            });
+          } else {
+            if (assetEvt.cancelled) {
+              assetTask.resolve({
+                success: false,
+                cancelled: true
+              });
+            } else {
+              assetTask.reject(new Error(assetEvt.error || 'Asset generation failed'));
+            }
+          }
         }
         break;
       }
@@ -549,6 +746,12 @@ export class MediaWorkerBridge extends EventEmitter {
   private handleWorkerExit(code: number): void {
     logger.info(`[MediaWorkerBridge] Worker exited with code ${code} (state: ${this.state}).`);
 
+    // Clean up stability timer if active
+    if (this.healthTimer) {
+      clearTimeout(this.healthTimer);
+      this.healthTimer = null;
+    }
+
     // Clean up any in-flight ping promises
     for (const resolver of this.pendingPingResolvers.values()) {
       resolver(-1);
@@ -567,21 +770,59 @@ export class MediaWorkerBridge extends EventEmitter {
     }
     this.activeParseResolvers.clear();
 
+    // Fail any in-flight asset generation promises immediately (CRITICAL: Bridge NEVER retries work!)
+    for (const [taskId, assetTask] of this.activeAssetResolvers.entries()) {
+      assetTask.reject(
+        new Error(`[MediaWorkerBridge] Worker process crashed (exit code ${code}) while generating asset ${taskId}.`)
+      );
+    }
+    this.activeAssetResolvers.clear();
+
     const wasDraining = this.state === 'DRAINING' || this.state === 'TERMINATED';
     this.childProcess = null;
     this.workerPid = undefined;
 
     if (!wasDraining) {
-      this.state = 'CRASHED';
+      if (this.restartTimer) {
+        clearTimeout(this.restartTimer);
+        this.restartTimer = null;
+      }
+
       const now = Date.now();
+      // Rolling 60-second crash window
       this.crashTimestamps = this.crashTimestamps.filter((ts) => now - ts < 60000);
       this.crashTimestamps.push(now);
 
-      this.emit('crashed', { code });
+      this.emit('crashed', { code, crashCount: this.crashTimestamps.length });
 
+      // Crash #1, #2, #3 restart; Crash #4 within rolling 60s suppresses auto-restart
       if (this.crashTimestamps.length > this.MAX_CRASHES_PER_MINUTE) {
-        logger.error('[MediaWorkerBridge] Worker exceeded crash limit (>3 in 60s). Suppressing auto-restart.');
+        this.state = 'CRASHED';
+        logger.error('[MediaWorkerBridge] Worker exceeded crash limit (4 crashes within 60s). Auto-restart suppressed.');
+        this.emit('crash_limit_exceeded', { code, crashCount: this.crashTimestamps.length });
+        return;
       }
+
+      // Schedule controlled restart with consecutive backoff:
+      // consecutiveCrashCount = 1 -> 100ms, 2 -> 250ms, 3 -> 500ms
+      this.consecutiveCrashCount++;
+      const delayMs = Math.min(1000, Math.round(100 * (2.5 ** (this.consecutiveCrashCount - 1))));
+
+      this.state = 'STARTING';
+      logger.info(
+        `[MediaWorkerBridge] Scheduling auto-restart in ${delayMs}ms (crash #${this.crashTimestamps.length} in rolling 60s, consecutive: ${this.consecutiveCrashCount})...`
+      );
+
+      this.restartTimer = setTimeout(() => {
+        this.restartTimer = null;
+        this.start()
+          .then(() => {
+            this.emit('restarted', { pid: this.workerPid });
+          })
+          .catch((err) => {
+            logger.error('[MediaWorkerBridge] Auto-restart failed:', { error: err });
+          });
+      }, delayMs);
     } else {
       this.state = 'TERMINATED';
     }
@@ -589,11 +830,22 @@ export class MediaWorkerBridge extends EventEmitter {
 
   /**
    * Performs an orderly shutdown:
-   * 1. Signals worker with CMD_SHUTDOWN.
-   * 2. Waits for EVT_SHUTDOWN_DRAINED or process exit.
-   * 3. Falls back to kill() if timeout is exceeded.
+   * 1. Cancels any pending restart or stability timers.
+   * 2. Signals worker with CMD_SHUTDOWN.
+   * 3. Waits for EVT_SHUTDOWN_DRAINED or process exit.
+   * 4. Falls back to kill() if timeout is exceeded.
    */
   public async terminate(timeoutMs = 5000): Promise<void> {
+    // Cancel any pending auto-restart or health timers immediately to prevent restart during shutdown
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    if (this.healthTimer) {
+      clearTimeout(this.healthTimer);
+      this.healthTimer = null;
+    }
+
     if (this.state === 'TERMINATED' || !this.childProcess) {
       this.state = 'TERMINATED';
       return;

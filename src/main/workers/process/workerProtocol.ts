@@ -57,17 +57,16 @@ export interface CmdParseTrackBatch {
   batchSize?: number;
 }
 
-// Reserved for Phase C4
+// Phase C4: Persistent asset jobs
 export interface CmdGenerateAsset {
   protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
   type: 'CMD_GENERATE_ASSET';
-  jobId: string;
-  jobType: 'artwork' | 'waveform' | 'replaygain';
+  taskId: string;
+  jobType: 'artwork' | 'waveform';
   input: {
-    songId: number;
-    filePath: string;
-    targetCacheDir: string;
-    version: number;
+    sourceFilePath: string;
+    destinationPath: string;
+    metadata?: Record<string, unknown>;
   };
 }
 
@@ -181,16 +180,27 @@ export interface EvtTracksParsedBatch {
   cancelled?: boolean;
 }
 
-// Reserved for Phase C4
-export interface EvtAssetComplete {
-  protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
-  type: 'EVT_ASSET_COMPLETE';
-  jobId: string;
-  success: boolean;
-  outputFilePath?: string;
-  metadata?: Record<string, unknown>;
-  error?: string;
-}
+// Phase C4: Persistent asset generation events
+export type EvtAssetComplete =
+  | {
+      protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
+      type: 'EVT_ASSET_COMPLETE';
+      taskId: string;
+      jobType: 'artwork' | 'waveform';
+      success: true;
+      outputFilePath: string;
+      metadata: Record<string, unknown>;
+      cancelled?: false;
+    }
+  | {
+      protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
+      type: 'EVT_ASSET_COMPLETE';
+      taskId: string;
+      jobType: 'artwork' | 'waveform';
+      success: false;
+      error: string;
+      cancelled?: boolean;
+    };
 
 export type WorkerToMainEvent =
   | EvtReady

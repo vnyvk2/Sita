@@ -8,6 +8,7 @@
  * Database ownership belongs strictly to the Main process.
  */
 
+import { executeAssetJob } from './handlers/assetJobHandler';
 import { executeDiskWalk } from './handlers/diskWalkHandler';
 import { parseTracksStreaming } from './handlers/tagParserHandler';
 import {
@@ -248,12 +249,66 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
     }
 
     case 'CMD_GENERATE_ASSET': {
-      // Reserved for C4
-      postToMain({
-        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-        type: 'EVT_PROTOCOL_ERROR',
-        error: `Command '${cmd.type}' is reserved for future implementation phase and not yet enabled.`
-      });
+      if (isDraining) {
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_ASSET_COMPLETE',
+          taskId: cmd.taskId,
+          jobType: cmd.jobType,
+          success: false,
+          error: 'Worker is currently draining for shutdown.',
+          cancelled: true
+        });
+        return;
+      }
+
+      const controller = new AbortController();
+      activeTaskControllers.set(cmd.taskId, controller);
+
+      try {
+        const result = await executeAssetJob({
+          taskId: cmd.taskId,
+          jobType: cmd.jobType,
+          input: cmd.input,
+          abortSignal: controller.signal
+        });
+
+        if (result.success) {
+          postToMain({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_ASSET_COMPLETE',
+            taskId: cmd.taskId,
+            jobType: cmd.jobType,
+            success: true,
+            outputFilePath: result.outputFilePath,
+            metadata: result.metadata,
+            cancelled: false
+          });
+        } else {
+          postToMain({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'EVT_ASSET_COMPLETE',
+            taskId: cmd.taskId,
+            jobType: cmd.jobType,
+            success: false,
+            error: result.error,
+            cancelled: result.cancelled
+          });
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        postToMain({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_ASSET_COMPLETE',
+          taskId: cmd.taskId,
+          jobType: cmd.jobType,
+          success: false,
+          error: msg,
+          cancelled: controller.signal.aborted
+        });
+      } finally {
+        activeTaskControllers.delete(cmd.taskId);
+      }
       break;
     }
 
@@ -302,6 +357,7 @@ postToMain({
     'CMD_WALK_DIRECTORY',
     'CMD_PARSE_TRACK_BATCH',
     'CMD_ACK_BATCH',
+    'CMD_GENERATE_ASSET',
     'CMD_CANCEL_TASK',
     'CMD_SHUTDOWN'
   ]
