@@ -15,6 +15,10 @@ export interface DiskWalkResult {
   snapshots: DiskSongSnapshot[];
   failedSubtrees: string[];
   failedPaths: string[];
+  cancelled?: boolean;
+  executionMode?: 'worker' | 'local_fallback' | 'local_direct';
+  workerPid?: number;
+  durationMs?: number;
 }
 
 /**
@@ -134,10 +138,22 @@ export const fastDiskWalkLocal = async (
 
   await Promise.all(workers);
 
+  if (hasAborted || abortSignal?.aborted) {
+    return {
+      snapshots: [],
+      failedSubtrees: [],
+      failedPaths: [],
+      cancelled: true,
+      executionMode: 'local_direct'
+    };
+  }
+
   return {
     snapshots,
     failedSubtrees,
-    failedPaths
+    failedPaths,
+    cancelled: false,
+    executionMode: 'local_direct'
   };
 };
 
@@ -153,21 +169,76 @@ export const fastDiskWalk = async (
   roots: ScanRoot[],
   options: DiskWalkOptions = {}
 ): Promise<DiskWalkResult> => {
+  const startTime = Date.now();
+
   if (typeof process !== 'undefined' && process.versions?.electron && !process.env.VITEST) {
     try {
       const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
-      return await mediaWorkerBridge.walkDirectory(roots, {
+      const bridgeResult = await mediaWorkerBridge.walkDirectory(roots, {
         abortSignal: options.abortSignal,
         onFileDiscovered: options.onFileDiscovered,
         maxConcurrency: options.maxConcurrency,
         supportedExtensions: supportedMusicExtensions
       });
+
+      const durationMs = Date.now() - startTime;
+      const workerPid = mediaWorkerBridge.getWorkerPid();
+
+      logger.info(
+        `[fastDiskWalk] Discovered ${bridgeResult.snapshots.length} files via utilityProcess worker (pid: ${workerPid ?? 'unknown'}) in ${durationMs}ms (cancelled: ${Boolean(bridgeResult.cancelled)}).`,
+        {
+          executionMode: 'worker',
+          workerPid,
+          durationMs,
+          filesDiscovered: bridgeResult.snapshots.length,
+          cancelled: bridgeResult.cancelled
+        }
+      );
+
+      try {
+        performance.mark('fastDiskWalk:executionMode:worker');
+      } catch {
+        // Ignore performance mark failures in environments without performance API
+      }
+
+      return {
+        ...bridgeResult,
+        executionMode: 'worker',
+        workerPid,
+        durationMs
+      };
     } catch (workerError) {
-      logger.warn('[fastDiskWalk] Worker directory walk failed, falling back to local walk.', {
-        error: workerError
-      });
+      const fallbackDurationMs = Date.now() - startTime;
+      logger.warn(
+        `[fastDiskWalk] Worker directory walk failed (${fallbackDurationMs}ms), falling back to local walk in Main.`,
+        { error: workerError }
+      );
+
+      try {
+        performance.mark('fastDiskWalk:executionMode:local_fallback');
+      } catch {
+        // Ignore
+      }
+
+      const localResult = await fastDiskWalkLocal(roots, options);
+      return {
+        ...localResult,
+        executionMode: 'local_fallback',
+        durationMs: Date.now() - startTime
+      };
     }
   }
 
-  return fastDiskWalkLocal(roots, options);
+  try {
+    performance.mark('fastDiskWalk:executionMode:local_direct');
+  } catch {
+    // Ignore
+  }
+
+  const localResult = await fastDiskWalkLocal(roots, options);
+  return {
+    ...localResult,
+    executionMode: 'local_direct',
+    durationMs: Date.now() - startTime
+  };
 };

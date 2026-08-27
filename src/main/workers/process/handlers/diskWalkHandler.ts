@@ -25,6 +25,7 @@ export interface DiskWalkHandlerResult {
   snapshots: DiskSongSnapshotDTO[];
   failedSubtrees: string[];
   failedPaths: string[];
+  cancelled?: boolean;
 }
 
 /**
@@ -158,12 +159,22 @@ export async function executeDiskWalk(
 
   await Promise.all(workers);
 
+  if (hasAborted || abortSignal?.aborted) {
+    return {
+      snapshots: [],
+      failedSubtrees: [],
+      failedPaths: [],
+      cancelled: true
+    };
+  }
+
   // Emit final progress update
   maybeEmitProgress(snapshots.length, undefined, true);
 
   return {
     snapshots,
     failedSubtrees,
-    failedPaths
+    failedPaths,
+    cancelled: false
   };
 }

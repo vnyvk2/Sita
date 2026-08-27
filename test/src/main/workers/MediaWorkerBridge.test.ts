@@ -72,6 +72,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
 
       expect(bridge.getState()).toBe('READY');
       expect(bridge.isReady()).toBe(true);
+      expect(bridge.getWorkerPid()).toBe(12345);
     });
 
     it('should reject start() if worker exits during startup', async () => {

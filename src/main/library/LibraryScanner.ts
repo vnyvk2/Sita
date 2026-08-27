@@ -148,11 +148,7 @@ export class LibraryScanner extends EventEmitter {
       }
 
       // Fast single-pass disk traversal across accessible roots with subtree & stat failure safety
-      const {
-        snapshots: diskSnapshots,
-        failedSubtrees,
-        failedPaths
-      } = await fastDiskWalk(accessibleRoots, {
+      const walkResult = await fastDiskWalk(accessibleRoots, {
         abortSignal,
         onFileDiscovered: (count, currentPath) => {
           this.setState('DISCOVERING', { discoveredFiles: count, currentPath });
@@ -162,11 +158,27 @@ export class LibraryScanner extends EventEmitter {
       performance.mark('scanner:discover-end');
       try {
         performance.measure('scanner:discover', 'scanner:discover-start', 'scanner:discover-end');
-      } catch {}
+      } catch {
+        // Ignore performance measure errors
+      }
 
-      if (abortSignal.aborted) {
+      if (abortSignal.aborted || walkResult.cancelled) {
         return this.handleCancellation(startTime, skippedRoots);
       }
+
+      const {
+        snapshots: diskSnapshots,
+        failedSubtrees,
+        failedPaths
+      } = walkResult;
+
+      logger.info('[LibraryScanner] Discovery complete', {
+        executionMode: walkResult.executionMode,
+        discoveredFiles: diskSnapshots.length,
+        failedSubtreesCount: failedSubtrees.length,
+        failedPathsCount: failedPaths.length,
+        durationMs: walkResult.durationMs
+      });
 
       // ----------------------------------------------------
       // PHASE 2: DIFFING (Pure In-Memory Diff Engine)
@@ -202,7 +214,9 @@ export class LibraryScanner extends EventEmitter {
       performance.mark('scanner:diff-end');
       try {
         performance.measure('scanner:diff', 'scanner:diff-start', 'scanner:diff-end');
-      } catch {}
+      } catch {
+        // Ignore performance measure errors
+      }
 
       logger.info('[LibraryScanner] Diff calculated.', {
         added: diff.added.length,
@@ -287,7 +301,9 @@ export class LibraryScanner extends EventEmitter {
       performance.mark('scanner:reconcile-end');
       try {
         performance.measure('scanner:reconcile', 'scanner:reconcile-start', 'scanner:reconcile-end');
-      } catch {}
+      } catch {
+        // Ignore performance measure errors
+      }
 
       if (abortSignal.aborted) {
         return this.handleCancellation(startTime, skippedRoots);

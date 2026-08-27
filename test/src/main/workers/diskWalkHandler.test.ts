@@ -115,5 +115,99 @@ describe('diskWalkHandler (Worker Directory Walker)', () => {
     });
 
     expect(result.snapshots).toHaveLength(0);
+    expect(result.cancelled).toBe(true);
+  });
+
+  describe('Recursive Breadth Stress & Concurrency', () => {
+    // Generate a deep/wide simulated tree: 10 artists x 5 albums x 5 tracks = 250 tracks across 61 dirs
+    const createVirtualTreeReaddir = () => {
+      return async (dirPath: string) => {
+        const normalized = String(dirPath).replace(/\\/g, '/');
+
+        // Root
+        if (normalized === 'C:/Music') {
+          return Array.from({ length: 10 }, (_, i) => ({
+            name: `Artist${i}`,
+            isFile: () => false,
+            isDirectory: () => true
+          })) as any;
+        }
+
+        // Artist level
+        const artistMatch = normalized.match(/^C:\/Music\/Artist\d+$/);
+        if (artistMatch) {
+          return Array.from({ length: 5 }, (_, i) => ({
+            name: `Album${i}`,
+            isFile: () => false,
+            isDirectory: () => true
+          })) as any;
+        }
+
+        // Album level
+        const albumMatch = normalized.match(/^C:\/Music\/Artist\d+\/Album\d+$/);
+        if (albumMatch) {
+          return Array.from({ length: 5 }, (_, i) => ({
+            name: `track${i}.mp3`,
+            isFile: () => true,
+            isDirectory: () => false
+          })) as any;
+        }
+
+        return [] as any;
+      };
+    };
+
+    it('should traverse a 61-directory, 250-track tree with bounded concurrency (8 workers)', async () => {
+      const root = { id: 1, path: 'C:\\Music' };
+      vi.mocked(fs.readdir).mockImplementation(createVirtualTreeReaddir() as any);
+      vi.mocked(fs.stat).mockResolvedValue({
+        mtime: new Date(12345678),
+        size: 2048
+      } as any);
+
+      const onProgress = vi.fn();
+      const result = await executeDiskWalk([root], {
+        supportedExtensions: ['.mp3'],
+        maxConcurrency: 8,
+        onProgress
+      });
+
+      expect(result.snapshots).toHaveLength(250);
+      expect(result.failedSubtrees).toHaveLength(0);
+      expect(result.failedPaths).toHaveLength(0);
+      expect(result.cancelled).toBe(false);
+      expect(onProgress).toHaveBeenCalled();
+    });
+
+    it('should cleanly abort mid-flight with active workers without deadlocking', async () => {
+      const root = { id: 1, path: 'C:\\Music' };
+      const abortController = new AbortController();
+      let filesSeen = 0;
+
+      vi.mocked(fs.readdir).mockImplementation(createVirtualTreeReaddir() as any);
+      vi.mocked(fs.stat).mockImplementation(async () => {
+        filesSeen++;
+        // Abort mid-flight when 20 files have been stat-ed by concurrent workers
+        if (filesSeen >= 20) {
+          abortController.abort();
+        }
+        // Small async delay simulating I/O to ensure workers overlap
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return {
+          mtime: new Date(12345678),
+          size: 2048
+        } as any;
+      });
+
+      const result = await executeDiskWalk([root], {
+        supportedExtensions: ['.mp3'],
+        maxConcurrency: 8,
+        abortSignal: abortController.signal
+      });
+
+      // Cancellation MUST guarantee zero partial snapshots are returned
+      expect(result.snapshots).toHaveLength(0);
+      expect(result.cancelled).toBe(true);
+    });
   });
 });

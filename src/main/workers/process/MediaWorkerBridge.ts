@@ -34,6 +34,7 @@ export interface DiskWalkBridgeResult {
   snapshots: DiskSongSnapshotDTO[];
   failedSubtrees: string[];
   failedPaths: string[];
+  cancelled?: boolean;
 }
 
 export interface DiskWalkBridgeOptions {
@@ -69,6 +70,7 @@ export class MediaWorkerBridge extends EventEmitter {
   private state: MediaWorkerState = 'UNINITIALIZED';
   private startPromise: Promise<void> | null = null;
   private pendingPingResolvers: Map<number, (latencyMs: number) => void> = new Map();
+  private workerPid?: number;
 
   // Active directory walk task resolvers (Phase C2)
   private activeWalkResolvers: Map<
@@ -93,6 +95,10 @@ export class MediaWorkerBridge extends EventEmitter {
 
   public isReady(): boolean {
     return this.state === 'READY' && this.childProcess !== null;
+  }
+
+  public getWorkerPid(): number | undefined {
+    return this.workerPid;
   }
 
   /**
@@ -186,7 +192,7 @@ export class MediaWorkerBridge extends EventEmitter {
     } = options;
 
     if (abortSignal?.aborted) {
-      return { snapshots: [], failedSubtrees: [], failedPaths: [] };
+      return { snapshots: [], failedSubtrees: [], failedPaths: [], cancelled: true };
     }
 
     if (this.state !== 'READY') {
@@ -306,6 +312,7 @@ export class MediaWorkerBridge extends EventEmitter {
 
     switch (event.type) {
       case 'EVT_READY': {
+        this.workerPid = event.pid;
         logger.info('[MediaWorkerBridge] Worker handshake complete. Worker is READY.', {
           pid: event.pid,
           supportedOps: event.supportedOps
@@ -338,17 +345,21 @@ export class MediaWorkerBridge extends EventEmitter {
         if (walk) {
           this.activeWalkResolvers.delete((event as EvtWalkComplete).taskId);
           const raw = event as EvtWalkComplete;
+          const isCancelled = Boolean(raw.cancelled);
 
-          // Ensure fileModifiedAt dates are Date objects across structured cloning
-          const snapshots = raw.snapshots.map((s) => ({
-            ...s,
-            fileModifiedAt: s.fileModifiedAt instanceof Date ? s.fileModifiedAt : new Date(s.fileModifiedAt)
-          }));
+          // If cancelled, snapshots MUST be empty so partial walk results CANNOT be consumed
+          const snapshots = isCancelled
+            ? []
+            : raw.snapshots.map((s) => ({
+                ...s,
+                fileModifiedAt: s.fileModifiedAt instanceof Date ? s.fileModifiedAt : new Date(s.fileModifiedAt)
+              }));
 
           walk.resolve({
             snapshots,
-            failedSubtrees: raw.failedSubtrees ?? [],
-            failedPaths: raw.failedPaths ?? []
+            failedSubtrees: isCancelled ? [] : (raw.failedSubtrees ?? []),
+            failedPaths: isCancelled ? [] : (raw.failedPaths ?? []),
+            cancelled: isCancelled
           });
         }
         break;
@@ -392,6 +403,7 @@ export class MediaWorkerBridge extends EventEmitter {
 
     const wasDraining = this.state === 'DRAINING' || this.state === 'TERMINATED';
     this.childProcess = null;
+    this.workerPid = undefined;
 
     if (!wasDraining) {
       this.state = 'CRASHED';
