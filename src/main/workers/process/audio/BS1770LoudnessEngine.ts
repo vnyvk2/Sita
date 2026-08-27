@@ -1,13 +1,13 @@
 import type { ChannelPosition, DecodeChunk } from './types';
 
 export interface LoudnessResult {
-  /** Integrated loudness in LUFS (or -Infinity if completely silent) */
+  /** Integrated loudness in LUFS (or -Infinity if completely silent or shorter than 400ms gating window) */
   integratedLoudness: number;
-  /** Maximum absolute discrete sample value observed (0.0 to 1.0+) */
+  /** Maximum absolute discrete sample value observed (0.0 to 1.0+). Note: this is discrete sample peak, NOT true peak. */
   samplePeak: number;
-  /** Peak sample value in dBFS (20 * log10(samplePeak)) */
+  /** Peak discrete sample value in dBFS (20 * log10(samplePeak)) */
   samplePeakDb: number;
-  /** True peak oversampled metric - explicitly null in Gate D2 (deferred) */
+  /** True peak oversampled metric per BS.1770-4 Annex 2 - explicitly null in Gate D2 (deferred) */
   truePeak: null;
   /** Duration in seconds processed */
   duration: number;
@@ -15,8 +15,8 @@ export interface LoudnessResult {
   totalSamples: number;
   /** Total 400ms blocks evaluated */
   blocksProcessed: number;
-  /** Total blocks remaining after dual-stage gating */
-  blocksGated: number;
+  /** Total 400ms blocks surviving after dual-stage gating */
+  blocksSurvivingGate: number;
 }
 
 export interface BiquadCoefficients {
@@ -35,7 +35,7 @@ export interface BiquadState {
 /**
  * Calculates ITU-R BS.1770-4 K-weighting filter coefficients dynamically
  * for arbitrary sample rates using exact bilinear transformation with pre-warping
- * conforming bit-for-bit to ITU-R BS.1770-4 Table 1 & Table 2 and libebur128.
+ * conforming bit-for-bit to ITU-R BS.1770-4 Table 1 & Table 2.
  */
 export function getKWeightingCoefficients(sampleRate: number): {
   stage1: BiquadCoefficients;
@@ -77,27 +77,32 @@ export function getKWeightingCoefficients(sampleRate: number): {
 
 /**
  * Returns the ITU-R BS.1770-4 channel energy weighting G_i for a given semantic position.
+ * Throws on unknown or unmapped multichannel positions to prevent silent mis-weighting.
  */
 export function getChannelWeighting(position?: ChannelPosition): number {
-  if (!position) return 1.0;
+  if (!position || position === 'Unknown') {
+    throw new Error('Cannot compute BS.1770 loudness for unknown channel position. Explicit channel layout required.');
+  }
   switch (position) {
     case 'Ls':
     case 'Rs':
       return 1.4125375446227544; // +1.5 dB (approx sqrt(2))
     case 'LFE':
-      return 0.0; // LFE channel is excluded from loudness calculation
+      return 0.0; // LFE channel is excluded from loudness calculation per BS.1770-4
     case 'L':
     case 'R':
     case 'C':
     case 'Mono':
-    default:
       return 1.0; // 0.0 dB
+    default:
+      throw new Error(`Unsupported channel position: ${String(position)}`);
   }
 }
 
 /**
  * Pure, streaming ITU-R BS.1770-4 / EBU R128 Loudness Engine.
- * Operates with O(1) memory on streaming PCM chunks using Transposed Direct Form II.
+ * Operates with O(1) memory and O(1) computation per frame using Transposed Direct Form II
+ * and a sliding rolling energy accumulator.
  */
 export class BS1770LoudnessEngine {
   private readonly sampleRate: number;
@@ -111,18 +116,20 @@ export class BS1770LoudnessEngine {
   private stage2States: BiquadState[] = [];
   private channelWeights: number[] = [];
 
-  // Ring buffer for calculating 400ms block energies with 100ms hop
-  private blockRingBuffer: Float64Array = new Float64Array(0);
+  // O(1) Rolling energy buffer for 400ms block with 100ms hop
+  private blockRingBuffer: Float64Array;
+  private rollingEnergySum: number = 0.0;
   private ringWriteIndex: number = 0;
   private samplesAccumulated: number = 0;
   private nextHopTarget: number = 0;
 
-  // Stored 400ms block energies (approx 10 floats per second)
+  // Stored 400ms block energies (approx 10 floats per second of audio)
   private blockEnergies: number[] = [];
 
   // Metrics
   private maxSamplePeak: number = 0.0;
   private totalFramesProcessed: number = 0;
+  private finalizedResult: LoudnessResult | null = null;
 
   constructor(sampleRate = 44100, channelCount = 2, channelLayout?: ChannelPosition[]) {
     this.sampleRate = Math.max(8000, sampleRate);
@@ -151,8 +158,13 @@ export class BS1770LoudnessEngine {
 
   /**
    * Consumes a bounded PCM chunk from the audio decoder stream.
+   * Throws if engine has already been finalized.
    */
   public processChunk(chunk: DecodeChunk): void {
+    if (this.finalizedResult !== null) {
+      throw new Error('BS1770LoudnessEngine has already been finalized. Cannot process additional chunks.');
+    }
+
     const { channelData, frameCount, channelLayout } = chunk;
     const numChannels = channelData.length;
     if (numChannels === 0 || frameCount === 0) return;
@@ -189,19 +201,18 @@ export class BS1770LoudnessEngine {
         weightedFrameEnergy += weight * (y2 * y2);
       }
 
-      // Add to rolling 400ms ring buffer
+      // O(1) Sliding rolling energy accumulator
+      const oldSampleEnergy = this.blockRingBuffer[this.ringWriteIndex];
+      this.rollingEnergySum += weightedFrameEnergy - oldSampleEnergy;
       this.blockRingBuffer[this.ringWriteIndex] = weightedFrameEnergy;
+
       this.ringWriteIndex = (this.ringWriteIndex + 1) % this.blockSize;
       this.samplesAccumulated++;
       this.totalFramesProcessed++;
 
       // When a 100ms hop boundary is reached after at least 400ms of audio
       if (this.samplesAccumulated >= this.nextHopTarget) {
-        let blockEnergySum = 0.0;
-        for (let b = 0; b < this.blockSize; b++) {
-          blockEnergySum += this.blockRingBuffer[b];
-        }
-        const meanSquare = blockEnergySum / this.blockSize;
+        const meanSquare = Math.max(0.0, this.rollingEnergySum / this.blockSize);
         this.blockEnergies.push(meanSquare);
 
         this.nextHopTarget += this.hopSize;
@@ -211,42 +222,31 @@ export class BS1770LoudnessEngine {
 
   /**
    * Finalizes the calculation and returns the pure LoudnessResult with dual-stage gating.
+   * This method is idempotent: subsequent calls return the cached final result.
    */
   public finish(): LoudnessResult {
+    if (this.finalizedResult !== null) {
+      return this.finalizedResult;
+    }
+
     const duration = this.totalFramesProcessed / this.sampleRate;
     const samplePeak = this.maxSamplePeak;
     const samplePeakDb = samplePeak > 0 ? 20 * Math.log10(samplePeak) : -Infinity;
 
-    // If audio was shorter than 400ms, compute loudness from available accumulated samples
+    // Strict BS.1770-4 Compliance: If audio is shorter than the 400ms gating block window,
+    // a valid BS.1770 integrated loudness cannot be formed. Return -Infinity.
     if (this.blockEnergies.length === 0) {
-      if (this.samplesAccumulated > 0) {
-        let sum = 0.0;
-        for (let i = 0; i < this.samplesAccumulated; i++) {
-          sum += this.blockRingBuffer[i];
-        }
-        const meanSquare = sum / this.samplesAccumulated;
-        const lufs = meanSquare > 0 ? -0.691 + (10 * Math.log10(meanSquare)) : -Infinity;
-        return {
-          integratedLoudness: Number.isFinite(lufs) ? Math.round(lufs * 100) / 100 : -Infinity,
-          samplePeak: Math.round(samplePeak * 10000) / 10000,
-          samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
-          truePeak: null,
-          duration: Math.round(duration * 100) / 100,
-          totalSamples: this.totalFramesProcessed,
-          blocksProcessed: 1,
-          blocksGated: 1
-        };
-      }
-      return {
+      this.finalizedResult = {
         integratedLoudness: -Infinity,
-        samplePeak: 0.0,
-        samplePeakDb: -Infinity,
+        samplePeak: Math.round(samplePeak * 10000) / 10000,
+        samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
         truePeak: null,
-        duration: 0.0,
-        totalSamples: 0,
+        duration: Math.round(duration * 100) / 100,
+        totalSamples: this.totalFramesProcessed,
         blocksProcessed: 0,
-        blocksGated: 0
+        blocksSurvivingGate: 0
       };
+      return this.finalizedResult;
     }
 
     // Step 1: Absolute Threshold Gating (-70.0 LKFS)
@@ -260,7 +260,7 @@ export class BS1770LoudnessEngine {
     }
 
     if (absoluteGatedEnergies.length === 0) {
-      return {
+      this.finalizedResult = {
         integratedLoudness: -Infinity,
         samplePeak: Math.round(samplePeak * 10000) / 10000,
         samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
@@ -268,8 +268,9 @@ export class BS1770LoudnessEngine {
         duration: Math.round(duration * 100) / 100,
         totalSamples: this.totalFramesProcessed,
         blocksProcessed: this.blockEnergies.length,
-        blocksGated: 0
+        blocksSurvivingGate: 0
       };
+      return this.finalizedResult;
     }
 
     // Step 2: Calculate un-gated loudness from absolute surviving blocks
@@ -291,7 +292,7 @@ export class BS1770LoudnessEngine {
     }
 
     if (relativeGatedEnergies.length === 0) {
-      return {
+      this.finalizedResult = {
         integratedLoudness: -Infinity,
         samplePeak: Math.round(samplePeak * 10000) / 10000,
         samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
@@ -299,8 +300,9 @@ export class BS1770LoudnessEngine {
         duration: Math.round(duration * 100) / 100,
         totalSamples: this.totalFramesProcessed,
         blocksProcessed: this.blockEnergies.length,
-        blocksGated: 0
+        blocksSurvivingGate: 0
       };
+      return this.finalizedResult;
     }
 
     // Step 4: Integrated Loudness over relative surviving blocks
@@ -311,7 +313,7 @@ export class BS1770LoudnessEngine {
     const finalMeanEnergy = relEnergySum / relativeGatedEnergies.length;
     const integratedLoudness = -0.691 + (10 * Math.log10(finalMeanEnergy));
 
-    return {
+    this.finalizedResult = {
       integratedLoudness: Math.round(integratedLoudness * 100) / 100,
       samplePeak: Math.round(samplePeak * 10000) / 10000,
       samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
@@ -319,7 +321,9 @@ export class BS1770LoudnessEngine {
       duration: Math.round(duration * 100) / 100,
       totalSamples: this.totalFramesProcessed,
       blocksProcessed: this.blockEnergies.length,
-      blocksGated: relativeGatedEnergies.length
+      blocksSurvivingGate: relativeGatedEnergies.length
     };
+
+    return this.finalizedResult;
   }
 }

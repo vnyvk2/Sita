@@ -5,7 +5,7 @@ import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { executeAssetJob } from '../../../../../src/main/workers/process/handlers/assetJobHandler';
 import { createWavBuffer } from './wavHelper';
 
-describe('Gate D2: End-to-End ReplayGain BS.1770 Integration', () => {
+describe('Gate D2-R1: End-to-End ReplayGain BS.1770 Integration', () => {
   let tempDir: string;
 
   beforeEach(async () => {
@@ -20,7 +20,7 @@ describe('Gate D2: End-to-End ReplayGain BS.1770 Integration', () => {
     const audioPath = path.join(tempDir, 'test_song.wav');
 
     // 1 kHz stereo sine wave at -20 dBFS (amplitude 0.1) -> Integrated loudness approx -20.07 LUFS
-    // Target is -18.0 LUFS -> trackGain should be approx +2.07 dB
+    // Nora target is -18.0 LUFS -> trackGain should be approx +2.07 dB
     const wavBuf = createWavBuffer({
       sampleRate: 48000,
       channels: 2,
