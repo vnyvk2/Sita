@@ -1,14 +1,16 @@
 import type { AudioDecoder, AudioFormatInfo, DecodeChunk, DecodeStreamOptions } from './types';
 import { WavAudioDecoder } from './decoders/WavAudioDecoder';
-import { CompressedAudioDecoder } from './decoders/CompressedAudioDecoder';
 
 export class AudioDecoderRegistry {
   private readonly decoders: AudioDecoder[] = [];
 
   constructor() {
-    // Register decoders in order of specificity
+    // Register genuinely supported streaming decoders
     this.decoders.push(new WavAudioDecoder());
-    this.decoders.push(new CompressedAudioDecoder());
+  }
+
+  public registerDecoder(decoder: AudioDecoder): void {
+    this.decoders.unshift(decoder);
   }
 
   public getDecoderForFile(filePath: string): AudioDecoder | null {

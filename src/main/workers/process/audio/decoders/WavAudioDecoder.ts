@@ -1,9 +1,31 @@
 import fs from 'fs';
 import type { AudioDecoder, AudioFormatInfo, DecodeChunk, DecodeStreamOptions } from '../types';
 
+const WAVE_FORMAT_PCM = 1;
+const WAVE_FORMAT_IEEE_FLOAT = 3;
+const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
+
+// SubFormat GUID first 4 bytes for PCM and IEEE Float in WAVE_FORMAT_EXTENSIBLE
+const KSDATAFORMAT_SUBTYPE_PCM_GUID_PREFIX = 0x00000001;
+const KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX = 0x00000003;
+
+interface ParsedWavHeader {
+  audioFormat: number;
+  isFloat: boolean;
+  channels: number;
+  sampleRate: number;
+  bitDepth: number;
+  dataOffset: number;
+  dataLength: number;
+  totalSamples: number;
+  codec: string;
+}
+
 /**
- * Streaming WAV (RIFF/PCM) Audio Decoder.
- * Streams PCM samples incrementally in fixed-size memory buffers (O(1) memory).
+ * Streaming WAV (RIFF/PCM/IEEE-FLOAT) Audio Decoder.
+ * Decodes audio stream in bounded, incremental chunks (O(1) memory).
+ * Supports arbitrary RIFF chunk ordering, extra metadata chunks (LIST, INFO, JUNK, bext),
+ * 8-bit, 16-bit, 24-bit, 32-bit PCM integer, and 32-bit IEEE float formats across mono/stereo/multi-channel.
  */
 export class WavAudioDecoder implements AudioDecoder {
   readonly codec = 'pcm_wav';
@@ -15,20 +37,14 @@ export class WavAudioDecoder implements AudioDecoder {
   public async probe(filePath: string): Promise<AudioFormatInfo> {
     const handle = await fs.promises.open(filePath, 'r');
     try {
-      const headerBuffer = Buffer.alloc(4096);
-      const { bytesRead } = await handle.read(headerBuffer, 0, 4096, 0);
-      if (bytesRead < 44) {
-        throw new Error(`WAV file ${filePath} is too small to contain a valid header.`);
-      }
-
-      const parsed = this.parseWavHeader(headerBuffer);
+      const parsed = await this.parseWavStructure(handle, filePath);
       return {
         sampleRate: parsed.sampleRate,
         channels: parsed.channels,
         bitDepth: parsed.bitDepth,
         duration: parsed.totalSamples / parsed.sampleRate,
         totalSamples: parsed.totalSamples,
-        codec: parsed.audioFormat === 3 ? 'WAV (IEEE Float)' : 'WAV (PCM)'
+        codec: parsed.codec
       };
     } finally {
       await handle.close();
@@ -44,14 +60,8 @@ export class WavAudioDecoder implements AudioDecoder {
     const handle = await fs.promises.open(filePath, 'r');
 
     try {
-      const headerBuffer = Buffer.alloc(4096);
-      const { bytesRead } = await handle.read(headerBuffer, 0, 4096, 0);
-      if (bytesRead < 44) {
-        throw new Error(`Invalid WAV file: header truncated in ${filePath}`);
-      }
-
-      const parsed = this.parseWavHeader(headerBuffer);
-      const { channels, bitDepth, dataOffset, dataLength, totalSamples } = parsed;
+      const parsed = await this.parseWavStructure(handle, filePath);
+      const { channels, bitDepth, isFloat, dataOffset, dataLength, totalSamples } = parsed;
       const bytesPerSample = bitDepth / 8;
       const blockAlign = channels * bytesPerSample;
 
@@ -85,7 +95,11 @@ export class WavAudioDecoder implements AudioDecoder {
         for (let f = 0; f < framesInChunk; f++) {
           for (let ch = 0; ch < channels; ch++) {
             let normalized = 0;
-            if (bitDepth === 16) {
+
+            if (isFloat && bitDepth === 32) {
+              normalized = readBuffer.readFloatLE(bytePos);
+              bytePos += 4;
+            } else if (bitDepth === 16) {
               const int16 = readBuffer.readInt16LE(bytePos);
               normalized = int16 / 32768.0;
               bytePos += 2;
@@ -97,14 +111,20 @@ export class WavAudioDecoder implements AudioDecoder {
               if (int24 & 0x800000) int24 |= 0xff000000;
               normalized = int24 / 8388608.0;
               bytePos += 3;
-            } else if (bitDepth === 32) {
-              normalized = readBuffer.readFloatLE(bytePos);
+            } else if (!isFloat && bitDepth === 32) {
+              // 32-bit PCM integer
+              const int32 = readBuffer.readInt32LE(bytePos);
+              normalized = int32 / 2147483648.0;
               bytePos += 4;
             } else if (bitDepth === 8) {
+              // 8-bit unsigned PCM
               const uint8 = readBuffer.readUInt8(bytePos);
               normalized = (uint8 - 128) / 128.0;
               bytePos += 1;
+            } else {
+              throw new Error(`Unsupported WAV bit depth (${bitDepth}) or format configuration.`);
             }
+
             channelData[ch][f] = Math.max(-1.0, Math.min(1.0, normalized));
           }
         }
@@ -124,63 +144,107 @@ export class WavAudioDecoder implements AudioDecoder {
     }
   }
 
-  private parseWavHeader(buf: Buffer): {
-    audioFormat: number;
-    channels: number;
-    sampleRate: number;
-    bitDepth: number;
-    dataOffset: number;
-    dataLength: number;
-    totalSamples: number;
-  } {
-    const riff = buf.toString('ascii', 0, 4);
-    const wave = buf.toString('ascii', 8, 12);
-    if (riff !== 'RIFF' || wave !== 'WAVE') {
-      throw new Error('Not a valid RIFF/WAVE audio file.');
+  /**
+   * Scans RIFF/WAVE chunk headers iteratively to handle arbitrary chunk ordering and metadata.
+   */
+  private async parseWavStructure(handle: fs.promises.FileHandle, filePath: string): Promise<ParsedWavHeader> {
+    const stats = await handle.stat();
+    const fileSize = stats.size;
+
+    if (fileSize < 12) {
+      throw new Error(`Invalid WAV file: size (${fileSize} bytes) too small for RIFF header.`);
     }
 
-    let offset = 12;
-    let audioFormat = 1;
-    let channels = 2;
-    let sampleRate = 44100;
-    let bitDepth = 16;
+    const headerBuf = Buffer.alloc(12);
+    await handle.read(headerBuf, 0, 12, 0);
+
+    const riff = headerBuf.toString('ascii', 0, 4);
+    const wave = headerBuf.toString('ascii', 8, 12);
+    if (riff !== 'RIFF' || wave !== 'WAVE') {
+      throw new Error(`Not a valid RIFF/WAVE audio file: ${filePath}`);
+    }
+
+    let fileOffset = 12;
+    let audioFormat = 0;
+    let isFloat = false;
+    let channels = 0;
+    let sampleRate = 0;
+    let bitDepth = 0;
     let dataOffset = 0;
     let dataLength = 0;
 
-    while (offset < buf.length - 8) {
-      const chunkId = buf.toString('ascii', offset, offset + 4);
-      const chunkSize = buf.readUInt32LE(offset + 4);
-      offset += 8;
+    const chunkHeaderBuf = Buffer.alloc(8);
+
+    while (fileOffset + 8 <= fileSize) {
+      const { bytesRead } = await handle.read(chunkHeaderBuf, 0, 8, fileOffset);
+      if (bytesRead < 8) break;
+
+      const chunkId = chunkHeaderBuf.toString('ascii', 0, 4);
+      const chunkSize = chunkHeaderBuf.readUInt32LE(4);
+      const chunkDataOffset = fileOffset + 8;
 
       if (chunkId === 'fmt ') {
-        audioFormat = buf.readUInt16LE(offset);
-        channels = buf.readUInt16LE(offset + 2);
-        sampleRate = buf.readUInt32LE(offset + 4);
-        bitDepth = buf.readUInt16LE(offset + 14);
+        const fmtSize = Math.max(16, chunkSize);
+        const fmtBuf = Buffer.alloc(fmtSize);
+        await handle.read(fmtBuf, 0, fmtSize, chunkDataOffset);
+
+        audioFormat = fmtBuf.readUInt16LE(0);
+        channels = fmtBuf.readUInt16LE(2);
+        sampleRate = fmtBuf.readUInt32LE(4);
+        bitDepth = fmtBuf.readUInt16LE(14);
+
+        if (audioFormat === WAVE_FORMAT_PCM) {
+          isFloat = false;
+        } else if (audioFormat === WAVE_FORMAT_IEEE_FLOAT) {
+          isFloat = true;
+        } else if (audioFormat === WAVE_FORMAT_EXTENSIBLE && fmtSize >= 24) {
+          const subFormat = fmtBuf.readUInt32LE(24);
+          if (subFormat === KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX) {
+            isFloat = true;
+          } else if (subFormat === KSDATAFORMAT_SUBTYPE_PCM_GUID_PREFIX) {
+            isFloat = false;
+          } else {
+            throw new Error(`Unsupported WAVE_FORMAT_EXTENSIBLE subFormat (${subFormat}).`);
+          }
+        } else {
+          throw new Error(`Unsupported WAV compression format tag: ${audioFormat}`);
+        }
       } else if (chunkId === 'data') {
-        dataOffset = offset;
-        dataLength = chunkSize;
-        break;
+        dataOffset = chunkDataOffset;
+        dataLength = Math.min(chunkSize, fileSize - dataOffset);
+        break; // Found data chunk
       }
-      offset += chunkSize;
+
+      // Advance to next chunk (RIFF chunks are word-aligned to 2-byte boundaries)
+      const paddedSize = chunkSize + (chunkSize % 2);
+      fileOffset = chunkDataOffset + paddedSize;
     }
 
     if (dataOffset === 0) {
-      throw new Error('WAV data chunk not found in header.');
+      throw new Error(`Invalid WAV file: 'data' chunk not found in ${filePath}`);
+    }
+    if (channels === 0 || sampleRate === 0 || bitDepth === 0) {
+      throw new Error(`Invalid WAV file: missing or incomplete 'fmt ' chunk in ${filePath}`);
     }
 
     const bytesPerSample = bitDepth / 8;
     const blockAlign = channels * bytesPerSample;
     const totalSamples = Math.floor(dataLength / blockAlign);
 
+    const codecName = isFloat
+      ? `WAV (IEEE Float ${bitDepth}-bit)`
+      : `WAV (PCM ${bitDepth}-bit)`;
+
     return {
       audioFormat,
+      isFloat,
       channels,
       sampleRate,
       bitDepth,
       dataOffset,
       dataLength,
-      totalSamples
+      totalSamples,
+      codec: codecName
     };
   }
 }

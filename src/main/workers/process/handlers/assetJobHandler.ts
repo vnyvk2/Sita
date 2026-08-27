@@ -102,6 +102,7 @@ async function generateWaveformInWorker(
   abortSignal?: AbortSignal
 ): Promise<AssetExecutionResult> {
   let peaks: Float32Array;
+  let metadata: Record<string, unknown>;
 
   const decoder = defaultAudioDecoderRegistry.getDecoderForFile(sourceFilePath);
   if (decoder) {
@@ -118,6 +119,12 @@ async function generateWaveformInWorker(
       );
 
       peaks = accumulator.finish();
+      metadata = {
+        resolution: WAVEFORM_RESOLUTION,
+        generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION,
+        codec: info.codec,
+        method: 'decoded'
+      };
     } catch (err) {
       if (abortSignal?.aborted) {
         return {
@@ -126,19 +133,24 @@ async function generateWaveformInWorker(
           cancelled: true
         };
       }
-      // Fallback to deterministic synthetic waveform if decoding encounters non-fatal format issues
-      const stats = await fs.stat(sourceFilePath);
-      peaks = new Float32Array(WAVEFORM_RESOLUTION);
-      for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
-        peaks[i] = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
-      }
+      // Re-surface decode failures for supported formats without swallowing as fake synthetic peaks
+      return {
+        success: false,
+        error: `Audio decode failed for ${sourceFilePath}: ${err instanceof Error ? err.message : String(err)}`
+      };
     }
   } else {
+    // Unsupported audio codec: explicit fallback for formats awaiting native decoder implementation
     const stats = await fs.stat(sourceFilePath);
     peaks = new Float32Array(WAVEFORM_RESOLUTION);
     for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
       peaks[i] = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
     }
+    metadata = {
+      resolution: WAVEFORM_RESOLUTION,
+      generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION,
+      method: 'synthetic_unsupported_codec'
+    };
   }
 
   if (abortSignal?.aborted) {
@@ -170,10 +182,7 @@ async function generateWaveformInWorker(
   return {
     success: true,
     outputFilePath: destinationPath,
-    metadata: {
-      resolution: WAVEFORM_RESOLUTION,
-      generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION
-    }
+    metadata
   };
 }
 
