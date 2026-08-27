@@ -1,16 +1,16 @@
 import { app } from 'electron';
 import { eq } from 'drizzle-orm';
 import path from 'path';
-import fs from 'fs/promises';
 import { EventEmitter } from 'events';
 import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
 export const CURRENT_WAVEFORM_GENERATOR_VERSION = 1;
-const WAVEFORM_RESOLUTION = 200; // Number of peak data points
+export const WAVEFORM_RESOLUTION = 200; // Number of peak data points
 
 export class WaveformJob implements Job {
   id: string;
@@ -23,6 +23,7 @@ export class WaveformJob implements Job {
   public songId: number;
   public songPath: string;
   private eventBus: EventEmitter;
+  private abortController = new AbortController();
 
   constructor(
     songId: number,
@@ -39,13 +40,18 @@ export class WaveformJob implements Job {
     this.description = `Generating waveform for "${songTitle}"`;
   }
 
-  private isCancelled(): boolean {
-    return (this.state as JobState) === 'cancelled';
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
   }
 
   async execute(): Promise<void> {
     try {
-      // 1. Check idempotency and version
+      // 1. Check idempotency and version in DB
       const existing = await db.query.waveforms.findFirst({
         where: (w, { eq }) => eq(w.songId, this.songId)
       });
@@ -63,29 +69,31 @@ export class WaveformJob implements Job {
         logger.debug(`[WaveformJob] Song ${this.songId} waveform is outdated. Regenerating.`);
       }
 
-      // 2. Generate waveform binary data
-      // TODO: Replace with real peak extraction algorithm
-      const peaks = await this.generatePeaks(this.songPath);
-
       if (this.isCancelled()) return;
 
-      // 3. Serialize to .tmp file first (in-flight files invisible to GC)
+      // 2. Determine target destination file path
       const cacheDir = path.join(app.getPath('userData'), 'cache', 'waveforms');
-      await fs.mkdir(cacheDir, { recursive: true });
-      
       const fileName = `${this.songId}_v${CURRENT_WAVEFORM_GENERATOR_VERSION}.bin`;
       const filePath = path.join(cacheDir, fileName);
-      const tempPath = `${filePath}.tmp`;
-      
-      const buffer = Buffer.from(peaks.buffer);
-      await fs.writeFile(tempPath, buffer);
 
-      if (this.isCancelled()) {
-        await fs.unlink(tempPath).catch(() => {});
-        return;
+      // 3. Delegate CPU peak generation & atomic file writing to mediaWorker
+      const result = await mediaWorkerBridge.generateAsset({
+        jobType: 'waveform',
+        sourceFilePath: this.songPath,
+        destinationPath: filePath,
+        abortSignal: this.abortController.signal,
+        metadata: {
+          songId: this.songId,
+          version: CURRENT_WAVEFORM_GENERATOR_VERSION
+        }
+      });
+
+      if (result.cancelled || this.isCancelled()) return;
+      if (!result.success) {
+        throw new Error(`[WaveformJob] Failed to generate waveform for song ${this.songId}`);
       }
 
-      // 4. Save to DB
+      // 4. Save to DB (Main owns all database mutations)
       await db.transaction(async (trx) => {
         if (existing) {
           // Update existing
@@ -108,16 +116,7 @@ export class WaveformJob implements Job {
         }
       });
 
-      // 5. Atomic publication: rename temp -> final .bin directly
-      try {
-        await fs.rename(tempPath, filePath);
-      } catch (renameErr) {
-        logger.error(`[WaveformJob] Failed to publish waveform file from temp ${tempPath}`, { error: renameErr });
-        await fs.unlink(tempPath).catch(() => {});
-        throw renameErr;
-      }
-
-      // 6. Post-commit guarantee: emit event
+      // 5. Post-commit guarantee: emit event only after successful DB transaction
       this.eventBus.emit(ASSET_EVENTS.WAVEFORM_CREATED, {
         songId: this.songId,
         path: filePath
@@ -127,26 +126,5 @@ export class WaveformJob implements Job {
       logger.error(`[WaveformJob] Failed to generate waveform for song ${this.songId}`, { error });
       throw error;
     }
-  }
-
-  /**
-   * Reads audio file and extracts normalized peaks.
-   * NOTE: A true implementation in Node.js requires decoding the audio format (MP3/FLAC).
-   * For the architectural proof, we generate deterministic peaks based on file size.
-   */
-  private async generatePeaks(audioPath: string): Promise<Float32Array> {
-    const stats = await fs.stat(audioPath);
-    const peaks = new Float32Array(WAVEFORM_RESOLUTION);
-    
-    // Generate deterministic "peaks" for testing the architecture
-    for (let i = 0; i < WAVEFORM_RESOLUTION; i++) {
-      const val = Math.abs(Math.sin((stats.size + i) * 0.01)) * 0.9 + 0.1;
-      peaks[i] = val;
-    }
-    
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    return peaks;
   }
 }

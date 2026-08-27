@@ -1,7 +1,9 @@
 param(
   [string[]]$Variants = @('L0', 'L1', 'L2', 'L3'),
   [string]$OutRoot = "$env:TEMP\opencode\nora-memprof",
-  [int]$TimeoutSec = 180
+  [int]$TimeoutSec = 180,
+  [string]$CustomVariantName = '',
+  [string]$CustomProfileDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,7 +90,14 @@ function Invoke-Variant([string]$variant) {
   Write-Log "=== Variant $variant ==="
   $profileDir = Join-Path $outDir "$variant\profile"
   $telemetryDir = Join-Path $outDir "$variant\telemetry"
-  New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+
+  if ($CustomVariantName -and $variant -eq $CustomVariantName -and $CustomProfileDir) {
+    $profileDir = $CustomProfileDir
+    New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    Write-Log "Using pre-built custom profile: $profileDir"
+  } else {
+    New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+  }
   New-Item -ItemType Directory -Path $telemetryDir -Force | Out-Null
 
   if ($variant -eq 'L3') {

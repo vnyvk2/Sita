@@ -33,6 +33,9 @@ vi.mock('@main/other/artworks', () => ({
 vi.mock('@main/db/db', () => ({
   closeDatabaseInstance: vi.fn().mockResolvedValue(undefined)
 }));
+vi.mock('@main/workers/process/MediaWorkerBridge', () => ({
+  mediaWorkerBridge: { terminate: vi.fn().mockResolvedValue(undefined) }
+}));
 
 describe('ShutdownCoordinator', () => {
   beforeEach(() => {

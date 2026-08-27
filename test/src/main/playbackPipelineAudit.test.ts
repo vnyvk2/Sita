@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
@@ -11,7 +11,13 @@ class MockAudioContext {
   destination = {};
   createGain() {
     return {
-      gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      gain: {
+        value: 1,
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+        setTargetAtTime: vi.fn(),
+        cancelScheduledValues: vi.fn()
+      },
       connect: vi.fn()
     };
   }

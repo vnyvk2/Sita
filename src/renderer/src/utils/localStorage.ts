@@ -16,10 +16,12 @@ const resetLocalStorage = () => {
     localStorage.setItem('version', version);
     localStorage.setItem('localStorage', template);
 
-    dispatch({
-      type: 'UPDATE_LOCAL_STORAGE',
-      data: LOCAL_STORAGE_DEFAULT_TEMPLATE
-    });
+    if (typeof dispatch === 'function') {
+      dispatch({
+        type: 'UPDATE_LOCAL_STORAGE',
+        data: LOCAL_STORAGE_DEFAULT_TEMPLATE
+      });
+    }
   } catch (error) {
     log('An error occurred while resetting the local storage.', { error }, 'ERROR');
   }

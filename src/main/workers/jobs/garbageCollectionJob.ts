@@ -7,6 +7,7 @@ import { collectGarbageArtworks } from '@main/core/garbageCollector';
 import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
+import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
 import type { Job, JobClass, JobState } from '../types';
 
 export class GarbageCollectionJob implements Job {
@@ -45,8 +46,8 @@ export class GarbageCollectionJob implements Job {
       let files: string[] = [];
       try {
         files = await fs.readdir(cacheDir);
-      } catch (e: any) {
-        if (e.code === 'ENOENT') return 0;
+      } catch (e) {
+        if (isAnErrorWithCode(e) && e.code === 'ENOENT') return 0;
         throw e;
       }
       

@@ -52,7 +52,7 @@ async function seed() {
   const playlists = await db.select({ id: collections.id }).from(collections).where(sql`type = 'PLAYLIST'`);
   
   let totalEntries = 0;
-  for (let p of playlists) {
+  for (const p of playlists) {
     if (totalEntries >= 250000) break;
 
     const entriesToInsert = [];

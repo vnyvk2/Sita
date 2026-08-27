@@ -6,14 +6,23 @@ import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getLibraryVersion } from '@renderer/other/libraryVersion';
 import { getQueuesManager } from '@renderer/other/queuesManager';
-import { artistQuery } from '@renderer/queries/artists';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  SONG_WINDOW_SIZE,
+  SONG_WINDOW_STALE_TIME,
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -29,27 +38,39 @@ export const Route = createFileRoute('/main-player/songs/')({
   loaderDeps: ({ search }) => ({
     sortingOrder: search.sortingOrder,
     filteringOrder: search.filteringOrder,
-    keyword: search.keyword
+    keyword: search.keyword,
+    language: search.language,
+    genre: search.genre,
+    onlyFavoriteArtists: search.onlyFavoriteArtists,
+    onlyFavoriteAlbums: search.onlyFavoriteAlbums
   }),
   loader: async ({ deps }) => {
     const sortingState = store.state.localStorage.sortingStates.songsPage;
-    await queryClient.ensureQueryData(
-      songQuery.all({
-        sortType: deps.sortingOrder ?? sortingState ?? 'aToZ',
-        filterType: deps.filteringOrder ?? 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: deps.keyword ?? ''
-      })
-    );
-    await queryClient.ensureQueryData(
-      artistQuery.all({
-        sortType: 'aToZ',
-        filterType: 'favorites',
-        start: 0,
-        end: 0
-      })
-    );
+    const idsParams: SongIdsParams = {
+      sortType: deps.sortingOrder ?? sortingState ?? 'aToZ',
+      filterType: deps.filteringOrder ?? 'notSelected',
+      keyword: deps.keyword ?? '',
+      language: deps.language ?? 'all',
+      genre: deps.genre ?? 'all',
+      onlyFavoriteArtists: deps.onlyFavoriteArtists ?? false,
+      onlyFavoriteAlbums: deps.onlyFavoriteAlbums ?? false
+    };
+    const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+    const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    const version = songIdsVersionFromState(state?.dataUpdatedAt);
+    const listIdentity = getSongListIdentity(idsParams);
+    await queryClient.ensureQueryData({
+      queryKey: songCacheKeys.window(listIdentity, version, 0),
+      queryFn: () =>
+        window.api.audioLibraryControls.getSongInfo(
+          idsData.ids.slice(0, Math.min(SONG_WINDOW_SIZE, idsData.ids.length)),
+          undefined,
+          undefined,
+          undefined,
+          true
+        ),
+      staleTime: SONG_WINDOW_STALE_TIME
+    });
   },
   component: SongsPage
 });
@@ -119,55 +140,42 @@ function SongsPage() {
     ]
   );
 
-  const {
-    data: { data: songData }
-  } = useSuspenseQuery(
-    songQuery.all({
+  const songIdsParams = useMemo(
+    () => ({
       sortType: sortingOrder,
       filterType: filteringOrder,
-      start: 0,
-      end: 0,
-      keyword: keyword ?? ''
-    })
+      keyword: keyword ?? '',
+      language,
+      genre,
+      onlyFavoriteArtists,
+      onlyFavoriteAlbums
+    }),
+    [sortingOrder, filteringOrder, keyword, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums]
+  );
+
+  const idsQuery = useSuspenseQuery(songQuery.ids(songIdsParams));
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
+
+  const filteredSongIds = idsQuery.data.ids;
+  const blacklistedIds = idsQuery.data.blacklistedIds;
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+
+  const blacklistedSet = useMemo(() => new Set(blacklistedIds), [blacklistedIds]);
+  const playableSongIds = useMemo(
+    () => filteredSongIds.filter((id) => !blacklistedSet.has(id)),
+    [filteredSongIds, blacklistedSet]
+  );
+  const playableSongIdsRef = useRef(playableSongIds);
+  playableSongIdsRef.current = playableSongIds;
+
+  const selectAllStubs = useMemo(
+    () => filteredSongIds.map((id) => ({ songId: id })),
+    [filteredSongIds]
   );
 
   const {
-    data: { data: favoriteArtistsData }
-  } = useSuspenseQuery(
-    artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 })
-  );
-
-  const favoriteArtistIds = useMemo(() => {
-    if (!favoriteArtistsData) return new Set<number>();
-    return new Set(favoriteArtistsData.map((artist) => artist.artistId));
-  }, [favoriteArtistsData]);
-
-  const { availableLanguages, availableGenres } = useMemo(() => {
-    if (!songData || songData.length === 0) {
-      return { availableLanguages: [] as string[], availableGenres: [] as string[] };
-    }
-    const langs = new Set<string>();
-    const genres = new Set<string>();
-
-    for (const item of songData) {
-      const song = item as SongData;
-      if (song.language && song.language.trim() !== '') {
-        langs.add(song.language.trim());
-      }
-      if ('genres' in song && song.genres && Array.isArray(song.genres)) {
-        for (const g of song.genres) {
-          if (g.name && g.name.trim() !== '') {
-            genres.add(g.name.trim());
-          }
-        }
-      }
-    }
-
-    return {
-      availableLanguages: Array.from(langs).sort(),
-      availableGenres: Array.from(genres).sort()
-    };
-  }, [songData]);
+    data: { languages: availableLanguages, genres: availableGenres }
+  } = useSuspenseQuery(songQuery.facets());
 
   const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
     const options: DropdownOption<string>[] = [
@@ -196,58 +204,8 @@ function SongsPage() {
     return options;
   }, [availableGenres, t]);
 
-  const filteredSongs = useMemo(() => {
-    if (!songData) return [];
-
-    const hasSubFilters =
-      (language && language !== 'all') ||
-      (genre && genre !== 'all') ||
-      onlyFavoriteArtists ||
-      onlyFavoriteAlbums;
-
-    if (!hasSubFilters) return songData;
-
-    return songData.filter((song) => {
-      // 1. Language filter
-      if (language && language !== 'all') {
-        if (language === 'unspecified') {
-          if (song.language && song.language.trim() !== '') return false;
-        } else {
-          if (song.language?.toLowerCase() !== language.toLowerCase()) return false;
-        }
-      }
-
-      // 2. Genre filter
-      if (genre && genre !== 'all') {
-        const hasGenre =
-          'genres' in song && song.genres
-            ? (song as SongData).genres!.some((g) => g.name.toLowerCase() === genre.toLowerCase())
-            : false;
-        if (!hasGenre) return false;
-      }
-
-      // 3. Favorite Artist filter (song has at least one favorited artist)
-      if (onlyFavoriteArtists) {
-        const hasFavArtist = song.artists?.some((a) => favoriteArtistIds.has(a.artistId));
-        if (!hasFavArtist) return false;
-      }
-
-      // 4. Favorite Album filter (song's album is favorited)
-      if (onlyFavoriteAlbums) {
-        const isFavAlbum = Boolean(song.album?.isAFavorite);
-        if (!isFavAlbum) return false;
-      }
-
-      return true;
-    });
-  }, [songData, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums, favoriteArtistIds]);
-
-  const filteredSongsRef = useRef(filteredSongs);
-  filteredSongsRef.current = filteredSongs;
-
   // An unfiltered All Songs view is canonical-eligible: it projects the whole library.
   // Any active keyword or sub-filter makes the request a contextual (filtered browse) queue
-  // (docs/canonical-queue-architecture.md, Invariant 8).
   const trimmedKeyword = keyword?.trim();
   const isCanonicalEligibleView = useMemo(
     () =>
@@ -262,11 +220,8 @@ function SongsPage() {
 
   const canonicalQueueTitle = t('common.allSongs', 'All Songs');
 
-  // Library version the currently rendered songData was actually derived from. Stable while the
-  // React Query cache lags behind a structural IPC event, which lets QueuesManager stamp honest
-  // provenance instead of poisoning the projection as fresh (docs/canonical-queue-architecture.md,
-  // Invariant 7).
-  const songDataLibraryVersion = useMemo(() => getLibraryVersion(), [songData]);
+  // Library version the currently rendered list was derived from.
+  const songDataLibraryVersion = useMemo(() => getLibraryVersion(), [filteredSongIds]);
 
   const contextualQueueTitle = useMemo(() => {
     const detail =
@@ -329,18 +284,11 @@ function SongsPage() {
       true,
       <AddMusicFoldersPrompt
         onSuccess={() => {
-          queryClient.invalidateQueries(
-            songQuery.all({
-              sortType: sortingOrder,
-              filterType: filteringOrder,
-              start: 0,
-              end: 0
-            })
-          );
+          queryClient.invalidateQueries({ queryKey: songQuery.ids._def });
         }}
       />
     );
-  }, [changePromptMenuData, filteringOrder, sortingOrder]);
+  }, [changePromptMenuData]);
 
   const importAppData = useCallback(
     (
@@ -366,14 +314,11 @@ function SongsPage() {
     []
   );
 
-  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(selectAllStubs, 'songs', 'songId');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = filteredSongsRef.current
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
-
+      const queueSongIds = playableSongIdsRef.current;
       if (queueSongIds.length === 0) return;
 
       if (isCanonicalEligibleView) {
@@ -399,21 +344,27 @@ function SongsPage() {
     ]
   );
 
+  const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    listIdentity
+  });
+
   const renderSong = useCallback(
-    (index: number, song: SongData | AudioInfo | undefined) => {
-      if (song)
+    (index: number) => {
+      const song = getItem(index);
+      if (song) {
         return (
           <Song
             index={index}
             isIndexingSongs={isSongIndexingEnabled}
             onPlayClick={handleSongPlayBtnClick}
             selectAllHandler={selectAllHandler}
-            {...(song as SongData)}
+            {...song}
           />
         );
-      return <div>Bad Index</div>;
+      }
+      return <SongRowSkeleton index={index} />;
     },
-    [isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler]
+    [getItem, isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler]
   );
 
   const normalizedKeyword = keyword?.trim();
@@ -426,8 +377,8 @@ function SongsPage() {
   const hasActiveFilter =
     Boolean(normalizedKeyword) || hasActiveSubFilters || filteringOrder !== 'notSelected';
 
-  const isLibraryEmpty = (songData?.length ?? 0) === 0 && !hasActiveFilter;
-  const isFilteredEmpty = filteredSongs.length === 0 && hasActiveFilter;
+  const isLibraryEmpty = filteredSongIds.length === 0 && !hasActiveFilter;
+  const isFilteredEmpty = filteredSongIds.length === 0 && hasActiveFilter;
 
   return (
     <MainContainer
@@ -456,11 +407,10 @@ function SongsPage() {
                 })}
               </div>
             ) : (
-              filteredSongs &&
-              filteredSongs.length > 0 && (
+              filteredSongIds.length > 0 && (
                 <span className="no-of-songs">
                   {t('common.songWithCount', {
-                    count: filteredSongs.length
+                    count: filteredSongIds.length
                   })}
                 </span>
               )
@@ -571,9 +521,7 @@ function SongsPage() {
             className="play-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName="play_arrow"
             clickHandler={() => {
-              const queueSongIds = filteredSongs
-                .filter((song) => !song.isBlacklisted)
-                .map((song) => song.songId);
+              const queueSongIds = playableSongIdsRef.current;
               if (queueSongIds.length === 0) return;
               if (isCanonicalEligibleView) {
                 playAllSongs({
@@ -593,9 +541,7 @@ function SongsPage() {
             className="shuffle-and-play-all-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
             iconName="shuffle"
             clickHandler={() => {
-              const queueSongIds = filteredSongs
-                .filter((song) => !song.isBlacklisted)
-                .map((song) => song.songId);
+              const queueSongIds = playableSongIdsRef.current;
               if (queueSongIds.length === 0) return;
               if (isCanonicalEligibleView) {
                 playAllSongs({
@@ -765,10 +711,11 @@ function SongsPage() {
       ) : (
         <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100">
           <VirtualizedList
-            data={filteredSongs}
+            data={filteredSongIds}
             fixedItemHeight={60}
             scrollKey={scrollKey}
             itemContent={renderSong}
+            onChange={onRangeChange}
           />
         </div>
       )}

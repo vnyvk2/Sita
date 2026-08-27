@@ -1,6 +1,7 @@
 import { db } from '@db/db';
 import { albumsArtists, albums, albumsSongs } from '@db/schema';
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { parseAlbumArtworks } from '@main/fs/resolveFilePaths';
 
 export const isAlbumWithIdAvailable = async (albumId: number, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(albums).where(eq(albums.id, albumId));
@@ -71,6 +72,100 @@ export const getAllAlbums = async (
     limit,
     offset: start
   });
+
+  return {
+    data,
+    sortType,
+    start,
+    end
+  };
+};
+
+export interface AlbumSummary {
+  albumId: number;
+  title: string;
+  year?: number;
+  isAFavorite: boolean;
+  artists: { artistId: number; name: string }[];
+  artworkPaths: ReturnType<typeof parseAlbumArtworks>;
+  songCount: number;
+}
+
+export type GetAllAlbumSummariesReturnType = Awaited<
+  ReturnType<typeof getAlbumSummaries>
+>['data'];
+
+export const getAlbumSummaries = async (
+  options: Omit<GetAllAlbumsOptions, 'albumIds'> & { albumIds?: number[] } = {},
+  trx: DB | DBTransaction = db
+): Promise<{
+  data: AlbumSummary[];
+  sortType: AlbumSortTypes;
+  start: number;
+  end: number;
+}> => {
+  const { albumIds = [], start = 0, end = 0, filterType = 'notSelected', sortType = 'aToZ' } = options;
+
+  const limit = end - start === 0 ? undefined : end - start;
+
+  const page = await trx.query.albums.findMany({
+    columns: { id: true, title: true, year: true, isFavorite: true },
+    where: (a) => {
+      const filters: SQL[] = [];
+
+      if (albumIds && albumIds.length > 0) {
+        filters.push(inArray(a.id, albumIds));
+      }
+
+      if (filterType === 'favorites') filters.push(eq(a.isFavorite, true));
+
+      return and(...filters);
+    },
+    with: {
+      artists: {
+        with: {
+          artist: {
+            columns: { id: true, name: true }
+          }
+        }
+      },
+      artworks: {
+        with: {
+          artwork: {}
+        }
+      }
+    },
+    orderBy: (a) => {
+      if (sortType === 'zToA') return [desc(a.title)];
+      return [asc(a.title)];
+    },
+    limit,
+    offset: start
+  });
+
+  const pageIds = page.map((a) => a.id);
+  const countMap = new Map<number, number>();
+  if (pageIds.length > 0) {
+    const counts = await trx
+      .select({ albumId: albumsSongs.albumId, songCount: count() })
+      .from(albumsSongs)
+      .where(inArray(albumsSongs.albumId, pageIds))
+      .groupBy(albumsSongs.albumId);
+    for (const row of counts) {
+      countMap.set(row.albumId, Number(row.songCount));
+    }
+  }
+
+  const data: AlbumSummary[] = page.map((album) => ({
+    albumId: album.id,
+    title: album.title,
+    year: album.year ?? undefined,
+    isAFavorite: album.isFavorite ?? false,
+    artists:
+      album.artists?.map((entry) => ({ artistId: entry.artist.id, name: entry.artist.name })) ?? [],
+    artworkPaths: parseAlbumArtworks(album.artworks.map((entry) => entry.artwork)),
+    songCount: countMap.get(album.id) ?? 0
+  }));
 
   return {
     data,

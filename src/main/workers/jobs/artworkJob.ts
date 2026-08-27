@@ -1,15 +1,18 @@
 import { EventEmitter } from 'events';
+import { inArray } from 'drizzle-orm';
 
+import { db } from '@main/db/db';
 import { getAlbumById } from '@main/db/queries/albums';
 import {
   CURRENT_ARTWORK_GENERATOR_VERSION,
   linkArtworksToAlbum,
   saveArtworks
 } from '@main/db/queries/artworks';
-import { db } from '@main/db/db';
+import { artworks } from '@main/db/schema';
+import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import logger from '@main/logger';
-import { processArtworkFiles } from '@main/other/artworks';
-import { extractFrontCover } from '@main/utils/extractFrontCover';
+import type { ArtworkPayload } from '@main/other/artworks';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 
 import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
@@ -27,6 +30,7 @@ export class ArtworkJob implements Job {
   public albumId: number;
   public sampleSongPath: string;
   private eventBus: EventEmitter;
+  private abortController = new AbortController();
 
   constructor(
     albumId: number,
@@ -43,13 +47,18 @@ export class ArtworkJob implements Job {
     this.description = `Generating artwork for "${albumTitle}"`;
   }
 
-  private isCancelled(): boolean {
-    return (this.state as JobState) === 'cancelled';
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
   }
 
   async execute(): Promise<void> {
     try {
-      // 1. Check idempotency: Does the album already have artwork?
+      // 1. Check idempotency: Does the album already have artwork in DB?
       const album = await getAlbumById(this.albumId);
       if (!album) {
         logger.warn(`[ArtworkJob] Album ${this.albumId} not found, aborting.`);
@@ -80,57 +89,71 @@ export class ArtworkJob implements Job {
 
       if (this.isCancelled()) return;
 
-      // 2. Read ID3 tags
-      const taglib = await import('node-taglib-sharp');
-      const file = taglib.File.createFromPath(this.sampleSongPath);
-      let pictureData: Uint8Array | undefined;
-
-      try {
-        const tag = file.tag;
-        pictureData = extractFrontCover(tag?.pictures);
-      } finally {
-        file.dispose();
-      }
-
-      if (this.isCancelled()) return;
-
-      // 3. Store artwork (process outside transaction)
-      const processedArtwork = await processArtworkFiles('album', pictureData);
-
-      if (this.isCancelled()) return;
-
-      // 4. Save and link artwork in a transaction
-      const artworkData = await db.transaction(async (trx) => {
-        let data = processedArtwork.existing;
-
-        if (!data && processedArtwork.payloads) {
-          data = await saveArtworks(processedArtwork.payloads, trx);
+      // 2. Delegate CPU ID3 Taglib extraction & Sharp WebP resizing to utilityProcess worker
+      const result = await mediaWorkerBridge.generateAsset({
+        jobType: 'artwork',
+        sourceFilePath: this.sampleSongPath,
+        destinationPath: DEFAULT_ARTWORK_SAVE_LOCATION,
+        abortSignal: this.abortController.signal,
+        metadata: {
+          albumId: this.albumId,
+          version: CURRENT_ARTWORK_GENERATOR_VERSION
         }
-
-        // Link artwork to album
-        if (data && data.length > 0) {
-          await linkArtworksToAlbum(
-            data.map((artwork) => ({
-              albumId: this.albumId,
-              artworkId: artwork.id
-            })),
-            trx
-          );
-        }
-        return data;
       });
 
-      if (artworkData && artworkData.length > 0) {
-        // Find the optimized artwork specifically intended for palette generation
-        const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
+      if (result.cancelled || this.isCancelled()) return;
+      if (!result.success) {
+        throw new Error(`[ArtworkJob] Failed to generate artwork for album ${this.albumId}`);
+      }
 
-        // 5. Post-commit guarantee: event MUST fire after successful commit
-        this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
-          albumId: this.albumId,
-          artworkId: optimizedArtwork.id,
-          path: optimizedArtwork.path,
-          albumTitle: album.title
+      // 3. Save and link artwork in a DB transaction with complete hash-level deduplication
+      if (result.metadata?.hasEmbeddedArtwork && result.metadata?.payloads) {
+        const fullHash = result.metadata.fullHash as string;
+        const optHash = result.metadata.optHash as string;
+        const generatedPayloads = result.metadata.payloads as ArtworkPayload[];
+
+        const artworkData = await db.transaction(async (trx) => {
+          // Query existing artworks by hash
+          const existingArtworks = await trx
+            .select()
+            .from(artworks)
+            .where(inArray(artworks.hash, [fullHash, optHash]));
+
+          const existingHashes = new Set(existingArtworks.map((a) => a.hash));
+          const missingPayloads = generatedPayloads.filter((p) => !existingHashes.has(p.hash));
+
+          let newlySavedArtworks: (typeof artworks.$inferSelect)[] = [];
+          if (missingPayloads.length > 0) {
+            newlySavedArtworks = await saveArtworks(missingPayloads, trx);
+          }
+
+          const combinedArtworks = [...existingArtworks, ...newlySavedArtworks];
+
+          // Link all artwork components (full + optimized) to album
+          if (combinedArtworks.length > 0) {
+            await linkArtworksToAlbum(
+              combinedArtworks.map((artwork) => ({
+                albumId: this.albumId,
+                artworkId: artwork.id
+              })),
+              trx
+            );
+          }
+
+          return combinedArtworks;
         });
+
+        if (artworkData && artworkData.length > 0) {
+          const optimizedArtwork = artworkData.find((a) => a.isOptimized) || artworkData[0];
+
+          // 4. Post-commit guarantee: event MUST fire after successful commit
+          this.eventBus.emit(ASSET_EVENTS.ARTWORK_CREATED, {
+            albumId: this.albumId,
+            artworkId: optimizedArtwork.id,
+            path: optimizedArtwork.path,
+            albumTitle: album.title
+          });
+        }
       }
     } catch (error) {
       logger.error(`[ArtworkJob] Failed to generate artwork for album ${this.albumId}`, { error });

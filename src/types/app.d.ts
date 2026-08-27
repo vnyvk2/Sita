@@ -30,6 +30,11 @@ declare global {
     | 'app/getSong'
     | 'app/getAllSongs'
     | 'app/getAllSongIds'
+    | 'app/getFilteredSongLibraryIds'
+    | 'app/getSongListFacets'
+    | 'app/getSongDurations'
+    | 'app/getAlbumSummaries'
+    | 'app/getAlbumSongIds'
     | 'library/getChangeState'
     | 'library/resetChangeState'
     | 'library/diskChanged'
@@ -188,6 +193,12 @@ declare global {
     paletteData?: PaletteData;
     isKnownSource: boolean;
     isBlacklisted: boolean;
+    replayGain?: {
+      trackGain: number | null;
+      trackPeak: number | null;
+      albumGain: number | null;
+      albumPeak: number | null;
+    };
   }
 
   interface AudioInfo {
@@ -598,6 +609,11 @@ declare global {
     currentSong: CurrentSong;
     volume: Volume;
     playbackRate: number;
+    replayGain?: {
+      mode: 'track' | 'album' | 'off';
+      preampDb: number;
+      preventClipping: boolean;
+    };
   }
 
   type EqualizerBandFilters =
@@ -836,6 +852,21 @@ declare global {
   interface Album extends SavableAlbum {
     artworkPaths: ArtworkPaths;
   }
+
+  interface AlbumSummary {
+    albumId: number;
+    title: string;
+    year?: number;
+    isAFavorite: boolean;
+    artists: {
+      artistId: number;
+      name: string;
+    }[];
+    artworkPaths: ArtworkPaths;
+    songCount: number;
+  }
+
+  type AlbumLike = Album | AlbumSummary;
 
   // ? Artists related types
 

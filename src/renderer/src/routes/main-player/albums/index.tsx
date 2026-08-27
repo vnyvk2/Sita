@@ -15,16 +15,22 @@ import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { albumQuery } from '@renderer/queries/albums';
+import {
+  ALBUM_SUMMARY_PAGE_SIZE,
+  albumSummariesQuery,
+  albumSummariesQueryKey,
+  fetchAlbumSummariesPage
+} from '@renderer/queries/albums';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { albumSearchSchema } from '@renderer/utils/zod/albumSchema';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ListRange } from 'react-virtuoso';
 
 export const Route = createFileRoute('/main-player/albums/')({
   validateSearch: albumSearchSchema,
@@ -36,13 +42,12 @@ export const Route = createFileRoute('/main-player/albums/')({
   }),
   loader: async ({ deps }) => {
     const sortingState = store.state.localStorage.sortingStates.albumsPage;
-    await queryClient.ensureQueryData(
-      albumQuery.all({
+    await queryClient.fetchQuery(
+      albumSummariesQuery({
         sortType: deps.sortingOrder || sortingState || 'aToZ',
         filterType: deps.filteringOrder || 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: deps.keyword ?? ''
+        keyword: deps.keyword ?? '',
+        start: 0
       })
     );
   }
@@ -76,16 +81,46 @@ function AlbumsPage() {
     [sortingOrder, filteringOrder, keyword]
   );
 
-  const {
-    data: { data: albumsData }
-  } = useSuspenseQuery(
-    albumQuery.all({
+  const summariesQuery = useInfiniteQuery({
+    queryKey: albumSummariesQueryKey({
       sortType: sortingOrder,
       filterType: filteringOrder,
-      start: 0,
-      end: 0,
       keyword: keyword ?? ''
-    })
+    }),
+    queryFn: ({ pageParam }) =>
+      fetchAlbumSummariesPage(
+        { sortType: sortingOrder, filterType: filteringOrder, keyword: keyword ?? '' },
+        pageParam as number
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (keyword?.trim()) return undefined;
+      const fetched = lastPage.end;
+      return lastPage.data.length < ALBUM_SUMMARY_PAGE_SIZE ? undefined : fetched;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000
+  });
+
+  const albumsData = useMemo(
+    () => summariesQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [summariesQuery.data]
+  );
+
+  const latestRangeRef = useRef<ListRange | null>(null);
+  const handleGridRangeChange = useCallback(
+    (range: ListRange) => {
+      latestRangeRef.current = range;
+      if (
+        summariesQuery.hasNextPage &&
+        !summariesQuery.isFetchingNextPage &&
+        range.endIndex >= albumsData.length - 24
+      ) {
+        summariesQuery.fetchNextPage();
+      }
+    },
+    [albumsData.length, summariesQuery]
   );
 
   const search = usePageSearch({
@@ -250,6 +285,7 @@ function AlbumsPage() {
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
               scrollKey={scrollKey}
+              onChange={handleGridRangeChange}
               itemContent={(index, item) => {
                 return (
                   <Album

@@ -10,7 +10,16 @@ export default defineConfig({
     build: {
       sourcemap: true,
       minify: false,
-      rollupOptions: { input: '/src/main/main.ts', external: ['sharp'] }
+      rollupOptions: {
+        input: {
+          main: resolve(import.meta.dirname, 'src/main/main.ts'),
+          mediaWorker: resolve(import.meta.dirname, 'src/main/workers/process/mediaWorker.ts')
+        },
+        output: {
+          entryFileNames: '[name].js'
+        },
+        external: ['sharp']
+      }
     },
     resolve: {
       alias: {

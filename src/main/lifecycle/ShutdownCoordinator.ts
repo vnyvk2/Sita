@@ -8,6 +8,7 @@ import { savePendingSongLyrics } from '@main/saveLyricsToSong';
 import { savePendingMetadataUpdates } from '@main/updateSong/updateSongId3Tags';
 import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
 import { libraryScheduler } from '@main/workers/jobScheduler';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import type { BrowserWindow } from 'electron';
 
 import { ShutdownLogger } from './ShutdownLogger';
@@ -47,6 +48,7 @@ export class ShutdownCoordinator {
       await libraryScheduler.stop();
       adaptivePolicyEngine.stop();
       await libraryLifecycleController.shutdown();
+      await mediaWorkerBridge.terminate();
     } catch (error) {
       hasPartialFailures = true;
       logger.error('Error stopping schedulers and library lifecycle during shutdown:', { error });

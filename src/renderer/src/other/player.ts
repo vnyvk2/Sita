@@ -5,6 +5,7 @@ import storage from '../utils/localStorage';
 import { equalizerBandHertzData } from './equalizerData';
 import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
+import { computeEffectiveReplayGain } from './replayGainCalculator';
 
 const DEBUG_PLAYER = false;
 
@@ -51,8 +52,14 @@ class AudioPlayer {
   currentContext: AudioContext;
   equalizerBands: Map<EqualizerBandFilters, BiquadFilterNode>;
   gainNode: GainNode;
+  replayGainNode: GainNode;
 
   unsubscribeFunc: Subscription;
+
+  private currentSongData: AudioPlayerData | null = null;
+  private lastReplayGainMode: string | undefined;
+  private lastPreampDb: number | undefined;
+  private lastPreventClipping: boolean | undefined;
 
   private repeatMode: 'off' | 'one' | 'all' = 'off';
   private pendingAutoPlay: boolean = false;
@@ -78,6 +85,8 @@ class AudioPlayer {
     this.currentContext = new window.AudioContext();
     this.equalizerBands = new Map();
     this.gainNode = this.currentContext.createGain();
+    this.replayGainNode = this.currentContext.createGain();
+    this.replayGainNode.gain.value = 1.0;
 
     this.currentVolume = this.audio.volume;
 
@@ -279,6 +288,9 @@ class AudioPlayer {
         options
       });
 
+      this.currentSongData = songData;
+      this.applyReplayGain();
+
       // 1. Set audio source (clean protocol path without cache-busting)
       this.audio.src = songData.path;
 
@@ -385,7 +397,9 @@ class AudioPlayer {
         const currentTime = this.currentContext.currentTime;
         this.gainNode.gain.cancelScheduledValues(currentTime);
         this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
-      } catch {}
+      } catch {
+        // AudioContext may be closed or in transition; ignore parameter cancel errors
+      }
       this.activeFade.resolve();
       this.activeFade = null;
     }
@@ -503,11 +517,12 @@ class AudioPlayer {
         const prevFilter = map.get(filterMapKeys[currentFilterIndex - 1]);
         if (prevFilter) prevFilter.connect(filter);
 
-        if (isTheLastFilter) filter.connect(this.gainNode);
+        if (isTheLastFilter) filter.connect(this.replayGainNode);
       }
     });
 
-    // Connect gain node to destination
+    // ReplayGain node connects to master gain node, which connects to destination
+    this.replayGainNode.connect(this.gainNode);
     this.gainNode.connect(this.currentContext.destination);
   }
 
@@ -526,15 +541,73 @@ class AudioPlayer {
   private subscribeToStoreEvents() {
     const unsubscribeFunction = store.subscribe(() => {
       if (store) {
-        const { player } = store.state;
+        const { player, localStorage } = store.state;
 
         this.updatePlayerVolume(player.volume);
         this.updatePlaybackRate(player.playbackRate);
         this.syncRepeatModeFromStore(player.isRepeating);
+
+        const rg = localStorage?.playback?.replayGain;
+        if (
+          rg &&
+          (rg.mode !== this.lastReplayGainMode ||
+            rg.preampDb !== this.lastPreampDb ||
+            rg.preventClipping !== this.lastPreventClipping)
+        ) {
+          this.lastReplayGainMode = rg.mode;
+          this.lastPreampDb = rg.preampDb;
+          this.lastPreventClipping = rg.preventClipping;
+          this.applyReplayGain();
+        }
       }
     });
 
     return unsubscribeFunction;
+  }
+
+  /**
+   * Applies ReplayGain to this.replayGainNode using smooth exponential ramping.
+   * Master volume and ducking remain entirely separate on this.gainNode.
+   */
+  public applyReplayGain() {
+    const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
+      mode: 'track',
+      preampDb: 0,
+      preventClipping: true
+    };
+
+    const calculation = computeEffectiveReplayGain({
+      mode: settings.mode,
+      preampDb: settings.preampDb,
+      preventClipping: settings.preventClipping,
+      trackGain: this.currentSongData?.replayGain?.trackGain,
+      trackPeak: this.currentSongData?.replayGain?.trackPeak,
+      albumGain: this.currentSongData?.replayGain?.albumGain,
+      albumPeak: this.currentSongData?.replayGain?.albumPeak
+    });
+
+    const now = this.currentContext.currentTime;
+    // Exponential smoothing with time constant 0.05s to prevent audio pops/zippering
+    if (typeof this.replayGainNode.gain.setTargetAtTime === 'function') {
+      this.replayGainNode.gain.setTargetAtTime(calculation.targetLinearGain, now, 0.05);
+    } else {
+      this.replayGainNode.gain.value = calculation.targetLinearGain;
+    }
+
+    logPlayer('[AudioPlayer.applyReplayGain]', {
+      songId: this.currentSongData?.songId,
+      mode: settings.mode,
+      targetLinearGain: calculation.targetLinearGain,
+      appliedGainDb: calculation.appliedGainDb,
+      isClipped: calculation.isClipped
+    });
+  }
+
+  public updateReplayGainSettings(settings?: Playback['replayGain']) {
+    if (settings) {
+      storage.playback.setPlaybackOptions('replayGain', settings);
+    }
+    this.applyReplayGain();
   }
 
   private syncRepeatModeFromStore(isRepeating: RepeatTypes) {

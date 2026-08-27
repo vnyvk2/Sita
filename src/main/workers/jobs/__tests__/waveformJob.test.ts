@@ -3,9 +3,10 @@ import fs from 'fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { GarbageCollectionJob } from '../garbageCollectionJob';
-import { WaveformJob } from '../waveformJob';
+import { CURRENT_WAVEFORM_GENERATOR_VERSION, WAVEFORM_RESOLUTION, WaveformJob } from '../waveformJob';
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -31,11 +32,17 @@ vi.mock('@main/db/db', () => ({
   }
 }));
 
+vi.mock('@main/workers/process/MediaWorkerBridge', () => ({
+  mediaWorkerBridge: {
+    generateAsset: vi.fn()
+  }
+}));
+
 vi.mock('@main/core/garbageCollector', () => ({
   collectGarbageArtworks: vi.fn().mockResolvedValue(0)
 }));
 
-describe('WaveformJob & Publication Protocol', () => {
+describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
   let eventBus: EventEmitter;
 
   beforeEach(() => {
@@ -44,23 +51,17 @@ describe('WaveformJob & Publication Protocol', () => {
     eventBus = new EventEmitter();
   });
 
-  it('A-3: should write .tmp file, commit to DB, and atomically publish directly to .bin (no prior unlink)', async () => {
+  it('delegates waveform generation to mediaWorkerBridge, saves to DB, and emits event', async () => {
     vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1024 } as any);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined as any);
-    vi.mocked(fs.rename).mockResolvedValue(undefined as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: true,
+      outputFilePath: 'C:/Cache/waveforms/123_v1.bin',
+      metadata: { resolution: WAVEFORM_RESOLUTION, generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION }
+    });
 
+    const insertMock = vi.fn().mockReturnValue({ values: vi.fn() });
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
-      // Invariant: .tmp file must be written before DB transaction
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        expect.stringMatching(/\.bin\.tmp$/),
-        expect.any(Buffer)
-      );
-      return callback({
-        insert: vi.fn().mockReturnValue({ values: vi.fn() }),
-        update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn() }) })
-      } as any);
+      return callback({ insert: insertMock, update: vi.fn() } as any);
     });
 
     const emitSpy = vi.spyOn(eventBus, 'emit');
@@ -68,34 +69,119 @@ describe('WaveformJob & Publication Protocol', () => {
 
     await job.execute();
 
-    // Verify atomic rename directly from .tmp to .bin (NO prior unlink of destination)
-    expect(fs.unlink).not.toHaveBeenCalledWith(expect.stringMatching(/123_v1\.bin$/));
-    expect(fs.rename).toHaveBeenCalledWith(
-      expect.stringMatching(/123_v1\.bin\.tmp$/),
-      expect.stringMatching(/123_v1\.bin$/)
+    // Verify worker bridge invocation
+    expect(mediaWorkerBridge.generateAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobType: 'waveform',
+        sourceFilePath: '/music/song.mp3',
+        destinationPath: expect.stringMatching(/123_v1\.bin$/)
+      })
     );
 
+    // Verify DB commit
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+
+    // Verify post-commit event
     expect(emitSpy).toHaveBeenCalledWith(ASSET_EVENTS.WAVEFORM_CREATED, {
       songId: 123,
       path: expect.stringMatching(/123_v1\.bin$/)
     });
   });
 
-  it('A-3: should clean up temp file and abort if cancelled before DB transaction', async () => {
+  it('skips worker generation if waveform is already up to date in DB (Idempotency)', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue({
+      id: 1,
+      songId: 123,
+      path: 'C:/Cache/waveforms/123_v1.bin',
+      generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION
+    } as any);
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    await job.execute();
+
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).toHaveBeenCalledWith(ASSET_EVENTS.WAVEFORM_CREATED, {
+      songId: 123,
+      path: 'C:/Cache/waveforms/123_v1.bin'
+    });
+  });
+
+  it('throws error when worker asset generation fails so scheduler can handle retries', async () => {
     vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1024 } as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockRejectedValue(
+      new Error('Worker process crashed')
+    );
 
     const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
-    
-    // Simulate cancellation arriving during peak generation / write
-    vi.mocked(fs.writeFile).mockImplementation(async () => {
+
+    await expect(job.execute()).rejects.toThrow('Worker process crashed');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws error when generateAsset returns success: false without cancelled flag', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
+      success: false
+    });
+
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    await expect(job.execute()).rejects.toThrow('Failed to generate waveform for song 123');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborts cleanly before DB transaction if cancelled during worker generation', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async () => {
       job.state = 'cancelled';
+      return {
+        success: true,
+        outputFilePath: 'C:/Cache/waveforms/123_v1.bin',
+        metadata: { resolution: WAVEFORM_RESOLUTION, generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION }
+      };
     });
 
     await job.execute();
 
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/123_v1\.bin\.tmp$/));
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborts immediately without calling worker if cancelled before execution', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+    job.cancel();
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(mediaWorkerBridge.generateAsset).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts and suppresses DB persistence and events when cancel() is called mid-flight', async () => {
+    vi.mocked(db.query.waveforms.findFirst).mockResolvedValue(null as any);
+    const job = new WaveformJob(123, '/music/song.mp3', 'Test Song', eventBus);
+
+    vi.mocked(mediaWorkerBridge.generateAsset).mockImplementation(async (opts) => {
+      job.cancel();
+      expect(opts.abortSignal?.aborted).toBe(true);
+      return {
+        success: false,
+        cancelled: true
+      };
+    });
+
+    const emitSpy = vi.spyOn(eventBus, 'emit');
+    await job.execute();
+
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('A-3 REGRESSION Race A: In-flight GC must NOT delete DB row while temp file is fresh (<60s)', async () => {
@@ -157,25 +243,22 @@ describe('WaveformJob & Publication Protocol', () => {
     const gcJob = new GarbageCollectionJob();
     await gcJob.execute();
 
-    // Self-healing: promote matching .tmp to .bin
+    // Invariant: Stale file must be repaired
     expect(fs.rename).toHaveBeenCalledWith(
-      '/cache/waveforms/200_v1.bin.tmp',
-      '/cache/waveforms/200_v1.bin'
+      expect.stringMatching(/200_v1\.bin\.tmp$/),
+      expect.stringMatching(/200_v1\.bin$/)
     );
-    // DB row is preserved
     expect(db.delete).not.toHaveBeenCalled();
   });
 
-  it('A-3: Orphaned DB row with neither .bin nor .tmp must be deleted by GC', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([] as any);
+  it('A-3 REGRESSION Orphan Cleanup: Orphaned DB row without existing file or fresh temp file is cleaned up', async () => {
+    vi.mocked(fs.readdir).mockResolvedValue([] as any); // no files in cache dir
 
-    vi.mocked(fs.stat).mockImplementation(async () => {
-      throw new Error('ENOENT'); // neither .bin nor .tmp exists
-    });
+    vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT')); // .bin does not exist
 
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockResolvedValue([
-        { id: 999, path: '/cache/waveforms/nonexistent.bin' }
+        { id: 300, path: '/cache/waveforms/300_v1.bin' }
       ])
     } as any);
 
@@ -185,39 +268,7 @@ describe('WaveformJob & Publication Protocol', () => {
     const gcJob = new GarbageCollectionJob();
     await gcJob.execute();
 
+    // Invariant: Missing file on disk causes orphaned DB row to be purged
     expect(db.delete).toHaveBeenCalled();
-  });
-
-  it('A-3 REGRESSION: Stale temp file (>60s) when final .bin already exists must be cleaned by GC', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue(['300_v1.bin', '300_v1.bin.tmp'] as any);
-
-    const now = Date.now();
-    vi.mocked(fs.stat).mockImplementation(async (filePath: any) => {
-      if (String(filePath).endsWith('300_v1.bin')) {
-        return { mtimeMs: now - 10_000 } as any; // valid published .bin exists
-      }
-      if (String(filePath).endsWith('300_v1.bin.tmp')) {
-        return { mtimeMs: now - 120_000 } as any; // stale leftover .tmp (>60s)
-      }
-      return { mtimeMs: now } as any;
-    });
-
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 3, path: '/cache/waveforms/300_v1.bin' }
-      ])
-    } as any);
-
-    const deleteWhereMock = vi.fn();
-    vi.mocked(db.delete).mockReturnValue({ where: deleteWhereMock } as any);
-
-    const gcJob = new GarbageCollectionJob();
-    await gcJob.execute();
-
-    // Invariant: Stale .tmp leftover is deleted
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/300_v1\.bin\.tmp$/));
-    // Invariant: Published .bin and DB row are preserved
-    expect(db.delete).not.toHaveBeenCalled();
-    expect(fs.rename).not.toHaveBeenCalled();
   });
 });

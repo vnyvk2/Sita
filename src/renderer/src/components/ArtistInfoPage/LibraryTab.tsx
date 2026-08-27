@@ -215,7 +215,7 @@ export function LibraryTab({
             iconName="favorite"
             iconClassName={`text-4xl! leading-none! ${
               artistData?.isAFavorite
-                ? 'material-icons-round text-[#FF2D55]!'
+                ? 'material-icons-round text-font-color-favorite!'
                 : 'material-icons-round-outlined'
             }`}
             clickHandler={() => {

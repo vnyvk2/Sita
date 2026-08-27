@@ -587,7 +587,7 @@
   --heart-x1: 8px; --heart-y1: -18px; --heart-scale1: 1.35; --heart-rot1: 14deg;
   --heart-x2: 2px; --heart-y2: -36px; --heart-scale2: 1;    --heart-rot2: 6deg;
   --heart-x3: 6px; --heart-y3: -52px; --heart-scale3: 0.3;  --heart-rot3: 12deg;
-  filter: drop-shadow(0 0 4px rgba(255, 45, 85, 0.5));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-favorite) 50%, transparent));
 }
 
 .fx-float-heart.m-mid1 {

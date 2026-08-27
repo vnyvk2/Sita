@@ -5,14 +5,23 @@ import { analyticsQuery } from '@renderer/queries/analytics';
 import { artistQuery } from '@renderer/queries/artists';
 import { genreQuery } from '@renderer/queries/genres';
 import { homeQuery } from '@renderer/queries/home';
+import {
+  SONG_WINDOW_SIZE,
+  getSongListIdentity,
+  songCacheKeys,
+  songQuery,
+  type SongIdsResult
+} from '@renderer/queries/songs';
 import { searchQuery } from '@renderer/queries/search';
 import { settingsQuery } from '@renderer/queries/settings';
-import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { useEffect, useRef } from 'react';
 
 export type InvalidationTargetKey =
   | 'songs:all'
+  | 'songs:ids'
+  | 'songs:facets'
+  | 'songs:windows'
   | 'songs:favorites'
   | 'songs:history'
   | 'songs:recentlyAdded'
@@ -40,24 +49,28 @@ export type InvalidationTargetKey =
  *
  * Invariants:
  *
- * - Songs/artworks affects getAllSongs because its returned rows include artworkPaths. Do not remove
- *   'songs:all' without auditing that return shape.
- * - Songs/palette, songs/lyrics do NOT affect bulk song lists.
- * - Domain events (artists/_, albums/_, genres/*) only affect their respective domain queries.
- * - Never use broad homeQuery._def; target specific home queries.
+ * - Bulk hydration keys are gone: ID lists live under songQuery.ids; row objects live under
+ *   ['songs','window',version,start]. 'songs:all' is kept only as a transition-safety net for
+ *   consumers not yet converted.
+ * - 'songs:windows' requires changed song ids from eventData; the batcher resolves them to the
+ *   exact containing window keys of every active ID list (surgical row refresh, no version bump,
+ *   no scroll disturbance).
+ * - Structural song changes (add/delete/blacklist/tag edits affecting order or filters) bump the
+ *   ID lists instead; new versions orphan old windows which gc naturally.
  */
 export function getInvalidationTargetsForEvent(
   dataType: DataUpdateEventTypes
 ): InvalidationTargetKey[] {
   switch (dataType) {
-    // 1. Structural song changes (new, updated, deleted, general song events)
+    // 1. Structural song changes: list membership / ordering may change
     case 'songs':
     case 'songs/newSong':
-    case 'songs/updatedSong':
     case 'songs/deletedSong':
     case 'blacklist/songBlacklist':
       return [
         'songs:all',
+        'songs:ids',
+        'songs:facets',
         'songs:recentlyAdded',
         'songs:history',
         'search:query',
@@ -66,19 +79,29 @@ export function getInvalidationTargetsForEvent(
         'analytics:libraryStats'
       ];
 
-    // 2. Song likes / favorites
+    // 2. Tag edits: may affect sort position or filter membership; ids refetch is ~tens of ms
+    case 'songs/updatedSong':
+      return [
+        'songs:all',
+        'songs:ids',
+        'songs:facets',
+        'songs:recentlyAdded',
+        'songs:history',
+        'search:query',
+        'home:recentlyPlayedSongs',
+        'analytics:listening'
+      ];
+
     case 'songs/likes':
-      return ['songs:favorites', 'home:mostLovedSongs', 'songs:singleInfo'];
+      return ['songs:favorites', 'home:mostLovedSongs', 'songs:singleInfo', 'songs:windows'];
 
-    // 3. Song Artworks: affects getAllSongs because its returned rows include artworkPaths.
     case 'songs/artworks':
-      return ['songs:all', 'songs:allInfo', 'songs:singleInfo', 'albums:all', 'albums:single'];
+      return ['songs:all', 'songs:allInfo', 'songs:singleInfo', 'songs:windows', 'albums:all', 'albums:single'];
 
-    // 4. Pure song assets (palette, lyrics, listening data) -> Do NOT invalidate bulk song list queries
     case 'songs/palette':
-      return []; // Consumed by player theme/components without React Query list invalidation
+      return [];
     case 'songs/lyrics':
-      return []; // Handled by lyrics query/viewer directly
+      return [];
     case 'songs/listeningData':
     case 'songs/listeningData/fullSongListens':
     case 'songs/listeningData/skips':
@@ -147,6 +170,12 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
   switch (target) {
     case 'songs:all':
       client.invalidateQueries({ queryKey: songQuery.all._def });
+      break;
+    case 'songs:ids':
+      client.invalidateQueries({ queryKey: songQuery.ids._def });
+      break;
+    case 'songs:facets':
+      client.invalidateQueries({ queryKey: songQuery.facets._def });
       break;
     case 'songs:favorites':
       client.invalidateQueries({ queryKey: songQuery.favorites._def });
@@ -220,8 +249,44 @@ export const defaultRafScheduler: SchedulerFn = (callback) => {
   return () => cancelAnimationFrame(handle);
 };
 
+/**
+ * Invalidates exactly the hydration windows that contain the changed song ids, across every
+ * cached ID list version. Rows refetch in place (~40KB per window) without bumping the ID list
+ * version, so scroll position and list ordering are untouched.
+ */
+export function invalidateWindowsContainingIds(
+  client: typeof queryClient,
+  changedIds: ReadonlySet<number>
+): void {
+  if (changedIds.size === 0) return;
+  const idQueries = client.getQueryCache().findAll({ queryKey: songQuery.ids._def });
+
+  for (const listQuery of idQueries) {
+    const data = listQuery.state.data as SongIdsResult | undefined;
+    const dataUpdatedAt = listQuery.state.dataUpdatedAt;
+    if (!data?.ids?.length || !dataUpdatedAt) continue;
+
+    // listQuery.queryKey is ['songs', 'ids', params]
+    const params = listQuery.queryKey[2];
+    const listIdentity = getSongListIdentity(params);
+    const version = Math.floor(dataUpdatedAt);
+    const indexById = new Map<number, number>();
+    for (let i = 0; i < data.ids.length; i += 1) {
+      indexById.set(data.ids[i], i);
+    }
+
+    for (const id of changedIds) {
+      const index = indexById.get(id);
+      if (index === undefined) continue;
+      const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
+      client.invalidateQueries({ queryKey: songCacheKeys.window(listIdentity, version, windowStart) });
+    }
+  }
+}
+
 export class DataSyncBatcher {
   private pendingTargets = new Set<InvalidationTargetKey>();
+  private pendingChangedIds = new Set<number>();
   private cancelScheduledFlush: (() => void) | null = null;
   private scheduler: SchedulerFn;
   private client: typeof queryClient;
@@ -237,9 +302,16 @@ export class DataSyncBatcher {
       for (const target of targets) {
         this.pendingTargets.add(target);
       }
+      for (const payload of event.eventData ?? []) {
+        if (Array.isArray(payload?.data)) {
+          for (const id of payload.data) {
+            if (typeof id === 'number') this.pendingChangedIds.add(id);
+          }
+        }
+      }
     }
 
-    if (this.pendingTargets.size > 0 && !this.cancelScheduledFlush) {
+    if ((this.pendingTargets.size > 0 || this.pendingChangedIds.size > 0) && !this.cancelScheduledFlush) {
       this.cancelScheduledFlush = this.scheduler(() => {
         this.flush();
       });
@@ -252,10 +324,17 @@ export class DataSyncBatcher {
       this.cancelScheduledFlush = null;
     }
     const targetsToInvalidate = Array.from(this.pendingTargets);
+    const changedIds = new Set(this.pendingChangedIds);
     this.pendingTargets.clear();
+    this.pendingChangedIds.clear();
 
     for (const target of targetsToInvalidate) {
+      if (target === 'songs:windows') continue;
       invalidateTarget(target, this.client);
+    }
+
+    if (changedIds.size > 0) {
+      invalidateWindowsContainingIds(this.client, changedIds);
     }
   }
 
@@ -265,6 +344,7 @@ export class DataSyncBatcher {
       this.cancelScheduledFlush = null;
     }
     this.pendingTargets.clear();
+    this.pendingChangedIds.clear();
   }
 }
 

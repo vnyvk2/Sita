@@ -1,12 +1,17 @@
 import path from 'path';
 
+import { db } from '@main/db/db';
+import { processArtworkFiles } from '@main/other/artworks';
+import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
+import { tryToParseSong } from '@main/parseSong/parseSong';
+import { ArtworkJob } from '@main/workers/jobs/artworkJob';
+import { LyricsJob } from '@main/workers/jobs/lyricsJob';
+import { ReplayGainJob } from '@main/workers/jobs/replayGainJob';
+import { WaveformJob } from '@main/workers/jobs/waveformJob';
+import { libraryScheduler } from '@main/workers/jobScheduler';
+
 import logger from '../logger';
-import { tryToParseSong } from '../parseSong/parseSong';
-import { ArtworkJob } from '../workers/jobs/artworkJob';
-import { LyricsJob } from '../workers/jobs/lyricsJob';
-import { ReplayGainJob } from '../workers/jobs/replayGainJob';
-import { WaveformJob } from '../workers/jobs/waveformJob';
-import { libraryScheduler } from '../workers/jobScheduler';
+import { dataUpdateEvent } from '../main';
 
 export interface SongPoolInput {
   songPath: string;
@@ -19,17 +24,52 @@ export interface WorkerPoolResult {
   errors: Array<{ path: string; error: string }>;
 }
 
+export interface SongIngestionMetrics {
+  workerParseCount: number;
+  localParseFallbackCount: number;
+  workerPid?: number;
+  batchesProcessed: number;
+  totalArtworkBytes: number;
+  dbTxDurations: number[];
+  artworkDurations: number[];
+}
+
+export const songIngestionMetrics: SongIngestionMetrics = {
+  workerParseCount: 0,
+  localParseFallbackCount: 0,
+  batchesProcessed: 0,
+  totalArtworkBytes: 0,
+  dbTxDurations: [],
+  artworkDurations: []
+};
+
+export function getSongIngestionMetrics(): Readonly<SongIngestionMetrics> {
+  return { ...songIngestionMetrics };
+}
+
+export function resetSongIngestionMetrics(): void {
+  songIngestionMetrics.workerParseCount = 0;
+  songIngestionMetrics.localParseFallbackCount = 0;
+  songIngestionMetrics.workerPid = undefined;
+  songIngestionMetrics.batchesProcessed = 0;
+  songIngestionMetrics.totalArtworkBytes = 0;
+  songIngestionMetrics.dbTxDurations = [];
+  songIngestionMetrics.artworkDurations = [];
+}
+
 /**
- * ProcessSongsWithWorkerPool is the single canonical ingestion pipeline for bulk song discovery. It
- * uses bounded concurrency, safe error isolation, clean cancellation, and automatically routes new
- * albums to the libraryScheduler to ensure Architectural Invariants are met.
+ * Local in-process fallback implementation.
+ * Used in Vitest unit test environments or if the utilityProcess worker is unavailable.
  */
-export const processSongsWithWorkerPool = async (
+export const processSongsWithWorkerPoolLocal = async (
   songs: SongPoolInput[],
   abortSignal?: AbortSignal,
   updateProgress?: (current: number, total: number) => void,
   maxConcurrency = 8
 ): Promise<WorkerPoolResult> => {
+  songIngestionMetrics.localParseFallbackCount += songs.length;
+  performance.mark('songWorkerPool:executionMode:local_fallback');
+
   const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
   const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
   const errors: Array<{ path: string; error: string }> = [];
@@ -127,4 +167,253 @@ export const processSongsWithWorkerPool = async (
     errorCount: errors.length,
     errors
   };
+};
+
+/**
+ * Single canonical ingestion pipeline for bulk song discovery.
+ *
+ * In Electron runtime (Phase C3):
+ * 1. Delegates CPU-heavy ID3 tag parsing and file stats to the utilityProcess.
+ * 2. Streams parsed tracks to Main in bounded 100-track batches with explicit backpressure.
+ * 3. Pre-processes artwork files (Sharp decode + disk writes) OUTSIDE of the DB transaction.
+ * 4. Commits pure DB operations within a single Drizzle transaction per 100 tracks.
+ * 5. Measures DB transaction latency and artwork duration separately (P50/P95).
+ * 6. Yields to the libuv event loop (setImmediate) between transactions to prevent UI starvation.
+ * 7. Enforces batch-boundary cancellation: active batch commits atomically; subsequent batches are discarded.
+ */
+export const processSongsWithWorkerPool = async (
+  songs: SongPoolInput[],
+  abortSignal?: AbortSignal,
+  updateProgress?: (current: number, total: number) => void,
+  maxConcurrency = 8
+): Promise<WorkerPoolResult> => {
+  if (songs.length === 0) {
+    return { successCount: 0, errorCount: 0, errors: [] };
+  }
+
+  const { mediaWorkerBridge } = await import('../workers/process/MediaWorkerBridge');
+
+  if (mediaWorkerBridge.isReady()) {
+    const albumAssetsToQueue = new Map<number, { path: string; title: string }>();
+    const songAssetsToQueue: Array<{ id: number; path: string; title: string }> = [];
+    const errors: Array<{ path: string; error: string }> = [];
+    const newSongIds: number[] = [];
+    const newArtistIds: number[] = [];
+    const newAlbumIds: number[] = [];
+    const newGenreIds: number[] = [];
+    let successCount = 0;
+    let durablyCommittedSongCount = 0;
+
+    try {
+      performance.mark('songWorkerPool:executionMode:worker');
+      const workerPid = mediaWorkerBridge.getWorkerPid();
+      songIngestionMetrics.workerPid = workerPid;
+
+      logger.info(`[songWorkerPool] Ingesting ${songs.length} tracks via utilityProcess worker (pid: ${workerPid ?? 'unknown'})...`);
+
+      await mediaWorkerBridge.parseTrackBatchStream(songs, {
+        batchSize: 100,
+        abortSignal,
+        onBatch: async (batch) => {
+          // BATCH-BOUNDARY CANCELLATION SEMANTICS:
+          // If the user cancelled the scan while this batch was in transit,
+          // discard this and all subsequent batches immediately without touching DB.
+          if (abortSignal?.aborted) {
+            logger.info(`[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`);
+            return;
+          }
+
+          if (batch.tracks.length > 0) {
+            songIngestionMetrics.batchesProcessed++;
+            songIngestionMetrics.workerParseCount += batch.tracks.length;
+
+            // 1. Calculate batch artwork payload size
+            const batchArtworkBytes = batch.tracks.reduce(
+              (acc, t) => acc + (t.rawPictureBytes?.byteLength ?? 0),
+              0
+            );
+            songIngestionMetrics.totalArtworkBytes += batchArtworkBytes;
+
+            // 2. Pre-process artwork files OUTSIDE of the DB transaction
+            // If worker already generated artwork files, reuse the lightweight payloads directly.
+            // Only fall back to local processArtworkFiles if rawPictureBytes was passed without preprocessed payloads.
+            const artworkStart = performance.now();
+            const preprocessedArtworks = await Promise.all(
+              batch.tracks.map(async (t) => {
+                if (t.artworkPayloads && t.artworkPayloads.length > 0) {
+                  return { payloads: t.artworkPayloads };
+                }
+                return processArtworkFiles('songs', t.rawPictureBytes);
+              })
+            );
+            const artworkDuration = performance.now() - artworkStart;
+            songIngestionMetrics.artworkDurations.push(artworkDuration);
+
+            // 3. Execute pure DB transaction (no filesystem/sharp work inside transaction lock)
+            const dbTxStart = performance.now();
+            await db.transaction(async (trx) => {
+              for (let i = 0; i < batch.tracks.length; i++) {
+                const track = batch.tracks[i];
+                const artwork = preprocessedArtworks[i];
+
+                try {
+                  const res = await ingestTrackDTO(track, trx, artwork);
+                  if (res) {
+                    successCount++;
+                    newSongIds.push(res.songData.id);
+                    songAssetsToQueue.push({
+                      id: res.songData.id,
+                      path: track.songPath,
+                      title: res.songData.title
+                    });
+
+                    const album = res.newAlbum || res.relevantAlbum;
+                    if (album && !albumAssetsToQueue.has(album.id)) {
+                      albumAssetsToQueue.set(album.id, {
+                        path: track.songPath,
+                        title: album.title
+                      });
+                    }
+
+                    if (res.newAlbum) newAlbumIds.push(res.newAlbum.id);
+                    if (res.newArtists.length > 0) {
+                      newArtistIds.push(...res.newArtists.map((a) => a.id));
+                    }
+                    if (res.newGenres.length > 0) {
+                      newGenreIds.push(...res.newGenres.map((g) => g.id));
+                    }
+                  }
+                } catch (trackErr) {
+                  const msg = trackErr instanceof Error ? trackErr.message : String(trackErr);
+                  errors.push({ path: track.songPath, error: msg });
+                }
+              }
+            });
+            const dbTxDuration = performance.now() - dbTxStart;
+            songIngestionMetrics.dbTxDurations.push(dbTxDuration);
+
+            // Invariant: Durably committed boundary advances ONLY AFTER the DB transaction succeeds
+            durablyCommittedSongCount += batch.tracks.length + batch.errors.length;
+
+            logger.info(
+              `[songWorkerPool] Batch ${batch.batchId} (${batch.tracks.length} tracks, ${(batchArtworkBytes / 1024 / 1024).toFixed(2)} MB artwork): artwork=${artworkDuration.toFixed(1)}ms, pureDbTx=${dbTxDuration.toFixed(1)}ms`
+            );
+          }
+
+          if (batch.errors.length > 0) {
+            for (const err of batch.errors) {
+              errors.push({ path: err.path, error: err.error });
+            }
+          }
+
+          if (updateProgress) {
+            updateProgress(successCount + errors.length, songs.length);
+          }
+
+          // Yield to the libuv event loop to allow IPC messages and renderer tasks to process
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+      });
+
+      // Log isolated transaction and artwork latency percentiles
+      if (songIngestionMetrics.dbTxDurations.length > 0) {
+        const sortedDb = [...songIngestionMetrics.dbTxDurations].sort((a, b) => a - b);
+        const sortedArt = [...songIngestionMetrics.artworkDurations].sort((a, b) => a - b);
+        const dbP50 = sortedDb[Math.floor(sortedDb.length * 0.5)];
+        const dbP95 = sortedDb[Math.floor(sortedDb.length * 0.95)];
+        const artP50 = sortedArt[Math.floor(sortedArt.length * 0.5)];
+        const artP95 = sortedArt[Math.floor(sortedArt.length * 0.95)];
+
+        logger.info(
+          `[songWorkerPool] Ingestion complete: ${successCount} tracks in ${songIngestionMetrics.batchesProcessed} batches (${(songIngestionMetrics.totalArtworkBytes / 1024 / 1024).toFixed(1)} MB total artwork).\n` +
+          `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
+          `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
+        );
+      }
+
+      if (!abortSignal?.aborted) {
+        // Enqueue background asset jobs
+        if (albumAssetsToQueue.size > 0) {
+          for (const [albumId, data] of albumAssetsToQueue.entries()) {
+            libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+          }
+        }
+
+        if (songAssetsToQueue.length > 0) {
+          for (const song of songAssetsToQueue) {
+            libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+            libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
+            );
+          }
+        }
+
+        // Notify renderer of updates
+        if (newSongIds.length > 0) dataUpdateEvent('songs/newSong', newSongIds);
+        if (newArtistIds.length > 0) dataUpdateEvent('artists/newArtist', newArtistIds);
+        if (newAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', newAlbumIds);
+        if (newGenreIds.length > 0) dataUpdateEvent('genres/newGenre', newGenreIds);
+      }
+
+      return {
+        successCount,
+        errorCount: errors.length,
+        errors
+      };
+    } catch (workerErr) {
+      logger.error(
+        `[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed at committed count ${durablyCommittedSongCount}/${songs.length}. Falling back to local ingestion in Main.`,
+        { error: workerErr }
+      );
+
+      // Enqueue background asset jobs and fire data update events for already committed tracks
+      if (!abortSignal?.aborted) {
+        if (albumAssetsToQueue.size > 0) {
+          for (const [albumId, data] of albumAssetsToQueue.entries()) {
+            libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+          }
+        }
+        if (songAssetsToQueue.length > 0) {
+          for (const song of songAssetsToQueue) {
+            libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+            libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
+            );
+          }
+        }
+        if (newSongIds.length > 0) dataUpdateEvent('songs/newSong', newSongIds);
+        if (newArtistIds.length > 0) dataUpdateEvent('artists/newArtist', newArtistIds);
+        if (newAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', newAlbumIds);
+        if (newGenreIds.length > 0) dataUpdateEvent('genres/newGenre', newGenreIds);
+      }
+
+      const remainingSongs = songs.slice(durablyCommittedSongCount);
+      if (remainingSongs.length === 0) {
+        return {
+          successCount,
+          errorCount: errors.length,
+          errors
+        };
+      }
+
+      const localResult = await processSongsWithWorkerPoolLocal(
+        remainingSongs,
+        abortSignal,
+        updateProgress
+          ? (current, _total) => updateProgress(durablyCommittedSongCount + current, songs.length)
+          : undefined,
+        maxConcurrency
+      );
+
+      return {
+        successCount: successCount + localResult.successCount,
+        errorCount: errors.length + localResult.errorCount,
+        errors: [...errors, ...localResult.errors]
+      };
+    }
+  }
+
+  return processSongsWithWorkerPoolLocal(songs, abortSignal, updateProgress, maxConcurrency);
 };

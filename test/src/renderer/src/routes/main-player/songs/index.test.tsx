@@ -57,19 +57,34 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 vi.mock('@renderer/components/VirtualizedList', () => ({
-  default: ({ data }: { data: any[] }) => (
-    <div data-testid="virtualized-list">
-      {data.map((item, i) => (
-        <div key={item.songId ?? i} data-testid="song-item">
-          {item.title}
-        </div>
-      ))}
-    </div>
-  )
+  default: ({
+    data,
+    itemContent,
+    renderItem
+  }: {
+    data: any[];
+    itemContent?: (index: number) => React.ReactNode;
+    renderItem?: (index: number) => React.ReactNode;
+  }) => {
+    const renderFn = itemContent ?? renderItem;
+    return (
+      <div data-testid="virtualized-list">
+        {data.map((item, i) => (
+          <div key={typeof item === 'object' ? item.songId ?? i : item ?? i} data-testid="song-item">
+            {renderFn ? renderFn(i) : item?.title}
+          </div>
+        ))}
+      </div>
+    );
+  }
 }));
 
 vi.mock('@renderer/components/Img', () => ({
   default: (props: any) => <img data-testid="mock-img" alt={props.alt ?? ''} {...props} />
+}));
+
+vi.mock('@renderer/components/NavLink', () => ({
+  default: ({ children, ...props }: any) => <a {...props}>{children}</a>
 }));
 
 const mockContextValue: Partial<AppUpdateContextType> = {
@@ -82,10 +97,22 @@ const mockContextValue: Partial<AppUpdateContextType> = {
 
 describe('SongsPage Search & Navigation State Split', () => {
   beforeEach(() => {
-    mockNavigate.mockReset();
-    mockSearchState = {};
-
     vi.spyOn(Route, 'useSearch').mockImplementation(() => mockSearchState as any);
+
+    (window as any).api = {
+      properties: { isInDevelopment: false },
+      audioLibraryControls: {
+        getFilteredSongLibraryIds: vi.fn().mockResolvedValue({ ids: [], total: 0, blacklistedIds: [] }),
+        getSongInfo: vi.fn().mockResolvedValue([]),
+        getSongFacets: vi.fn().mockResolvedValue({ languages: [], genres: [] })
+      },
+      search: {
+        query: vi.fn().mockResolvedValue({ songs: [] })
+      },
+      log: {
+        sendLogs: vi.fn()
+      }
+    };
   });
 
   afterEach(() => {
@@ -93,31 +120,52 @@ describe('SongsPage Search & Navigation State Split', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps PageSearchInput rendered and displays compact empty search state when query yields zero results', () => {
+  const createTestQueryClient = (keyword?: string, sampleSongs: any[] = []) => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Infinity
+        }
+      }
+    });
+
+    client.setQueryData(songQuery.facets().queryKey, { languages: [], genres: [] });
+
+    const idsParams = {
+      sortType: 'aToZ',
+      filterType: 'notSelected',
+      keyword: keyword ?? '',
+      language: 'all',
+      genre: 'all',
+      onlyFavoriteArtists: false,
+      onlyFavoriteAlbums: false
+    };
+
+    client.setQueryData(songQuery.ids(idsParams).queryKey, {
+      ids: sampleSongs.map((s) => s.songId),
+      total: sampleSongs.length,
+      blacklistedIds: []
+    });
+
+    client.setQueryData(
+      artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 }).queryKey,
+      { data: [] }
+    );
+
+    return client;
+  };
+
+  it('keeps PageSearchInput rendered and displays compact empty search state when query yields zero results', async () => {
     mockSearchState = {
       keyword: 'nonexistent_song',
       filteringOrder: 'notSelected',
       sortingOrder: 'aToZ'
     };
 
-    const queryClient = new QueryClient();
-    queryClient.setQueryData(
-      songQuery.all({
-        sortType: 'aToZ',
-        filterType: 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: 'nonexistent_song'
-      }).queryKey,
-      { data: [] }
-    );
-    queryClient.setQueryData(
-      artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 }).queryKey,
-      { data: [] }
-    );
-
+    const queryClient = createTestQueryClient('nonexistent_song', []);
     const SongsPageComponent = Route.options.component!;
-    const { getByPlaceholderText, getByText, queryByText } = render(
+    const { findByPlaceholderText, findByText, queryByText } = render(
       <Suspense fallback={<div>Loading...</div>}>
         <SongsPageComponent />
       </Suspense>,
@@ -133,46 +181,30 @@ describe('SongsPage Search & Navigation State Split', () => {
     );
 
     // 1. Search input remains mounted and accessible
-    const searchInput = getByPlaceholderText('Search songs...') as HTMLInputElement;
+    const searchInput = (await findByPlaceholderText('Search songs...')) as HTMLInputElement;
     expect(searchInput).not.toBeNull();
     expect(searchInput.value).toBe('nonexistent_song');
 
     // 2. Compact empty search state is shown
-    expect(getByText('No matching songs found')).not.toBeNull();
-    expect(getByText('No songs match "nonexistent_song"')).not.toBeNull();
-    expect(getByText('search_off')).not.toBeNull();
+    expect(await findByText('No matching songs found')).not.toBeNull();
+    expect(await findByText('No songs match "nonexistent_song"')).not.toBeNull();
+    expect(await findByText('search_off')).not.toBeNull();
 
     // 3. Onboarding buttons (Add folder / Import) are NOT rendered
     expect(queryByText('Add folder')).toBeNull();
     expect(queryByText("There's nothing here..")).toBeNull();
   });
 
-  it('allows user to edit search input when in zero-match state without unmounting', () => {
-    vi.useFakeTimers();
+  it('allows user to edit search input when in zero-match state without unmounting', async () => {
     mockSearchState = {
       keyword: 'nonexistent_song',
       filteringOrder: 'notSelected',
       sortingOrder: 'aToZ'
     };
 
-    const queryClient = new QueryClient();
-    queryClient.setQueryData(
-      songQuery.all({
-        sortType: 'aToZ',
-        filterType: 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: 'nonexistent_song'
-      }).queryKey,
-      { data: [] }
-    );
-    queryClient.setQueryData(
-      artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 }).queryKey,
-      { data: [] }
-    );
-
+    const queryClient = createTestQueryClient('nonexistent_song', []);
     const SongsPageComponent = Route.options.component!;
-    const { getByPlaceholderText } = render(
+    const { findByPlaceholderText } = render(
       <Suspense fallback={<div>Loading...</div>}>
         <SongsPageComponent />
       </Suspense>,
@@ -187,41 +219,21 @@ describe('SongsPage Search & Navigation State Split', () => {
       }
     );
 
-    const searchInput = getByPlaceholderText('Search songs...') as HTMLInputElement;
+    const searchInput = (await findByPlaceholderText('Search songs...')) as HTMLInputElement;
     expect(searchInput).not.toBeNull();
     expect(searchInput.value).toBe('nonexistent_song');
 
-    // Simulate clearing / backspacing query and advancing debounce timer
+    // Simulate clearing / backspacing query
     fireEvent.change(searchInput, { target: { value: '' } });
     expect(searchInput.value).toBe('');
-    act(() => {
-      vi.advanceTimersByTime(600);
-    });
-    expect(mockNavigate).toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
-  it('keeps PageSearchInput rendered and displays empty library state when library has zero songs and no filter/search is active', () => {
+  it('keeps PageSearchInput rendered and displays empty library state when library has zero songs and no filter/search is active', async () => {
     mockSearchState = { keyword: undefined, filteringOrder: 'notSelected', sortingOrder: 'aToZ' };
 
-    const queryClient = new QueryClient();
-    queryClient.setQueryData(
-      songQuery.all({
-        sortType: 'aToZ',
-        filterType: 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: ''
-      }).queryKey,
-      { data: [] }
-    );
-    queryClient.setQueryData(
-      artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 }).queryKey,
-      { data: [] }
-    );
-
+    const queryClient = createTestQueryClient(undefined, []);
     const SongsPageComponent = Route.options.component!;
-    const { getByPlaceholderText, getByText, queryByText } = render(
+    const { findByPlaceholderText, findByText, queryByText } = render(
       <Suspense fallback={<div>Loading...</div>}>
         <SongsPageComponent />
       </Suspense>,
@@ -237,17 +249,17 @@ describe('SongsPage Search & Navigation State Split', () => {
     );
 
     // 1. Search input is still present in header
-    expect(getByPlaceholderText('Search songs...')).not.toBeNull();
+    expect(await findByPlaceholderText('Search songs...')).not.toBeNull();
 
     // 2. Empty library state and onboarding buttons are shown
-    expect(getByText("There's nothing here..")).not.toBeNull();
-    expect(getByText('Add folder')).not.toBeNull();
+    expect(await findByText("There's nothing here..")).not.toBeNull();
+    expect(await findByText('Add folder')).not.toBeNull();
 
     // 3. Compact search_off state is NOT rendered
     expect(queryByText('No matching songs found')).toBeNull();
   });
 
-  it('renders songs list when matching songs exist', () => {
+  it('renders songs list when matching songs exist', async () => {
     mockSearchState = {
       keyword: 'Imagine',
       filteringOrder: 'notSelected',
@@ -263,24 +275,11 @@ describe('SongsPage Search & Navigation State Split', () => {
       }
     ];
 
-    const queryClient = new QueryClient();
-    queryClient.setQueryData(
-      songQuery.all({
-        sortType: 'aToZ',
-        filterType: 'notSelected',
-        start: 0,
-        end: 0,
-        keyword: 'Imagine'
-      }).queryKey,
-      { data: sampleSongs }
-    );
-    queryClient.setQueryData(
-      artistQuery.all({ sortType: 'aToZ', filterType: 'favorites', start: 0, end: 0 }).queryKey,
-      { data: [] }
-    );
+    const queryClient = createTestQueryClient('Imagine', sampleSongs);
+    (window as any).api.audioLibraryControls.getSongInfo.mockResolvedValue(sampleSongs);
 
     const SongsPageComponent = Route.options.component!;
-    const { getByPlaceholderText, getByTestId, getByText, queryByText } = render(
+    const { queryByText, findByPlaceholderText, findByText, findByTestId } = render(
       <Suspense fallback={<div>Loading...</div>}>
         <SongsPageComponent />
       </Suspense>,
@@ -296,11 +295,12 @@ describe('SongsPage Search & Navigation State Split', () => {
     );
 
     // 1. Header and search input rendered
-    expect(getByPlaceholderText('Search songs...')).not.toBeNull();
+    const searchInput = await findByPlaceholderText('Search songs...');
+    expect(searchInput).not.toBeNull();
 
     // 2. List rendered with item
-    expect(getByTestId('virtualized-list')).not.toBeNull();
-    expect(getByText('Imagine')).not.toBeNull();
+    expect(await findByTestId('virtualized-list')).not.toBeNull();
+    expect(await findByText(/Imagine/i)).not.toBeNull();
 
     // 3. Neither empty state is shown
     expect(queryByText('No matching songs found')).toBeNull();

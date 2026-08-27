@@ -21,22 +21,51 @@ const seekbarScrollIntervals: DropdownOption<string>[] = [
   { label: `20 ${seconds}`, value: '20' }
 ];
 
+const replayGainModeOptions: DropdownOption<string>[] = [
+  { label: 'Track Gain (Recommended for mixed playlists)', value: 'track' },
+  { label: 'Album Gain (Preserves album dynamics)', value: 'album' },
+  { label: 'Off (No loudness normalization)', value: 'off' }
+];
+
 const AudioPlaybackSettings = () => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
   const { t } = useTranslation();
 
   const [seekbarScrollInterval, setSeekbarScrollInterval] = useState('5');
-
   const [playbackRateInterval, setPlaybackRateInterval] = useState(1);
+
+  const [replayGainMode, setReplayGainMode] = useState<'track' | 'album' | 'off'>('track');
+  const [preampDb, setPreampDb] = useState(0);
+  const [preventClipping, setPreventClipping] = useState(true);
 
   useEffect(() => {
     const interval = storage.preferences.getPreferences('seekbarScrollInterval');
     const playbackRate = storage.playback.getPlaybackOptions('playbackRate');
+    const rg = storage.playback.getPlaybackOptions('replayGain');
 
     setPlaybackRateInterval(playbackRate);
     setSeekbarScrollInterval(interval.toString());
+
+    if (rg) {
+      if (rg.mode) setReplayGainMode(rg.mode);
+      if (typeof rg.preampDb === 'number') setPreampDb(rg.preampDb);
+      if (typeof rg.preventClipping === 'boolean') setPreventClipping(rg.preventClipping);
+    }
   }, []);
+
+  const updateReplayGain = (
+    updated: Partial<{ mode: 'track' | 'album' | 'off'; preampDb: number; preventClipping: boolean }>
+  ) => {
+    const current = storage.playback.getPlaybackOptions('replayGain') ?? {
+      mode: 'track',
+      preampDb: 0,
+      preventClipping: true
+    };
+    const next = { ...current, ...updated };
+    storage.playback.setPlaybackOptions('replayGain', next);
+    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+  };
 
   const playbackRateSeekBarCssProperties: CSSProperties = {};
 
@@ -112,7 +141,7 @@ const AudioPlaybackSettings = () => {
           </div>
         </li>
 
-        <li className="seekbar-scroll-interval mb-4">
+        <li className="seekbar-scroll-interval mb-6">
           <div className="description">{t('settingsPage.seekbarScrollInterval')}</div>
           <Dropdown
             className="mt-4"
@@ -125,6 +154,77 @@ const AudioPlaybackSettings = () => {
               storage.preferences.setPreferences('seekbarScrollInterval', parseFloat(val));
             }}
           />
+        </li>
+
+        <li className="replay-gain-settings mb-6" id="replayGainSettings">
+          <div className="title font-medium text-lg text-font-color-highlight dark:text-dark-font-color-highlight mb-1">
+            Loudness Normalization (ReplayGain / ITU-R BS.1770)
+          </div>
+          <div className="description text-sm opacity-80 mb-3">
+            Automatically adjusts track and album playback volume to a consistent standard loudness (-18 LUFS).
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="replayGainModeSelect" className="text-sm font-medium block mb-1">
+              Normalization Mode
+            </label>
+            <Dropdown
+              id="replayGainModeSelect"
+              name="replayGainMode"
+              value={replayGainMode}
+              options={replayGainModeOptions}
+              onChange={(e) => {
+                const mode = e.currentTarget.value as 'track' | 'album' | 'off';
+                setReplayGainMode(mode);
+                updateReplayGain({ mode });
+              }}
+            />
+          </div>
+
+          <div className="mb-4">
+            <Checkbox
+              id="togglePreventClipping"
+              isChecked={preventClipping}
+              checkedStateUpdateFunction={(state) => {
+                setPreventClipping(state);
+                updateReplayGain({ preventClipping: state });
+              }}
+              labelContent="Prevent clipping (limits gain to ensure peak never clips)"
+            />
+          </div>
+
+          <div className="preamp-container flex flex-col w-1/2 min-w-[200px]">
+            <span className="text-sm font-medium mb-1">
+              Pre-amp Adjustment: {preampDb > 0 ? `+${preampDb}` : preampDb} dB
+            </span>
+            <div className="flex items-center">
+              <span className="text-xs mr-2">-12 dB</span>
+              <input
+                type="range"
+                min={-12}
+                max={12}
+                step={0.5}
+                value={preampDb}
+                onChange={(e) => {
+                  const val = e.currentTarget.valueAsNumber;
+                  setPreampDb(val);
+                  updateReplayGain({ preampDb: val });
+                }}
+                className="w-full h-1 bg-neutral-300 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="text-xs ml-2">+12 dB</span>
+              <Button
+                label="Reset"
+                iconName="restart_alt"
+                className="ml-4"
+                isDisabled={preampDb === 0}
+                clickHandler={() => {
+                  setPreampDb(0);
+                  updateReplayGain({ preampDb: 0 });
+                }}
+              />
+            </div>
+          </div>
         </li>
       </ul>
     </li>
