@@ -657,7 +657,7 @@ const Song = memo(
         data-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`${songId} group relative mr-4 mb-2 flex h-13 w-[98%] overflow-hidden rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${
+        className={`${songId} group relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${
           isCurrentSong || isAMultipleSelection
             ? bodyBackgroundImage
               ? `bg-background-color-3/70 text-font-color-black dark:bg-dark-background-color-3/70 shadow-lg backdrop-blur-md`
@@ -864,7 +864,7 @@ const Song = memo(
                   isAFavorite
                     ? isCurrentSong || isAMultipleSelection
                       ? 'text-font-color-black! dark:text-font-color-black!'
-                      : 'text-[#FF2D55]! dark:text-[#FF2D55]!'
+                      : 'text-font-color-favorite!'
                     : isCurrentSong || isAMultipleSelection
                       ? 'text-font-color-black! dark:text-font-color-black!'
                       : 'text-font-color-highlight! dark:text-dark-background-color-3!'

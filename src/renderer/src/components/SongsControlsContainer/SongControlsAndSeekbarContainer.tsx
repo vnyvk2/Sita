@@ -67,7 +67,7 @@ const SongControlsAndSeekbarContainer = () => {
             iconName="favorite"
             iconClassName={`${
               isAFavorite
-                ? 'material-icons-round text-[#FF2D55]! dark:text-[#FF2D55]! opacity-100!'
+                ? 'material-icons-round text-font-color-favorite! opacity-100!'
                 : 'material-icons-round-outlined'
             } ${isBursting ? 'fx-heart-pop' : ''} icon cursor-pointer !text-2xl leading-none text-font-color-black opacity-60 transition-opacity hover:opacity-80 dark:text-font-color-white`}
             clickHandler={handleFavoriteClick}

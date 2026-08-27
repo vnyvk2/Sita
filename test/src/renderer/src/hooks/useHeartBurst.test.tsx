@@ -12,6 +12,19 @@ describe('useHeartBurst hook lifecycle and animation restart', () => {
     vi.useRealTimers();
   });
 
+  /**
+   * Explicitly flushes the double requestAnimationFrame sequence without relying on
+   * fixed magic-number time assumptions (e.g. 32ms).
+   */
+  const flushDoubleRaf = () => {
+    act(() => {
+      // 1st rAF: initial frame boundary
+      vi.advanceTimersToNextTimer();
+      // 2nd rAF: DOM unmount/remount settle frame
+      vi.advanceTimersToNextTimer();
+    });
+  };
+
   it('initializes with isBursting as false', () => {
     const { result } = renderHook(() => useHeartBurst());
     expect(result.current.isBursting).toBe(false);
@@ -27,10 +40,8 @@ describe('useHeartBurst hook lifecycle and animation restart', () => {
     // Before rAF fires
     expect(result.current.isBursting).toBe(false);
 
-    // Advance rAFs
-    act(() => {
-      vi.advanceTimersByTime(32);
-    });
+    // Explicitly advance through double rAF frames
+    flushDoubleRaf();
 
     expect(result.current.isBursting).toBe(true);
 
@@ -49,9 +60,7 @@ describe('useHeartBurst hook lifecycle and animation restart', () => {
       result.current.triggerBurst();
     });
 
-    act(() => {
-      vi.advanceTimersByTime(32);
-    });
+    flushDoubleRaf();
     expect(result.current.isBursting).toBe(true);
 
     // Re-trigger halfway
@@ -59,9 +68,7 @@ describe('useHeartBurst hook lifecycle and animation restart', () => {
       result.current.triggerBurst();
     });
 
-    act(() => {
-      vi.advanceTimersByTime(32);
-    });
+    flushDoubleRaf();
     expect(result.current.isBursting).toBe(true);
 
     // Old timer expiry should not set isBursting to false prematurely

@@ -1,5 +1,5 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
-import { albumQuery } from '@renderer/queries/albums';
+import { albumSummariesQueryKey } from '@renderer/queries/albums';
 import { Route } from '@renderer/routes/main-player/albums/index';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @vitest-environment jsdom
@@ -92,14 +92,15 @@ describe('AlbumsPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      albumQuery.all({
+      albumSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'nonexistent_album'
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const AlbumsPageComponent = Route.options.component!;
@@ -142,14 +143,15 @@ describe('AlbumsPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      albumQuery.all({
+      albumSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'nonexistent_album'
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const AlbumsPageComponent = Route.options.component!;
@@ -187,14 +189,15 @@ describe('AlbumsPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      albumQuery.all({
+      albumSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: ''
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const AlbumsPageComponent = Route.options.component!;
@@ -242,14 +245,15 @@ describe('AlbumsPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      albumQuery.all({
+      albumSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'Thriller'
-      }).queryKey,
-      { data: sampleAlbums }
+      }),
+      {
+        pages: [{ data: sampleAlbums, end: sampleAlbums.length, total: sampleAlbums.length }],
+        pageParams: [0]
+      }
     );
 
     const AlbumsPageComponent = Route.options.component!;

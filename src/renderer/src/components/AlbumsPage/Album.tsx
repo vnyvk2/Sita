@@ -419,7 +419,7 @@ export const Album = (props: AlbumProp) => {
         else showAlbumInfoPage();
       }}
     >
-      <div className="album-cover-and-play-btn-container relative h-[70%] cursor-pointer overflow-hidden">
+      <div className="album-cover-and-play-btn-container relative h-[70%] cursor-pointer">
         {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' ? (
           <MultipleSelectionCheckbox
             id={props.albumId}
@@ -438,7 +438,7 @@ export const Album = (props: AlbumProp) => {
                 iconName="favorite"
                 iconClassName={`${
                   isFavorite
-                    ? 'material-icons-round text-[#FF2D55]!'
+                    ? 'material-icons-round text-font-color-favorite!'
                     : 'material-icons-round-outlined text-font-color-white'
                 } ${isBursting ? 'fx-heart-pop' : ''} text-xl! leading-none!`}
                 tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}

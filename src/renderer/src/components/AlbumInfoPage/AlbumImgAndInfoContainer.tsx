@@ -90,7 +90,7 @@ const AlbumImgAndInfoContainer = (props: Props) => {
                 iconName="favorite"
                 iconClassName={`text-3xl! leading-none! ${
                   isFavorite
-                    ? 'material-icons-round text-[#FF2D55]!'
+                    ? 'material-icons-round text-font-color-favorite!'
                     : 'material-icons-round-outlined'
                 } ${isBursting ? 'fx-heart-pop' : ''}`}
                 clickHandler={toggleLikeAlbum}
