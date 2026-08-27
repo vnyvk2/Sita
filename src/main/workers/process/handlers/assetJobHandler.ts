@@ -5,6 +5,8 @@ import sharp from 'sharp';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
 import { defaultAudioDecoderRegistry } from '../audio/AudioDecoderRegistry';
 import { WaveformAccumulator } from '../audio/WaveformAccumulator';
+import { BS1770LoudnessEngine } from '../audio/BS1770LoudnessEngine';
+import { calculateReplayGainMetrics } from '../audio/ReplayGainPolicy';
 
 export const CURRENT_WAVEFORM_GENERATOR_VERSION = 1;
 export const WAVEFORM_RESOLUTION = 200;
@@ -326,37 +328,85 @@ async function generateArtworkInWorker(
 }
 
 /**
- * Computes ReplayGain loudness metrics in utilityProcess (Phase C4-C).
+ * Computes ITU-R BS.1770-4 / EBU R128 loudness metrics and ReplayGain in utilityProcess (Gate D2).
  */
 async function generateReplayGainInWorker(
   taskId: string,
   sourceFilePath: string,
   abortSignal?: AbortSignal
 ): Promise<AssetExecutionResult> {
-  const stats = await fs.stat(sourceFilePath);
+  const decoder = defaultAudioDecoderRegistry.getDecoderForFile(sourceFilePath);
+  if (decoder) {
+    try {
+      const info = await decoder.probe(sourceFilePath);
+      const engine = new BS1770LoudnessEngine(info.sampleRate, info.channels, info.channelLayout);
 
-  if (abortSignal?.aborted) {
+      await decoder.decodeStream(
+        sourceFilePath,
+        { abortSignal, chunkSize: 16384 },
+        (chunk) => {
+          engine.processChunk(chunk);
+        }
+      );
+
+      const loudness = engine.finish();
+      const metrics = calculateReplayGainMetrics(loudness);
+
+      return {
+        success: true,
+        outputFilePath: '',
+        metadata: {
+          trackGain: metrics.trackGain,
+          trackPeak: metrics.trackPeak,
+          samplePeak: loudness.samplePeak,
+          samplePeakDb: loudness.samplePeakDb,
+          integratedLoudness: loudness.integratedLoudness,
+          targetLufs: metrics.targetLufs,
+          codec: info.codec,
+          generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
+          method: 'bs1770_decoded'
+        }
+      };
+    } catch (err) {
+      if (abortSignal?.aborted) {
+        return {
+          success: false,
+          error: `ReplayGain analysis for task ${taskId} cancelled during audio decode.`,
+          cancelled: true
+        };
+      }
+      return {
+        success: false,
+        error: `Audio decode failed for ${sourceFilePath}: ${err instanceof Error ? err.message : String(err)}`
+      };
+    }
+  } else {
+    // Unsupported audio codec: explicit fallback for formats awaiting native decoder implementation
+    const stats = await fs.stat(sourceFilePath);
+    if (abortSignal?.aborted) {
+      return {
+        success: false,
+        error: `ReplayGain analysis for task ${taskId} cancelled before processing.`,
+        cancelled: true
+      };
+    }
+
+    const mockTrackGain = Math.sin(stats.size) * -5 - 5;
+    const mockTrackPeak = 0.9 + Math.cos(stats.size) * 0.1;
+
     return {
-      success: false,
-      error: `ReplayGain analysis for task ${taskId} cancelled before processing.`,
-      cancelled: true
+      success: true,
+      outputFilePath: '',
+      metadata: {
+        trackGain: mockTrackGain,
+        trackPeak: mockTrackPeak,
+        albumGain: mockTrackGain,
+        albumPeak: mockTrackPeak,
+        generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
+        method: 'synthetic_unsupported_codec'
+      }
     };
   }
-
-  const mockTrackGain = Math.sin(stats.size) * -5 - 5;
-  const mockTrackPeak = 0.9 + Math.cos(stats.size) * 0.1;
-
-  return {
-    success: true,
-    outputFilePath: '',
-    metadata: {
-      trackGain: mockTrackGain,
-      trackPeak: mockTrackPeak,
-      albumGain: mockTrackGain,
-      albumPeak: mockTrackPeak,
-      generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION
-    }
-  };
 }
 
 /**

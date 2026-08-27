@@ -1,5 +1,5 @@
 import fs from 'fs';
-import type { AudioDecoder, AudioFormatInfo, DecodeChunk, DecodeStreamOptions } from '../types';
+import type { AudioDecoder, AudioFormatInfo, ChannelPosition, DecodeChunk, DecodeStreamOptions } from '../types';
 
 const WAVE_FORMAT_PCM = 1;
 const WAVE_FORMAT_IEEE_FLOAT = 3;
@@ -13,12 +13,34 @@ interface ParsedWavHeader {
   audioFormat: number;
   isFloat: boolean;
   channels: number;
+  channelLayout: ChannelPosition[];
   sampleRate: number;
   bitDepth: number;
   dataOffset: number;
   dataLength: number;
   totalSamples: number;
   codec: string;
+}
+
+function deriveChannelLayout(channels: number, channelMask = 0): ChannelPosition[] {
+  if (channelMask > 0) {
+    const layout: ChannelPosition[] = [];
+    if (channelMask & 0x1) layout.push('L');
+    if (channelMask & 0x2) layout.push('R');
+    if (channelMask & 0x4) layout.push('C');
+    if (channelMask & 0x8) layout.push('LFE');
+    if (channelMask & 0x10) layout.push('Ls');
+    if (channelMask & 0x20) layout.push('Rs');
+    if (layout.length === channels) return layout;
+  }
+
+  if (channels === 1) return ['Mono'];
+  if (channels === 2) return ['L', 'R'];
+  if (channels === 3) return ['L', 'R', 'C'];
+  if (channels === 4) return ['L', 'R', 'Ls', 'Rs'];
+  if (channels === 6) return ['L', 'R', 'C', 'LFE', 'Ls', 'Rs'];
+
+  return Array.from({ length: channels }, (_, i) => (i === 0 ? 'L' : i === 1 ? 'R' : 'Unknown'));
 }
 
 /**
@@ -41,6 +63,7 @@ export class WavAudioDecoder implements AudioDecoder {
       return {
         sampleRate: parsed.sampleRate,
         channels: parsed.channels,
+        channelLayout: parsed.channelLayout,
         bitDepth: parsed.bitDepth,
         duration: parsed.totalSamples / parsed.sampleRate,
         totalSamples: parsed.totalSamples,
@@ -61,7 +84,7 @@ export class WavAudioDecoder implements AudioDecoder {
 
     try {
       const parsed = await this.parseWavStructure(handle, filePath);
-      const { channels, bitDepth, isFloat, dataOffset, dataLength, totalSamples } = parsed;
+      const { channels, channelLayout, bitDepth, isFloat, dataOffset, dataLength, totalSamples } = parsed;
       const bytesPerSample = bitDepth / 8;
       const blockAlign = channels * bytesPerSample;
 
@@ -131,6 +154,7 @@ export class WavAudioDecoder implements AudioDecoder {
 
         await onChunk({
           channelData,
+          channelLayout,
           sampleOffset: currentSampleOffset,
           frameCount: framesInChunk,
           totalSamples
@@ -168,6 +192,7 @@ export class WavAudioDecoder implements AudioDecoder {
     let audioFormat = 0;
     let isFloat = false;
     let channels = 0;
+    let channelMask = 0;
     let sampleRate = 0;
     let bitDepth = 0;
     let dataOffset = 0;
@@ -198,6 +223,7 @@ export class WavAudioDecoder implements AudioDecoder {
         } else if (audioFormat === WAVE_FORMAT_IEEE_FLOAT) {
           isFloat = true;
         } else if (audioFormat === WAVE_FORMAT_EXTENSIBLE && fmtSize >= 24) {
+          channelMask = fmtBuf.readUInt32LE(20);
           const subFormat = fmtBuf.readUInt32LE(24);
           if (subFormat === KSDATAFORMAT_SUBTYPE_IEEE_FLOAT_GUID_PREFIX) {
             isFloat = true;
@@ -235,10 +261,13 @@ export class WavAudioDecoder implements AudioDecoder {
       ? `WAV (IEEE Float ${bitDepth}-bit)`
       : `WAV (PCM ${bitDepth}-bit)`;
 
+    const channelLayout = deriveChannelLayout(channels, channelMask);
+
     return {
       audioFormat,
       isFloat,
       channels,
+      channelLayout,
       sampleRate,
       bitDepth,
       dataOffset,

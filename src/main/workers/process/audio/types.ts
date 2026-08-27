@@ -1,6 +1,9 @@
+export type ChannelPosition = 'L' | 'R' | 'C' | 'LFE' | 'Ls' | 'Rs' | 'Mono' | 'Unknown';
+
 export interface AudioFormatInfo {
   sampleRate: number;
   channels: number;
+  channelLayout?: ChannelPosition[];
   duration: number; // in seconds
   totalSamples: number; // total frames / sample points per channel
   codec: string;
@@ -13,6 +16,10 @@ export interface DecodeChunk {
    * channelData[0] is Left (or Mono), channelData[1] is Right, etc.
    */
   channelData: Float32Array[];
+  /**
+   * Semantic channel layout for each channel in channelData.
+   */
+  channelLayout?: ChannelPosition[];
   /**
    * Zero-indexed starting frame position of this chunk relative to the entire track.
    */
