@@ -40,7 +40,20 @@ electron.vite.config.*.mjs
 *.zip
 memory_report_*.json
 phase1_mini_report.json
+current_mini_baseline_report.json
+memory_attribution_cycles_report.json
+*_report.json
+audits/
+
+# Aider artifacts
+.aider*
+
+# Agent audit run directories (preserve permanent skills)
+.agents/*/
+.agents/*.md
+!.agents/skills/
 
 # Downloaded external binaries for online downloads (fetched via `npm run fetch:binaries`)
 resources/bin/
+
 
