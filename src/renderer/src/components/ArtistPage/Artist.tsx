@@ -2,15 +2,16 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultArtistCover from '../../assets/images/webp/artist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import useHeartBurst from '../../hooks/useHeartBurst';
 import Button from '../Button';
+import HeartBurst from '../HeartBurst';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
-import NavLink from '../NavLink';
 
 interface ArtistProp {
   index: number;
@@ -49,6 +50,11 @@ export const Artist = (props: ArtistProp) => {
   const { appearFromBottom = true } = props;
 
   const [isAFavorite, setIsAFavorite] = useState(props.isAFavorite);
+  const { isBursting, triggerBurst } = useHeartBurst();
+
+  useEffect(() => {
+    setIsAFavorite(props.isAFavorite);
+  }, [props.isAFavorite]);
 
   const goToArtistInfoPage = useCallback(
     () =>
@@ -107,8 +113,21 @@ export const Artist = (props: ArtistProp) => {
           return undefined;
         });
     },
-    [createQueue, multipleSelectionsData, props.artistId]
+    [createQueue, multipleSelectionsData, props.artistId, t]
   );
+
+  const toggleLikeArtist = useCallback(async () => {
+    const nextValue = !isAFavorite;
+    if (nextValue) {
+      triggerBurst();
+    }
+    setIsAFavorite(nextValue);
+    try {
+      await window.api.artistsData.toggleLikeArtists([props.artistId], nextValue);
+    } catch {
+      setIsAFavorite(!nextValue);
+    }
+  }, [isAFavorite, props.artistId, triggerBurst]);
 
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;
@@ -197,25 +216,28 @@ export const Artist = (props: ArtistProp) => {
         iconClassName: isMultipleSelectionsEnabled
           ? 'material-icons-round-outlined mr-4 text-xl'
           : isAFavorite
-            ? 'material-icons-round mr-4 text-xl'
+            ? 'material-icons-round mr-4 text-xl text-font-color-favorite!'
             : 'material-icons-round-outlined mr-4 text-xl',
         handlerFunction: () => {
-          const { multipleSelections: artistIds } = multipleSelectionsData;
+          if (isMultipleSelectionEnabled) {
+            const { multipleSelections: artistIds } = multipleSelectionsData;
 
-          return window.api.artistsData
-            .toggleLikeArtists(isMultipleSelectionsEnabled ? artistIds : [props.artistId])
-            .then((res) => {
-              if (res && res.likes.length + res.dislikes.length > 0) {
-                return setIsAFavorite((prevState) => {
-                  const isLiked = res.likes.includes(props.artistId);
-                  const isDisliked = res.dislikes.includes(props.artistId);
+            return window.api.artistsData
+              .toggleLikeArtists(artistIds)
+              .then((res) => {
+                if (res && res.likes.length + res.dislikes.length > 0) {
+                  return setIsAFavorite((prevState) => {
+                    const isLiked = res.likes.includes(props.artistId);
+                    const isDisliked = res.dislikes.includes(props.artistId);
 
-                  return isLiked ? true : isDisliked ? false : prevState;
-                });
-              }
-              return undefined;
-            })
-            .catch((err) => console.error(err));
+                    return isLiked ? true : isDisliked ? false : prevState;
+                  });
+                }
+                return undefined;
+              })
+              .catch((err) => console.error(err));
+          }
+          return toggleLikeArtist();
         }
       },
       {
@@ -260,7 +282,8 @@ export const Artist = (props: ArtistProp) => {
     props.artistId,
     addNewNotifications,
     toggleMultipleSelections,
-    updateMultipleSelections
+    updateMultipleSelections,
+    toggleLikeArtist
   ]);
 
   const contextMenuItemData = useMemo(
@@ -297,13 +320,11 @@ export const Artist = (props: ArtistProp) => {
   );
 
   return (
-    <NavLink
-      to="/main-player/artists/$artistId"
-      params={{ artistId: String(props.artistId) }}
-      preload={isMultipleSelectionEnabled ? false : undefined}
-      // style={{ animationDelay: `${50 * (props.index + 1)}ms` }}
-      className={`artist ${appearFromBottom && 'appear-from-bottom'} hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 mr-2 flex h-44 w-40 cursor-pointer flex-col justify-between overflow-hidden rounded-lg p-4 ${
-        props.className
+    <div
+      role="button"
+      tabIndex={0}
+      className={`artist ${appearFromBottom && 'appear-from-bottom'} fx-rise fx-spotlight group hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 mr-2 flex h-44 w-40 cursor-pointer flex-col justify-between overflow-hidden rounded-lg p-4 transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:-translate-y-0.5 ${
+        props.className ?? ''
       } ${isAMultipleSelection ? 'bg-background-color-3! dark:bg-dark-background-color-3!' : ''}`}
       onContextMenu={(e) => {
         e.stopPropagation();
@@ -325,30 +346,55 @@ export const Artist = (props: ArtistProp) => {
       }}
     >
       <div className="artist-img-container relative flex h-3/4 items-center justify-center">
-        {isAFavorite && (
-          <span
-            className={`material-icons-round bg-background-color-1 !text-font-color-highlight dark:bg-dark-background-color-2 dark:!text-dark-font-color-highlight absolute -bottom-2 z-10 flex rounded-full p-2 text-2xl shadow-lg ${
-              isAMultipleSelection && 'bg-background-color-3! dark:bg-dark-background-color-3!'
-            }`}
-          >
-            favorite
-          </span>
-        )}
-        <Img
-          src={props?.onlineArtworkPaths?.picture_medium}
-          fallbackSrc={props.artworkPaths.artworkPath}
-          alt="Default song cover"
-          className="aspect-square h-full rounded-full object-cover"
-          // enableImgFadeIns={!isMultipleSelectionEnabled}
-          enableImgFadeIns={false}
-        />
-        {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' && (
+        {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' ? (
           <MultipleSelectionCheckbox
             id={props.artistId}
             selectionType="artist"
             className="absolute right-3 bottom-3 z-10"
           />
+        ) : (
+          <>
+            <div className="absolute top-[5%] right-[5%] z-2 flex items-center justify-center">
+              <Button
+                className={`m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
+                  isAFavorite
+                    ? 'opacity-100'
+                    : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
+                }`}
+                iconName="favorite"
+                iconClassName={`${
+                  isAFavorite
+                    ? 'material-icons-round text-font-color-favorite!'
+                    : 'material-icons-round-outlined text-font-color-white'
+                } ${isBursting ? 'fx-heart-pop' : ''} text-xl! leading-none!`}
+                tooltipLabel={t(`common.${isAFavorite ? 'dislike' : 'like'}`)}
+                clickHandler={(e) => {
+                  e.stopPropagation();
+                  toggleLikeArtist();
+                }}
+              />
+              <HeartBurst isBursting={isBursting} />
+            </div>
+            <Button
+              className="text-font-color-white! absolute right-[5%] bottom-[5%] z-1 m-0! rounded-none! border-0! bg-transparent p-0! opacity-0 outline-offset-1 transition-opacity group-focus-within:opacity-75 group-hover:opacity-75 hover:bg-transparent hover:opacity-100! focus-visible:opacity-100! focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
+              iconName="play_circle"
+              iconClassName="text-5xl! leading-none!"
+              clickHandler={(e) => {
+                e.stopPropagation();
+                playArtistSongs();
+              }}
+            />
+          </>
         )}
+        <div className="artist-cover-container relative h-full overflow-hidden rounded-full before:invisible before:absolute before:h-full before:w-full before:bg-linear-to-b before:from-[hsla(0,0%,0%,0%)] before:to-[hsla(0,0%,0%,50%)] before:opacity-0 before:transition-[visibility,opacity] before:duration-300 before:content-[''] group-focus-within:before:visible group-focus-within:before:opacity-100 group-hover:before:visible group-hover:before:opacity-100">
+          <Img
+            src={props?.onlineArtworkPaths?.picture_medium}
+            fallbackSrc={props.artworkPaths.artworkPath}
+            alt="Default song cover"
+            className="aspect-square h-full rounded-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04] group-focus-within:scale-[1.04]"
+            enableImgFadeIns={false}
+          />
+        </div>
       </div>
       <div className="artist-info-container relative max-h-1/5">
         <Button
@@ -359,6 +405,6 @@ export const Artist = (props: ArtistProp) => {
           clickHandler={goToArtistInfoPage}
         />
       </div>
-    </NavLink>
+    </div>
   );
 };
