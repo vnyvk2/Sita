@@ -60,12 +60,25 @@ describe('Crash Recovery (Startup Sync)', () => {
 
     const enqueueSpy = vi.spyOn(libraryScheduler, 'enqueue');
 
-    await recoverLibraryAssets();
+    const result = await recoverLibraryAssets();
 
     expect(enqueueSpy).toHaveBeenCalledTimes(2);
+    expect(result.remainingWork).toBe(false);
 
     // Verify the enqueued jobs are of type 'artwork'
     expect(enqueueSpy.mock.calls[0][0].type).toBe('artwork');
     expect(enqueueSpy.mock.calls[1][0].type).toBe('artwork');
+  });
+
+  it('signals remainingWork: true when any bounded recovery query hits its batch limit', async () => {
+    const thousandAlbums = Array.from({ length: 1000 }, (_, i) => ({
+      albumId: i + 1,
+      sampleSongPath: `/fake/song_${i + 1}.mp3`,
+      albumTitle: `Album ${i + 1}`
+    }));
+    vi.mocked(getAlbumsWithoutArtwork).mockResolvedValueOnce(thousandAlbums);
+
+    const result = await recoverLibraryAssets();
+    expect(result.remainingWork).toBe(true);
   });
 });

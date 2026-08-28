@@ -436,10 +436,19 @@ async function generateReplayGainInWorker(
 
 /**
  * Atomically publishes a temp file to destination path.
- * Invariant: Never overwrites pre-existing destination files on any platform (POSIX or Windows).
+ *
+ * Invariants & Guarantees:
+ * 1. Non-destructive: Never overwrites pre-existing destination files on any platform (POSIX or Windows).
+ * 2. Hard-link primary: Uses fs.link for instantaneous, race-free publication on same-filesystem paths.
+ * 3. Exclusive copy fallback: For cross-device (EXDEV) or restricted filesystems, uses fs.copyFile
+ *    with COPYFILE_EXCL (O_CREAT | O_EXCL) to guarantee kernel-level exclusive creation without overwrite.
+ * 4. Zero-byte safety: A zero-byte destination is considered corrupt / invalid. `already_existed` is returned
+ *    ONLY when destination is non-empty (>0 bytes). If an existing file is 0-bytes, publication aborts with error
+ *    to trigger garbage collection re-generation.
+ * 5. Temp cleanup: Always unlinks tempPath on success, collision, or re-thrown error.
+ *
  * Returns 'published' if this process successfully publishes the temp file to destination.
  * Returns 'already_existed' if destination already exists and is non-empty (idempotent collision).
- * Cleans up tempPath and rethrows on real I/O or permissions failures where destination is absent.
  */
 export async function atomicPublishFile(
   tempPath: string,

@@ -23,9 +23,28 @@ const handleReplayGainCreated = (payload: { songId: number; albumId?: number; tr
   }
 };
 
-const handleMaintenanceReady = () => {
+let isRecoverySweeping = false;
+
+const handleMaintenanceReady = async () => {
   log.info('[LibraryChoreography] Maintenance Ready - Enqueuing Garbage Collection');
   libraryScheduler.enqueue(new GarbageCollectionJob());
+
+  // Continuously sweep next batch of unindexed/missing library assets until library is fully hydrated
+  if (!isRecoverySweeping) {
+    isRecoverySweeping = true;
+    try {
+      const { recoverLibraryAssets } = await import('@main/core/recovery');
+      const { remainingWork } = await recoverLibraryAssets();
+      if (remainingWork) {
+        // Request another maintenance cycle once this batch finishes processing
+        libraryScheduler.requestMaintenance();
+      }
+    } catch (err) {
+      log.warn('[LibraryChoreography] Error during maintenance recovery sweep:', { error: err });
+    } finally {
+      isRecoverySweeping = false;
+    }
+  }
 };
 
 export function registerLibraryChoreography() {

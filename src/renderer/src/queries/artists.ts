@@ -73,6 +73,8 @@ export const artistQuery = createQueryKeys('artists', {
   }
 });
 
+export const ARTIST_ONLINE_STALE_TIME = 1000 * 60 * 60 * 24;
+
 export const artistMutations = {
   toggleLike: (data: { artistIds: number[]; isLikeArtist?: boolean }) => ({
     invalidatingQueryKeys: [['artists']],
