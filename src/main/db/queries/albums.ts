@@ -214,7 +214,7 @@ export const linkSongToAlbum = async (
   songId: number,
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(albumsSongs).values({ albumId, songId });
+  return trx.insert(albumsSongs).values({ albumId, songId }).onConflictDoNothing();
 };
 
 /**

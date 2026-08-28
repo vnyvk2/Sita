@@ -131,27 +131,32 @@ if (tags.albums && tags.albums.length > 0) {
     if (!currentAlbum || currentAlbum.id !== albumId) {
       await linkSongToAlbum(albumId, songId, trx);
     }
-  } else {
+  } else if (tags.albums[0].title) {
     // Create new album or link by title
-    const existingAlbum = await getAlbumWithTitle(tags.albums[0].title, trx);
+    const albumTitle = tags.albums[0].title.trim();
+    if (albumTitle) {
+      const existingAlbum = await getAlbumWithTitle(albumTitle, trx);
 
-    if (existingAlbum) {
-      targetAlbumId = existingAlbum.id;
-      await linkSongToAlbum(existingAlbum.id, songId, trx);
-    } else {
-      const newAlbum = await createAlbum({ title: tags.albums[0].title }, trx);
-      targetAlbumId = newAlbum.id;
-      await linkSongToAlbum(newAlbum.id, songId, trx);
-    }
+      if (existingAlbum) {
+        targetAlbumId = existingAlbum.id;
+      } else {
+        const newAlbum = await createAlbum({ title: albumTitle }, trx);
+        targetAlbumId = newAlbum.id;
+      }
 
-    // Unlink from old album if it existed
-    if (currentAlbum) {
-      await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
+      // Unlink from old album only if target is a different album
+      if (currentAlbum && currentAlbum.id !== targetAlbumId) {
+        await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
 
-      // Safe cascade pattern: Verify no remaining songs before deletion
-      const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
-      if (albumSongIds.length === 0) {
-        await deleteAlbum(currentAlbum.id, trx);
+        // Safe cascade pattern: Verify no remaining songs before deletion
+        const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
+        if (albumSongIds.length === 0) {
+          await deleteAlbum(currentAlbum.id, trx);
+        }
+      }
+
+      if (!currentAlbum || currentAlbum.id !== targetAlbumId) {
+        await linkSongToAlbum(targetAlbumId, songId, trx);
       }
     }
   }

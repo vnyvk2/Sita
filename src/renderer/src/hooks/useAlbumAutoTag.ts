@@ -211,50 +211,6 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     queryClient.invalidateQueries({ queryKey: genreQuery._def });
   }, [queryClient]);
 
-  // Search releases action
-  const searchReleases = useCallback(
-    async (albumParam?: string, artistParam?: string, sourceParam?: string) => {
-      const albumQuery = (albumParam !== undefined ? albumParam : searchAlbum).trim();
-      const artistQuery = (artistParam !== undefined ? artistParam : searchArtist).trim();
-      const activeSource = sourceParam !== undefined ? sourceParam : selectedSource;
-
-      if (!albumQuery) return;
-
-      setLoading(true);
-      setLoadingCandidates(true);
-      setError(null);
-      setStep('search');
-
-      try {
-        const parsedTracks = searchTotalTracks.trim() ? parseInt(searchTotalTracks.trim(), 10) : undefined;
-        const targetTrackCount = Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
-        const source = activeSource === 'auto' ? undefined : (activeSource as MetadataProviderId);
-
-        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, {
-          limit: 10,
-          targetTrackCount,
-          source: source ?? 'auto',
-          operationId
-        });
-        setSearchCandidates(results);
-
-        // Auto-select best match candidate if available
-        if (results.length > 0 && initialSongs.length > 0) {
-          const bestCandidate = results[0];
-          const candidateKey = bestCandidate.releaseId ?? bestCandidate.title;
-          setSelectedCandidateId(candidateKey);
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
-      } finally {
-        setLoading(false);
-        setLoadingCandidates(false);
-      }
-    },
-    [searchAlbum, searchArtist, searchTotalTracks, selectedSource, operationId, initialSongs]
-  );
-
   // Initialize preview state from response
   const initPreviewState = useCallback((res: AlbumTagPreview) => {
     setPreview(res);
@@ -333,6 +289,53 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       }
     },
     [operationId, initPreviewState]
+  );
+
+  // Search releases action
+  const searchReleases = useCallback(
+    async (albumParam?: string, artistParam?: string, sourceParam?: string) => {
+      const albumQuery = (albumParam !== undefined ? albumParam : searchAlbum).trim();
+      const artistQuery = (artistParam !== undefined ? artistParam : searchArtist).trim();
+      const activeSource = sourceParam !== undefined ? sourceParam : selectedSource;
+
+      if (!albumQuery) return;
+
+      setLoading(true);
+      setLoadingCandidates(true);
+      setError(null);
+      setStep('search');
+
+      try {
+        const parsedTracks = searchTotalTracks.trim() ? parseInt(searchTotalTracks.trim(), 10) : undefined;
+        const targetTrackCount = Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
+        const source = activeSource === 'auto' ? undefined : (activeSource as MetadataProviderId);
+
+        const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, {
+          limit: 10,
+          targetTrackCount,
+          source: source ?? 'auto',
+          operationId
+        });
+        setSearchCandidates(results);
+
+        // Auto-select best match candidate and build its preview seamlessly
+        if (results.length > 0 && initialSongs.length > 0) {
+          const bestCandidate = results[0];
+          const candidateKey = bestCandidate.releaseId ?? bestCandidate.title;
+          setSelectedCandidateId(candidateKey);
+          if (bestCandidate.releaseId) {
+            await buildPreview(initialSongs, bestCandidate.releaseId, bestCandidate.provider);
+          }
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+      } finally {
+        setLoading(false);
+        setLoadingCandidates(false);
+      }
+    },
+    [searchAlbum, searchArtist, searchTotalTracks, selectedSource, operationId, initialSongs, buildPreview]
   );
 
   // Select a candidate from the table and trigger preview

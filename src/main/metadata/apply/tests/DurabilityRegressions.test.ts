@@ -287,4 +287,45 @@ describe('Durability regressions (P0 #1/#2/#3/#4 - single-transaction design)', 
     expect(snap?.previousSongs[0]?.title).toBe('Durable Journal Seed');
     expect(snap?.updatedSongs[0]?.title).toBe('Durable Journal New');
   });
+
+  it('applying metadata with existing album title does not violate album_songs unique constraint and preserves album linkage', async () => {
+    const fixture = makeFixture();
+    fixtures.push(fixture);
+    const songId = await seedSong('Album Link Test', fixture);
+
+    // Pre-create album and link song to it
+    const { createAlbum, linkSongToAlbum, getAlbumWithTitle } = await import('@main/db/queries/albums');
+    const existing = await createAlbum({ title: 'Thriller Album' });
+    await linkSongToAlbum(existing.id, songId);
+
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter: new TagWriterServiceShim() as unknown as TagWriterService,
+      historyService: history,
+      getCurrentPlayingPath: () => undefined
+    });
+
+    const result = await orchestrator.execute([
+      {
+        mutationId: 'dur-album-idemp:1',
+        operationId: 'dur-album-idemp',
+        songId,
+        filePath: fixture,
+        fields: [
+          { fieldId: 'title', oldValue: 'Album Link Test', newValue: 'Album Link Test Updated' },
+          { fieldId: 'album', oldValue: 'Thriller Album', newValue: 'Thriller Album' }
+        ],
+        fileWrite: { deferredIfPlaying: false },
+        undo: { description: 'album idempotency probe' }
+      }
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(result.updatedCount).toBe(1);
+    expect(result.failedCount).toBe(0);
+
+    // Verify song is still linked to the album and album was not deleted
+    const checkAlbum = await getAlbumWithTitle('Thriller Album');
+    expect(checkAlbum).toBeDefined();
+    expect(checkAlbum?.id).toBe(existing.id);
+  });
 });
