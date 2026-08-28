@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
-import { EventEmitter } from 'events';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@main/db/db';
 import { replayGain } from '@main/db/schema';
@@ -11,6 +10,7 @@ import {
   type TrackLoudnessData
 } from '../process/audio/AlbumLoudnessAggregator';
 import { ASSET_EVENTS } from '../libraryChoreography';
+import { JobScheduler } from '../jobScheduler';
 import type { Job, JobClass, JobState } from '../types';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from './replayGainJob';
 
@@ -41,15 +41,15 @@ export class AlbumReplayGainJob implements Job {
   description: string;
 
   public albumId: number;
-  private eventBus: EventEmitter;
+  private scheduler: JobScheduler;
 
   constructor(
     albumId: number,
-    eventBus: EventEmitter,
+    scheduler: JobScheduler,
     jobClass: JobClass = 'background'
   ) {
     this.albumId = albumId;
-    this.eventBus = eventBus;
+    this.scheduler = scheduler;
     this.id = `album_replaygain_${albumId}`;
     this.jobClass = jobClass;
     this.description = `Aggregating album loudness for album ${albumId}`;
@@ -94,7 +94,16 @@ export class AlbumReplayGainJob implements Job {
       // Completeness check: All songs in the album must have finished track ReplayGain analysis
       if (rgRows.length < songIds.length) {
         logger.debug(
-          `[AlbumReplayGainJob] Incomplete album ${this.albumId} (${rgRows.length}/${songIds.length} tracks analyzed). Deferring aggregation.`
+          `[AlbumReplayGainJob] Incomplete album ${this.albumId} (${rgRows.length}/${songIds.length} tracks analyzed). Deferring re-evaluation.`
+        );
+        // Deferred re-enqueue: After this job completes and its ID is cleared from
+        // activeJobIds, a fresh AlbumReplayGainJob will be enqueued to re-check.
+        // This prevents permanent deferral when track completion events are suppressed
+        // by deduplication while this job is still active.
+        // Uses the scheduler's explicit deferred enqueue mechanism (not a fake domain event).
+        this.scheduler.scheduleDeferred(
+          new AlbumReplayGainJob(this.albumId, this.scheduler, this.jobClass),
+          5000
         );
         return;
       }
@@ -247,7 +256,7 @@ export class AlbumReplayGainJob implements Job {
       }
 
       // 6. Post-commit event emission
-      this.eventBus.emit(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, {
+      this.scheduler.emit(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, {
         albumId: this.albumId,
         albumGain: albumResult.albumGain,
         albumPeak: albumResult.albumPeak,

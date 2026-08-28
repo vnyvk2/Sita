@@ -23,6 +23,7 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
         getSongInfo: vi.fn().mockImplementation(async (ids: number[]) => {
           return ids.map((id) => ({
             id,
+            songId: id,
             title: `Song ${id}`,
             artists: ['Artist'],
             album: 'Album',
@@ -163,5 +164,38 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
 
     expect(getWindowA()?.state.isInvalidated).toBe(false);
     expect(getWindowB()?.state.isInvalidated).toBe(true);
+  });
+
+  it('maps by actual songId when API returns fewer rows than requested (e.g. concurrent deletion)', async () => {
+    const timestamp = 1700000000000;
+    const ids = [1, 2, 3, 4];
+
+    // Mock API to simulate deletion of song 2 (returns 1, 3, 4)
+    (window as any).api.audioLibraryControls.getSongInfo = vi.fn().mockResolvedValue([
+      { id: 1, songId: 1, title: 'Song 1' },
+      { id: 3, songId: 3, title: 'Song 3' },
+      { id: 4, songId: 4, title: 'Song 4' },
+    ]);
+
+    const identity = getSongListIdentity({ sortType: 'aToZ' } as any);
+
+    const { result } = renderHook(
+      () =>
+        useWindowHydration(ids, timestamp, {
+          listIdentity: identity,
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.getItem(0)).toBeDefined();
+    });
+
+    // Verify slots match correct requested IDs
+    expect(result.current.getItem(0)?.id).toBe(1); // Requested ID 1
+    expect(result.current.getItem(1)).toBeUndefined(); // Requested ID 2 missing
+    expect(result.current.getItem(2)?.id).toBe(3); // Requested ID 3
+    expect(result.current.getItem(3)?.id).toBe(4); // Requested ID 4
   });
 });

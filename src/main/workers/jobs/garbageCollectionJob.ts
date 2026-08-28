@@ -10,6 +10,7 @@ import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
 import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
 import { atomicPublishFile, isAssetTempFileFor } from '@main/workers/process/handlers/assetJobHandler';
+import { WAVEFORM_RESOLUTION } from './waveformJob';
 import type { Job, JobClass, JobState } from '../types';
 
 export class GarbageCollectionJob implements Job {
@@ -19,6 +20,7 @@ export class GarbageCollectionJob implements Job {
   state: JobState = 'queued'; // Using 'queued' instead of 'pending' as JobState has 'queued'
   retries = 0;
   description: string;
+  private abortController = new AbortController();
   
   // Provide a unique id so that multiple GC jobs don't queue up unnecessarily
   constructor() {
@@ -26,10 +28,21 @@ export class GarbageCollectionJob implements Job {
     this.description = 'Collecting orphaned library assets';
   }
 
+  public cancel(): void {
+    this.state = 'cancelled';
+    this.abortController.abort();
+  }
+
+  public isCancelled(): boolean {
+    return this.state === 'cancelled' || this.abortController.signal.aborted;
+  }
+
   async execute(): Promise<void> {
     try {
+      if (this.isCancelled()) return;
       logger.info('Starting garbage collection for orphaned library assets');
       const removedCount = await collectGarbageArtworks();
+      if (this.isCancelled()) return;
       logger.info(`Garbage collection completed. Removed ${removedCount} orphaned artworks.`);
 
       logger.info('Starting garbage collection for orphaned waveforms');
@@ -61,6 +74,7 @@ export class GarbageCollectionJob implements Job {
 
       // 1. Crash recovery & in-flight protection for DB rows
       for (const row of dbWaveforms) {
+        if (this.isCancelled()) return removedCount;
         const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
         if (!fileExists) {
           const rowBasename = path.basename(row.path);
@@ -96,6 +110,20 @@ export class GarbageCollectionJob implements Job {
 
             if (staleCandidates.length > 0) {
               const newestCandidate = staleCandidates[0];
+              // Nora waveforms are raw Float32Array data with WAVEFORM_RESOLUTION (200) peaks.
+              // Expected file size = WAVEFORM_RESOLUTION * Float32Array.BYTES_PER_ELEMENT = 800 bytes.
+              // Reject files that don't match the expected format.
+              const EXPECTED_WAVEFORM_BYTES = WAVEFORM_RESOLUTION * Float32Array.BYTES_PER_ELEMENT;
+              const { size } = newestCandidate.tempStats;
+              const isValidWaveform = size === EXPECTED_WAVEFORM_BYTES;
+              if (!isValidWaveform) {
+                logger.warn(
+                  `[GarbageCollection] Rejecting corrupt/truncated waveform tmp file for DB row ${row.id}: ` +
+                  `${newestCandidate.tempFilePath} (${size} bytes, expected ${EXPECTED_WAVEFORM_BYTES} bytes)`
+                );
+                continue;
+              }
+
               logger.info(
                 `[GarbageCollection] Recovering newest unpromoted waveform tmp file for DB row ${row.id}: ${newestCandidate.tempFilePath} -> ${row.path}`
               );
@@ -127,6 +155,7 @@ export class GarbageCollectionJob implements Job {
       // Any .tmp file older than 60s that remains after Step 1 (e.g. leftover when .bin already exists,
       // or unreferenced without DB row) is obsolete and must be deleted.
       for (const file of files) {
+        if (this.isCancelled()) return removedCount;
         if (file.endsWith('.tmp')) {
           const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath).catch(() => null);
@@ -141,6 +170,7 @@ export class GarbageCollectionJob implements Job {
 
       // 3. Clean unreferenced .bin files (>60s old and not referenced in DB)
       for (const file of files) {
+        if (this.isCancelled()) return removedCount;
         if (file.endsWith('.bin') && !validBinPaths.has(file)) {
           const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath).catch(() => null);

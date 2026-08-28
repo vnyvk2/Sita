@@ -228,7 +228,7 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       expect(fs.rename).toHaveBeenCalledTimes(2);
     });
 
-    it('rolls back newly published optimized file if full-image publication fails (Dual Publication Atomicity)', async () => {
+    it('does NOT rollback newly published optimized file if full-image publication fails (Shared Asset Ownership)', async () => {
       const mockDispose = vi.fn();
       const taglib = await import('node-taglib-sharp');
       vi.mocked(taglib.File.createFromPath).mockReturnValue({
@@ -272,8 +272,8 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       });
 
       expect(result.success).toBe(false);
-      // PROVE: rollback unlinked the newly published optimized file to avoid half-state
-      expect(fs.unlink).toHaveBeenCalledWith(
+      // PROVE: the newly published optimized file is NOT unlinked
+      expect(fs.unlink).not.toHaveBeenCalledWith(
         expect.stringMatching(/-optimized\.webp$/)
       );
     });

@@ -369,4 +369,79 @@ describe('diffEngine', () => {
     expect(result.removed).toHaveLength(0); // Missing blacklisted song MUST NOT be removed
     expect(result.unchangedCount).toBe(2); // NormalSong (1) + BlacklistedSong (1)
   });
+
+  // === P0 REGRESSION: walkFailed defense-in-depth ===
+
+  describe('walkFailed defense-in-depth (P0 regression)', () => {
+    const existingDbSongs: DbSongSnapshot[] = [
+      { id: 1, path: 'C:\\Music\\Song1.mp3', fileModifiedAt: new Date(10000), folderId: 1 },
+      { id: 2, path: 'C:\\Music\\Song2.mp3', fileModifiedAt: new Date(10000), folderId: 1 },
+      { id: 3, path: 'C:\\Music\\Sub\\Song3.flac', fileModifiedAt: new Date(10000), folderId: 2 }
+    ];
+
+    it('walkFailed=true + empty disk snapshot → ZERO removals (prevents mass deletion)', () => {
+      // This is THE critical regression test. A worker walk failure produces empty
+      // snapshots. Without the walkFailed guard, all 3 DB songs would be removed.
+      const result = diffFilesystemSnapshot([], existingDbSongs, [rootC], {
+        platform: 'win32',
+        walkFailed: true
+      });
+
+      expect(result.removed).toHaveLength(0);
+      expect(result.added).toHaveLength(0);
+      expect(result.modified).toHaveLength(0);
+    });
+
+    it('walkFailed=true + partial disk snapshot → ZERO removals, additions still computed', () => {
+      // Even if some files were found before failure, no removals should occur
+      const partialDisk: DiskSongSnapshot[] = [
+        { path: 'C:\\Music\\Song1.mp3', fileModifiedAt: new Date(10000), rootId: 1 },
+        { path: 'C:\\Music\\NewSong.mp3', fileModifiedAt: new Date(10000), rootId: 1 }
+      ];
+
+      const result = diffFilesystemSnapshot(partialDisk, existingDbSongs, [rootC], {
+        platform: 'win32',
+        walkFailed: true
+      });
+
+      expect(result.removed).toHaveLength(0);
+      // Additions and modifications are still computed (safe direction)
+      expect(result.added).toHaveLength(1);
+      expect(result.added[0].path).toBe('C:\\Music\\NewSong.mp3');
+    });
+
+    it('walkFailed=false (default) + empty disk → songs ARE removed (legitimate empty scan)', () => {
+      // When the walk genuinely succeeds and finds no files, songs under
+      // accessible roots should be removed. This is the legitimate case.
+      const result = diffFilesystemSnapshot([], existingDbSongs, [rootC], {
+        platform: 'win32',
+        walkFailed: false
+      });
+
+      expect(result.removed).toHaveLength(3);
+    });
+
+    it('walkFailed defaults to false when not specified', () => {
+      const result = diffFilesystemSnapshot([], existingDbSongs, [rootC], {
+        platform: 'win32'
+      });
+
+      expect(result.removed).toHaveLength(3);
+    });
+
+    it('walkFailed=true still correctly reports skippedRoots/failedSubtrees/failedPaths', () => {
+      const result = diffFilesystemSnapshot([], existingDbSongs, [rootC], {
+        platform: 'win32',
+        walkFailed: true,
+        failedSubtrees: ['C:\\Music\\Sub'],
+        failedPaths: ['C:\\Music\\Song1.mp3'],
+        skippedRoots: [rootE]
+      });
+
+      expect(result.removed).toHaveLength(0);
+      expect(result.failedSubtrees).toEqual(['C:\\Music\\Sub']);
+      expect(result.failedPaths).toEqual(['C:\\Music\\Song1.mp3']);
+      expect(result.skippedRoots).toEqual([rootE]);
+    });
+  });
 });

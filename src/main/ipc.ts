@@ -159,12 +159,12 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     libraryScheduler.start();
     adaptivePolicyEngine.start();
 
-    // Enqueue Garbage Collection on startup
-    libraryScheduler.requestMaintenance();
-
     // Event Choreography: When an ArtworkJob finishes, queue a PaletteJob
     // Register background asset generation pipelines (e.g., palettes)
     registerLibraryChoreography();
+
+    // Enqueue Garbage Collection on startup
+    libraryScheduler.requestMaintenance();
   }
 
   const sendSchedulerUpdate = () => {

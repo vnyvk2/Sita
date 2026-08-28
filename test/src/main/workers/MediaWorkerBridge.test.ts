@@ -373,6 +373,110 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
         'Worker process exited with code 1 during directory walk.'
       );
     });
+
+    it('P0 REGRESSION: should REJECT walkDirectory when worker reports raw.error (prevents mass deletion)', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }]);
+      await Promise.resolve();
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_WALK_DIRECTORY'
+      );
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Worker reports a global walk error with empty snapshots.
+      // Before the fix, this would RESOLVE and deliver empty snapshots
+      // that the diff engine would interpret as "no files exist" → mass deletion.
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_COMPLETE',
+        taskId,
+        snapshots: [],
+        failedSubtrees: [],
+        failedPaths: [],
+        error: 'EPERM: permission denied, readdir /Music'
+      });
+
+      // MUST reject, not resolve
+      await expect(walkPromise).rejects.toThrow('[MediaWorkerBridge] Worker walk failed');
+    });
+
+    it('P0 REGRESSION: should RESOLVE with cancelled=true on user cancellation (not error)', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }]);
+      await Promise.resolve();
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_WALK_DIRECTORY'
+      );
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // User cancellation should still RESOLVE with cancelled: true
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_COMPLETE',
+        taskId,
+        snapshots: [],
+        failedSubtrees: [],
+        failedPaths: [],
+        cancelled: true
+      });
+
+      const result = await walkPromise;
+      expect(result.cancelled).toBe(true);
+      expect(result.snapshots).toHaveLength(0);
+    });
+
+    it('P0 REGRESSION: should RESOLVE normally on successful walk with empty snapshots', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_WALK_DIRECTORY', 'CMD_SHUTDOWN']
+      });
+      await startPromise;
+
+      const walkPromise = bridge.walkDirectory([{ id: 1, path: 'C:/Music' }]);
+      await Promise.resolve();
+
+      const postCall = mockProcess.postMessage.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'CMD_WALK_DIRECTORY'
+      );
+      const taskId = (postCall![0] as { taskId: string }).taskId;
+
+      // Successful walk with empty snapshots (legitimate empty directory)
+      // should RESOLVE normally with empty arrays
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_WALK_COMPLETE',
+        taskId,
+        snapshots: [],
+        failedSubtrees: [],
+        failedPaths: []
+        // No error, no cancelled
+      });
+
+      const result = await walkPromise;
+      expect(result.snapshots).toHaveLength(0);
+      expect(result.cancelled).toBeFalsy();
+    });
   });
 
   describe('parseTrackBatchStream (Phase C3)', () => {

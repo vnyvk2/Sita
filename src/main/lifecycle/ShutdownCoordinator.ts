@@ -44,14 +44,34 @@ export class ShutdownCoordinator {
 
     // 1. Stop schedulers, background engines, and active library scans
     ShutdownLogger.logShutdownTransition(ShutdownState.StoppingSchedulers, source);
+    let schedulerSurvivingPromises: Promise<void>[] = [];
     try {
-      await libraryScheduler.stop();
+      const result = await libraryScheduler.stop();
+      schedulerSurvivingPromises = result.survivingJobPromises;
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping library scheduler during shutdown:', { error });
+    }
+
+    try {
       adaptivePolicyEngine.stop();
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping adaptive policy engine during shutdown:', { error });
+    }
+
+    try {
       await libraryLifecycleController.shutdown();
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping library lifecycle controller during shutdown:', { error });
+    }
+
+    try {
       await mediaWorkerBridge.terminate();
     } catch (error) {
       hasPartialFailures = true;
-      logger.error('Error stopping schedulers and library lifecycle during shutdown:', { error });
+      logger.error('Error terminating media worker bridge during shutdown:', { error });
     }
 
     // 2. Save pending state
@@ -82,6 +102,21 @@ export class ShutdownCoordinator {
       } catch (error) {
         logger.warn('Could not send app/beforeQuitEvent to renderer (best-effort):', { error });
       }
+    }
+
+    // DB Write Barrier: If the scheduler had surviving job promises that did not
+    // settle during its grace period, await them here with a hard timeout.
+    // This establishes the invariant: no DB-dependent job is still executing
+    // when closeDatabaseInstance() is called.
+    if (schedulerSurvivingPromises.length > 0) {
+      logger.warn(
+        `[ShutdownCoordinator] Awaiting ${schedulerSurvivingPromises.length} surviving scheduler job promises before DB closure.`
+      );
+      const DB_BARRIER_TIMEOUT_MS = 5000;
+      await Promise.race([
+        Promise.allSettled(schedulerSurvivingPromises),
+        new Promise(resolve => setTimeout(resolve, DB_BARRIER_TIMEOUT_MS))
+      ]);
     }
 
     // 4. Guaranteed Database Teardown

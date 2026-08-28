@@ -13,6 +13,7 @@ export class JobScheduler extends EventEmitter {
   
   // To protect against duplicates across all queues and running state
   private activeJobIds = new Set<string>();
+  private deferredTimers = new Map<string, NodeJS.Timeout>();
 
   private isRunning = false;
   private isDraining = false;
@@ -93,6 +94,35 @@ export class JobScheduler extends EventEmitter {
     log.debug(`[JobScheduler] Enqueued ${job.jobClass} job: ${job.id}`);
     this.processNext();
     return true;
+  }
+
+  /**
+   * Schedules a job to be enqueued after a delay. Useful when a job needs to
+   * re-check conditions (e.g., album completeness) after its current invocation
+   * finishes and its ID is cleared from activeJobIds.
+   *
+   * If a deferred timer already exists for this job ID, the new timer replaces it.
+   * Deferred timers are cancelled during stop() and dispose().
+   */
+  public scheduleDeferred(job: Job, delayMs: number): void {
+    if (this.isDraining) {
+      log.debug(`[JobScheduler] Rejected deferred job ${job.id} because scheduler is shutting down.`);
+      return;
+    }
+
+    // Cancel any existing deferred timer for this job ID
+    const existingTimer = this.deferredTimers.get(job.id);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      this.deferredTimers.delete(job.id);
+      this.enqueue(job);
+    }, delayMs);
+
+    this.deferredTimers.set(job.id, timer);
+    log.debug(`[JobScheduler] Scheduled deferred enqueue for ${job.id} in ${delayMs}ms`);
   }
 
   /**
@@ -200,11 +230,15 @@ export class JobScheduler extends EventEmitter {
    * Shuts down the scheduler through a two-phase bounded drain:
    * 1. Graceful Drain Phase (up to 15s): Prevents new jobs from starting while waiting
    *    for running jobs to complete naturally.
-   * 2. Forced Abort & Grace Phase (up to 2s): If jobs survive the drain timeout, broadcasts
-   *    cancellation (job.state = 'cancelled', job.cancel()) and awaits up to a 2-second grace
-   *    period for in-flight tasks to yield and terminate before clearing tracking and completing stop().
+   * 2. Forced Abort & Grace Phase (up to 5s): If jobs survive the drain timeout, broadcasts
+   *    cancellation (job.state = 'cancelled', job.cancel()) and awaits up to 5 seconds
+   *    for in-flight promises to settle.
+   *
+   * Returns surviving job promises that have NOT settled within the grace period.
+   * The caller MUST await these (or await a bounded timeout on them) before closing
+   * any shared resource (e.g., database) that jobs depend on.
    */
-  public async stop(): Promise<void> {
+  public async stop(): Promise<{ survivingJobPromises: Promise<void>[] }> {
     this.isRunning = false;
     this.isDraining = true;
     log.info('[JobScheduler] Draining... waiting for running jobs to finish.');
@@ -223,12 +257,20 @@ export class JobScheduler extends EventEmitter {
     }
     this.pendingRetryJobs.clear();
 
+    // Cancel any deferred enqueue timers
+    for (const timer of this.deferredTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.deferredTimers.clear();
+
     // 1. Drain wait: wait up to timeout for running jobs to naturally finish
     const timeoutMs = 15000;
     const start = Date.now();
     while (this.inFlightJobPromises.size > 0 && Date.now() - start < timeoutMs) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+
+    let survivingJobPromises: Promise<void>[] = [];
 
     if (this.inFlightJobPromises.size > 0 || this.runningJobs.size > 0) {
       log.warn(
@@ -245,12 +287,27 @@ export class JobScheduler extends EventEmitter {
         }
       }
 
-      // Hard await to ensure all executing job promises have yielded and returned before shutdown proceeds
-      const survivingPromises = Array.from(this.inFlightJobPromises.values());
-      await Promise.race([
-        Promise.allSettled(survivingPromises),
-        new Promise(resolve => setTimeout(resolve, 2000))
+      // Snapshot the promises BEFORE clearing tracking.
+      // These are the promises the caller must await before closing shared resources.
+      survivingJobPromises = Array.from(this.inFlightJobPromises.values());
+
+      // Grace period: wait up to 5s for cancelled jobs to settle
+      const GRACE_TIMEOUT_MS = 5000;
+      const settleResult = await Promise.race([
+        Promise.allSettled(survivingJobPromises).then(() => 'settled' as const),
+        new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), GRACE_TIMEOUT_MS))
       ]);
+
+      if (settleResult === 'timeout') {
+        log.error(
+          `[JobScheduler] ${this.inFlightJobPromises.size} job promises did not settle within ${GRACE_TIMEOUT_MS}ms after cancellation. ` +
+          `Returning unsettled promises to caller for write barrier.`
+        );
+        // Re-snapshot: only return promises that are STILL in-flight
+        survivingJobPromises = Array.from(this.inFlightJobPromises.values());
+      } else {
+        survivingJobPromises = [];
+      }
 
       this.runningJobs.clear();
       this.activeJobIds.clear();
@@ -259,6 +316,7 @@ export class JobScheduler extends EventEmitter {
     
     this.isDraining = false;
     log.info('[JobScheduler] Stopped cleanly');
+    return { survivingJobPromises };
   }
 
   /**
@@ -281,6 +339,12 @@ export class JobScheduler extends EventEmitter {
       this.activeJobIds.delete(job.id);
     }
     this.pendingRetryJobs.clear();
+
+    // Cancel deferred timers
+    for (const timer of this.deferredTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.deferredTimers.clear();
     
     // Clear queues
     this.interactiveQueue = [];

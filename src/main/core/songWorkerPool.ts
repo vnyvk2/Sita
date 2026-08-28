@@ -265,7 +265,12 @@ export const processSongsWithWorkerPool = async (
                 const artwork = preprocessedArtworks[i];
 
                 try {
-                  const res = await ingestTrackDTO(track, trx, artwork);
+                  // Nested transaction = SAVEPOINT. If ingestTrackDTO fails partway through
+                  // (e.g., song saved but genre linking throws), the SAVEPOINT is rolled back,
+                  // leaving zero partial state for this track.
+                  const res = await trx.transaction(async (savepointTrx) => {
+                    return ingestTrackDTO(track, savepointTrx, artwork);
+                  });
                   if (res) {
                     stagedSuccessCount++;
                     stagedSongIds.push(res.songData.id);

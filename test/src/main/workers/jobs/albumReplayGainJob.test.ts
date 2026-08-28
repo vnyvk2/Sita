@@ -1,10 +1,10 @@
 import fs from 'fs/promises';
-import { EventEmitter } from 'events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@main/db/db';
 import { ASSET_EVENTS } from '@main/workers/libraryChoreography';
 import { AlbumReplayGainJob } from '@main/workers/jobs/albumReplayGainJob';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from '@main/workers/jobs/replayGainJob';
+import { JobScheduler } from '@main/workers/jobScheduler';
 
 vi.mock('fs/promises');
 
@@ -23,24 +23,24 @@ vi.mock('@main/db/db', () => ({
 }));
 
 describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurrency, Invariants)', () => {
-  let eventBus: EventEmitter;
+  let scheduler: JobScheduler;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    eventBus = new EventEmitter();
+    scheduler = new JobScheduler();
   });
 
   it('skips gracefully when album has no songs', async () => {
     vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([]);
 
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(db.query.replayGain.findMany).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('defers aggregation when album is incomplete (not all tracks have track ReplayGain)', async () => {
+  it('defers aggregation when album is incomplete (not all tracks have track ReplayGain) and schedules re-enqueue', async () => {
     // 3 songs in album
     vi.mocked(db.query.albumsSongs.findMany).mockResolvedValue([
       { albumId: 1, songId: 101 },
@@ -54,12 +54,23 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       { songId: 102, trackGain: -6.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
     ] as any);
 
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const deferSpy = vi.spyOn(scheduler, 'scheduleDeferred');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     // Must NOT proceed to reading block caches or writing to DB
     expect(fs.readFile).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
+
+    // Must use scheduler's explicit deferred enqueue mechanism (NOT fake domain event)
+    expect(deferSpy).toHaveBeenCalledOnce();
+    expect(deferSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'album_replaygain',
+        albumId: 1
+      }),
+      5000
+    );
   });
 
   it('skips processing if album is already fully up to date (Constraint #7)', async () => {
@@ -74,7 +85,7 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       { songId: 102, trackGain: -8.0, trackPeak: 0.95, albumGain: -7.2, albumPeak: 0.95, generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION, updatedAt: new Date() }
     ] as any);
 
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(fs.readFile).not.toHaveBeenCalled();
@@ -125,8 +136,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       } as any);
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     // Verify DB update called with albumGain and albumPeak
@@ -182,8 +193,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       } as any);
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(updateSetMock).not.toHaveBeenCalled();
@@ -225,8 +236,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       } as any);
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     // Verify commit was aborted due to stale detection
@@ -272,8 +283,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       } as any);
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     // Verify event was NOT emitted because optimistic concurrency update conflict rolled back
@@ -291,19 +302,19 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     // Test 1: 0 bytes (empty file)
     vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(0));
-    const job1 = new AlbumReplayGainJob(1, eventBus);
+    const job1 = new AlbumReplayGainJob(1, scheduler);
     await job1.execute();
     expect(db.transaction).not.toHaveBeenCalled();
 
     // Test 2: 7 bytes (truncated float)
     vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(7));
-    const job2 = new AlbumReplayGainJob(1, eventBus);
+    const job2 = new AlbumReplayGainJob(1, scheduler);
     await job2.execute();
     expect(db.transaction).not.toHaveBeenCalled();
 
     // Test 3: 15 bytes (misaligned: not divisible by 8)
     vi.mocked(fs.readFile).mockResolvedValue(Buffer.alloc(15));
-    const job3 = new AlbumReplayGainJob(1, eventBus);
+    const job3 = new AlbumReplayGainJob(1, scheduler);
     await job3.execute();
     expect(db.transaction).not.toHaveBeenCalled();
   });
@@ -319,18 +330,18 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT: file not found'));
 
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
   it('aborts immediately without querying DB if cancelled before execution', async () => {
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const job = new AlbumReplayGainJob(1, scheduler);
     job.cancel();
 
     expect(job.isCancelled()).toBe(true);
-    const emitSpy = vi.spyOn(eventBus, 'emit');
+    const emitSpy = vi.spyOn(scheduler, 'emit');
     await job.execute();
 
     expect(db.query.albumsSongs.findMany).not.toHaveBeenCalled();
@@ -344,8 +355,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       return [{ albumId: 1, songId: 101 }] as any;
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(job.isCancelled()).toBe(true);
@@ -365,8 +376,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       ] as any;
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(job.isCancelled()).toBe(true);
@@ -401,8 +412,8 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       } as any);
     });
 
-    const emitSpy = vi.spyOn(eventBus, 'emit');
-    const job = new AlbumReplayGainJob(1, eventBus);
+    const emitSpy = vi.spyOn(scheduler, 'emit');
+    const job = new AlbumReplayGainJob(1, scheduler);
     await job.execute();
 
     expect(job.isCancelled()).toBe(true);

@@ -28,6 +28,12 @@ export interface DiffOptions {
   failedPaths?: string[];
   toleranceMs?: number;
   platform?: NodeJS.Platform;
+  /**
+   * Defense-in-depth: When true, the walk result is NOT authoritative.
+   * The diff engine will produce zero removals regardless of snapshot content.
+   * This prevents a failed/incomplete walk from triggering mass deletion.
+   */
+  walkFailed?: boolean;
 }
 
 export interface DiffResult {
@@ -66,7 +72,8 @@ export const diffFilesystemSnapshot = (
     failedSubtrees = [],
     failedPaths = [],
     toleranceMs = 1000,
-    platform = process.platform
+    platform = process.platform,
+    walkFailed = false
   } = options;
 
   const diskMap = new Map<string, DiskSongSnapshot>();
@@ -112,6 +119,20 @@ export const diffFilesystemSnapshot = (
 
   // 2. Identify Removed tracks (Root-Scoped & Unverified-Filesystem Protected Boundary)
   const removed: DbSongSnapshot[] = [];
+
+  // Defense-in-depth: If the walk failed, the disk snapshot is NOT authoritative.
+  // No songs may be removed based on a non-authoritative snapshot.
+  if (walkFailed) {
+    return {
+      added,
+      modified,
+      removed,
+      unchangedCount,
+      skippedRoots,
+      failedSubtrees,
+      failedPaths
+    };
+  }
 
   for (const dbItem of dbSongs) {
     if (dbItem.isBlacklisted) {

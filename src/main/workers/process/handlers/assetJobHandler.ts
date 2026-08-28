@@ -298,10 +298,10 @@ async function generateArtworkInWorker(
         publishedPaths.push(imgPath);
       }
     } catch (pubError) {
-      // Rollback only files newly published by this invocation
-      for (const p of publishedPaths) {
-        await fs.unlink(p).catch(() => {});
-      }
+      // Do NOT unlink published destination files on rollback.
+      // Published files are hash-addressed and may have been adopted by concurrent
+      // operations. The GC job will clean genuinely orphaned files.
+      // Temp file cleanup is handled by the outer catch block.
       throw pubError;
     }
 

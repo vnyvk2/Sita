@@ -39,7 +39,7 @@ export const AddSongsToTargetPlaylistPrompt = ({
   }, [allIds, existingSet]);
 
   const idsVersion = songIdsVersionFromState(dataUpdatedAt);
-  const { getItem, handleRangeChange } = useWindowHydration(eligibleIds, idsVersion, {
+  const { getItem, onRangeChange } = useWindowHydration(eligibleIds, idsVersion, {
     keyPrefix: 'add-to-playlist',
     listIdentity: `playlist_${playlistId}`
   });
@@ -187,7 +187,7 @@ export const AddSongsToTargetPlaylistPrompt = ({
             data={eligibleIds}
             fixedItemHeight={56}
             itemContent={renderSongRow}
-            onChange={handleRangeChange}
+            onChange={onRangeChange}
             style={{ height: '350px', width: '100%' }}
           />
         ) : (

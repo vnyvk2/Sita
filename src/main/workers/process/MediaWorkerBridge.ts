@@ -53,6 +53,7 @@ export interface ParseBatchStreamOptions {
   batchSize?: number;
   abortSignal?: AbortSignal;
   artworkSaveLocation?: string;
+  timeoutMs?: number;
   onBatch: (batch: {
     batchId: number;
     isLastBatch: boolean;
@@ -406,6 +407,7 @@ export class MediaWorkerBridge extends EventEmitter {
       batchSize = 100,
       abortSignal,
       artworkSaveLocation = DEFAULT_ARTWORK_SAVE_LOCATION,
+      timeoutMs,
       onBatch
     } = options;
 
@@ -425,8 +427,10 @@ export class MediaWorkerBridge extends EventEmitter {
 
     return new Promise<ParseStreamResult>((resolve, reject) => {
       let settled = false;
+      let timeoutTimer: NodeJS.Timeout | null = null;
 
       const cleanup = () => {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         this.activeParseResolvers.delete(taskId);
         if (abortSignal) {
           abortSignal.removeEventListener('abort', onAbort);
@@ -452,8 +456,28 @@ export class MediaWorkerBridge extends EventEmitter {
         resolve({ totalParsed, totalErrors, cancelled: true });
       };
 
+      const onTimeout = () => {
+        if (settled) return;
+        settled = true;
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore
+        }
+        cleanup();
+        reject(new Error(`[MediaWorkerBridge] Batch parsing timed out after ${timeoutMs}ms.`));
+      };
+
       if (abortSignal) {
         abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      if (timeoutMs && timeoutMs > 0) {
+        timeoutTimer = setTimeout(onTimeout, timeoutMs);
       }
 
       this.activeParseResolvers.set(taskId, {
@@ -682,7 +706,17 @@ export class MediaWorkerBridge extends EventEmitter {
           const raw = event as EvtWalkComplete;
           const isCancelled = Boolean(raw.cancelled);
 
-          if (!isCancelled && !raw.error) {
+          // Worker reported a global walk error (not user cancellation).
+          // REJECT the promise so callers cannot consume an empty snapshot
+          // as if it were an authoritative "no files on disk" result.
+          if (!isCancelled && raw.error) {
+            walk.reject(
+              new Error(`[MediaWorkerBridge] Worker walk failed: ${typeof raw.error === 'string' ? raw.error : 'unknown error'}`)
+            );
+            break;
+          }
+
+          if (!isCancelled) {
             this.onTaskCompletedSuccessfully();
           }
 
@@ -742,14 +776,23 @@ export class MediaWorkerBridge extends EventEmitter {
               }
 
               if (batchEvt.isLastBatch || batchEvt.cancelled) {
-                if (!batchEvt.cancelled) {
-                  this.onTaskCompletedSuccessfully();
+                if (batchEvt.cancelled && !batchEvt.isLastBatch) {
+                  // Worker-initiated cancellation (e.g., backpressure timeout).
+                  // REJECT so the caller can fall back to local processing for remaining tracks.
+                  parseTask.reject(
+                    new Error(`[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). ` +
+                      `Committed ${parseTask.totalParsed} tracks before cancellation.`)
+                  );
+                } else {
+                  if (!batchEvt.cancelled) {
+                    this.onTaskCompletedSuccessfully();
+                  }
+                  parseTask.resolve({
+                    totalParsed: parseTask.totalParsed,
+                    totalErrors: parseTask.totalErrors,
+                    cancelled: Boolean(batchEvt.cancelled)
+                  });
                 }
-                parseTask.resolve({
-                  totalParsed: parseTask.totalParsed,
-                  totalErrors: parseTask.totalErrors,
-                  cancelled: Boolean(batchEvt.cancelled)
-                });
               }
             })
             .catch((err) => {

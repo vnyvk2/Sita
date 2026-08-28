@@ -97,12 +97,24 @@ export function useWindowHydration(
       const win = windows[i];
       const data = query.data;
       if (!win || !data) return;
-      for (let k = 0; k < data.length; k += 1) {
-        map.set(win.startIndex + k, data[k]);
+
+      const responseById = new Map<number, SongData>();
+      for (const item of data) {
+        responseById.set(item.songId, item);
+      }
+
+      for (let k = 0; k < (win.endIndex - win.startIndex); k += 1) {
+        const requestedId = ids[win.startIndex + k];
+        if (requestedId !== undefined) {
+          const item = responseById.get(requestedId);
+          if (item) {
+            map.set(win.startIndex + k, item);
+          }
+        }
       }
     });
     return map;
-  }, [queries, windows]);
+  }, [queries, windows, ids]);
 
   const getItem = useCallback((index: number) => itemsByIndex.get(index), [itemsByIndex]);
 
