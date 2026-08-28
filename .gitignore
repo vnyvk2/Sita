@@ -30,12 +30,13 @@ tsconfig.web.tsbuildinfo
 chrome/
 graphify-out/
 
-# Ignore patches, diffs, and untracked files
+# Ignore text, patch, diff, and temp files
+*.txt
+!LICENSE.txt
+!open_source_licenses.txt
 *.patch
 *.diff
 .git-rewrite/
-old_miniplayer.txt
-diff_output*.txt
 electron.vite.config.*.mjs
 *.zip
 memory_report_*.json
