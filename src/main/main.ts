@@ -603,10 +603,12 @@ app.on('will-quit', () => {
 
 process.on('SIGTERM', () => {
   ShutdownLogger.logEventObservation('process.on(SIGTERM)');
+  app.quit();
 });
 
 process.on('SIGINT', () => {
   ShutdownLogger.logEventObservation('process.on(SIGINT)');
+  app.quit();
 });
 
 process.on('exit', (code) => {

@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
+import type { Stats } from 'fs';
 import path from 'path';
 
 import { collectGarbageArtworks } from '@main/core/garbageCollector';
@@ -8,6 +9,7 @@ import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
 import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
+import { atomicPublishFile, isAssetTempFileFor } from '@main/workers/process/handlers/assetJobHandler';
 import type { Job, JobClass, JobState } from '../types';
 
 export class GarbageCollectionJob implements Job {
@@ -61,28 +63,62 @@ export class GarbageCollectionJob implements Job {
       for (const row of dbWaveforms) {
         const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
         if (!fileExists) {
-          const tempPath = `${row.path}.tmp`;
-          const tempStats = await fs.stat(tempPath).catch(() => null);
+          const rowBasename = path.basename(row.path);
+          const matchingTempFiles = files.filter((f) => isAssetTempFileFor(f, rowBasename));
 
-          if (tempStats) {
-            if (now - tempStats.mtimeMs < 60_000) {
-              // In-flight publication race protection: file is actively being written/renamed
-              logger.debug(`[GarbageCollection] Waveform ${row.id} has active in-flight temp file. Preserving DB row.`);
-              continue;
-            } else {
-              // Crash recovery: Process crashed after DB commit but before rename
-              // Deterministic promotion of matching temp file restores published asset
-              logger.info(`[GarbageCollection] Recovering unpromoted waveform tmp file for DB row ${row.id}: ${tempPath} -> ${row.path}`);
-              const promoted = await fs.rename(tempPath, row.path).then(() => true).catch((err) => {
-                logger.warn(`[GarbageCollection] Failed to promote recovered waveform tmp file`, { error: err });
-                return false;
-              });
-              if (promoted) continue;
+          let protectedInFlight = false;
+          let recovered = false;
+
+          // Collect stats for all matching candidate files
+          const candidateEntries = await Promise.all(
+            matchingTempFiles.map(async (tempFileName) => {
+              const tempFilePath = path.join(cacheDir, tempFileName);
+              const tempStats = await fs.stat(tempFilePath).catch(() => null);
+              return { tempFileName, tempFilePath, tempStats };
+            })
+          );
+
+          // 1. Check if any matching temp file is active / in-flight (<60s)
+          const hasActiveInFlight = candidateEntries.some(
+            (c) => c.tempStats && now - c.tempStats.mtimeMs < 60_000
+          );
+
+          if (hasActiveInFlight) {
+            logger.debug(
+              `[GarbageCollection] Waveform ${row.id} has active in-flight temp file. Preserving DB row.`
+            );
+            protectedInFlight = true;
+          } else {
+            // 2. Deterministic crash recovery: Sort stale candidates newest first
+            const staleCandidates = candidateEntries
+              .filter((c): c is { tempFileName: string; tempFilePath: string; tempStats: Stats } => c.tempStats !== null)
+              .sort((a, b) => b.tempStats.mtimeMs - a.tempStats.mtimeMs);
+
+            if (staleCandidates.length > 0) {
+              const newestCandidate = staleCandidates[0];
+              logger.info(
+                `[GarbageCollection] Recovering newest unpromoted waveform tmp file for DB row ${row.id}: ${newestCandidate.tempFilePath} -> ${row.path}`
+              );
+
+              try {
+                const pubStatus = await atomicPublishFile(newestCandidate.tempFilePath, row.path);
+                if (pubStatus === 'published' || pubStatus === 'already_existed') {
+                  recovered = true;
+                }
+              } catch (err) {
+                logger.warn(`[GarbageCollection] Failed to promote recovered waveform tmp file`, {
+                  error: err
+                });
+              }
             }
           }
 
+          if (protectedInFlight || recovered) continue;
+
           // Neither final .bin nor valid in-flight/recoverable .tmp exists
-          logger.warn(`[GarbageCollection] Waveform DB row ${row.id} points to missing file ${row.path}. Removing orphaned row.`);
+          logger.warn(
+            `[GarbageCollection] Waveform DB row ${row.id} points to missing file ${row.path}. Removing orphaned row.`
+          );
           await db.delete(waveforms).where(eq(waveforms.id, row.id));
         }
       }

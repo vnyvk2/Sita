@@ -1,8 +1,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { getAlbumsWithoutArtwork } from '../../src/main/db/queries/recovery';
+import { libraryScheduler } from '../../src/main/workers/jobScheduler';
+import { recoverLibraryAssets } from '../../src/main/core/recovery';
 
 // Mock dependencies before importing
 vi.mock('../../src/main/db/queries/recovery', () => ({
-  getAlbumsWithoutArtwork: vi.fn(),
+  getAlbumsWithoutArtwork: vi.fn().mockResolvedValue([]),
+  getSongsWithoutWaveform: vi.fn().mockResolvedValue([]),
+  getSongsWithoutReplayGain: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock('../../src/main/db/queries/genres', () => ({
@@ -17,7 +22,7 @@ vi.mock('../../src/main/workers/jobs/artworkJob', () => {
       albumId: number;
       path: string;
       execute = vi.fn();
-      
+
       constructor(albumId: number, path: string) {
         this.id = `artwork_${albumId}`;
         this.albumId = albumId;
@@ -28,55 +33,37 @@ vi.mock('../../src/main/workers/jobs/artworkJob', () => {
 });
 
 describe('Crash Recovery (Startup Sync)', () => {
-  let recoverLibraryAssets: typeof import('../../src/main/core/recovery').recoverLibraryAssets;
-  let getAlbumsWithoutArtwork: any;
-  let JobScheduler: any;
-  let scheduler: any;
-
-  beforeEach(async () => {
-    vi.resetModules();
-    
-    // Import mocked module
-    const recoveryQueries = await import('../../src/main/db/queries/recovery');
-    getAlbumsWithoutArtwork = recoveryQueries.getAlbumsWithoutArtwork;
-    
-    const jobSchedulerModule = await import('../../src/main/workers/jobScheduler');
-    JobScheduler = jobSchedulerModule.JobScheduler;
-    scheduler = jobSchedulerModule.libraryScheduler;
-    
-    const recoveryModule = await import('../../src/main/core/recovery');
-    recoverLibraryAssets = recoveryModule.recoverLibraryAssets;
-    
-    scheduler.start();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    libraryScheduler.start();
   });
 
   afterEach(() => {
-    scheduler.stop();
-    vi.clearAllMocks();
+    libraryScheduler.stop();
   });
 
   it('should not enqueue jobs if no albums are missing artwork', async () => {
-    getAlbumsWithoutArtwork.mockResolvedValueOnce([]);
-    
-    const enqueueSpy = vi.spyOn(scheduler, 'enqueue');
-    
+    vi.mocked(getAlbumsWithoutArtwork).mockResolvedValueOnce([]);
+
+    const enqueueSpy = vi.spyOn(libraryScheduler, 'enqueue');
+
     await recoverLibraryAssets();
-    
+
     expect(enqueueSpy).not.toHaveBeenCalled();
   });
 
   it('should enqueue ArtworkJobs for albums missing artwork', async () => {
-    getAlbumsWithoutArtwork.mockResolvedValueOnce([
-      { albumId: 1, sampleSongPath: '/fake/path/song1.mp3' },
-      { albumId: 2, sampleSongPath: '/fake/path/song2.mp3' }
+    vi.mocked(getAlbumsWithoutArtwork).mockResolvedValueOnce([
+      { albumId: 1, sampleSongPath: '/fake/path/song1.mp3', albumTitle: 'Album 1' },
+      { albumId: 2, sampleSongPath: '/fake/path/song2.mp3', albumTitle: 'Album 2' }
     ]);
-    
-    const enqueueSpy = vi.spyOn(scheduler, 'enqueue');
-    
+
+    const enqueueSpy = vi.spyOn(libraryScheduler, 'enqueue');
+
     await recoverLibraryAssets();
-    
+
     expect(enqueueSpy).toHaveBeenCalledTimes(2);
-    
+
     // Verify the enqueued jobs are of type 'artwork'
     expect(enqueueSpy.mock.calls[0][0].type).toBe('artwork');
     expect(enqueueSpy.mock.calls[1][0].type).toBe('artwork');

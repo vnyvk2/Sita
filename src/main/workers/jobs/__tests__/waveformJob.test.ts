@@ -15,7 +15,12 @@ vi.mock('fs/promises', () => ({
     writeFile: vi.fn(),
     rename: vi.fn(),
     unlink: vi.fn(),
-    readdir: vi.fn()
+    readdir: vi.fn(),
+    link: vi.fn(),
+    copyFile: vi.fn(),
+    constants: {
+      COPYFILE_EXCL: 1
+    }
   }
 }));
 
@@ -229,7 +234,9 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
       return { mtimeMs: now } as any;
     });
 
-    vi.mocked(fs.rename).mockResolvedValue(undefined as any);
+    vi.mocked(fs.link).mockResolvedValue(undefined as any);
+    vi.mocked(fs.copyFile).mockResolvedValue(undefined as any);
+    vi.mocked(fs.unlink).mockResolvedValue(undefined as any);
 
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockResolvedValue([
@@ -243,8 +250,8 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     const gcJob = new GarbageCollectionJob();
     await gcJob.execute();
 
-    // Invariant: Stale file must be repaired
-    expect(fs.rename).toHaveBeenCalledWith(
+    // Invariant: Stale file must be repaired atomically via link/copyFile
+    expect(fs.link).toHaveBeenCalledWith(
       expect.stringMatching(/200_v1\.bin\.tmp$/),
       expect.stringMatching(/200_v1\.bin$/)
     );

@@ -267,7 +267,7 @@ export function invalidateWindowsContainingIds(
     if (!data?.ids?.length || !dataUpdatedAt) continue;
 
     // listQuery.queryKey is ['songs', 'ids', params]
-    const params = listQuery.queryKey[2];
+    const params = listQuery.queryKey?.[2];
     const listIdentity = getSongListIdentity(params);
     const version = Math.floor(dataUpdatedAt);
     const indexById = new Map<number, number>();

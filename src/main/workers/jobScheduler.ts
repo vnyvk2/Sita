@@ -32,6 +32,7 @@ export class JobScheduler extends EventEmitter {
   // Track whether we've already emitted QUEUE_EMPTY to prevent duplicate events
   private isQueueEmptyState = true;
   private pendingMaintenance = false;
+  private pendingRetryJobs = new Map<string, { timer: NodeJS.Timeout; job: Job }>();
 
   constructor(options?: { limits?: Record<JobClass, number> }) {
     super();
@@ -55,9 +56,9 @@ export class JobScheduler extends EventEmitter {
   public requestMaintenance() {
     this.pendingMaintenance = true;
     
-    // If the queue is already empty when maintenance is requested, 
+    // If the queue is already empty and no retry jobs are pending when maintenance is requested, 
     // emit immediately so it can start without waiting for another job.
-    if (this.isQueueEmptyState && this.runningJobs.size === 0) {
+    if (this.isQueueEmptyState && this.runningJobs.size === 0 && this.pendingRetryJobs.size === 0) {
       this.pendingMaintenance = false;
       this.emit('MAINTENANCE_READY');
     }
@@ -79,6 +80,7 @@ export class JobScheduler extends EventEmitter {
 
     job.state = 'queued';
     this.activeJobIds.add(job.id);
+    this.isQueueEmptyState = false;
 
     if (job.jobClass === 'interactive') {
       this.interactiveQueue.push(job);
@@ -124,8 +126,34 @@ export class JobScheduler extends EventEmitter {
    * Cancels a specific job. If running, relies on the job's internal cancel() implementation.
    */
   public cancelJob(id: string): boolean {
-    // 1. Remove from queues
-    const filterFn = (j: Job) => j.id !== id;
+    // 1. Cancel if in retry backoff delay
+    const pendingRetry = this.pendingRetryJobs.get(id);
+    if (pendingRetry) {
+      clearTimeout(pendingRetry.timer);
+      pendingRetry.job.state = 'cancelled';
+      if (pendingRetry.job.cancel) {
+        try {
+          pendingRetry.job.cancel();
+        } catch (e) {
+          log.warn(`[JobScheduler] Error cancelling retry job ${id}:`, { error: e });
+        }
+      }
+      this.pendingRetryJobs.delete(id);
+      this.activeJobIds.delete(id);
+      return true;
+    }
+
+    // 2. Remove from queues if queued
+    const filterFn = (job: Job) => {
+      if (job.id === id) {
+        job.state = 'cancelled';
+        if (job.cancel) {
+          job.cancel();
+        }
+        return false;
+      }
+      return true;
+    };
     
     const initialIntLen = this.interactiveQueue.length;
     this.interactiveQueue = this.interactiveQueue.filter(filterFn);
@@ -140,7 +168,7 @@ export class JobScheduler extends EventEmitter {
                       (initialBgLen !== this.backgroundQueue.length) ||
                       (initialMaintLen !== this.maintenanceQueue.length);
     
-    // 2. Cancel if running
+    // 3. Cancel if running
     const runningJob = this.runningJobs.get(id);
     if (runningJob) {
       runningJob.state = 'cancelled';
@@ -180,6 +208,20 @@ export class JobScheduler extends EventEmitter {
     this.isRunning = false;
     this.isDraining = true;
     log.info('[JobScheduler] Draining... waiting for running jobs to finish.');
+
+    for (const { timer, job } of this.pendingRetryJobs.values()) {
+      clearTimeout(timer);
+      job.state = 'cancelled';
+      if (job.cancel) {
+        try {
+          job.cancel();
+        } catch (e) {
+          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during stop:`, { error: e });
+        }
+      }
+      this.activeJobIds.delete(job.id);
+    }
+    this.pendingRetryJobs.clear();
 
     // 1. Drain wait: wait up to timeout for running jobs to naturally finish
     const timeoutMs = 15000;
@@ -225,6 +267,20 @@ export class JobScheduler extends EventEmitter {
   public dispose() {
     this.isDraining = true;
     this.isRunning = false;
+
+    for (const { timer, job } of this.pendingRetryJobs.values()) {
+      clearTimeout(timer);
+      job.state = 'cancelled';
+      if (job.cancel) {
+        try {
+          job.cancel();
+        } catch (e) {
+          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during dispose:`, { error: e });
+        }
+      }
+      this.activeJobIds.delete(job.id);
+    }
+    this.pendingRetryJobs.clear();
     
     // Clear queues
     this.interactiveQueue = [];
@@ -292,11 +348,12 @@ export class JobScheduler extends EventEmitter {
 
     } while (startedNewJob);
     
-    // Emit QUEUE_EMPTY if no jobs are running and queues are empty
+    // Emit QUEUE_EMPTY if no jobs are running, queues are empty, and no retry jobs are pending
     if (this.runningJobs.size === 0 && 
         this.interactiveQueue.length === 0 && 
         this.backgroundQueue.length === 0 && 
-        this.maintenanceQueue.length === 0) {
+        this.maintenanceQueue.length === 0 &&
+        this.pendingRetryJobs.size === 0) {
       
       if (!this.isQueueEmptyState) {
         this.isQueueEmptyState = true;
@@ -307,6 +364,8 @@ export class JobScheduler extends EventEmitter {
         this.pendingMaintenance = false;
         this.emit('MAINTENANCE_READY');
       }
+    } else {
+      this.isQueueEmptyState = false;
     }
   }
 
@@ -356,14 +415,24 @@ export class JobScheduler extends EventEmitter {
       if (job.retries < maxRetries) {
         job.retries++;
         job.state = 'queued';
-        // Re-enqueue
-        if (job.jobClass === 'interactive') {
-          this.interactiveQueue.push(job);
-        } else if (job.jobClass === 'maintenance') {
-          this.maintenanceQueue.push(job);
-        } else {
-          this.backgroundQueue.push(job);
-        }
+        const delayMs = Math.min(500 * Math.pow(2, job.retries - 1), 5000);
+        log.warn(`[JobScheduler] Scheduling retry ${job.retries}/${maxRetries} for job ${job.id} in ${delayMs}ms.`);
+        const retryTimer = setTimeout(() => {
+          this.pendingRetryJobs.delete(job.id);
+          if (this.isDraining || !this.isRunning || job.state === 'cancelled') {
+            this.activeJobIds.delete(job.id);
+            return;
+          }
+          if (job.jobClass === 'interactive') {
+            this.interactiveQueue.push(job);
+          } else if (job.jobClass === 'maintenance') {
+            this.maintenanceQueue.push(job);
+          } else {
+            this.backgroundQueue.push(job);
+          }
+          this.processNext();
+        }, delayMs);
+        this.pendingRetryJobs.set(job.id, { timer: retryTimer, job });
       } else {
         job.state = 'failed';
         this.failedCount++;
@@ -393,7 +462,11 @@ export class JobScheduler extends EventEmitter {
   public getRawMetrics() {
     return {
       runningJobs: this.runningJobs.size,
-      queuedJobs: this.interactiveQueue.length + this.backgroundQueue.length + this.maintenanceQueue.length,
+      queuedJobs:
+        this.interactiveQueue.length +
+        this.backgroundQueue.length +
+        this.maintenanceQueue.length +
+        this.pendingRetryJobs.size,
       completedJobs: this.completedCount,
       failedJobs: this.failedCount,
       totalExecutionTimeMs: this.totalExecutionTimeMs,

@@ -1,5 +1,4 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { keepPreviousData } from '@tanstack/react-query';
 
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
@@ -66,16 +65,12 @@ export const songQuery = createQueryKeys('songs', {
           };
         }
         return window.api.audioLibraryControls.getFilteredSongLibraryIds(params);
-      },
-      placeholderData: keepPreviousData,
-      staleTime: SONG_IDS_STALE_TIME,
-      gcTime: SONG_IDS_GC_TIME
+      }
     };
   },
   facets: () => ({
     queryKey: ['facets'],
-    queryFn: () => window.api.audioLibraryControls.getSongListFacets(),
-    staleTime: 30 * 60 * 1000
+    queryFn: () => window.api.audioLibraryControls.getSongListFacets()
   }),
   all: (data: {
     sortType: SongSortTypes;

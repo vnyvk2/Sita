@@ -6,17 +6,18 @@ import { ArtworkCacheInvalidator } from '@main/metadata/transactions/ArtworkCach
 import { getSongArtworkPath } from '@main/fs/resolveFilePaths';
 
 describe('ArtworkCacheInvalidator (Phase 5-D Lifecycle)', () => {
-  it('cleans up artwork cache directories on disk safely', () => {
+  it('does NOT delete or unlink physical artwork files on disk during invalidation', () => {
     const tempDir = path.join(os.tmpdir(), `artwork_inval_test_${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'art1.webp'), 'test');
     fs.writeFileSync(path.join(tempDir, 'art2.webp'), 'test');
 
     const invalidator = new ArtworkCacheInvalidator();
-    invalidator.invalidateArtworkCache(tempDir);
+    invalidator.invalidateArtworkCache(tempDir, tempDir);
 
     expect(fs.existsSync(tempDir)).toBe(true);
-    expect(fs.readdirSync(tempDir).length).toBe(0);
+    // Invariant: Physical artwork files MUST remain intact
+    expect(fs.readdirSync(tempDir).length).toBe(2);
 
     fs.rmSync(tempDir, { recursive: true, force: true });
   });

@@ -137,25 +137,38 @@ describe('JobScheduler', () => {
   });
 
   describe('Retries & Error Handling', () => {
-    it('should retry failed jobs up to maxRetries before emitting JOB_FAILED', async () => {
-      let attempts = 0;
-      const job = new MockJob('retry_job', 'interactive', async () => {
-        attempts++;
-        throw new Error(`Failure on attempt ${attempts}`);
-      }, 2); // maxRetries = 2 (3 total attempts: initial + 2 retries)
+    it('should retry failed jobs up to maxRetries before emitting JOB_FAILED with bounded backoff', async () => {
+      vi.useFakeTimers();
+      try {
+        let attempts = 0;
+        const job = new MockJob('retry_job', 'interactive', async () => {
+          attempts++;
+          throw new Error(`Failure on attempt ${attempts}`);
+        }, 2); // maxRetries = 2 (3 total attempts: initial + 2 retries)
 
-      const failedSpy = vi.fn();
-      scheduler.on('JOB_FAILED', failedSpy);
+        const failedSpy = vi.fn();
+        scheduler.on('JOB_FAILED', failedSpy);
 
-      scheduler.start();
-      scheduler.enqueue(job);
+        scheduler.start();
+        scheduler.enqueue(job);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+        // Attempt 1: immediate execution
+        await vi.advanceTimersByTimeAsync(0);
+        expect(attempts).toBe(1);
 
-      expect(attempts).toBe(3);
-      expect(job.state).toBe('failed');
-      expect(failedSpy).toHaveBeenCalledWith(job, expect.any(Error));
-      expect(scheduler.getFailedJobs()).toContain(job);
+        // Attempt 2: retry #1 after 500ms backoff
+        await vi.advanceTimersByTimeAsync(500);
+        expect(attempts).toBe(2);
+
+        // Attempt 3: retry #2 after 1000ms backoff
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(attempts).toBe(3);
+        expect(job.state).toBe('failed');
+        expect(failedSpy).toHaveBeenCalledWith(job, expect.any(Error));
+        expect(scheduler.getFailedJobs()).toContain(job);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should re-enqueue failed jobs when retryRecoverableJobs is called', async () => {

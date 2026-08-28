@@ -186,9 +186,9 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       scheduledCallback!();
 
       const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]?.queryKey);
-      // id 11 -> index 10 -> window 0; id 250 -> index 249 -> window 200 (version 1000)
-      expect(invalidatedKeys).toContainEqual(['songs', 'window', 1000, 0]);
-      expect(invalidatedKeys).toContainEqual(['songs', 'window', 1000, 200]);
+      // id 11 -> index 10 -> window 0; id 250 -> index 249 -> window 200 (version 1000, listIdentity 'ids=default')
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1000, 0]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1000, 200]);
     });
 
     it('should clean up and cancel scheduled frame on unmount/cleanup', () => {

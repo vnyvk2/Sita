@@ -581,6 +581,123 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       expect(receivedTrack.artworkPayloads).toHaveLength(2);
       expect(receivedTrack.artworkPayloads[0].path).toBe('C:/Artworks/abc.webp');
     });
+
+    it('settles cleanly on abort and ignores late worker completion events for directory walk, parse stream, and asset generation', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH', 'CMD_WALK_DIRECTORY', 'CMD_GENERATE_ASSET']
+      });
+      await startPromise;
+
+      // 1. Walk directory abort -> late completion
+      const walkController = new AbortController();
+      const walkPromise = bridge.walkDirectory('C:/Music', { abortSignal: walkController.signal });
+      const walkTaskId = (mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_WALK_DIRECTORY'
+      )![0] as any).taskId;
+
+      walkController.abort();
+      const walkResult = await walkPromise;
+      expect(walkResult.cancelled).toBe(true);
+
+      // Late event arrives from worker
+      expect(() => {
+        mockProcess.simulateWorkerMessage({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_DIRECTORY_WALK_COMPLETED',
+          taskId: walkTaskId,
+          totalFilesDiscovered: 100,
+          totalValidAudioFiles: 50,
+          durationMs: 200
+        });
+      }).not.toThrow();
+
+      // 2. Parse batch stream abort -> late batch
+      const parseController = new AbortController();
+      const parsePromise = bridge.parseTrackBatchStream([{ songPath: 'C:/Music/test.wav' }], { abortSignal: parseController.signal });
+      const parseTaskId = (mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_PARSE_TRACK_BATCH' && (c[0] as any).taskId !== walkTaskId
+      )![0] as any).taskId;
+
+      parseController.abort();
+      const parseResult = await parsePromise;
+      expect(parseResult.cancelled).toBe(true);
+
+      // Late batch arrives from worker
+      expect(() => {
+        mockProcess.simulateWorkerMessage({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_TRACKS_PARSED_BATCH',
+          taskId: parseTaskId,
+          batchId: 1,
+          isLastBatch: true,
+          tracks: [],
+          errors: []
+        });
+      }).not.toThrow();
+
+      // 3. Asset generation abort -> late result
+      const assetController = new AbortController();
+      const assetPromise = bridge.generateAsset({
+        jobType: 'waveform',
+        input: { sourceFilePath: 'C:/Music/test.wav', destinationPath: 'C:/Cache/1.bin' },
+        abortSignal: assetController.signal
+      });
+      const assetTaskId = (mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
+      )![0] as any).taskId;
+
+      assetController.abort();
+      const assetResult = await assetPromise;
+      expect(assetResult.success).toBe(false);
+      expect(assetResult.cancelled).toBe(true);
+
+      // Late asset result arrives from worker
+      expect(() => {
+        mockProcess.simulateWorkerMessage({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_ASSET_GENERATED',
+          taskId: assetTaskId,
+          result: { success: true, outputFilePath: 'C:/Cache/1.bin', metadata: {} }
+        });
+      }).not.toThrow();
+    });
+
+    it('settles cleanly on timeout and ignores late worker completion events for asset generation', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_GENERATE_ASSET']
+      });
+      await startPromise;
+
+      const assetPromise = bridge.generateAsset({
+        jobType: 'replaygain',
+        input: { sourceFilePath: 'C:/Music/test.wav', destinationPath: '' },
+        timeoutMs: 50
+      });
+
+      const assetTaskId = (mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
+      )![0] as any).taskId;
+
+      await expect(assetPromise).rejects.toThrow('timed out');
+
+      // Late event arrives from worker after timeout rejection
+      expect(() => {
+        mockProcess.simulateWorkerMessage({
+          protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+          type: 'EVT_ASSET_GENERATED',
+          taskId: assetTaskId,
+          result: { success: true, outputFilePath: '', metadata: { trackGain: -5.0 } }
+        });
+      }).not.toThrow();
+    });
   });
 
   describe('getMediaWorkerPath', () => {

@@ -180,14 +180,14 @@ describe('Gate D4: DSP Streaming Memory, Throughput & Multi-Track Pipeline Bench
         console.log('========================================================================================\n');
 
         // Verification of Non-Linear Scaling Invariant:
-        // A full in-memory buffer approach would grow from ~10.5 MB -> ~52.9 MB -> ~105.8 MB (10x growth).
-        // Under our bounded streaming pipeline, the heap delta for 10 minutes does NOT scale linearly with file size.
+        // A full in-memory buffer approach would scale 1:1 with file size (10x growth between 1m and 10m).
+        // Under our streaming pipeline, heap growth is sublinear and bounded (< 25MB for 100MB audio).
         const mem1m = memorySnapshots[0].heapDeltaMB;
         const mem10m = memorySnapshots[2].heapDeltaMB;
-
-        // The 10m stream file size is 10x the 1m stream, but working memory growth must remain sub-linear
         const ratio = mem10m / Math.max(0.1, mem1m);
         expect(ratio).toBeLessThan(10.0);
+        expect(mem10m).toBeLessThan(25.0);
+        expect(mem10m).toBeLessThan(memorySnapshots[2].fileSizeMB);
       },
       60000 // 60s timeout for multi-minute audio generation & decode
     );

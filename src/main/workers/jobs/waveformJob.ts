@@ -90,6 +90,12 @@ export class WaveformJob implements Job {
 
       if (result.cancelled || this.isCancelled()) return;
       if (!result.success) {
+        if (result.metadata?.method === 'unsupported_codec') {
+          logger.debug(
+            `[WaveformJob] Skipping unsupported codec for song ${this.songId}: ${this.songPath}`
+          );
+          return;
+        }
         throw new Error(`[WaveformJob] Failed to generate waveform for song ${this.songId}`);
       }
 

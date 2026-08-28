@@ -1,9 +1,10 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAddSongsToCollection } from '../../hooks/collections/useCollectionMutations';
-import { songQuery } from '../../queries/songs';
+import { useWindowHydration } from '../../hooks/useWindowHydration';
+import { songIdsVersionFromState, songQuery } from '../../queries/songs';
 import Button from '../Button';
 import Checkbox from '../Checkbox';
 import Img from '../Img';
@@ -25,21 +26,23 @@ export const AddSongsToTargetPlaylistPrompt = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSongIdSet, setSelectedSongIdSet] = useState<Set<number>>(new Set());
 
-  const { data: songsResponse } = useQuery(songQuery.all({ sortType: 'aToZ' }));
-  const allSongs = songsResponse?.data ?? [];
+  const { data: idsData, dataUpdatedAt } = useQuery({
+    ...songQuery.ids({ sortType: 'aToZ', keyword: searchTerm.trim() || undefined }),
+    placeholderData: keepPreviousData
+  });
+  const allIds = idsData?.ids ?? [];
 
   const existingSet = useMemo(() => new Set(existingSongIds), [existingSongIds]);
 
-  const filteredSongs = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
-    return allSongs.filter((song) => {
-      if (existingSet.has(song.songId)) return false;
-      if (!term) return true;
-      const title = (song.title || '').toLowerCase();
-      const artist = (song.artists?.map((a) => a.name).join(' ') || '').toLowerCase();
-      return title.includes(term) || artist.includes(term);
-    });
-  }, [allSongs, existingSet, searchTerm]);
+  const eligibleIds = useMemo(() => {
+    return allIds.filter((id) => !existingSet.has(id));
+  }, [allIds, existingSet]);
+
+  const idsVersion = songIdsVersionFromState(dataUpdatedAt);
+  const { getItem, handleRangeChange } = useWindowHydration(eligibleIds, idsVersion, {
+    keyPrefix: 'add-to-playlist',
+    listIdentity: `playlist_${playlistId}`
+  });
 
   const addSongsMutation = useAddSongsToCollection();
 
@@ -70,12 +73,12 @@ export const AddSongsToTargetPlaylistPrompt = ({
   }, [addSongsMutation, playlistId, selectedSongIdSet, changePromptMenuData, addNewNotifications, t]);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedSongIdSet.size === filteredSongs.length && filteredSongs.length > 0) {
+    if (selectedSongIdSet.size === eligibleIds.length && eligibleIds.length > 0) {
       setSelectedSongIdSet(new Set());
     } else {
-      setSelectedSongIdSet(new Set(filteredSongs.map((s) => s.songId)));
+      setSelectedSongIdSet(new Set(eligibleIds));
     }
-  }, [selectedSongIdSet, filteredSongs]);
+  }, [selectedSongIdSet, eligibleIds]);
 
   const toggleSongSelection = useCallback((songId: number) => {
     setSelectedSongIdSet((prev) => {
@@ -90,8 +93,32 @@ export const AddSongsToTargetPlaylistPrompt = ({
   }, []);
 
   const renderSongRow = useCallback(
-    (_index: number, song: (typeof filteredSongs)[0]) => {
-      const isSelected = selectedSongIdSet.has(song.songId);
+    (index: number, songId: number) => {
+      const isSelected = selectedSongIdSet.has(songId);
+      const song = getItem(index);
+
+      if (!song) {
+        return (
+          <div
+            key={songId}
+            className="flex h-14 items-center justify-between rounded-lg px-2"
+          >
+            <div className="flex items-center gap-3 overflow-hidden pr-2">
+              <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-10 w-10 min-w-10 animate-pulse rounded-md" />
+              <div className="flex flex-col gap-1 overflow-hidden">
+                <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-4 w-32 animate-pulse rounded" />
+                <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-3 w-20 animate-pulse rounded" />
+              </div>
+            </div>
+            <Checkbox
+              id={`song-${songId}`}
+              isChecked={isSelected}
+              checkedStateUpdateFunction={() => {}}
+            />
+          </div>
+        );
+      }
+
       return (
         <div
           key={song.songId}
@@ -122,7 +149,7 @@ export const AddSongsToTargetPlaylistPrompt = ({
         </div>
       );
     },
-    [selectedSongIdSet, toggleSongSelection]
+    [getItem, selectedSongIdSet, toggleSongSelection]
   );
 
   return (
@@ -143,23 +170,24 @@ export const AddSongsToTargetPlaylistPrompt = ({
         <span className="text-font-color-dim dark:text-dark-font-color-dim">
           {t('common.selectionWithCount', { count: selectedSongIdSet.size })}
         </span>
-        {filteredSongs.length > 0 && (
+        {eligibleIds.length > 0 && (
           <button
             type="button"
             className="text-font-color-highlight cursor-pointer text-sm font-medium hover:underline"
             onClick={toggleSelectAll}
           >
-            {selectedSongIdSet.size === filteredSongs.length ? 'Unselect All' : 'Select All'}
+            {selectedSongIdSet.size === eligibleIds.length ? 'Unselect All' : 'Select All'}
           </button>
         )}
       </div>
 
       <div className="h-[350px] min-h-[350px] w-full overflow-hidden">
-        {filteredSongs.length > 0 ? (
+        {eligibleIds.length > 0 ? (
           <VirtualizedList
-            data={filteredSongs}
+            data={eligibleIds}
             fixedItemHeight={56}
             itemContent={renderSongRow}
+            onChange={handleRangeChange}
             style={{ height: '350px', width: '100%' }}
           />
         ) : (

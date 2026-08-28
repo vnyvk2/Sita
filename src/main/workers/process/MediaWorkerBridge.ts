@@ -208,6 +208,10 @@ export class MediaWorkerBridge extends EventEmitter {
    */
   public async start(timeoutMs = 5000): Promise<void> {
     if (this.state === 'READY') return;
+    if (this.state === 'DRAINING' || this.state === 'TERMINATED') {
+      logger.warn(`[MediaWorkerBridge] start() ignored: bridge is in ${this.state} state.`);
+      return;
+    }
     if (this.startPromise) return this.startPromise;
 
     this.startPromise = this.executeStart(timeoutMs).finally(() => {
@@ -312,6 +316,7 @@ export class MediaWorkerBridge extends EventEmitter {
     const taskId = `walk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     return new Promise<DiskWalkBridgeResult>((resolve, reject) => {
+      let settled = false;
       let timeoutTimer: NodeJS.Timeout | null = null;
 
       const cleanup = () => {
@@ -323,6 +328,8 @@ export class MediaWorkerBridge extends EventEmitter {
       };
 
       const onAbort = () => {
+        if (settled) return;
+        settled = true;
         try {
           this.sendCommand({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -336,23 +343,40 @@ export class MediaWorkerBridge extends EventEmitter {
         resolve({ snapshots: [], failedSubtrees: [], failedPaths: [], cancelled: true });
       };
 
+      const onTimeout = () => {
+        if (settled) return;
+        settled = true;
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore
+        }
+        cleanup();
+        reject(new Error(`[MediaWorkerBridge] Directory walk timed out after ${timeoutMs}ms.`));
+      };
+
       if (abortSignal) {
         abortSignal.addEventListener('abort', onAbort, { once: true });
       }
 
       if (timeoutMs && timeoutMs > 0) {
-        timeoutTimer = setTimeout(() => {
-          onAbort();
-          reject(new Error(`[MediaWorkerBridge] Directory walk timed out after ${timeoutMs}ms.`));
-        }, timeoutMs);
+        timeoutTimer = setTimeout(onTimeout, timeoutMs);
       }
 
       this.activeWalkResolvers.set(taskId, {
         resolve: (result) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           resolve(result);
         },
         reject: (error) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           reject(error);
         },
@@ -400,6 +424,8 @@ export class MediaWorkerBridge extends EventEmitter {
     const taskId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     return new Promise<ParseStreamResult>((resolve, reject) => {
+      let settled = false;
+
       const cleanup = () => {
         this.activeParseResolvers.delete(taskId);
         if (abortSignal) {
@@ -408,6 +434,8 @@ export class MediaWorkerBridge extends EventEmitter {
       };
 
       const onAbort = () => {
+        if (settled) return;
+        settled = true;
         try {
           this.sendCommand({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -430,10 +458,14 @@ export class MediaWorkerBridge extends EventEmitter {
 
       this.activeParseResolvers.set(taskId, {
         resolve: (res) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           resolve(res);
         },
         reject: (err) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           reject(err);
         },
@@ -476,6 +508,7 @@ export class MediaWorkerBridge extends EventEmitter {
     const taskId = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     return new Promise<AssetBridgeResult>((resolve, reject) => {
+      let settled = false;
       let timeoutTimer: NodeJS.Timeout | null = null;
 
       const cleanup = () => {
@@ -487,6 +520,8 @@ export class MediaWorkerBridge extends EventEmitter {
       };
 
       const onAbort = () => {
+        if (settled) return;
+        settled = true;
         try {
           this.sendCommand({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -500,24 +535,40 @@ export class MediaWorkerBridge extends EventEmitter {
         resolve({ success: false, cancelled: true });
       };
 
+      const onTimeout = () => {
+        if (settled) return;
+        settled = true;
+        try {
+          this.sendCommand({
+            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+            type: 'CMD_CANCEL_TASK',
+            taskId
+          });
+        } catch {
+          // Ignore
+        }
+        cleanup();
+        reject(new Error(`[MediaWorkerBridge] Asset generation timed out after ${timeoutMs}ms.`));
+      };
+
       if (abortSignal) {
         abortSignal.addEventListener('abort', onAbort, { once: true });
       }
 
       if (timeoutMs && timeoutMs > 0) {
-        timeoutTimer = setTimeout(() => {
-          onAbort();
-          cleanup();
-          reject(new Error(`[MediaWorkerBridge] Asset generation timed out after ${timeoutMs}ms.`));
-        }, timeoutMs);
+        timeoutTimer = setTimeout(onTimeout, timeoutMs);
       }
 
       this.activeAssetResolvers.set(taskId, {
         resolve: (result) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           resolve(result);
         },
         reject: (error) => {
+          if (settled) return;
+          settled = true;
           cleanup();
           reject(error);
         },

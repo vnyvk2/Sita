@@ -198,6 +198,13 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
         } finally {
           activeTaskControllers.delete(cmd.taskId);
           activeTaskPromises.delete(cmd.taskId);
+          // Defensive cleanup: unblock and delete any remaining pending batch acks for this task
+          for (const [key, resolve] of pendingBatchAcks.entries()) {
+            if (key.startsWith(`${cmd.taskId}:`)) {
+              pendingBatchAcks.delete(key);
+              resolve();
+            }
+          }
         }
       })();
 

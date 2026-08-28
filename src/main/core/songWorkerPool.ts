@@ -250,6 +250,14 @@ export const processSongsWithWorkerPool = async (
             songIngestionMetrics.artworkDurations.push(artworkDuration);
 
             // 3. Execute pure DB transaction (no filesystem/sharp work inside transaction lock)
+            const stagedSongIds: number[] = [];
+            const stagedSongAssets: { id: number; path: string; title: string }[] = [];
+            const stagedAlbumAssets: Map<number, { path: string; title: string }> = new Map();
+            const stagedNewAlbumIds: number[] = [];
+            const stagedNewArtistIds: number[] = [];
+            const stagedNewGenreIds: number[] = [];
+            let stagedSuccessCount = 0;
+
             const dbTxStart = performance.now();
             await db.transaction(async (trx) => {
               for (let i = 0; i < batch.tracks.length; i++) {
@@ -259,28 +267,28 @@ export const processSongsWithWorkerPool = async (
                 try {
                   const res = await ingestTrackDTO(track, trx, artwork);
                   if (res) {
-                    successCount++;
-                    newSongIds.push(res.songData.id);
-                    songAssetsToQueue.push({
+                    stagedSuccessCount++;
+                    stagedSongIds.push(res.songData.id);
+                    stagedSongAssets.push({
                       id: res.songData.id,
                       path: track.songPath,
                       title: res.songData.title
                     });
 
                     const album = res.newAlbum || res.relevantAlbum;
-                    if (album && !albumAssetsToQueue.has(album.id)) {
-                      albumAssetsToQueue.set(album.id, {
+                    if (album && !stagedAlbumAssets.has(album.id) && !albumAssetsToQueue.has(album.id)) {
+                      stagedAlbumAssets.set(album.id, {
                         path: track.songPath,
                         title: album.title
                       });
                     }
 
-                    if (res.newAlbum) newAlbumIds.push(res.newAlbum.id);
+                    if (res.newAlbum) stagedNewAlbumIds.push(res.newAlbum.id);
                     if (res.newArtists.length > 0) {
-                      newArtistIds.push(...res.newArtists.map((a) => a.id));
+                      stagedNewArtistIds.push(...res.newArtists.map((a) => a.id));
                     }
                     if (res.newGenres.length > 0) {
-                      newGenreIds.push(...res.newGenres.map((g) => g.id));
+                      stagedNewGenreIds.push(...res.newGenres.map((g) => g.id));
                     }
                   }
                 } catch (trackErr) {
@@ -292,7 +300,16 @@ export const processSongsWithWorkerPool = async (
             const dbTxDuration = performance.now() - dbTxStart;
             songIngestionMetrics.dbTxDurations.push(dbTxDuration);
 
-            // Invariant: Durably committed boundary advances ONLY AFTER the DB transaction succeeds
+            // Invariant: Durably committed boundary & tracking collections advance ONLY AFTER the DB transaction succeeds
+            successCount += stagedSuccessCount;
+            newSongIds.push(...stagedSongIds);
+            songAssetsToQueue.push(...stagedSongAssets);
+            for (const [albumId, albumData] of stagedAlbumAssets.entries()) {
+              albumAssetsToQueue.set(albumId, albumData);
+            }
+            newAlbumIds.push(...stagedNewAlbumIds);
+            newArtistIds.push(...stagedNewArtistIds);
+            newGenreIds.push(...stagedNewGenreIds);
             durablyCommittedSongCount += batch.tracks.length + batch.errors.length;
 
             logger.info(

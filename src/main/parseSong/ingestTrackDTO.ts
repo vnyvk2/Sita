@@ -34,7 +34,7 @@ export async function ingestTrackDTO(
   trx: Parameters<Parameters<typeof import('@main/db/db').db.transaction>[0]>[0],
   preprocessedArtwork?: Awaited<ReturnType<typeof processArtworkFiles>>
 ): Promise<IngestedTrackResult | undefined> {
-  const isAvailable = await isSongWithPathAvailable(track.songPath);
+  const isAvailable = await isSongWithPathAvailable(track.songPath, trx);
   if (isAvailable) {
     return undefined;
   }

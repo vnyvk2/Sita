@@ -47,11 +47,27 @@ export type AssetExecutionResult =
  *
  * CRITICAL ARCHITECTURAL INVARIANTS:
  * 1. Zero database dependencies, zero ORM imports.
- * 2. CPU / filesystem intensive work runs exclusively in utilityProcess.
- * 3. Atomic file writes (${dest}.${pid}.${taskId}.tmp -> fs.rename).
- * 4. Cooperative cancellation check via abortSignal.
- * 5. Rollback on partial multi-file publication failures.
+/**
+ * Generates an isolated temporary file path for asset generation.
  */
+export function getAssetTempPath(destinationPath: string, pid: number, taskId: string): string {
+  return `${destinationPath}.${pid}.${taskId}.tmp`;
+}
+
+/**
+ * Returns true if a given filename in the cache directory is an in-flight or abandoned
+ * temp file created for the specified asset destination filename (e.g. '123_v1.bin').
+ */
+export function isAssetTempFileFor(filename: string, destinationBasename: string): boolean {
+  if (filename === `${destinationBasename}.tmp`) return true;
+  if (!filename.endsWith('.tmp')) return false;
+
+  // Exact format: ${destinationBasename}.${pid}.${taskId}.tmp where pid is numeric
+  const escapedBase = destinationBasename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tempRegex = new RegExp(`^${escapedBase}\\.\\d+\\.[a-zA-Z0-9_-]+\\.tmp$`);
+  return tempRegex.test(filename);
+}
+
 export async function executeAssetJob(options: ExecuteAssetOptions): Promise<AssetExecutionResult> {
   const { taskId, jobType, input, abortSignal } = options;
 
@@ -164,7 +180,7 @@ async function generateWaveformInWorker(
   const cacheDir = path.dirname(destinationPath);
   await fs.mkdir(cacheDir, { recursive: true });
 
-  const tempPath = `${destinationPath}.${process.pid}.${taskId}.tmp`;
+  const tempPath = getAssetTempPath(destinationPath, process.pid, taskId);
   const buffer = Buffer.from(peaks.buffer);
   await fs.writeFile(tempPath, buffer);
 
@@ -420,7 +436,8 @@ async function generateReplayGainInWorker(
 
 /**
  * Atomically publishes a temp file to destination path.
- * Returns 'published' if this process successfully renamed the temp file to destination.
+ * Invariant: Never overwrites pre-existing destination files on any platform (POSIX or Windows).
+ * Returns 'published' if this process successfully publishes the temp file to destination.
  * Returns 'already_existed' if destination already exists and is non-empty (idempotent collision).
  * Cleans up tempPath and rethrows on real I/O or permissions failures where destination is absent.
  */
@@ -428,27 +445,62 @@ export async function atomicPublishFile(
   tempPath: string,
   destinationPath: string
 ): Promise<'published' | 'already_existed'> {
+  // 1. Guard against unnecessary I/O if destination already exists and is non-empty
   try {
-    await fs.rename(tempPath, destinationPath);
-    return 'published';
-  } catch (renameErr: unknown) {
-    const errCode = (renameErr as { code?: string })?.code;
-    const isCollisionCandidate =
-      errCode === 'EEXIST' || errCode === 'EBUSY' || errCode === 'EPERM';
+    const destStat = await fs.stat(destinationPath);
+    if (destStat.size > 0) {
+      await fs.unlink(tempPath).catch(() => {});
+      return 'already_existed';
+    }
+  } catch (statErr: unknown) {
+    const code = (statErr as { code?: string })?.code;
+    if (code && code !== 'ENOENT') {
+      await fs.unlink(tempPath).catch(() => {});
+      throw statErr;
+    }
+    // Destination does not exist (ENOENT), proceed with atomic publication
+  }
 
-    if (isCollisionCandidate) {
-      try {
-        const destStat = await fs.stat(destinationPath);
-        if (destStat.size > 0) {
-          await fs.unlink(tempPath).catch(() => {});
-          return 'already_existed'; // Valid existing file, idempotent collision
-        }
-      } catch {
-        // Destination check failed, fall through to cleanup and throw
+  // 2. Perform atomic hard link (atomic on POSIX & Windows on same filesystem)
+  try {
+    await fs.link(tempPath, destinationPath);
+    await fs.unlink(tempPath).catch(() => {});
+    return 'published';
+  } catch (linkErr: unknown) {
+    const errCode = (linkErr as { code?: string })?.code;
+
+    // Kernel-level atomic collision: destination was created between check and link
+    if (errCode === 'EEXIST') {
+      const destStat = await fs.stat(destinationPath).catch(() => null);
+      if (destStat && destStat.size > 0) {
+        await fs.unlink(tempPath).catch(() => {});
+        return 'already_existed';
       }
     }
 
+    // If hard links are not supported (e.g. cross-device EXDEV, unsupported filesystem ENOSYS, policy EPERM),
+    // fallback to exclusive copy (COPYFILE_EXCL uses O_CREAT | O_EXCL to atomically guarantee non-overwrite)
+    if (errCode === 'EXDEV' || errCode === 'ENOSYS' || errCode === 'EPERM') {
+      try {
+        await fs.copyFile(tempPath, destinationPath, fs.constants.COPYFILE_EXCL);
+        await fs.unlink(tempPath).catch(() => {});
+        return 'published';
+      } catch (copyErr: unknown) {
+        const copyErrCode = (copyErr as { code?: string })?.code;
+        if (copyErrCode === 'EEXIST') {
+          const destStat = await fs.stat(destinationPath).catch(() => null);
+          if (destStat && destStat.size > 0) {
+            await fs.unlink(tempPath).catch(() => {});
+            return 'already_existed';
+          }
+        }
+        await fs.unlink(tempPath).catch(() => {});
+        throw copyErr;
+      }
+    }
+
+    // Real error on link (e.g. EIO, EACCES, ENOSPC) -> clean up temp and rethrow
     await fs.unlink(tempPath).catch(() => {});
-    throw renameErr;
+    throw linkErr;
   }
 }

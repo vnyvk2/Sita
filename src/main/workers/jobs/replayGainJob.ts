@@ -89,6 +89,12 @@ export class ReplayGainJob implements Job {
 
       if (result.cancelled || this.isCancelled()) return;
       if (!result.success) {
+        if (result.metadata?.method === 'unsupported_codec') {
+          logger.debug(
+            `[ReplayGainJob] Skipping unsupported codec for song ${this.songId}: ${song.path}`
+          );
+          return;
+        }
         throw new Error(`[ReplayGainJob] Failed to analyze loudness for song ${this.songId}`);
       }
 

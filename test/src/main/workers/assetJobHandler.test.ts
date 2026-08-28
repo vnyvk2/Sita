@@ -2,9 +2,12 @@ import fs from 'fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  atomicPublishFile,
   CURRENT_REPLAYGAIN_GENERATOR_VERSION,
   CURRENT_WAVEFORM_GENERATOR_VERSION,
   executeAssetJob,
+  getAssetTempPath,
+  isAssetTempFileFor,
   WAVEFORM_RESOLUTION
 } from '@main/workers/process/handlers/assetJobHandler';
 import { defaultAudioDecoderRegistry } from '@main/workers/process/audio/AudioDecoderRegistry';
@@ -38,14 +41,29 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
         });
       }
     });
+    vi.mocked(fs.link).mockImplementation(async (src, dest) => {
+      return vi.mocked(fs.rename)(src, dest);
+    });
+    vi.mocked(fs.copyFile).mockImplementation(async (src, dest) => {
+      return vi.mocked(fs.rename)(src, dest);
+    });
+    vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+      if (
+        typeof filePath === 'string' &&
+        (filePath.endsWith('.bin') || filePath.endsWith('.webp') || filePath.endsWith('.tmp'))
+      ) {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+      }
+      return { size: 1048576 } as any;
+    });
   });
 
   describe('Waveform Generation', () => {
     it('generates Float32Array(200) peaks and writes atomically to destination', async () => {
-      vi.mocked(fs.stat).mockResolvedValue({ size: 1048576 } as any);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
-      vi.mocked(fs.rename).mockResolvedValue(undefined);
+      vi.mocked(fs.link).mockResolvedValue(undefined);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       const result = await executeAssetJob({
         taskId: 'task-waveform-1',
@@ -63,12 +81,12 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
         expect(result.metadata.generatorVersion).toBe(CURRENT_WAVEFORM_GENERATOR_VERSION);
       }
 
-      // Verify atomic temp file write and rename
+      // Verify atomic temp file write and link publication
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.stringMatching(/1_v1\.bin\.\d+\.task-waveform-1\.tmp$/),
         expect.any(Buffer)
       );
-      expect(fs.rename).toHaveBeenCalledWith(
+      expect(fs.link).toHaveBeenCalledWith(
         expect.stringMatching(/1_v1\.bin\.\d+\.task-waveform-1\.tmp$/),
         'C:/Cache/waveforms/1_v1.bin'
       );
@@ -128,7 +146,12 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
     });
 
     it('rethrows fatal permission error during atomic publish without swallowing as collision', async () => {
-      vi.mocked(fs.stat).mockResolvedValue({ size: 1048576 } as any);
+      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+        if (typeof filePath === 'string' && filePath.endsWith('.bin')) {
+          throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+        }
+        return { size: 1048576 } as any;
+      });
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as any);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       const permError: any = new Error('EACCES: permission denied');
@@ -283,13 +306,9 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
         throw new Error('ENOENT');
       });
 
-      const eexistError: any = new Error('EEXIST: file already exists');
-      eexistError.code = 'EEXIST';
-
-      // First rename gets EEXIST (collision with existing file), second rename gets EIO fatal error
-      vi.mocked(fs.rename)
-        .mockRejectedValueOnce(eexistError)
-        .mockRejectedValueOnce(new Error('EIO: Disk I/O error on full webp'));
+      // Destination for optimized webp already exists (collision) -> atomicPublishFile skips rename and returns 'already_existed'
+      // Second rename (full webp) throws EIO fatal error
+      vi.mocked(fs.rename).mockRejectedValueOnce(new Error('EIO: Disk I/O error on full webp'));
 
       const result = await executeAssetJob({
         taskId: 'task-artwork-existing-opt-fail',
@@ -461,6 +480,93 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       if (!result.success) {
         expect(result.cancelled).toBe(true);
       }
+    });
+  });
+
+  describe('Temp File Convention & Strict Matching', () => {
+    it('generates temp path adhering to convention', () => {
+      const tempPath = getAssetTempPath('C:/Cache/artworks/123.webp', 9999, 'task-abc');
+      expect(tempPath).toBe('C:/Cache/artworks/123.webp.9999.task-abc.tmp');
+    });
+
+    it('strictly matches worker-generated temp files and rejects invalid/unrelated patterns', () => {
+      expect(isAssetTempFileFor('123_v1.bin.1234.task123.tmp', '123_v1.bin')).toBe(true);
+      expect(isAssetTempFileFor('123_v1.bin.tmp', '123_v1.bin')).toBe(true);
+      expect(isAssetTempFileFor('123_v1.bin.backup.tmp', '123_v1.bin')).toBe(false);
+      expect(isAssetTempFileFor('123_v1.bin.foo.bar.tmp', '123_v1.bin')).toBe(false);
+      expect(isAssetTempFileFor('other.bin.1234.task123.tmp', '123_v1.bin')).toBe(false);
+      expect(isAssetTempFileFor('123_v1.bin', '123_v1.bin')).toBe(false);
+    });
+  });
+
+  describe('atomicPublishFile Concurrency & Invariants', () => {
+    it('successfully publishes via hard link when destination is absent', async () => {
+      vi.mocked(fs.stat).mockRejectedValueOnce(new Error('ENOENT'));
+      vi.mocked(fs.link).mockResolvedValueOnce(undefined);
+      vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
+
+      const status = await atomicPublishFile('C:/Cache/temp.tmp', 'C:/Cache/dest.bin');
+      expect(status).toBe('published');
+      expect(fs.link).toHaveBeenCalledWith('C:/Cache/temp.tmp', 'C:/Cache/dest.bin');
+      expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp.tmp');
+    });
+
+    it('handles concurrent race where destination is created between check and link (EEXIST)', async () => {
+      vi.mocked(fs.stat)
+        .mockRejectedValueOnce(new Error('ENOENT')) // initial check: absent
+        .mockResolvedValueOnce({ size: 2048 } as any); // post-EEXIST check: winner published valid file
+
+      vi.mocked(fs.link).mockRejectedValueOnce(
+        Object.assign(new Error('EEXIST: file already exists'), { code: 'EEXIST' })
+      );
+      vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
+
+      const status = await atomicPublishFile('C:/Cache/temp_loser.tmp', 'C:/Cache/dest.bin');
+      expect(status).toBe('already_existed');
+      // Winner file is untouched; loser temp file is cleaned up
+      expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp_loser.tmp');
+    });
+
+    it('falls back to atomic COPYFILE_EXCL when hard links are unsupported (EXDEV / EPERM)', async () => {
+      vi.mocked(fs.stat).mockRejectedValueOnce(new Error('ENOENT'));
+      vi.mocked(fs.link).mockRejectedValueOnce(
+        Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV' })
+      );
+      vi.mocked(fs.copyFile).mockResolvedValueOnce(undefined);
+      vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
+
+      const status = await atomicPublishFile('C:/Cache/temp.tmp', 'C:/Cache/dest.bin');
+      expect(status).toBe('published');
+      expect(fs.copyFile).toHaveBeenCalledWith('C:/Cache/temp.tmp', 'C:/Cache/dest.bin', 1); // COPYFILE_EXCL = 1
+      expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp.tmp');
+    });
+
+    it('handles concurrent race during COPYFILE_EXCL fallback without overwriting winner (EEXIST)', async () => {
+      vi.mocked(fs.stat)
+        .mockRejectedValueOnce(new Error('ENOENT'))
+        .mockResolvedValueOnce({ size: 4096 } as any);
+
+      vi.mocked(fs.link).mockRejectedValueOnce(
+        Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV' })
+      );
+      vi.mocked(fs.copyFile).mockRejectedValueOnce(
+        Object.assign(new Error('EEXIST: file already exists'), { code: 'EEXIST' })
+      );
+      vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
+
+      const status = await atomicPublishFile('C:/Cache/temp_loser.tmp', 'C:/Cache/dest.bin');
+      expect(status).toBe('already_existed');
+      expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp_loser.tmp');
+    });
+
+    it('rethrows fatal non-ENOENT permission/disk error on initial stat and cleans up temp file', async () => {
+      const eaccesError = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      vi.mocked(fs.stat).mockRejectedValueOnce(eaccesError);
+      vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
+
+      await expect(atomicPublishFile('C:/Cache/temp.tmp', 'C:/Cache/dest.bin')).rejects.toThrow('EACCES');
+      expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp.tmp');
+      expect(fs.link).not.toHaveBeenCalled();
     });
   });
 });

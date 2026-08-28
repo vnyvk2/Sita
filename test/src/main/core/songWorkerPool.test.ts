@@ -226,4 +226,60 @@ describe('songWorkerPool', () => {
       { current: 2, total: 2 }
     ]);
   });
+
+  it('isolates staged transaction state and emits zero ghost jobs or duplicate fallback counts on db.transaction rollback', async () => {
+    const songs = [
+      { songPath: '/test/1.mp3' },
+      { songPath: '/test/2.mp3' }
+    ];
+
+    vi.mocked(mediaWorkerBridge.isReady).mockReturnValue(true);
+    vi.mocked(mediaWorkerBridge.parseTrackBatchStream).mockImplementation(async (_songs, options: any) => {
+      // Worker delivers 1 batch with 2 tracks
+      await options.onBatch({
+        batchId: 'batch-1',
+        tracks: [
+          { songPath: '/test/1.mp3', title: 'Song 1', duration: 180 } as any,
+          { songPath: '/test/2.mp3', title: 'Song 2', duration: 200 } as any
+        ],
+        errors: [],
+        isLastBatch: true,
+        durablyCommittedCount: 0
+      });
+      return { totalTracks: 2, totalBatches: 1, failedTracks: [], cancelled: false };
+    });
+
+    // Mock ingestTrackDTO to succeed on track 1
+    vi.mocked(ingestTrackDTO).mockResolvedValue({
+      songData: { id: 101, title: 'Song 1' } as any,
+      relevantAlbum: { id: 50, title: 'Album 1' } as any,
+      newArtists: [],
+      newGenres: []
+    });
+
+    // Mock db.transaction to fail and rollback
+    const { db } = await import('../../../../src/main/db/db');
+    vi.mocked(db.transaction).mockRejectedValueOnce(new Error('Postgres transaction rollback error'));
+
+    // When fallback runs locally, tryToParseSong succeeds for both songs
+    (tryToParseSong as Mock).mockResolvedValue({
+      songData: { id: 201, title: 'Local Song' },
+      relevantAlbum: { id: 50, title: 'Album 1' }
+    });
+
+    const result = await processSongsWithWorkerPool(songs, undefined, undefined, 2);
+
+    // 1. Fallback processed both songs locally because durablyCommittedSongCount remained 0
+    expect(tryToParseSong).toHaveBeenCalledTimes(2);
+    // 2. Success count is exact (2), not double-counted (not 1 from aborted tx + 2 from fallback = 3)
+    expect(result.successCount).toBe(2);
+    expect(result.errorCount).toBe(0);
+
+    // 3. Verify zero ghost jobs leaked from the aborted transaction (song ID 101 was never enqueued)
+    const enqueuedCalls = vi.mocked(libraryScheduler.enqueue).mock.calls;
+    const enqueuedJobIds = enqueuedCalls
+      .map((call) => (call[0] as any).songId ?? (call[0] as any).id)
+      .filter(Boolean);
+    expect(enqueuedJobIds).not.toContain(101);
+  });
 });

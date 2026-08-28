@@ -180,4 +180,59 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       expect(dbRowsY.length).toBe(1);
     });
   });
+
+  describe('Waveform GC & Stale Candidate Promotion', () => {
+    it('promotes the newest stale temp file deterministically when multiple stale temp files exist', async () => {
+      const { waveforms } = await import('../../src/main/db/schema');
+      const songPath = `/test-waveform-${crypto.randomUUID()}.wav`;
+      const song = await db.insert(songs).values({
+        title: 'Waveform song',
+        path: songPath,
+        duration: 120,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      }).returning();
+
+      const waveformPath = 'C:/mock/userData/waveforms/999_v1.bin';
+      const insertedWaveform = await db.insert(waveforms).values({
+        songId: song[0].id,
+        path: waveformPath,
+        resolution: 200,
+        generatorVersion: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      const now = Date.now();
+      vi.mocked(fs.readdir).mockResolvedValue([
+        '999_v1.bin.1111.task-old.tmp',
+        '999_v1.bin.2222.task-new.tmp'
+      ] as any);
+
+      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+        if (filePath === waveformPath) {
+          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        }
+        if (typeof filePath === 'string' && filePath.includes('task-old')) {
+          return { mtimeMs: now - 200_000, size: 800 } as any;
+        }
+        if (typeof filePath === 'string' && filePath.includes('task-new')) {
+          return { mtimeMs: now - 100_000, size: 800 } as any;
+        }
+        return { mtimeMs: now - 100_000, size: 800 } as any;
+      });
+
+      vi.mocked(fs.link).mockResolvedValue(undefined);
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      const job = new GarbageCollectionJob();
+      await job.execute();
+
+      // Proves: newest candidate (task-new) was promoted via link to destination
+      expect(fs.link).toHaveBeenCalledWith(
+        expect.stringContaining('999_v1.bin.2222.task-new.tmp'),
+        waveformPath
+      );
+    });
+  });
 });
