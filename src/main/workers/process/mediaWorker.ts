@@ -161,24 +161,19 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
               // Backpressure: pause until Main sends CMD_ACK_BATCH for this batch
               if (!batch.isLastBatch) {
                 const ackKey = `${cmd.taskId}:${batch.batchId}`;
-                await new Promise<void>((resolve) => {
+                await new Promise<void>((resolve, reject) => {
                   const timeoutTimer = setTimeout(() => {
                     pendingBatchAcks.delete(ackKey);
-                    console.warn(
-                      `[MediaWorker] Backpressure safety timeout triggered (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}. Resuming worker.`
+                    console.error(
+                      `[MediaWorker] Backpressure safety timeout triggered (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}. Aborting task.`
                     );
-                    postToMain({
-                      protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-                      type: 'EVT_ERROR_SUMMARY',
-                      taskId: cmd.taskId,
-                      category: 'IO_ERROR',
-                      count: 1,
-                      sampleMessages: [
-                        `Backpressure safety timeout triggered (30s) on task '${cmd.taskId}', batch ${batch.batchId}.`
-                      ]
-                    });
-                    resolve();
-                  }, 30000); // 30s safety timeout to prevent permanent worker stalls
+                    controller.abort();
+                    reject(
+                      new Error(
+                        `Backpressure safety timeout (30s) waiting for CMD_ACK_BATCH on task '${cmd.taskId}', batch ${batch.batchId}.`
+                      )
+                    );
+                  }, 30000); // 30s safety timeout to prevent unbounded worker allocation
 
                   pendingBatchAcks.set(ackKey, () => {
                     clearTimeout(timeoutTimer);

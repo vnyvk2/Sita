@@ -332,6 +332,8 @@ export class MediaWorkerBridge extends EventEmitter {
         } catch {
           // Ignore if process already exited
         }
+        cleanup();
+        resolve({ snapshots: [], failedSubtrees: [], failedPaths: [], cancelled: true });
       };
 
       if (abortSignal) {
@@ -341,7 +343,6 @@ export class MediaWorkerBridge extends EventEmitter {
       if (timeoutMs && timeoutMs > 0) {
         timeoutTimer = setTimeout(() => {
           onAbort();
-          cleanup();
           reject(new Error(`[MediaWorkerBridge] Directory walk timed out after ${timeoutMs}ms.`));
         }, timeoutMs);
       }
@@ -416,6 +417,11 @@ export class MediaWorkerBridge extends EventEmitter {
         } catch {
           // Ignore
         }
+        const currentTask = this.activeParseResolvers.get(taskId);
+        const totalParsed = currentTask?.totalParsed ?? 0;
+        const totalErrors = currentTask?.totalErrors ?? 0;
+        cleanup();
+        resolve({ totalParsed, totalErrors, cancelled: true });
       };
 
       if (abortSignal) {
@@ -490,6 +496,8 @@ export class MediaWorkerBridge extends EventEmitter {
         } catch {
           // Ignore
         }
+        cleanup();
+        resolve({ success: false, cancelled: true });
       };
 
       if (abortSignal) {
