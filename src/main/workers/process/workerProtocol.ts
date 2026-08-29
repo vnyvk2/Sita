@@ -234,7 +234,7 @@ export function isValidProtocolEnvelope(data: unknown): data is { protocolVersio
     typeof data === 'object' &&
     data !== null &&
     'protocolVersion' in data &&
-    typeof (data as { protocolVersion: unknown }).protocolVersion === 'number' &&
+    (data as { protocolVersion: unknown }).protocolVersion === MEDIA_WORKER_PROTOCOL_VERSION &&
     'type' in data &&
     typeof (data as { type: unknown }).type === 'string'
   );

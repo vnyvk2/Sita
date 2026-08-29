@@ -265,9 +265,11 @@ export class JobScheduler extends EventEmitter {
 
     // 1. Drain wait: wait up to timeout for running jobs to naturally finish
     const timeoutMs = 15000;
-    const start = Date.now();
-    while (this.inFlightJobPromises.size > 0 && Date.now() - start < timeoutMs) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (this.inFlightJobPromises.size > 0) {
+      await Promise.race([
+        Promise.allSettled(Array.from(this.inFlightJobPromises.values())),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))
+      ]);
     }
 
     let survivingJobPromises: Promise<void>[] = [];

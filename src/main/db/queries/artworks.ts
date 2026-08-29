@@ -23,6 +23,8 @@ export const saveArtworks = async (
   }[],
   trx: DB | DBTransaction = db
 ) => {
+  if (data.length === 0) return [];
+
   const res = await trx
     .insert(artworks)
     .values(data.map((d) => ({ ...d, generatorVersion: CURRENT_ARTWORK_GENERATOR_VERSION })))
@@ -46,6 +48,7 @@ export const linkArtworksToSong = async (
   data: (typeof artworksSongs.$inferInsert)[],
   trx: DB | DBTransaction = db
 ) => {
+  if (data.length === 0) return [];
   return trx.insert(artworksSongs).values(data).onConflictDoNothing().returning();
 };
 

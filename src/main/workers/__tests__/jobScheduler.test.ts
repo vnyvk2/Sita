@@ -260,10 +260,9 @@ describe('JobScheduler', () => {
         // Initiate stop() drain in background
         const stopPromise = scheduler.stop();
 
-        // Advance timers past the 15,000ms drain timeout and drain grace period
-        for (let i = 0; i < 180; i++) {
-          await vi.advanceTimersByTimeAsync(100);
-        }
+        // Advance timers past the 15,000ms drain timeout and 5,000ms drain grace period sequentially
+        await vi.advanceTimersByTimeAsync(16000);
+        await vi.advanceTimersByTimeAsync(6000);
         await stopPromise;
 
         // Verify surviving job was cancelled and cleared from active bookkeeping

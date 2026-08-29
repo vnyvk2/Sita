@@ -46,6 +46,9 @@ vi.mock('electron', () => ({
       workArea: { x: 0, y: 0, width: 1920, height: 1040 }
     })),
     on: vi.fn()
+  },
+  utilityProcess: {
+    fork: vi.fn()
   }
 }));
 
