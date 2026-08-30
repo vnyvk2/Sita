@@ -11,7 +11,7 @@ const SongAdditionalInfoContainer = (props: Props) => {
 
   const { songInfo, songDurationStr } = props;
 
-  const [isDataVisible, setIsDataVisible] = useState(false);
+  const [isDataVisible, setIsDataVisible] = useState(true);
 
   return (
     <div className="other-cards appear-from-bottom bg-background-color-2/70 dark:bg-dark-background-color-2/70 dark:text-font-color-white mt-4 mr-4 w-full max-w-full rounded-xl p-4 backdrop-blur-xs">
