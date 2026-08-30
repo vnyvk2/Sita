@@ -14,7 +14,9 @@ export type ThemeNameKey =
   | 'settingsPage.synthwaveThemePreset'
   | 'settingsPage.cyberpunkThemePreset'
   | 'settingsPage.oceanicThemePreset'
-  | 'settingsPage.midnightThemePreset';
+  | 'settingsPage.midnightThemePreset'
+  | 'settingsPage.linearThemePreset'
+  | 'settingsPage.spotifyThemePreset';
 
 export interface ThemeDefinition {
   id: string;
@@ -41,7 +43,9 @@ export type ThemePreset =
   | 'synthwave'
   | 'cyberpunk'
   | 'oceanic'
-  | 'midnight';
+  | 'midnight'
+  | 'linear'
+  | 'spotify';
 
 export const themeRegistry: Record<ThemePreset, ThemeDefinition> = {
   default: {
@@ -127,5 +131,17 @@ export const themeRegistry: Record<ThemePreset, ThemeDefinition> = {
     nameKey: 'settingsPage.midnightThemePreset',
     mode: 'dark',
     preview: { background: '#000000', foreground: '#0d0d0d', accent: '#4d4dff' }
+  },
+  linear: {
+    id: 'linear',
+    nameKey: 'settingsPage.linearThemePreset',
+    mode: 'dark',
+    preview: { background: '#0f1117', foreground: '#1b1f2a', accent: '#6366f1' }
+  },
+  spotify: {
+    id: 'spotify',
+    nameKey: 'settingsPage.spotifyThemePreset',
+    mode: 'dark',
+    preview: { background: '#121212', foreground: '#282828', accent: '#1db954' }
   }
 };

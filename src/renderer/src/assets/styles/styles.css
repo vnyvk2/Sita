@@ -153,7 +153,7 @@
 
 /* ? THEME PRESETS */
 
-[data-theme="nord"] {
+[data-theme='nord'] {
   --background-color-1: 220 16% 96%;
   --background-color-2: 216 28% 90%;
   --background-color-3: 193 48% 82%;
@@ -187,7 +187,7 @@
   --dark-foreground-color-1: 193 43% 67%;
 }
 
-[data-theme="emerald"] {
+[data-theme='emerald'] {
   --background-color-1: 150 20% 97%;
   --background-color-2: 152 24% 91%;
   --background-color-3: 158 55% 82%;
@@ -221,7 +221,7 @@
   --dark-foreground-color-1: 158 64% 55%;
 }
 
-[data-theme="dracula"] {
+[data-theme='dracula'] {
   --background-color-1: 260 20% 97%;
   --background-color-2: 260 20% 92%;
   --background-color-3: 265 60% 86%;
@@ -255,7 +255,7 @@
   --dark-foreground-color-1: 265 89% 75%;
 }
 
-[data-theme="solarized"] {
+[data-theme='solarized'] {
   --text-color-dimmed: 192 81% 14%;
   --text-color: 192 100% 11%;
   /* Light */
@@ -291,7 +291,7 @@
   --dark-foreground-color-1: 205 69% 41%;
 }
 
-[data-theme="monokai"] {
+[data-theme='monokai'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -326,7 +326,7 @@
   --dark-foreground-color-1: 338 95% 56%;
 }
 
-[data-theme="catppuccin"] {
+[data-theme='catppuccin'] {
   --text-color-dimmed: 240 21% 12%;
   --text-color: 240 21% 15%;
   /* Light */
@@ -362,7 +362,7 @@
   --dark-foreground-color-1: 266 85% 75%;
 }
 
-[data-theme="tokyonight"] {
+[data-theme='tokyonight'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -397,7 +397,7 @@
   --dark-foreground-color-1: 250 85% 65%;
 }
 
-[data-theme="rosepine"] {
+[data-theme='rosepine'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -432,7 +432,7 @@
   --dark-foreground-color-1: 343 35% 69%;
 }
 
-[data-theme="gruvbox"] {
+[data-theme='gruvbox'] {
   --text-color-dimmed: 233 13% 13%;
   --text-color: 233 13% 16%;
   /* Light */
@@ -468,7 +468,7 @@
   --dark-foreground-color-1: 9 84% 63%;
 }
 
-[data-theme="synthwave"] {
+[data-theme='synthwave'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -503,7 +503,7 @@
   --dark-foreground-color-1: 320 85% 65%;
 }
 
-[data-theme="cyberpunk"] {
+[data-theme='cyberpunk'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -538,7 +538,7 @@
   --dark-foreground-color-1: 52 100% 50%;
 }
 
-[data-theme="oceanic"] {
+[data-theme='oceanic'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (Fixed) */
@@ -573,7 +573,7 @@
   --dark-foreground-color-1: 180 60% 50%;
 }
 
-[data-theme="midnight"] {
+[data-theme='midnight'] {
   --text-color-dimmed: 0 0% 75%;
   --text-color: 0 0% 95%;
   /* Dark Only Theme (AMOLED Black) (Fixed) */
@@ -606,6 +606,76 @@
   --dark-text-color: 0 0% 95%;
   --dark-text-color-dimmed: 0 0% 75%;
   --dark-foreground-color-1: 215 100% 65%;
+}
+
+[data-theme='linear'] {
+  --text-color-dimmed: 219 14% 69%;
+  --text-color: 220 17% 96%;
+  /* Dark Only Theme (Linear Matte Slate & Indigo) */
+  --background-color-1: 225 21% 7%;
+  --background-color-2: 225 22% 11%;
+  --background-color-3: 223 22% 14%;
+  --side-bar-background: 225 22% 11%;
+  --background-color-dimmed: 225 22% 11%;
+  --text-color-highlight: 239 84% 67%;
+  --text-color-highlight-2: 199 89% 60%;
+  --context-menu-background: 225 22% 11%;
+  --context-menu-list-hover: 222 21% 21%;
+  --seekbar-background-color: 239 84% 67%;
+  --seekbar-track-background-color: 222 21% 21%;
+  --foreground-color-1: 239 84% 67%;
+  --scrollbar-thumb-background-color: 222 21% 21%;
+
+  --dark-background-color-1: 225 21% 7%;
+  --dark-background-color-2: 225 22% 11%;
+  --dark-background-color-3: 223 22% 14%;
+  --dark-side-bar-background: 225 22% 11%;
+  --dark-text-color-highlight: 239 84% 67%;
+  --dark-text-color-highlight-2: 199 89% 60%;
+  --dark-context-menu-background: 225 22% 11%;
+  --dark-context-menu-list-hover: 222 21% 21%;
+  --dark-seekbar-background-color: 239 84% 67%;
+  --dark-seekbar-track-background-color: 222 21% 21%;
+  --dark-scrollbar-thumb-background-color: 222 21% 21%;
+  --dark-background-color-dimmed: 225 22% 11%;
+  --dark-text-color: 220 17% 96%;
+  --dark-text-color-dimmed: 219 14% 69%;
+  --dark-foreground-color-1: 239 84% 67%;
+}
+
+[data-theme='spotify'] {
+  --text-color-dimmed: 0 0% 70%;
+  --text-color: 0 0% 100%;
+  /* Dark Only Theme (Spotify Obsidian & Emerald) */
+  --background-color-1: 0 0% 7%;
+  --background-color-2: 0 0% 9%;
+  --background-color-3: 0 0% 16%;
+  --side-bar-background: 0 0% 7%;
+  --background-color-dimmed: 0 0% 9%;
+  --text-color-highlight: 141 73% 42%;
+  --text-color-highlight-2: 141 76% 48%;
+  --context-menu-background: 0 0% 16%;
+  --context-menu-list-hover: 0 0% 23%;
+  --seekbar-background-color: 141 73% 42%;
+  --seekbar-track-background-color: 0 0% 23%;
+  --foreground-color-1: 141 73% 42%;
+  --scrollbar-thumb-background-color: 0 0% 23%;
+
+  --dark-background-color-1: 0 0% 7%;
+  --dark-background-color-2: 0 0% 9%;
+  --dark-background-color-3: 0 0% 16%;
+  --dark-side-bar-background: 0 0% 7%;
+  --dark-text-color-highlight: 141 73% 42%;
+  --dark-text-color-highlight-2: 141 76% 48%;
+  --dark-context-menu-background: 0 0% 16%;
+  --dark-context-menu-list-hover: 0 0% 23%;
+  --dark-seekbar-background-color: 141 73% 42%;
+  --dark-seekbar-track-background-color: 0 0% 23%;
+  --dark-scrollbar-thumb-background-color: 0 0% 23%;
+  --dark-background-color-dimmed: 0 0% 9%;
+  --dark-text-color: 0 0% 100%;
+  --dark-text-color-dimmed: 0 0% 70%;
+  --dark-foreground-color-1: 141 73% 42%;
 }
 
 /* ? BASIC STYLING */
@@ -836,7 +906,6 @@ input[type='range']:active::-webkit-slider-thumb {
   transform: scale(1.2);
 }
 
-
 #miniPlayerLyricsContainer::-webkit-scrollbar {
   display: none !important;
 }
@@ -1033,13 +1102,16 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 }
 
 @keyframes marqueeScroll {
-  0%, 8% {
+  0%,
+  8% {
     transform: translateX(0);
   }
-  48%, 56% {
+  48%,
+  56% {
     transform: translateX(var(--marquee-dist, 0px));
   }
-  96%, 100% {
+  96%,
+  100% {
     transform: translateX(0);
   }
 }
@@ -1054,4 +1126,3 @@ input[type='checkbox']:checked ~ .checkmark .icon {
     animation: none !important;
   }
 }
-

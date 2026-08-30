@@ -481,6 +481,66 @@ export const PRESET_RAW_TOKENS: Record<ThemePreset, Record<ThemeTokenKey, string
     '--dark-text-color': '0 0% 95%',
     '--dark-text-color-dimmed': '0 0% 75%',
     '--dark-foreground-color-1': '215 100% 65%'
+  },
+  linear: {
+    '--background-color-1': '225 21% 7%',
+    '--background-color-2': '225 22% 11%',
+    '--background-color-3': '223 22% 14%',
+    '--side-bar-background': '225 22% 11%',
+    '--background-color-dimmed': '225 22% 11%',
+    '--text-color-highlight': '239 84% 67%',
+    '--text-color-highlight-2': '199 89% 60%',
+    '--context-menu-background': '225 22% 11%',
+    '--context-menu-list-hover': '222 21% 21%',
+    '--seekbar-background-color': '239 84% 67%',
+    '--seekbar-track-background-color': '222 21% 21%',
+    '--foreground-color-1': '239 84% 67%',
+    '--text-color': '220 17% 96%',
+    '--text-color-dimmed': '219 14% 69%',
+    '--dark-background-color-1': '225 21% 7%',
+    '--dark-background-color-2': '225 22% 11%',
+    '--dark-background-color-3': '223 22% 14%',
+    '--dark-side-bar-background': '225 22% 11%',
+    '--dark-text-color-highlight': '239 84% 67%',
+    '--dark-text-color-highlight-2': '199 89% 60%',
+    '--dark-context-menu-background': '225 22% 11%',
+    '--dark-context-menu-list-hover': '222 21% 21%',
+    '--dark-seekbar-background-color': '239 84% 67%',
+    '--dark-seekbar-track-background-color': '222 21% 21%',
+    '--dark-background-color-dimmed': '225 22% 11%',
+    '--dark-text-color': '220 17% 96%',
+    '--dark-text-color-dimmed': '219 14% 69%',
+    '--dark-foreground-color-1': '239 84% 67%'
+  },
+  spotify: {
+    '--background-color-1': '0 0% 7%',
+    '--background-color-2': '0 0% 9%',
+    '--background-color-3': '0 0% 16%',
+    '--side-bar-background': '0 0% 7%',
+    '--background-color-dimmed': '0 0% 9%',
+    '--text-color-highlight': '141 73% 42%',
+    '--text-color-highlight-2': '141 76% 48%',
+    '--context-menu-background': '0 0% 16%',
+    '--context-menu-list-hover': '0 0% 23%',
+    '--seekbar-background-color': '141 73% 42%',
+    '--seekbar-track-background-color': '0 0% 23%',
+    '--foreground-color-1': '141 73% 42%',
+    '--text-color': '0 0% 100%',
+    '--text-color-dimmed': '0 0% 70%',
+    '--dark-background-color-1': '0 0% 7%',
+    '--dark-background-color-2': '0 0% 9%',
+    '--dark-background-color-3': '0 0% 16%',
+    '--dark-side-bar-background': '0 0% 7%',
+    '--dark-text-color-highlight': '141 73% 42%',
+    '--dark-text-color-highlight-2': '141 76% 48%',
+    '--dark-context-menu-background': '0 0% 16%',
+    '--dark-context-menu-list-hover': '0 0% 23%',
+    '--dark-seekbar-background-color': '141 73% 42%',
+    '--dark-seekbar-track-background-color': '0 0% 23%',
+    '--dark-background-color-dimmed': '0 0% 9%',
+    '--dark-text-color': '0 0% 100%',
+    '--dark-text-color-dimmed': '0 0% 70%',
+    '--dark-foreground-color-1': '141 73% 42%'
   }
 };
 
@@ -498,7 +558,9 @@ export function interpolateHsl(from: HslColor, to: HslColor, intensity: number):
   return { h, s, l };
 }
 
-export function buildDynamicTokens(palette: SemanticDynamicPalette): Record<ThemeTokenKey, HslColor> {
+export function buildDynamicTokens(
+  palette: SemanticDynamicPalette
+): Record<ThemeTokenKey, HslColor> {
   return {
     // Light Surfaces & Accents
     '--background-color-1': palette.light.backgroundBase,

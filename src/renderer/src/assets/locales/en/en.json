@@ -400,6 +400,8 @@
     "cyberpunkThemePreset": "Cyberpunk",
     "oceanicThemePreset": "Oceanic",
     "midnightThemePreset": "Midnight",
+    "linearThemePreset": "Linear (Indigo Slate)",
+    "spotifyThemePreset": "Spotify (Obsidian Emerald)",
 
     "enableImageBasedDynamicThemes": "Enable Dynamic Themes",
     "enableImageBasedDynamicThemesDescription": "Change app theme dynamically based on the theme of the current playing song cover image",

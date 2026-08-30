@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { describe, expect, it } from 'vitest';
 
 import { themeRegistry, type ThemePreset } from '../../../../../src/common/themeRegistry';
 import {
@@ -53,9 +52,28 @@ describe('themeResolver', () => {
   });
 
   describe('resolveTheme', () => {
-    it('should return pure preset tokens for all 14 presets when intensity is 0 or palette is undefined', () => {
+    it('should return pure preset tokens for all registered presets when intensity is 0 or palette is undefined', () => {
+      const expectedPresets: ThemePreset[] = [
+        'default',
+        'nord',
+        'emerald',
+        'dracula',
+        'solarized',
+        'monokai',
+        'catppuccin',
+        'tokyonight',
+        'rosepine',
+        'gruvbox',
+        'synthwave',
+        'cyberpunk',
+        'oceanic',
+        'midnight',
+        'linear',
+        'spotify'
+      ];
       const allPresets = Object.keys(themeRegistry) as ThemePreset[];
-      expect(allPresets.length).toBe(14);
+      expect(allPresets.sort()).toEqual(expectedPresets.sort());
+      expect(allPresets.length).toBe(16);
 
       for (const preset of allPresets) {
         const theme = resolveTheme({
@@ -178,9 +196,7 @@ describe('themeResolver', () => {
       expect(theme['--text-color-dimmed']).toBe(formatHsl(mockPalette.light.textMuted));
       expect(theme['--text-color-highlight']).toBe(formatHsl(mockPalette.primaryAccent));
       expect(theme['--text-color-highlight-2']).toBe(formatHsl(mockPalette.secondaryAccent));
-      expect(theme['--context-menu-background']).toBe(
-        formatHsl(mockPalette.light.surfaceElevated)
-      );
+      expect(theme['--context-menu-background']).toBe(formatHsl(mockPalette.light.surfaceElevated));
       expect(theme['--seekbar-background-color']).toBe(formatHsl(mockPalette.primaryAccent));
       expect(theme['--seekbar-track-background-color']).toBe(
         formatHsl(mockPalette.light.seekbarTrack)
@@ -240,7 +256,10 @@ describe('themeResolver', () => {
           blockContent = rootMatch![1];
         } else {
           // Extract [data-theme="preset"] block
-          const selectorRegex = new RegExp(`\\[data-theme=["']${preset}["']\\][^{]*\\{([^}]+)\\}`, 'g');
+          const selectorRegex = new RegExp(
+            `\\[data-theme=["']${preset}["']\\][^{]*\\{([^}]+)\\}`,
+            'g'
+          );
           const match = selectorRegex.exec(stylesContent);
           expect(match).toBeTruthy();
           blockContent = match![1];
@@ -261,12 +280,18 @@ describe('themeResolver', () => {
           const varMatch = varRegex.exec(blockContent);
 
           // Strictly enforce that the variable exists in styles.css
-          expect(varMatch, `Token ${token} should exist in styles.css for preset ${preset}`).toBeTruthy();
+          expect(
+            varMatch,
+            `Token ${token} should exist in styles.css for preset ${preset}`
+          ).toBeTruthy();
 
           // Clean inline comments like /* hsl(...) */
           const cssValue = varMatch![1].replace(/\/\*.*?\*\//g, '').trim();
           const resolverValue = PRESET_RAW_TOKENS[preset][token as ThemeTokenKey].trim();
-          expect(resolverValue, `Token ${token} value in PRESET_RAW_TOKENS should match styles.css for preset ${preset}`).toBe(cssValue);
+          expect(
+            resolverValue,
+            `Token ${token} value in PRESET_RAW_TOKENS should match styles.css for preset ${preset}`
+          ).toBe(cssValue);
         }
       }
     });
