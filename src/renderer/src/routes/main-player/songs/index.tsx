@@ -25,6 +25,7 @@ import {
 } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
+import { scrollRegistry } from '@renderer/utils/scrollStore';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -344,8 +345,15 @@ function SongsPage() {
     ]
   );
 
+  const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
+  const initialScrollIndex =
+    typeof Route.useSearch().scrollTopOffset === 'number'
+      ? Route.useSearch().scrollTopOffset
+      : (savedPosition?.index ?? 0);
+
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
-    listIdentity
+    listIdentity,
+    initialIndex: initialScrollIndex
   });
 
   const renderSong = useCallback(

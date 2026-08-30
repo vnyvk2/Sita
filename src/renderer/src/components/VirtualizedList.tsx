@@ -164,16 +164,17 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
         bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
       }}
       rangeChanged={(range) => {
-        // Guard: if currently restoring, ignore transient intermediate ranges until target is reached
+        // Guard scroll registry updates while restoring so transient ranges don't overwrite saved position
         if (restorationStateRef.current === 'RESTORING') {
           const target = targetIndexRef.current;
-          const isTargetReached = range.startIndex <= target && range.endIndex >= target;
+          const isTargetReached =
+            (range.startIndex <= target && range.endIndex >= target) ||
+            Math.abs(range.startIndex - target) <= 25;
 
-          if (!isTargetReached) {
-            return;
+          if (isTargetReached) {
+            // Target position reached; transition to normal tracking
+            restorationStateRef.current = 'TRACKING';
           }
-          // Target position reached; transition to normal tracking
-          restorationStateRef.current = 'TRACKING';
         }
 
         if (scrollKey && restorationStateRef.current === 'TRACKING') {
@@ -183,6 +184,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
           });
         }
 
+        // Always notify parent of the currently visible range to keep hydration in sync
         if (onChange) onChange(range);
         handleDebouncedScroll(range);
       }}

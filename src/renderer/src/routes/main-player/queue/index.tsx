@@ -20,6 +20,7 @@ import {
   calculateQueueSuffixDurations,
   getRemainingQueueDuration
 } from '@renderer/utils/queueDuration';
+import { scrollRegistry } from '@renderer/utils/scrollStore';
 import { baseInfoPageSearchParamsSchema } from '@renderer/utils/zod/baseInfoPageSearchParamsSchema';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -112,8 +113,10 @@ function RouteComponent() {
   const queueId = viewingQueue?.id ?? queue.queues[viewingQueueIndex]?.id ?? 'active';
   const membershipVersion = viewingQueue?.membershipVersion ?? 0;
 
+  const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
   const { getItem, onRangeChange } = useWindowHydration(currentQueue, `${queueId}:${membershipVersion}`, {
-    keyPrefix: 'queue'
+    keyPrefix: 'queue',
+    initialIndex: savedPosition?.index ?? 0
   });
 
   const durationsQuery = useQuery({

@@ -26,6 +26,8 @@ export function useWindowHydration(
     keyPrefix?: string;
     /** Logical query/list identity to prevent cache collision across distinct filters/sorts */
     listIdentity?: string;
+    /** Initial visible item index when restoring scroll position */
+    initialIndex?: number;
   }
 ) {
   const {
@@ -33,10 +35,14 @@ export function useWindowHydration(
     extraRowsBefore = 50,
     extraRowsAfter = 100,
     keyPrefix = 'songs',
-    listIdentity = 'default'
+    listIdentity = 'default',
+    initialIndex = 0
   } = options ?? {};
 
-  const [visibleRange, setVisibleRange] = useState<WindowRange>({ startIndex: 0, endIndex: 0 });
+  const [visibleRange, setVisibleRange] = useState<WindowRange>(() => ({
+    startIndex: Math.max(0, initialIndex),
+    endIndex: Math.max(0, initialIndex)
+  }));
 
   const handleRangeChange = useCallback((range: WindowRange) => {
     setVisibleRange((prev) => {
