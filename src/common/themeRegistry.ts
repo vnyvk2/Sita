@@ -16,7 +16,8 @@ export type ThemeNameKey =
   | 'settingsPage.oceanicThemePreset'
   | 'settingsPage.midnightThemePreset'
   | 'settingsPage.linearThemePreset'
-  | 'settingsPage.spotifyThemePreset';
+  | 'settingsPage.spotifyThemePreset'
+  | 'settingsPage.monochromeThemePreset';
 
 export interface ThemeDefinition {
   id: string;
@@ -45,7 +46,8 @@ export type ThemePreset =
   | 'oceanic'
   | 'midnight'
   | 'linear'
-  | 'spotify';
+  | 'spotify'
+  | 'monochrome';
 
 export const themeRegistry: Record<ThemePreset, ThemeDefinition> = {
   default: {
@@ -143,5 +145,11 @@ export const themeRegistry: Record<ThemePreset, ThemeDefinition> = {
     nameKey: 'settingsPage.spotifyThemePreset',
     mode: 'dark',
     preview: { background: '#121212', foreground: '#282828', accent: '#1db954' }
+  },
+  monochrome: {
+    id: 'monochrome',
+    nameKey: 'settingsPage.monochromeThemePreset',
+    mode: 'dark',
+    preview: { background: '#101010', foreground: '#242424', accent: '#ffffff' }
   }
 };

@@ -541,6 +541,36 @@ export const PRESET_RAW_TOKENS: Record<ThemePreset, Record<ThemeTokenKey, string
     '--dark-text-color': '0 0% 100%',
     '--dark-text-color-dimmed': '0 0% 70%',
     '--dark-foreground-color-1': '141 73% 42%'
+  },
+  monochrome: {
+    '--background-color-1': '0 0% 6%',
+    '--background-color-2': '0 0% 9%',
+    '--background-color-3': '0 0% 14%',
+    '--side-bar-background': '0 0% 9%',
+    '--background-color-dimmed': '0 0% 9%',
+    '--text-color-highlight': '0 0% 100%',
+    '--text-color-highlight-2': '0 0% 88%',
+    '--context-menu-background': '0 0% 14%',
+    '--context-menu-list-hover': '0 0% 20%',
+    '--seekbar-background-color': '0 0% 100%',
+    '--seekbar-track-background-color': '0 0% 20%',
+    '--foreground-color-1': '0 0% 100%',
+    '--text-color': '0 0% 100%',
+    '--text-color-dimmed': '0 0% 80%',
+    '--dark-background-color-1': '0 0% 6%',
+    '--dark-background-color-2': '0 0% 9%',
+    '--dark-background-color-3': '0 0% 14%',
+    '--dark-side-bar-background': '0 0% 9%',
+    '--dark-text-color-highlight': '0 0% 100%',
+    '--dark-text-color-highlight-2': '0 0% 88%',
+    '--dark-context-menu-background': '0 0% 14%',
+    '--dark-context-menu-list-hover': '0 0% 20%',
+    '--dark-seekbar-background-color': '0 0% 100%',
+    '--dark-seekbar-track-background-color': '0 0% 20%',
+    '--dark-background-color-dimmed': '0 0% 9%',
+    '--dark-text-color': '0 0% 100%',
+    '--dark-text-color-dimmed': '0 0% 80%',
+    '--dark-foreground-color-1': '0 0% 100%'
   }
 };
 

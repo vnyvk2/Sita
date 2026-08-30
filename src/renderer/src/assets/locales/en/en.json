@@ -402,6 +402,7 @@
     "midnightThemePreset": "Midnight",
     "linearThemePreset": "Linear (Indigo Slate)",
     "spotifyThemePreset": "Spotify (Obsidian Emerald)",
+    "monochromeThemePreset": "Monochrome (Black & White)",
 
     "enableImageBasedDynamicThemes": "Enable Dynamic Themes",
     "enableImageBasedDynamicThemesDescription": "Change app theme dynamically based on the theme of the current playing song cover image",

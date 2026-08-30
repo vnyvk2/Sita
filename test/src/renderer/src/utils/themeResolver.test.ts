@@ -69,11 +69,12 @@ describe('themeResolver', () => {
         'oceanic',
         'midnight',
         'linear',
-        'spotify'
+        'spotify',
+        'monochrome'
       ];
       const allPresets = Object.keys(themeRegistry) as ThemePreset[];
       expect(allPresets.sort()).toEqual(expectedPresets.sort());
-      expect(allPresets.length).toBe(16);
+      expect(allPresets.length).toBe(17);
 
       for (const preset of allPresets) {
         const theme = resolveTheme({
