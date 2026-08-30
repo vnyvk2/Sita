@@ -1,4 +1,4 @@
-import { and, eq, ilike, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, like, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { albums, albumsArtworks, albumsSongs, replayGain, songs, waveforms } from '../schema';
 
@@ -27,7 +27,7 @@ export const getAlbumsWithoutArtwork = async (limit = 1000) => {
 /**
  * Returns a bounded list of songs missing waveform data for supported audio formats.
  * NOTE: WAV is intentionally the only audio decoder implemented in the current milestone (WavAudioDecoder).
- * Using case-insensitive ILIKE ensures .wav, .WAV, .Wav extensions are all matched.
+ * Using case-insensitive LIKE ensures .wav, .WAV, .Wav extensions are all matched in SQLite.
  * When additional streaming decoders (e.g. FLAC, MP3) are registered in AudioDecoderRegistry,
  * this SQL filter should be extended or removed.
  */
@@ -40,14 +40,14 @@ export const getSongsWithoutWaveform = async (limit = 500) => {
     })
     .from(songs)
     .leftJoin(waveforms, eq(songs.id, waveforms.songId))
-    .where(and(isNull(waveforms.id), ilike(songs.path, '%.wav')))
+    .where(and(isNull(waveforms.id), like(songs.path, '%.wav')))
     .limit(limit);
 };
 
 /**
  * Returns a bounded list of songs missing ReplayGain loudness metrics for supported audio formats.
  * NOTE: WAV is intentionally the only audio decoder implemented in the current milestone (WavAudioDecoder).
- * Using case-insensitive ILIKE ensures .wav, .WAV, .Wav extensions are all matched.
+ * Using case-insensitive LIKE ensures .wav, .WAV, .Wav extensions are all matched in SQLite.
  * When additional streaming decoders (e.g. FLAC, MP3) are registered in AudioDecoderRegistry,
  * this SQL filter should be extended or removed.
  */
@@ -60,6 +60,6 @@ export const getSongsWithoutReplayGain = async (limit = 500) => {
     })
     .from(songs)
     .leftJoin(replayGain, eq(songs.id, replayGain.songId))
-    .where(and(isNull(replayGain.id), ilike(songs.path, '%.wav')))
+    .where(and(isNull(replayGain.id), like(songs.path, '%.wav')))
     .limit(limit);
 };

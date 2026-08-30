@@ -1,5 +1,5 @@
 import { basename, extname } from 'path';
-import { eq, like, ilike, or, inArray } from 'drizzle-orm';
+import { eq, like, or, inArray } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
@@ -276,7 +276,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
           .where(
             or(
               like(songs.path, `%${cleanTitle}%`),
-              ilike(songs.title, `%${cleanTitle}%`)
+              like(songs.title, `%${cleanTitle}%`)
             )
           )
           .limit(50);

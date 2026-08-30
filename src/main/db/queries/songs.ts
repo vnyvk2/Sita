@@ -12,7 +12,7 @@ import {
   songs
 } from '@db/schema';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
 
 export const isSongWithPathAvailable = async (path: string, trx: DB | DBTransaction = db) => {
   const count = await trx.$count(songs, eq(songs.path, path));
@@ -860,7 +860,7 @@ export const updateSongByPath = async (
 
 export const searchSongs = async (keyword: string, trx: DB | DBTransaction = db) => {
   const data = await trx.query.songs.findMany({
-    where: or(ilike(songs.title, `%${keyword}%`)),
+    where: or(like(songs.title, `%${keyword}%`)),
     with: {
       artists: {
         with: {
