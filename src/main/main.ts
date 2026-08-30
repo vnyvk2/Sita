@@ -644,10 +644,11 @@ async function manageWindowFinishLoad() {
   applyWindowZoomFactor(currentWindowZoomFactor, 'window-finish-load');
 
   mainWindow.show();
+  mainWindow.focus();
   manageWindowPositionInMonitor();
 
   if (IS_DEVELOPMENT && !process.env.NORA_DEVTOOLS_CLOSED)
-    mainWindow.webContents.openDevTools({ mode: 'detach', activate: true });
+    mainWindow.webContents.openDevTools({ mode: 'detach', activate: false });
 
   logger.debug(`Starting up the renderer.`);
 
