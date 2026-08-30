@@ -13,6 +13,7 @@ export interface ButtonProps {
   id?: string;
   label?: string;
   iconName?: string;
+  icon?: ReactNode;
   className?: string;
   iconClassName?: string;
   pendingClassName?: string;
@@ -38,6 +39,7 @@ const Button = memo((props: ButtonProps) => {
     id,
     className,
     iconName,
+    icon,
     iconClassName,
     pendingClassName,
     children,
@@ -113,6 +115,8 @@ const Button = memo((props: ButtonProps) => {
         >
           {isStatusPending ? '' : iconName}
         </span>
+      ) : icon ? (
+        icon
       ) : (
         buttonIcons
       )}

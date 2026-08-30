@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
 import historyPlaylistCoverImage from '../../../assets/images/webp/history-playlist-icon.webp';
 import playlistCoverDefaultImage from '../../../assets/images/webp/playlist_cover_default.webp';
+import AutoGraphIcon from '../../../components/HomePage/AutoGraphIcon';
 
 export const Route = createFileRoute('/main-player/home/')({
   component: HomePage,
@@ -250,9 +251,8 @@ function HomePage() {
             {t('homePage.favoritesAndRecaps')}
             <Button
               tooltipLabel={t('sideBar.insights', { defaultValue: 'Insights' })}
-              iconName="auto_graph"
+              icon={<AutoGraphIcon />}
               className="insights-btn mt-1.5 min-w-[80px] px-8 py-2 text-sm font-normal"
-              iconClassName="text-xl"
               clickHandler={() =>
                 navigate({
                   to: '/main-player/insights'

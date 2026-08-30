@@ -130,13 +130,8 @@
   opacity: 0;
   transition: opacity 250ms ease;
   background: radial-gradient(
-    var(--fx-spotlight-size, 320px) circle at
-      var(--fx-spotlight-x, 50%)
-      var(--fx-spotlight-y, 0%),
-    hsl(
-      var(--fx-spotlight-color, var(--fx-accent)) /
-        var(--fx-spotlight-intensity, 0.14)
-    ),
+    var(--fx-spotlight-size, 320px) circle at var(--fx-spotlight-x, 50%) var(--fx-spotlight-y, 0%),
+    hsl(var(--fx-spotlight-color, var(--fx-accent)) / var(--fx-spotlight-intensity, 0.14)),
     transparent 70%
   );
 }
@@ -249,8 +244,7 @@
   border-radius: 9999px;
   background: currentColor;
   transform-origin: 50% 100%;
-  animation: fx-wave-bar var(--fx-wave-duration, 0.72s) ease-in-out infinite
-    alternate;
+  animation: fx-wave-bar var(--fx-wave-duration, 0.72s) ease-in-out infinite alternate;
 }
 
 @keyframes fx-wave-bar {
@@ -309,8 +303,7 @@
 }
 
 .fx-aurora--animate .fx-aurora__blob {
-  animation: fx-aurora-a var(--fx-blob-duration-a, 34s) ease-in-out infinite
-    alternate;
+  animation: fx-aurora-a var(--fx-blob-duration-a, 34s) ease-in-out infinite alternate;
 }
 
 .fx-aurora--animate .fx-aurora__blob:nth-child(2) {
@@ -457,9 +450,7 @@
   animation: fx-insights-ripple 0.9s ease-in-out infinite alternate;
 }
 
-.insights:hover
-  .fx-insights__col:nth-child(even)
-  .fx-insights__dot:last-child {
+.insights:hover .fx-insights__col:nth-child(even) .fx-insights__dot:last-child {
   animation: fx-insights-ripple 0.9s ease-in-out -0.45s infinite alternate-reverse;
 }
 
@@ -477,8 +468,52 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .insights :is(.fx-insights__dot) {
+  .insights :is(.fx-insights__dot),
+  .insights-btn :is(.fx-auto-graph-dot) {
     animation: none !important;
+  }
+}
+
+/* ? AUTO_GRAPH HOVER MAGIC ANIMATION ---------------------------------------
+   Exact Material `auto_graph` icon with magical floating & twinkling dots on hover.
+   Runs ONLY on hover, 100% GPU compositor-only (transform + opacity), 60 FPS smooth. */
+.fx-auto-graph-icon {
+  display: inline-flex;
+  overflow: visible;
+  color: currentColor;
+}
+
+.fx-auto-graph-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 0.25s ease-out,
+    opacity 0.25s ease-out;
+  will-change: transform, opacity;
+}
+
+.insights-btn:hover .fx-auto-graph-dot-1 {
+  animation: fx-auto-graph-float 0.8s ease-in-out infinite alternate;
+}
+
+.insights-btn:hover .fx-auto-graph-dot-2 {
+  animation: fx-auto-graph-float 0.8s ease-in-out -0.27s infinite alternate;
+}
+
+.insights-btn:hover .fx-auto-graph-dot-3 {
+  animation: fx-auto-graph-float 0.8s ease-in-out -0.54s infinite alternate;
+}
+
+@keyframes fx-auto-graph-float {
+  0% {
+    transform: translateY(1.5px) scale(0.9);
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(-2.5px) scale(1.2);
+    opacity: 1;
+    filter: drop-shadow(0 0 2px currentColor);
   }
 }
 
@@ -497,6 +532,7 @@
 [data-fx-paused] .fx-dots__pulse-dot,
 [data-fx-paused] .fx-dots__wave-bar,
 [data-fx-paused] .fx-insights__dot,
+[data-fx-paused] .fx-auto-graph-dot,
 [data-fx-paused] .fx-skeleton::after,
 [data-fx-paused] .fx-beam--animate::before,
 .fx-paused .animate-ambient-drift,
@@ -506,6 +542,7 @@
 .fx-paused .fx-dots__pulse-dot,
 .fx-paused .fx-dots__wave-bar,
 .fx-paused .fx-insights__dot,
+.fx-paused .fx-auto-graph-dot,
 .fx-paused .fx-skeleton::after,
 .fx-paused .fx-beam--animate::before {
   animation-play-state: paused !important;
@@ -515,7 +552,7 @@
    Fired when a user favorites/likes a track. Main heart pops with spring
    tactile arc while 6 diverse mini hearts float upward in parameterized S-curves. */
 :root {
-  --color-favorite: #FF2D55;
+  --color-favorite: #ff2d55;
 }
 
 .fx-heart-pop {
@@ -550,7 +587,8 @@
   pointer-events: none;
   opacity: 0;
   line-height: 1;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
   transform: translate(0, 0) scale(0);
   transform-origin: center center;
   user-select: none;
@@ -566,15 +604,18 @@
   }
   25% {
     opacity: 1;
-    transform: translate(var(--heart-x1), var(--heart-y1)) scale(var(--heart-scale1, 1.25)) rotate(var(--heart-rot1, 10deg));
+    transform: translate(var(--heart-x1), var(--heart-y1)) scale(var(--heart-scale1, 1.25))
+      rotate(var(--heart-rot1, 10deg));
   }
   65% {
     opacity: 0.9;
-    transform: translate(var(--heart-x2), var(--heart-y2)) scale(var(--heart-scale2, 0.95)) rotate(var(--heart-rot2, 6deg));
+    transform: translate(var(--heart-x2), var(--heart-y2)) scale(var(--heart-scale2, 0.95))
+      rotate(var(--heart-rot2, 6deg));
   }
   100% {
     opacity: 0;
-    transform: translate(var(--heart-x3), var(--heart-y3)) scale(var(--heart-scale3, 0.2)) rotate(var(--heart-rot3, 12deg));
+    transform: translate(var(--heart-x3), var(--heart-y3)) scale(var(--heart-scale3, 0.2))
+      rotate(var(--heart-rot3, 12deg));
   }
 }
 
@@ -584,60 +625,114 @@
   --heart-color: var(--color-favorite);
   --heart-duration: 0.85s;
   --heart-delay: 0ms;
-  --heart-x1: 8px; --heart-y1: -18px; --heart-scale1: 1.35; --heart-rot1: 14deg;
-  --heart-x2: 2px; --heart-y2: -36px; --heart-scale2: 1;    --heart-rot2: 6deg;
-  --heart-x3: 6px; --heart-y3: -52px; --heart-scale3: 0.3;  --heart-rot3: 12deg;
+  --heart-x1: 8px;
+  --heart-y1: -18px;
+  --heart-scale1: 1.35;
+  --heart-rot1: 14deg;
+  --heart-x2: 2px;
+  --heart-y2: -36px;
+  --heart-scale2: 1;
+  --heart-rot2: 6deg;
+  --heart-x3: 6px;
+  --heart-y3: -52px;
+  --heart-scale3: 0.3;
+  --heart-rot3: 12deg;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-favorite) 50%, transparent));
 }
 
 .fx-float-heart.m-mid1 {
   --heart-size: 13px;
-  --heart-color: #FF6584;
+  --heart-color: #ff6584;
   --heart-duration: 0.76s;
   --heart-delay: 40ms;
-  --heart-x1: -15px; --heart-y1: -15px; --heart-scale1: 1.25; --heart-rot1: -18deg;
-  --heart-x2: -20px; --heart-y2: -32px; --heart-scale2: 0.95; --heart-rot2: -26deg;
-  --heart-x3: -24px; --heart-y3: -46px; --heart-scale3: 0.2;  --heart-rot3: -34deg;
+  --heart-x1: -15px;
+  --heart-y1: -15px;
+  --heart-scale1: 1.25;
+  --heart-rot1: -18deg;
+  --heart-x2: -20px;
+  --heart-y2: -32px;
+  --heart-scale2: 0.95;
+  --heart-rot2: -26deg;
+  --heart-x3: -24px;
+  --heart-y3: -46px;
+  --heart-scale3: 0.2;
+  --heart-rot3: -34deg;
 }
 
 .fx-float-heart.m-mid2 {
   --heart-size: 11px;
-  --heart-color: #FF5E3A;
+  --heart-color: #ff5e3a;
   --heart-duration: 0.72s;
   --heart-delay: 70ms;
-  --heart-x1: 16px; --heart-y1: -14px; --heart-scale1: 1.2;  --heart-rot1: 22deg;
-  --heart-x2: 22px; --heart-y2: -28px; --heart-scale2: 0.85; --heart-rot2: 28deg;
-  --heart-x3: 26px; --heart-y3: -40px; --heart-scale3: 0.2;  --heart-rot3: 35deg;
+  --heart-x1: 16px;
+  --heart-y1: -14px;
+  --heart-scale1: 1.2;
+  --heart-rot1: 22deg;
+  --heart-x2: 22px;
+  --heart-y2: -28px;
+  --heart-scale2: 0.85;
+  --heart-rot2: 28deg;
+  --heart-x3: 26px;
+  --heart-y3: -40px;
+  --heart-scale3: 0.2;
+  --heart-rot3: 35deg;
 }
 
 .fx-float-heart.m-tiny1 {
   --heart-size: 8px;
-  --heart-color: #AF52DE;
+  --heart-color: #af52de;
   --heart-duration: 0.6s;
   --heart-delay: 20ms;
-  --heart-x1: -20px; --heart-y1: -10px; --heart-scale1: 1.2;  --heart-rot1: -30deg;
-  --heart-x2: -24px; --heart-y2: -18px; --heart-scale2: 0.8;  --heart-rot2: -38deg;
-  --heart-x3: -28px; --heart-y3: -24px; --heart-scale3: 0.15; --heart-rot3: -45deg;
+  --heart-x1: -20px;
+  --heart-y1: -10px;
+  --heart-scale1: 1.2;
+  --heart-rot1: -30deg;
+  --heart-x2: -24px;
+  --heart-y2: -18px;
+  --heart-scale2: 0.8;
+  --heart-rot2: -38deg;
+  --heart-x3: -28px;
+  --heart-y3: -24px;
+  --heart-scale3: 0.15;
+  --heart-rot3: -45deg;
 }
 
 .fx-float-heart.m-tiny2 {
   --heart-size: 9px;
-  --heart-color: #FF375F;
+  --heart-color: #ff375f;
   --heart-duration: 0.65s;
   --heart-delay: 90ms;
-  --heart-x1: 11px; --heart-y1: -12px; --heart-scale1: 1.15; --heart-rot1: 15deg;
-  --heart-x2: 14px; --heart-y2: -22px; --heart-scale2: 0.7;  --heart-rot2: 20deg;
-  --heart-x3: 16px; --heart-y3: -34px; --heart-scale3: 0.2;  --heart-rot3: 25deg;
+  --heart-x1: 11px;
+  --heart-y1: -12px;
+  --heart-scale1: 1.15;
+  --heart-rot1: 15deg;
+  --heart-x2: 14px;
+  --heart-y2: -22px;
+  --heart-scale2: 0.7;
+  --heart-rot2: 20deg;
+  --heart-x3: 16px;
+  --heart-y3: -34px;
+  --heart-scale3: 0.2;
+  --heart-rot3: 25deg;
 }
 
 .fx-float-heart.m-micro {
   --heart-size: 6px;
-  --heart-color: #FFD60A;
+  --heart-color: #ffd60a;
   --heart-duration: 0.55s;
   --heart-delay: 110ms;
-  --heart-x1: -6px;  --heart-y1: -10px; --heart-scale1: 1.2; --heart-rot1: 0deg;
-  --heart-x2: -8px;  --heart-y2: -18px; --heart-scale2: 0.6; --heart-rot2: 0deg;
-  --heart-x3: -10px; --heart-y3: -26px; --heart-scale3: 0;   --heart-rot3: 0deg;
+  --heart-x1: -6px;
+  --heart-y1: -10px;
+  --heart-scale1: 1.2;
+  --heart-rot1: 0deg;
+  --heart-x2: -8px;
+  --heart-y2: -18px;
+  --heart-scale2: 0.6;
+  --heart-rot2: 0deg;
+  --heart-x3: -10px;
+  --heart-y3: -26px;
+  --heart-scale3: 0;
+  --heart-rot3: 0deg;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -649,5 +744,3 @@
     display: none !important;
   }
 }
-
-
