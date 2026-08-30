@@ -201,6 +201,10 @@ export const processSongsWithWorkerPool = async (
     const newArtistIds: number[] = [];
     const newAlbumIds: number[] = [];
     const newGenreIds: number[] = [];
+    const unnotifiedSongIds: number[] = [];
+    const unnotifiedArtistIds: number[] = [];
+    const unnotifiedAlbumIds: number[] = [];
+    const unnotifiedGenreIds: number[] = [];
     let successCount = 0;
     let durablyCommittedSongCount = 0;
 
@@ -308,18 +312,39 @@ export const processSongsWithWorkerPool = async (
             // Invariant: Durably committed boundary & tracking collections advance ONLY AFTER the DB transaction succeeds
             successCount += stagedSuccessCount;
             newSongIds.push(...stagedSongIds);
+            unnotifiedSongIds.push(...stagedSongIds);
             songAssetsToQueue.push(...stagedSongAssets);
             for (const [albumId, albumData] of stagedAlbumAssets.entries()) {
               albumAssetsToQueue.set(albumId, albumData);
             }
             newAlbumIds.push(...stagedNewAlbumIds);
+            unnotifiedAlbumIds.push(...stagedNewAlbumIds);
             newArtistIds.push(...stagedNewArtistIds);
+            unnotifiedArtistIds.push(...stagedNewArtistIds);
             newGenreIds.push(...stagedNewGenreIds);
+            unnotifiedGenreIds.push(...stagedNewGenreIds);
             durablyCommittedSongCount += batch.tracks.length + batch.errors.length;
 
             logger.info(
               `[songWorkerPool] Batch ${batch.batchId} (${batch.tracks.length} tracks, ${(batchArtworkBytes / 1024 / 1024).toFixed(2)} MB artwork): artwork=${artworkDuration.toFixed(1)}ms, pureDbTx=${dbTxDuration.toFixed(1)}ms`
             );
+
+            // Progressive UI updates:
+            // 1st batch (100 tracks) emits immediately for instant visible UX,
+            // then every 500 tracks (e.g. at 600, 1100, etc.) to keep UI updated smoothly without render storms.
+            if (
+              !abortSignal?.aborted &&
+              (songIngestionMetrics.batchesProcessed === 1 || unnotifiedSongIds.length >= 500)
+            ) {
+              if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', [...unnotifiedSongIds]);
+              if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', [...unnotifiedArtistIds]);
+              if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', [...unnotifiedAlbumIds]);
+              if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', [...unnotifiedGenreIds]);
+              unnotifiedSongIds.length = 0;
+              unnotifiedArtistIds.length = 0;
+              unnotifiedAlbumIds.length = 0;
+              unnotifiedGenreIds.length = 0;
+            }
           }
 
           if (batch.errors.length > 0) {
@@ -371,11 +396,11 @@ export const processSongsWithWorkerPool = async (
           }
         }
 
-        // Notify renderer of updates
-        if (newSongIds.length > 0) dataUpdateEvent('songs/newSong', newSongIds);
-        if (newArtistIds.length > 0) dataUpdateEvent('artists/newArtist', newArtistIds);
-        if (newAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', newAlbumIds);
-        if (newGenreIds.length > 0) dataUpdateEvent('genres/newGenre', newGenreIds);
+        // Flush any remaining unnotified tracks to the renderer
+        if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
+        if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+        if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
+        if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
       }
 
       return {
@@ -405,10 +430,10 @@ export const processSongsWithWorkerPool = async (
             );
           }
         }
-        if (newSongIds.length > 0) dataUpdateEvent('songs/newSong', newSongIds);
-        if (newArtistIds.length > 0) dataUpdateEvent('artists/newArtist', newArtistIds);
-        if (newAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', newAlbumIds);
-        if (newGenreIds.length > 0) dataUpdateEvent('genres/newGenre', newGenreIds);
+        if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
+        if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+        if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
+        if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
       }
 
       const remainingSongs = songs.slice(durablyCommittedSongCount);
