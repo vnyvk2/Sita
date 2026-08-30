@@ -90,7 +90,7 @@ const Sidebar = memo(() => {
           to: '/main-player/genres',
           id: 'Genres',
           parentClassName: 'genres',
-          icon: 'track_changes',
+          icon: 'style',
           content: t('common.genre_other'),
           isActive: false
         },
