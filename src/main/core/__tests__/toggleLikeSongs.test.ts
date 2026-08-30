@@ -52,7 +52,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 1',
           path: 'C:\\test\\song1.mp3',
-          duration: '180.00',
+          duration: 180.00,
           isFavorite: true,
           isBlacklisted: false,
           fileCreatedAt: now,
@@ -61,7 +61,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 2',
           path: 'C:\\test\\song2.mp3',
-          duration: '200.00',
+          duration: 200.00,
           isFavorite: false,
           isBlacklisted: false,
           fileCreatedAt: now,
@@ -70,7 +70,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 3',
           path: 'C:\\test\\song3.mp3',
-          duration: '220.00',
+          duration: 220.00,
           isFavorite: true,
           isBlacklisted: false,
           fileCreatedAt: now,

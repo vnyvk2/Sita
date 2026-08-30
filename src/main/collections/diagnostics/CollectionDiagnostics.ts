@@ -1,4 +1,5 @@
 import { db } from '../../db/db';
+import { rawAll } from '../../db/sqlite/raw';
 import { playlists } from '../../db/schema';
 import { sql } from 'drizzle-orm';
 
@@ -15,15 +16,14 @@ export class CollectionDiagnostics {
    */
   public async findEmptyFolders(): Promise<number[]> {
     // A folder is empty if no playlist has it as parentId
-    const result = await db.execute(sql`
+    const rows = await rawAll<{ id: number }>(sql`
       SELECT id FROM playlists p
       WHERE playlist_type = 'folder'
       AND NOT EXISTS (
         SELECT 1 FROM playlists c WHERE c.parent_id = p.id
       )
     `);
-    const rows = Array.isArray(result) ? result : (result as any).rows;
-    return rows.map((r: any) => r.id as number);
+    return rows.map((r) => r.id);
   }
 
   /**
@@ -51,21 +51,19 @@ export class CollectionDiagnostics {
         ? sql`parent_id IS NULL` 
         : sql`parent_id = ${parentId}`;
 
-    const result = await db.execute(sql`
-      SELECT name, parent_id, COUNT(*) as count, array_agg(id) as playlist_ids
+    const rows = await rawAll<{ name: string; parent_id: number | null; count: number; playlist_ids: string }>(sql`
+      SELECT name, parent_id, COUNT(*) as count, group_concat(id) as playlist_ids
       FROM playlists
       WHERE ${parentCondition}
       GROUP BY name, parent_id
       HAVING COUNT(*) > 1
     `);
-    
-    const rows = Array.isArray(result) ? result : (result as any).rows;
 
-    return rows.map((r: any) => ({
+    return rows.map((r) => ({
       name: r.name,
       parentId: r.parent_id,
       count: Number(r.count),
-      playlistIds: r.playlist_ids
+      playlistIds: r.playlist_ids.split(',').map(Number)
     }));
   }
 
@@ -73,14 +71,12 @@ export class CollectionDiagnostics {
    * Detects orphaned collections where the parentId points to a non-existent playlist.
    */
   public async findOrphanedCollections(): Promise<number[]> {
-    const result = await db.execute(sql`
+    const rows = await rawAll<{ id: number }>(sql`
       SELECT p.id 
       FROM playlists p
       LEFT JOIN playlists parent ON p.parent_id = parent.id
       WHERE p.parent_id IS NOT NULL AND parent.id IS NULL
     `);
-    
-    const rows = Array.isArray(result) ? result : (result as any).rows;
-    return rows.map((r: any) => r.id as number);
+    return rows.map((r) => r.id);
   }
 }

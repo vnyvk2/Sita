@@ -1,0 +1,76 @@
+{
+  "name": "concurrency",
+  "recordedAt": "2026-08-29T13:51:34.205Z",
+  "host": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "size": 50000,
+  "env": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "results": {
+    "engines": {
+      "sqlite": {
+        "concurrent_4_readers": {
+          "totalMs": 706,
+          "perReader": {
+            "n": 4,
+            "min": 43.973,
+            "median": 45.06,
+            "p95": 572.04,
+            "max": 572.04,
+            "mean": 176.328
+          },
+          "rows": 8000
+        },
+        "read_during_write": {
+          "reads": {
+            "n": 20,
+            "min": 0.102,
+            "median": 0.188,
+            "p95": 3.77,
+            "max": 3.77,
+            "mean": 0.416
+          }
+        },
+        "two_writer_contention": {
+          "totalMs": 5580,
+          "error": "database is locked",
+          "note": "second writer hit SQLITE_BUSY beyond busy_timeout while tx held lock"
+        }
+      },
+      "pglite": {
+        "concurrent_4_readers": {
+          "totalMs": 414,
+          "perReader": {
+            "n": 4,
+            "min": 355.223,
+            "median": 396.803,
+            "p95": 413.8,
+            "max": 413.8,
+            "mean": 385.051
+          }
+        },
+        "read_during_write": {
+          "reads": {
+            "n": 20,
+            "min": 8.934,
+            "median": 12.308,
+            "p95": 2431.207,
+            "max": 2431.207,
+            "mean": 133.433
+          }
+        }
+      }
+    }
+  },
+  "suites": {}
+}

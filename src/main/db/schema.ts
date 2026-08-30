@@ -1,23 +1,15 @@
 import { relations, type SQL, sql } from 'drizzle-orm';
 import {
-  type AnyPgColumn,
-  boolean,
-  customType,
-  decimal,
-  doublePrecision,
+  type AnySQLiteColumn,
   index,
   integer,
-  json,
-  jsonb,
-  pgEnum,
-  pgTable,
   primaryKey,
+  real,
+  sqliteTable,
   text,
-  timestamp,
   unique,
-  uniqueIndex,
-  varchar
-} from 'drizzle-orm/pg-core';
+  uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 
 import type { CollectionContextData } from '../collections/context/types';
 import type { OperationInverseInput, OperationType } from '../collections/operations/types';
@@ -31,115 +23,121 @@ import {
   DEFAULT_METADATA_PREFERENCES,
   type MetadataProviderPreferences
 } from '../../common/metadata/preferences';
+import { NORM_STRIP_CHARS } from './sqlite/norm';
 
 // ============================================================================
-// Data types
+// SQLite translation of the PostgreSQL schema (PGlite -> node:sqlite migration).
+//
+// Mapping rules (documented in sqlite-poc/migration-surface.md):
+//   identity PK            -> INTEGER PRIMARY KEY (rowid alias)
+//   citext generated col   -> TEXT GENERATED ALWAYS AS (lower(x)) STORED  (ASCII lower)
+//   search-norm column     -> TEXT GENERATED ALWAYS AS (lower + punctuation/space strip) STORED
+//   varchar(n)             -> TEXT
+//   numeric/decimal        -> REAL
+//   double precision       -> REAL
+//   timestamp / timestamptz-> INTEGER epoch-ms (drizzle timestamp_ms; UTC instants)
+//   boolean                -> INTEGER 0/1 (drizzle boolean mode)
+//   pgEnum                 -> TEXT with $type<> union (CHECK enforced in baseline DDL)
+//   json / jsonb           -> TEXT (drizzle json mode; JSON1 compiled into node:sqlite)
+//   GIN gin_trgm_ops       -> FTS5 trigram tables (baseline DDL; not modelled in drizzle)
 // ============================================================================
 
-export const tsvector = customType<{
-  data: string;
-}>({
-  dataType() {
-    return `tsvector`;
+// Characters stripped by the *_norm columns: ASCII whitespace + punctuation.
+// (definition lives in ./sqlite/norm.ts — shared with the baseline DDL)
+
+function normExpr(columnGetter: () => AnySQLiteColumn): SQL {
+  // built lazily so the table symbol is initialized (mirrors generatedAlwaysAs callbacks)
+  let expr: SQL = sql`lower(${columnGetter()})`;
+  for (const ch of NORM_STRIP_CHARS) {
+    expr = sql`replace(${expr}, ${ch}, ${''})`;
   }
-});
+  return expr;
+}
 
-// Case-insensitive text type for fuzzy search support
-export const citext = customType<{
-  data: string;
-}>({
-  dataType() {
-    return `citext`;
-  }
-});
+const ts = (name: string) => integer(name, { mode: 'timestamp_ms' });
+const tsDefaultNow = (name: string) => ts(name).notNull().$defaultFn(() => new Date());
+const jsonText = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 
-// ============================================================================
-// Enums
-// ============================================================================
-export const artworkSourceEnum = pgEnum('artwork_source', ['LOCAL', 'REMOTE']);
-export const swatchTypeEnum = pgEnum('swatch_type', [
+// Enum mirrors (string unions; CHECK constraints live in the baseline DDL)
+export const artworkSourceEnumValues = ['LOCAL', 'REMOTE'] as const;
+export type ArtworkSource = (typeof artworkSourceEnumValues)[number];
+export const swatchTypeEnumValues = [
   'VIBRANT',
   'LIGHT_VIBRANT',
   'DARK_VIBRANT',
   'MUTED',
   'LIGHT_MUTED',
   'DARK_MUTED'
-]);
+] as const;
+export type SwatchType = (typeof swatchTypeEnumValues)[number];
+export const lyricsProviderEnumValues = ['MUSIXMATCH', 'LRCLIB', 'EMBEDDED', 'FILESYSTEM'] as const;
+export type LyricsProvider = (typeof lyricsProviderEnumValues)[number];
+
+// Backwards-compatible aliases (the old pgEnum objects; consumers only used the type unions)
+export const artworkSourceEnum = { enumValues: artworkSourceEnumValues };
+export const swatchTypeEnum = { enumValues: swatchTypeEnumValues };
+export const lyricsProviderEnum = { enumValues: lyricsProviderEnumValues };
 
 // ============================================================================
-// Tables
+// Core tables
 // ============================================================================
-export const artists = pgTable(
+export const artists = sqliteTable(
   'artists',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    name: varchar('name', { length: 1024 }).notNull(),
-    // Generated column: case-insensitive text for searches (using citext type)
-    nameCI: citext('name_ci').generatedAlwaysAs((): SQL => sql`${artists.name}::citext`),
-    isFavorite: boolean('is_favorite').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    id: integer('id').primaryKey(),
+    name: text('name').notNull(),
+    // Generated column: case-insensitive text for searches
+    nameCI: text('name_ci').generatedAlwaysAs((): SQL => sql`lower(${artists.name})`),
+    nameNorm: text('name_norm').generatedAlwaysAs((): SQL => normExpr(() => artists.name)),
+    isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for name-based lookups and sorting (aToZ, zToA)
-    index('idx_artists_name').on(t.name.asc()),
-    // Index for case-insensitive exact matches
-    index('idx_artists_name_ci').on(t.nameCI.asc()),
-    // GIN index for fuzzy matching with pg_trgm trigram operator
-    index('idx_artists_name_ci_trgm').using('gin', t.nameCI.op('gin_trgm_ops')),
+    index('idx_artists_name').on(t.name),
+    index('idx_artists_name_ci').on(t.nameCI),
     index('idx_artists_is_favorite').on(t.isFavorite)
   ]
 );
 
-export const musicFolders = pgTable(
+export const musicFolders = sqliteTable(
   'music_folders',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     path: text('path').notNull().unique(),
-    name: varchar('name', { length: 512 }).notNull(),
-    isBlacklisted: boolean('is_blacklisted').notNull().default(false),
-    parentId: integer('parent_id').references((): AnyPgColumn => musicFolders.id, {
+    name: text('name').notNull(),
+    isBlacklisted: integer('is_blacklisted', { mode: 'boolean' }).notNull().default(false),
+    parentId: integer('parent_id').references((): AnySQLiteColumn => musicFolders.id, {
       onDelete: 'set null',
       onUpdate: 'cascade'
     }),
-    isBlacklistedUpdatedAt: timestamp('is_blacklisted_updated_at', {
-      withTimezone: false
-    })
-      .notNull()
-      .defaultNow(),
-    /*   When the folder itself was created on the file system */
-    folderCreatedAt: timestamp('folder_created_at', { withTimezone: false }),
-    /*   When the folder metadata (like permissions or timestamps) last changed */
-    lastModifiedAt: timestamp('last_modified_at', { withTimezone: false }),
-    /*   When file contents inside the folder were changed (more volatile) */
-    lastChangedAt: timestamp('last_changed_at', { withTimezone: false }),
-    /*   When your app last parsed or indexed the contents of this folder */
-    lastParsedAt: timestamp('last_parsed_at', { withTimezone: false }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    isBlacklistedUpdatedAt: tsDefaultNow('is_blacklisted_updated_at'),
+    folderCreatedAt: ts('folder_created_at'),
+    lastModifiedAt: ts('last_modified_at'),
+    lastChangedAt: ts('last_changed_at'),
+    lastParsedAt: ts('last_parsed_at'),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Existing index for hierarchical queries
     index('idx_parent_id').on(t.parentId),
-    // Index for path-based lookups
-    index('idx_music_folders_path').on(t.path.asc()),
+    index('idx_music_folders_path').on(t.path),
     index('idx_music_folders_is_blacklisted').on(t.isBlacklisted),
-    // Composite index for hierarchical queries with path
-    index('idx_music_folders_parent_path').on(t.parentId, t.path.asc())
+    index('idx_music_folders_parent_path').on(t.parentId, t.path)
   ]
 );
 
-export const songs = pgTable(
+export const songs = sqliteTable(
   'songs',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    title: varchar('title', { length: 4096 }).notNull(),
-    // Generated column: case-insensitive text for searches (using citext type)
-    titleCI: citext('title_ci').generatedAlwaysAs((): SQL => sql`${songs.title}::citext`),
-    duration: decimal('duration', { precision: 10, scale: 3 }).notNull(),
+    id: integer('id').primaryKey(),
+    title: text('title').notNull(),
+    titleCI: text('title_ci').generatedAlwaysAs((): SQL => sql`lower(${songs.title})`),
+    titleNorm: text('title_norm').generatedAlwaysAs((): SQL => normExpr(() => songs.title)),
+    duration: real('duration').notNull(),
     skipCount: integer('skip_count').notNull().default(0),
     path: text('path').notNull().unique(),
-    isFavorite: boolean('is_favorite').notNull().default(false),
+    isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     sampleRate: integer('sample_rate'),
     bitRate: integer('bit_rate'),
     noOfChannels: integer('no_of_channels'),
@@ -150,87 +148,66 @@ export const songs = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade'
     }),
-    isBlacklisted: boolean('is_blacklisted').notNull().default(false),
-    isBlacklistedUpdatedAt: timestamp('is_blacklisted_updated_at', {
-      withTimezone: false
-    })
-      .notNull()
-      .defaultNow(),
-    isFavoriteUpdatedAt: timestamp('is_favorite_updated_at', {
-      withTimezone: false
-    })
-      .notNull()
-      .defaultNow(),
-    fileCreatedAt: timestamp('file_created_at', { withTimezone: false }).notNull(),
-    fileModifiedAt: timestamp('file_modified_at', { withTimezone: false }).notNull(),
+    isBlacklisted: integer('is_blacklisted', { mode: 'boolean' }).notNull().default(false),
+    isBlacklistedUpdatedAt: tsDefaultNow('is_blacklisted_updated_at'),
+    isFavoriteUpdatedAt: tsDefaultNow('is_favorite_updated_at'),
+    fileCreatedAt: ts('file_created_at').notNull(),
+    fileModifiedAt: ts('file_modified_at').notNull(),
     musicBrainzRecordingId: text('music_brainz_recording_id'),
     isrc: text('isrc'),
-    language: varchar('language', { length: 64 }),
-    createdAt: timestamp('created_at', { withTimezone: false }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).notNull().defaultNow()
+    language: text('language'),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Single column indexes for common sort operations
-    index('idx_songs_title').on(t.title.asc()),
-    // Index for case-insensitive exact matches
-    index('idx_songs_title_ci').on(t.titleCI.asc()),
-    // GIN index for fuzzy matching with pg_trgm trigram operator
-    index('idx_songs_title_ci_trgm').using('gin', t.titleCI.op('gin_trgm_ops')),
-    index('idx_songs_year').on(t.year.asc()),
-    index('idx_songs_track_number').on(t.trackNumber.asc()),
+    index('idx_songs_title').on(t.title),
+    index('idx_songs_title_ci').on(t.titleCI),
+    index('idx_songs_year').on(t.year),
+    index('idx_songs_track_number').on(t.trackNumber),
     index('idx_songs_music_brainz_recording_id').on(t.musicBrainzRecordingId),
     index('idx_songs_isrc').on(t.isrc),
-    index('idx_songs_language').on(t.language.asc()),
-    index('idx_songs_created_at').on(t.createdAt.desc()),
-    index('idx_songs_file_modified_at').on(t.fileModifiedAt.desc()),
+    index('idx_songs_language').on(t.language),
+    index('idx_songs_created_at').on(t.createdAt),
+    index('idx_songs_file_modified_at').on(t.fileModifiedAt),
     index('idx_songs_folder_id').on(t.folderId),
-    index('idx_songs_path').on(t.path),
     index('idx_songs_is_favorite').on(t.isFavorite),
     index('idx_songs_is_blacklisted').on(t.isBlacklisted),
-
-    // Composite indexes for common sorting patterns
-    index('idx_songs_skip_count_title').on(t.skipCount.desc(), t.title.asc()),
-    index('idx_songs_year_title').on(t.year.asc(), t.title.asc()),
-    index('idx_songs_track_title').on(t.trackNumber.asc(), t.title.asc()),
-    index('idx_songs_created_title').on(t.createdAt.desc(), t.title.asc()),
-    index('idx_songs_modified_title').on(t.fileModifiedAt.desc(), t.title.asc()),
-    index('idx_songs_favorite_title').on(t.isFavorite, t.title.asc()),
-
-    // Index for folder-based queries
-    index('idx_songs_folder_title').on(t.folderId, t.title.asc())
+    index('idx_songs_skip_count_title').on(t.skipCount, t.title),
+    index('idx_songs_year_title').on(t.year, t.title),
+    index('idx_songs_track_title').on(t.trackNumber, t.title),
+    index('idx_songs_created_title').on(t.createdAt, t.title),
+    index('idx_songs_modified_title').on(t.fileModifiedAt, t.title),
+    index('idx_songs_favorite_title').on(t.isFavorite, t.title),
+    index('idx_songs_folder_title').on(t.folderId, t.title)
   ]
 );
 
-export const artworks = pgTable(
+export const artworks = sqliteTable(
   'artworks',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     hash: text('hash').notNull().unique(),
     path: text('path').notNull(),
-    source: artworkSourceEnum('source').notNull().default('LOCAL'),
+    source: text('source').$type<ArtworkSource>().notNull().default('LOCAL'),
     width: integer('width').notNull(),
     height: integer('height').notNull(),
-    isOptimized: boolean('is_optimized').notNull().default(false),
+    isOptimized: integer('is_optimized', { mode: 'boolean' }).notNull().default(false),
     generatorVersion: integer('generator_version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for path-based lookups
     index('idx_artworks_path').on(t.path),
-    // Index for source filtering
     index('idx_artworks_source').on(t.source),
-    // Index for dimension-based queries
     index('idx_artworks_dimensions').on(t.width, t.height),
-    // Composite index for palette queries filtering by source and dimensions
     index('idx_artworks_source_dimensions').on(t.source, t.width, t.height)
   ]
 );
 
-export const palettes = pgTable(
+export const palettes = sqliteTable(
   'palettes',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     artworkId: integer('artwork_id')
       .notNull()
       .references(() => artworks.id, {
@@ -238,281 +215,234 @@ export const palettes = pgTable(
         onUpdate: 'cascade'
       }),
     generatorVersion: integer('generator_version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [
-    // Unique index for artwork-based palette lookups
-    uniqueIndex('idx_palettes_artwork_id').on(t.artworkId)
-  ]
+  (t) => [uniqueIndex('idx_palettes_artwork_id').on(t.artworkId)]
 );
 
-export const paletteSwatches = pgTable(
+export const paletteSwatches = sqliteTable(
   'palette_swatches',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     population: integer('population').notNull(),
-    hex: varchar('hex', { length: 255 }).notNull(),
-    hsl: json('hsl').$type<{ h: number; s: number; l: number }>().notNull(),
-    swatchType: swatchTypeEnum('swatch_type').notNull().default('VIBRANT'),
+    hex: text('hex').notNull(),
+    hsl: jsonText<{ h: number; s: number; l: number }>('hsl').notNull(),
+    swatchType: text('swatch_type').$type<SwatchType>().notNull().default('VIBRANT'),
     paletteId: integer('palette_id')
       .notNull()
       .references(() => palettes.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for palette-based swatch lookups
     index('idx_palette_swatches_palette_id').on(t.paletteId),
-    // Index for swatch type filtering
     index('idx_palette_swatches_type').on(t.swatchType),
-    // Composite index for palette + type queries
     index('idx_palette_swatches_palette_type').on(t.paletteId, t.swatchType),
-    // Index for hex color lookups
     index('idx_palette_swatches_hex').on(t.hex)
   ]
 );
 
-export const albums = pgTable(
+export const albums = sqliteTable(
   'albums',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    title: varchar('title', { length: 255 }).notNull(),
-    // Generated column: case-insensitive text for searches (using citext type)
-    titleCI: citext('title_ci').generatedAlwaysAs((): SQL => sql`${albums.title}::citext`),
+    id: integer('id').primaryKey(),
+    title: text('title').notNull(),
+    titleCI: text('title_ci').generatedAlwaysAs((): SQL => sql`lower(${albums.title})`),
+    titleNorm: text('title_norm').generatedAlwaysAs((): SQL => normExpr(() => albums.title)),
     year: integer('year'),
-    isFavorite: boolean('is_favorite').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for title-based lookups and sorting
-    index('idx_albums_title').on(t.title.asc()),
-    // Index for case-insensitive exact matches
-    index('idx_albums_title_ci').on(t.titleCI.asc()),
-    // GIN index for fuzzy matching with pg_trgm trigram operator
-    index('idx_albums_title_ci_trgm').using('gin', t.titleCI.op('gin_trgm_ops')),
-    // Index for year-based filtering and sorting
-    index('idx_albums_year').on(t.year.desc()),
-    // Composite index for year + title sorting
-    index('idx_albums_year_title').on(t.year.desc(), t.title.asc()),
+    index('idx_albums_title').on(t.title),
+    index('idx_albums_title_ci').on(t.titleCI),
+    index('idx_albums_year').on(t.year),
+    index('idx_albums_year_title').on(t.year, t.title),
     index('idx_albums_is_favorite').on(t.isFavorite)
   ]
 );
 
-export const genres = pgTable(
+export const genres = sqliteTable(
   'genres',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    name: varchar('name', { length: 255 }).notNull(),
-    // Generated column: case-insensitive text for searches (using citext type)
-    nameCI: citext('name_ci').generatedAlwaysAs((): SQL => sql`${genres.name}::citext`),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    id: integer('id').primaryKey(),
+    name: text('name').notNull(),
+    nameCI: text('name_ci').generatedAlwaysAs((): SQL => sql`lower(${genres.name})`),
+    nameNorm: text('name_norm').generatedAlwaysAs((): SQL => normExpr(() => genres.name)),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for name-based lookups and sorting
-    index('idx_genres_name').on(t.name.asc()),
-    // Unique index for case-insensitive exact matches (prevents duplicate genres from concurrent parsing)
-    uniqueIndex('idx_genres_name_ci').on(t.nameCI),
-    // GIN index for fuzzy matching with pg_trgm trigram operator
-    index('idx_genres_name_ci_trgm').using('gin', t.nameCI.op('gin_trgm_ops'))
+    index('idx_genres_name').on(t.name),
+    uniqueIndex('idx_genres_name_ci').on(t.nameCI)
   ]
 );
 
-export const playlists = pgTable(
+export const playlists = sqliteTable(
   'playlists',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    name: varchar('name', { length: 255 }).notNull(),
-    // Generated column: case-insensitive text for searches (using citext type)
-    nameCI: citext('name_ci').generatedAlwaysAs((): SQL => sql`${playlists.name}::citext`),
+    id: integer('id').primaryKey(),
+    name: text('name').notNull(),
+    nameCI: text('name_ci').generatedAlwaysAs((): SQL => sql`lower(${playlists.name})`),
+    nameNorm: text('name_norm').generatedAlwaysAs((): SQL => normExpr(() => playlists.name)),
     description: text('description'),
-    parentId: integer('parent_id').references((): AnyPgColumn => playlists.id, {
+    parentId: integer('parent_id').references((): AnySQLiteColumn => playlists.id, {
       onDelete: 'set null',
       onUpdate: 'cascade'
     }),
-    playlistType: varchar('playlist_type', { length: 20 }).notNull().default('standard'),
+    playlistType: text('playlist_type').notNull().default('standard'),
     itemCount: integer('item_count').notNull().default(0),
-    totalDuration: decimal('total_duration', { precision: 12, scale: 3 }).notNull().default('0'),
+    totalDuration: real('total_duration').notNull().default(0),
     sidebarPosition: integer('sidebar_position'),
-    pinnedAt: timestamp('pinned_at', { withTimezone: false }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    pinnedAt: ts('pinned_at'),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for name-based lookups and sorting
-    index('idx_playlists_name').on(t.name.asc()),
-    // Index for case-insensitive exact matches
-    index('idx_playlists_name_ci').on(t.nameCI.asc()),
-    // GIN index for fuzzy matching with pg_trgm trigram operator
-    index('idx_playlists_name_ci_trgm').using('gin', t.nameCI.op('gin_trgm_ops')),
-    // Index for creation date sorting
-    index('idx_playlists_created_at').on(t.createdAt.desc()),
+    index('idx_playlists_name').on(t.name),
+    index('idx_playlists_name_ci').on(t.nameCI),
+    index('idx_playlists_created_at').on(t.createdAt),
     index('idx_playlists_parent_id').on(t.parentId),
     index('idx_playlists_type').on(t.playlistType),
-    index('idx_playlists_sidebar').on(t.sidebarPosition.asc()),
-    index('idx_playlists_pinned').on(t.pinnedAt.desc())
+    index('idx_playlists_sidebar').on(t.sidebarPosition),
+    index('idx_playlists_pinned').on(t.pinnedAt)
   ]
 );
 
-export const playlistEntries = pgTable(
+export const playlistEntries = sqliteTable(
   'playlist_entries',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     playlistId: integer('playlist_id')
       .notNull()
       .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    /** Explicit ordering. Allows manual reorder + duplicate songs. */
     position: integer('position').notNull(),
-    addedAt: timestamp('added_at', { withTimezone: false }).defaultNow().notNull(),
-    /** Optional: who or what added this entry */
-    source: varchar('source', { length: 50 }).default('manual'),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    addedAt: tsDefaultNow('added_at'),
+    source: text('source').default('manual'),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
     index('idx_playlist_entries_playlist_id').on(t.playlistId),
     index('idx_playlist_entries_song_id').on(t.songId),
-    // Critical: enables ORDER BY position queries within a playlist
-    index('idx_playlist_entries_playlist_position').on(t.playlistId, t.position.asc()),
-    index('idx_playlist_entries_added_at').on(t.addedAt.desc())
+    index('idx_playlist_entries_playlist_position').on(t.playlistId, t.position),
+    index('idx_playlist_entries_added_at').on(t.addedAt)
   ]
 );
 
-export const smartPlaylistRules = pgTable(
+export const smartPlaylistRules = sqliteTable(
   'smart_playlist_rules',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     playlistId: integer('playlist_id')
       .notNull()
       .unique()
       .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    /** The rule AST stored as JSON */
-    ruleAst: json('rule_ast').$type<SmartPlaylistRuleAST>().notNull(),
-    /** Version of the rule schema — for forward-compatible deserialization */
+    ruleAst: jsonText<SmartPlaylistRuleAST>('rule_ast').notNull(),
     ruleVersion: integer('rule_version').notNull().default(1),
-    /** Maximum entries the smart playlist should contain (null = unlimited) */
     maxEntries: integer('max_entries'),
-    /** Sort order for the generated results */
-    sortDefinition: json('sort_definition').$type<OrderDefinition[]>(),
-    /** Cached dependencies extracted from the AST */
-    dependencies: json('dependencies').$type<SmartPlaylistField[]>(),
-    /** When the playlist was last regenerated */
-    lastGeneratedAt: timestamp('last_generated_at', { withTimezone: false }),
-    /** Hash of the rule AST — used to detect if regeneration is needed */
-    ruleHash: varchar('rule_hash', { length: 64 }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    sortDefinition: jsonText<OrderDefinition[]>('sort_definition'),
+    dependencies: jsonText<SmartPlaylistField[]>('dependencies'),
+    lastGeneratedAt: ts('last_generated_at'),
+    ruleHash: text('rule_hash'),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_smart_playlist_rules_playlist_id').on(t.playlistId)]
 );
 
-export const playEvents = pgTable(
+export const playEvents = sqliteTable(
   'play_events',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    playbackPercentage: decimal('playback_percentage', {
-      precision: 5,
-      scale: 1
-    }).notNull(),
+    id: integer('id').primaryKey(),
+    playbackPercentage: real('playback_percentage').notNull(),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for song-based event lookups
     index('idx_play_events_song_id').on(t.songId),
-    // Index for time-based queries
-    index('idx_play_events_created_at').on(t.createdAt.desc()),
-    // Composite index for song + time queries (for play statistics)
-    index('idx_play_events_song_created').on(t.songId, t.createdAt.desc()),
-    // Index for playback percentage analysis
+    index('idx_play_events_created_at').on(t.createdAt),
+    index('idx_play_events_song_created').on(t.songId, t.createdAt),
     index('idx_play_events_percentage').on(t.playbackPercentage)
   ]
 );
 
-export const seekEvents = pgTable(
+export const seekEvents = sqliteTable(
   'seek_events',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    position: decimal('position', { precision: 8, scale: 3 }).notNull(),
+    id: integer('id').primaryKey(),
+    position: real('position').notNull(),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for song-based event lookups
     index('idx_seek_events_song_id').on(t.songId),
-    // Index for time-based queries
-    index('idx_seek_events_created_at').on(t.createdAt.desc()),
-    // Composite index for song + time queries
-    index('idx_seek_events_song_created').on(t.songId, t.createdAt.desc())
+    index('idx_seek_events_created_at').on(t.createdAt),
+    index('idx_seek_events_song_created').on(t.songId, t.createdAt)
   ]
 );
 
-export const skipEvents = pgTable(
+export const skipEvents = sqliteTable(
   'skip_events',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    position: decimal('position', { precision: 8, scale: 3 }).notNull(),
+    id: integer('id').primaryKey(),
+    position: real('position').notNull(),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for song-based event lookups
     index('idx_skip_events_song_id').on(t.songId),
-    // Index for time-based queries
-    index('idx_skip_events_created_at').on(t.createdAt.desc()),
-    // Composite index for song + time queries
-    index('idx_skip_events_song_created').on(t.songId, t.createdAt.desc())
+    index('idx_skip_events_created_at').on(t.createdAt),
+    index('idx_skip_events_song_created').on(t.songId, t.createdAt)
   ]
 );
 
-export const playHistory = pgTable(
+export const playHistory = sqliteTable(
   'play_history',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for song-based lookups
     index('idx_play_history_song_id').on(t.songId),
-    // Index for time-based queries
-    index('idx_play_history_created_at').on(t.createdAt.desc())
+    index('idx_play_history_created_at').on(t.createdAt)
   ]
 );
 
-export const metadataOverrides = pgTable(
+export const metadataOverrides = sqliteTable(
   'metadata_overrides',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    entityKind: varchar('entity_kind', { length: 64 }).notNull(),
-    entityId: varchar('entity_id', { length: 256 }).notNull(),
-    fieldId: varchar('field_id', { length: 64 }).notNull(),
+    id: integer('id').primaryKey(),
+    entityKind: text('entity_kind').notNull(),
+    entityId: text('entity_id').notNull(),
+    fieldId: text('field_id').notNull(),
     stringValue: text('string_value'),
-    numberValue: doublePrecision('number_value'),
-    booleanValue: boolean('boolean_value'),
+    numberValue: real('number_value'),
+    booleanValue: integer('boolean_value', { mode: 'boolean' }),
     jsonValue: text('json_value'),
-    createdAt: timestamp('created_at', { withTimezone: false }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).notNull().defaultNow()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
     uniqueIndex('idx_metadata_overrides_lookup').on(t.entityKind, t.entityId, t.fieldId),
@@ -522,24 +452,23 @@ export const metadataOverrides = pgTable(
 
 /**
  * Durable undo journal for AutoTag / metadata operations.
- * Snapshots are bounded (kept to the newest N by MetadataHistoryService);
- * payload holds { previousSongs, updatedSongs, songIds? } as JSON.
+ * `seq` is assigned by a baseline-DDL trigger (AFTER INSERT, MAX(seq)+1) — SQLite
+ * supports only one rowid-alias per table and the PK here is the varchar `id`.
+ * The PGlite->SQLite migration inserts explicit `seq` values, which the trigger skips.
  */
-export const metadataUndoSnapshots = pgTable(
+export const metadataUndoSnapshots = sqliteTable(
   'metadata_undo_snapshots',
   {
-    id: varchar('id', { length: 128 }).primaryKey(),
-    seq: integer('seq').generatedAlwaysAsIdentity(),
+    id: text('id').primaryKey(),
+    seq: integer('seq'),
     description: text('description').notNull().default(''),
     albumTitle: text('album_title'),
-    payload: jsonb('payload')
-      .$type<{
-        previousSongs: MetadataHistorySnapshot['previousSongs'];
-        updatedSongs: MetadataHistorySnapshot['updatedSongs'];
-        songIds?: number[];
-      }>()
-      .notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+    payload: jsonText<{
+      previousSongs: MetadataHistorySnapshot['previousSongs'];
+      updatedSongs: MetadataHistorySnapshot['updatedSongs'];
+      songIds?: number[];
+    }>('payload').notNull(),
+    createdAt: ts('created_at').notNull().$defaultFn(() => new Date())
   },
   (t) => [index('metadata_undo_snapshots_seq_idx').on(t.seq)]
 );
@@ -550,155 +479,139 @@ export const metadataUndoSnapshots = pgTable(
  * success. Part of the DB-first correctness model - a crash between the DB
  * commit and the file write is recovered from here instead of drifting.
  */
-export const metadataPendingWrites = pgTable(
+export const metadataPendingWrites = sqliteTable(
   'metadata_pending_writes',
   {
-    id: varchar('id', { length: 128 }).primaryKey(),
+    id: text('id').primaryKey(),
     songPath: text('song_path').notNull().unique(),
-    tags: jsonb('tags').$type<Record<string, unknown>>().notNull(),
-    isKnownSource: boolean('is_known_source').notNull().default(true),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+    tags: jsonText<Record<string, unknown>>('tags').notNull(),
+    isKnownSource: integer('is_known_source', { mode: 'boolean' }).notNull().default(true),
+    createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
+    updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
   },
   (t) => [index('metadata_pending_writes_song_path_idx').on(t.songPath)]
 );
 
-export const userSettings = pgTable(
+export const userSettings = sqliteTable(
   'user_settings',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-
-    // Language settings
-    language: varchar('language', { length: 10 }).notNull().default('en'),
-
-    // Theme settings (from AppThemeData)
-    isDarkMode: boolean('is_dark_mode').notNull().default(true),
-    useSystemTheme: boolean('use_system_theme').notNull().default(true),
-
-    // Preferences
-    autoLaunchApp: boolean('auto_launch_app').notNull().default(false),
-    openWindowMaximizedOnStart: boolean('open_window_maximized_on_start').notNull().default(false),
-    openWindowAsHiddenOnSystemStart: boolean('open_window_as_hidden_on_system_start')
+    id: integer('id').primaryKey(),
+    language: text('language').notNull().default('en'),
+    isDarkMode: integer('is_dark_mode', { mode: 'boolean' }).notNull().default(true),
+    useSystemTheme: integer('use_system_theme', { mode: 'boolean' }).notNull().default(true),
+    autoLaunchApp: integer('auto_launch_app', { mode: 'boolean' }).notNull().default(false),
+    openWindowMaximizedOnStart: integer('open_window_maximized_on_start', { mode: 'boolean' })
       .notNull()
       .default(false),
-    isMiniPlayerAlwaysOnTop: boolean('is_mini_player_always_on_top').notNull().default(false),
-    isMusixmatchLyricsEnabled: boolean('is_musixmatch_lyrics_enabled').notNull().default(true),
-    hideWindowOnClose: boolean('hide_window_on_close').notNull().default(false),
-    traySingleClickTogglesWindow: boolean('tray_single_click_toggles_window')
+    openWindowAsHiddenOnSystemStart: integer('open_window_as_hidden_on_system_start', {
+      mode: 'boolean'
+    })
       .notNull()
       .default(false),
-    sendSongScrobblingDataToLastFM: boolean('send_song_scrobbling_data_to_lastfm')
+    isMiniPlayerAlwaysOnTop: integer('is_mini_player_always_on_top', { mode: 'boolean' })
       .notNull()
       .default(false),
-    sendSongFavoritesDataToLastFM: boolean('send_song_favorites_data_to_lastfm')
-      .notNull()
-      .default(false),
-    sendNowPlayingSongDataToLastFM: boolean('send_now_playing_song_data_to_lastfm')
-      .notNull()
-      .default(false),
-    saveLyricsInLrcFilesForSupportedSongs: boolean('save_lyrics_in_lrc_files_for_supported_songs')
+    isMusixmatchLyricsEnabled: integer('is_musixmatch_lyrics_enabled', { mode: 'boolean' })
       .notNull()
       .default(true),
-    enableDiscordRPC: boolean('enable_discord_rpc').notNull().default(true),
-    saveVerboseLogs: boolean('save_verbose_logs').notNull().default(false),
-
-    // Window positions (stored as JSON objects)
+    hideWindowOnClose: integer('hide_window_on_close', { mode: 'boolean' }).notNull().default(false),
+    traySingleClickTogglesWindow: integer('tray_single_click_toggles_window', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    sendSongScrobblingDataToLastFM: integer('send_song_scrobbling_data_to_lastfm', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
+    sendSongFavoritesDataToLastFM: integer('send_song_favorites_data_to_lastfm', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
+    sendNowPlayingSongDataToLastFM: integer('send_now_playing_song_data_to_lastfm', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
+    saveLyricsInLrcFilesForSupportedSongs: integer('save_lyrics_in_lrc_files_for_supported_songs', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(true),
+    enableDiscordRPC: integer('enable_discord_rpc', { mode: 'boolean' }).notNull().default(true),
+    saveVerboseLogs: integer('save_verbose_logs', { mode: 'boolean' }).notNull().default(false),
     mainWindowX: integer('main_window_x'),
     mainWindowY: integer('main_window_y'),
     miniPlayerX: integer('mini_player_x'),
     miniPlayerY: integer('mini_player_y'),
-
-    // Window dimensions (stored as JSON objects)
     mainWindowWidth: integer('main_window_width'),
     mainWindowHeight: integer('main_window_height'),
     miniPlayerWidth: integer('mini_player_width'),
     miniPlayerHeight: integer('mini_player_height'),
-    zoomFactor: doublePrecision('zoom_factor').notNull().default(0.8),
-
-    // Window state
-    windowState: varchar('window_state', { length: 20 }).notNull().default('normal'),
-
-    // Recent searches (stored as JSON array)
-    recentSearches: json('recent_searches').$type<string[]>().notNull().default([]),
-
-    // Mini Player pinned controls
-    miniPlayerPinnedControls: json('mini_player_pinned_controls')
-      .$type<string[]>()
-      .notNull()
-      .default(['love', 'lyrics', 'volume']),
-
-    // Mini Player mode (standard 3-tier deck vs compact 1-tier progressive strip)
-    miniPlayerMode: varchar('mini_player_mode', { length: 20 })
+    zoomFactor: real('zoom_factor').notNull().default(0.8),
+    windowState: text('window_state').notNull().default('normal'),
+    recentSearches: jsonText<string[]>('recent_searches').notNull().default([]),
+    miniPlayerPinnedControls: jsonText<string[]>('mini_player_pinned_controls').notNull().default([
+      'love',
+      'lyrics',
+      'volume'
+    ]),
+    miniPlayerMode: text('mini_player_mode')
       .$type<'standard' | 'compact'>()
       .notNull()
       .default('standard'),
-
-    // Optional settings
     customLrcFilesSaveLocation: text('custom_lrc_files_save_location'),
-
-    // Online downloads (download-song feature)
     onlineDownloadsFolder: text('online_downloads_folder'),
-    downloadsDuplicatePolicy: varchar('downloads_duplicate_policy', { length: 20 })
+    downloadsDuplicatePolicy: text('downloads_duplicate_policy')
       .$type<'SKIP' | 'OVERWRITE' | 'KEEP_BOTH'>()
       .notNull()
       .default('SKIP'),
-    addDownloadsToLibrary: boolean('add_downloads_to_library').notNull().default(true),
-
-    // LastFM session data
-    lastFmSessionName: varchar('lastfm_session_name', { length: 255 }),
-    lastFmSessionKey: varchar('lastfm_session_key', { length: 255 }),
-
-    // Library scanning policy & audit
-    libraryScanMode: varchar('library_scan_mode', { length: 20 })
+    addDownloadsToLibrary: integer('add_downloads_to_library', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    lastFmSessionName: text('lastfm_session_name'),
+    lastFmSessionKey: text('lastfm_session_key'),
+    libraryScanMode: text('library_scan_mode')
       .$type<'automatic' | 'startup' | 'manual'>()
       .notNull()
       .default('automatic'),
-    lastScanTime: timestamp('last_scan_time', { withTimezone: false }),
-
-    // Metadata provider preferences (search sources, priorities, enrichment defaults)
-    metadataPreferences: json('metadata_preferences')
-      .$type<MetadataProviderPreferences>()
+    lastScanTime: ts('last_scan_time'),
+    metadataPreferences: jsonText<MetadataProviderPreferences>('metadata_preferences')
       .notNull()
       .default(DEFAULT_METADATA_PREFERENCES),
-
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
-    // Index for language-based queries
     index('idx_user_settings_language').on(t.language),
-    // Index for window state queries
     index('idx_user_settings_window_state').on(t.windowState)
   ]
 );
 
-// ============================================================================
-// User Preferences Tables (Migrated from localStorage)
-// ============================================================================
-export const userKeyboardShortcuts = pgTable('user_keyboard_shortcuts', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  shortcuts: json('shortcuts').$type<Record<string, string>>().notNull().default({}),
-  createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+export const userKeyboardShortcuts = sqliteTable('user_keyboard_shortcuts', {
+  id: integer('id').primaryKey(),
+  shortcuts: jsonText<Record<string, string>>('shortcuts').notNull().default({}),
+  createdAt: tsDefaultNow('created_at'),
+  updatedAt: tsDefaultNow('updated_at')
 });
 
-export const userEqualizerPreset = pgTable(
+export const userEqualizerPreset = sqliteTable(
   'user_equalizer_preset',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    presetName: varchar('preset_name', { length: 255 }).notNull().default('Default'),
-    frequencyBands: json('frequency_bands').$type<number[]>().notNull().default([]),
-    isEnabled: boolean('is_enabled').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    id: integer('id').primaryKey(),
+    presetName: text('preset_name').notNull().default('Default'),
+    frequencyBands: jsonText<number[]>('frequency_bands').notNull().default([]),
+    isEnabled: integer('is_enabled', { mode: 'boolean' }).notNull().default(false),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_user_equalizer_preset_created_at').on(t.createdAt.desc())]
+  (t) => [index('idx_user_equalizer_preset_created_at').on(t.createdAt)]
 );
 
-export const ignoredArtists = pgTable(
+export const ignoredArtists = sqliteTable(
   'ignored_artists',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     artistId: integer('artist_id')
       .notNull()
       .unique()
@@ -706,16 +619,16 @@ export const ignoredArtists = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_ignored_artists_artist_id').on(t.artistId)]
 );
 
-export const ignoredFeaturingArtists = pgTable(
+export const ignoredFeaturingArtists = sqliteTable(
   'ignored_featuring_artists',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     artistId: integer('artist_id')
       .notNull()
       .unique()
@@ -723,22 +636,22 @@ export const ignoredFeaturingArtists = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_ignored_featuring_artists_artist_id').on(t.artistId)]
 );
 
-export const ignoredDuplicateMetadata = pgTable(
+export const ignoredDuplicateMetadata = sqliteTable(
   'ignored_duplicate_metadata',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    duplicateGroupId: varchar('duplicate_group_id', { length: 255 }).notNull(),
+    id: integer('id').primaryKey(),
+    duplicateGroupId: text('duplicate_group_id').notNull(),
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
     index('idx_ignored_duplicate_metadata_group').on(t.duplicateGroupId),
@@ -749,7 +662,7 @@ export const ignoredDuplicateMetadata = pgTable(
 // ============================================================================
 // Many-to-Many Junction Tables
 // ============================================================================
-export const artworksSongs = pgTable(
+export const artworksSongs = sqliteTable(
   'artworks_songs',
   {
     songId: integer('song_id')
@@ -761,18 +674,17 @@ export const artworksSongs = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.songId, table.artworkId] }),
-    // Indexes for reverse lookups
     index('idx_artworks_songs_artwork_id').on(table.artworkId),
     index('idx_artworks_songs_song_id').on(table.songId)
   ]
 );
 
-export const artistsArtworks = pgTable(
+export const artistsArtworks = sqliteTable(
   'artists_artworks',
   {
     artistId: integer('artist_id')
@@ -787,18 +699,17 @@ export const artistsArtworks = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.artistId, table.artworkId] }),
-    // Indexes for reverse lookups
     index('idx_artists_artworks_artwork_id').on(table.artworkId),
     index('idx_artists_artworks_artist_id').on(table.artistId)
   ]
 );
 
-export const albumsArtworks = pgTable(
+export const albumsArtworks = sqliteTable(
   'albums_artworks',
   {
     albumId: integer('album_id')
@@ -813,18 +724,17 @@ export const albumsArtworks = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.artworkId] }),
-    // Indexes for reverse lookups
     index('idx_albums_artworks_artwork_id').on(table.artworkId),
     index('idx_albums_artworks_album_id').on(table.albumId)
   ]
 );
 
-export const artistsSongs = pgTable(
+export const artistsSongs = sqliteTable(
   'artists_songs',
   {
     songId: integer('song_id')
@@ -836,18 +746,17 @@ export const artistsSongs = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.songId, table.artistId] }),
-    // Indexes for reverse lookups - crucial for artist-based queries
     index('idx_artists_songs_artist_id').on(table.artistId),
     index('idx_artists_songs_song_id').on(table.songId)
   ]
 );
 
-export const albumsSongs = pgTable(
+export const albumsSongs = sqliteTable(
   'album_songs',
   {
     albumId: integer('album_id')
@@ -859,18 +768,17 @@ export const albumsSongs = pgTable(
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.songId] }),
-    // Indexes for reverse lookups - crucial for album-based queries
     index('idx_album_songs_album_id').on(table.albumId),
     index('idx_album_songs_song_id').on(table.songId)
   ]
 );
 
-export const genresSongs = pgTable(
+export const genresSongs = sqliteTable(
   'genres_songs',
   {
     genreId: integer('genre_id')
@@ -882,18 +790,17 @@ export const genresSongs = pgTable(
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.genreId, table.songId] }),
-    // Indexes for reverse lookups
     index('idx_genres_songs_genre_id').on(table.genreId),
     index('idx_genres_songs_song_id').on(table.songId)
   ]
 );
 
-export const artworksGenres = pgTable(
+export const artworksGenres = sqliteTable(
   'artworks_genres',
   {
     genreId: integer('genre_id')
@@ -908,18 +815,17 @@ export const artworksGenres = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.genreId, table.artworkId] }),
-    // Indexes for reverse lookups
     index('idx_artworks_genres_genre_id').on(table.genreId),
     index('idx_artworks_genres_artwork_id').on(table.artworkId)
   ]
 );
 
-export const playlistsSongs = pgTable(
+export const playlistsSongs = sqliteTable(
   'playlists_songs',
   {
     playlistId: integer('playlist_id')
@@ -931,18 +837,17 @@ export const playlistsSongs = pgTable(
     songId: integer('song_id')
       .notNull()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.playlistId, table.songId] }),
-    // Indexes for reverse lookups - crucial for playlist operations
     index('idx_playlists_songs_playlist_id').on(table.playlistId),
     index('idx_playlists_songs_song_id').on(table.songId)
   ]
 );
 
-export const artworksPlaylists = pgTable(
+export const artworksPlaylists = sqliteTable(
   'artworks_playlists',
   {
     playlistId: integer('playlist_id')
@@ -957,18 +862,17 @@ export const artworksPlaylists = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.playlistId, table.artworkId] }),
-    // Indexes for reverse lookups
     index('idx_artworks_playlists_playlist_id').on(table.playlistId),
     index('idx_artworks_playlists_artwork_id').on(table.artworkId)
   ]
 );
 
-export const albumsArtists = pgTable(
+export const albumsArtists = sqliteTable(
   'albums_artists',
   {
     albumId: integer('album_id')
@@ -983,22 +887,20 @@ export const albumsArtists = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade'
       }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.artistId] }),
-    // Indexes for reverse lookups
     index('idx_albums_artists_album_id').on(table.albumId),
     index('idx_albums_artists_artist_id').on(table.artistId)
   ]
 );
 
 // ============================================================================
-// Relations
+// Relations (dialect-agnostic; ported 1:1 from the PostgreSQL schema)
 // ============================================================================
 
-// User Preferences Relations
 export const userKeyboardShortcutsRelations = relations(userKeyboardShortcuts, () => ({}));
 
 export const userEqualizerPresetRelations = relations(userEqualizerPreset, () => ({}));
@@ -1017,14 +919,16 @@ export const ignoredFeaturingArtistsRelations = relations(ignoredFeaturingArtist
   })
 }));
 
-export const ignoredDuplicateMetadataRelations = relations(ignoredDuplicateMetadata, ({ one }) => ({
-  song: one(songs, {
-    fields: [ignoredDuplicateMetadata.songId],
-    references: [songs.id]
+export const ignoredDuplicateMetadataRelations = relations(
+  ignoredDuplicateMetadata,
+  ({ one }) => ({
+    song: one(songs, {
+      fields: [ignoredDuplicateMetadata.songId],
+      references: [songs.id]
+    })
   })
-}));
+);
 
-// Main Table Relations
 export const albumsRelations = relations(albums, ({ many }) => ({
   songs: many(albumsSongs),
   artists: many(albumsArtists),
@@ -1131,26 +1035,26 @@ export const playHistoryRelations = relations(playHistory, ({ one }) => ({
   })
 }));
 
-export const scrobbleQueue = pgTable(
+export const scrobbleQueue = sqliteTable(
   'scrobble_queue',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     songId: integer('song_id').references(() => songs.id, {
       onDelete: 'set null',
       onUpdate: 'cascade'
     }),
     startTimeSecs: integer('start_time_secs'),
-    operationType: varchar('operation_type', { length: 20 }).notNull(),
-    trackTitle: varchar('track_title', { length: 4096 }),
+    operationType: text('operation_type').notNull(),
+    trackTitle: text('track_title'),
     artistNames: text('artist_names'),
-    status: varchar('status', { length: 10 }).notNull().default('pending'),
+    status: text('status').notNull().default('pending'),
     retryCount: integer('retry_count').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [
     index('idx_scrobble_queue_status').on(t.status),
-    index('idx_scrobble_queue_created_at').on(t.createdAt.asc())
+    index('idx_scrobble_queue_created_at').on(t.createdAt)
   ]
 );
 
@@ -1295,17 +1199,11 @@ export const artworksPlaylistsRelations = relations(artworksPlaylists, ({ one })
 // ============================================================================
 // Phase 9 - Derived Assets Tables
 // ============================================================================
-export const lyricsProviderEnum = pgEnum('lyrics_provider', [
-  'MUSIXMATCH',
-  'LRCLIB',
-  'EMBEDDED',
-  'FILESYSTEM'
-]);
 
-export const waveforms = pgTable(
+export const waveforms = sqliteTable(
   'waveforms',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     songId: integer('song_id')
       .notNull()
       .unique()
@@ -1313,45 +1211,45 @@ export const waveforms = pgTable(
     path: text('path').notNull(),
     resolution: integer('resolution').notNull(),
     generatorVersion: integer('generator_version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_waveforms_song_id').on(t.songId)]
 );
 
-export const lyrics = pgTable(
+export const lyrics = sqliteTable(
   'lyrics',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     songId: integer('song_id')
       .notNull()
       .unique()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     text: text('text').notNull(),
-    isSynced: boolean('is_synced').notNull().default(false),
-    provider: lyricsProviderEnum('provider').notNull(),
+    isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false),
+    provider: text('provider').$type<LyricsProvider>().notNull(),
     generatorVersion: integer('generator_version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_lyrics_song_id').on(t.songId)]
 );
 
-export const replayGain = pgTable(
+export const replayGain = sqliteTable(
   'replay_gain',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     songId: integer('song_id')
       .notNull()
       .unique()
       .references(() => songs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    trackGain: doublePrecision('track_gain'),
-    trackPeak: doublePrecision('track_peak'),
-    albumGain: doublePrecision('album_gain'),
-    albumPeak: doublePrecision('album_peak'),
+    trackGain: real('track_gain'),
+    trackPeak: real('track_peak'),
+    albumGain: real('album_gain'),
+    albumPeak: real('album_peak'),
     generatorVersion: integer('generator_version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_replay_gain_song_id').on(t.songId)]
 );
@@ -1377,45 +1275,45 @@ export const replayGainRelations = relations(replayGain, ({ one }) => ({
   })
 }));
 
-export const operationJournal = pgTable(
+export const operationJournal = sqliteTable(
   'operation_journal',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     /** Which collection this operation targeted */
-    collectionType: varchar('collection_type', { length: 20 }).notNull(),
+    collectionType: text('collection_type').notNull(),
     collectionId: integer('collection_id').notNull(),
     /** What operation was performed */
-    operationType: varchar('operation_type', { length: 50 }).$type<OperationType>().notNull(),
+    operationType: text('operation_type').$type<OperationType>().notNull(),
     /** Direction: 'forward' for original, 'reverse' for undo */
-    direction: varchar('direction', { length: 10 }).notNull().default('forward'),
+    direction: text('direction').notNull().default('forward'),
     /** The forward operation input (what was requested) */
-    operationInput: json('operation_input').$type<Record<string, unknown>>().notNull(),
+    operationInput: jsonText<Record<string, unknown>>('operation_input').notNull(),
     /** The reverse operation data (what's needed to undo) */
-    inverseInput: json('inverse_input').$type<OperationInverseInput>().notNull(),
+    inverseInput: jsonText<OperationInverseInput>('inverse_input').notNull(),
     /** Position in the journal stack (for redo ordering) */
     sequenceNumber: integer('sequence_number').notNull(),
     /** Auto-expires old entries */
-    expiresAt: timestamp('expires_at', { withTimezone: false }),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull()
+    expiresAt: ts('expires_at'),
+    createdAt: tsDefaultNow('created_at')
   },
   (t) => [
     index('idx_journal_collection').on(t.collectionType, t.collectionId),
-    index('idx_journal_sequence').on(t.sequenceNumber.desc()),
-    index('idx_journal_expires').on(t.expiresAt.asc()),
+    index('idx_journal_sequence').on(t.sequenceNumber),
+    index('idx_journal_expires').on(t.expiresAt),
     unique('unique_journal_sequence').on(t.collectionType, t.collectionId, t.sequenceNumber)
   ]
 );
 
-export const collectionContexts = pgTable(
+export const collectionContexts = sqliteTable(
   'collection_contexts',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    id: integer('id').primaryKey(),
     /** Serialized CollectionId (e.g., "local://playlist/52") */
-    collectionUri: varchar('collection_uri', { length: 255 }).notNull().unique(),
+    collectionUri: text('collection_uri').notNull().unique(),
     /** Persisted UI state */
-    contextData: json('context_data').$type<CollectionContextData>().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull()
+    contextData: jsonText<CollectionContextData>('context_data').notNull(),
+    createdAt: tsDefaultNow('created_at'),
+    updatedAt: tsDefaultNow('updated_at')
   },
   (t) => [index('idx_collection_contexts_uri').on(t.collectionUri)]
 );
@@ -1423,49 +1321,50 @@ export const collectionContexts = pgTable(
 // ============================================================================
 // Spotify Integration Tables (Phase 1)
 // ============================================================================
-export const spotifyIntegrations = pgTable('spotify_integrations', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  spotifyUserId: varchar('spotify_user_id', { length: 255 }).notNull().unique(),
-  displayName: varchar('display_name', { length: 255 }),
-  email: varchar('email', { length: 255 }),
-  product: varchar('product', { length: 50 }),
+export const spotifyIntegrations = sqliteTable('spotify_integrations', {
+  id: integer('id').primaryKey(),
+  spotifyUserId: text('spotify_user_id').notNull().unique(),
+  displayName: text('display_name'),
+  email: text('email'),
+  product: text('product'),
   encryptedAccessToken: text('encrypted_access_token').notNull(),
   encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
-  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }).notNull(),
-  scopes: json('scopes').$type<string[]>().notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
- });
+  tokenExpiresAt: ts('token_expires_at').notNull(),
+  scopes: jsonText<string[]>('scopes').notNull().default([]),
+  createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
+  updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
+});
 
-export const spotifyPlaylistLinks = pgTable(
+export const spotifyPlaylistLinks = sqliteTable(
   'spotify_playlist_links',
   {
-    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    spotifyUserId: varchar('spotify_user_id', { length: 255 }).notNull(),
+    id: integer('id').primaryKey(),
+    spotifyUserId: text('spotify_user_id').notNull(),
     playlistId: integer('playlist_id')
       .notNull()
       .unique()
       .references(() => playlists.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    spotifyPlaylistId: varchar('spotify_playlist_id', { length: 255 }).notNull(),
-    spotifyPlaylistName: varchar('spotify_playlist_name', { length: 255 }),
+    spotifyPlaylistId: text('spotify_playlist_id').notNull(),
+    spotifyPlaylistName: text('spotify_playlist_name'),
     lastSyncedSnapshotId: text('last_synced_snapshot_id'),
     lastSyncedEntriesHash: text('last_synced_entries_hash'),
-    syncStrategy: varchar('sync_strategy', { length: 50 })
+    syncStrategy: text('sync_strategy')
       .$type<'UNION_MERGE' | 'LOCAL_WINS' | 'REMOTE_WINS'>()
       .notNull()
       .default('UNION_MERGE'),
-    syncState: varchar('sync_state', { length: 50 })
+    syncState: text('sync_state')
       .$type<'SYNCED' | 'SYNCING' | 'PARTIAL_FAILURE' | 'CONFLICT' | 'ERROR'>()
       .notNull()
       .default('SYNCED'),
-    failureStage: varchar('failure_stage', { length: 50 })
-      .$type<'REMOTE' | 'REMOTE_VERIFICATION' | 'LOCAL' | 'LOCAL_VERIFICATION' | 'FINALIZATION'>(),
+    failureStage: text('failure_stage').$type<
+      'REMOTE' | 'REMOTE_VERIFICATION' | 'LOCAL' | 'LOCAL_VERIFICATION' | 'FINALIZATION'
+    >(),
     completedRemoteBatches: integer('completed_remote_batches').default(0),
     failedBatchIndex: integer('failed_batch_index'),
     lastError: text('last_error'),
-    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+    lastSyncedAt: ts('last_synced_at'),
+    createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
+    updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
   },
   (t) => [
     index('idx_spotify_playlist_links_user_id').on(t.spotifyUserId),
@@ -1479,5 +1378,3 @@ export const spotifyPlaylistLinksRelations = relations(spotifyPlaylistLinks, ({ 
     references: [playlists.id]
   })
 }));
-
-

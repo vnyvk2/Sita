@@ -9,15 +9,8 @@ import { musicFolders, songs } from '@main/db/schema';
 
 // Mock DB with in-memory PGlite
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 vi.mock('@main/other/artworks', () => ({
@@ -29,9 +22,7 @@ vi.mock('@main/main', () => ({
   sendMessageToRenderer: vi.fn()
 }));
 
-import type { PGlite } from '@electric-sql/pglite';
 import { db } from '@main/db/db';
-const client = (db as unknown as { [k: string]: any }).$client as PGlite;
 import { diffFilesystemSnapshot, type DbSongSnapshot } from '@main/library/diffEngine';
 import { LibraryReconciler } from '@main/library/LibraryReconciler';
 
@@ -40,11 +31,6 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
   let reconciler: LibraryReconciler;
 
   beforeAll(async () => {
-    await client.query('CREATE EXTENSION IF NOT EXISTS citext;');
-    await client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-
-    const migrationsFolder = path.resolve(__dirname, '../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
 
     reconciler = new LibraryReconciler();
   });
@@ -75,9 +61,9 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
     const song3Path = path.join(tempDir, 'Track3.wav');
 
     await db.insert(songs).values([
-      { title: 'Track 1', duration: '180', path: song1Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
-      { title: 'Track 2', duration: '200', path: song2Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
-      { title: 'Track 3', duration: '220', path: song3Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() }
+      { title: 'Track 1', duration: 180, path: song1Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
+      { title: 'Track 2', duration: 200, path: song2Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
+      { title: 'Track 3', duration: 220, path: song3Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() }
     ]);
 
     const initialDbSongs = await db.select().from(songs);
@@ -130,7 +116,7 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
     const existingRockSong = path.join(rockDir, 'ClassicRock.mp3');
     await db.insert(songs).values({
       title: 'ClassicRock',
-      duration: '300',
+      duration: 300,
       path: existingRockSong,
       folderId: rootFolder.id,
       fileCreatedAt: new Date(),
@@ -194,7 +180,7 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
     const oldSongPath = path.join(tempDir, 'DeletedSong.mp3');
     await db.insert(songs).values({
       title: 'DeletedSong',
-      duration: '180',
+      duration: 180,
       path: oldSongPath,
       folderId: rootFolder.id,
       fileCreatedAt: new Date(),

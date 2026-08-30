@@ -39,7 +39,7 @@ export const getAllSongsInRecentlyAdded = async (
     const whereClause = cutoffDate ? gte(songs.createdAt, cutoffDate) : undefined;
 
     const countResult = await trx
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)` })
       .from(songs)
       .where(whereClause);
 

@@ -119,17 +119,17 @@ export const getListeningAnalytics = async (
     // 1. Play History & Play Events Aggregates
     const [historyAgg] = await trx
       .select({
-        totalPlays: sql<number>`count(*)::int`,
-        uniqueSongs: sql<number>`count(distinct ${playHistory.songId})::int`
+        totalPlays: sql<number>`count(*)`,
+        uniqueSongs: sql<number>`count(distinct ${playHistory.songId})`
       })
       .from(playHistory)
       .where(playHistoryWhere);
 
     const [eventsAgg] = await trx
       .select({
-        totalListenedSeconds: sql<number>`coalesce(sum(${songs.duration} * (${playEvents.playbackPercentage}::float)), 0)::int`,
-        fullListensCount: sql<number>`count(case when ${playEvents.playbackPercentage}::float >= 0.85 then 1 end)::int`,
-        totalRecordedEvents: sql<number>`count(*)::int`
+        totalListenedSeconds: sql<number>`coalesce(sum(${songs.duration} * (${playEvents.playbackPercentage})), 0)`,
+        fullListensCount: sql<number>`count(case when ${playEvents.playbackPercentage} >= 0.85 then 1 end)`,
+        totalRecordedEvents: sql<number>`count(*)`
       })
       .from(playEvents)
       .innerJoin(songs, eq(playEvents.songId, songs.id))
@@ -137,7 +137,7 @@ export const getListeningAnalytics = async (
 
     const [skipsAgg] = await trx
       .select({
-        totalSkips: sql<number>`count(*)::int`
+        totalSkips: sql<number>`count(*)`
       })
       .from(skipEvents)
       .where(skipEventsWhere);
@@ -155,7 +155,7 @@ export const getListeningAnalytics = async (
     // Count unique artists in history
     const [uniqueArtistsAgg] = await trx
       .select({
-        uniqueArtists: sql<number>`count(distinct ${artistsSongs.artistId})::int`
+        uniqueArtists: sql<number>`count(distinct ${artistsSongs.artistId})`
       })
       .from(playHistory)
       .innerJoin(artistsSongs, eq(playHistory.songId, artistsSongs.songId))
@@ -166,15 +166,16 @@ export const getListeningAnalytics = async (
     // 2. Daily Activity (Date Bucketing)
     const dailyRecords = await trx
       .select({
-        date: sql<string>`to_char(${playHistory.createdAt}, 'YYYY-MM-DD')`,
-        playCount: sql<number>`count(*)::int`,
-        seconds: sql<number>`coalesce(sum(${songs.duration}), 0)::int`
+        // created_at is epoch-ms: strftime over unixepoch seconds (pg: to_char(col,'YYYY-MM-DD'))
+        date: sql<string>`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch')`,
+        playCount: sql<number>`count(*)`,
+        seconds: sql<number>`coalesce(sum(${songs.duration}), 0)`
       })
       .from(playHistory)
       .innerJoin(songs, eq(playHistory.songId, songs.id))
       .where(playHistoryWhere)
-      .groupBy(sql`to_char(${playHistory.createdAt}, 'YYYY-MM-DD')`)
-      .orderBy(sql`to_char(${playHistory.createdAt}, 'YYYY-MM-DD') ASC`);
+      .groupBy(sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch')`)
+      .orderBy(sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch') ASC`);
 
     const dailyActivity: DailyActivityItem[] = dailyRecords.map((r) => ({
       date: r.date,
@@ -185,12 +186,12 @@ export const getListeningAnalytics = async (
     // 3. Hourly Circadian Distribution (0..23 hours)
     const hourlyRecords = await trx
       .select({
-        hour: sql<number>`extract(hour from ${playHistory.createdAt})::int`,
-        playCount: sql<number>`count(*)::int`
+        hour: sql<number>`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch') as integer)`,
+        playCount: sql<number>`count(*)`
       })
       .from(playHistory)
       .where(playHistoryWhere)
-      .groupBy(sql`extract(hour from ${playHistory.createdAt})`);
+      .groupBy(sql`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch') as integer)`);
 
     const hourMap = new Map<number, number>();
     hourlyRecords.forEach((r) => hourMap.set(r.hour, r.playCount));
@@ -211,8 +212,8 @@ export const getListeningAnalytics = async (
       .select({
         artistId: artists.id,
         name: artists.name,
-        playCount: sql<number>`count(*)::int`,
-        totalSeconds: sql<number>`coalesce(sum(${songs.duration}), 0)::int`
+        playCount: sql<number>`count(*)`,
+        totalSeconds: sql<number>`coalesce(sum(${songs.duration}), 0)`
       })
       .from(playHistory)
       .innerJoin(artistsSongs, eq(playHistory.songId, artistsSongs.songId))
@@ -266,7 +267,7 @@ export const getListeningAnalytics = async (
       .select({
         genreId: genres.id,
         name: genres.name,
-        playCount: sql<number>`count(*)::int`
+        playCount: sql<number>`count(*)`
       })
       .from(playHistory)
       .innerJoin(genresSongs, eq(playHistory.songId, genresSongs.songId))
@@ -289,9 +290,9 @@ export const getListeningAnalytics = async (
       .select({
         songId: songs.id,
         title: songs.title,
-        duration: sql<number>`${songs.duration}::float`,
-        playCount: sql<number>`count(*)::int`,
-        totalSeconds: sql<number>`coalesce(sum(${songs.duration}), 0)::int`
+        duration: sql<number>`${songs.duration}`,
+        playCount: sql<number>`count(*)`,
+        totalSeconds: sql<number>`coalesce(sum(${songs.duration}), 0)`
       })
       .from(playHistory)
       .innerJoin(songs, eq(playHistory.songId, songs.id))
@@ -421,7 +422,7 @@ export const getLibraryAudioStats = async (
       .select({
         id: songs.id,
         path: songs.path,
-        duration: sql<number>`${songs.duration}::float`,
+        duration: sql<number>`${songs.duration}`,
         sampleRate: songs.sampleRate,
         bitRate: songs.bitRate
       })

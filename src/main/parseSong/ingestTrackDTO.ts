@@ -44,7 +44,7 @@ export async function ingestTrackDTO(
 
   const songInfo: typeof songs.$inferInsert = {
     title: track.title,
-    duration: track.duration,
+    duration: Number(track.duration),
     year: track.year,
     path: track.songPath,
     sampleRate: track.sampleRate,

@@ -26,7 +26,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         .insert(songs)
         .values({
           title: 'Execution Test Song 1',
-          duration: '200.000',
+          duration: 200.000,
           path: '/test/music/exec_test_song_1.mp3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
@@ -38,7 +38,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         .insert(songs)
         .values({
           title: 'Execution Test Song 2',
-          duration: '300.000',
+          duration: 300.000,
           path: '/test/music/exec_test_song_2.mp3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()

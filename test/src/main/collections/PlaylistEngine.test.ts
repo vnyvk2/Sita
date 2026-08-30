@@ -1,21 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import path from 'path';
-import * as schema from '../../../../src/main/db/schema';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 import { eq, and } from 'drizzle-orm';
 
 // Mock DB
 vi.mock('../../../../src/main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-  
-  // Create an in-memory PGlite instance
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-  
-  return { db, client };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 import { db, client } from '../../../../src/main/db/db';
@@ -33,12 +22,7 @@ describe('PlaylistEngine', () => {
   let membershipService: MembershipService;
   
   beforeEach(async () => {
-    // Run migrations on the in-memory DB
-    await client.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
-    await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
-    
-    const migrationsFolder = path.resolve(__dirname, '../../../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
+    // Baseline SQLite schema is applied by the engine on first open (:memory:)
 
     // Insert some mock songs so we don't hit foreign key constraints
     const now = new Date();

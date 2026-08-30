@@ -77,7 +77,7 @@ describe('LyricsJob', () => {
       id: 10,
       path: '/music/song.mp3',
       title: 'Test Song',
-      duration: '180'
+      duration: 180
     } as any);
 
     vi.mocked(fs.readFile).mockResolvedValue('[00:05.00] Synced LRC line' as any);
@@ -107,7 +107,7 @@ describe('LyricsJob', () => {
       id: 10,
       path: '/music/song.mp3',
       title: 'Online Song',
-      duration: '180',
+      duration: 180,
       artists: [{ artist: { name: 'Online Artist' } }],
       albums: [{ album: { title: 'Online Album' } }]
     } as any);

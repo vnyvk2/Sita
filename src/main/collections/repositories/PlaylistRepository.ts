@@ -1,4 +1,5 @@
 import { db } from '@db/db';
+import { rawRun } from '@db/sqlite/raw';
 import { playlists, playlistEntries, songs, artists, artistsSongs } from '@db/schema';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 
@@ -123,7 +124,7 @@ export class PlaylistRepository {
   public async countEntries(playlistId: number, trx: DB | DBTransaction = db): Promise<number> {
     if (trx !== db) {
       const [result] = await trx
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: sql<number>`count(*)` })
         .from(playlistEntries)
         .where(eq(playlistEntries.playlistId, playlistId));
       return result?.count ?? 0;
@@ -134,7 +135,7 @@ export class PlaylistRepository {
   }
 
   public async countAll(trx: DB | DBTransaction = db): Promise<number> {
-    const [result] = await trx.select({ count: sql<number>`count(*)::int` }).from(playlists);
+    const [result] = await trx.select({ count: sql<number>`count(*)` }).from(playlists);
 
     return result?.count ?? 0;
   }
@@ -207,7 +208,8 @@ export class PlaylistRepository {
   }
 
   public async restorePlaylistWithId(data: PlaylistRow, trx: DB | DBTransaction = db) {
-    const [inserted] = await trx.insert(playlists).overridingSystemValue().values(data).returning();
+    const [inserted] = // SQLite (rowid tables) accepts explicit id values; pg needed overridingSystemValue for identity
+    await trx.insert(playlists).values(data).returning();
 
     return inserted;
   }
@@ -245,7 +247,8 @@ export class PlaylistRepository {
   ): Promise<PlaylistEntryRow[]> {
     if (entries.length === 0) return [];
 
-    return await trx.insert(playlistEntries).overridingSystemValue().values(entries).returning();
+    // SQLite accepts explicit ids (see restorePlaylistWithId)
+    return await trx.insert(playlistEntries).values(entries).returning();
   }
 
   public async deleteEntries(entryIds: number[], trx: DB | DBTransaction = db) {
@@ -295,21 +298,27 @@ export class PlaylistRepository {
   public async updatePositionsBulk(
     playlistId: number,
     updates: { entryId: number; position: number }[],
-    trx: DB | DBTransaction = db
+    // trx kept for API compatibility: rawRun targets the same connection, so the
+    // statement joins the caller's transaction (single-connection SQLite semantics).
+    _trx: DB | DBTransaction = db
   ): Promise<void> {
     if (updates.length === 0) return;
 
     const CHUNK_SIZE = 500;
     for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
-      await trx.execute(sql`
-        UPDATE playlist_entries AS pe
-        SET position = v.position
-        FROM (VALUES ${sql.join(
-          chunk.map((u) => sql`(${u.entryId}::int, ${u.position}::int)`),
+      // rawRun targets the same connection, so this joins the caller's transaction.
+      // pg used UPDATE ... FROM (VALUES ...) AS v(...); SQLite's equivalent is a
+      // CTE with a correlated subquery UPDATE.
+      await rawRun(sql`
+        WITH v(entry_id, position) AS (VALUES ${sql.join(
+          chunk.map((u) => sql`(${u.entryId}, ${u.position})`),
           sql`, `
-        )}) AS v(entry_id, position)
-        WHERE pe.id = v.entry_id AND pe.playlist_id = ${playlistId}
+        )})
+        UPDATE playlist_entries
+        SET position = (SELECT position FROM v WHERE v.entry_id = playlist_entries.id)
+        WHERE playlist_id = ${playlistId}
+          AND id IN (SELECT entry_id FROM v)
       `);
     }
   }
@@ -385,7 +394,7 @@ export class PlaylistRepository {
       .update(playlists)
       .set({
         itemCount: sql`${playlists.itemCount} + ${deltas.itemCountDelta}`,
-        totalDuration: sql`(${playlists.totalDuration} + ${deltas.durationDelta})::decimal(12,3)`,
+        totalDuration: sql`(${playlists.totalDuration} + ${deltas.durationDelta})`,
         updatedAt: new Date()
       })
       .where(eq(playlists.id, playlistId));
@@ -399,7 +408,7 @@ export class PlaylistRepository {
 
     const uniqueSongIds = Array.from(new Set(songIds));
     const CHUNK_SIZE = 500;
-    const songRows: { id: number; duration: string | null }[] = [];
+    const songRows: { id: number; duration: number | null }[] = [];
 
     for (let i = 0; i < uniqueSongIds.length; i += CHUNK_SIZE) {
       const chunk = uniqueSongIds.slice(i, i + CHUNK_SIZE);

@@ -6,15 +6,8 @@ import * as schema from '@main/db/schema';
 import { musicFolders, songs } from '@main/db/schema';
 
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 vi.mock('@main/other/artworks', () => ({
@@ -34,7 +27,7 @@ vi.mock('@main/parseSong/parseSong', () => ({
   tryToParseSong: vi.fn(async (songPath: string, folderId?: number) => {
     const [inserted] = await db.insert(songs).values({
       title: path.basename(songPath),
-      duration: '180',
+      duration: 180,
       path: songPath,
       folderId,
       fileCreatedAt: new Date(),
@@ -55,9 +48,7 @@ vi.mock('@main/parseSong/parseSong', () => ({
   })
 }));
 
-import type { PGlite } from '@electric-sql/pglite';
 import { db } from '@main/db/db';
-const client = (db as unknown as { [k: string]: any }).$client as PGlite;
 import { processSongsWithWorkerPool, type SongPoolInput } from '@main/core/songWorkerPool';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 
@@ -65,11 +56,6 @@ describe('Item 3/5 FORENSIC: Worker Backpressure Timeout & Durable Cursor Fallba
   let rootFolderId: number;
 
   beforeAll(async () => {
-    await client.query('CREATE EXTENSION IF NOT EXISTS citext;');
-    await client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-
-    const migrationsFolder = path.resolve(__dirname, '../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
   });
 
   beforeEach(async () => {
@@ -101,7 +87,7 @@ describe('Item 3/5 FORENSIC: Worker Backpressure Timeout & Durable Cursor Fallba
       const batch1Tracks = songsToParse.slice(0, 50).map((s, idx) => ({
         songPath: s.songPath,
         title: `Song ${idx}`,
-        duration: '180',
+        duration: 180,
         artists: ['Artist 1'],
         albumArtists: ['Artist 1'],
         album: 'Album 1',

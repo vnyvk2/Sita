@@ -8,7 +8,7 @@ export interface SongPersistenceDTO {
   trackNumber?: number | null;
   discNumber?: number | null;
   diskNumber?: number | null;
-  duration?: string | null;
+  duration?: number | null;
   bitrate?: number | null;
   sampleRate?: number | null;
   fileModifiedAt?: Date | null;

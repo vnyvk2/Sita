@@ -100,7 +100,7 @@ export async function markFailed(id: number, trx: DB | DBTransaction = db): Prom
     .set({
       status: sql`CASE WHEN retry_count + 1 >= ${MAX_RETRY_COUNT} THEN 'failed' ELSE 'pending' END`,
       retryCount: sql`retry_count + 1`,
-      updatedAt: sql`NOW()`
+      updatedAt: new Date()
     })
     .where(and(eq(scrobbleQueue.id, id), eq(scrobbleQueue.status, 'sending')));
 }
@@ -110,7 +110,7 @@ export async function markPermanentlyFailed(id: number, trx: DB | DBTransaction 
     .update(scrobbleQueue)
     .set({
       status: 'failed',
-      updatedAt: sql`NOW()`
+      updatedAt: new Date()
     })
     .where(and(eq(scrobbleQueue.id, id), eq(scrobbleQueue.status, 'sending')));
 }
@@ -123,19 +123,20 @@ export async function resetSendingToPending(ids: number[], trx: DB | DBTransacti
   if (ids.length === 0) return;
   await trx
     .update(scrobbleQueue)
-    .set({ status: 'pending', updatedAt: sql`NOW()` })
+    .set({ status: 'pending', updatedAt: new Date() })
     .where(and(inArray(scrobbleQueue.id, ids), eq(scrobbleQueue.status, 'sending')));
 }
 
 export async function resetStuckSending(trx: DB | DBTransaction = db): Promise<void> {
   await trx
     .update(scrobbleQueue)
-    .set({ status: 'pending', updatedAt: sql`NOW()` })
+    .set({ status: 'pending', updatedAt: new Date() })
     .where(eq(scrobbleQueue.status, 'sending'));
 }
 
 export async function deleteOldPending(trx: DB | DBTransaction = db): Promise<void> {
-  const cutoff = sql`NOW() - (${TTL_DAYS} * INTERVAL '1 day')`;
+  // timestamps are epoch-ms ints (pg compared NOW() - TTL * INTERVAL '1 day')
+  const cutoff = new Date(Date.now() - TTL_DAYS * 24 * 60 * 60 * 1000);
   await trx
     .delete(scrobbleQueue)
     .where(

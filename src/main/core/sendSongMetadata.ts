@@ -168,7 +168,7 @@ const sendSongMetadata = async (
         releasedYear,
         composer: songMetadata?.composers ? songMetadata.composers.join(', ') : undefined,
         artworkPath: parseSongArtworks(artworks).artworkPath,
-        duration: parseFloat(song.duration),
+        duration: Number(song.duration ?? 0),
         trackNumber,
         isLyricsSavePending: isLyricsSavePending(song.path),
         isMetadataSavePending: isMetadataUpdatesPending(song.path),

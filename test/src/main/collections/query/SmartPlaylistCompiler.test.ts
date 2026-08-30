@@ -22,7 +22,9 @@ describe('SmartPlaylistCompiler', () => {
 
     // The SQL generation should be fully deterministic
     expect(query1).toEqual(query2);
-    expect(query1).toContain('ILIKE');
+    // SQLite dialect: case-insensitive contains is lower(col) LIKE (pg emitted ILIKE)
+    expect(query1).toContain('LIKE');
+    expect(query1).toContain('lower(');
   });
 
   it('should compile complex nested conditions', () => {

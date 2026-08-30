@@ -507,7 +507,7 @@ describe('parseSong', () => {
       const { saveSong } = await import('../../../../src/main/db/queries/songs');
       expect(saveSong).toHaveBeenCalledWith(
         expect.objectContaining({
-          duration: '245.68' // Rounded to 2 decimal places
+          duration: 245.68 // Rounded to 2 decimal places
         }),
         expect.anything()
       );

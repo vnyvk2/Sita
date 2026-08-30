@@ -37,7 +37,8 @@ export default defineConfig({
       '@main': path.resolve(__dirname, './src/main'),
       '@db': path.resolve(__dirname, './src/main/db'),
       '@preload': path.resolve(__dirname, './src/preload'),
-      '@types': path.resolve(__dirname, './src/types')
+      '@types': path.resolve(__dirname, './src/types'),
+      '@test-helpers': path.resolve(__dirname, './test/helpers')
     }
   }
 });

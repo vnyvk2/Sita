@@ -48,7 +48,7 @@ vi.mock('@main/db/queries/songs', () => ({
   getSongById: vi.fn().mockResolvedValue({
     id: 1,
     title: 'Test Song',
-    duration: '200',
+    duration: 200,
     trackNumber: 1,
     isFavorite: false,
     isBlacklisted: false,
@@ -84,7 +84,7 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.mocked(songQueries.getSongById).mockResolvedValue({
       id: 1,
       title: 'Test Song',
-      duration: '200',
+      duration: 200,
       trackNumber: 1,
       isFavorite: false,
       isBlacklisted: false,

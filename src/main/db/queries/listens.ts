@@ -40,26 +40,26 @@ export const getAllSongListeningData = async (songIds?: number[], trx: DB | DBTr
 
 export const addSongPlayEvent = (
   songId: number,
-  playbackPercentage: string,
+  playbackPercentage: string | number,
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(playEvents).values({ playbackPercentage, songId });
+  return trx.insert(playEvents).values({ playbackPercentage: Number(playbackPercentage), songId });
 };
 
 export const addSongSeekEvent = (
   songId: number,
-  position: string,
+  position: string | number,
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(seekEvents).values({ position, songId });
+  return trx.insert(seekEvents).values({ position: Number(position), songId });
 };
 
 export const addSongSkipEvent = (
   songId: number,
-  position: string,
+  position: string | number,
   trx: DB | DBTransaction = db
 ) => {
-  return trx.insert(skipEvents).values({ position, songId });
+  return trx.insert(skipEvents).values({ position: Number(position), songId });
 };
 
 export const deleteSongPlayEvents = (songId: number, trx: DB | DBTransaction = db) => {

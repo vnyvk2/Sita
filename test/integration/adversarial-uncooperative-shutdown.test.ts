@@ -51,34 +51,8 @@ vi.mock('@main/updateSong/updateSongId3Tags', () => ({
 
 // Real PGlite
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  let client: any = await PGlite.create({ extensions: { pg_trgm, citext } });
-  let dbInstance: any = drizzle(client, { schema });
-
-  return {
-    get db() {
-      return dbInstance;
-    },
-    get client() {
-      return client;
-    },
-    closeDatabaseInstance: async () => {
-      if (client) {
-        await client.close();
-        client = null;
-        dbInstance = null;
-      }
-    },
-    reopenDatabaseInstanceForTesting: async () => {
-      client = await PGlite.create({ extensions: { pg_trgm, citext } });
-      dbInstance = drizzle(client, { schema });
-      return { db: dbInstance, client };
-    }
-  };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 import { db, closeDatabaseInstance } from '@main/db/db';
@@ -93,10 +67,6 @@ describe('Adversarial Investigation: Uncooperative Rogue Job vs 5-Second Shutdow
 
     // 1. Setup real PGlite schema
     const { client } = await import('@main/db/db');
-    await client.query('CREATE EXTENSION IF NOT EXISTS citext;');
-    await client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-    const migrationsFolder = path.resolve(__dirname, '../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
 
     const scheduler = new JobScheduler();
     scheduler.start();
@@ -121,7 +91,7 @@ describe('Adversarial Investigation: Uncooperative Rogue Job vs 5-Second Shutdow
         try {
           await db.insert(songs).values({
             title: 'Rogue Track',
-            duration: '180',
+            duration: 180,
             path: '/rogue/track.mp3',
             fileCreatedAt: new Date(),
             fileModifiedAt: new Date()
@@ -161,7 +131,8 @@ describe('Adversarial Investigation: Uncooperative Rogue Job vs 5-Second Shutdow
     expect(rogueWriteAttempted).toBe(true);
     // Empirical Result: DB was closed by shutdown, so rogue write after DB closure is rejected safely
     expect(rogueWriteError).not.toBeNull();
-    expect(rogueWriteError.message).toMatch(/closed|cannot read|null/i);
+    // SQLite closed-connection error is "database is not open" (PGlite: "client has been closed")
+    expect(rogueWriteError.message).toMatch(/closed|not open|cannot read|null/i);
 
     vi.useRealTimers();
   }, 15000);

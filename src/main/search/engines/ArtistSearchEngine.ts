@@ -10,6 +10,10 @@ import type {
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
 import type { SearchMatchReference } from '../models/SearchMatchReference';
+import { fuzzySearch } from '../fuzzy/ftsFuzzySearch';
+
+/** query normalization with all whitespace removed — matches the *_norm columns */
+const normWithoutSpaces = (normalized: string) => normalized.replace(/\s+/g, '');
 
 export const ArtistSearchEngine = {
   async search(
@@ -22,19 +26,23 @@ export const ArtistSearchEngine = {
 
     const timer = timeStart();
 
-    const whereClause = fuzzy
-      ? sql`(${artists.nameCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${artists.nameCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'} OR ${artists.nameCI} % ${normalized})`
-      : sql`(${artists.nameCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${artists.nameCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`;
+    // SQLite translation of the pg_trgm pipeline: raw LIKE + *_norm LIKE; the pg `%`
+    // fuzzy branch is the FTS trigram-OR pool + JS pg-similarity (ftsFuzzySearch).
+    const norm = normWithoutSpaces(normalized);
+    const whereClause = sql`(
+      ${artists.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'
+      OR ${artists.nameNorm} LIKE ${'%' + norm + '%'} ESCAPE '\\'
+    )`;
 
     const orderByClause = sql`(
       CASE
-        WHEN ${artists.nameCI} ILIKE ${escaped}                THEN 6
-        WHEN ${artists.nameCI} ILIKE ${escaped + '%'}          THEN 5
-        WHEN ${artists.nameCI} ILIKE ${'% ' + escaped + '%'}  THEN 4
-        WHEN ${artists.nameCI} ILIKE ${'%' + escaped + '%'}   THEN 3
+        WHEN ${artists.name} LIKE ${escaped}                THEN 6
+        WHEN ${artists.name} LIKE ${escaped + '%'}          THEN 5
+        WHEN ${artists.name} LIKE ${'% ' + escaped + '%'}   THEN 4
+        WHEN ${artists.name} LIKE ${'%' + escaped + '%'}    THEN 3
         ELSE 1
       END
-    ) DESC, similarity(${artists.nameCI}, ${normalized}) DESC`;
+    ) DESC, ${artists.name} ASC`;
 
     const results = await trx.query.artists.findMany({
       columns: { id: true, name: true },
@@ -43,12 +51,38 @@ export const ArtistSearchEngine = {
       limit
     });
 
-    timeEnd(timer, 'Search Artists');
-
-    return results.map((raw) => ({
+    const references: SearchMatchReference[] = results.map((raw) => ({
       kind: 'artist' as const,
       id: raw.id,
       tier: computeTier(raw.name, normalized)
     }));
+
+    if (fuzzy && results.length < limit) {
+      try {
+        const fuzzyMatches = await fuzzySearch({
+          baseTable: 'artists',
+          textColumn: 'name',
+          query: normalized,
+          limit: limit - references.length,
+          excludeIds: new Set(results.map((r) => r.id)),
+          trx
+        });
+        for (const m of fuzzyMatches) {
+          references.push({
+            kind: 'artist',
+            id: m.id,
+            tier: computeTier(m.text, normalized)
+          });
+        }
+      } catch (err) {
+        import('@main/logger').then(({ default: logger }) => {
+          logger.warn('Fuzzy artist search failed', { err });
+        });
+      }
+    }
+
+    timeEnd(timer, 'Search Artists');
+
+    return references;
   }
 };

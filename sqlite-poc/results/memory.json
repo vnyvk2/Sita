@@ -1,0 +1,613 @@
+{
+  "name": "memory",
+  "recordedAt": "2026-08-29T11:44:33.286Z",
+  "host": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "size": 50000,
+  "runs": 3,
+  "method": "forked child; commit via Get-Process PrivateMemorySize64",
+  "env": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "results": {
+    "baseline": {
+      "runs": [
+        {
+          "checkpoints": [
+            {
+              "label": "after-noop-open",
+              "commitMb": 21.3,
+              "rssMb": 38.4,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "baseline-process",
+              "commitMb": 21.3,
+              "rssMb": 38.3,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": null,
+              "rssMb": 38.5,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 38.5,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": []
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 21.2,
+              "rssMb": 38.4,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-noop-open",
+              "commitMb": 21.2,
+              "rssMb": 38.5,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": null,
+              "rssMb": 38.6,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 38.6,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": []
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 21.2,
+              "rssMb": 38.7,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-noop-open",
+              "commitMb": 21.2,
+              "rssMb": 38.9,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": null,
+              "rssMb": 38.9,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 39,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": []
+        }
+      ],
+      "medians": {
+        "after-noop-open": {
+          "commitMbMedian": 21.2,
+          "commitMbMin": 21.2,
+          "commitMbMax": 21.3
+        },
+        "baseline-process": {
+          "commitMbMedian": 21.2,
+          "commitMbMin": 21.2,
+          "commitMbMax": 21.3
+        },
+        "idle-after-init": {
+          "commitMbMedian": null,
+          "commitMbMin": null,
+          "commitMbMax": null
+        },
+        "after-close": {
+          "commitMbMedian": null,
+          "commitMbMin": null,
+          "commitMbMax": null
+        }
+      }
+    },
+    "sqlite": {
+      "runs": [
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 119.8,
+              "rssMb": 38.5,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 163.1,
+              "rssMb": 147.9,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.4,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 184.3,
+              "rssMb": 148,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 182.5,
+              "rssMb": 174.8,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 182.5,
+              "rssMb": 175.4,
+              "heapUsedMb": 41.2,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-10k-ingestion-1196ms",
+              "commitMb": null,
+              "rssMb": 185.7,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 167.4,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": [
+            28.3184000000183
+          ]
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 117,
+              "rssMb": 43.8,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 162.8,
+              "rssMb": 148,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.4,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 181.1,
+              "rssMb": 148.1,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 183.6,
+              "rssMb": 174.9,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 183.6,
+              "rssMb": 175.6,
+              "heapUsedMb": 41.2,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-10k-ingestion-1076ms",
+              "commitMb": null,
+              "rssMb": 184.8,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 167.1,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": [
+            15.993699999991804
+          ]
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 126.2,
+              "rssMb": 43.6,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 162.8,
+              "rssMb": 148.1,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.4,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 181,
+              "rssMb": 148.1,
+              "heapUsedMb": 6.3,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 182.8,
+              "rssMb": 175.1,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 182.8,
+              "rssMb": 175.5,
+              "heapUsedMb": 41.2,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-10k-ingestion-1053ms",
+              "commitMb": 12.6,
+              "rssMb": 185.2,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 167.5,
+              "heapUsedMb": 40.9,
+              "externalMb": 2.2,
+              "arrayBuffersMb": 0.1
+            }
+          ],
+          "closeTimes": [
+            11.582099999999627
+          ]
+        }
+      ],
+      "medians": {
+        "baseline-process": {
+          "commitMbMedian": 119.8,
+          "commitMbMin": 117,
+          "commitMbMax": 126.2
+        },
+        "after-engine-open": {
+          "commitMbMedian": 162.8,
+          "commitMbMin": 162.8,
+          "commitMbMax": 163.1
+        },
+        "idle-after-init": {
+          "commitMbMedian": 181.1,
+          "commitMbMin": 181,
+          "commitMbMax": 184.3
+        },
+        "after-full-songs-scan": {
+          "commitMbMedian": 182.8,
+          "commitMbMin": 182.5,
+          "commitMbMax": 183.6
+        },
+        "after-representative-queries": {
+          "commitMbMedian": 182.8,
+          "commitMbMin": 182.5,
+          "commitMbMax": 183.6
+        },
+        "after-10k-ingestion-1196ms": {
+          "commitMbMedian": null,
+          "commitMbMin": null,
+          "commitMbMax": null
+        },
+        "after-close": {
+          "commitMbMedian": null,
+          "commitMbMin": null,
+          "commitMbMax": null
+        }
+      },
+      "deltaVsBaseline": {
+        "afterEngineOpenMb": 141.6,
+        "idleAfterInitMb": 159.9
+      }
+    },
+    "pglite": {
+      "runs": [
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 277.3,
+              "rssMb": 43.7,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 283.2,
+              "rssMb": 523.9,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 285.9,
+              "rssMb": 238.8,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 367.5,
+              "rssMb": 306.8,
+              "heapUsedMb": 27.4,
+              "externalMb": 193.9,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 374.4,
+              "rssMb": 307,
+              "heapUsedMb": 27.6,
+              "externalMb": 194,
+              "arrayBuffersMb": 7.4
+            },
+            {
+              "label": "after-10k-ingestion-4144ms",
+              "commitMb": 372.4,
+              "rssMb": 330.9,
+              "heapUsedMb": 27.8,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 330.4,
+              "heapUsedMb": 27.8,
+              "externalMb": 194.8,
+              "arrayBuffersMb": 7.3
+            }
+          ],
+          "closeTimes": [
+            137.6195000000007
+          ]
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 277.7,
+              "rssMb": 45.7,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 286.3,
+              "rssMb": 635.3,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 298.1,
+              "rssMb": 236.7,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 369.5,
+              "rssMb": 307.1,
+              "heapUsedMb": 26.6,
+              "externalMb": 193.9,
+              "arrayBuffersMb": 7.4
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 372.1,
+              "rssMb": 307.5,
+              "heapUsedMb": 26.8,
+              "externalMb": 193.9,
+              "arrayBuffersMb": 7.4
+            },
+            {
+              "label": "after-10k-ingestion-4129ms",
+              "commitMb": 375.9,
+              "rssMb": 332.4,
+              "heapUsedMb": 27,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-close",
+              "commitMb": null,
+              "rssMb": 332.5,
+              "heapUsedMb": 27,
+              "externalMb": 194.8,
+              "arrayBuffersMb": 7.3
+            }
+          ],
+          "closeTimes": [
+            153.72520000001532
+          ]
+        },
+        {
+          "checkpoints": [
+            {
+              "label": "baseline-process",
+              "commitMb": 255.1,
+              "rssMb": 45.7,
+              "heapUsedMb": 4.4,
+              "externalMb": 2,
+              "arrayBuffersMb": 0.1
+            },
+            {
+              "label": "after-engine-open",
+              "commitMb": 282.1,
+              "rssMb": 671.7,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "idle-after-init",
+              "commitMb": 286.8,
+              "rssMb": 238.3,
+              "heapUsedMb": 13.6,
+              "externalMb": 193.8,
+              "arrayBuffersMb": 7.3
+            },
+            {
+              "label": "after-full-songs-scan",
+              "commitMb": 374.4,
+              "rssMb": 307.6,
+              "heapUsedMb": 27.4,
+              "externalMb": 194,
+              "arrayBuffersMb": 7.4
+            },
+            {
+              "label": "after-representative-queries",
+              "commitMb": 375,
+              "rssMb": 307.6,
+              "heapUsedMb": 27.6,
+              "externalMb": 194,
+              "arrayBuffersMb": 7.4
+            }
+          ],
+          "closeTimes": [
+            117.27709999997751
+          ]
+        }
+      ],
+      "medians": {
+        "baseline-process": {
+          "commitMbMedian": 277.3,
+          "commitMbMin": 255.1,
+          "commitMbMax": 277.7
+        },
+        "after-engine-open": {
+          "commitMbMedian": 283.2,
+          "commitMbMin": 282.1,
+          "commitMbMax": 286.3
+        },
+        "idle-after-init": {
+          "commitMbMedian": 286.8,
+          "commitMbMin": 285.9,
+          "commitMbMax": 298.1
+        },
+        "after-full-songs-scan": {
+          "commitMbMedian": 369.5,
+          "commitMbMin": 367.5,
+          "commitMbMax": 374.4
+        },
+        "after-representative-queries": {
+          "commitMbMedian": 374.4,
+          "commitMbMin": 372.1,
+          "commitMbMax": 375
+        },
+        "after-10k-ingestion-4144ms": {
+          "commitMbMedian": 372.4,
+          "commitMbMin": 372.4,
+          "commitMbMax": 372.4
+        },
+        "after-close": {
+          "commitMbMedian": null,
+          "commitMbMin": null,
+          "commitMbMax": null
+        }
+      },
+      "deltaVsBaseline": {
+        "afterEngineOpenMb": 262,
+        "idleAfterInitMb": 265.6
+      }
+    }
+  },
+  "suites": {}
+}

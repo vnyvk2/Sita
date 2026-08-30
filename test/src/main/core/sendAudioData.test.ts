@@ -62,7 +62,7 @@ describe('sendAudioData (Phase P1 Regression)', () => {
     mockedGetPlayableSongById.mockResolvedValue({
       id: 42,
       title: 'High Resolution Master',
-      duration: '215',
+      duration: 215,
       path: 'C:/Music/Track.flac',
       isFavorite: true,
       isBlacklisted: false,

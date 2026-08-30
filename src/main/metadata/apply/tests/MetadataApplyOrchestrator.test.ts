@@ -32,7 +32,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     // Seed one song row pointing at the fixture
     await db.insert(songs).values({
       title: 'Seed Title',
-      duration: '180.000',
+      duration: 180.000,
       path: tempSongPath,
       fileCreatedAt: new Date(),
       fileModifiedAt: new Date(),
@@ -302,7 +302,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     try {
       const [song1] = await db.insert(songs).values({
         title: 'Song 1 Old',
-        duration: '180.000',
+        duration: 180.000,
         path: tempSong1,
         fileCreatedAt: new Date(),
         fileModifiedAt: new Date()
@@ -310,7 +310,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
       const [song2] = await db.insert(songs).values({
         title: 'Song 2 Old',
-        duration: '200.000',
+        duration: 200.000,
         path: tempSong2,
         fileCreatedAt: new Date(),
         fileModifiedAt: new Date()
@@ -413,7 +413,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     try {
       const [song1] = await db.insert(songs).values({
         title: 'Title 1',
-        duration: '180.000',
+        duration: 180.000,
         path: tempSong1,
         fileCreatedAt: new Date(),
         fileModifiedAt: new Date()
@@ -421,7 +421,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
       const [song2] = await db.insert(songs).values({
         title: 'Title 2',
-        duration: '200.000',
+        duration: 200.000,
         path: tempSong2,
         fileCreatedAt: new Date(),
         fileModifiedAt: new Date()

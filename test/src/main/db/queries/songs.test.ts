@@ -29,7 +29,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Song A',
-        duration: '180',
+        duration: 180,
         path: 'C:\\Music\\songA.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -41,7 +41,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Song B',
-        duration: '200',
+        duration: 200,
         path: 'C:\\Music\\songB.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -53,7 +53,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Song C',
-        duration: '220',
+        duration: 220,
         path: 'C:\\Music\\songC.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -99,7 +99,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Track 1',
-        duration: '100',
+        duration: 100,
         path: 'C:\\Music\\track1.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -111,7 +111,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Track 2',
-        duration: '200',
+        duration: 200,
         path: 'C:\\Music\\track2.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -160,7 +160,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .values(
         songTitles.map((title, i) => ({
           title,
-          duration: '150',
+          duration: 150,
           path: `C:\\Music\\${title.toLowerCase()}.mp3`,
           folderId: folder.id,
           fileCreatedAt: now,
@@ -210,7 +210,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Song One',
-        duration: '100',
+        duration: 100,
         path: 'C:\\Music\\s1.mp3',
         folderId: folder.id,
         fileCreatedAt: now,
@@ -222,7 +222,7 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
       .insert(songs)
       .values({
         title: 'Song Two',
-        duration: '200',
+        duration: 200,
         path: 'C:\\Music\\s2.mp3',
         folderId: folder.id,
         fileCreatedAt: now,

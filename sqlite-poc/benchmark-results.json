@@ -1,0 +1,3899 @@
+{
+  "name": "nora-sqlite-poc benchmark results",
+  "generatedAt": "2026-08-29T15:16:04.568Z",
+  "environment": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0",
+    "versions": {
+      "drizzleOrm": "0.45.2",
+      "pglite": "0.4.6",
+      "electron": "41.7.2",
+      "node": "v24.18.0"
+    }
+  },
+  "reproduction": "See README.md — each suite is a standalone script: node src/bench/b<N>-<name>.js",
+  "suites": {
+    "concurrency": {
+      "name": "concurrency",
+      "recordedAt": "2026-08-29T13:51:34.205Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "size": 50000,
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "engines": {
+          "sqlite": {
+            "concurrent_4_readers": {
+              "totalMs": 706,
+              "perReader": {
+                "n": 4,
+                "min": 43.973,
+                "median": 45.06,
+                "p95": 572.04,
+                "max": 572.04,
+                "mean": 176.328
+              },
+              "rows": 8000
+            },
+            "read_during_write": {
+              "reads": {
+                "n": 20,
+                "min": 0.102,
+                "median": 0.188,
+                "p95": 3.77,
+                "max": 3.77,
+                "mean": 0.416
+              }
+            },
+            "two_writer_contention": {
+              "totalMs": 5580,
+              "error": "database is locked",
+              "note": "second writer hit SQLITE_BUSY beyond busy_timeout while tx held lock"
+            }
+          },
+          "pglite": {
+            "concurrent_4_readers": {
+              "totalMs": 414,
+              "perReader": {
+                "n": 4,
+                "min": 355.223,
+                "median": 396.803,
+                "p95": 413.8,
+                "max": 413.8,
+                "mean": 385.051
+              }
+            },
+            "read_during_write": {
+              "reads": {
+                "n": 20,
+                "min": 8.934,
+                "median": 12.308,
+                "p95": 2431.207,
+                "max": 2431.207,
+                "mean": 133.433
+              }
+            }
+          }
+        }
+      },
+      "suites": {}
+    },
+    "crash": {
+      "name": "crash",
+      "recordedAt": "2026-08-29T11:59:43.697Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "engines": {
+          "sqlite": {
+            "kill_1000ms_into_tx": {
+              "killConfirmed": true,
+              "childErr": "",
+              "songsAfterCrash": 0,
+              "expected": "exactly 0 (uncommitted transaction rolled back)",
+              "integrity": "ok",
+              "atomicityPreserved": true
+            },
+            "kill_300ms_into_tx": {
+              "killConfirmed": true,
+              "childErr": "",
+              "songsAfterCrash": 0,
+              "expected": "exactly 0 (uncommitted transaction rolled back)",
+              "integrity": "ok",
+              "atomicityPreserved": true
+            }
+          },
+          "pglite": {
+            "kill_1000ms_into_tx": {
+              "killConfirmed": true,
+              "childErr": "",
+              "songsAfterCrash": 0,
+              "expected": "exactly 0 (uncommitted transaction rolled back)",
+              "integrity": "opened-ok",
+              "atomicityPreserved": true
+            },
+            "kill_300ms_into_tx": {
+              "killConfirmed": true,
+              "childErr": "",
+              "songsAfterCrash": 0,
+              "expected": "exactly 0 (uncommitted transaction rolled back)",
+              "integrity": "opened-ok",
+              "atomicityPreserved": true
+            }
+          }
+        }
+      },
+      "suites": {}
+    },
+    "durability": {
+      "name": "durability",
+      "recordedAt": "2026-08-29T14:51:40.727Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "modes": {
+          "NORMAL": {
+            "commitHeavy": {
+              "txs": 1000,
+              "rowsPerTx": 10,
+              "totalMs": 1152,
+              "commitsPerSec": 868
+            },
+            "singleBulkTx": {
+              "rows": 10000,
+              "ms": 487
+            },
+            "songsAfter": 10000,
+            "closeMs": 3,
+            "soak": {
+              "cycles": 15,
+              "batchRows": 50,
+              "corruptEvents": 0,
+              "partialApplicationEvents": 0,
+              "finalSongs": 650,
+              "detail": [
+                {
+                  "cycle": 1,
+                  "killDelayMs": 170,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 50,
+                  "fts": 50,
+                  "atomic": true
+                },
+                {
+                  "cycle": 2,
+                  "killDelayMs": 16,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 50,
+                  "fts": 50,
+                  "atomic": true
+                },
+                {
+                  "cycle": 3,
+                  "killDelayMs": 278,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 100,
+                  "fts": 100,
+                  "atomic": true
+                },
+                {
+                  "cycle": 4,
+                  "killDelayMs": 194,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 150,
+                  "fts": 150,
+                  "atomic": true
+                },
+                {
+                  "cycle": 5,
+                  "killDelayMs": 46,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 200,
+                  "fts": 200,
+                  "atomic": true
+                },
+                {
+                  "cycle": 6,
+                  "killDelayMs": 330,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 250,
+                  "fts": 250,
+                  "atomic": true
+                },
+                {
+                  "cycle": 7,
+                  "killDelayMs": 353,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 300,
+                  "fts": 300,
+                  "atomic": true
+                },
+                {
+                  "cycle": 8,
+                  "killDelayMs": 313,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 350,
+                  "fts": 350,
+                  "atomic": true
+                },
+                {
+                  "cycle": 9,
+                  "killDelayMs": 22,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 350,
+                  "fts": 350,
+                  "atomic": true
+                },
+                {
+                  "cycle": 10,
+                  "killDelayMs": 72,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 400,
+                  "fts": 400,
+                  "atomic": true
+                },
+                {
+                  "cycle": 11,
+                  "killDelayMs": 363,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 450,
+                  "fts": 450,
+                  "atomic": true
+                },
+                {
+                  "cycle": 12,
+                  "killDelayMs": 233,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 500,
+                  "fts": 500,
+                  "atomic": true
+                },
+                {
+                  "cycle": 13,
+                  "killDelayMs": 198,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 550,
+                  "fts": 550,
+                  "atomic": true
+                },
+                {
+                  "cycle": 14,
+                  "killDelayMs": 275,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 600,
+                  "fts": 600,
+                  "atomic": true
+                },
+                {
+                  "cycle": 15,
+                  "killDelayMs": 168,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 650,
+                  "fts": 650,
+                  "atomic": true
+                }
+              ],
+              "verdict": "NO CORRUPTION, NO PARTIAL TRANSACTIONS across all kill cycles"
+            }
+          },
+          "FULL": {
+            "commitHeavy": {
+              "txs": 1000,
+              "rowsPerTx": 10,
+              "totalMs": 2739,
+              "commitsPerSec": 365
+            },
+            "singleBulkTx": {
+              "rows": 10000,
+              "ms": 533
+            },
+            "songsAfter": 10000,
+            "closeMs": 3,
+            "soak": {
+              "cycles": 15,
+              "batchRows": 50,
+              "corruptEvents": 0,
+              "partialApplicationEvents": 0,
+              "finalSongs": 600,
+              "detail": [
+                {
+                  "cycle": 1,
+                  "killDelayMs": 104,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 50,
+                  "fts": 50,
+                  "atomic": true
+                },
+                {
+                  "cycle": 2,
+                  "killDelayMs": 321,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 100,
+                  "fts": 100,
+                  "atomic": true
+                },
+                {
+                  "cycle": 3,
+                  "killDelayMs": 216,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 150,
+                  "fts": 150,
+                  "atomic": true
+                },
+                {
+                  "cycle": 4,
+                  "killDelayMs": 276,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 200,
+                  "fts": 200,
+                  "atomic": true
+                },
+                {
+                  "cycle": 5,
+                  "killDelayMs": 0,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 200,
+                  "fts": 200,
+                  "atomic": true
+                },
+                {
+                  "cycle": 6,
+                  "killDelayMs": 327,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 250,
+                  "fts": 250,
+                  "atomic": true
+                },
+                {
+                  "cycle": 7,
+                  "killDelayMs": 4,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 250,
+                  "fts": 250,
+                  "atomic": true
+                },
+                {
+                  "cycle": 8,
+                  "killDelayMs": 42,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 300,
+                  "fts": 300,
+                  "atomic": true
+                },
+                {
+                  "cycle": 9,
+                  "killDelayMs": 158,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 350,
+                  "fts": 350,
+                  "atomic": true
+                },
+                {
+                  "cycle": 10,
+                  "killDelayMs": 268,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 400,
+                  "fts": 400,
+                  "atomic": true
+                },
+                {
+                  "cycle": 11,
+                  "killDelayMs": 146,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 450,
+                  "fts": 450,
+                  "atomic": true
+                },
+                {
+                  "cycle": 12,
+                  "killDelayMs": 25,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 450,
+                  "fts": 450,
+                  "atomic": true
+                },
+                {
+                  "cycle": 13,
+                  "killDelayMs": 135,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 500,
+                  "fts": 500,
+                  "atomic": true
+                },
+                {
+                  "cycle": 14,
+                  "killDelayMs": 290,
+                  "killed": false,
+                  "integrity": "ok",
+                  "songs": 550,
+                  "fts": 550,
+                  "atomic": true
+                },
+                {
+                  "cycle": 15,
+                  "killDelayMs": 101,
+                  "killed": true,
+                  "integrity": "ok",
+                  "songs": 600,
+                  "fts": 600,
+                  "atomic": true
+                }
+              ],
+              "verdict": "NO CORRUPTION, NO PARTIAL TRANSACTIONS across all kill cycles"
+            }
+          }
+        },
+        "note": {
+          "normalSemantics": "WAL + synchronous=NORMAL: committed txs survive app crashes; an OS/power failure may roll back the most recent commits (never corrupts).",
+          "fullSemantics": "WAL + synchronous=FULL: committed txs survive power loss (fsync per commit).",
+          "recommendationInput": "see commitsPerSec delta — with SQLite ~19x faster than PGlite on Nora-shaped ingestion, FULL stays well above PGlite-NORMAL throughput; Nora can afford FULL if userData may be on removable media."
+        }
+      },
+      "suites": {}
+    },
+    "electron-runtime": {
+      "name": "electron-runtime",
+      "recordedAt": "2026-08-29T12:49:52.306Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "electronBinary": "C:\\Users\\VINAY\\.gemini\\antigravity\\worktrees\\Nora\\sqlite3\\node_modules\\electron\\dist\\electron.exe",
+      "electronVersion": "v41.7.2",
+      "runAsNode": {
+        "ok": true,
+        "node": "v24.15.0",
+        "sqlite": "3.51.3",
+        "ftsHits": 1,
+        "success": true
+      },
+      "realMainProcess": {
+        "ok": true,
+        "mainProcess": true,
+        "node": "v24.15.0",
+        "sqlite": "3.51.3",
+        "byId": "Song 499",
+        "ftsHits": 5,
+        "integrity": "ok",
+        "userData": "C:\\Users\\VINAY\\AppData\\Roaming\\Electron"
+      },
+      "summary": {
+        "nodeSqliteAvailableInElectron": true,
+        "worksInRealMainProcess": true,
+        "fts5TrigramAvailable": true,
+        "electronNode": "v24.15.0",
+        "electronSqlite": "3.51.3",
+        "note": "node:sqlite is compiled into Electron's bundled Node — no native module, no electron-rebuild, no asarUnpack changes, no npmRebuild. Packaged-app verification (electron-builder --dir) still recommended before ship; this probe covers the runtime capability."
+      },
+      "suites": {}
+    },
+    "forensics": {
+      "name": "forensics",
+      "recordedAt": "2026-08-29T12:47:25.974Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "gate": "PASS",
+      "results": {
+        "checks": []
+      },
+      "suites": {}
+    },
+    "memory": {
+      "name": "memory",
+      "recordedAt": "2026-08-29T11:44:33.286Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "size": 50000,
+      "runs": 3,
+      "method": "forked child; commit via Get-Process PrivateMemorySize64",
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "baseline": {
+          "runs": [
+            {
+              "checkpoints": [
+                {
+                  "label": "after-noop-open",
+                  "commitMb": 21.3,
+                  "rssMb": 38.4,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "baseline-process",
+                  "commitMb": 21.3,
+                  "rssMb": 38.3,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": null,
+                  "rssMb": 38.5,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 38.5,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": []
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 21.2,
+                  "rssMb": 38.4,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-noop-open",
+                  "commitMb": 21.2,
+                  "rssMb": 38.5,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": null,
+                  "rssMb": 38.6,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 38.6,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": []
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 21.2,
+                  "rssMb": 38.7,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-noop-open",
+                  "commitMb": 21.2,
+                  "rssMb": 38.9,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": null,
+                  "rssMb": 38.9,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 39,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": []
+            }
+          ],
+          "medians": {
+            "after-noop-open": {
+              "commitMbMedian": 21.2,
+              "commitMbMin": 21.2,
+              "commitMbMax": 21.3
+            },
+            "baseline-process": {
+              "commitMbMedian": 21.2,
+              "commitMbMin": 21.2,
+              "commitMbMax": 21.3
+            },
+            "idle-after-init": {
+              "commitMbMedian": null,
+              "commitMbMin": null,
+              "commitMbMax": null
+            },
+            "after-close": {
+              "commitMbMedian": null,
+              "commitMbMin": null,
+              "commitMbMax": null
+            }
+          }
+        },
+        "sqlite": {
+          "runs": [
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 119.8,
+                  "rssMb": 38.5,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 163.1,
+                  "rssMb": 147.9,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.4,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 184.3,
+                  "rssMb": 148,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 182.5,
+                  "rssMb": 174.8,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 182.5,
+                  "rssMb": 175.4,
+                  "heapUsedMb": 41.2,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-10k-ingestion-1196ms",
+                  "commitMb": null,
+                  "rssMb": 185.7,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 167.4,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": [
+                28.3184000000183
+              ]
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 117,
+                  "rssMb": 43.8,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 162.8,
+                  "rssMb": 148,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.4,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 181.1,
+                  "rssMb": 148.1,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 183.6,
+                  "rssMb": 174.9,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 183.6,
+                  "rssMb": 175.6,
+                  "heapUsedMb": 41.2,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-10k-ingestion-1076ms",
+                  "commitMb": null,
+                  "rssMb": 184.8,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 167.1,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": [
+                15.993699999991804
+              ]
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 126.2,
+                  "rssMb": 43.6,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 162.8,
+                  "rssMb": 148.1,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.4,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 181,
+                  "rssMb": 148.1,
+                  "heapUsedMb": 6.3,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 182.8,
+                  "rssMb": 175.1,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 182.8,
+                  "rssMb": 175.5,
+                  "heapUsedMb": 41.2,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-10k-ingestion-1053ms",
+                  "commitMb": 12.6,
+                  "rssMb": 185.2,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 167.5,
+                  "heapUsedMb": 40.9,
+                  "externalMb": 2.2,
+                  "arrayBuffersMb": 0.1
+                }
+              ],
+              "closeTimes": [
+                11.582099999999627
+              ]
+            }
+          ],
+          "medians": {
+            "baseline-process": {
+              "commitMbMedian": 119.8,
+              "commitMbMin": 117,
+              "commitMbMax": 126.2
+            },
+            "after-engine-open": {
+              "commitMbMedian": 162.8,
+              "commitMbMin": 162.8,
+              "commitMbMax": 163.1
+            },
+            "idle-after-init": {
+              "commitMbMedian": 181.1,
+              "commitMbMin": 181,
+              "commitMbMax": 184.3
+            },
+            "after-full-songs-scan": {
+              "commitMbMedian": 182.8,
+              "commitMbMin": 182.5,
+              "commitMbMax": 183.6
+            },
+            "after-representative-queries": {
+              "commitMbMedian": 182.8,
+              "commitMbMin": 182.5,
+              "commitMbMax": 183.6
+            },
+            "after-10k-ingestion-1196ms": {
+              "commitMbMedian": null,
+              "commitMbMin": null,
+              "commitMbMax": null
+            },
+            "after-close": {
+              "commitMbMedian": null,
+              "commitMbMin": null,
+              "commitMbMax": null
+            }
+          },
+          "deltaVsBaseline": {
+            "afterEngineOpenMb": 141.6,
+            "idleAfterInitMb": 159.9
+          }
+        },
+        "pglite": {
+          "runs": [
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 277.3,
+                  "rssMb": 43.7,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 283.2,
+                  "rssMb": 523.9,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 285.9,
+                  "rssMb": 238.8,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 367.5,
+                  "rssMb": 306.8,
+                  "heapUsedMb": 27.4,
+                  "externalMb": 193.9,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 374.4,
+                  "rssMb": 307,
+                  "heapUsedMb": 27.6,
+                  "externalMb": 194,
+                  "arrayBuffersMb": 7.4
+                },
+                {
+                  "label": "after-10k-ingestion-4144ms",
+                  "commitMb": 372.4,
+                  "rssMb": 330.9,
+                  "heapUsedMb": 27.8,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 330.4,
+                  "heapUsedMb": 27.8,
+                  "externalMb": 194.8,
+                  "arrayBuffersMb": 7.3
+                }
+              ],
+              "closeTimes": [
+                137.6195000000007
+              ]
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 277.7,
+                  "rssMb": 45.7,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 286.3,
+                  "rssMb": 635.3,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 298.1,
+                  "rssMb": 236.7,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 369.5,
+                  "rssMb": 307.1,
+                  "heapUsedMb": 26.6,
+                  "externalMb": 193.9,
+                  "arrayBuffersMb": 7.4
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 372.1,
+                  "rssMb": 307.5,
+                  "heapUsedMb": 26.8,
+                  "externalMb": 193.9,
+                  "arrayBuffersMb": 7.4
+                },
+                {
+                  "label": "after-10k-ingestion-4129ms",
+                  "commitMb": 375.9,
+                  "rssMb": 332.4,
+                  "heapUsedMb": 27,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-close",
+                  "commitMb": null,
+                  "rssMb": 332.5,
+                  "heapUsedMb": 27,
+                  "externalMb": 194.8,
+                  "arrayBuffersMb": 7.3
+                }
+              ],
+              "closeTimes": [
+                153.72520000001532
+              ]
+            },
+            {
+              "checkpoints": [
+                {
+                  "label": "baseline-process",
+                  "commitMb": 255.1,
+                  "rssMb": 45.7,
+                  "heapUsedMb": 4.4,
+                  "externalMb": 2,
+                  "arrayBuffersMb": 0.1
+                },
+                {
+                  "label": "after-engine-open",
+                  "commitMb": 282.1,
+                  "rssMb": 671.7,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "idle-after-init",
+                  "commitMb": 286.8,
+                  "rssMb": 238.3,
+                  "heapUsedMb": 13.6,
+                  "externalMb": 193.8,
+                  "arrayBuffersMb": 7.3
+                },
+                {
+                  "label": "after-full-songs-scan",
+                  "commitMb": 374.4,
+                  "rssMb": 307.6,
+                  "heapUsedMb": 27.4,
+                  "externalMb": 194,
+                  "arrayBuffersMb": 7.4
+                },
+                {
+                  "label": "after-representative-queries",
+                  "commitMb": 375,
+                  "rssMb": 307.6,
+                  "heapUsedMb": 27.6,
+                  "externalMb": 194,
+                  "arrayBuffersMb": 7.4
+                }
+              ],
+              "closeTimes": [
+                117.27709999997751
+              ]
+            }
+          ],
+          "medians": {
+            "baseline-process": {
+              "commitMbMedian": 277.3,
+              "commitMbMin": 255.1,
+              "commitMbMax": 277.7
+            },
+            "after-engine-open": {
+              "commitMbMedian": 283.2,
+              "commitMbMin": 282.1,
+              "commitMbMax": 286.3
+            },
+            "idle-after-init": {
+              "commitMbMedian": 286.8,
+              "commitMbMin": 285.9,
+              "commitMbMax": 298.1
+            },
+            "after-full-songs-scan": {
+              "commitMbMedian": 369.5,
+              "commitMbMin": 367.5,
+              "commitMbMax": 374.4
+            },
+            "after-representative-queries": {
+              "commitMbMedian": 374.4,
+              "commitMbMin": 372.1,
+              "commitMbMax": 375
+            },
+            "after-10k-ingestion-4144ms": {
+              "commitMbMedian": 372.4,
+              "commitMbMin": 372.4,
+              "commitMbMax": 372.4
+            },
+            "after-close": {
+              "commitMbMedian": null,
+              "commitMbMin": null,
+              "commitMbMax": null
+            }
+          },
+          "deltaVsBaseline": {
+            "afterEngineOpenMb": 262,
+            "idleAfterInitMb": 265.6
+          }
+        }
+      },
+      "suites": {}
+    },
+    "migration": {
+      "name": "migration",
+      "recordedAt": "2026-08-29T12:47:54.720Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "nSongs": 50000,
+        "steps": {
+          "realMigrationsMs": 10700,
+          "populateSourceMs": 393354,
+          "ddlGenerationMs": 43,
+          "copyMs": 32202,
+          "verification": {
+            "sourceCounts": {
+              "album_songs": 46984,
+              "albums": 15935,
+              "albums_artists": 15108,
+              "albums_artworks": 15108,
+              "artists": 4545,
+              "artists_artworks": 0,
+              "artists_songs": 56024,
+              "artworks": 13676,
+              "artworks_genres": 0,
+              "artworks_playlists": 0,
+              "artworks_songs": 2015,
+              "collection_contexts": 0,
+              "genres": 30,
+              "genres_songs": 70077,
+              "ignored_artists": 0,
+              "ignored_duplicate_metadata": 0,
+              "ignored_featuring_artists": 0,
+              "lyrics": 0,
+              "metadata_overrides": 1897,
+              "metadata_pending_writes": 0,
+              "metadata_undo_snapshots": 0,
+              "music_folders": 1,
+              "operation_journal": 0,
+              "palette_swatches": 0,
+              "palettes": 0,
+              "play_events": 92973,
+              "play_history": 92973,
+              "playlist_entries": 9941,
+              "playlists": 12,
+              "playlists_songs": 0,
+              "replay_gain": 0,
+              "scrobble_queue": 0,
+              "seek_events": 0,
+              "skip_events": 0,
+              "smart_playlist_rules": 0,
+              "songs": 50000,
+              "spotify_integrations": 0,
+              "spotify_playlist_links": 0,
+              "user_equalizer_preset": 0,
+              "user_keyboard_shortcuts": 0,
+              "user_settings": 0,
+              "waveforms": 0
+            },
+            "sqliteCounts": {
+              "album_songs": 46984,
+              "albums": 15935,
+              "albums_artists": 15108,
+              "albums_artworks": 15108,
+              "artists": 4545,
+              "artists_artworks": 0,
+              "artists_songs": 56024,
+              "artworks": 13676,
+              "artworks_genres": 0,
+              "artworks_playlists": 0,
+              "artworks_songs": 2015,
+              "collection_contexts": 0,
+              "genres": 30,
+              "genres_songs": 70077,
+              "ignored_artists": 0,
+              "ignored_duplicate_metadata": 0,
+              "ignored_featuring_artists": 0,
+              "lyrics": 0,
+              "metadata_overrides": 1897,
+              "metadata_pending_writes": 0,
+              "metadata_undo_snapshots": 0,
+              "music_folders": 1,
+              "operation_journal": 0,
+              "palette_swatches": 0,
+              "palettes": 0,
+              "play_events": 92973,
+              "play_history": 92973,
+              "playlist_entries": 9941,
+              "playlists": 12,
+              "playlists_songs": 0,
+              "replay_gain": 0,
+              "scrobble_queue": 0,
+              "seek_events": 0,
+              "skip_events": 0,
+              "smart_playlist_rules": 0,
+              "songs": 50000,
+              "spotify_integrations": 0,
+              "spotify_playlist_links": 0,
+              "user_equalizer_preset": 0,
+              "user_keyboard_shortcuts": 0,
+              "user_settings": 0,
+              "waveforms": 0
+            },
+            "countMismatches": [],
+            "allCountsMatch": true,
+            "spotChecks": {
+              "songs": {
+                "pgKeys": [
+                  "id",
+                  "title",
+                  "title_ci",
+                  "duration",
+                  "path",
+                  "is_favorite",
+                  "sample_rate",
+                  "bit_rate",
+                  "no_of_channels",
+                  "year",
+                  "disk_number",
+                  "track_number",
+                  "folder_id",
+                  "is_blacklisted",
+                  "is_blacklisted_updated_at",
+                  "is_favorite_updated_at",
+                  "file_created_at",
+                  "file_modified_at",
+                  "created_at",
+                  "updated_at",
+                  "skip_count",
+                  "music_brainz_recording_id",
+                  "isrc",
+                  "language"
+                ],
+                "sqKeys": [
+                  "id",
+                  "title",
+                  "title_ci",
+                  "duration",
+                  "path",
+                  "is_favorite",
+                  "sample_rate",
+                  "bit_rate",
+                  "no_of_channels",
+                  "year",
+                  "disk_number",
+                  "track_number",
+                  "folder_id",
+                  "is_blacklisted",
+                  "is_blacklisted_updated_at",
+                  "is_favorite_updated_at",
+                  "file_created_at",
+                  "file_modified_at",
+                  "created_at",
+                  "updated_at",
+                  "skip_count",
+                  "music_brainz_recording_id",
+                  "isrc",
+                  "language"
+                ],
+                "columnAlignment": true
+              },
+              "metadata_overrides": {
+                "pgKeys": [
+                  "id",
+                  "entity_kind",
+                  "entity_id",
+                  "field_id",
+                  "string_value",
+                  "number_value",
+                  "boolean_value",
+                  "json_value",
+                  "created_at",
+                  "updated_at"
+                ],
+                "sqKeys": [
+                  "id",
+                  "entity_kind",
+                  "entity_id",
+                  "field_id",
+                  "string_value",
+                  "number_value",
+                  "boolean_value",
+                  "json_value",
+                  "created_at",
+                  "updated_at"
+                ],
+                "columnAlignment": true
+              },
+              "artworks_songs": {
+                "pgKeys": [
+                  "song_id",
+                  "artwork_id",
+                  "created_at",
+                  "updated_at"
+                ],
+                "sqKeys": [
+                  "song_id",
+                  "artwork_id",
+                  "created_at",
+                  "updated_at"
+                ],
+                "columnAlignment": true
+              },
+              "playlist_entries": {
+                "pgKeys": [
+                  "id",
+                  "playlist_id",
+                  "song_id",
+                  "position",
+                  "added_at",
+                  "source",
+                  "created_at",
+                  "updated_at"
+                ],
+                "sqKeys": [
+                  "id",
+                  "playlist_id",
+                  "song_id",
+                  "position",
+                  "added_at",
+                  "source",
+                  "created_at",
+                  "updated_at"
+                ],
+                "columnAlignment": true
+              },
+              "favoritesIdentical": true
+            }
+          }
+        },
+        "totalMs": 438875,
+        "migrationOnlyMs": 32245,
+        "sqliteSizeMb": 47.1
+      },
+      "suites": {}
+    },
+    "orm": {
+      "name": "orm",
+      "recordedAt": "2026-08-29T13:15:34.486Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "functional": {
+          "selectWhereOrderBy": {
+            "sqlite": 10,
+            "pglite": 10,
+            "titlesMatch": true
+          },
+          "join": {
+            "sqlite": [
+              {
+                "title": "orm song 42",
+                "artist": "artist 43"
+              }
+            ],
+            "pglite": [
+              {
+                "title": "orm song 42",
+                "artist": "artist 43"
+              }
+            ],
+            "match": true
+          },
+          "nestedSavepoint": {
+            "sqlite": {
+              "rolled": 1,
+              "innerGone": true,
+              "outerSurvived": true
+            },
+            "pglite": {
+              "rolled": 1,
+              "innerGone": true,
+              "outerSurvived": true
+            },
+            "equivalent": true
+          },
+          "insertReturning": {
+            "sqliteId": 5002,
+            "pgliteId": 5003,
+            "bothReturned": true
+          }
+        },
+        "orm_pk_lookup": {
+          "sqlite": {
+            "n": 100,
+            "min": 0.127,
+            "median": 0.151,
+            "p95": 0.289,
+            "max": 0.441,
+            "mean": 0.169
+          },
+          "pglite": {
+            "n": 100,
+            "min": 1.204,
+            "median": 1.557,
+            "p95": 2.393,
+            "max": 2.671,
+            "mean": 1.652
+          }
+        },
+        "orm_filtered_list": {
+          "sqlite": {
+            "n": 100,
+            "min": 0.47,
+            "median": 0.546,
+            "p95": 0.709,
+            "max": 0.933,
+            "mean": 0.553
+          },
+          "pglite": {
+            "n": 100,
+            "min": 3.546,
+            "median": 4.617,
+            "p95": 6.844,
+            "max": 7.68,
+            "mean": 4.97
+          }
+        },
+        "orm_join": {
+          "sqlite": {
+            "n": 100,
+            "min": 0.327,
+            "median": 0.36,
+            "p95": 0.417,
+            "max": 0.782,
+            "mean": 0.367
+          },
+          "pglite": {
+            "n": 100,
+            "min": 2.272,
+            "median": 2.649,
+            "p95": 3.39,
+            "max": 4.533,
+            "mean": 2.722
+          }
+        }
+      },
+      "suites": {}
+    },
+    "packaged-build": {
+      "name": "packaged-build",
+      "recordedAt": "2026-08-29T15:15:43.953Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "packagedNoraExists": true,
+      "probeA_packagedBinary": {
+        "ok": true,
+        "node": "v24.15.0",
+        "sqlite": "3.51.3",
+        "ftsHits": 1
+      },
+      "probeB_packagedAppBuilt": true,
+      "probeB_packagedApp": {
+        "packaged": true,
+        "exePath": "C:\\Users\\VINAY\\.gemini\\antigravity\\worktrees\\Nora\\sqlite3\\sqlite-poc\\data\\packaged-probe-app\\dist\\win-unpacked\\SqliteProbe.exe",
+        "ok": true,
+        "sqlite": "3.51.3",
+        "node": "24.15.0",
+        "byId": "Packaged Song 249",
+        "ftsHits": 3,
+        "integrity": "ok"
+      },
+      "summary": {
+        "packagedNoraBinaryWorks": true,
+        "asarPackagedMainProcessWorks": true,
+        "fts5InPackagedApp": true
+      },
+      "suites": {}
+    },
+    "queries": {
+      "name": "queries",
+      "recordedAt": "2026-08-29T11:49:05.994Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "size": 50000,
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "size": 50000,
+        "reps": 20,
+        "engines": {
+          "sqlite": {
+            "song_by_id": {
+              "n": 200,
+              "min": 0.035,
+              "median": 0.251,
+              "p95": 0.366,
+              "max": 0.877,
+              "mean": 0.231,
+              "rows": 1
+            },
+            "songs_by_100_ids": {
+              "n": 50,
+              "min": 4.836,
+              "median": 9.895,
+              "p95": 17.409,
+              "max": 17.93,
+              "mean": 10.438,
+              "rows": 99
+            },
+            "song_hydration_chunk_500": {
+              "n": 20,
+              "min": 1.316,
+              "median": 1.646,
+              "p95": 5.111,
+              "max": 5.111,
+              "mean": 1.923,
+              "rows": 500
+            },
+            "album_by_id": {
+              "n": 200,
+              "min": 0.017,
+              "median": 0.036,
+              "p95": 0.349,
+              "max": 9.35,
+              "mean": 0.164,
+              "rows": 1
+            },
+            "artist_by_id": {
+              "n": 200,
+              "min": 0.018,
+              "median": 0.05,
+              "p95": 0.396,
+              "max": 0.812,
+              "mean": 0.161,
+              "rows": 1
+            },
+            "all_song_ids_by_title": {
+              "n": 10,
+              "min": 103.535,
+              "median": 133.78,
+              "p95": 411.885,
+              "max": 411.885,
+              "mean": 164.716,
+              "rows": 48951
+            },
+            "all_song_ids_by_created": {
+              "n": 10,
+              "min": 108.416,
+              "median": 155.656,
+              "p95": 189.57,
+              "max": 189.57,
+              "mean": 147.335,
+              "rows": 48951
+            },
+            "all_song_ids_by_year": {
+              "n": 10,
+              "min": 117.768,
+              "median": 171.121,
+              "p95": 249.288,
+              "max": 249.288,
+              "mean": 173.182,
+              "rows": 48951
+            },
+            "favorites": {
+              "n": 20,
+              "min": 8.5,
+              "median": 10.735,
+              "p95": 29.507,
+              "max": 29.507,
+              "mean": 11.638,
+              "rows": 4938
+            },
+            "language_filter": {
+              "n": 20,
+              "min": 13.814,
+              "median": 14.347,
+              "p95": 50.302,
+              "max": 50.302,
+              "mean": 16.96,
+              "rows": 7724
+            },
+            "genre_filter": {
+              "n": 20,
+              "min": 94.483,
+              "median": 129.282,
+              "p95": 193.145,
+              "max": 193.145,
+              "mean": 129.204,
+              "rows": 42143
+            },
+            "song_to_artists": {
+              "n": 200,
+              "min": 2.782,
+              "median": 4.69,
+              "p95": 10.562,
+              "max": 32.769,
+              "mean": 5.561,
+              "rows": 1
+            },
+            "song_to_album": {
+              "n": 200,
+              "min": 0.018,
+              "median": 0.405,
+              "p95": 0.832,
+              "max": 1.941,
+              "mean": 0.442,
+              "rows": 1
+            },
+            "album_to_songs": {
+              "n": 100,
+              "min": 0.013,
+              "median": 0.078,
+              "p95": 0.41,
+              "max": 0.616,
+              "mean": 0.125,
+              "rows": 4
+            },
+            "artist_to_songs": {
+              "n": 100,
+              "min": 0.048,
+              "median": 0.188,
+              "p95": 0.755,
+              "max": 10.969,
+              "mean": 0.368,
+              "rows": 8
+            }
+          },
+          "pglite": {
+            "song_by_id": {
+              "n": 200,
+              "min": 1.416,
+              "median": 2.323,
+              "p95": 4.059,
+              "max": 6.725,
+              "mean": 2.504,
+              "rows": 1
+            },
+            "songs_by_100_ids": {
+              "n": 50,
+              "min": 7.942,
+              "median": 11.196,
+              "p95": 18.103,
+              "max": 29.516,
+              "mean": 12.646,
+              "rows": 100
+            },
+            "song_hydration_chunk_500": {
+              "n": 20,
+              "min": 12.225,
+              "median": 15.942,
+              "p95": 23.105,
+              "max": 23.105,
+              "mean": 16.754,
+              "rows": 500
+            },
+            "album_by_id": {
+              "n": 200,
+              "min": 0.879,
+              "median": 1.523,
+              "p95": 2.678,
+              "max": 7.542,
+              "mean": 1.69,
+              "rows": 1
+            },
+            "artist_by_id": {
+              "n": 200,
+              "min": 1.27,
+              "median": 1.922,
+              "p95": 2.83,
+              "max": 6.713,
+              "mean": 1.973,
+              "rows": 1
+            },
+            "all_song_ids_by_title": {
+              "n": 10,
+              "min": 205.568,
+              "median": 253.843,
+              "p95": 425.891,
+              "max": 425.891,
+              "mean": 262.887,
+              "rows": 48951
+            },
+            "all_song_ids_by_created": {
+              "n": 10,
+              "min": 221.119,
+              "median": 338.006,
+              "p95": 431.738,
+              "max": 431.738,
+              "mean": 345.563,
+              "rows": 48951
+            },
+            "all_song_ids_by_year": {
+              "n": 10,
+              "min": 441.899,
+              "median": 502.869,
+              "p95": 678.4,
+              "max": 678.4,
+              "mean": 532.842,
+              "rows": 48951
+            },
+            "favorites": {
+              "n": 20,
+              "min": 49.171,
+              "median": 66.634,
+              "p95": 125.7,
+              "max": 125.7,
+              "mean": 71.026,
+              "rows": 4938
+            },
+            "language_filter": {
+              "n": 20,
+              "min": 51.238,
+              "median": 76.355,
+              "p95": 116.862,
+              "max": 116.862,
+              "mean": 75.841,
+              "rows": 7724
+            },
+            "genre_filter": {
+              "n": 20,
+              "min": 376.709,
+              "median": 454.017,
+              "p95": 612.023,
+              "max": 612.023,
+              "mean": 467.471,
+              "rows": 42143
+            },
+            "song_to_artists": {
+              "n": 200,
+              "min": 9.429,
+              "median": 10.74,
+              "p95": 22.4,
+              "max": 32.966,
+              "mean": 12.558,
+              "rows": 1
+            },
+            "song_to_album": {
+              "n": 200,
+              "min": 1.125,
+              "median": 7.099,
+              "p95": 10.392,
+              "max": 15.138,
+              "mean": 6.663,
+              "rows": 1
+            },
+            "album_to_songs": {
+              "n": 100,
+              "min": 2.421,
+              "median": 3.993,
+              "p95": 5.901,
+              "max": 14.715,
+              "mean": 4.199,
+              "rows": 1
+            },
+            "artist_to_songs": {
+              "n": 100,
+              "min": 2.217,
+              "median": 3.149,
+              "p95": 4.683,
+              "max": 6.184,
+              "mean": 3.26,
+              "rows": 16
+            }
+          }
+        }
+      },
+      "suites": {}
+    },
+    "savepoints": {
+      "name": "savepoints",
+      "recordedAt": "2026-08-29T11:47:43.697Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "gate": "PASS",
+      "results": {
+        "engines": {
+          "sqlite": {
+            "first-track-fails": {
+              "ms": 8.524000000000115,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "middle-track-fails": {
+              "ms": 3.2520999999999276,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "last-track-fails": {
+              "ms": 4.283300000000054,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "multiple-fail": {
+              "ms": 3.2705000000000837,
+              "songs": 1,
+              "albums": 1,
+              "artists": 1,
+              "genres": 1,
+              "errors": 2,
+              "successful": 1
+            },
+            "all-fail": {
+              "ms": 1.7543000000000575,
+              "songs": 0,
+              "albums": 0,
+              "artists": 0,
+              "genres": 0,
+              "errors": 3,
+              "successful": 0
+            },
+            "nested-savepoint-outer-commits": {
+              "songs": 1
+            }
+          },
+          "pglite": {
+            "first-track-fails": {
+              "ms": 216.65359999999964,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "middle-track-fails": {
+              "ms": 158.07290000000103,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "last-track-fails": {
+              "ms": 182.1909999999989,
+              "songs": 2,
+              "albums": 2,
+              "artists": 2,
+              "genres": 2,
+              "errors": 1,
+              "successful": 2
+            },
+            "multiple-fail": {
+              "ms": 21.92870000000039,
+              "songs": 1,
+              "albums": 1,
+              "artists": 1,
+              "genres": 1,
+              "errors": 2,
+              "successful": 1
+            },
+            "all-fail": {
+              "ms": 9.861399999999776,
+              "songs": 0,
+              "albums": 0,
+              "artists": 0,
+              "genres": 0,
+              "errors": 3,
+              "successful": 0
+            },
+            "nested-savepoint-outer-commits": {
+              "songs": 1
+            }
+          }
+        },
+        "failures": [],
+        "assertionsPassed": 152,
+        "assertionsFailed": 0
+      },
+      "suites": {}
+    },
+    "search-hardened": {
+      "name": "search-hardened",
+      "recordedAt": "2026-08-29T14:48:26.173Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "size": 50000,
+      "reps": 8,
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "size": 50000,
+        "buildNormIndexMs": 1403,
+        "probes": [
+          {
+            "label": "exact_title",
+            "query": "midnight city",
+            "pglite": {
+              "n": 50,
+              "min": 758.566,
+              "median": 815.002,
+              "p95": 930.608,
+              "max": 930.608,
+              "mean": 812.228
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 120.201,
+              "median": 137.059,
+              "p95": 165.776,
+              "max": 165.776,
+              "mean": 137.173
+            },
+            "jaccardVsPg": 0.961,
+            "recallOfPgMatches": 1,
+            "poolSize": 5064,
+            "pgIdsSample": [
+              26563,
+              33742,
+              12034,
+              38780,
+              41018,
+              3752
+            ],
+            "hardenedIdsSample": [
+              3611,
+              3752,
+              3900,
+              4006,
+              8393,
+              12034
+            ]
+          },
+          {
+            "label": "prefix",
+            "query": "gold",
+            "pglite": {
+              "n": 50,
+              "min": 668.315,
+              "median": 717.122,
+              "p95": 787.523,
+              "max": 787.523,
+              "mean": 715.217
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 58.745,
+              "median": 70.955,
+              "p95": 83.408,
+              "max": 83.408,
+              "mean": 68.868
+            },
+            "jaccardVsPg": 0.639,
+            "recallOfPgMatches": 1,
+            "poolSize": 4312,
+            "pgIdsSample": [
+              10693,
+              11457,
+              28058,
+              48273,
+              30873,
+              2692
+            ],
+            "hardenedIdsSample": [
+              867,
+              896,
+              2692,
+              10693,
+              10743,
+              11457
+            ]
+          },
+          {
+            "label": "substring",
+            "query": "idnight ci",
+            "pglite": {
+              "n": 50,
+              "min": 697.066,
+              "median": 751.477,
+              "p95": 782.814,
+              "max": 782.814,
+              "mean": 743.876
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 81.618,
+              "median": 96.707,
+              "p95": 109.775,
+              "max": 109.775,
+              "mean": 96.195
+            },
+            "jaccardVsPg": 0.923,
+            "recallOfPgMatches": 1,
+            "poolSize": 4202,
+            "pgIdsSample": [
+              8393,
+              42787,
+              31160,
+              3752,
+              19435,
+              32595
+            ],
+            "hardenedIdsSample": [
+              3611,
+              3752,
+              3900,
+              4006,
+              8393,
+              12034
+            ]
+          },
+          {
+            "label": "multi_word",
+            "query": "shadow sky",
+            "pglite": {
+              "n": 50,
+              "min": 724.556,
+              "median": 758.628,
+              "p95": 811.757,
+              "max": 811.757,
+              "mean": 764.246
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 134.27,
+              "median": 154.856,
+              "p95": 180.002,
+              "max": 180.002,
+              "mean": 154.811
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 7362,
+            "pgIdsSample": [
+              27355,
+              12111,
+              11890,
+              9053,
+              9277,
+              39070
+            ],
+            "hardenedIdsSample": [
+              3444,
+              5709,
+              5871,
+              7804,
+              9053,
+              9277
+            ]
+          },
+          {
+            "label": "case_mismatch",
+            "query": "MIDNIGHT CITY",
+            "pglite": {
+              "n": 50,
+              "min": 762.854,
+              "median": 832.379,
+              "p95": 961.857,
+              "max": 961.857,
+              "mean": 828.714
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 111.253,
+              "median": 126.326,
+              "p95": 138.947,
+              "max": 138.947,
+              "mean": 124.555
+            },
+            "jaccardVsPg": 0.961,
+            "recallOfPgMatches": 1,
+            "poolSize": 5064,
+            "pgIdsSample": [
+              26563,
+              33742,
+              12034,
+              38780,
+              41018,
+              3752
+            ],
+            "hardenedIdsSample": [
+              3611,
+              3752,
+              3900,
+              4006,
+              8393,
+              12034
+            ]
+          },
+          {
+            "label": "punctuated",
+            "query": "midnight-city!",
+            "pglite": {
+              "n": 50,
+              "min": 719.187,
+              "median": 796.018,
+              "p95": 829.237,
+              "max": 829.237,
+              "mean": 780.215
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 83.968,
+              "median": 91.295,
+              "p95": 105.093,
+              "max": 105.093,
+              "mean": 92.371
+            },
+            "jaccardVsPg": 0.852,
+            "recallOfPgMatches": 1,
+            "poolSize": 5064,
+            "pgIdsSample": [
+              19435,
+              43044,
+              22056,
+              4006,
+              8393,
+              40809
+            ],
+            "hardenedIdsSample": [
+              3611,
+              3752,
+              3900,
+              4006,
+              8393,
+              12034
+            ]
+          },
+          {
+            "label": "punctuated_spaces",
+            "query": "m.i.d.n.i.g.h.t  c.i.t.y",
+            "pglite": {
+              "n": 50,
+              "min": 741.704,
+              "median": 787.149,
+              "p95": 813.695,
+              "max": 813.695,
+              "mean": 775.136
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 88.389,
+              "median": 91.859,
+              "p95": 102.439,
+              "max": 102.439,
+              "mean": 92.796
+            },
+            "jaccardVsPg": 0.852,
+            "recallOfPgMatches": 1,
+            "poolSize": 5064,
+            "pgIdsSample": [
+              45269,
+              33742,
+              43044,
+              4006,
+              19435,
+              20473
+            ],
+            "hardenedIdsSample": [
+              3611,
+              3752,
+              3900,
+              4006,
+              8393,
+              12034
+            ]
+          },
+          {
+            "label": "partial_word",
+            "query": "velv",
+            "pglite": {
+              "n": 50,
+              "min": 628.757,
+              "median": 672.079,
+              "p95": 700.316,
+              "max": 700.316,
+              "mean": 670.113
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 36.323,
+              "median": 43.55,
+              "p95": 48.752,
+              "max": 48.752,
+              "mean": 42.331
+            },
+            "jaccardVsPg": 0.613,
+            "recallOfPgMatches": 1,
+            "poolSize": 2206,
+            "pgIdsSample": [
+              44676,
+              8243,
+              26601,
+              49669,
+              6576,
+              9157
+            ],
+            "hardenedIdsSample": [
+              3078,
+              6576,
+              8243,
+              9157,
+              12789,
+              13784
+            ]
+          },
+          {
+            "label": "short_query_2chars",
+            "query": "fe",
+            "pglite": {
+              "n": 50,
+              "min": 593.2,
+              "median": 678.341,
+              "p95": 689.144,
+              "max": 689.144,
+              "mean": 660.303
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 85.12,
+              "median": 101.006,
+              "p95": 157.46,
+              "max": 157.46,
+              "mean": 108.124
+            },
+            "jaccardVsPg": 0,
+            "recallOfPgMatches": 1,
+            "poolSize": 8970,
+            "pgIdsSample": [
+              28902,
+              25868,
+              6070,
+              45822,
+              6750,
+              369
+            ],
+            "hardenedIdsSample": [
+              2626,
+              12897,
+              20310,
+              22071,
+              23458,
+              23872
+            ]
+          },
+          {
+            "label": "single_char",
+            "query": "a",
+            "pglite": {
+              "n": 50,
+              "min": 517.749,
+              "median": 571.935,
+              "p95": 599.265,
+              "max": 599.265,
+              "mean": 563.065
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 0.204,
+              "median": 0.223,
+              "p95": 0.366,
+              "max": 0.366,
+              "mean": 0.236
+            },
+            "jaccardVsPg": 0,
+            "recallOfPgMatches": 0.06,
+            "poolSize": 20000,
+            "pgIdsSample": [
+              28964,
+              16833,
+              33967,
+              34596,
+              14545,
+              28766
+            ],
+            "hardenedIdsSample": [
+              3942,
+              5093,
+              20976,
+              22718,
+              24787,
+              27497
+            ]
+          },
+          {
+            "label": "unicode",
+            "query": "夢のつづき",
+            "pglite": {
+              "n": 45,
+              "min": 710.332,
+              "median": 731.446,
+              "p95": 776.029,
+              "max": 776.029,
+              "mean": 731.155
+            },
+            "sqliteHardened": {
+              "n": 45,
+              "min": 1.489,
+              "median": 1.817,
+              "p95": 2.685,
+              "max": 2.685,
+              "mean": 1.865
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 45,
+            "pgIdsSample": [
+              4271,
+              4931,
+              6269,
+              6487,
+              6762,
+              7198
+            ],
+            "hardenedIdsSample": [
+              4271,
+              4931,
+              6269,
+              6487,
+              6762,
+              7198
+            ]
+          },
+          {
+            "label": "unicode_partial",
+            "query": "願い",
+            "pglite": {
+              "n": 50,
+              "min": 630.005,
+              "median": 662.61,
+              "p95": 704.895,
+              "max": 704.895,
+              "mean": 665.047
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 5.194,
+              "median": 6.039,
+              "p95": 6.344,
+              "max": 6.344,
+              "mean": 5.944
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 51,
+            "pgIdsSample": [
+              878,
+              1168,
+              1463,
+              3653,
+              4050,
+              5922
+            ],
+            "hardenedIdsSample": [
+              878,
+              1168,
+              1463,
+              3653,
+              4050,
+              5922
+            ]
+          },
+          {
+            "label": "typo_transpose",
+            "query": "midngith",
+            "pglite": {
+              "n": 0,
+              "min": 668.745,
+              "median": 735.162,
+              "p95": 768.617,
+              "max": 768.617,
+              "mean": 724.595
+            },
+            "sqliteHardened": {
+              "n": 0,
+              "min": 24.927,
+              "median": 28.515,
+              "p95": 39.383,
+              "max": 39.383,
+              "mean": 29.848
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 2154,
+            "pgIdsSample": [],
+            "hardenedIdsSample": []
+          },
+          {
+            "label": "typo_missing_char",
+            "query": "velvt",
+            "pglite": {
+              "n": 30,
+              "min": 651.507,
+              "median": 674.751,
+              "p95": 815.319,
+              "max": 815.319,
+              "mean": 691.554
+            },
+            "sqliteHardened": {
+              "n": 30,
+              "min": 25.484,
+              "median": 28.76,
+              "p95": 38.641,
+              "max": 38.641,
+              "mean": 29.319
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 2206,
+            "pgIdsSample": [
+              3078,
+              6576,
+              8243,
+              9157,
+              12789,
+              13784
+            ],
+            "hardenedIdsSample": [
+              3078,
+              6576,
+              8243,
+              9157,
+              12789,
+              13784
+            ]
+          },
+          {
+            "label": "typo_extra_char",
+            "query": "goldenx hour",
+            "pglite": {
+              "n": 50,
+              "min": 715.359,
+              "median": 732.924,
+              "p95": 795.068,
+              "max": 795.068,
+              "mean": 740.895
+            },
+            "sqliteHardened": {
+              "n": 50,
+              "min": 38.833,
+              "median": 41.981,
+              "p95": 44.399,
+              "max": 44.399,
+              "mean": 41.387
+            },
+            "jaccardVsPg": 0.786,
+            "recallOfPgMatches": 1,
+            "poolSize": 2482,
+            "pgIdsSample": [
+              14781,
+              916,
+              43300,
+              2874,
+              33952,
+              10703
+            ],
+            "hardenedIdsSample": [
+              916,
+              2874,
+              8938,
+              9879,
+              10094,
+              10703
+            ]
+          },
+          {
+            "label": "artist_substring",
+            "query": "tanaka",
+            "pglite": {
+              "n": 0,
+              "min": 648.807,
+              "median": 684.537,
+              "p95": 711.411,
+              "max": 711.411,
+              "mean": 680.16
+            },
+            "sqliteHardened": {
+              "n": 0,
+              "min": 4.055,
+              "median": 4.532,
+              "p95": 5.589,
+              "max": 5.589,
+              "mean": 4.646
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 338,
+            "pgIdsSample": [],
+            "hardenedIdsSample": []
+          },
+          {
+            "label": "no_match",
+            "query": "zzzznothing",
+            "pglite": {
+              "n": 0,
+              "min": 672.389,
+              "median": 714.769,
+              "p95": 773.163,
+              "max": 773.163,
+              "mean": 721.607
+            },
+            "sqliteHardened": {
+              "n": 0,
+              "min": 80.483,
+              "median": 90.229,
+              "p95": 100.482,
+              "max": 100.482,
+              "mean": 90.552
+            },
+            "jaccardVsPg": 1,
+            "recallOfPgMatches": 1,
+            "poolSize": 6589,
+            "pgIdsSample": [],
+            "hardenedIdsSample": []
+          }
+        ],
+        "typoCalibration": {
+          "typo_missing_char": {
+            "pg": 30,
+            "hardened": 30,
+            "jac": 1
+          },
+          "typo_transpose": {
+            "pg": 0,
+            "hardened": 0,
+            "jac": 1
+          },
+          "typo_extra_char": {
+            "pg": 50,
+            "hardened": 50,
+            "jac": 0.786
+          }
+        },
+        "verdict": {
+          "regressionsClosed": true,
+          "normalQueriesPreserved": true,
+          "note": "jaccard on LIMIT-50 lists conflates recall with ranking; recallOfPgMatches is the regression-closure measure"
+        }
+      },
+      "suites": {}
+    },
+    "search": {
+      "name": "search",
+      "recordedAt": "2026-08-29T12:06:30.030Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "size": 50000,
+      "reps": 8,
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "size": 50000,
+        "probes": [
+          {
+            "label": "exact_title",
+            "query": "midnight city",
+            "kind": "exact",
+            "pglite": {
+              "n": 50,
+              "min": 857.293,
+              "median": 1180.782,
+              "p95": 1244.249,
+              "max": 1244.249,
+              "mean": 1091.615
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 7.507,
+              "median": 7.831,
+              "p95": 11.711,
+              "max": 11.711,
+              "mean": 8.34
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 2.447,
+              "median": 2.578,
+              "p95": 9.171,
+              "max": 9.171,
+              "mean": 3.416
+            },
+            "overlap": {
+              "pglite_vs_like": 0.639344262295082,
+              "pglite_vs_fts5": 0.9607843137254902
+            }
+          },
+          {
+            "label": "prefix",
+            "query": "gold",
+            "kind": "prefix",
+            "pglite": {
+              "n": 50,
+              "min": 571.39,
+              "median": 941.028,
+              "p95": 1444.84,
+              "max": 1444.84,
+              "mean": 864.779
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 11,
+              "median": 11.894,
+              "p95": 14.46,
+              "max": 14.46,
+              "mean": 12
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 6.59,
+              "median": 7.018,
+              "p95": 12.345,
+              "max": 12.345,
+              "mean": 8.11
+            },
+            "overlap": {
+              "pglite_vs_like": 0.02040816326530612,
+              "pglite_vs_fts5": 0.639344262295082
+            }
+          },
+          {
+            "label": "substring",
+            "query": "idnight ci",
+            "kind": "substring",
+            "pglite": {
+              "n": 50,
+              "min": 737.394,
+              "median": 851.873,
+              "p95": 1455.726,
+              "max": 1455.726,
+              "mean": 962.335
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 6.527,
+              "median": 8.228,
+              "p95": 11.124,
+              "max": 11.124,
+              "mean": 8.338
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 2.213,
+              "median": 2.373,
+              "p95": 2.688,
+              "max": 2.688,
+              "mean": 2.396
+            },
+            "overlap": {
+              "pglite_vs_like": 0.42857142857142855,
+              "pglite_vs_fts5": 0.9230769230769231
+            }
+          },
+          {
+            "label": "multi_word",
+            "query": "shadow sky",
+            "kind": "multi-word",
+            "pglite": {
+              "n": 50,
+              "min": 699.561,
+              "median": 803.744,
+              "p95": 1295.817,
+              "max": 1295.817,
+              "mean": 845.93
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 6.521,
+              "median": 6.709,
+              "p95": 7.244,
+              "max": 7.244,
+              "mean": 6.772
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 1.688,
+              "median": 1.779,
+              "p95": 3.012,
+              "max": 3.012,
+              "mean": 1.928
+            },
+            "overlap": {
+              "pglite_vs_like": 0.6129032258064516,
+              "pglite_vs_fts5": 1
+            }
+          },
+          {
+            "label": "case_mismatch",
+            "query": "MIDNIGHT CITY",
+            "kind": "case",
+            "pglite": {
+              "n": 50,
+              "min": 631.114,
+              "median": 690.908,
+              "p95": 983.176,
+              "max": 983.176,
+              "mean": 719.258
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 6.606,
+              "median": 7.04,
+              "p95": 7.375,
+              "max": 7.375,
+              "mean": 7.041
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 2.049,
+              "median": 2.191,
+              "p95": 2.379,
+              "max": 2.379,
+              "mean": 2.205
+            },
+            "overlap": {
+              "pglite_vs_like": 0.639344262295082,
+              "pglite_vs_fts5": 0.9607843137254902
+            }
+          },
+          {
+            "label": "punctuated",
+            "query": "midnight-city!",
+            "kind": "punct",
+            "pglite": {
+              "n": 50,
+              "min": 679.433,
+              "median": 834.947,
+              "p95": 1138.774,
+              "max": 1138.774,
+              "mean": 850.051
+            },
+            "sqlite_like": {
+              "n": 0,
+              "min": 6.34,
+              "median": 6.708,
+              "p95": 6.949,
+              "max": 6.949,
+              "mean": 6.695
+            },
+            "sqlite_fts5": {
+              "n": 0,
+              "min": 0.08,
+              "median": 0.085,
+              "p95": 0.198,
+              "max": 0.198,
+              "mean": 0.102
+            },
+            "overlap": {
+              "pglite_vs_like": 0,
+              "pglite_vs_fts5": 0
+            }
+          },
+          {
+            "label": "partial_word",
+            "query": "velv",
+            "kind": "partial",
+            "pglite": {
+              "n": 50,
+              "min": 584.596,
+              "median": 798.921,
+              "p95": 914.094,
+              "max": 914.094,
+              "mean": 748.716
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 8.084,
+              "median": 11.135,
+              "p95": 14,
+              "max": 14,
+              "mean": 10.456
+            },
+            "sqlite_fts5": {
+              "n": 50,
+              "min": 8.213,
+              "median": 8.575,
+              "p95": 10.31,
+              "max": 10.31,
+              "mean": 8.699
+            },
+            "overlap": {
+              "pglite_vs_like": 0.030927835051546393,
+              "pglite_vs_fts5": 0.6129032258064516
+            }
+          },
+          {
+            "label": "short_query_2chars",
+            "query": "fe",
+            "kind": "short",
+            "pglite": {
+              "n": 50,
+              "min": 556.362,
+              "median": 692.711,
+              "p95": 774.899,
+              "max": 774.899,
+              "mean": 676.983
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 8.088,
+              "median": 9.972,
+              "p95": 10.633,
+              "max": 10.633,
+              "mean": 9.447
+            },
+            "sqlite_fts5": {
+              "skipped": "query < 3 chars after normalize"
+            },
+            "overlap": {
+              "pglite_vs_like": 0,
+              "pglite_vs_fts5": null
+            }
+          },
+          {
+            "label": "single_char",
+            "query": "a",
+            "kind": "short",
+            "pglite": {
+              "n": 50,
+              "min": 431.715,
+              "median": 488.951,
+              "p95": 697.183,
+              "max": 697.183,
+              "mean": 511.329
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 12.289,
+              "median": 12.563,
+              "p95": 12.65,
+              "max": 12.65,
+              "mean": 12.465
+            },
+            "sqlite_fts5": {
+              "skipped": "query < 3 chars after normalize"
+            },
+            "overlap": {
+              "pglite_vs_like": 0,
+              "pglite_vs_fts5": null
+            }
+          },
+          {
+            "label": "unicode",
+            "query": "夢のつづき",
+            "kind": "unicode",
+            "pglite": {
+              "n": 45,
+              "min": 692.647,
+              "median": 856.447,
+              "p95": 1206.849,
+              "max": 1206.849,
+              "mean": 892.025
+            },
+            "sqlite_like": {
+              "n": 45,
+              "min": 5.405,
+              "median": 5.679,
+              "p95": 8.327,
+              "max": 8.327,
+              "mean": 6.195
+            },
+            "sqlite_fts5": {
+              "n": 45,
+              "min": 0.244,
+              "median": 0.251,
+              "p95": 10.999,
+              "max": 10.999,
+              "mean": 1.602
+            },
+            "overlap": {
+              "pglite_vs_like": 1,
+              "pglite_vs_fts5": 1
+            }
+          },
+          {
+            "label": "unicode_partial",
+            "query": "願い",
+            "kind": "unicode-partial",
+            "pglite": {
+              "n": 50,
+              "min": 744.64,
+              "median": 966.335,
+              "p95": 1027.33,
+              "max": 1027.33,
+              "mean": 918.189
+            },
+            "sqlite_like": {
+              "n": 50,
+              "min": 6.541,
+              "median": 7.798,
+              "p95": 11.316,
+              "max": 11.316,
+              "mean": 7.942
+            },
+            "sqlite_fts5": {
+              "skipped": "query < 3 chars after normalize"
+            },
+            "overlap": {
+              "pglite_vs_like": 1,
+              "pglite_vs_fts5": null
+            }
+          },
+          {
+            "label": "typo_transpose",
+            "query": "midngith",
+            "kind": "typo",
+            "pglite": {
+              "n": 0,
+              "min": 796.852,
+              "median": 918.332,
+              "p95": 1084.516,
+              "max": 1084.516,
+              "mean": 904.768
+            },
+            "sqlite_like": {
+              "n": 0,
+              "min": 6.596,
+              "median": 7.172,
+              "p95": 12.756,
+              "max": 12.756,
+              "mean": 8.053
+            },
+            "sqlite_fts5": {
+              "n": 0,
+              "min": 0.066,
+              "median": 0.07,
+              "p95": 0.184,
+              "max": 0.184,
+              "mean": 0.086
+            },
+            "overlap": {
+              "pglite_vs_like": 1,
+              "pglite_vs_fts5": 1
+            }
+          },
+          {
+            "label": "typo_missing_char",
+            "query": "velvt",
+            "kind": "typo",
+            "pglite": {
+              "n": 30,
+              "min": 696.404,
+              "median": 781.366,
+              "p95": 1473.418,
+              "max": 1473.418,
+              "mean": 865.957
+            },
+            "sqlite_like": {
+              "n": 0,
+              "min": 8.688,
+              "median": 11.201,
+              "p95": 12.158,
+              "max": 12.158,
+              "mean": 11.088
+            },
+            "sqlite_fts5": {
+              "n": 0,
+              "min": 0.117,
+              "median": 0.138,
+              "p95": 0.381,
+              "max": 0.381,
+              "mean": 0.172
+            },
+            "overlap": {
+              "pglite_vs_like": 0,
+              "pglite_vs_fts5": 0
+            }
+          },
+          {
+            "label": "artist_substring",
+            "query": "tanaka",
+            "kind": "artist",
+            "pglite": {
+              "n": 0,
+              "min": 622.858,
+              "median": 960.227,
+              "p95": 1233.993,
+              "max": 1233.993,
+              "mean": 879.5
+            },
+            "sqlite_like": {
+              "n": 0,
+              "min": 11.945,
+              "median": 13.145,
+              "p95": 16.574,
+              "max": 16.574,
+              "mean": 13.606
+            },
+            "sqlite_fts5": {
+              "n": 0,
+              "min": 0.176,
+              "median": 0.196,
+              "p95": 0.592,
+              "max": 0.592,
+              "mean": 0.254
+            },
+            "overlap": {
+              "pglite_vs_like": 1,
+              "pglite_vs_fts5": 1
+            }
+          },
+          {
+            "label": "no_match",
+            "query": "zzzznothing",
+            "kind": "negative",
+            "pglite": {
+              "n": 0,
+              "min": 765.274,
+              "median": 1278.667,
+              "p95": 1456.232,
+              "max": 1456.232,
+              "mean": 1103.413
+            },
+            "sqlite_like": {
+              "n": 0,
+              "min": 4.676,
+              "median": 5.206,
+              "p95": 5.695,
+              "max": 5.695,
+              "mean": 5.172
+            },
+            "sqlite_fts5": {
+              "n": 0,
+              "min": 0.051,
+              "median": 0.061,
+              "p95": 0.2,
+              "max": 0.2,
+              "mean": 0.077
+            },
+            "overlap": {
+              "pglite_vs_like": 1,
+              "pglite_vs_fts5": 1
+            }
+          }
+        ],
+        "metadata_cross_search": {
+          "pglite": {
+            "n": 8,
+            "min": 822.724,
+            "median": 894.435,
+            "p95": 1225.35,
+            "max": 1225.35,
+            "mean": 938.743
+          },
+          "sqlite": {
+            "n": 8,
+            "min": 20.333,
+            "median": 22.068,
+            "p95": 30.577,
+            "max": 30.577,
+            "mean": 22.953
+          },
+          "pgN": 50,
+          "sqN": 50
+        }
+      },
+      "suites": {}
+    },
+    "shutdown": {
+      "name": "shutdown",
+      "recordedAt": "2026-08-29T12:17:27.111Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "engines": {
+          "sqlite": {
+            "close_during_read": {
+              "closeMs": 8.656900000000064,
+              "readOutcome": "completed"
+            },
+            "close_during_write_tx": {
+              "closeMs": 5559.6767,
+              "stragglerResult": "committed-after-close",
+              "songsAfterReopen": 120,
+              "integrity": "ok",
+              "consistent": true
+            },
+            "write_after_close": {
+              "afterClose": 1.8400000000001455,
+              "writeAfterCloseError": "database is not open",
+              "throwsCleanly": true
+            },
+            "wal_checkpoint_on_close": {
+              "mainSizeMb": 0.39,
+              "walLeftBytes": 0,
+              "songsOnReopen": 121,
+              "selfContained": true
+            }
+          }
+        }
+      },
+      "suites": {}
+    },
+    "smartplaylist": {
+      "name": "smartplaylist",
+      "recordedAt": "2026-08-29T12:29:16.361Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "size": 50000,
+        "rules": [
+          {
+            "name": "contains: title ILIKE %golden%",
+            "pgCount": 2158,
+            "sqCount": 2158,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "contains: artist name ILIKE %tanaka%",
+            "pgCount": 2100,
+            "sqCount": 2100,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "not_contains: title NOT ILIKE %golden%",
+            "pgCount": 47842,
+            "sqCount": 47842,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "starts_with: title ILIKE mid%",
+            "pgCount": 1843,
+            "sqCount": 1843,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "ends_with: title ILIKE %city",
+            "pgCount": 1239,
+            "sqCount": 1239,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "eq: year = 1994",
+            "pgCount": 656,
+            "sqCount": 656,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "gt: duration > 300",
+            "pgCount": 18537,
+            "sqCount": 18537,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "is_true: is_favorite = true",
+            "pgCount": 5019,
+            "sqCount": 5019,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "is_false: is_blacklisted = false",
+            "pgCount": 48951,
+            "sqCount": 48951,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "is_null: language IS NULL",
+            "pgCount": 0,
+            "sqCount": 0,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "is_not_null: isrc IS NOT NULL",
+            "pgCount": 24746,
+            "sqCount": 24746,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "in_last: created_at >= NOW() - 30 days",
+            "pgCount": 2118,
+            "sqCount": 2128,
+            "match": false,
+            "onlyPgSample": [],
+            "onlySqSample": [
+              987,
+              5922,
+              7800,
+              9846,
+              11844
+            ]
+          },
+          {
+            "name": "not_in_last: created_at < NOW() - 90 days",
+            "pgCount": 43668,
+            "sqCount": 43660,
+            "match": false,
+            "onlyPgSample": [
+              6254,
+              10819,
+              11538,
+              18126,
+              33522
+            ],
+            "onlySqSample": []
+          },
+          {
+            "name": "group AND: is_favorite AND year > 2010",
+            "pgCount": 856,
+            "sqCount": 856,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "group OR: language = ko OR language = ja",
+            "pgCount": 6984,
+            "sqCount": 6984,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "gte: skip_count >= 3",
+            "pgCount": 25168,
+            "sqCount": 25168,
+            "match": true,
+            "onlyPgSample": [],
+            "onlySqSample": []
+          },
+          {
+            "name": "unicode: CJK title match (case paths not exercised)",
+            "pgCount": 20,
+            "sqCount": 20,
+            "match": true
+          }
+        ],
+        "unicode_ci_note": {
+          "note": "PG citext lower() is locale-aware; SQLite lower() is ASCII-only. For CJK (caseless scripts) both behave identically. Risk: Turkish İ/ı, Greek final sigma in title_ci equality/ORDER BY.",
+          "pgCount": 5,
+          "sqCount": 5
+        },
+        "mismatchCount": 2,
+        "verdict": "2 rule(s) differ — see rules[].match=false"
+      },
+      "suites": {}
+    },
+    "startup": {
+      "name": "startup",
+      "recordedAt": "2026-08-29T10:51:08.831Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "method": "forked fresh process per iteration; populated disk-backed DBs; warm OS page cache",
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "sizes": {
+          "1300": {
+            "sqliteMb": 3.1,
+            "pgliteMb": 59.9,
+            "runs": {
+              "sqlite": [
+                {
+                  "engineCreateMs": 12.9,
+                  "schemaInitMs": 0.29,
+                  "drizzleInitMs": 1.55,
+                  "firstQueryMs": 0.05,
+                  "firstMeaningfulQueryMs": 17.97,
+                  "closeMs": 1.1660000000000537
+                },
+                {
+                  "engineCreateMs": 4.53,
+                  "schemaInitMs": 0.22,
+                  "drizzleInitMs": 1.47,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 3.29,
+                  "closeMs": 0.9835000000000491
+                },
+                {
+                  "engineCreateMs": 4.08,
+                  "schemaInitMs": 0.16,
+                  "drizzleInitMs": 1.57,
+                  "firstQueryMs": 0.04,
+                  "firstMeaningfulQueryMs": 3.59,
+                  "closeMs": 1.2610999999999422
+                },
+                {
+                  "engineCreateMs": 3.75,
+                  "schemaInitMs": 0.14,
+                  "drizzleInitMs": 1.41,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 3.28,
+                  "closeMs": 1.0153000000000247
+                },
+                {
+                  "engineCreateMs": 3.4,
+                  "schemaInitMs": 0.13,
+                  "drizzleInitMs": 1.35,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 3.22,
+                  "closeMs": 1.0758999999999332
+                },
+                {
+                  "engineCreateMs": 3.39,
+                  "schemaInitMs": 0.13,
+                  "drizzleInitMs": 1.36,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 3.27,
+                  "closeMs": 0.9397999999999911
+                },
+                {
+                  "engineCreateMs": 4.03,
+                  "schemaInitMs": 0.16,
+                  "drizzleInitMs": 1.47,
+                  "firstQueryMs": 0.04,
+                  "firstMeaningfulQueryMs": 3.51,
+                  "closeMs": 0.9827999999999975
+                }
+              ],
+              "pglite": [
+                {
+                  "engineCreateMs": 458.21,
+                  "schemaInitMs": 44.78,
+                  "drizzleInitMs": 1.71,
+                  "firstQueryMs": 1.05,
+                  "firstMeaningfulQueryMs": 105.95,
+                  "closeMs": 37.14080000000001
+                },
+                {
+                  "engineCreateMs": 430.39,
+                  "schemaInitMs": 37.34,
+                  "drizzleInitMs": 2.77,
+                  "firstQueryMs": 1.07,
+                  "firstMeaningfulQueryMs": 92.9,
+                  "closeMs": 39.24309999999991
+                },
+                {
+                  "engineCreateMs": 402.33,
+                  "schemaInitMs": 40.32,
+                  "drizzleInitMs": 3.3,
+                  "firstQueryMs": 1.88,
+                  "firstMeaningfulQueryMs": 91.04,
+                  "closeMs": 40.60660000000007
+                },
+                {
+                  "engineCreateMs": 444.33,
+                  "schemaInitMs": 35.58,
+                  "drizzleInitMs": 2.46,
+                  "firstQueryMs": 1.01,
+                  "firstMeaningfulQueryMs": 88.37,
+                  "closeMs": 45.814199999999914
+                },
+                {
+                  "engineCreateMs": 423.9,
+                  "schemaInitMs": 39.13,
+                  "drizzleInitMs": 2.45,
+                  "firstQueryMs": 1.58,
+                  "firstMeaningfulQueryMs": 85.5,
+                  "closeMs": 47.08889999999997
+                },
+                {
+                  "engineCreateMs": 412.31,
+                  "schemaInitMs": 37.8,
+                  "drizzleInitMs": 2.62,
+                  "firstQueryMs": 1.86,
+                  "firstMeaningfulQueryMs": 91.31,
+                  "closeMs": 44.21799999999996
+                },
+                {
+                  "engineCreateMs": 394.27,
+                  "schemaInitMs": 34.44,
+                  "drizzleInitMs": 2.32,
+                  "firstQueryMs": 0.93,
+                  "firstMeaningfulQueryMs": 80.79,
+                  "closeMs": 41.90129999999999
+                }
+              ]
+            }
+          },
+          "50000": {
+            "sqliteMb": 84.2,
+            "pgliteMb": 384.9,
+            "runs": {
+              "sqlite": [
+                {
+                  "engineCreateMs": 8.59,
+                  "schemaInitMs": 0.13,
+                  "drizzleInitMs": 1.31,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 206.07,
+                  "closeMs": 5.6580000000000155
+                },
+                {
+                  "engineCreateMs": 4.3,
+                  "schemaInitMs": 0.26,
+                  "drizzleInitMs": 2.43,
+                  "firstQueryMs": 0.04,
+                  "firstMeaningfulQueryMs": 135.38,
+                  "closeMs": 4.150700000000029
+                },
+                {
+                  "engineCreateMs": 3.77,
+                  "schemaInitMs": 0.14,
+                  "drizzleInitMs": 1.62,
+                  "firstQueryMs": 0.08,
+                  "firstMeaningfulQueryMs": 128.36,
+                  "closeMs": 3.840000000000032
+                },
+                {
+                  "engineCreateMs": 3.61,
+                  "schemaInitMs": 0.14,
+                  "drizzleInitMs": 1.39,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 150.19,
+                  "closeMs": 3.9325999999999794
+                },
+                {
+                  "engineCreateMs": 4.41,
+                  "schemaInitMs": 0.26,
+                  "drizzleInitMs": 2.28,
+                  "firstQueryMs": 0.07,
+                  "firstMeaningfulQueryMs": 154.68,
+                  "closeMs": 4.273599999999988
+                },
+                {
+                  "engineCreateMs": 3.51,
+                  "schemaInitMs": 0.11,
+                  "drizzleInitMs": 1.23,
+                  "firstQueryMs": 0.03,
+                  "firstMeaningfulQueryMs": 143.39,
+                  "closeMs": 4.716000000000008
+                },
+                {
+                  "engineCreateMs": 4.12,
+                  "schemaInitMs": 0.18,
+                  "drizzleInitMs": 1.63,
+                  "firstQueryMs": 0.04,
+                  "firstMeaningfulQueryMs": 125.15,
+                  "closeMs": 3.9810999999999694
+                }
+              ],
+              "pglite": [
+                {
+                  "engineCreateMs": 436.38,
+                  "schemaInitMs": 35.92,
+                  "drizzleInitMs": 3.51,
+                  "firstQueryMs": 1.42,
+                  "firstMeaningfulQueryMs": 401.47,
+                  "closeMs": 20.64370000000008
+                },
+                {
+                  "engineCreateMs": 416.84,
+                  "schemaInitMs": 32.24,
+                  "drizzleInitMs": 2.74,
+                  "firstQueryMs": 1.06,
+                  "firstMeaningfulQueryMs": 389.85,
+                  "closeMs": 25.246999999999957
+                },
+                {
+                  "engineCreateMs": 429.2,
+                  "schemaInitMs": 32.98,
+                  "drizzleInitMs": 2.32,
+                  "firstQueryMs": 1.4,
+                  "firstMeaningfulQueryMs": 400.1,
+                  "closeMs": 29.16590000000008
+                },
+                {
+                  "engineCreateMs": 427.97,
+                  "schemaInitMs": 33.78,
+                  "drizzleInitMs": 1.87,
+                  "firstQueryMs": 1.69,
+                  "firstMeaningfulQueryMs": 456.35,
+                  "closeMs": 24.41319999999996
+                },
+                {
+                  "engineCreateMs": 443.83,
+                  "schemaInitMs": 36.22,
+                  "drizzleInitMs": 2.63,
+                  "firstQueryMs": 1.38,
+                  "firstMeaningfulQueryMs": 383.33,
+                  "closeMs": 23.360500000000002
+                },
+                {
+                  "engineCreateMs": 402.65,
+                  "schemaInitMs": 39.93,
+                  "drizzleInitMs": 1.46,
+                  "firstQueryMs": 0.86,
+                  "firstMeaningfulQueryMs": 399.92,
+                  "closeMs": 25.047000000000025
+                },
+                {
+                  "engineCreateMs": 418.64,
+                  "schemaInitMs": 39.16,
+                  "drizzleInitMs": 1.76,
+                  "firstQueryMs": 1.42,
+                  "firstMeaningfulQueryMs": 388.48,
+                  "closeMs": 22.887699999999995
+                }
+              ]
+            }
+          }
+        }
+      },
+      "suites": {}
+    },
+    "write": {
+      "name": "write",
+      "recordedAt": "2026-08-29T13:47:53.544Z",
+      "host": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "env": {
+        "os": "Windows_NT 10.0.26200 (x64)",
+        "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+        "cores": 8,
+        "totalMemGb": 7.8,
+        "node": "v24.18.0"
+      },
+      "results": {
+        "scenarios": {
+          "insertMatrix": [
+            {
+              "n": 1,
+              "mode": "autocommit",
+              "sqlite": {
+                "ms": 1.2407000000000608,
+                "rowsPerSec": 806
+              },
+              "pglite": {
+                "ms": 57.14090000000033,
+                "rowsPerSec": 18
+              }
+            },
+            {
+              "n": 1,
+              "mode": "one-tx",
+              "sqlite": {
+                "ms": 1.7299000000002707,
+                "rowsPerSec": 578
+              },
+              "pglite": {
+                "ms": 44.792099999998754,
+                "rowsPerSec": 22
+              }
+            },
+            {
+              "n": 1,
+              "mode": "batched-100",
+              "sqlite": {
+                "ms": 1.3965000000007421,
+                "rowsPerSec": 716
+              },
+              "pglite": {
+                "ms": 43.45210000000225,
+                "rowsPerSec": 23
+              }
+            },
+            {
+              "n": 100,
+              "mode": "autocommit",
+              "sqlite": {
+                "ms": 123.35499999999956,
+                "rowsPerSec": 811
+              },
+              "pglite": {
+                "ms": 239.09470000000147,
+                "rowsPerSec": 418
+              }
+            },
+            {
+              "n": 100,
+              "mode": "one-tx",
+              "sqlite": {
+                "ms": 11.309900000000198,
+                "rowsPerSec": 8842
+              },
+              "pglite": {
+                "ms": 162.04969999999958,
+                "rowsPerSec": 617
+              }
+            },
+            {
+              "n": 100,
+              "mode": "batched-100",
+              "sqlite": {
+                "ms": 10.966100000001461,
+                "rowsPerSec": 9119
+              },
+              "pglite": {
+                "ms": 172.95630000000529,
+                "rowsPerSec": 578
+              }
+            },
+            {
+              "n": 1000,
+              "mode": "autocommit",
+              "sqlite": {
+                "ms": 802.9988000000012,
+                "rowsPerSec": 1245
+              },
+              "pglite": {
+                "ms": 1278.8872999999949,
+                "rowsPerSec": 782
+              }
+            },
+            {
+              "n": 1000,
+              "mode": "one-tx",
+              "sqlite": {
+                "ms": 98.19150000000081,
+                "rowsPerSec": 10184
+              },
+              "pglite": {
+                "ms": 1147.215099999994,
+                "rowsPerSec": 872
+              }
+            },
+            {
+              "n": 1000,
+              "mode": "batched-100",
+              "sqlite": {
+                "ms": 140.08410000000003,
+                "rowsPerSec": 7139
+              },
+              "pglite": {
+                "ms": 1118.8889000000054,
+                "rowsPerSec": 894
+              }
+            },
+            {
+              "n": 10000,
+              "mode": "autocommit",
+              "sqlite": {
+                "ms": 11568.244700000003,
+                "rowsPerSec": 864
+              },
+              "pglite": {
+                "ms": 11958.685100000002,
+                "rowsPerSec": 836
+              }
+            },
+            {
+              "n": 10000,
+              "mode": "one-tx",
+              "sqlite": {
+                "ms": 1135.4282999999996,
+                "rowsPerSec": 8807
+              },
+              "pglite": {
+                "ms": 10588.499299999996,
+                "rowsPerSec": 944
+              }
+            },
+            {
+              "n": 10000,
+              "mode": "batched-100",
+              "sqlite": {
+                "ms": 1848.6534000000102,
+                "rowsPerSec": 5409
+              },
+              "pglite": {
+                "ms": 8519.396900000007,
+                "rowsPerSec": 1174
+              }
+            },
+            {
+              "n": 50000,
+              "mode": "one-tx",
+              "sqlite": {
+                "ms": 5892.8701,
+                "rowsPerSec": 8485
+              },
+              "pglite": {
+                "ms": 41962.224799999996,
+                "rowsPerSec": 1192
+              }
+            }
+          ],
+          "relationInserts50k": {
+            "sqlite": {
+              "ms": 225.7231000000029,
+              "rowsPerSec": 221502
+            },
+            "pglite": {
+              "ms": 23120.45690000002,
+              "rowsPerSec": 2163
+            }
+          },
+          "ftsTriggerCost": {
+            "withFts": {
+              "ms": 2122.3062999999966,
+              "rowsPerSec": 9424
+            },
+            "withoutFts": {
+              "ms": 869.5254999999888,
+              "rowsPerSec": 23001
+            },
+            "overheadPct": 144
+          },
+          "noraShaped": {
+            "sqlite": {
+              "ms": 1129.7180999999982,
+              "rowsPerSec": 4426
+            },
+            "pglite": {
+              "ms": 21395.340200000006,
+              "rowsPerSec": 234
+            }
+          }
+        }
+      },
+      "suites": {}
+    }
+  }
+}

@@ -341,28 +341,28 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     switch (collection.kind) {
       case 'playlist': {
         const result = await this.database
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ count: sql<number>`count(*)` })
           .from(playlistEntries)
           .where(eq(playlistEntries.playlistId, colId));
         return result[0]?.count ?? 0;
       }
       case 'album': {
         const result = await this.database
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ count: sql<number>`count(*)` })
           .from(albumsSongs)
           .where(eq(albumsSongs.albumId, colId));
         return result[0]?.count ?? 0;
       }
       case 'artist': {
         const result = await this.database
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ count: sql<number>`count(*)` })
           .from(artistsSongs)
           .where(eq(artistsSongs.artistId, colId));
         return result[0]?.count ?? 0;
       }
       case 'genre': {
         const result = await this.database
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ count: sql<number>`count(*)` })
           .from(genresSongs)
           .where(eq(genresSongs.genreId, colId));
         return result[0]?.count ?? 0;

@@ -261,5 +261,6 @@ export const updatePlaylistName = async (
 
 export const deletePlaylists = async (playlistIds: number[], trx: DB | DBTransaction = db) => {
   const data = await trx.delete(playlists).where(inArray(playlists.id, playlistIds));
-  return data.affectedRows || 0;
+  // drizzle sqlite run result exposes SQLite's `changes` (pg used `affectedRows`)
+  return (data as unknown as { changes?: number }).changes ?? 0;
 };

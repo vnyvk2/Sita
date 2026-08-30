@@ -1,21 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { migrate } from 'drizzle-orm/pglite/migrator';
-import path from 'path';
 
-import * as schema from '@main/db/schema';
 import { albums, albumsArtists, albumsSongs, artists, artistsSongs, artworksSongs, genres, genresSongs, musicFolders, songs } from '@main/db/schema';
 
-// Mock DB with real in-memory PGlite
+// Mock DB with real in-memory SQLite (baseline schema applied by the engine)
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 vi.mock('@main/other/artworks', () => ({
@@ -26,9 +16,7 @@ vi.mock('@main/other/artworks', () => ({
   sweepUnusedArtworks: vi.fn().mockResolvedValue(undefined)
 }));
 
-import type { PGlite } from '@electric-sql/pglite';
 import { db } from '@main/db/db';
-const client = (db as unknown as { [k: string]: any }).$client as PGlite;
 import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
 import type { ParsedTrackDTO } from '@main/workers/process/workerProtocol';
 
@@ -36,11 +24,7 @@ describe('P1 FORENSIC INTEGRATION: Real PGlite Savepoint / Per-Track Ingestion A
   let rootFolderId: number;
 
   beforeAll(async () => {
-    await client.query('CREATE EXTENSION IF NOT EXISTS citext;');
-    await client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-
-    const migrationsFolder = path.resolve(__dirname, '../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
+    // Baseline SQLite schema is applied by the engine on first open (:memory:)
   });
 
   beforeEach(async () => {
@@ -67,7 +51,7 @@ describe('P1 FORENSIC INTEGRATION: Real PGlite Savepoint / Per-Track Ingestion A
     return {
       songPath: `/mock/music/track_${suffix}.mp3`,
       title: `Title ${suffix}`,
-      duration: '180',
+      duration: 180,
       artists: [`Artist ${suffix}`],
       albumArtists: [`AlbumArtist ${suffix}`],
       album: `Album ${suffix}`,

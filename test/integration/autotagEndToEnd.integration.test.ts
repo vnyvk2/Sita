@@ -308,7 +308,7 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
       path: tempTestFile,
       title: 'Old Song',
       year: 2000,
-      duration: '210.0',
+      duration: 210.0,
       artists: [],
       albums: [],
       genres: [],

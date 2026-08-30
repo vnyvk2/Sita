@@ -2,22 +2,13 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 
-import * as schema from '@main/db/schema';
 import { musicFolders, songs } from '@main/db/schema';
 
-// Mock DB with in-memory PGlite
+// Mock DB with in-memory SQLite (baseline schema applied by the engine)
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client };
+  const { createSqliteMockDb } = await import('../../../../test/helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 vi.mock('@main/parseSong/parseSong', () => ({
@@ -25,7 +16,7 @@ vi.mock('@main/parseSong/parseSong', () => ({
     const fileName = path.basename(songPath, path.extname(songPath));
     const [inserted] = await db.insert(songs).values({
       title: fileName,
-      duration: '180',
+      duration: 180,
       path: songPath,
       folderId,
       fileCreatedAt: new Date(),
@@ -56,9 +47,7 @@ vi.mock('@main/main', () => ({
 }));
 
 
-import type { PGlite } from '@electric-sql/pglite';
 import { db } from '@main/db/db';
-const client = (db as unknown as { $client: PGlite }).$client;
 import { diffFilesystemSnapshot, type DbSongSnapshot } from '../diffEngine';
 import { fastDiskWalk } from '../fastDiskWalk';
 import { LibraryReconciler } from '../LibraryReconciler';
@@ -68,12 +57,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
   let reconciler: LibraryReconciler;
 
   beforeAll(async () => {
-    await client.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
-    await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
-
-    const migrationsFolder = path.resolve(__dirname, '../../../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
-
+    // Baseline SQLite schema is applied by the engine on first open (:memory:)
     reconciler = new LibraryReconciler();
   });
 
@@ -269,7 +253,7 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     await fs.writeFile(existingSongPath, 'existing audio');
     const [existingSong] = await db.insert(songs).values({
       title: 'ExistingSong',
-      duration: '180',
+      duration: 180,
       path: existingSongPath,
       folderId: existing21.id,
       fileCreatedAt: new Date(),

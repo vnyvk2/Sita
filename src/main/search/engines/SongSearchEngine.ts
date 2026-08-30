@@ -1,5 +1,6 @@
 import { db } from '@db/db';
 import { songs } from '@db/schema';
+import { rawAll } from '@db/sqlite/raw';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
@@ -10,6 +11,10 @@ import type {
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
 import type { SearchMatchReference } from '../models/SearchMatchReference';
+import { fuzzySearch } from '../fuzzy/ftsFuzzySearch';
+
+/** query normalization with all whitespace removed — matches the *_norm columns */
+const normWithoutSpaces = (normalized: string) => normalized.replace(/\s+/g, '');
 
 export const SongSearchEngine = {
   async search(
@@ -23,19 +28,26 @@ export const SongSearchEngine = {
     const timer = timeStart();
 
     // --- TITLE SEARCH ---
-    const titleWhereClause = fuzzy
-      ? sql`(${songs.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${songs.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'} OR ${songs.titleCI} % ${normalized})`
-      : sql`(${songs.titleCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${songs.titleCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`;
+    // SQLite translation of the pg_trgm pipeline (ILIKE + regexp_replace + %):
+    //   1. raw LIKE (ASCII case-insensitive) covers exact/prefix/substring
+    //   2. title_norm LIKE covers punctuation/space-insensitive matches
+    //   3. the pg_trgm `%` fuzzy branch is replaced by the FTS trigram-OR pool +
+    //      JS pg-similarity scoring (ftsFuzzySearch), merged below when fuzzy=true
+    const norm = normWithoutSpaces(normalized);
+    const titleWhereClause = sql`(
+      ${songs.title} LIKE ${'%' + escaped + '%'} ESCAPE '\\'
+      OR ${songs.titleNorm} LIKE ${'%' + norm + '%'} ESCAPE '\\'
+    )`;
 
     const titleOrderBy = sql`(
       CASE
-        WHEN ${songs.titleCI} ILIKE ${escaped}                THEN 6
-        WHEN ${songs.titleCI} ILIKE ${escaped + '%'}          THEN 5
-        WHEN ${songs.titleCI} ILIKE ${'% ' + escaped + '%'}  THEN 4
-        WHEN ${songs.titleCI} ILIKE ${'%' + escaped + '%'}   THEN 3
+        WHEN ${songs.title} LIKE ${escaped}                       THEN 6
+        WHEN ${songs.title} LIKE ${escaped + '%'}                 THEN 5
+        WHEN ${songs.title} LIKE ${'% ' + escaped + '%'}          THEN 4
+        WHEN ${songs.title} LIKE ${'%' + escaped + '%'}           THEN 3
         ELSE 1
       END
-    ) DESC, similarity(${songs.titleCI}, ${normalized}) DESC`;
+    ) DESC, ${songs.title} ASC`;
 
     // Select ONLY id and title for tier computation (no relation joins!)
     const titleResults = await trx.query.songs.findMany({
@@ -46,19 +58,51 @@ export const SongSearchEngine = {
     });
 
     const titleMatchIds = new Set(titleResults.map((s) => s.id));
+    const references: SearchMatchReference[] = titleResults.map((raw) => ({
+      kind: 'song' as const,
+      id: raw.id,
+      tier: computeTier(raw.title, normalized)
+    }));
+
+    // --- FUZZY (pg_trgm `%` replacement): fill remaining slots with similar titles ---
+    if (fuzzy && titleResults.length < limit) {
+      try {
+        const fuzzyMatches = await fuzzySearch({
+          baseTable: 'songs',
+          textColumn: 'title',
+          query: normalized,
+          limit: limit - references.length,
+          excludeIds: titleMatchIds,
+          trx
+        });
+        for (const m of fuzzyMatches) {
+          titleMatchIds.add(m.id);
+          // original pg path computed tiers over every title hit, fuzzy ones included
+          references.push({ kind: 'song', id: m.id, tier: computeTier(m.text, normalized) });
+        }
+      } catch (err) {
+        import('@main/logger').then(({ default: logger }) => {
+          logger.warn('Fuzzy song search failed', { err });
+        });
+      }
+    }
 
     // --- METADATA SEARCH (artist/album name → song IDs) ---
-    let metadataResults: typeof titleResults = [];
+    let metadataResults: { id: number; title: string }[] = [];
 
-    if (metadata && (metadata.artist || metadata.album) && titleResults.length < limit) {
-      const remaining = Math.min(limit - titleResults.length, SEARCH_LIMITS.METADATA);
+    if (metadata && (metadata.artist || metadata.album) && references.length < limit) {
+      const remaining = Math.min(limit - references.length, SEARCH_LIMITS.METADATA);
 
-      const metaConditions: ReturnType<typeof sql>[] = [];
+      const metaConditions = [];
       if (metadata.artist) {
-        metaConditions.push(sql`(a.name_ci ILIKE ${'%' + escaped + '%'} OR regexp_replace(a.name_ci, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`);
+        metaConditions.push(
+          sql`(a.name LIKE ${'%' + escaped + '%'} ESCAPE '\\' OR a.name_norm LIKE ${'%' + norm + '%'} ESCAPE '\\')`
+        );
       }
       if (metadata.album) {
-        metaConditions.push(sql`(al.title_ci ILIKE ${'%' + escaped + '%'} OR regexp_replace(al.title_ci, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`);
+        metaConditions.push(
+          sql`(al.title LIKE ${'%' + escaped + '%'} ESCAPE '\\' OR al.title_norm LIKE ${'%' + norm + '%'} ESCAPE '\\')`
+        );
       }
 
       const metaWhereClause =
@@ -67,7 +111,7 @@ export const SongSearchEngine = {
           : sql`(${sql.join(metaConditions, sql` OR `)})`;
 
       try {
-        const metaIdRows = await trx.execute<{ id: number }>(sql`
+        const metaIdRows = await rawAll<{ id: number }>(sql`
           SELECT DISTINCT s.id FROM songs s
           LEFT JOIN artists_songs ars ON s.id = ars.song_id
           LEFT JOIN artists a ON ars.artist_id = a.id
@@ -77,7 +121,7 @@ export const SongSearchEngine = {
           LIMIT ${remaining + titleMatchIds.size}
         `);
 
-        const newIds = metaIdRows.rows
+        const newIds = metaIdRows
           .map((r) => r.id)
           .filter((id) => !titleMatchIds.has(id))
           .slice(0, remaining);
@@ -101,17 +145,6 @@ export const SongSearchEngine = {
     }
 
     timeEnd(timer, 'Search Songs');
-
-    const references: SearchMatchReference[] = [];
-
-    for (const raw of titleResults) {
-      const tier = computeTier(raw.title, normalized);
-      references.push({
-        kind: 'song',
-        id: raw.id,
-        tier
-      });
-    }
 
     for (const raw of metadataResults) {
       references.push({

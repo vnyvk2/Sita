@@ -1,0 +1,115 @@
+{
+  "name": "orm",
+  "recordedAt": "2026-08-29T13:15:34.486Z",
+  "host": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "env": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "results": {
+    "functional": {
+      "selectWhereOrderBy": {
+        "sqlite": 10,
+        "pglite": 10,
+        "titlesMatch": true
+      },
+      "join": {
+        "sqlite": [
+          {
+            "title": "orm song 42",
+            "artist": "artist 43"
+          }
+        ],
+        "pglite": [
+          {
+            "title": "orm song 42",
+            "artist": "artist 43"
+          }
+        ],
+        "match": true
+      },
+      "nestedSavepoint": {
+        "sqlite": {
+          "rolled": 1,
+          "innerGone": true,
+          "outerSurvived": true
+        },
+        "pglite": {
+          "rolled": 1,
+          "innerGone": true,
+          "outerSurvived": true
+        },
+        "equivalent": true
+      },
+      "insertReturning": {
+        "sqliteId": 5002,
+        "pgliteId": 5003,
+        "bothReturned": true
+      }
+    },
+    "orm_pk_lookup": {
+      "sqlite": {
+        "n": 100,
+        "min": 0.127,
+        "median": 0.151,
+        "p95": 0.289,
+        "max": 0.441,
+        "mean": 0.169
+      },
+      "pglite": {
+        "n": 100,
+        "min": 1.204,
+        "median": 1.557,
+        "p95": 2.393,
+        "max": 2.671,
+        "mean": 1.652
+      }
+    },
+    "orm_filtered_list": {
+      "sqlite": {
+        "n": 100,
+        "min": 0.47,
+        "median": 0.546,
+        "p95": 0.709,
+        "max": 0.933,
+        "mean": 0.553
+      },
+      "pglite": {
+        "n": 100,
+        "min": 3.546,
+        "median": 4.617,
+        "p95": 6.844,
+        "max": 7.68,
+        "mean": 4.97
+      }
+    },
+    "orm_join": {
+      "sqlite": {
+        "n": 100,
+        "min": 0.327,
+        "median": 0.36,
+        "p95": 0.417,
+        "max": 0.782,
+        "mean": 0.367
+      },
+      "pglite": {
+        "n": 100,
+        "min": 2.272,
+        "median": 2.649,
+        "p95": 3.39,
+        "max": 4.533,
+        "mean": 2.722
+      }
+    }
+  },
+  "suites": {}
+}

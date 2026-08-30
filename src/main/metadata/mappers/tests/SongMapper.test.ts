@@ -88,7 +88,7 @@ describe('SongMapper — G1-01 discNumber / diskNumber mapping & round-trip', ()
     // 1. Seed database row with diskNumber: 1 (as stored in SQLite songs table)
     const [seeded] = await db.insert(songs).values({
       title: 'Roundtrip Track',
-      duration: '210.000',
+      duration: 210.000,
       path: 'C:\\music\\track.mp3',
       diskNumber: 1,
       trackNumber: 5,

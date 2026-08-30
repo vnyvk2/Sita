@@ -452,9 +452,9 @@ const hasTruthyLanguageOverride = sql`EXISTS (
   SELECT 1 FROM ${metadataOverrides}
   WHERE ${metadataOverrides.entityKind} = 'song'
     AND ${metadataOverrides.fieldId} = 'language'
-    AND ${metadataOverrides.entityId} = ${songs.id}::text
+    AND ${metadataOverrides.entityId} = ${songs.id}
     AND ${metadataOverrides.stringValue} IS NOT NULL
-    AND btrim(${metadataOverrides.stringValue}) <> ''
+    AND trim(${metadataOverrides.stringValue}) <> ''
 )`;
 
 export const getFilteredSongLibraryIds = async (
@@ -497,7 +497,7 @@ export const getFilteredSongLibraryIds = async (
   if (language && language !== 'all') {
     if (language === 'unspecified') {
       filters.push(
-        sql`(NOT ${hasTruthyLanguageOverride} AND (${songs.language} IS NULL OR btrim(${songs.language}) = ''))`
+        sql`(NOT ${hasTruthyLanguageOverride} AND (${songs.language} IS NULL OR trim(${songs.language}) = ''))`
       );
     } else {
       filters.push(sql`(
@@ -505,7 +505,7 @@ export const getFilteredSongLibraryIds = async (
           SELECT 1 FROM ${metadataOverrides}
           WHERE ${metadataOverrides.entityKind} = 'song'
             AND ${metadataOverrides.fieldId} = 'language'
-            AND ${metadataOverrides.entityId} = ${songs.id}::text
+            AND ${metadataOverrides.entityId} = ${songs.id}
             AND lower(${metadataOverrides.stringValue}) = lower(${language})
         ))
         OR (
@@ -619,26 +619,26 @@ export interface SongListFacets {
 export const getSongListFacets = async (
   trx: DB | DBTransaction = db
 ): Promise<SongListFacets> => {
-  const languagesResult = await trx.execute<{ val: string }>(sql`
+  const languagesResult = await trx.all<{ val: string }>(sql`
     SELECT DISTINCT val FROM (
-      SELECT language AS val FROM songs WHERE language IS NOT NULL AND btrim(language) <> ''
+      SELECT language AS val FROM songs WHERE language IS NOT NULL AND trim(language) <> ''
       UNION
       SELECT string_value AS val FROM ${metadataOverrides}
         WHERE ${metadataOverrides.entityKind} = 'song'
           AND ${metadataOverrides.fieldId} = 'language'
           AND ${metadataOverrides.stringValue} IS NOT NULL
-          AND btrim(${metadataOverrides.stringValue}) <> ''
+          AND trim(${metadataOverrides.stringValue}) <> ''
     ) t ORDER BY val ASC
   `);
 
   const genresResult = await trx
     .select({ name: genres.name })
     .from(genres)
-    .where(sql`btrim(${genres.name}) <> ''`)
+    .where(sql`trim(${genres.name}) <> ''`)
     .orderBy(asc(genres.name));
 
   return {
-    languages: languagesResult.rows.map((r) => r.val.trim()).filter((v) => v.length > 0),
+    languages: languagesResult.map((r) => r.val.trim()).filter((v) => v.length > 0),
     genres: genresResult.map((r) => r.name.trim()).filter((v) => v.length > 0)
   };
 };

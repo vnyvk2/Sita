@@ -6,11 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 // Three full PGlite boots + real migration chains: observed 7-33s on this
 // machine depending on thermal/load state, hence the generous local ceiling
 vi.setConfig({ testTimeout: 120_000 });
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
-import { citext } from '@electric-sql/pglite/contrib/citext';
-import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
+import { openSqliteEngine } from '../../../db/sqlite/engine';
 
 import type { MetadataHistorySnapshot } from '../MetadataHistoryService';
 import { MetadataHistoryService } from '../MetadataHistoryService';
@@ -40,17 +36,11 @@ describe('MetadataHistoryService — real-file DB restart lifecycle', () => {
   });
 
   const bootFresh = async () => {
-    // Mirror the production boot sequence (db.ts): extensions BEFORE migrations
-    const pglite = await PGlite.create(dbPath, {
-      extensions: { pg_trgm, citext }
-    });
-    await pglite.exec('CREATE EXTENSION IF NOT EXISTS citext;');
-    await pglite.exec('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-    await migrate(drizzle(pglite), { migrationsFolder: path.join(process.cwd(), 'resources', 'drizzle') });
-    const orm = drizzle(pglite, { schema: {} as any });
+    // Mirror the production boot sequence (db.ts): engine open applies the baseline schema
+    const engine = openSqliteEngine(dbPath);
     return {
-      service: new MetadataHistoryService(new MetadataHistoryRepository(orm as any)),
-      close: () => pglite.close()
+      service: new MetadataHistoryService(new MetadataHistoryRepository(engine.orm as any)),
+      close: () => engine.close()
     };
   };
 

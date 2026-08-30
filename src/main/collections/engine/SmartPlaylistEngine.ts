@@ -151,15 +151,15 @@ export class SmartPlaylistEngine {
           .where(
             and(eq(playlistEntries.playlistId, playlistId), ne(playlistEntries.source, 'smart'))
           );
-        manualDuration = manualSongRows.reduce((sum, s) => sum + parseFloat(s.duration || '0'), 0);
+        manualDuration = manualSongRows.reduce((sum, s) => sum + Number(s.duration ?? 0), 0);
       }
-      const totalDuration = uniqueSongs.reduce((sum, s) => sum + parseFloat(s.duration || '0'), 0);
+      const totalDuration = uniqueSongs.reduce((sum, s) => sum + Number(s.duration ?? 0), 0);
 
       await trx
         .update(playlists)
         .set({
           itemCount: songIds.length + manualCount,
-          totalDuration: (totalDuration + manualDuration).toString(),
+          totalDuration: totalDuration + manualDuration,
           updatedAt: new Date()
         })
         .where(eq(playlists.id, playlistId));

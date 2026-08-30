@@ -1,23 +1,14 @@
 import path from 'path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 
-import * as schema from '@main/db/schema';
 import { musicFolders, songs } from '@main/db/schema';
 import { LibraryReconciler } from '../LibraryReconciler';
 import reParseSong from '../../parseSong/reParseSong';
 
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client };
+  const { createSqliteMockDb } = await import('../../../../test/helpers/sqliteMockDb');
+  return createSqliteMockDb();
 });
 
 vi.mock('../../parseSong/reParseSong', () => ({
@@ -33,34 +24,27 @@ vi.mock('@main/core/songWorkerPool', () => ({
   songWorkerPool: vi.fn()
 }));
 
-import type { PGlite } from '@electric-sql/pglite';
 import type { DB } from '@main/db/db';
 
 let testDb: DB;
 
-// Note: reParseSong is mocked to isolate and validate PGlite transaction concurrency
+// Note: reParseSong is mocked to isolate and validate SQLite transaction concurrency
 // and monotonic progress reporting under 8 concurrent reconciliation workers.
-describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
+describe('LibraryReconciler SQLite transaction concurrency stress test', () => {
   beforeAll(async () => {
-    const mockedModule = (await import('@main/db/db')) as unknown as { db: DB; client: PGlite };
-    const { db, client } = mockedModule;
-    testDb = db;
-
-    await client.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
-    await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
-
-    const migrationsFolder = path.resolve(__dirname, '../../../../resources/drizzle');
-    await migrate(db, { migrationsFolder });
+    const mockedModule = (await import('@main/db/db')) as unknown as { db: DB };
+    testDb = mockedModule.db;
+    // Baseline SQLite schema is applied by the engine on first open (:memory:)
 
     // Seed root folder
-    await db.insert(musicFolders).values({
+    await testDb.insert(musicFolders).values({
       name: 'Music',
       path: 'C:\\Music',
       isBlacklisted: false
     });
   });
 
-  it('should process 100 concurrent reconciliation operations with 8 workers under real PGlite transactions with zero surfaced errors', async () => {
+  it('should process 100 concurrent reconciliation operations with 8 workers under real SQLite transactions with zero surfaced errors', async () => {
     vi.mocked(reParseSong).mockImplementation(async (songPath: string) => {
       const fileName = path.basename(songPath, path.extname(songPath));
       await testDb.transaction(async (trx) => {
@@ -68,7 +52,7 @@ describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
           .update(songs)
           .set({
             title: `Updated_${fileName}`,
-            duration: '240',
+            duration: 240,
             fileModifiedAt: new Date()
           })
           .where(eq(songs.path, songPath));
@@ -96,7 +80,7 @@ describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
     const songCount = 100;
     const initialRows = Array.from({ length: songCount }, (_, i) => ({
       title: `Track_${i}`,
-      duration: '180',
+      duration: 180,
       path: `C:\\Music\\Track_${i}.mp3`,
       folderId: 1,
       fileCreatedAt: new Date(),
@@ -134,7 +118,7 @@ describe('LibraryReconciler PGlite transaction concurrency stress test', () => {
       expect(progressReports[i]).toBe(i + 1);
     }
 
-    // Invariant 3: Verify all 100 rows in PGlite DB have updated titles & durations
+    // Invariant 3: Verify all 100 rows in SQLite DB have updated titles & durations
     const dbSongs = await testDb.select().from(songs);
     expect(dbSongs).toHaveLength(100);
     for (const song of dbSongs) {

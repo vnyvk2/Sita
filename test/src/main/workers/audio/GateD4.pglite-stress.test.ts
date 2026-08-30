@@ -4,7 +4,6 @@ import os from 'os';
 import { EventEmitter } from 'events';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 
 import * as schema from '@main/db/schema';
 import { albums, albumsSongs, musicFolders, replayGain, songs } from '@main/db/schema';
@@ -12,15 +11,8 @@ import { ASSET_EVENTS } from '@main/workers/libraryChoreography';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from '@main/workers/jobs/replayGainJob';
 
 vi.mock('@main/db/db', async () => {
-  const { PGlite } = await import('@electric-sql/pglite');
-  const { drizzle } = await import('drizzle-orm/pglite');
-  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const { citext } = await import('@electric-sql/pglite/contrib/citext');
-
-  const client = await PGlite.create({ extensions: { pg_trgm, citext } });
-  const db = drizzle(client, { schema });
-
-  return { db, client, isDatabaseStubbed: false };
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return { ...(await createSqliteMockDb()), isDatabaseStubbed: false };
 });
 
 vi.mock('@main/main', () => ({
@@ -28,26 +20,18 @@ vi.mock('@main/main', () => ({
   dataUpdateEvent: vi.fn()
 }));
 
-import type { PGlite } from '@electric-sql/pglite';
 import type { DB } from '@main/db/db';
 import { AlbumReplayGainJob } from '@main/workers/jobs/albumReplayGainJob';
 
 describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () => {
   let testDb: DB;
-  let testClient: PGlite;
   let tempUserDataDir: string;
   let eventBus: EventEmitter;
 
   beforeAll(async () => {
-    const mockedModule = (await import('@main/db/db')) as unknown as { db: DB; client: PGlite };
+    const mockedModule = (await import('@main/db/db')) as unknown as { db: DB };
     testDb = mockedModule.db;
-    testClient = mockedModule.client;
-
-    await testClient.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
-    await testClient.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
-
-    const migrationsFolder = path.resolve(__dirname, '../../../../../resources/drizzle');
-    await migrate(testDb, { migrationsFolder });
+    // Baseline SQLite schema applied by the engine on first open (:memory:)
 
     tempUserDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nora-gated4-pglite-'));
     await fs.mkdir(path.join(tempUserDataDir, 'loudness_blocks'), { recursive: true });
@@ -87,7 +71,7 @@ describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () 
         .values({
           title: 'Dark Side of the Moon',
           albumArtists: ['Pink Floyd'],
-          duration: '1800',
+          duration: 1800,
           totalTracks: 3
         })
         .returning({ id: albums.id });
@@ -97,7 +81,7 @@ describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () 
         .values([
           {
             title: 'Track 1',
-            duration: '600',
+            duration: 600,
             path: 'C:\\Music\\Track_1.wav',
             folderId: folder.id,
             fileCreatedAt: new Date(),
@@ -105,7 +89,7 @@ describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () 
           },
           {
             title: 'Track 2',
-            duration: '600',
+            duration: 600,
             path: 'C:\\Music\\Track_2.wav',
             folderId: folder.id,
             fileCreatedAt: new Date(),
@@ -113,7 +97,7 @@ describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () 
           },
           {
             title: 'Track 3',
-            duration: '600',
+            duration: 600,
             path: 'C:\\Music\\Track_3.wav',
             folderId: folder.id,
             fileCreatedAt: new Date(),

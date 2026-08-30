@@ -11,7 +11,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 10,
       title: 'Current Title',
-      duration: '210.5',
+      duration: 210.5,
       year: 2010,
       trackNumber: 2,
       diskNumber: 1,
@@ -43,7 +43,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 11,
       title: 'Existing Title',
-      duration: '180.0',
+      duration: 180.0,
       year: 2018,
       trackNumber: 4,
       diskNumber: 1,
@@ -68,7 +68,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 12,
       title: 'To Clear',
-      duration: '150.0',
+      duration: 150.0,
       musicBrainzRecordingId: 'rec-will-be-cleared',
       isrc: 'USRC12345678',
       artists: [],
@@ -89,7 +89,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 13,
       title: 'Disc Test',
-      duration: '120.0',
+      duration: 120.0,
       diskNumber: 1,
       artists: [],
       albums: [],
@@ -107,7 +107,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 14,
       title: 'Genre Merge Test',
-      duration: '190.0',
+      duration: 190.0,
       artists: [],
       albums: [],
       genres: [{ genre: { id: 42, name: 'Rock' } }]
@@ -128,7 +128,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 15,
       title: 'Compound Genre Test',
-      duration: '240.0',
+      duration: 240.0,
       artists: [],
       albums: [],
       genres: []
@@ -156,7 +156,7 @@ describe('SongMetadataBuilder (Phase 4 Persistence & Identity)', () => {
     vi.mocked(songsDb.getSongById).mockResolvedValueOnce({
       id: 16,
       title: 'Deduplicate Both Fields Test',
-      duration: '200.0',
+      duration: 200.0,
       artists: [],
       albums: [],
       genres: [{ genre: { id: 42, name: 'Rock' } }]

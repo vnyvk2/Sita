@@ -108,7 +108,7 @@ export class PlaylistProvider implements CollectionProvider {
       capabilities: PLAYLIST_CAPABILITIES,
       stats: {
         totalEntries: row.itemCount,
-        totalDuration: parseFloat(row.totalDuration),
+        totalDuration: Number(row.totalDuration ?? 0),
         uniqueArtists: 0, 
         uniqueAlbums: 0
       },
@@ -130,7 +130,7 @@ export class PlaylistProvider implements CollectionProvider {
     return {
       songId: row.id,
       title: row.title,
-      duration: parseFloat(row.duration),
+      duration: Number(row.duration ?? 0),
       artists: [], // Hydrated by Pipeline/SortEngine if needed, or joined later if requested
       album: undefined,
       genres: [],

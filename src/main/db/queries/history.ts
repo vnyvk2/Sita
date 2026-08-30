@@ -55,7 +55,7 @@ export const getAllSongsInHistory = async (
       const historyRecords = await trx
         .select({
           songId: playHistory.songId,
-          playCount: sql<number>`count(*)::int`,
+          playCount: sql<number>`count(*)`,
           lastPlayed: sql<Date>`max(${playHistory.createdAt})`
         })
         .from(playHistory)

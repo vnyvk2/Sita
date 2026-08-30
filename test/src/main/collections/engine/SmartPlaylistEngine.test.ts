@@ -32,21 +32,21 @@ describe('SmartPlaylistEngine', () => {
       .values([
         {
           title: 'Test Song 1',
-          duration: '120.000',
+          duration: 120.000,
           path: '/path/1',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
         },
         {
           title: 'Another Song',
-          duration: '180.000',
+          duration: 180.000,
           path: '/path/2',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
         },
         {
           title: 'Test Song 3',
-          duration: '200.000',
+          duration: 200.000,
           path: '/path/3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
@@ -128,7 +128,7 @@ describe('SmartPlaylistEngine', () => {
 
     const [updatedPl] = await db.select().from(playlists).where(eq(playlists.id, playlistId));
     expect(updatedPl.itemCount).toBe(2);
-    expect(updatedPl.totalDuration).toBe('320.000');
+    expect(updatedPl.totalDuration).toBe(320);
   });
 
   it('should be idempotent on repeated regenerations', async () => {

@@ -1,0 +1,268 @@
+{
+  "name": "startup",
+  "recordedAt": "2026-08-29T10:51:08.831Z",
+  "host": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "method": "forked fresh process per iteration; populated disk-backed DBs; warm OS page cache",
+  "env": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "results": {
+    "sizes": {
+      "1300": {
+        "sqliteMb": 3.1,
+        "pgliteMb": 59.9,
+        "runs": {
+          "sqlite": [
+            {
+              "engineCreateMs": 12.9,
+              "schemaInitMs": 0.29,
+              "drizzleInitMs": 1.55,
+              "firstQueryMs": 0.05,
+              "firstMeaningfulQueryMs": 17.97,
+              "closeMs": 1.1660000000000537
+            },
+            {
+              "engineCreateMs": 4.53,
+              "schemaInitMs": 0.22,
+              "drizzleInitMs": 1.47,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 3.29,
+              "closeMs": 0.9835000000000491
+            },
+            {
+              "engineCreateMs": 4.08,
+              "schemaInitMs": 0.16,
+              "drizzleInitMs": 1.57,
+              "firstQueryMs": 0.04,
+              "firstMeaningfulQueryMs": 3.59,
+              "closeMs": 1.2610999999999422
+            },
+            {
+              "engineCreateMs": 3.75,
+              "schemaInitMs": 0.14,
+              "drizzleInitMs": 1.41,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 3.28,
+              "closeMs": 1.0153000000000247
+            },
+            {
+              "engineCreateMs": 3.4,
+              "schemaInitMs": 0.13,
+              "drizzleInitMs": 1.35,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 3.22,
+              "closeMs": 1.0758999999999332
+            },
+            {
+              "engineCreateMs": 3.39,
+              "schemaInitMs": 0.13,
+              "drizzleInitMs": 1.36,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 3.27,
+              "closeMs": 0.9397999999999911
+            },
+            {
+              "engineCreateMs": 4.03,
+              "schemaInitMs": 0.16,
+              "drizzleInitMs": 1.47,
+              "firstQueryMs": 0.04,
+              "firstMeaningfulQueryMs": 3.51,
+              "closeMs": 0.9827999999999975
+            }
+          ],
+          "pglite": [
+            {
+              "engineCreateMs": 458.21,
+              "schemaInitMs": 44.78,
+              "drizzleInitMs": 1.71,
+              "firstQueryMs": 1.05,
+              "firstMeaningfulQueryMs": 105.95,
+              "closeMs": 37.14080000000001
+            },
+            {
+              "engineCreateMs": 430.39,
+              "schemaInitMs": 37.34,
+              "drizzleInitMs": 2.77,
+              "firstQueryMs": 1.07,
+              "firstMeaningfulQueryMs": 92.9,
+              "closeMs": 39.24309999999991
+            },
+            {
+              "engineCreateMs": 402.33,
+              "schemaInitMs": 40.32,
+              "drizzleInitMs": 3.3,
+              "firstQueryMs": 1.88,
+              "firstMeaningfulQueryMs": 91.04,
+              "closeMs": 40.60660000000007
+            },
+            {
+              "engineCreateMs": 444.33,
+              "schemaInitMs": 35.58,
+              "drizzleInitMs": 2.46,
+              "firstQueryMs": 1.01,
+              "firstMeaningfulQueryMs": 88.37,
+              "closeMs": 45.814199999999914
+            },
+            {
+              "engineCreateMs": 423.9,
+              "schemaInitMs": 39.13,
+              "drizzleInitMs": 2.45,
+              "firstQueryMs": 1.58,
+              "firstMeaningfulQueryMs": 85.5,
+              "closeMs": 47.08889999999997
+            },
+            {
+              "engineCreateMs": 412.31,
+              "schemaInitMs": 37.8,
+              "drizzleInitMs": 2.62,
+              "firstQueryMs": 1.86,
+              "firstMeaningfulQueryMs": 91.31,
+              "closeMs": 44.21799999999996
+            },
+            {
+              "engineCreateMs": 394.27,
+              "schemaInitMs": 34.44,
+              "drizzleInitMs": 2.32,
+              "firstQueryMs": 0.93,
+              "firstMeaningfulQueryMs": 80.79,
+              "closeMs": 41.90129999999999
+            }
+          ]
+        }
+      },
+      "50000": {
+        "sqliteMb": 84.2,
+        "pgliteMb": 384.9,
+        "runs": {
+          "sqlite": [
+            {
+              "engineCreateMs": 8.59,
+              "schemaInitMs": 0.13,
+              "drizzleInitMs": 1.31,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 206.07,
+              "closeMs": 5.6580000000000155
+            },
+            {
+              "engineCreateMs": 4.3,
+              "schemaInitMs": 0.26,
+              "drizzleInitMs": 2.43,
+              "firstQueryMs": 0.04,
+              "firstMeaningfulQueryMs": 135.38,
+              "closeMs": 4.150700000000029
+            },
+            {
+              "engineCreateMs": 3.77,
+              "schemaInitMs": 0.14,
+              "drizzleInitMs": 1.62,
+              "firstQueryMs": 0.08,
+              "firstMeaningfulQueryMs": 128.36,
+              "closeMs": 3.840000000000032
+            },
+            {
+              "engineCreateMs": 3.61,
+              "schemaInitMs": 0.14,
+              "drizzleInitMs": 1.39,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 150.19,
+              "closeMs": 3.9325999999999794
+            },
+            {
+              "engineCreateMs": 4.41,
+              "schemaInitMs": 0.26,
+              "drizzleInitMs": 2.28,
+              "firstQueryMs": 0.07,
+              "firstMeaningfulQueryMs": 154.68,
+              "closeMs": 4.273599999999988
+            },
+            {
+              "engineCreateMs": 3.51,
+              "schemaInitMs": 0.11,
+              "drizzleInitMs": 1.23,
+              "firstQueryMs": 0.03,
+              "firstMeaningfulQueryMs": 143.39,
+              "closeMs": 4.716000000000008
+            },
+            {
+              "engineCreateMs": 4.12,
+              "schemaInitMs": 0.18,
+              "drizzleInitMs": 1.63,
+              "firstQueryMs": 0.04,
+              "firstMeaningfulQueryMs": 125.15,
+              "closeMs": 3.9810999999999694
+            }
+          ],
+          "pglite": [
+            {
+              "engineCreateMs": 436.38,
+              "schemaInitMs": 35.92,
+              "drizzleInitMs": 3.51,
+              "firstQueryMs": 1.42,
+              "firstMeaningfulQueryMs": 401.47,
+              "closeMs": 20.64370000000008
+            },
+            {
+              "engineCreateMs": 416.84,
+              "schemaInitMs": 32.24,
+              "drizzleInitMs": 2.74,
+              "firstQueryMs": 1.06,
+              "firstMeaningfulQueryMs": 389.85,
+              "closeMs": 25.246999999999957
+            },
+            {
+              "engineCreateMs": 429.2,
+              "schemaInitMs": 32.98,
+              "drizzleInitMs": 2.32,
+              "firstQueryMs": 1.4,
+              "firstMeaningfulQueryMs": 400.1,
+              "closeMs": 29.16590000000008
+            },
+            {
+              "engineCreateMs": 427.97,
+              "schemaInitMs": 33.78,
+              "drizzleInitMs": 1.87,
+              "firstQueryMs": 1.69,
+              "firstMeaningfulQueryMs": 456.35,
+              "closeMs": 24.41319999999996
+            },
+            {
+              "engineCreateMs": 443.83,
+              "schemaInitMs": 36.22,
+              "drizzleInitMs": 2.63,
+              "firstQueryMs": 1.38,
+              "firstMeaningfulQueryMs": 383.33,
+              "closeMs": 23.360500000000002
+            },
+            {
+              "engineCreateMs": 402.65,
+              "schemaInitMs": 39.93,
+              "drizzleInitMs": 1.46,
+              "firstQueryMs": 0.86,
+              "firstMeaningfulQueryMs": 399.92,
+              "closeMs": 25.047000000000025
+            },
+            {
+              "engineCreateMs": 418.64,
+              "schemaInitMs": 39.16,
+              "drizzleInitMs": 1.76,
+              "firstQueryMs": 1.42,
+              "firstMeaningfulQueryMs": 388.48,
+              "closeMs": 22.887699999999995
+            }
+          ]
+        }
+      }
+    }
+  },
+  "suites": {}
+}

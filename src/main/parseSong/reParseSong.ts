@@ -67,7 +67,7 @@ const reParseSong = async (filePath: string) => {
 
           updatedSong = {
             title: songTitle,
-            duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
+            duration: Number(getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)),
             year: metadata.year || undefined,
             path: songPath,
             sampleRate: file.properties.audioSampleRate,

@@ -53,7 +53,7 @@ describe('getMusicFolderData', () => {
       .insert(songs)
       .values({
         title: 'Song 1',
-        duration: '180',
+        duration: 180,
         path: 'C:\\Music\\Artist 1\\song1.mp3',
         folderId: child1.id,
         fileCreatedAt: new Date(),

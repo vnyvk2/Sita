@@ -1,0 +1,47 @@
+{
+  "name": "shutdown",
+  "recordedAt": "2026-08-29T12:17:27.111Z",
+  "host": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "env": {
+    "os": "Windows_NT 10.0.26200 (x64)",
+    "cpu": "Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz",
+    "cores": 8,
+    "totalMemGb": 7.8,
+    "node": "v24.18.0"
+  },
+  "results": {
+    "engines": {
+      "sqlite": {
+        "close_during_read": {
+          "closeMs": 8.656900000000064,
+          "readOutcome": "completed"
+        },
+        "close_during_write_tx": {
+          "closeMs": 5559.6767,
+          "stragglerResult": "committed-after-close",
+          "songsAfterReopen": 120,
+          "integrity": "ok",
+          "consistent": true
+        },
+        "write_after_close": {
+          "afterClose": 1.8400000000001455,
+          "writeAfterCloseError": "database is not open",
+          "throwsCleanly": true
+        },
+        "wal_checkpoint_on_close": {
+          "mainSizeMb": 0.39,
+          "walLeftBytes": 0,
+          "songsOnReopen": 121,
+          "selfContained": true
+        }
+      }
+    }
+  },
+  "suites": {}
+}

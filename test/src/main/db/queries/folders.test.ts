@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
-import { db } from '../../../../../src/main/db/db';
+import { db, getEngine } from '../../../../../src/main/db/db';
 import { getAllMusicFolders } from '../../../../../src/main/db/queries/folders';
 import { musicFolders, songs } from '../../../../../src/main/db/schema';
 
@@ -35,7 +35,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
       .insert(songs)
       .values({
         title: 'Song 1',
-        duration: '180',
+        duration: 180,
         path: 'C:\\Music\\song1.mp3',
         folderId: root.id,
         fileCreatedAt: now,
@@ -47,7 +47,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
       .insert(songs)
       .values({
         title: 'Song 2',
-        duration: '210',
+        duration: 210,
         path: 'C:\\Music\\song2.mp3',
         folderId: root.id,
         fileCreatedAt: now,
@@ -88,7 +88,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
       .insert(songs)
       .values({
         title: 'Track 1',
-        duration: '200',
+        duration: 200,
         path: 'C:\\Music\\Artist A\\Album 1\\track1.mp3',
         folderId: album.id,
         fileCreatedAt: new Date(),
@@ -142,8 +142,9 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
 
   it('throws an explicit error when an orphaned parentId is detected without corrupting data', async () => {
     // Insert a child folder pointing to a non-existent parentId (e.g. 999999)
-    // First disable foreign key check or insert directly to simulate corruption
-    await db.execute('SET session_replication_role = replica;');
+    // Disable FK enforcement to simulate corruption (SQLite equivalent of
+    // pg's `SET session_replication_role = replica`)
+    getEngine()!.exec('PRAGMA foreign_keys = OFF;');
     try {
       await db.insert(musicFolders).values({
         name: 'Orphan Folder',
@@ -155,7 +156,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
         "Unable to resolve parent folder ID 999999 for 'C:\\Music\\Orphan'"
       );
     } finally {
-      await db.execute('SET session_replication_role = DEFAULT;');
+      getEngine()!.exec('PRAGMA foreign_keys = ON;');
     }
   });
 
@@ -216,7 +217,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
   });
 
   it('throws an explicit error when a circular parent cycle is detected (A -> B -> A)', async () => {
-    await db.execute('SET session_replication_role = replica;');
+    getEngine()!.exec('PRAGMA foreign_keys = OFF;');
     try {
       const [folderA] = await db
         .insert(musicFolders)
@@ -229,7 +230,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
         .returning();
 
       // Create cycle: A.parentId = B.id, B.parentId = A.id
-      await db.execute(
+      getEngine()!.exec(
         `UPDATE music_folders SET parent_id = ${folderB.id} WHERE id = ${folderA.id};`
       );
 
@@ -237,7 +238,7 @@ describe('getAllMusicFolders (Flat-Query In-Memory Tree Builder)', () => {
         'Circular parent-child cycle detected in music folders'
       );
     } finally {
-      await db.execute('SET session_replication_role = DEFAULT;');
+      getEngine()!.exec('PRAGMA foreign_keys = ON;');
     }
   });
 });

@@ -1,7 +1,9 @@
 import { type SQL, sql } from 'drizzle-orm';
 import type { SmartPlaylistRuleAST, RuleCondition, SmartPlaylistField, OrderDefinition } from './ast';
 import { songs, artists, albums, genres } from '../../db/schema';
-import type { AnyPgColumn } from 'drizzle-orm/pg-core';
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class SmartPlaylistCompiler {
   public compilePredicate(rule: SmartPlaylistRuleAST | RuleCondition): SQL<unknown> | undefined {
@@ -46,13 +48,15 @@ export class SmartPlaylistCompiler {
       case 'lte':
         return sql`${col} <= ${value}`;
       case 'contains':
-        return sql`${col} ILIKE ${'%' + value + '%'}`;
+        // lower() on both sides mirrors pg ILIKE semantics (SQLite LIKE is ASCII-CI
+        // only when unadorned; explicit lower() keeps intent clear and deterministic)
+        return sql`lower(${col}) LIKE ${'%' + String(value).toLowerCase() + '%'}`;
       case 'not_contains':
-        return sql`${col} NOT ILIKE ${'%' + value + '%'}`;
+        return sql`lower(${col}) NOT LIKE ${'%' + String(value).toLowerCase() + '%'}`;
       case 'starts_with':
-        return sql`${col} ILIKE ${value + '%'}`;
+        return sql`lower(${col}) LIKE ${String(value).toLowerCase() + '%'}`;
       case 'ends_with':
-        return sql`${col} ILIKE ${'%' + value}`;
+        return sql`lower(${col}) LIKE ${'%' + String(value).toLowerCase()}`;
       case 'is_true':
         return sql`${col} = true`;
       case 'is_false':
@@ -62,15 +66,18 @@ export class SmartPlaylistCompiler {
       case 'is_not_null':
         return sql`${col} IS NOT NULL`;
       case 'in_last':
-        return sql`${col} >= NOW() - (${value} || ' days')::interval`;
+        // pg: col >= NOW() - (value || ' days')::interval. Timestamps are epoch-ms
+        // integers now; the cutoff is computed at compile time, which removes the
+        // session-timezone dependence pg's naive NOW() had (POC finding b9).
+        return sql`${col} >= ${Date.now() - Number(value) * DAY_MS}`;
       case 'not_in_last':
-        return sql`${col} < NOW() - (${value} || ' days')::interval`;
+        return sql`${col} < ${Date.now() - Number(value) * DAY_MS}`;
       default:
         throw new Error(`Unsupported operator: ${condition.operator}`);
     }
   }
 
-  private getColumnForField(field: SmartPlaylistField): AnyPgColumn {
+  private getColumnForField(field: SmartPlaylistField): AnySQLiteColumn {
     switch (field) {
       case 'title': return songs.title;
       case 'artist': return artists.name;

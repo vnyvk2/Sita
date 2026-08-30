@@ -153,7 +153,7 @@ export function createMockSongData(overrides: Partial<MockSongData> = {}): MockS
   return {
     id: 1,
     title: 'Test Song',
-    duration: '180.00',
+    duration: 180.00,
     year: 2023,
     path: '/test/path/song.mp3',
     sampleRate: 44100,

@@ -25,7 +25,7 @@ const seedSong = async (title: string, filePath: string): Promise<number> => {
     .insert(songs)
     .values({
       title,
-      duration: '180.000',
+      duration: 180.000,
       path: filePath,
       fileCreatedAt: new Date(),
       fileModifiedAt: new Date()

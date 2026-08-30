@@ -10,6 +10,10 @@ import type {
 } from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
 import type { SearchMatchReference } from '../models/SearchMatchReference';
+import { fuzzySearch } from '../fuzzy/ftsFuzzySearch';
+
+/** query normalization with all whitespace removed — matches the *_norm columns */
+const normWithoutSpaces = (normalized: string) => normalized.replace(/\s+/g, '');
 
 export const PlaylistSearchEngine = {
   async search(
@@ -22,19 +26,23 @@ export const PlaylistSearchEngine = {
 
     const timer = timeStart();
 
-    const whereClause = fuzzy
-      ? sql`(${playlists.nameCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${playlists.nameCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'} OR ${playlists.nameCI} % ${normalized})`
-      : sql`(${playlists.nameCI} ILIKE ${'%' + escaped + '%'} OR regexp_replace(${playlists.nameCI}, '[[:punct:]]', '', 'g') ILIKE ${'%' + normalized + '%'})`;
+    // SQLite translation of the pg_trgm pipeline: raw LIKE + *_norm LIKE; the pg `%`
+    // fuzzy branch is the FTS trigram-OR pool + JS pg-similarity (ftsFuzzySearch).
+    const norm = normWithoutSpaces(normalized);
+    const whereClause = sql`(
+      ${playlists.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'
+      OR ${playlists.nameNorm} LIKE ${'%' + norm + '%'} ESCAPE '\\'
+    )`;
 
     const orderByClause = sql`(
       CASE
-        WHEN ${playlists.nameCI} ILIKE ${escaped}                THEN 6
-        WHEN ${playlists.nameCI} ILIKE ${escaped + '%'}          THEN 5
-        WHEN ${playlists.nameCI} ILIKE ${'% ' + escaped + '%'}  THEN 4
-        WHEN ${playlists.nameCI} ILIKE ${'%' + escaped + '%'}   THEN 3
+        WHEN ${playlists.name} LIKE ${escaped}                THEN 6
+        WHEN ${playlists.name} LIKE ${escaped + '%'}          THEN 5
+        WHEN ${playlists.name} LIKE ${'% ' + escaped + '%'}   THEN 4
+        WHEN ${playlists.name} LIKE ${'%' + escaped + '%'}    THEN 3
         ELSE 1
       END
-    ) DESC, similarity(${playlists.nameCI}, ${normalized}) DESC`;
+    ) DESC, ${playlists.name} ASC`;
 
     const results = await trx.query.playlists.findMany({
       columns: { id: true, name: true },
@@ -43,12 +51,38 @@ export const PlaylistSearchEngine = {
       limit
     });
 
-    timeEnd(timer, 'Search Playlists');
-
-    return results.map((raw) => ({
+    const references: SearchMatchReference[] = results.map((raw) => ({
       kind: 'playlist' as const,
       id: raw.id,
       tier: computeTier(raw.name, normalized)
     }));
+
+    if (fuzzy && results.length < limit) {
+      try {
+        const fuzzyMatches = await fuzzySearch({
+          baseTable: 'playlists',
+          textColumn: 'name',
+          query: normalized,
+          limit: limit - references.length,
+          excludeIds: new Set(results.map((r) => r.id)),
+          trx
+        });
+        for (const m of fuzzyMatches) {
+          references.push({
+            kind: 'playlist',
+            id: m.id,
+            tier: computeTier(m.text, normalized)
+          });
+        }
+      } catch (err) {
+        import('@main/logger').then(({ default: logger }) => {
+          logger.warn('Fuzzy artist search failed', { err });
+        });
+      }
+    }
+
+    timeEnd(timer, 'Search Playlists');
+
+    return references;
   }
 };

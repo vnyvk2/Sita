@@ -1154,7 +1154,7 @@ const updateSongId3Tags = async (
             : undefined,
           artwork: artworkBuffer ? Buffer.from(artworkBuffer).toString('base64') : undefined,
           artworkPath: getSongArtworkPath(songId, !!artworkBuffer).artworkPath,
-          duration: parseFloat(updatedSong.duration),
+          duration: Number(updatedSong.duration ?? 0),
           isAFavorite: updatedSong.isFavorite,
           isBlacklisted: await isSongBlacklisted(songId, updatedSong.path),
           path: updatedSong.path,

@@ -53,7 +53,7 @@ describe('LocalSongNormalizer', () => {
       id: 303,
       title: 'drivers license',
       path: '/music/03-drivers-license.mp3',
-      duration: '242.000',
+      duration: 242.000,
       year: 2021,
       trackNumber: 3,
       diskNumber: 1,

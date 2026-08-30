@@ -32,7 +32,7 @@ export class FolderStatisticsService {
         .update(playlists)
         .set({
           itemCount: sql`${playlists.itemCount} + ${deltaCount}`,
-          totalDuration: sql`(${playlists.totalDuration} + ${deltaDuration})::decimal(12,3)`,
+          totalDuration: sql`(${playlists.totalDuration} + ${deltaDuration})`,
           updatedAt: new Date()
         })
         .where(eq(playlists.id, ancestor.id));

@@ -1,6 +1,6 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
-import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { parseGenreList } from '../../../common/genreUtils';
 import { linkArtworksToGenre } from './artworks';
 
@@ -130,7 +130,7 @@ export const createGenre = async (
     .values(genre)
     .onConflictDoUpdate({
       target: genres.nameCI,
-      set: { updatedAt: sql`now()` }
+      set: { updatedAt: new Date() }
     })
     .returning();
 

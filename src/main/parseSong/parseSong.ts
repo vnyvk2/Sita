@@ -165,7 +165,7 @@ export const parseSong = async (
 
         songInfo = {
           title: songTitle,
-          duration: getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2),
+          duration: Number(getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)),
           year: metadata.year || undefined,
           path: absoluteFilePath,
           sampleRate: file.properties.audioSampleRate,
