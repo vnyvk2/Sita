@@ -251,7 +251,8 @@ function HomePage() {
             <Button
               tooltipLabel={t('sideBar.insights', { defaultValue: 'Insights' })}
               iconName="auto_graph"
-              className="insights-btn text-sm font-normal"
+              className="insights-btn mt-1.5 min-w-[80px] px-8 py-2 text-sm font-normal"
+              iconClassName="text-xl"
               clickHandler={() =>
                 navigate({
                   to: '/main-player/insights'
