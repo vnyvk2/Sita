@@ -298,19 +298,15 @@ export class PlaylistRepository {
   public async updatePositionsBulk(
     playlistId: number,
     updates: { entryId: number; position: number }[],
-    // trx kept for API compatibility: rawRun targets the same connection, so the
-    // statement joins the caller's transaction (single-connection SQLite semantics).
-    _trx: DB | DBTransaction = db
+    trx: DB | DBTransaction = db
   ): Promise<void> {
     if (updates.length === 0) return;
 
     const CHUNK_SIZE = 500;
     for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
-      // rawRun targets the same connection, so this joins the caller's transaction.
-      // pg used UPDATE ... FROM (VALUES ...) AS v(...); SQLite's equivalent is a
-      // CTE with a correlated subquery UPDATE.
-      await rawRun(sql`
+      await rawRun(
+        sql`
         WITH v(entry_id, position) AS (VALUES ${sql.join(
           chunk.map((u) => sql`(${u.entryId}, ${u.position})`),
           sql`, `
@@ -319,7 +315,9 @@ export class PlaylistRepository {
         SET position = (SELECT position FROM v WHERE v.entry_id = playlist_entries.id)
         WHERE playlist_id = ${playlistId}
           AND id IN (SELECT entry_id FROM v)
-      `);
+      `,
+        trx
+      );
     }
   }
 

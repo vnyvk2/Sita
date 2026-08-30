@@ -225,6 +225,8 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     }
   };
 
+  (orm as any)._engine = engine;
+
   return engine;
 }
 

@@ -2,6 +2,7 @@ import { type SQL } from 'drizzle-orm';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 
 import { getEngine } from '../db';
+import type { SqliteEngine } from './engine';
 
 /**
  * Raw object-row queries against the SQLite engine.
@@ -18,22 +19,22 @@ import { getEngine } from '../db';
 
 const dialect = new SQLiteSyncDialect();
 
-export const rawAll = async <T>(query: SQL): Promise<T[]> => {
-  const engine = getEngine();
+export const rawAll = async <T>(query: SQL, trx?: unknown): Promise<T[]> => {
+  const engine = (trx as { _engine?: SqliteEngine } | undefined)?._engine ?? getEngine();
   if (!engine) throw new Error('[Nora] rawAll called with no SQLite engine');
   const { sql: q, params } = dialect.sqlToQuery(query);
   return engine.all(q, params) as unknown as T[];
 };
 
-export const rawGet = async <T>(query: SQL): Promise<T | undefined> => {
-  const engine = getEngine();
+export const rawGet = async <T>(query: SQL, trx?: unknown): Promise<T | undefined> => {
+  const engine = (trx as { _engine?: SqliteEngine } | undefined)?._engine ?? getEngine();
   if (!engine) throw new Error('[Nora] rawGet called with no SQLite engine');
   const { sql: q, params } = dialect.sqlToQuery(query);
   return engine.get(q, params) as unknown as T | undefined;
 };
 
-export const rawRun = async (query: SQL): Promise<void> => {
-  const engine = getEngine();
+export const rawRun = async (query: SQL, trx?: unknown): Promise<void> => {
+  const engine = (trx as { _engine?: SqliteEngine } | undefined)?._engine ?? getEngine();
   if (!engine) throw new Error('[Nora] rawRun called with no SQLite engine');
   const { sql: q, params } = dialect.sqlToQuery(query);
   engine.run(q, params);

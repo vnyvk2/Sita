@@ -73,7 +73,7 @@ export const fuzzySearch = async (
     WHERE ${sql.raw(ftsTable)} MATCH ${orQuery}
     ORDER BY rank
     LIMIT 8000
-  `);
+  `, args.trx);
 
   const exclude = excludeIds ?? new Set<number>();
   // Score every candidate once, then apply a PROGRESSIVE threshold:

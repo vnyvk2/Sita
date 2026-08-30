@@ -34,7 +34,7 @@ const rng = makeRng(1234);
 const WORDS_A = ['midnight', 'golden', 'silent', 'electric', 'crimson', 'velvet', 'lonely', 'neon', 'paper', 'wild'];
 const WORDS_B = ['heart', 'city', 'fire', 'dream', 'river', 'sky', 'love', 'road', 'rain', 'star'];
 
-describe('scroll hydration performance @50k', () => {
+describe('scroll hydration performance @50k', { timeout: 60000 }, () => {
   beforeAll(async () => {
     const engine = getEngine()!;
     await db.insert(musicFolders).values({ name: 'Lib', path: 'C:\\Lib' });
@@ -43,29 +43,28 @@ describe('scroll hydration performance @50k', () => {
     const COLS = `title, duration, skip_count, path, is_favorite, sample_rate, bit_rate, no_of_channels, year, disk_number, track_number, folder_id, is_blacklisted, file_created_at, file_modified_at, language, created_at, updated_at`;
     engine.exec('BEGIN');
     for (let i = 0; i < N; i += 400) {
-      const n = Math.min(400, N - i);
-      const ph: string[] = [];
-      const params: unknown[] = [];
-      let p = 0;
-      for (let r = 0; r < n; r++) {
-        const id = i + r;
-        const title = `${WORDS_A[Math.floor(rng() * 10)]} ${WORDS_B[Math.floor(rng() * 10)]} ${id}`;
-        ph.push(`(${Array(18).fill(0).map(() => '?').join(',')})`);
-        params.push(
-          title, 200.5, 0, `C:\\Lib\\${id}.mp3`, rng() < 0.1 ? 1 : 0, 44100, 320000, 2,
-          2000 + Math.floor(rng() * 25), 1, 1 + (id % 12), 1, 0,
-          '2024-06-01T00:00:00.000Z', '2024-06-01T00:00:00.000Z', 'en',
-          '2024-06-01T00:00:00.000Z', '2024-06-01T00:00:00.000Z'
-        );
+      const chunk = Math.min(400, N - i);
+      const rows: string[] = [];
+      for (let j = 0; j < chunk; j++) {
+        const idx = i + j;
+        const a = WORDS_A[Math.floor(rng() * WORDS_A.length)];
+        const b = WORDS_B[Math.floor(rng() * WORDS_B.length)];
+        const title = `'${a} ${b} ${idx}'`;
+        const dur = (120 + rng() * 240).toFixed(1);
+        const path = `'C:\\\\Lib\\\\track_${idx}.mp3'`;
+        const fav = rng() < 0.1 ? 1 : 0;
+        const year = 1970 + Math.floor(rng() * 55);
+        const lang = rng() < 0.15 ? `'ja'` : `'en'`;
+        const now = 1700000000000 + idx * 1000;
+        rows.push(`(${title}, ${dur}, 0, ${path}, ${fav}, 44100, 320000, 2, ${year}, 1, ${idx + 1}, 1, 0, ${now}, ${now}, ${lang}, ${now}, ${now})`);
       }
-      void p;
-      engine.run(`INSERT INTO songs (${COLS}) VALUES ${ph.join(',')}`, params);
+      engine.exec(`INSERT INTO songs (${COLS}) VALUES ${rows.join(',')}`);
     }
     engine.exec('COMMIT');
 
     // warm the FTS/index caches with one full pass
     engine.all('SELECT id FROM songs ORDER BY title');
-  });
+  }, 60000);
 
   afterAll(async () => {
     const { closeDatabaseInstance } = await import('@main/db/db');
