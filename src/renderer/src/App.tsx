@@ -65,7 +65,11 @@ import { dispatch, store } from './store/store';
 // });
 // / / / / / / / /
 
-const updateNetworkStatus = () => window.api.settingsHelpers.networkStatusChange(navigator.onLine);
+const updateNetworkStatus = () => {
+  if (typeof window !== 'undefined' && window.api?.settingsHelpers?.networkStatusChange) {
+    window.api.settingsHelpers.networkStatusChange(navigator.onLine);
+  }
+};
 
 updateNetworkStatus();
 window.addEventListener('online', updateNetworkStatus);

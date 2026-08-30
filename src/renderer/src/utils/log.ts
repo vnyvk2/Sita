@@ -25,7 +25,9 @@ const log = (
     }
   }
 
-  window.api.log.sendLogs(message, parsedData, logType, forceWindowRestart, forceMainRestart);
+  if (typeof window !== 'undefined' && window?.api?.log?.sendLogs) {
+    window.api.log.sendLogs(message, parsedData, logType, forceWindowRestart, forceMainRestart);
+  }
 };
 
 export default log;

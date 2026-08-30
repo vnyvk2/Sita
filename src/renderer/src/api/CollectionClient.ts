@@ -47,8 +47,10 @@ export const CollectionClient = {
   redo: (collectionId: string) => window.api.collections.history.redo(collectionId),
 
   // Events
-  onEvent: (callback: (e: unknown, event: CollectionEvent) => void) => window.api.collections.events.onEvent(callback as any),
-  offEvent: (callback: (e: unknown, event: CollectionEvent) => void) => window.api.collections.events.offEvent(callback as any),
+  onEvent: (callback: (e: unknown, event: CollectionEvent) => void) =>
+    window.api?.collections?.events?.onEvent?.(callback as any),
+  offEvent: (callback: (e: unknown, event: CollectionEvent) => void) =>
+    window.api?.collections?.events?.offEvent?.(callback as any),
 
   // Import / Export
   export: (playlistId: number, options?: PlaylistExportOptions) => window.api.collections.export(playlistId, options),
