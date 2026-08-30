@@ -1,4 +1,5 @@
 import { db } from '@db/db';
+import { rawAll } from '@db/sqlite/raw';
 import {
   albums,
   albumsSongs,
@@ -619,7 +620,8 @@ export interface SongListFacets {
 export const getSongListFacets = async (
   trx: DB | DBTransaction = db
 ): Promise<SongListFacets> => {
-  const languagesResult = await trx.all<{ val: string }>(sql`
+  // rawAll: object rows (drizzle proxy .all() returns positional arrays for raw SQL)
+  const languagesResult = await rawAll<{ val: string }>(sql`
     SELECT DISTINCT val FROM (
       SELECT language AS val FROM songs WHERE language IS NOT NULL AND trim(language) <> ''
       UNION

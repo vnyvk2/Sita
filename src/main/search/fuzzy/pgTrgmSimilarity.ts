@@ -32,8 +32,15 @@ export const pgSimilarity = (a: string, b: string): number => {
   return m / (A.size + B.size - m);
 };
 
-/** pg_trgm.similarity_threshold default — the `%` operator's cutoff. */
+/** pg_trgm.similarity_threshold default — the `%` operator's cutoff (pass 1). */
 export const PG_SIMILARITY_THRESHOLD = 0.3;
+/**
+ * Relaxed second-pass cutoff for typo resistance. Used ONLY when pass 1 (0.3)
+ * found nothing, so normal searches keep pg-exact behavior. 0.2 catches
+ * letter transpositions ('midngith' = 0.286) and short-ish typos ('goln' =
+ * 0.214) that pg_trgm rejected.
+ */
+export const PG_SIMILARITY_FLOOR = 0.2;
 
 export const isPgSimilar = (a: string, b: string, threshold = PG_SIMILARITY_THRESHOLD): boolean =>
   pgSimilarity(a, b) >= threshold;

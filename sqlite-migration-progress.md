@@ -225,3 +225,40 @@ changes above.
 - Re-verified: typecheck:node 0 errors; sqlite-engine suite 6/6; smoke 5/5; collections
   + integration 36/37 files / 135/136 tests (the 1 failure = verified pre-existing
   autotagArtwork).
+
+## Runtime feedback round 1 (user testing)
+
+- **Scroll**: benchmarked the real hydration path at 50k songs
+  (test/src/main/db/sqlite/scroll-perf.test.ts, kept as a perf regression gate):
+  full id list 57.6ms; 50 concurrent 200-row windows (fast-scroll burst, 10k rows
+  hydrated) 510ms total / 10.2ms per window; sequential slow-scroll p50 9.25ms p95
+  14.6ms; hydration during concurrent write txs 18.2ms (no txLock stall). DB layer
+  is not the bottleneck — awaiting user's re-test with more detail before touching
+  the renderer/windowing side.
+- **Search typo resistance**: user reports typos handle poorly. Parity check:
+  pg_trgm's 0.3 threshold fails transpositions ('midngith' = 0.286) and short-ish
+  typos ('goln' = 0.214) — PGlite failed those too. SQLite lets us do BETTER:
+  implementing progressive threshold in fuzzySearch (below).
+
+## Search typo resistance + .all() runtime bug (round 2)
+
+- **ROOT CAUSE of "typos don't work" found**: drizzle's sqlite-proxy `.all()` returns
+  POSITIONAL ARRAYS for raw SQL (positional mapping is what the query-builder layer
+  needs). Two raw-SQL sites treated rows as objects and silently broke at runtime:
+  1. `fuzzySearch` pool — `r.id`/`r.text` were undefined → pgSimilarity scored ~0 →
+     fuzzy ALWAYS returned [] → typos never matched in the production build (the POC
+     b3b used object-mode helpers, the production port used drizzle .all() — port bug).
+  2. `getSongListFacets` — `r.val.trim()` would throw TypeError at runtime when the
+     Songs page loaded language facets.
+- Both fixed by routing raw object-row queries through `rawAll` (same connection →
+  transaction-safe). Sweep confirmed no other object-style `.all()`/`.get()` sites remain.
+- **Typo resistance implemented** (better than the PG build): `fuzzySearch` now scores
+  the pool once and applies a PROGRESSIVE threshold — pass 1 at pg-exact 0.3; when pass
+  1 finds nothing, pass 2 relaxes to 0.2. pg_trgm rejected transpositions ('midngith'
+  = 0.286) and short typos ('goln' = 0.214); the SQLite build now catches them. Pass 2
+  never runs when pass 1 matched, so correct-typing behavior is byte-identical to before
+  (no noise).
+- New suite: test/src/main/search/typo-resistance.test.ts (pass-1 parity, pass-2 rescue,
+  artist fuzzy, negative-noise guard) — 4/4 PASS.
+- getSongListFacets has NO test coverage (only used by renderer) — the .all() bug there
+  would have thrown on every Songs-page load; note for test-debt backlog.

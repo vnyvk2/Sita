@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 
 import type { DB, DBTransaction } from '../../db/db';
-import { PG_SIMILARITY_THRESHOLD, pgSimilarity } from './pgTrgmSimilarity';
+import { rawAll } from '../../db/sqlite/raw';
+import { PG_SIMILARITY_THRESHOLD, PG_SIMILARITY_FLOOR, pgSimilarity } from './pgTrgmSimilarity';
 
 /**
  * Fuzzy `%`-replacement used by the search engines (b3b design):
@@ -23,6 +24,8 @@ export interface FuzzySearchArgs {
   query: string;
   limit: number;
   excludeIds?: Set<number>;
+  /** Kept for API compatibility: rawAll targets the same connection, so queries
+   *  issued here always participate in the caller's transaction. */
   trx?: DB | DBTransaction;
 }
 
@@ -44,8 +47,8 @@ export const trigramPhrases = (word: string): Set<string> => {
 export const fuzzySearch = async (
   args: FuzzySearchArgs
 ): Promise<{ id: number; text: string }[]> => {
-  const { baseTable, textColumn, query, limit, excludeIds, trx: trxArg } = args;
-  const trx = trxArg ?? (await import('../../db/db')).db;
+  const { baseTable, textColumn, query, limit, excludeIds } = args;
+  void args.trx;
   const normKeep = query
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
@@ -61,25 +64,41 @@ export const fuzzySearch = async (
 
   const orQuery = [...phrases].map(escapePhrase).join(' OR ');
   const ftsTable = `fts_${baseTable}`;
-  const rows = (await trx.all(sql`
+  // rawAll (object rows) — drizzle's proxy .all() returns positional arrays for raw
+  // SQL. Targets the same connection, so it joins the caller's transaction.
+  const rows = await rawAll<{ id: number; text: string }>(sql`
     SELECT s.id AS id, s.${sql.raw(textColumn)} AS text
     FROM ${sql.raw(ftsTable)} f
     JOIN ${sql.raw(baseTable)} s ON s.id = f.rowid
     WHERE ${sql.raw(ftsTable)} MATCH ${orQuery}
     ORDER BY rank
     LIMIT 8000
-  `)) as { id: number; text: string }[];
+  `);
 
   const exclude = excludeIds ?? new Set<number>();
-  const scored: { id: number; sim: number }[] = [];
+  // Score every candidate once, then apply a PROGRESSIVE threshold:
+  //   pass 1 — pg_trgm's exact 0.3 (parity with the PG build's `%` operator)
+  //   pass 2 — 0.2 relaxation, used ONLY when pass 1 found nothing. Catches
+  //            transpositions ('midngith' = 0.286) and short-ish typos
+  //            ('goln' = 0.214) that pg_trgm rejected — a deliberate
+  //            improvement over the PGlite build, at bounded noise cost
+  //            (pass 2 never runs when pass 1 already matched).
+  const scored: { id: number; sim: number; text: string }[] = [];
   for (const r of rows) {
     if (exclude.has(r.id)) continue;
     const sim = pgSimilarity(normKeep, String(r.text));
-    if (sim >= PG_SIMILARITY_THRESHOLD) scored.push({ id: r.id, sim });
+    if (sim >= PG_SIMILARITY_FLOOR) scored.push({ id: r.id, sim, text: String(r.text) });
   }
   scored.sort((a, b) => b.sim - a.sim);
-  return scored.slice(0, limit).map((s) => {
-    const row = rows.find((r) => r.id === s.id);
-    return { id: s.id, text: String(row?.text ?? '') };
-  });
+
+  const bestSim = scored[0]?.sim ?? 0;
+  const threshold = bestSim >= PG_SIMILARITY_THRESHOLD ? PG_SIMILARITY_THRESHOLD : PG_SIMILARITY_FLOOR;
+
+  const out: { id: number; text: string }[] = [];
+  for (const s of scored) {
+    if (out.length >= limit) break;
+    if (s.sim < threshold) break; // sorted desc — everything after is below
+    out.push({ id: s.id, text: s.text });
+  }
+  return out;
 };
