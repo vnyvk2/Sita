@@ -54,23 +54,23 @@ const SettingsPage = () => {
           {/* ? PREFERENCES SETTINGS */}
           <PreferencesSettings />
 
+          {/* METADATA & AUTOTAG SOURCES SETTINGS */}
+          <MetadataSettings />
+
           {/* ? ACCESSIBILITY SETTINGS */}
           <AccessibilitySettings />
 
           {/* PERFORMANCE SETTINGS */}
           <PerformanceSettings />
 
-          {/* STARTUP SETTINGS */}
-          <StartupSettings />
+          {/* ONLINE DOWNLOADS SETTINGS */}
+          <DownloadsSettings />
 
           {/* LIBRARY SCANNING SETTINGS */}
           <LibrarySettings />
 
-          {/* ONLINE DOWNLOADS SETTINGS */}
-          <DownloadsSettings />
-
-          {/* METADATA & AUTOTAG SOURCES SETTINGS */}
-          <MetadataSettings />
+          {/* STARTUP SETTINGS */}
+          <StartupSettings />
 
           {/* STORAGE SETTINGS */}
           <StorageSettings />
