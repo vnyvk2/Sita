@@ -220,10 +220,22 @@ const SongInfoContainer = (props: Props) => {
               isSemiTransparent
             />
           </div>
-          <div className="song-duration opacity-75">
+          <button
+            type="button"
+            onClick={() =>
+              storage.preferences.setPreferences(
+                'showSongRemainingTime',
+                !preferences?.showSongRemainingTime
+              )
+            }
+            title={
+              preferences?.showSongRemainingTime ? 'Show total duration' : 'Show remaining time'
+            }
+            className="song-duration cursor-pointer opacity-75 transition-opacity select-none hover:opacity-100"
+          >
             {preferences?.showSongRemainingTime ? '-' : ''}
             {songDuration.minutes}:{songDuration.seconds}
-          </div>
+          </button>
         </div>
       </div>
     </div>

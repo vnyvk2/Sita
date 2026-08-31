@@ -1,4 +1,5 @@
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
 import { memo, useCallback, useEffect, useState } from 'react';
 
@@ -49,14 +50,23 @@ export const RemainingSongDuration = memo(() => {
     return () => document.removeEventListener('player/positionChange', handlePositionChange);
   }, [handlePositionChange]);
 
+  const toggleRemainingTime = useCallback(() => {
+    storage.preferences.setPreferences('showSongRemainingTime', !showSongRemainingTime);
+  }, [showSongRemainingTime]);
+
   const remaining = Math.max(0, duration - elapsedSeconds);
   const displayTime = showSongRemainingTime ? calculateTime(remaining) : calculateTime(duration);
 
   return (
-    <div className="full-song-duration w-16 text-center text-sm font-light">
+    <button
+      type="button"
+      onClick={toggleRemainingTime}
+      title={showSongRemainingTime ? 'Show total duration' : 'Show remaining time'}
+      className="full-song-duration hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight w-16 cursor-pointer text-center text-sm font-light transition-colors select-none"
+    >
       {showSongRemainingTime ? '-' : ''}
       {displayTime.minutes}:{displayTime.seconds}
-    </div>
+    </button>
   );
 });
 

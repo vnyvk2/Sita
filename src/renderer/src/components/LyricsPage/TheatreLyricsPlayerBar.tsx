@@ -5,6 +5,7 @@ import VolumeSlider from '@renderer/components/VolumeSlider';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { store } from '@renderer/store/store';
 import calculateTime from '@renderer/utils/calculateTime';
+import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,12 +71,12 @@ const TheatreLyricsPlayerBar = () => {
   }, [currentSongData.artists]);
 
   return (
-    <div className="theatre-lyrics-player-bar-container pointer-events-auto relative z-20 w-full px-6 pb-6 pt-2">
-      <div className="mx-auto flex w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-black/60 px-6 py-3 shadow-2xl backdrop-blur-xl text-font-color-white">
+    <div className="theatre-lyrics-player-bar-container pointer-events-auto relative z-20 w-full px-6 pt-2 pb-6">
+      <div className="text-font-color-white mx-auto flex w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-black/60 px-6 py-3 shadow-2xl backdrop-blur-xl">
         {/* Top row: Track info, primary playback controls, volume */}
         <div className="flex w-full items-center justify-between gap-4">
           {/* Left: Track Info */}
-          <div className="flex min-w-0 max-w-[30%] items-center gap-3">
+          <div className="flex max-w-[30%] min-w-0 items-center gap-3">
             <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg shadow-md">
               <Img
                 src={currentSongData.artworkPath}
@@ -91,10 +92,7 @@ const TheatreLyricsPlayerBar = () => {
               >
                 {currentSongData.title || t('player.noSongPlaying')}
               </span>
-              <span
-                className="truncate text-xs text-white/70"
-                title={artistNames}
-              >
+              <span className="truncate text-xs text-white/70" title={artistNames}>
                 {artistNames || t('player.unknownArtist')}
               </span>
             </div>
@@ -106,7 +104,9 @@ const TheatreLyricsPlayerBar = () => {
               className={`like-btn !m-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 hover:bg-transparent focus-visible:!outline ${
                 !isKnownSource && 'cursor-not-allowed! opacity-30'
               }`}
-              tooltipLabel={isKnownSource ? t('player.likeDislike') : t('player.likeDislikeDisabled')}
+              tooltipLabel={
+                isKnownSource ? t('player.likeDislike') : t('player.likeDislikeDisabled')
+              }
               iconName="favorite"
               iconClassName={`${
                 isAFavorite
@@ -139,7 +139,7 @@ const TheatreLyricsPlayerBar = () => {
             <Button
               className={`play-pause-btn relative !m-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 hover:bg-transparent focus-visible:!outline ${
                 isPlayerStalled &&
-                'after:animate-spin-ease after:border-t-white after:absolute after:h-5 after:w-5 after:rounded-full after:border-2 after:border-transparent after:content-[""]'
+                'after:animate-spin-ease after:absolute after:h-5 after:w-5 after:rounded-full after:border-2 after:border-transparent after:border-t-white after:content-[""]'
               }`}
               tooltipLabel={t('player.playPause')}
               iconName={isCurrentSongPlaying ? 'pause_circle' : 'play_circle'}
@@ -160,7 +160,9 @@ const TheatreLyricsPlayerBar = () => {
             <Button
               className="repeat-btn !m-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 hover:bg-transparent focus-visible:!outline"
               tooltipLabel={t('player.repeat')}
-              iconName={isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'}
+              iconName={
+                isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'
+              }
               iconClassName={`material-icons-round !text-xl transition-colors ${
                 isRepeating !== 'false'
                   ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100!'
@@ -171,7 +173,7 @@ const TheatreLyricsPlayerBar = () => {
           </div>
 
           {/* Right: Volume Controls */}
-          <div className="flex min-w-0 max-w-[30%] items-center justify-end gap-2">
+          <div className="flex max-w-[30%] min-w-0 items-center justify-end gap-2">
             <Button
               className="volume-btn !m-0 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 hover:bg-transparent focus-visible:!outline"
               tooltipLabel={t('player.muteUnmute')}
@@ -202,10 +204,22 @@ const TheatreLyricsPlayerBar = () => {
               onSeek={(currentPosition) => setSongPos(currentPosition)}
             />
           </div>
-          <span className="w-12 text-left font-mono">
+          <button
+            type="button"
+            onClick={() =>
+              storage.preferences.setPreferences(
+                'showSongRemainingTime',
+                !preferences?.showSongRemainingTime
+              )
+            }
+            title={
+              preferences?.showSongRemainingTime ? 'Show total duration' : 'Show remaining time'
+            }
+            className="hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight w-12 cursor-pointer text-left font-mono transition-colors select-none"
+          >
             {preferences?.showSongRemainingTime ? '-' : ''}
             {songDuration.minutes}:{songDuration.seconds}
-          </span>
+          </button>
         </div>
       </div>
     </div>
