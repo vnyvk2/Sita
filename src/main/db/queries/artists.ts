@@ -20,7 +20,7 @@ export const getArtistById = async (id: number, trx: DB | DBTransaction = db) =>
   const data = await trx.query.artists.findFirst({
     where: (a) => eq(a.id, id),
     with: {
-      songs: { with: { song: { columns: { id: true, title: true } } } },
+      songs: { with: { song: { columns: { id: true, title: true, duration: true } } } },
       artworks: {
         with: {
           artwork: {

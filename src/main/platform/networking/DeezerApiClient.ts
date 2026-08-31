@@ -192,4 +192,35 @@ export class DeezerApiClient {
       return [];
     }
   }
+
+  /**
+   * Get related artists for a Deezer artist ID.
+   */
+  public async getRelatedArtists(
+    deezerArtistId: number,
+    limit = 10,
+    signal?: AbortSignal
+  ): Promise<DeezerArtistInfo[]> {
+    if (!deezerArtistId || deezerArtistId <= 0) return [];
+
+    const url = `${this.baseUrl}/artist/${deezerArtistId}/related`;
+    try {
+      const response = await this.pipeline.execute<{ data: DeezerArtistInfo[]; total: number }>({
+        url,
+        method: 'GET',
+        params: {
+          limit
+        },
+        signal
+      });
+
+      return response.data.data ?? [];
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 404) {
+        return [];
+      }
+      logger.warn(`Failed to fetch related artists for Deezer artist ID ${deezerArtistId}`, { error: err });
+      return [];
+    }
+  }
 }

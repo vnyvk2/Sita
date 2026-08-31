@@ -72,3 +72,8 @@ export type SimilarArtist = {
   url: string;
   artistData?: Artist;
 };
+
+export interface SimilarArtistInfo {
+  availableArtists: SimilarArtist[];
+  unAvailableArtists: SimilarArtist[];
+}

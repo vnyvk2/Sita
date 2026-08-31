@@ -26,7 +26,11 @@ export interface LastFmTopTracksResponse {
   message?: string;
 }
 
-const getArtistTopTracksFromLastFM = async (artistName: string, limit = 10): Promise<LastFmTopTrack[]> => {
+const getArtistTopTracksFromLastFM = async (
+  artistName: string,
+  limit = 10,
+  signal?: AbortSignal
+): Promise<LastFmTopTrack[]> => {
   const isConnectedToInternet = checkIfConnectedToInternet();
   if (!isConnectedToInternet) {
     return [];
@@ -47,7 +51,7 @@ const getArtistTopTracksFromLastFM = async (artistName: string, limit = 10): Pro
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('api_key', LAST_FM_API_KEY);
 
-    const res = await fetch(url);
+    const res = await fetch(url, { signal });
     if (!res.ok) {
       logger.warn(`Failed to fetch artist top tracks from LastFM: ${artistName}`, {
         status: res.status,

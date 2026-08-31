@@ -22,7 +22,7 @@ export class MusicBrainzApiClient {
     this.pipeline = pipeline;
     this.baseUrl = (options?.baseUrl ?? 'https://musicbrainz.org/ws/2').replace(/\/$/, '');
     this.userAgent =
-      options?.userAgent ?? 'NoraMusicPlayer/4.0.0 (https://github.com/vnyvk2/Nora)';
+      options?.userAgent ?? 'NoraMusicPlayer/1.0.0 (https://github.com/vnyvk2/MyNora)';
   }
 
   public async searchRecordings(

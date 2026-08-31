@@ -484,7 +484,14 @@ app
 
     if (windowState === 'maximized') mainWindow.maximize();
 
-    if (!app.isDefaultProtocolClient(DEFAULT_APP_PROTOCOL)) {
+    // Register protocol client (supports development mode where electron binary needs app entry path)
+    if (process.defaultApp || !app.isPackaged) {
+      if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(DEFAULT_APP_PROTOCOL, process.execPath, [
+          path.resolve(process.argv[1])
+        ]);
+      }
+    } else if (!app.isDefaultProtocolClient(DEFAULT_APP_PROTOCOL)) {
       logger.info(
         'No default protocol registered. Starting the default protocol registration process.'
       );
@@ -823,13 +830,18 @@ export const getCurrentSongPath = () => currentSongPath;
 
 function manageAuthServices(url: string) {
   logger.debug('URL selected for auth service', { url });
-  const { searchParams } = new URL(url);
+  try {
+    const cleaned = url.replace(/^"|"$/g, '').trim();
+    const { searchParams } = new URL(cleaned);
 
-  if (searchParams.has('service')) {
-    if (searchParams.get('service') === 'lastfm') {
-      const token = searchParams.get('token');
-      if (token) return manageLastFmAuth(token);
+    if (searchParams.has('service')) {
+      if (searchParams.get('service') === 'lastfm') {
+        const token = searchParams.get('token');
+        if (token) return manageLastFmAuth(token);
+      }
     }
+  } catch (err) {
+    logger.error('Failed to parse auth URL', { url, error: err });
   }
   return undefined;
 }

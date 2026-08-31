@@ -3,7 +3,7 @@ import logger from '../../logger';
 import { checkIfConnectedToInternet } from '../../main';
 import { LASTFM_BASE_URL } from './lastFmUtils';
 
-const getArtistInfoFromLastFM = async (artistName: string) => {
+const getArtistInfoFromLastFM = async (artistName: string, signal?: AbortSignal) => {
   const isConnectedToInternet = checkIfConnectedToInternet();
   if (isConnectedToInternet) {
     const LAST_FM_API_KEY = import.meta.env.MAIN_VITE_LAST_FM_API_KEY;
@@ -21,7 +21,7 @@ const getArtistInfoFromLastFM = async (artistName: string) => {
       url.searchParams.set('artist', artistName.trim());
       url.searchParams.set('api_key', LAST_FM_API_KEY);
 
-      const res = await fetch(url);
+      const res = await fetch(url, { signal });
 
       if (res.ok) {
         const data = (await res.json()) as LastFmArtistInfoAPI;

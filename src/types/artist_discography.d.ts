@@ -41,22 +41,36 @@ export interface ArtistDiscographyPayload {
 
 export interface ArtistPopularTrack {
   id: string | number;
+  globalRank: number; // 1-indexed true global/popularity rank
   title: string;
-  duration?: number;
+  artist?: string;
+  albumTitle?: string;
+  durationSec?: number; // duration normalized to seconds
   listeners?: number;
   playcount?: number;
-  previewUrl?: string;
-  albumTitle?: string;
-  coverMedium?: string;
   localSongId?: number;
   isInLibrary: boolean;
+  matchConfidence?: 'exact' | 'fuzzy';
+  previewUrl?: string;
+  previewProvider?: 'iTunes' | 'Deezer';
+  coverMedium?: string;
+}
+
+export interface ArtistFeaturedImage {
+  url: string;
+  source: 'Local' | 'Deezer' | 'Wikipedia' | 'iTunes';
 }
 
 export interface ArtistOnlineProfilePayload {
   artistId: number;
   artistName: string;
-  bio?: string;
+  fetchedAt: number;
+  bioSummary?: string;
+  bioFull?: string;
+  bioParagraphs: string[];
+  bioSource?: 'Last.fm' | 'Wikipedia';
   bioUrl?: string;
+  featuredImage?: ArtistFeaturedImage;
   tags: Array<{ name: string; url: string }>;
   topTracks: ArtistPopularTrack[];
   similarArtists: SimilarArtistInfo;

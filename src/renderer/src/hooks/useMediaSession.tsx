@@ -108,6 +108,9 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
         }
       }
 
+      // Check if the scheme is compliant with W3C MediaSession spec (http, https, data, blob)
+      const isStandardScheme = /^(https?|data|blob):/i.test(artworkPath);
+
       // Clean up previous blob URL if needed
       if (
         artworkPathRef.current &&
@@ -118,15 +121,16 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
       }
       artworkPathRef.current = artworkPath;
 
-      const artwork = artworkPath
-        ? [
-            {
-              src: artworkPath,
-              sizes: '1000x1000',
-              type: 'image/webp'
-            }
-          ]
-        : [];
+      const artwork =
+        artworkPath && isStandardScheme
+          ? [
+              {
+                src: artworkPath,
+                sizes: '512x512',
+                type: 'image/webp'
+              }
+            ]
+          : [];
 
       // Update metadata
       if (typeof MediaMetadata !== 'undefined') {
@@ -140,6 +144,35 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
             : t('common.unknownAlbum'),
           artwork
         });
+      }
+
+      // If artwork is a custom protocol (e.g. nora://localfiles/...), convert to blob URL for MediaSession
+      if (artworkPath && !isStandardScheme) {
+        fetch(artworkPath)
+          .then((res) => res.blob())
+          .then((blob) => {
+            // Ensure the song hasn't changed during the async fetch
+            if (store.state.currentSongData.songId !== currentSong.songId) return;
+
+            const blobUrl = URL.createObjectURL(blob);
+            if (artworkPathRef.current && artworkPathRef.current.startsWith('blob:')) {
+              URL.revokeObjectURL(artworkPathRef.current);
+            }
+            artworkPathRef.current = blobUrl;
+
+            if (typeof MediaMetadata !== 'undefined' && mediaSession.metadata) {
+              mediaSession.metadata.artwork = [
+                {
+                  src: blobUrl,
+                  sizes: '512x512',
+                  type: blob.type || 'image/webp'
+                }
+              ];
+            }
+          })
+          .catch(() => {
+            // Non-critical: ignore if custom protocol fetch fails
+          });
       }
 
       // Update position state

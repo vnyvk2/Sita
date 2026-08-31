@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
   memo,
   useEffect,
   useMemo,

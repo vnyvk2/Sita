@@ -17,7 +17,13 @@
       "@common/*": [
         "src/common/*"
       ],
+      "@main/*": [
+        "src/main/*"
+      ],
+      "@db/*": [
+        "src/main/db/*"
+      ]
     }
   },
-  "include": [ "src/types/" ]
+  "include": [ "test/**/*", "src/**/*", "src/types/*" ]
 }

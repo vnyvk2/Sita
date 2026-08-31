@@ -31,7 +31,7 @@ export class FetchHttpClient implements IHttpClient {
   constructor(options?: { defaultTimeoutMs?: number; defaultHeaders?: Record<string, string> }) {
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 10000;
     this.defaultHeaders = options?.defaultHeaders ?? {
-      'User-Agent': 'NoraMusicPlayer/4.0.0 (https://github.com/vnyvk2/Nora)'
+      'User-Agent': 'NoraMusicPlayer/1.0.0 (https://github.com/vnyvk2/MyNora)'
     };
   }
 
