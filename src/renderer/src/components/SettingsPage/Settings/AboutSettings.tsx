@@ -2,7 +2,6 @@ import { lazy, useContext, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import rawChangelog from '../../../../../../CHANGELOG.md?raw';
-import openSourceLicenses from '../../../../../../open_source_licenses.txt?raw';
 import { version, homepage, urls } from '../../../../../../package.json';
 import DiscordLightIcon from '../../../assets/images/svg/discord_dark_mode.svg';
 import DiscordDarkIcon from '../../../assets/images/svg/discord_light_mode.svg';
@@ -198,25 +197,6 @@ const AboutSettings = () => {
             label={t('settingsPage.releaseNotes')}
             clickHandler={() =>
               changePromptMenuData(true, <ReleaseNotesPrompt />, 'release-notes px-8 py-4')
-            }
-          />
-          <Button
-            iconName="receipt_long"
-            className="open-source-licenses-btn mb-4"
-            label={t('settingsPage.openSourceLicenses')}
-            clickHandler={() =>
-              changePromptMenuData(
-                true,
-                <>
-                  <div className="mb-4 w-full text-center text-3xl font-medium">
-                    {t('settingsPage.openSourceLicenses')}
-                  </div>
-                  <div className="relative max-h-full w-full overflow-y-auto px-4 text-sm whitespace-pre-wrap">
-                    {openSourceLicenses}
-                  </div>
-                </>,
-                'flex flex-col'
-              )
             }
           />
           <Button
