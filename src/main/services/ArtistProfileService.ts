@@ -247,7 +247,7 @@ export class ArtistProfileService {
     // 2. Fallback to Wikipedia biography
     if (wikiBio?.fullExtract) {
       const normalizedWiki = normalizeBioText(wikiBio.fullExtract, 80); // Wikipedia extracts are authoritative
-      if (normalizedWiki.paragraphs.length > 0) {
+      if (normalizedWiki.isValid && normalizedWiki.paragraphs.length > 0) {
         return {
           bioSummary: wikiBio.summary || normalizedWiki.summary,
           bioFull: normalizedWiki.fullText,

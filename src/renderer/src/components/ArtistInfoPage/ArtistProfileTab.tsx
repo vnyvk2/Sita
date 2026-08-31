@@ -280,7 +280,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                           <span className="material-icons-round text-sm">
                             {isPlayingThisPreview ? 'pause' : 'play_arrow'}
                           </span>
-                          <span>30s Preview</span>
+                          <span>{t('common.preview30s', '30s Preview')}</span>
                         </button>
                       ) : null}
                     </div>

@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "allowJs": true,
@@ -11,19 +12,11 @@
     "erasableSyntaxOnly": false,
     "sourceMap": true,
     "paths": {
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ],
-      "@common/*": [
-        "src/common/*"
-      ],
-      "@main/*": [
-        "src/main/*"
-      ],
-      "@db/*": [
-        "src/main/db/*"
-      ]
+      "@renderer/*": [ "./src/renderer/src/*" ],
+      "@common/*": [ "./src/common/*" ],
+      "@main/*": [ "./src/main/*" ],
+      "@db/*": [ "./src/main/db/*" ]
     }
   },
-  "include": [ "test/**/*", "src/**/*", "src/types/*" ]
+  "include": [ "test/**/*", "src/types/*" ]
 }
