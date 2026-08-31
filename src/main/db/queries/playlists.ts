@@ -1,7 +1,7 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { db } from '@db/db';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import { playlistEntries, playlists, songs, playHistory } from '../schema';
 
@@ -228,11 +228,13 @@ export const getHistoryPlaylistWithSongPaths = async (trx: DB | DBTransaction = 
   const timer = timeStart();
   const historySongs = await trx
     .select({
-      path: songs.path
+      path: songs.path,
+      lastPlayed: sql<Date>`max(${playHistory.createdAt})`
     })
     .from(playHistory)
     .innerJoin(songs, eq(playHistory.songId, songs.id))
-    .orderBy(desc(playHistory.createdAt));
+    .groupBy(playHistory.songId)
+    .orderBy(sql`max(${playHistory.createdAt}) DESC`);
 
   timeEnd(timer, 'Time taken to fetch history playlist with song paths');
 

@@ -39,11 +39,9 @@ export const getAllSongsInHistory = async (
   const limit = end - start > 0 ? end - start : undefined;
 
   try {
-    const isMostPlayed =
-      sortType === 'allTimeMostListened' || sortType === 'monthlyMostListened';
+    const isMostPlayed = sortType === 'allTimeMostListened' || sortType === 'monthlyMostListened';
 
-    const effectivePeriod =
-      options?.period ?? (sortType === 'monthlyMostListened' ? '30' : 'all');
+    const effectivePeriod = options?.period ?? (sortType === 'monthlyMostListened' ? '30' : 'all');
     const cutoffDate = getCutoffDate(effectivePeriod);
     const whereClause = cutoffDate ? gte(playHistory.createdAt, cutoffDate) : undefined;
 
@@ -71,16 +69,31 @@ export const getAllSongsInHistory = async (
       const allTopSongIds = historyRecords.map((r) => r.songId);
       songIds = limit ? allTopSongIds.slice(start, start + limit) : allTopSongIds.slice(start);
       preserveOrder = true;
-    } else if (
-      sortType === 'addedOrder' ||
-      sortType === 'dateAddedDescending' ||
-      !sortType
-    ) {
+    } else if (sortType === 'addedOrder' || sortType === 'dateAddedDescending' || !sortType) {
       const historyRecords = await trx
-        .select({ songId: playHistory.songId })
+        .select({
+          songId: playHistory.songId,
+          lastPlayed: sql<Date>`max(${playHistory.createdAt})`
+        })
         .from(playHistory)
         .where(whereClause)
-        .orderBy(desc(playHistory.createdAt))
+        .groupBy(playHistory.songId)
+        .orderBy(sql`max(${playHistory.createdAt}) DESC`)
+        .limit(limit ?? 1000000)
+        .offset(start);
+
+      songIds = historyRecords.map((r) => r.songId);
+      preserveOrder = true;
+    } else if (sortType === 'dateAddedAscending') {
+      const historyRecords = await trx
+        .select({
+          songId: playHistory.songId,
+          firstPlayed: sql<Date>`min(${playHistory.createdAt})`
+        })
+        .from(playHistory)
+        .where(whereClause)
+        .groupBy(playHistory.songId)
+        .orderBy(sql`min(${playHistory.createdAt}) ASC`)
         .limit(limit ?? 1000000)
         .offset(start);
 
@@ -135,4 +148,3 @@ export const clearFullSongHistory = async (trx: DB | DBTransaction = db) => {
   const data = await trx.delete(playHistory);
   return data;
 };
-

@@ -145,11 +145,7 @@ function RecentlyAddedPlaylistInfoPage() {
         })
       }
     ]);
-  }, [
-    addNewNotifications,
-    filteredSongs,
-    t
-  ]);
+  }, [addNewNotifications, filteredSongs, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
@@ -284,10 +280,14 @@ function RecentlyAddedPlaylistInfoPage() {
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={{
-                ...mapLegacyPlaylistToDto(playlistData),
+                ...mapLegacyPlaylistToDto({
+                  ...playlistData,
+                  songs: recentlyAddedSongs
+                }),
                 name: t('common.recentlyAdded', 'Recently Added')
               }}
-              songs={filteredSongs}
+              songs={recentlyAddedSongs}
+              filteredSongs={filteredSongs}
             />
           )
         }}

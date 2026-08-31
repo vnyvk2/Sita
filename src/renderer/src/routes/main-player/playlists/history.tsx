@@ -64,7 +64,11 @@ const mostPlayedLimitOptions = [
  * @returns A React element representing the History playlist information page.
  */
 function HistoryPlaylistInfoPage() {
-  const { period: searchPeriod, mostPlayedLimit: searchLimit, language = 'all' } = Route.useSearch();
+  const {
+    period: searchPeriod,
+    mostPlayedLimit: searchLimit,
+    language = 'all'
+  } = Route.useSearch();
 
   const playlistSortingState = useStore(
     store,
@@ -184,11 +188,7 @@ function HistoryPlaylistInfoPage() {
         })
       }
     ]);
-  }, [
-    addNewNotifications,
-    filteredSongs,
-    t
-  ]);
+  }, [addNewNotifications, filteredSongs, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
@@ -348,8 +348,12 @@ function HistoryPlaylistInfoPage() {
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
-              playlist={mapLegacyPlaylistToDto(playlistData)}
-              songs={filteredSongs}
+              playlist={mapLegacyPlaylistToDto({
+                ...playlistData,
+                songs: historySongs
+              })}
+              songs={historySongs}
+              filteredSongs={filteredSongs}
             />
           )
         }}

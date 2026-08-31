@@ -139,11 +139,7 @@ function FavoritesPlaylistInfoPage() {
         })
       }
     ]);
-  }, [
-    addNewNotifications,
-    filteredSongs,
-    t
-  ]);
+  }, [addNewNotifications, filteredSongs, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
@@ -257,8 +253,12 @@ function FavoritesPlaylistInfoPage() {
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
-              playlist={mapLegacyPlaylistToDto(playlistData)}
-              songs={filteredSongs}
+              playlist={mapLegacyPlaylistToDto({
+                ...playlistData,
+                songs: favoriteSongs
+              })}
+              songs={favoriteSongs}
+              filteredSongs={filteredSongs}
             />
           )
         }}
