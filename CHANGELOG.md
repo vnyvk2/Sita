@@ -6,53 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > [!TIP]
-> The latest version, **( v3.1.0-stable )** contains a lot of new features and improvements. As always expect some bugs in the app
+> The latest version, **( v1.0.0 )** contains a lot of new features and improvements.
+
+## [1.0.0] - 2026-08-31
 
 ### Added
 
-- Unified Discogs musical style suggestions with Nora's canonical multi-genre engine (`parseGenreList`) and added localized "(Added to Genres)" visual guidance in AutoTag diff previews.
-- Centralized multi-genre tokenizer and normalizer (`parseGenreList`) with support for compound delimiter splitting while preserving legitimate slash-containing genres (`Hip-Hop/Rap`, `R&B/Soul`, `AC/DC`) and ampersands (`Rock & Roll`, `R&B`).
-- Automated startup reconciliation (`reconcileExistingMultiGenres`) to detect, split, and re-link legacy concatenated delimiter genres in the database.
-- Immediate badge creation on `,` (comma), `;` (semicolon), and `Enter` in the song genres tag editor (`SongGenresInput`).
-- Canonical Unicode-aware normalization contract (`normalizeForMatching`) preserving CJK, Cyrillic, accented characters, and token boundaries across search and auto-tag matching.
-- Strongly-typed MusicBrainz Recording MBID and ISRC provider extraction and persistence across database schema and physical ID3 tags.
-- Cover Art Archive release-group lookup fallback when release-level artwork returns HTTP 404.
-- In-memory artwork cache invalidation with timestamp query parameter cache-busting for renderer image URLs.
-- Deferred write field-level coalescing (latest-write-wins) for currently playing tracks.
+- **App Rebranding & First Release**: Rebranded application to **Sita v1.0.0** inspired by MusicBee, featuring a clean desktop title bar and streamlined About interface.
+- **Theme Layer Inspector & Multi-Layer Customizer**: Introduced a comprehensive Theme Layer Inspector panel alongside a compact theme preset grid, allowing real-time CSS variable tweaking for surfaces (`--background-color-1`, `--background-color-2`, `--background-color-3`, `--side-bar-background`), text & accents (`--font-color-white`, `--font-color-dimmed`, `--font-color-highlight`, `--font-color-highlight-2`), and player controls (`--seekbar-background-color`, `--seekbar-track-background-color`).
+- **New Dark Theme Presets**: Added _Monochrome (Black & White)_, _Linear Slate_, and _Spotify Obsidian_ dark theme presets with full CSS custom property contracts.
+- **Compact Mini Player & Dedicated Shortcut**: Added dedicated `Ctrl+Shift+N` keyboard shortcut to immediately open or toggle the ultra-sleek Compact Mini Player mode.
+- **Interactive Player Duration / Remaining Time Toggle**: Made the song duration label in the main player bar, FullScreenPlayer, and TheatreLyrics bar clickable, toggling between total duration and remaining countdown time with two-way Settings synchronization.
+- **Progressive Library Hydration**: Engineered streaming library hydration that immediately emits an initial 100-track batch for instantaneous UI readiness, followed by 500-track chunks for smooth background indexing.
+- **Pure ITU-R BS.1770-4 / EBU R128 Loudness Normalization**: Implemented robust ReplayGain analysis engine with album-level loudness aggregation and decoupled playback volume policy.
+- **Multi-Format Streaming Audio Decoder & 200-Bin Peak Waveform**: Added streaming decoder abstraction supporting WAV/PCM parsing and 200-bin peak waveform visualization.
+- **Multi-Tier Heart Burst Animation**: Added multi-tier floating heart particle burst animation on favorite toggling with zero-latency optimistic state updates.
+- **Animated Insights Icon**: Added smooth, GPU-accelerated floating and twinkling sparkle dot wave animation on the Home page Insights button hover.
+- **Multi-Genre Tokenizer & Normalizer**: Centralized multi-genre parsing (`parseGenreList`) with compound delimiter splitting and localized guidance in AutoTag diff previews.
+- **Strongly-Typed MusicBrainz MBID & ISRC Extraction**: Added MusicBrainz Recording MBID and ISRC provider extraction with database persistence and ID3 tag synchronization.
+- **Cover Art Archive Fallback**: Added Cover Art Archive release-group lookup fallback when release-level artwork returns HTTP 404.
+- **Deferred Write Field-Level Coalescing**: Added deferred write coalescing (latest-write-wins) for currently playing tracks.
 
 ### Changed
 
-- Consolidated AutoTag metadata physical write ownership to a single updater (`updateSongId3Tags`), eliminating duplicate disk writes and encoding conflicts.
-- Refactored `MetadataProviderRuntime` to support multi-provider registration, rate-limiting, and circuit-breaking.
-- Optimized `RateLimiter` with single-drain timer scheduling and batch token consumption under concurrent bursts.
-- Added proactive TTL pruning to `IdentityResolutionCache` on cache pressure.
-- Removed binary artwork decoding (`sharp`) and payload transmission from the `getSong` IPC critical playback path.
-- Optimized `AudioPlayer` load sequencing and eliminated per-playback timestamp cache-busting to leverage Chromium media range caching.
-- Standardized `handleFileProtocol` on `Readable.toWeb` with native backpressure, byte-range slicing, and HTTP validator headers.
+- **Native SQLite Database Engine Migration**: Migrated the entire database architecture from PGlite to native `node:sqlite`, eliminating bundle overhead and dramatically reducing memory footprint.
+- **UtilityProcess Multi-Worker Offloading**: Migrated CPU-intensive operations (audio tag parsing, asset/palette generation, and ReplayGain analysis) to Electron `utilityProcess` workers with supervision, backpressure management, and crash recovery.
+- **Typo-Resistant Fuzzy Search**: Replaced raw positional SQL queries with typo-resistant fuzzy matching across library search.
+- **Song Information Accordion Default**: Updated Song Info page to open the "Additional song information" section expanded by default.
+- **Streamlined Settings Layout**: Reorganized Settings sections into an intuitive layout hierarchy (Preferences -> Metadata Sources -> Performance -> Online Downloads -> Library Scanning -> Startup & Windows).
+- **Modernized Genre Iconography**: Replaced radar icon with Material `style` layered tag icon across Sidebar and Search navigation.
+- **Standardized File Protocol Streaming**: Refactored audio file protocol on `Readable.toWeb` with native backpressure, byte-range slicing, and HTTP validator headers.
+- **Consolidated AutoTag Metadata Ownership**: Consolidated AutoTag metadata physical write ownership to a single updater (`updateSongId3Tags`), eliminating duplicate disk writes and encoding conflicts.
+- **Optimized Audio Load Sequencing**: Removed binary artwork decoding from the `getSong` IPC critical playback path and leveraged Chromium media range caching.
 
 ### Fixed
 
-- Fixed Discogs genre and style merging in `SongMetadataBuilder` using naive comma splitting instead of the canonical multi-genre tokenizer.
-- Fixed audio library scanning omitting genre extraction during track parsing (`parseSong`).
-- Fixed compound genre strings (e.g. `Rock,pop`, `Rock, Pop`, `Rock; Pop`, `Rock / Pop`) being indexed as a single literal genre instead of multiple distinct genres.
-- Fixed `linkSongToGenre` missing `ON CONFLICT DO NOTHING` idempotency for junction records.
-- Fixed rapid track skip race conditions using monotonic generation token tracking (`currentLoadRequestId`) in `AudioPlayer`.
-- Fixed fade transition timeout collision during rapid play/pause toggles.
-- Fixed unhandled exceptions and swallowed `loadError` events during song load failures.
-- Fixed in-flight playback load resolution on player teardown and queue clearing.
-- Fixed repeat-one mode omitted telemetry events.
-
-- Fixed track title corruption where album titles were applied to track titles in auto-tag previews.
-- Fixed ASCII-only regex normalizers destroying non-Latin metadata.
-- Fixed undo snapshots omitting `discNumber`, `genre`, `musicBrainzRecordingId`, `isrc`, and artwork tags during rollback.
-- Fixed Discogs unauthenticated API requests and loose candidate matching heuristics.
-- Fixed unescaped Lucene special characters in MusicBrainz search queries.
-- Fixed multi-disc album track counts only counting the first medium.
-- Fixed library scanner taking arbitrary picture frames instead of prioritizing `PictureType.FrontCover`.
+- **Memory & Resource Cleanup**: Fixed potential memory leaks in virtualized lists, listeners, and worker pools.
+- **Window Focus on Startup**: Prevented developer tools and child windows from stealing focus from the main window on startup.
+- **List Scroll Restoration**: Fixed virtualized row hydration glitch when navigating back to scrolled views.
+- **Genre Junction Conflicts**: Fixed missing `ON CONFLICT DO NOTHING` idempotency for multi-genre track associations.
+- **Fast Track Skip Race Conditions**: Fixed audio loader collisions during rapid track skipping using monotonic generation tokens.
+- **Fade Transition Overlaps**: Fixed volume fade transition timer collisions during rapid play/pause toggles.
+- **Track Title Metadata Overwrite**: Fixed track title corruption where album titles were applied to track titles in auto-tag previews.
+- **ASCII-Only Regex Normalizers**: Fixed ASCII-only regex normalizers destroying non-Latin metadata.
+- **Undo Snapshot Restorations**: Fixed undo snapshots omitting `discNumber`, `genre`, `musicBrainzRecordingId`, `isrc`, and artwork tags during rollback.
 
 ### Removed
 
-- Removed obsolete Gen1 `MetadataMergeEngine` and unreferenced background job manager queues.
+- Removed obsolete legacy PGlite database dependencies and unreferenced background job manager queues.
+- Removed legacy licenses button, external feedback prompts, and third-party author badges from About page.
 
 ## [3.1.0-stable] - 2025-03-29
 
@@ -997,6 +999,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a lyrics pane which shows lyrics according to the current song.
 - Instant identification of newly added songs.
 
+[1.0.0]: https://github.com/Sandakan/Nora/compare/v3.1.0-stable...v1.0.0
 [3.1.0-stable]: https://github.com/Sandakan/Nora/compare/v3.0.0-stable...v3.1.0-stable
 [3.0.0-stable]: https://github.com/Sandakan/Nora/compare/v2.4.3-stable...v3.0.0-stable
 [2.4.3-stable]: https://github.com/Sandakan/Nora/compare/v2.4.2-stable...v2.4.3-stable
