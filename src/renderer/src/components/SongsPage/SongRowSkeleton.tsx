@@ -1,7 +1,10 @@
-import { forwardRef, memo } from 'react';
+import { type CSSProperties, forwardRef, memo } from 'react';
 
 interface SongRowSkeletonProps {
   index: number;
+  height?: number;
+  style?: CSSProperties;
+  className?: string;
 }
 
 /**
@@ -12,12 +15,13 @@ interface SongRowSkeletonProps {
  * in on the real row via its existing appear animation.
  */
 const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
-  ({ index }, ref) => {
+  ({ index, height, style, className = '' }, ref) => {
     return (
       <div
         ref={ref}
         data-skeleton-index={index}
-        className="song-item-animation relative h-[3.75rem] w-full animate-pulse select-none items-center overflow-hidden pr-2"
+        style={{ ...(height ? { height: `${height}px` } : {}), ...style }}
+        className={`song-item-animation relative h-[3.75rem] w-full animate-pulse select-none items-center overflow-hidden pr-2 ${className}`}
         aria-hidden="true"
       >
         <div className="flex h-full w-full items-center gap-2">

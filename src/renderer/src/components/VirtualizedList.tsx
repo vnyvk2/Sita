@@ -1,8 +1,23 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { type CSSProperties, type ReactNode, forwardRef, useEffect, useRef, useState } from 'react';
-import { Virtuoso, type Components, type ListRange, type VirtuosoHandle } from 'react-virtuoso';
+import {
+  Virtuoso,
+  type Components,
+  type ListRange,
+  type ScrollSeekConfiguration,
+  type ScrollSeekPlaceholderProps,
+  type VirtuosoHandle
+} from 'react-virtuoso';
 
 import { scrollRegistry } from '../utils/scrollStore';
+
+export const SCROLL_IDLE_MS = 150;
+export const MIN_HOLD_MS = 400;
+
+export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
+  enter: (velocity) => Math.abs(velocity) > 800,
+  exit: (velocity) => Math.abs(velocity) < 300
+};
 
 type Props<T> = {
   data: readonly T[];
@@ -18,9 +33,19 @@ type Props<T> = {
   style?: CSSProperties;
   onChange?: (range: ListRange) => void;
   onDebouncedScroll?: (range: ListRange) => void;
+  onScrollingStateChange?: (isScrolling: boolean) => void;
+  scrollSeekConfiguration?: false | ScrollSeekConfiguration;
 };
 
 const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
+
+const DefaultScrollSeekPlaceholder = (props: ScrollSeekPlaceholderProps) => (
+  <div
+    style={{ height: `${props.height}px` }}
+    className="relative w-full select-none items-center overflow-hidden opacity-40"
+    aria-hidden="true"
+  />
+);
 
 const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   const {
@@ -35,7 +60,9 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     useWindowScroll = false,
     style,
     onChange,
-    onDebouncedScroll
+    onDebouncedScroll,
+    onScrollingStateChange,
+    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG
   } = props;
 
   // Retrieve initial saved position for scrollKey if available
@@ -57,17 +84,63 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   // Scroller element ref & event listener with lifecycle cleanup
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
 
+  // Keep latest onScrollingStateChange in a ref to avoid recreating listener
+  const onScrollingStateChangeRef = useRef(onScrollingStateChange);
+  onScrollingStateChangeRef.current = onScrollingStateChange;
+
   useEffect(() => {
     if (!scrollerElement) return;
 
-    const handleScroll = () => {
-      currentScrollTopRef.current = scrollerElement.scrollTop;
+    const ac = new AbortController();
+    let addedAt = 0;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const removeClass = () => {
+      if (scrollerElement.classList.contains('is-scrolling')) {
+        scrollerElement.classList.remove('is-scrolling');
+        onScrollingStateChangeRef.current?.(false);
+      }
     };
 
-    scrollerElement.addEventListener('scroll', handleScroll, { passive: true });
+    const handleScroll = () => {
+      currentScrollTopRef.current = scrollerElement.scrollTop;
+
+      // Guard: do not mark as active scrolling during programmatic restoration layout on initial mount
+      if (restorationStateRef.current === 'RESTORING') {
+        return;
+      }
+
+      if (!scrollerElement.classList.contains('is-scrolling')) {
+        scrollerElement.classList.add('is-scrolling');
+        addedAt = performance.now();
+        onScrollingStateChangeRef.current?.(true);
+      }
+
+      if (idleTimer) clearTimeout(idleTimer);
+
+      idleTimer = setTimeout(() => {
+        const elapsed = performance.now() - addedAt;
+        if (elapsed >= MIN_HOLD_MS) {
+          removeClass();
+        } else {
+          idleTimer = setTimeout(removeClass, MIN_HOLD_MS - elapsed);
+        }
+      }, SCROLL_IDLE_MS);
+    };
+
+    scrollerElement.addEventListener('scroll', handleScroll, {
+      passive: true,
+      signal: ac.signal
+    });
 
     return () => {
+      ac.abort();
       scrollerElement.removeEventListener('scroll', handleScroll);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (scrollerElement.classList.contains('is-scrolling')) {
+        scrollerElement.classList.remove('is-scrolling');
+        onScrollingStateChangeRef.current?.(false);
+      }
     };
   }, [scrollerElement]);
 
@@ -125,6 +198,11 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     }
   };
 
+  const resolvedComponents = {
+    ScrollSeekPlaceholder: DefaultScrollSeekPlaceholder,
+    ...components
+  };
+
   return (
     <Virtuoso
       style={
@@ -140,10 +218,9 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
       overscan={25}
       useWindowScroll={useWindowScroll}
       fixedItemHeight={fixedItemHeight}
-      components={{
-        ...components
-      }}
+      components={resolvedComponents}
       ref={setCombinedVirtuosoRef}
+      {...(scrollSeekConfiguration !== false ? { scrollSeekConfiguration } : {})}
       {...(initialItemCount !== undefined ? { initialItemCount } : {})}
       {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
       scrollerRef={(element) => {
@@ -198,3 +275,4 @@ const VirtualizedList = forwardRef(List) as <T>(
 ) => ReturnType<typeof List>;
 
 export default VirtualizedList;
+

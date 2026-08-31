@@ -196,9 +196,11 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
     });
 
     // After state update and effect run, exactly 1 listener attached
-    expect(addEventListenerSpy).toHaveBeenCalledWith('scroll', expect.any(Function), {
-      passive: true
-    });
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      'scroll',
+      expect.any(Function),
+      expect.objectContaining({ passive: true })
+    );
 
     // On unmount, listener is removed cleanly
     unmount();
@@ -226,4 +228,171 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
     rangeChanged({ startIndex: 15, endIndex: 35 });
     expect(scrollRegistry.getIndex('new-list')).toBe(15);
   });
+
+  describe('Fast-Scroll .is-scrolling Lifecycle & ScrollSeek (v3)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should add .is-scrolling class and notify onScrollingStateChange on scroll', () => {
+      const onScrollingStateChange = vi.fn();
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+      const { getByTestId } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+          onScrollingStateChange={onScrollingStateChange}
+        />
+      );
+
+      const scroller = getByTestId('mock-virtuoso');
+      expect(scroller.classList.contains('is-scrolling')).toBe(false);
+
+      act(() => {
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+      expect(onScrollingStateChange).toHaveBeenCalledWith(true);
+    });
+
+    it('should maintain .is-scrolling for at least MIN_HOLD_MS (400ms) on a single scroll event', () => {
+      const onScrollingStateChange = vi.fn();
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+      const { getByTestId } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+          onScrollingStateChange={onScrollingStateChange}
+        />
+      );
+
+      const scroller = getByTestId('mock-virtuoso');
+
+      act(() => {
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // Advance by SCROLL_IDLE_MS (150ms) -> Still within MIN_HOLD_MS (400ms), class must remain!
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // Advance to 350ms total -> still held
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // Advance past 400ms total -> class removed and onScrollingStateChange(false) called
+      act(() => {
+        vi.advanceTimersByTime(51);
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(false);
+      expect(onScrollingStateChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it('should reset idle timer on successive scroll ticks and remove class correctly', () => {
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+      const { getByTestId } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      const scroller = getByTestId('mock-virtuoso');
+
+      // t = 0
+      act(() => {
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // t = 350ms (second scroll event)
+      act(() => {
+        vi.advanceTimersByTime(350);
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // t = 450ms (100ms after second event: idle timer of 150ms not elapsed yet)
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      // t = 501ms (151ms after second event, and 501ms > 400ms MIN_HOLD): class removed
+      act(() => {
+        vi.advanceTimersByTime(51);
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(false);
+    });
+
+    it('should cleanly remove .is-scrolling and cancel timers when unmounting during active scroll', () => {
+      const onScrollingStateChange = vi.fn();
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+      const { getByTestId, unmount } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+          onScrollingStateChange={onScrollingStateChange}
+        />
+      );
+
+      const scroller = getByTestId('mock-virtuoso');
+
+      act(() => {
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+      expect(scroller.classList.contains('is-scrolling')).toBe(true);
+
+      unmount();
+      expect(scroller.classList.contains('is-scrolling')).toBe(false);
+      expect(onScrollingStateChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it('should forward scrollSeekConfiguration and default ScrollSeekPlaceholder to Virtuoso', () => {
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+      render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.scrollSeekConfiguration).toBeDefined();
+      const config = lastVirtuosoProps.scrollSeekConfiguration as {
+        enter: (v: number) => boolean;
+        exit: (v: number) => boolean;
+      };
+      expect(config.enter(900)).toBe(true);
+      expect(config.enter(500)).toBe(false);
+      expect(config.exit(200)).toBe(true);
+      expect(config.exit(400)).toBe(false);
+
+      const components = lastVirtuosoProps.components as {
+        ScrollSeekPlaceholder?: React.ComponentType<{ height: number; index: number }>;
+      };
+      expect(components.ScrollSeekPlaceholder).toBeDefined();
+    });
+  });
 });
+

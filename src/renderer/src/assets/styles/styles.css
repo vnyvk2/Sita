@@ -1161,3 +1161,33 @@ input[type='checkbox']:checked ~ .checkmark .icon {
     animation: none !important;
   }
 }
+
+/* Fast-Scrolling Optimization: Scope strictly to row descendants so scroller retains wheel/scrollbar events */
+.is-scrolling .list-row,
+.is-scrolling .song-item,
+.is-scrolling [data-index] {
+  pointer-events: none !important;
+}
+
+.is-scrolling .list-row *,
+.is-scrolling .song-item *,
+.is-scrolling [data-index] * {
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+/* GPU Shader Relief with Solid Visual Continuity Fallback */
+.is-scrolling .list-row,
+.is-scrolling .song-item,
+.is-scrolling [data-index] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* Freeze animated soundbars / heartbeat indicators without resetting frames */
+.is-scrolling .sound-bars-indicator,
+.is-scrolling .fx-heart-pop {
+  animation-play-state: paused !important;
+}
+

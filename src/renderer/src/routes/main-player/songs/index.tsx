@@ -724,6 +724,11 @@ function SongsPage() {
             scrollKey={scrollKey}
             itemContent={renderSong}
             onChange={onRangeChange}
+            components={{
+              ScrollSeekPlaceholder: ({ height, index }) => (
+                <SongRowSkeleton height={height} index={index} />
+              )
+            }}
           />
         </div>
       )}
