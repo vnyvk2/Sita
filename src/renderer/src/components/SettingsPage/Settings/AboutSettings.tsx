@@ -2,15 +2,13 @@ import { lazy, useContext, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import rawChangelog from '../../../../../../CHANGELOG.md?raw';
-import appLicense from '../../../../../../LICENSE.txt?raw';
 import openSourceLicenses from '../../../../../../open_source_licenses.txt?raw';
-import { version, author, homepage, bugs, urls } from '../../../../../../package.json';
+import { version, homepage, urls } from '../../../../../../package.json';
 import DiscordLightIcon from '../../../assets/images/svg/discord_dark_mode.svg';
 import DiscordDarkIcon from '../../../assets/images/svg/discord_light_mode.svg';
 import GithubLightIcon from '../../../assets/images/svg/github-white.svg';
 import GithubDarkIcon from '../../../assets/images/svg/github.svg';
 import AppIcon from '../../../assets/images/webp/logo_light_mode.webp';
-import SLFlag from '../../../assets/images/webp/sl-flag.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 import calculateElapsedTime from '../../../utils/calculateElapsedTime';
@@ -191,32 +189,6 @@ const AboutSettings = () => {
               }}
             />
           </li>
-          <li>
-            <Trans
-              i18nKey="settingsPage.noraLicenseNotice"
-              components={{
-                Button: (
-                  <Button
-                    className="show-app-licence-btn about-link text-font-color-highlight-2 dark:text-dark-font-color-highlight-2! inline! w-fit cursor-pointer rounded-none! border-0! bg-transparent p-0! text-sm outline! outline-offset-1 hover:bg-transparent hover:underline focus:outline! dark:bg-transparent dark:hover:bg-transparent"
-                    clickHandler={() =>
-                      changePromptMenuData(
-                        true,
-                        <>
-                          <div className="mb-4 w-full text-center text-3xl font-medium">
-                            {t('settingsPage.appLicense')}
-                          </div>
-                          <pre className="relative max-h-full w-full overflow-y-auto px-4">
-                            {appLicense}
-                          </pre>
-                        </>,
-                        'flex flex-col'
-                      )
-                    }
-                  />
-                )
-              }}
-            />
-          </li>
         </ul>
         <div className="mt-12 flex flex-wrap items-center justify-center px-8">
           <Button
@@ -376,57 +348,6 @@ const AboutSettings = () => {
                 .catch((err) => console.error(err));
             }}
           />
-        </div>
-        <div className="about-description mt-4 text-sm font-light">
-          <div>
-            <Trans
-              i18nKey="settingsPage.contact"
-              components={{
-                Hyperlink: (
-                  <Hyperlink
-                    link={`${bugs.url}/new/choose`}
-                    linkTitle={t('settingsPage.createIssueOnNoraGithubRepo')}
-                  />
-                )
-              }}
-            />
-          </div>
-          <Hyperlink
-            label={t('settingsPage.emailContact')}
-            link="mailto:sandakannipunajith@gmail.com?subject=Regarding Nora&body=If you found a bug in the app, please try to attach the log file of the app with a detailed explanation of the bug.%0d%0a%0d%0aYou can get to it by going to  Settings > About > Open Log File."
-            linkTitle={t('settingsPage.emailContact')}
-            noValidityCheck
-          />
-          <br />
-          <div className="mt-6 text-sm">
-            <Trans
-              i18nKey="settingsPage.loveNora"
-              components={{
-                span: (
-                  <span className="heart text-font-color-crimson dark:text-font-color-crimson" />
-                ),
-                Hyperlink: (
-                  <Hyperlink
-                    link={author.url}
-                    linkTitle={t('settingsPage.sandakanGithubProfile')}
-                    className="mr-1"
-                  />
-                )
-              }}
-            />
-
-            <br />
-            <Hyperlink
-              label={
-                <>
-                  #VisitSriLanka{' '}
-                  <Img src={SLFlag} alt="" className="ml-1 inline w-[24px] hover:underline" />
-                </>
-              }
-              link="https://www.google.com/search?q=beautiful+sri+lanka"
-              linkTitle={t('settingsPage.beautifulSriLanka')}
-            />
-          </div>
         </div>
       </div>
     </li>
