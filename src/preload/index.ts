@@ -30,9 +30,6 @@ import type {
   PlaylistBatchExportOptions,
   BatchExportResult
 } from '../common/collections/types';
-import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
-import type { LastFMTrackInfoApi } from '../types/last_fm_api';
-import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
 import type {
   HistoryPeriod,
@@ -44,6 +41,9 @@ import type {
   ArtistOnlineProfilePayload,
   OnlineTrackDetail
 } from '../types/artist_discography';
+import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
+import type { LastFMTrackInfoApi } from '../types/last_fm_api';
+import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -113,6 +113,8 @@ const audioLibraryControls = {
 
   getSong: (songId: number, updateListeningRate = true): Promise<AudioPlayerData> =>
     ipcRenderer.invoke('app/getSong', songId, updateListeningRate),
+  getSongWaveform: (songId: number): Promise<Float32Array | null> =>
+    ipcRenderer.invoke('app/getSongWaveform', songId),
   getAllSongs: (
     sortType?: SongSortTypes,
     filterType?: SongFilterTypes,
@@ -345,8 +347,7 @@ const songUpdates = {
     ipcRenderer.invoke('app/updateSongId3Tags', songIdOrPath, tags, sendUpdatedData, isKnownSource),
   batchUpdateSongTags: (
     updates: Array<{ songId: number; tags: SongTags }>
-  ): Promise<BatchUpdateSongTagsResult> =>
-    ipcRenderer.invoke('app/batchUpdateSongTags', updates),
+  ): Promise<BatchUpdateSongTagsResult> => ipcRenderer.invoke('app/batchUpdateSongTags', updates),
   onBatchTagUpdateProgress: (
     callback: (e: unknown, progress: BatchTagUpdateProgressEvent) => void
   ) => ipcRenderer.on('app/batchTagUpdateProgress', callback),
@@ -498,15 +499,9 @@ const artistsData = {
     ipcRenderer.invoke('app/toggleLikeArtists', artistIds, likeArtist),
   getArtistArtworks: (artistId: number): Promise<ArtistInfoFromNet | undefined> =>
     ipcRenderer.invoke('app/getArtistArtworks', artistId),
-  getArtistDiscography: (
-    artistId: number,
-    artistName: string
-  ): Promise<ArtistDiscographyPayload> =>
+  getArtistDiscography: (artistId: number, artistName: string): Promise<ArtistDiscographyPayload> =>
     ipcRenderer.invoke('app/getArtistDiscography', artistId, artistName),
-  getAlbumOnlineTracks: (
-    onlineAlbumId: number,
-    artistId: number
-  ): Promise<OnlineTrackDetail[]> =>
+  getAlbumOnlineTracks: (onlineAlbumId: number, artistId: number): Promise<OnlineTrackDetail[]> =>
     ipcRenderer.invoke('app/getAlbumOnlineTracks', onlineAlbumId, artistId),
   getArtistOnlineProfile: (
     artistId: number,
@@ -925,12 +920,10 @@ export const api = {
       ipcRenderer.invoke('metadata/undoLastAutoTag', operationId),
     cancelAutoTag: (operationId?: string) =>
       ipcRenderer.invoke('metadata/cancelAutoTag', operationId),
-    getMetadataPreferences: () =>
-      ipcRenderer.invoke('metadata/getPreferences'),
+    getMetadataPreferences: () => ipcRenderer.invoke('metadata/getPreferences'),
     saveMetadataPreferences: (prefs: Partial<MetadataProviderPreferences>) =>
       ipcRenderer.invoke('metadata/savePreferences', prefs),
-    getAvailableSearchProviders: () =>
-      ipcRenderer.invoke('metadata/getAvailableSearchProviders'),
+    getAvailableSearchProviders: () => ipcRenderer.invoke('metadata/getAvailableSearchProviders'),
     onProgress: (callback: (payload: any) => void) => {
       const listener = (_: unknown, data: any) => callback(data);
       ipcRenderer.on('metadata/progress', listener);
@@ -1006,8 +999,7 @@ export const api = {
       ipcRenderer.invoke('spotify/sync/linkPlaylist', playlistId, spotifyPlaylistId, strategy),
     unlinkPlaylist: (playlistId: number) =>
       ipcRenderer.invoke('spotify/sync/unlinkPlaylist', playlistId),
-    detectDrift: (playlistId: number) =>
-      ipcRenderer.invoke('spotify/sync/detectDrift', playlistId),
+    detectDrift: (playlistId: number) => ipcRenderer.invoke('spotify/sync/detectDrift', playlistId),
     generateSyncPlan: (playlistId: number, strategy?: string) =>
       ipcRenderer.invoke('spotify/sync/generatePlan', playlistId, strategy),
     executeSync: (playlistId: number, strategy?: string) =>
@@ -1016,5 +1008,3 @@ export const api = {
 };
 
 contextBridge.exposeInMainWorld('api', api);
-
-

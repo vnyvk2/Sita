@@ -55,7 +55,11 @@ const AudioPlaybackSettings = () => {
   }, []);
 
   const updateReplayGain = (
-    updated: Partial<{ mode: 'track' | 'album' | 'off'; preampDb: number; preventClipping: boolean }>
+    updated: Partial<{
+      mode: 'track' | 'album' | 'off';
+      preampDb: number;
+      preventClipping: boolean;
+    }>
   ) => {
     const current = storage.playback.getPlaybackOptions('replayGain') ?? {
       mode: 'track',
@@ -83,6 +87,19 @@ const AudioPlaybackSettings = () => {
         {t('settingsPage.audioPlayback')}
       </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
+        <li className="secondary-container enable-waveform-seekbar mb-4">
+          <div className="description">{t('settingsPage.enableWaveformSeekbarDescription')}</div>
+          <Checkbox
+            id="toggleEnableWaveformSeekbar"
+            isChecked={preferences?.isWaveformSeekbarEnabled ?? true}
+            checkedStateUpdateFunction={(state) => {
+              storage.preferences.setPreferences('isWaveformSeekbarEnabled', state);
+              dispatch({ type: 'TOGGLE_WAVEFORM_SEEKBAR', data: state });
+            }}
+            labelContent={t('settingsPage.enableWaveformSeekbar')}
+          />
+        </li>
+
         <li className="secondary-container show-remaining-song-duration mb-4">
           <div className="description">
             {t('settingsPage.showRemainingSongDurationDescription')}
@@ -157,15 +174,16 @@ const AudioPlaybackSettings = () => {
         </li>
 
         <li className="replay-gain-settings mb-6" id="replayGainSettings">
-          <div className="title font-medium text-lg text-font-color-highlight dark:text-dark-font-color-highlight mb-1">
+          <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 text-lg font-medium">
             Loudness Normalization (ReplayGain / ITU-R BS.1770)
           </div>
-          <div className="description text-sm opacity-80 mb-3">
-            Automatically adjusts track and album playback volume to a consistent standard loudness (-18 LUFS).
+          <div className="description mb-3 text-sm opacity-80">
+            Automatically adjusts track and album playback volume to a consistent standard loudness
+            (-18 LUFS).
           </div>
 
           <div className="mb-4">
-            <label htmlFor="replayGainModeSelect" className="text-sm font-medium block mb-1">
+            <label htmlFor="replayGainModeSelect" className="mb-1 block text-sm font-medium">
               Normalization Mode
             </label>
             <Dropdown
@@ -193,12 +211,12 @@ const AudioPlaybackSettings = () => {
             />
           </div>
 
-          <div className="preamp-container flex flex-col w-1/2 min-w-[200px]">
-            <span className="text-sm font-medium mb-1">
+          <div className="preamp-container flex w-1/2 min-w-[200px] flex-col">
+            <span className="mb-1 text-sm font-medium">
               Pre-amp Adjustment: {preampDb > 0 ? `+${preampDb}` : preampDb} dB
             </span>
             <div className="flex items-center">
-              <span className="text-xs mr-2">-12 dB</span>
+              <span className="mr-2 text-xs">-12 dB</span>
               <input
                 type="range"
                 min={-12}
@@ -210,9 +228,9 @@ const AudioPlaybackSettings = () => {
                   setPreampDb(val);
                   updateReplayGain({ preampDb: val });
                 }}
-                className="w-full h-1 bg-neutral-300 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer"
+                className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-neutral-300 dark:bg-neutral-700"
               />
-              <span className="text-xs ml-2">+12 dB</span>
+              <span className="ml-2 text-xs">+12 dB</span>
               <Button
                 label="Reset"
                 iconName="restart_alt"

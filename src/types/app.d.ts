@@ -28,6 +28,7 @@ declare global {
     | 'app/incrementNoOfSongListens'
     | 'app/addMusicFolder'
     | 'app/getSong'
+    | 'app/getSongWaveform'
     | 'app/getAllSongs'
     | 'app/getAllSongIds'
     | 'app/getFilteredSongLibraryIds'
@@ -590,6 +591,7 @@ declare global {
     showEqualizerOnTracklist?: boolean;
     reduceVisualEffectsOnBattery?: boolean;
     ambientParticles?: boolean;
+    isWaveformSeekbarEnabled?: boolean;
     customThemeOverrides?: Record<string, Record<string, string>>;
   }
 

@@ -1,10 +1,9 @@
-import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
-
 import {
   COMPACT_LYRICS_EXTENSION_HEIGHT,
   MINI_PLAYER_SEARCH_EXTENSION_HEIGHT
 } from '@common/miniPlayerConstants';
-import memProfiler from './utils/memProfiler';
+import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
+
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import {
   playlistEngine,
@@ -37,6 +36,7 @@ import { getListeningData } from './core/getListeningData';
 import getMusicFolderData from './core/getMusicFolderData';
 import getSongInfo from './core/getSongInfo';
 import getSongLyrics from './core/getSongLyrics';
+import getSongWaveform from './core/getSongWaveform';
 import getStorageUsage from './core/getStorageUsage';
 import importAppData from './core/importAppData';
 import { recoverLibraryAssets } from './core/recovery';
@@ -44,8 +44,6 @@ import removeMusicFolder from './core/removeMusicFolder';
 import { resolveArtistDuplicates } from './core/resolveDuplicates';
 import resolveFeaturingArtists from './core/resolveFeaturingArtists';
 import { resolveSeparateArtists } from './core/resolveSeparateArtists';
-import { artistDiscographyService } from './services/ArtistDiscographyService';
-import { artistProfileService } from './services/ArtistProfileService';
 import restoreBlacklistedFolders from './core/restoreBlacklistedFolder';
 import restoreBlacklistedSongs from './core/restoreBlacklistedSongs';
 import saveArtworkToSystem from './core/saveArtworkToSystem';
@@ -57,7 +55,12 @@ import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
-import { getListeningAnalytics, getLibraryAudioStats, type HistoryPeriod } from './db/queries/analytics';
+import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
+import {
+  getListeningAnalytics,
+  getLibraryAudioStats,
+  type HistoryPeriod
+} from './db/queries/analytics';
 import type { HistoryQueryOptions } from './db/queries/history';
 import {
   addIgnoredArtist,
@@ -79,17 +82,16 @@ import {
   getSongDurationsByIds,
   getSongListFacets
 } from './db/queries/songs';
-import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
 import {
   getUserKeyboardShortcuts,
   saveUserKeyboardShortcuts,
   getUserEqualizerPreset,
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
+import { setupDownloadsIpc } from './downloads/setupDownloads';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
-import { setupDownloadsIpc } from './downloads/setupDownloads';
 import libraryChangeTracker from './library/LibraryChangeTracker';
 import libraryLifecycleController, {
   type LibraryScanMode
@@ -134,6 +136,8 @@ import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImport
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
 import saveLyricsToSong from './saveLyricsToSong';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
+import { artistDiscographyService } from './services/ArtistDiscographyService';
+import { artistProfileService } from './services/ArtistProfileService';
 import { setupSpotifyIpc } from './spotify/ipc/setupSpotifyIpc';
 import updateSongId3Tags, { isMetadataUpdatesPending } from './updateSong/updateSongId3Tags';
 import convertLyricsToPinyin from './utils/convertToPinyin';
@@ -144,6 +148,7 @@ import {
 } from './utils/fetchSongMetadataFromInternet';
 import { getQueueInfo } from './utils/getQueueInfo';
 import getTranslatedLyrics from './utils/getTranslatedLyrics';
+import memProfiler from './utils/memProfiler';
 import resetLyrics from './utils/resetLyrics';
 import romanizeLyrics from './utils/romanizeLyrics';
 import { compare } from './utils/safeStorage';
@@ -177,7 +182,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   libraryObservability.on('METRICS_UPDATED', sendSchedulerUpdate);
 
   // Fire and forget startup recovery sync
-  if (!skipBackgroundWork) recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
+  if (!skipBackgroundWork)
+    recoverLibraryAssets().catch((err) => logger.error('Recovery failed', { error: err }));
 
   // Setup Collection IPC, Playlist Import IPC, & Playlist Export IPC
   setupCollectionIpc(
@@ -290,6 +296,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       sendAudioData(id, updateListeningRate)
     );
 
+    ipcMain.handle('app/getSongWaveform', (_, songId: number) => getSongWaveform(songId));
+
     ipcMain.handle('app/getSongFromUnknownSource', (_, songPath: string) =>
       sendAudioDataFromPath(songPath)
     );
@@ -308,7 +316,12 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle(
       'app/getAllSongs',
-      (_, sortType?: SongSortTypes, filterType?: SongFilterTypes, paginatingData?: PaginatingData) =>
+      (
+        _,
+        sortType?: SongSortTypes,
+        filterType?: SongFilterTypes,
+        paginatingData?: PaginatingData
+      ) =>
         memProfiler.wrapHandler('app/getAllSongs', () =>
           getAllSongs(sortType, filterType, paginatingData)
         )
@@ -345,9 +358,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       getListeningAnalytics(period)
     );
 
-    ipcMain.handle('app/getLibraryAudioStats', () =>
-      getLibraryAudioStats()
-    );
+    ipcMain.handle('app/getLibraryAudioStats', () => getLibraryAudioStats());
 
     // ipcMain.handle('app/saveUserData', (_, dataType: UserDataTypes, data: string) =>
     //   saveUserData(dataType, data)
@@ -573,8 +584,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         )
     );
 
-    ipcMain.handle('app/getAlbumSummaries', (_, sortType?: AlbumSortTypes, filterType?: AlbumFilterTypes, start?: number, end?: number) =>
-      getAlbumSummaries({ sortType, filterType, start, end })
+    ipcMain.handle(
+      'app/getAlbumSummaries',
+      (_, sortType?: AlbumSortTypes, filterType?: AlbumFilterTypes, start?: number, end?: number) =>
+        getAlbumSummaries({ sortType, filterType, start, end })
     );
 
     ipcMain.handle('app/getAlbumSongIds', (_, albumId: number) => getAlbumSongIds(albumId));

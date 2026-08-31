@@ -64,6 +64,7 @@ export type AppReducerStateActions =
   | { type: 'UPDATE_LOCAL_STORAGE'; data: LocalStorage }
   | { type: 'UPDATE_BATTERY_POWER_STATE'; data: boolean }
   | { type: 'TOGGLE_SHOW_SONG_REMAINING_DURATION'; data?: boolean }
+  | { type: 'TOGGLE_WAVEFORM_SEEKBAR'; data?: boolean }
   | { type: 'UPDATE_LOCAL_STORAGE_PREFERENCES'; data: LocalStorage['preferences'] }
   | {
       type: 'UPDATE_LOCAL_STORAGE_PREFERENCE_ITEM';
@@ -105,6 +106,18 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
             ...state.localStorage.preferences,
             showSongRemainingTime:
               action.data ?? state.localStorage.preferences.showSongRemainingTime
+          }
+        }
+      };
+    case 'TOGGLE_WAVEFORM_SEEKBAR':
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          preferences: {
+            ...state.localStorage.preferences,
+            isWaveformSeekbarEnabled:
+              action.data ?? state.localStorage.preferences.isWaveformSeekbarEnabled
           }
         }
       };
@@ -435,6 +448,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     showEqualizerOnTracklist: true,
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
+    isWaveformSeekbarEnabled: true,
     customThemeOverrides: {}
   },
   playback: {
