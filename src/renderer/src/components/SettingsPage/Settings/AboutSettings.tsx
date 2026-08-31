@@ -62,7 +62,7 @@ const AboutSettings = () => {
           <div className="flex items-center">
             <Img src={AppIcon} className="aspect-square max-h-12 rounded-md shadow-md" alt="" />
             <div className="ml-4 flex flex-col">
-              <span className="block">Nora</span>
+              <span className="block">Sita</span>
               <span className="text-sm font-light">
                 v{version}{' '}
                 {elapsed && (
@@ -182,8 +182,10 @@ const AboutSettings = () => {
               components={{
                 Hyperlink: (
                   <Hyperlink
-                    linkTitle={t('settingsPage.otoMusicOnPlayStore')}
-                    link="https://play.google.com/store/apps/details?id=com.piyush.music"
+                    linkTitle={t('settingsPage.musicBeeWebsite', {
+                      defaultValue: 'MusicBee website'
+                    })}
+                    link="https://getmusicbee.com/"
                   />
                 )
               }}

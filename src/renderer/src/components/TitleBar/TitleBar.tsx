@@ -44,7 +44,7 @@ const TitleBar = memo(() => {
           </span>
           <span className="app-name-container">
             <span>
-              Nora
+              Sita
               <sup
                 className={`app-version text-font-color-highlight dark:text-dark-font-color-highlight ml-1 cursor-pointer text-[0.6rem] font-semibold uppercase ${
                   bodyBackgroundImage && 'text-dark-font-color-highlight!'
