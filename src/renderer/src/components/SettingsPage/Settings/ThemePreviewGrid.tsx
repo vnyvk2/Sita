@@ -18,7 +18,7 @@ const ThemePreviewGrid = memo(function ThemePreviewGrid({
 }: ThemePreviewGridProps) {
   const { t } = useTranslation();
   const { isDark } = useEffectiveAppearance();
-  const [showInspector, setShowInspector] = useState(true);
+  const [showInspector, setShowInspector] = useState(false);
 
   return (
     <div className="mt-4 flex flex-col space-y-4">
