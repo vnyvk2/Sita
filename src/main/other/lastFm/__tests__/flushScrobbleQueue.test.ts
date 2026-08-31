@@ -10,6 +10,7 @@ import {
 } from '../flushScrobbleQueue';
 import getLastFmAuthData from '../getLastFMAuthData';
 import * as lastFmUtils from '../lastFmUtils';
+import getListenBrainzAuthData from '../../listenBrainz/getListenBrainzAuthData';
 
 vi.mock('@main/db/db', () => ({
   db: {}
@@ -44,6 +45,28 @@ vi.mock('../getLastFMAuthData', () => ({
   })
 }));
 
+vi.mock('../../listenBrainz/getListenBrainzAuthData', () => ({
+  default: vi.fn().mockResolvedValue({
+    userToken: 'test_lb_token',
+    userName: 'test_lb_user'
+  })
+}));
+vi.mock('../listenBrainz/getListenBrainzAuthData', () => ({
+  default: vi.fn().mockResolvedValue({
+    userToken: 'test_lb_token',
+    userName: 'test_lb_user'
+  })
+}));
+
+vi.mock('../../listenBrainz/sendFavoritesDataToListenBrainz', () => ({
+  resolveRecordingMbid: vi.fn().mockResolvedValue('test-mbid-123'),
+  postFeedbackToListenBrainz: vi.fn().mockResolvedValue(undefined)
+}));
+vi.mock('../listenBrainz/sendFavoritesDataToListenBrainz', () => ({
+  resolveRecordingMbid: vi.fn().mockResolvedValue('test-mbid-123'),
+  postFeedbackToListenBrainz: vi.fn().mockResolvedValue(undefined)
+}));
+
 vi.mock('@main/db/queries/songs', () => ({
   getSongById: vi.fn().mockResolvedValue({
     id: 1,
@@ -72,6 +95,7 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.mocked(scrobbleQueueQueries.resetStuckSending).mockReset();
     vi.mocked(scrobbleQueueQueries.clearScrobbleQueue).mockReset();
     vi.mocked(getLastFmAuthData).mockReset();
+    vi.mocked(getListenBrainzAuthData).mockReset();
     vi.mocked(songQueries.getSongById).mockReset();
     vi.clearAllMocks();
     _resetFlushStateForTesting();
@@ -80,6 +104,10 @@ describe('flushScrobbleQueue Durable Outbox', () => {
       LAST_FM_API_KEY: 'test_api_key',
       SESSION_KEY: 'test_session_key',
       LAST_FM_SHARED_SECRET: 'test_shared_secret'
+    });
+    vi.mocked(getListenBrainzAuthData).mockResolvedValue({
+      userToken: 'test_lb_token',
+      userName: 'test_lb_user'
     });
     vi.mocked(songQueries.getSongById).mockResolvedValue({
       id: 1,
@@ -112,6 +140,7 @@ describe('flushScrobbleQueue Durable Outbox', () => {
 
   it('skips flush when no auth data exists', async () => {
     vi.mocked(getLastFmAuthData).mockRejectedValue(new Error('No auth'));
+    vi.mocked(getListenBrainzAuthData).mockRejectedValue(new Error('No auth'));
     const claimSpy = vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch');
 
     await flushScrobbleQueue();
@@ -856,5 +885,89 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     expect(markSentSpy).toHaveBeenCalledWith(301);
     expect(markSentSpy).toHaveBeenCalledWith(302);
     expect(claimSpy).toHaveBeenCalledTimes(4);
+  });
+
+  it('successfully flushes listenbrainz.scrobble queue items and marks them sent', async () => {
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const item = {
+      id: 401,
+      songId: 1,
+      startTimeSecs: nowSecs - 100,
+      operationType: 'listenbrainz.scrobble',
+      trackTitle: 'Comfortably Numb',
+      artistNames: 'Pink Floyd',
+      status: 'pending' as const,
+      retryCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    vi.spyOn(scrobbleQueueQueries, 'resetStuckSending').mockResolvedValue(undefined);
+    vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
+    vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch')
+      .mockResolvedValueOnce([item])
+      .mockResolvedValueOnce([]);
+
+    const markSentSpy = vi.spyOn(scrobbleQueueQueries, 'markSent').mockResolvedValue(undefined);
+
+    const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }));
+    globalThis.fetch = mockFetch;
+
+    await flushScrobbleQueue();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('submit-listens'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Token test_lb_token',
+          'Content-Type': 'application/json'
+        })
+      })
+    );
+    expect(markSentSpy).toHaveBeenCalledWith(401);
+  });
+
+  it('halts flush cycle and resets in-flight items on ListenBrainz 401 Unauthorized', async () => {
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const item1 = {
+      id: 402,
+      songId: 1,
+      startTimeSecs: nowSecs - 100,
+      operationType: 'listenbrainz.scrobble',
+      trackTitle: 'Time',
+      artistNames: 'Pink Floyd',
+      status: 'pending' as const,
+      retryCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    const item2 = {
+      id: 403,
+      songId: 1,
+      startTimeSecs: nowSecs - 50,
+      operationType: 'listenbrainz.scrobble',
+      trackTitle: 'Money',
+      artistNames: 'Pink Floyd',
+      status: 'pending' as const,
+      retryCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    vi.spyOn(scrobbleQueueQueries, 'resetStuckSending').mockResolvedValue(undefined);
+    vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
+    vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([item1, item2]);
+
+    const resetSpy = vi.spyOn(scrobbleQueueQueries, 'resetSendingToPending').mockResolvedValue(undefined);
+    const markFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markFailed').mockResolvedValue(undefined);
+
+    const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
+    globalThis.fetch = mockFetch;
+
+    await flushScrobbleQueue();
+
+    expect(resetSpy).toHaveBeenCalledWith([402, 403]);
+    expect(markFailedSpy).not.toHaveBeenCalled();
   });
 });

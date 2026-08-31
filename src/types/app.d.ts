@@ -119,6 +119,7 @@ declare global {
     modifiedDate?: number;
     addedDate: number;
     language?: string;
+    musicBrainzId?: string;
   }
 
   interface ArtworkPaths {
@@ -435,6 +436,9 @@ declare global {
     | 'preferences.sendSongScrobblingDataToLastFM'
     | 'preferences.sendSongFavoritesDataToLastFM'
     | 'preferences.sendNowPlayingSongDataToLastFM'
+    | 'preferences.sendSongScrobblingDataToListenBrainz'
+    | 'preferences.sendSongFavoritesDataToListenBrainz'
+    | 'preferences.sendNowPlayingSongDataToListenBrainz'
     | 'preferences.saveLyricsInLrcFilesForSupportedSongs'
     | 'preferences.autoTranslateLyrics'
     | 'preferences.autoConvertLyrics'
@@ -473,6 +477,9 @@ declare global {
     sendSongScrobblingDataToLastFM: boolean;
     sendSongFavoritesDataToLastFM: boolean;
     sendNowPlayingSongDataToLastFM: boolean;
+    sendSongScrobblingDataToListenBrainz: boolean;
+    sendSongFavoritesDataToListenBrainz: boolean;
+    sendNowPlayingSongDataToListenBrainz: boolean;
     saveLyricsInLrcFilesForSupportedSongs: boolean;
     enableDiscordRPC: boolean;
     saveVerboseLogs: boolean;
@@ -495,6 +502,8 @@ declare global {
     addDownloadsToLibrary?: boolean;
     lastFmSessionName: string | null;
     lastFmSessionKey: string | null;
+    listenBrainzUsername: string | null;
+    listenBrainzUserToken: string | null;
     libraryScanMode?: LibraryScanMode;
     lastScanTime?: string | Date | null;
   }
@@ -1077,6 +1086,8 @@ declare global {
     | 'LYRICS_CONVERT_SUCCESS'
     | 'RESET_CONVERTED_LYRICS_SUCCESS'
     | 'LASTFM_LOGIN_SUCCESS'
+    | 'LISTENBRAINZ_LOGIN_SUCCESS'
+    | 'LISTENBRAINZ_SESSION_INVALID'
     | 'APPDATA_EXPORT_STARTED'
     | 'APPDATA_IMPORT_STARTED'
     | 'APPDATA_EXPORT_SUCCESS'

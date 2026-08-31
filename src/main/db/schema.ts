@@ -532,6 +532,21 @@ export const userSettings = sqliteTable(
     })
       .notNull()
       .default(false),
+    sendSongScrobblingDataToListenBrainz: integer('send_song_scrobbling_data_to_listenbrainz', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
+    sendSongFavoritesDataToListenBrainz: integer('send_song_favorites_data_to_listenbrainz', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
+    sendNowPlayingSongDataToListenBrainz: integer('send_now_playing_song_data_to_listenbrainz', {
+      mode: 'boolean'
+    })
+      .notNull()
+      .default(false),
     saveLyricsInLrcFilesForSupportedSongs: integer('save_lyrics_in_lrc_files_for_supported_songs', {
       mode: 'boolean'
     })
@@ -570,6 +585,8 @@ export const userSettings = sqliteTable(
       .default(true),
     lastFmSessionName: text('lastfm_session_name'),
     lastFmSessionKey: text('lastfm_session_key'),
+    listenBrainzUsername: text('listenbrainz_username'),
+    listenBrainzUserToken: text('listenbrainz_user_token'),
     libraryScanMode: text('library_scan_mode')
       .$type<'automatic' | 'startup' | 'manual'>()
       .notNull()

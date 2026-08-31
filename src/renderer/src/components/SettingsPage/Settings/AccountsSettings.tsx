@@ -32,6 +32,76 @@ const AccountsSettings = () => {
     [userSettings?.lastFmSessionKey]
   );
 
+  const isListenBrainzConnected = useMemo(
+    () => !!userSettings?.listenBrainzUserToken,
+    [userSettings?.listenBrainzUserToken]
+  );
+
+  const [listenBrainzTokenInput, setListenBrainzTokenInput] = useState('');
+  const [showListenBrainzToken, setShowListenBrainzToken] = useState(false);
+
+  const { mutate: connectListenBrainz, isPending: isConnectingListenBrainz } = useMutation({
+    mutationFn: async (token: string) => {
+      return await window.api.listenBrainz.validateAndSaveToken(token);
+    },
+    onSuccess: (data) => {
+      setListenBrainzTokenInput('');
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+      addNewNotifications([
+        {
+          id: `listenbrainz-connect-success-${Date.now()}`,
+          content: `Connected to ListenBrainz as ${data.userName}`,
+          iconName: 'check_circle',
+          duration: 5000
+        }
+      ]);
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      addNewNotifications([
+        {
+          id: `listenbrainz-connect-error-${Date.now()}`,
+          content: `ListenBrainz Connection Failed: ${message}`,
+          iconName: 'error',
+          duration: 8000
+        }
+      ]);
+    }
+  });
+
+  const { mutate: disconnectListenBrainz, isPending: isDisconnectingListenBrainz } = useMutation({
+    mutationFn: async () => {
+      return await window.api.listenBrainz.disconnect();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSongScrobblingToListenBrainzState } = useMutation({
+    mutationFn: (enableScrobbling: boolean) =>
+      window.api.settings.updateSongScrobblingToListenBrainzState(enableScrobbling),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSongFavoritesToListenBrainzState } = useMutation({
+    mutationFn: (enableFavorites: boolean) =>
+      window.api.settings.updateSongFavoritesToListenBrainzState(enableFavorites),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
+  const { mutate: updateSendNowPlayingSongDataToListenBrainzState } = useMutation({
+    mutationFn: (enableNowPlaying: boolean) =>
+      window.api.settings.updateNowPlayingSongDataToListenBrainzState(enableNowPlaying),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+    }
+  });
+
   const { mutate: updateDiscordRpcState } = useMutation({
     mutationFn: (enableDiscordRpc: boolean) =>
       window.api.settings.updateDiscordRpcState(enableDiscordRpc),
@@ -339,6 +409,154 @@ const AccountsSettings = () => {
                 }
                 labelContent={t('settingsPage.sendNowPlayingToLastFm')}
                 isDisabled={!isLastFmConnected}
+              />
+            </li>
+          </ul>
+        </li>
+
+        {/* ListenBrainz Integration */}
+        <li className="listenbrainz-integration mb-8">
+          <div className="description">{t('settingsPage.integrateListenBrainz')}</div>
+          <div className="flex items-start p-4 pb-0">
+            <div className="mr-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#EB743B]/10 text-[#EB743B]">
+              <span className="material-icons-round text-4xl">psychology</span>
+            </div>
+            <div className="grow">
+              <p
+                className={`flex items-center font-semibold uppercase ${
+                  isListenBrainzConnected ? 'text-green-500' : 'text-red-500'
+                }`}
+              >
+                {t(
+                  isListenBrainzConnected
+                    ? 'settingsPage.listenBrainzConnected'
+                    : 'settingsPage.listenBrainzNotConnected'
+                )}{' '}
+                {isListenBrainzConnected &&
+                  userSettings?.listenBrainzUsername &&
+                  `(${t('settingsPage.loggedInAs')} ${userSettings.listenBrainzUsername})`}
+              </p>
+              <ul className="list-inside list-disc text-sm">
+                <li>{t('settingsPage.listenBrainzDescription1')}</li>
+                <li>{t('settingsPage.listenBrainzDescription2')}</li>
+                <li>{t('settingsPage.listenBrainzDescription3')}</li>
+                <li>{t('settingsPage.listenBrainzDescription4')}</li>
+              </ul>
+
+              {!isListenBrainzConnected ? (
+                <div className="mt-4 max-w-md space-y-2">
+                  <div className="relative flex items-center">
+                    <input
+                      type={showListenBrainzToken ? 'text' : 'password'}
+                      value={listenBrainzTokenInput}
+                      onChange={(e) => setListenBrainzTokenInput(e.target.value)}
+                      placeholder={t('settingsPage.listenBrainzTokenPlaceholder')}
+                      className="bg-background-color-2 text-font-color-black dark:text-font-color-white focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight w-full rounded-md border border-gray-300 p-2 pr-10 text-sm focus:outline-none dark:border-zinc-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowListenBrainzToken(!showListenBrainzToken)}
+                      className="text-font-color-dim dark:text-dark-font-color-dim hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight absolute right-2 p-1"
+                      title={showListenBrainzToken ? 'Hide token' : 'Show token'}
+                    >
+                      <span className="material-icons-round text-lg">
+                        {showListenBrainzToken ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <Button
+                      label={
+                        isConnectingListenBrainz
+                          ? 'Validating...'
+                          : t('settingsPage.connectListenBrainz')
+                      }
+                      iconName="link"
+                      className="bg-[#EB743B]! text-white!"
+                      clickHandler={() => connectListenBrainz(listenBrainzTokenInput)}
+                      isDisabled={isConnectingListenBrainz || !listenBrainzTokenInput.trim()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.api.settingsHelpers.openInBrowser('https://listenbrainz.org/profile/')
+                      }
+                      className="text-font-color-highlight dark:text-dark-font-color-highlight flex items-center gap-1 text-xs hover:underline"
+                    >
+                      <span>{t('settingsPage.getListenBrainzToken')}</span>
+                      <span className="material-icons-round text-xs">open_in_new</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center gap-3">
+                  <Button
+                    label={
+                      isDisconnectingListenBrainz
+                        ? 'Disconnecting...'
+                        : t('settingsPage.disconnectListenBrainz')
+                    }
+                    iconName="link_off"
+                    className="border-red-500 text-red-500 hover:bg-red-500/10"
+                    clickHandler={() => disconnectListenBrainz()}
+                    isDisabled={isDisconnectingListenBrainz}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
+            <li
+              className={`listenbrainz-integration mb-4 transition-opacity ${
+                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">
+                {t('settingsPage.listenBrainzScrobblingDescription')}
+              </div>
+              <Checkbox
+                id="sendSongScrobblingDataToListenBrainz"
+                isChecked={!!userSettings?.sendSongScrobblingDataToListenBrainz}
+                checkedStateUpdateFunction={(state) =>
+                  updateSongScrobblingToListenBrainzState(state)
+                }
+                labelContent={t('settingsPage.enableListenBrainzScrobbling')}
+                isDisabled={!isListenBrainzConnected}
+              />
+            </li>
+            <li
+              className={`listenbrainz-integration mb-4 transition-opacity ${
+                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">
+                {t('settingsPage.sendFavoritesToListenBrainzDescription')}
+              </div>
+              <Checkbox
+                id="sendSongFavoritesDataToListenBrainz"
+                isChecked={!!userSettings?.sendSongFavoritesDataToListenBrainz}
+                checkedStateUpdateFunction={(state) => updateSongFavoritesToListenBrainzState(state)}
+                labelContent={t('settingsPage.sendFavoritesToListenBrainz')}
+                isDisabled={!isListenBrainzConnected}
+              />
+            </li>
+            <li
+              className={`listenbrainz-integration mb-4 transition-opacity ${
+                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
+              }`}
+            >
+              <div className="description">
+                {t('settingsPage.sendNowPlayingToListenBrainzDescription')}
+              </div>
+              <Checkbox
+                id="sendNowPlayingSongDataToListenBrainz"
+                isChecked={!!userSettings?.sendNowPlayingSongDataToListenBrainz}
+                checkedStateUpdateFunction={(state) =>
+                  updateSendNowPlayingSongDataToListenBrainzState(state)
+                }
+                labelContent={t('settingsPage.sendNowPlayingToListenBrainz')}
+                isDisabled={!isListenBrainzConnected}
               />
             </li>
           </ul>

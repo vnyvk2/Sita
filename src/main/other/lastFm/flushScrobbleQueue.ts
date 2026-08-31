@@ -14,7 +14,27 @@ import type { scrobbleQueue } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
 
 import type { AuthData, LoveParams, ScrobbleParams } from '../../../types/last_fm_api';
+import type { ListenBrainzSubmitListensPayload } from '../../../types/listen_brainz_api';
 import logger from '../../logger';
+import { sendMessageToRenderer } from '../../main';
+import getListenBrainzAuthData, {
+  type ListenBrainzAuthData
+} from '../listenBrainz/getListenBrainzAuthData';
+import {
+  getCurrentListenBrainzGeneration,
+  invalidateListenBrainzSession,
+  setActiveListenBrainzAbortController
+} from '../listenBrainz/listenBrainzSession';
+import {
+  fetchWithTimeout as fetchListenBrainzWithTimeout,
+  getListenBrainzUserAgent,
+  LISTENBRAINZ_BASE_URL,
+  LISTENBRAINZ_REQUEST_TIMEOUT_MS
+} from '../listenBrainz/listenBrainzUtils';
+import {
+  postFeedbackToListenBrainz,
+  resolveRecordingMbid
+} from '../listenBrainz/sendFavoritesDataToListenBrainz';
 import type { LastFMApi } from './generateApiRequestBodyForLastFMPostRequests';
 import generateApiRequestBodyForLastFMPostRequests from './generateApiRequestBodyForLastFMPostRequests';
 import getLastFmAuthData from './getLastFMAuthData';
@@ -31,6 +51,27 @@ export class LastFmAuthError extends Error {
     super(msg);
     this.name = 'LastFmAuthError';
     this.code = code;
+  }
+}
+
+export class ListenBrainzAuthError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = 'ListenBrainzAuthError';
+  }
+}
+
+export class ListenBrainzTransientError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = 'ListenBrainzTransientError';
+  }
+}
+
+export class ListenBrainzPermanentError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = 'ListenBrainzPermanentError';
   }
 }
 
@@ -117,18 +158,28 @@ export async function flushScrobbleQueue(): Promise<void> {
 }
 
 async function runFlushCycle(): Promise<void> {
-  const flushGen = currentFlushGeneration;
+  const lastFmGen = currentFlushGeneration;
+  const lbGen = getCurrentListenBrainzGeneration();
   const abortController = new AbortController();
   activeAbortController = abortController;
+  setActiveListenBrainzAbortController(abortController);
 
   try {
-    const authData = await getLastFmAuthData().catch(() => null);
-    if (!authData) {
-      logger.debug('Flush skipped - no Last.fm auth data');
+    const [authData, listenBrainzAuthData] = await Promise.all([
+      getLastFmAuthData().catch(() => null),
+      getListenBrainzAuthData().catch(() => null)
+    ]);
+
+    if (!authData && !listenBrainzAuthData) {
+      logger.debug('Flush skipped - neither Last.fm nor ListenBrainz auth data available');
       return;
     }
 
-    if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
+    if (
+      lastFmGen !== currentFlushGeneration ||
+      lbGen !== getCurrentListenBrainzGeneration() ||
+      abortController.signal.aborted
+    ) {
       logger.warn('Flush generation mismatch or aborted before startup recovery, exiting');
       return;
     }
@@ -148,30 +199,58 @@ async function runFlushCycle(): Promise<void> {
         return;
       }
 
-      if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
+      if (
+        lastFmGen !== currentFlushGeneration ||
+        lbGen !== getCurrentListenBrainzGeneration() ||
+        abortController.signal.aborted
+      ) {
         logger.warn('Flush generation mismatch or aborted, exiting flush loop immediately');
         return;
       }
 
       for (let i = 0; i < items.length; i += 1) {
-        if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
-          logger.warn('Flush generation mismatch or aborted before processing item, exiting flush loop');
+        if (
+          lastFmGen !== currentFlushGeneration ||
+          lbGen !== getCurrentListenBrainzGeneration() ||
+          abortController.signal.aborted
+        ) {
+          logger.warn(
+            'Flush generation mismatch or aborted before processing item, exiting flush loop'
+          );
           return;
         }
 
         const item = items[i];
         try {
-          const result = await processItem(item, authData, url, abortController.signal);
+          const result = await processItem(
+            item,
+            authData,
+            listenBrainzAuthData,
+            url,
+            abortController.signal
+          );
 
-          if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
+          if (
+            lastFmGen !== currentFlushGeneration ||
+            lbGen !== getCurrentListenBrainzGeneration() ||
+            abortController.signal.aborted
+          ) {
             logger.warn('Flush generation mismatch after processItem, dropping markSent');
             return;
           }
 
           await markSent(item.id);
-          logger.debug('Flushed scrobble queue item', { id: item.id, type: item.operationType, result });
+          logger.debug('Flushed scrobble queue item', {
+            id: item.id,
+            type: item.operationType,
+            result
+          });
         } catch (error) {
-          if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
+          if (
+            lastFmGen !== currentFlushGeneration ||
+            lbGen !== getCurrentListenBrainzGeneration() ||
+            abortController.signal.aborted
+          ) {
             logger.warn('Flush aborted during network request, halting without mutating queue item');
             return;
           }
@@ -181,9 +260,19 @@ async function runFlushCycle(): Promise<void> {
               code: error.code,
               message: error.message
             });
-            // Reset all in-flight items from this batch back to pending without incrementing retry
             const remainingIds = items.slice(i).map((it) => it.id);
             await resetSendingToPending(remainingIds);
+            return;
+          }
+
+          if (error instanceof ListenBrainzAuthError) {
+            logger.warn('ListenBrainz session rejected during flush, halting flush cycle', {
+              message: error.message
+            });
+            invalidateListenBrainzSession();
+            const remainingIds = items.slice(i).map((it) => it.id);
+            await resetSendingToPending(remainingIds);
+            sendMessageToRenderer({ messageCode: 'LISTENBRAINZ_SESSION_INVALID' });
             return;
           }
 
@@ -197,7 +286,10 @@ async function runFlushCycle(): Promise<void> {
             continue;
           }
 
-          if (error instanceof LastFmPermanentError) {
+          if (
+            error instanceof LastFmPermanentError ||
+            error instanceof ListenBrainzPermanentError
+          ) {
             logger.error('Permanent failure on queue item, marking permanently failed', {
               id: item.id,
               error
@@ -206,7 +298,7 @@ async function runFlushCycle(): Promise<void> {
             continue;
           }
 
-          // Transient error / network timeout / HTTP 429 / HTTP 5xx / daily scrobble limit / DB connection issue
+          // Transient error / network timeout / HTTP 429 / HTTP 5xx / DB connection issue
           logger.warn('Transient failure flushing scrobble queue item', { id: item.id, error });
           await markFailed(item.id);
         }
@@ -216,7 +308,11 @@ async function runFlushCycle(): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
       }
 
-      if (flushGen !== currentFlushGeneration || abortController.signal.aborted) {
+      if (
+        lastFmGen !== currentFlushGeneration ||
+        lbGen !== getCurrentListenBrainzGeneration() ||
+        abortController.signal.aborted
+      ) {
         logger.warn('Flush generation mismatch or aborted after batch delay, exiting');
         return;
       }
@@ -224,7 +320,11 @@ async function runFlushCycle(): Promise<void> {
       items = await claimPendingBatch(FLUSH_BATCH_SIZE);
     }
   } catch (error) {
-    if (abortController.signal.aborted || flushGen !== currentFlushGeneration) {
+    if (
+      abortController.signal.aborted ||
+      lastFmGen !== currentFlushGeneration ||
+      lbGen !== getCurrentListenBrainzGeneration()
+    ) {
       logger.info('Flush cleanly aborted on session invalidation');
     } else {
       logger.error('Flush cycle failed unexpectedly', { error });
@@ -232,18 +332,24 @@ async function runFlushCycle(): Promise<void> {
   } finally {
     if (activeAbortController === abortController) {
       activeAbortController = null;
+      setActiveListenBrainzAbortController(null);
     }
   }
 }
 
 async function processItem(
   item: typeof scrobbleQueue.$inferSelect,
-  authData: AuthData,
+  authData: AuthData | null,
+  listenBrainzAuthData: ListenBrainzAuthData | null,
   url: URL,
   signal?: AbortSignal
 ): Promise<'SENT' | 'DISCARDED_STALE'> {
   switch (item.operationType) {
     case 'scrobble': {
+      if (!authData) {
+        throw new LastFmAuthError('Last.fm not authenticated', 4);
+      }
+
       if (item.startTimeSecs == null) {
         logger.warn('Missing scrobble timestamp in queue item, dropping', { id: item.id });
         return 'DISCARDED_STALE';
@@ -260,8 +366,6 @@ async function processItem(
       }
 
       const songData = item.songId != null ? await getSongById(item.songId) : null;
-      // If the song was deleted between queue and flush, fall back to the
-      // title/artist captured at queue time so the scrobble can still post.
       if (!songData) {
         if (!item.trackTitle || !item.artistNames) {
           logger.warn('Song not found and no fallback metadata available, dropping', { id: item.id });
@@ -291,6 +395,9 @@ async function processItem(
 
     case 'track.love':
     case 'track.unlove': {
+      if (!authData) {
+        throw new LastFmAuthError('Last.fm not authenticated', 4);
+      }
       const params: LoveParams = {
         track: item.trackTitle || '',
         artist: item.artistNames || ''
@@ -299,8 +406,147 @@ async function processItem(
       return 'SENT';
     }
 
+    case 'listenbrainz.scrobble': {
+      if (!listenBrainzAuthData?.userToken) {
+        throw new ListenBrainzAuthError('ListenBrainz not authenticated');
+      }
+
+      if (item.startTimeSecs == null) {
+        logger.warn('Missing scrobble timestamp in ListenBrainz queue item, dropping', {
+          id: item.id
+        });
+        return 'DISCARDED_STALE';
+      }
+
+      const nowSecs = Math.floor(Date.now() / 1000);
+      const listenedAt = Math.min(item.startTimeSecs, nowSecs);
+
+      const songData = item.songId != null ? await getSongById(item.songId) : null;
+      let trackName = item.trackTitle || '';
+      let artistName = item.artistNames || '';
+      let releaseName: string | undefined;
+      let durationMs: number | undefined;
+      let trackNo: number | undefined;
+      let mbid: string | undefined;
+
+      if (songData) {
+        const song = convertToSongData(songData);
+        trackName = song.title || trackName;
+        artistName = song.artists?.map((a) => a.name).join(', ') || artistName;
+        releaseName = song.album?.name || undefined;
+        durationMs = Math.round(song.duration * 1000);
+        trackNo = song.trackNo ?? undefined;
+        mbid = song.musicBrainzId || undefined;
+      }
+
+      if (!trackName || !artistName) {
+        logger.warn('ListenBrainz scrobble missing required metadata, dropping', { id: item.id });
+        return 'DISCARDED_STALE';
+      }
+
+      const payload: ListenBrainzSubmitListensPayload = {
+        listen_type: 'single',
+        payload: [
+          {
+            listened_at: listenedAt,
+            track_metadata: {
+              artist_name: artistName,
+              track_name: trackName,
+              release_name: releaseName,
+              additional_info: {
+                media_player: 'Nora',
+                submission_client: 'Nora',
+                submission_client_version: getListenBrainzUserAgent()
+                  .split(' ')[0]
+                  .replace('Nora/', ''),
+                duration_ms: durationMs,
+                tracknumber: trackNo,
+                musicbrainz_recording_id: mbid
+              }
+            }
+          }
+        ]
+      };
+
+      const lbUrl = new URL(`${LISTENBRAINZ_BASE_URL}/submit-listens`);
+      const res = await fetchListenBrainzWithTimeout(
+        lbUrl,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Token ${listenBrainzAuthData.userToken}`,
+            'Content-Type': 'application/json',
+            'User-Agent': getListenBrainzUserAgent()
+          },
+          body: JSON.stringify(payload)
+        },
+        LISTENBRAINZ_REQUEST_TIMEOUT_MS,
+        signal
+      );
+
+      if (res.ok) {
+        return 'SENT';
+      }
+
+      if (res.status === 401) {
+        throw new ListenBrainzAuthError('ListenBrainz session rejected (401)');
+      }
+
+      if (res.status === 429 || res.status >= 500) {
+        throw new ListenBrainzTransientError(`ListenBrainz transient failure (${res.status})`);
+      }
+
+      throw new ListenBrainzPermanentError(`ListenBrainz permanent failure (${res.status})`);
+    }
+
+    case 'listenbrainz.love':
+    case 'listenbrainz.unlove': {
+      if (!listenBrainzAuthData?.userToken) {
+        throw new ListenBrainzAuthError('ListenBrainz not authenticated');
+      }
+
+      const trackName = item.trackTitle || '';
+      const artistName = item.artistNames || '';
+      if (!trackName || !artistName) {
+        return 'DISCARDED_STALE';
+      }
+
+      const songData = item.songId != null ? await getSongById(item.songId).catch(() => null) : null;
+      let mbid = songData ? convertToSongData(songData).musicBrainzId : undefined;
+      if (!mbid) {
+        mbid =
+          (await resolveRecordingMbid(
+            trackName,
+            artistName,
+            listenBrainzAuthData.userToken,
+            signal
+          )) || undefined;
+      }
+
+      if (!mbid) {
+        logger.info('Discarding unresolvable ListenBrainz feedback item', {
+          id: item.id,
+          trackName,
+          artistName
+        });
+        return 'DISCARDED_STALE';
+      }
+
+      const score: 1 | 0 = item.operationType === 'listenbrainz.love' ? 1 : 0;
+      try {
+        await postFeedbackToListenBrainz(listenBrainzAuthData.userToken, mbid, score, signal);
+        return 'SENT';
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        throw new ListenBrainzTransientError(err instanceof Error ? err.message : String(err));
+      }
+    }
+
     default:
-      logger.warn('Unknown operation type in queue, dropping', { id: item.id, type: item.operationType });
+      logger.warn('Unknown operation type in queue, dropping', {
+        id: item.id,
+        type: item.operationType
+      });
       return 'DISCARDED_STALE';
   }
 }

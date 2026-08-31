@@ -54,7 +54,8 @@ export default defineConfig({
         target: 'react',
         routesDirectory: 'src/routes',
         generatedRouteTree: 'src/routeTree.gen.ts',
-        autoCodeSplitting: false
+        autoCodeSplitting: false,
+        routeFileIgnorePattern: '.((test|spec).(js|jsx|ts|tsx))'
       }),
       react(),
       // babel({ presets: [reactCompilerPreset()] }),

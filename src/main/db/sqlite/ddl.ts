@@ -342,6 +342,9 @@ CREATE TABLE IF NOT EXISTS user_settings (
   send_song_scrobbling_data_to_lastfm INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_lastfm IN (0,1)),
   send_song_favorites_data_to_lastfm INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_lastfm IN (0,1)),
   send_now_playing_song_data_to_lastfm INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_lastfm IN (0,1)),
+  send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1)),
+  send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1)),
+  send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1)),
   save_lyrics_in_lrc_files_for_supported_songs INTEGER NOT NULL DEFAULT 1 CHECK (save_lyrics_in_lrc_files_for_supported_songs IN (0,1)),
   enable_discord_rpc INTEGER NOT NULL DEFAULT 1 CHECK (enable_discord_rpc IN (0,1)),
   save_verbose_logs INTEGER NOT NULL DEFAULT 0 CHECK (save_verbose_logs IN (0,1)),
@@ -364,6 +367,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
   add_downloads_to_library INTEGER NOT NULL DEFAULT 1 CHECK (add_downloads_to_library IN (0,1)),
   lastfm_session_name TEXT,
   lastfm_session_key TEXT,
+  listenbrainz_username TEXT,
+  listenbrainz_user_token TEXT,
   library_scan_mode TEXT NOT NULL DEFAULT 'automatic',
   last_scan_time INTEGER,
   metadata_preferences TEXT,
@@ -571,5 +576,5 @@ END;`;
   .join('\n');
 
 export const BASELINE_DDL = BASELINE_TABLE_DDL + '\n' + ftsDDL;
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 void searchable;

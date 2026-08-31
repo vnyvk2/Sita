@@ -53,7 +53,7 @@ const manageLastFmAuth = async (token: string) => {
           newUser: name
         });
         invalidateLastFmSession();
-        await clearScrobbleQueue();
+        await clearScrobbleQueue('lastfm');
       }
 
       await saveUserSettings({ lastFmSessionName: name, lastFmSessionKey: encryptedKey });

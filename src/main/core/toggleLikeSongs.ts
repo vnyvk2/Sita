@@ -10,10 +10,83 @@ import {
   flushScrobbleQueue,
   getCurrentLastFmGeneration
 } from '@main/other/lastFm/flushScrobbleQueue';
+import { getCurrentListenBrainzGeneration } from '@main/other/listenBrainz/listenBrainzSession';
 import { convertToSongData } from '@main/utils/convert';
 
 import logger from '../logger';
 import { dataUpdateEvent } from '../main';
+
+const syncFavoritesToListenBrainz = async (
+  likes: number[],
+  dislikes: number[],
+  accountGen: number
+) => {
+  try {
+    if (accountGen !== getCurrentListenBrainzGeneration()) {
+      logger.info('Discarding favorites sync: ListenBrainz account generation changed before execution', {
+        actionGen: accountGen,
+        currentGen: getCurrentListenBrainzGeneration()
+      });
+      return;
+    }
+
+    const { sendSongFavoritesDataToListenBrainz } = await getUserSettings();
+    if (!sendSongFavoritesDataToListenBrainz) {
+      return;
+    }
+
+    if (accountGen !== getCurrentListenBrainzGeneration()) {
+      logger.info('Discarding favorites sync: ListenBrainz account generation changed after fetching settings');
+      return;
+    }
+
+    const [likeSongs, dislikeSongs] = await Promise.all([
+      Promise.all(likes.map((id) => getSongById(id).catch(() => null))),
+      Promise.all(dislikes.map((id) => getSongById(id).catch(() => null)))
+    ]);
+
+    if (accountGen !== getCurrentListenBrainzGeneration()) {
+      logger.info('Discarding favorites sync: ListenBrainz account generation changed after querying songs');
+      return;
+    }
+
+    for (const songData of likeSongs) {
+      if (songData) {
+        if (accountGen !== getCurrentListenBrainzGeneration()) return;
+        const song = convertToSongData(songData);
+        const artistNames = song.artists?.map((a) => a.name).join(', ');
+        await insertScrobble({
+          songId: songData.id,
+          operationType: 'listenbrainz.love',
+          trackTitle: song.title,
+          artistNames
+        });
+      }
+    }
+
+    for (const songData of dislikeSongs) {
+      if (songData) {
+        if (accountGen !== getCurrentListenBrainzGeneration()) return;
+        const song = convertToSongData(songData);
+        const artistNames = song.artists?.map((a) => a.name).join(', ');
+        await insertScrobble({
+          songId: songData.id,
+          operationType: 'listenbrainz.unlove',
+          trackTitle: song.title,
+          artistNames
+        });
+      }
+    }
+
+    if (accountGen !== getCurrentListenBrainzGeneration()) return;
+
+    flushScrobbleQueue().catch((err) => {
+      logger.warn('Failed to flush scrobble queue after updating ListenBrainz favorites', { err });
+    });
+  } catch (error) {
+    logger.error('Error occurred in syncFavoritesToListenBrainz', { error });
+  }
+};
 
 const syncFavoritesToLastFm = async (
   likes: number[],
@@ -87,18 +160,22 @@ const syncFavoritesToLastFm = async (
   }
 };
 
-let lastFmSyncChain: Promise<void> = Promise.resolve();
+let favoritesSyncChain: Promise<void> = Promise.resolve();
 
 export function enqueueFavoritesSync(
   likes: number[],
   dislikes: number[],
-  accountGen: number = getCurrentLastFmGeneration()
+  lastFmGen: number = getCurrentLastFmGeneration(),
+  lbGen: number = getCurrentListenBrainzGeneration()
 ): Promise<void> {
   const task = async () => {
-    await syncFavoritesToLastFm(likes, dislikes, accountGen);
+    await Promise.all([
+      syncFavoritesToLastFm(likes, dislikes, lastFmGen),
+      syncFavoritesToListenBrainz(likes, dislikes, lbGen)
+    ]);
   };
-  lastFmSyncChain = lastFmSyncChain.then(task, task);
-  return lastFmSyncChain;
+  favoritesSyncChain = favoritesSyncChain.then(task, task);
+  return favoritesSyncChain;
 }
 
 const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
@@ -113,7 +190,8 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
     return result;
   }
 
-  const accountGen = getCurrentLastFmGeneration();
+  const lastFmGen = getCurrentLastFmGeneration();
+  const lbGen = getCurrentListenBrainzGeneration();
 
   await db.transaction(async (trx) => {
     if (isLikeSong !== undefined) {
@@ -140,8 +218,8 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
   dataUpdateEvent('songs/likes', [...result.likes, ...result.dislikes]);
 
   if (result.likes.length > 0 || result.dislikes.length > 0) {
-    enqueueFavoritesSync(result.likes, result.dislikes, accountGen).catch((error) => {
-      logger.error('Failed to sync favorites to LastFM', { error });
+    enqueueFavoritesSync(result.likes, result.dislikes, lastFmGen, lbGen).catch((error) => {
+      logger.error('Failed to sync favorites', { error });
     });
   }
 

@@ -425,6 +425,18 @@ const settings = {
     ipcRenderer.invoke('app/saveUserSettings', {
       sendNowPlayingSongDataToLastFM: enableNowPlaying
     }),
+  updateSongScrobblingToListenBrainzState: (enableScrobbling: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', {
+      sendSongScrobblingDataToListenBrainz: enableScrobbling
+    }),
+  updateSongFavoritesToListenBrainzState: (enableFavorites: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', {
+      sendSongFavoritesDataToListenBrainz: enableFavorites
+    }),
+  updateNowPlayingSongDataToListenBrainzState: (enableNowPlaying: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/saveUserSettings', {
+      sendNowPlayingSongDataToListenBrainz: enableNowPlaying
+    }),
   updateSaveLyricsInLrcFilesForSupportedSongs: (enableSave: boolean): Promise<void> =>
     ipcRenderer.invoke('app/saveUserSettings', {
       saveLyricsInLrcFilesForSupportedSongs: enableSave
@@ -1004,6 +1016,11 @@ export const api = {
       ipcRenderer.invoke('spotify/sync/generatePlan', playlistId, strategy),
     executeSync: (playlistId: number, strategy?: string) =>
       ipcRenderer.invoke('spotify/sync/executeSync', playlistId, strategy)
+  },
+  listenBrainz: {
+    validateAndSaveToken: (token: string): Promise<{ success: boolean; userName: string }> =>
+      ipcRenderer.invoke('app/validateAndSaveListenBrainzToken', token),
+    disconnect: (): Promise<boolean> => ipcRenderer.invoke('app/disconnectListenBrainz')
   }
 };
 

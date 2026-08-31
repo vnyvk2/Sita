@@ -63,7 +63,8 @@ export const convertToSongData = (
     modifiedDate: song.updatedAt ? new Date(song.updatedAt).getTime() : undefined,
     discNo: song.diskNumber ?? undefined,
     noOfChannels: song.noOfChannels ?? undefined,
-    language: languageOverride || song.language || undefined
+    language: languageOverride || song.language || undefined,
+    musicBrainzId: song.musicBrainzRecordingId ?? undefined
   } satisfies SongData;
 };
 

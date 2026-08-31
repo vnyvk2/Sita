@@ -115,7 +115,28 @@ export async function markPermanentlyFailed(id: number, trx: DB | DBTransaction 
     .where(and(eq(scrobbleQueue.id, id), eq(scrobbleQueue.status, 'sending')));
 }
 
-export async function clearScrobbleQueue(trx: DB | DBTransaction = db): Promise<void> {
+export async function clearScrobbleQueue(
+  service?: 'lastfm' | 'listenbrainz',
+  trx: DB | DBTransaction = db
+): Promise<void> {
+  if (service === 'lastfm') {
+    await trx
+      .delete(scrobbleQueue)
+      .where(inArray(scrobbleQueue.operationType, ['scrobble', 'track.love', 'track.unlove']));
+    return;
+  }
+  if (service === 'listenbrainz') {
+    await trx
+      .delete(scrobbleQueue)
+      .where(
+        inArray(scrobbleQueue.operationType, [
+          'listenbrainz.scrobble',
+          'listenbrainz.love',
+          'listenbrainz.unlove'
+        ])
+      );
+    return;
+  }
   await trx.delete(scrobbleQueue);
 }
 

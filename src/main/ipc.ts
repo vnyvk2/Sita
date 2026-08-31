@@ -130,6 +130,10 @@ import getAlbumInfoFromLastFM from './other/lastFm/getAlbumInfoFromLastFM';
 import getSimilarTracks from './other/lastFm/getSimilarTracks';
 import scrobbleSong from './other/lastFm/scrobbleSong';
 import sendNowPlayingSongDataToLastFM from './other/lastFm/sendNowPlayingSongDataToLastFM';
+import disconnectListenBrainz from './other/listenBrainz/disconnectListenBrainz';
+import scrobbleSongToListenBrainz from './other/listenBrainz/scrobbleSongToListenBrainz';
+import sendNowPlayingSongDataToListenBrainz from './other/listenBrainz/sendNowPlayingSongDataToListenBrainz';
+import validateAndSaveListenBrainzToken from './other/listenBrainz/validateAndSaveListenBrainzToken';
 import reParseSong from './parseSong/reParseSong';
 import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
 import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
@@ -501,21 +505,37 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/generatePalettes', generatePalettes);
 
     ipcMain.handle('app/scrobbleSong', (_, songId: number, startTimeInSecs: number) =>
-      scrobbleSong(songId, startTimeInSecs)
+      Promise.all([
+        scrobbleSong(songId, startTimeInSecs),
+        scrobbleSongToListenBrainz(songId, startTimeInSecs)
+      ])
     );
 
     ipcMain.handle('app/flushScrobbleQueue', () => flushScrobbleQueue());
 
     ipcMain.handle('app/disconnectLastFm', async () => {
       invalidateLastFmSession();
-      await clearScrobbleQueue();
+      await clearScrobbleQueue('lastfm');
       await saveUserSettings({ lastFmSessionName: null, lastFmSessionKey: null });
       dataUpdateEvent('userData');
       return true;
     });
 
     ipcMain.handle('app/sendNowPlayingSongDataToLastFM', (_, songId: number) =>
-      sendNowPlayingSongDataToLastFM(songId)
+      Promise.all([
+        sendNowPlayingSongDataToLastFM(songId),
+        sendNowPlayingSongDataToListenBrainz(songId)
+      ])
+    );
+
+    ipcMain.handle('app/validateAndSaveListenBrainzToken', (_, token: string) =>
+      validateAndSaveListenBrainzToken(token)
+    );
+
+    ipcMain.handle('app/disconnectListenBrainz', () => disconnectListenBrainz());
+
+    ipcMain.handle('app/sendNowPlayingSongDataToListenBrainz', (_, songId: number) =>
+      sendNowPlayingSongDataToListenBrainz(songId)
     );
 
     ipcMain.handle('app/getArtistArtworks', (_, artistId: number) =>

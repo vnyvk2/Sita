@@ -187,15 +187,59 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
   for (const p of SQLITE_PRAGMAS) db.exec(p);
   const pragmaMs = performance.now() - tPragma;
 
-  // Baseline schema: apply once, stamped via user_version.
+  // Baseline schema & migrations: stamped via user_version.
   let ddlMs = 0;
   const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  if (version < SCHEMA_VERSION) {
+  const tablesCount = (
+    db.prepare("SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='user_settings'").get() as { cnt: number }
+  ).cnt;
+  const isFreshDb = tablesCount === 0;
+
+  if (isFreshDb) {
     const tDdl = performance.now();
     db.exec(BASELINE_DDL);
     db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
     ddlMs = performance.now() - tDdl;
     logger.info(`SQLite baseline schema applied (v${SCHEMA_VERSION}) in ${Math.round(ddlMs)}ms`);
+  } else {
+    // Existing database: run migrations if needed
+    let currentVersion = version === 0 ? 1 : version;
+    const tDdl = performance.now();
+
+    if (currentVersion === 1) {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
+        ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
+        PRAGMA user_version = 2;
+        COMMIT;
+      `);
+      currentVersion = 2;
+      logger.info(`SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`);
+    }
+
+    // Defensive check: ensure all required v2 columns exist on user_settings
+    const userSettingsCols = new Set(
+      (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map((c) => c.name)
+    );
+    if (!userSettingsCols.has('send_song_scrobbling_data_to_listenbrainz')) {
+      logger.warn('Detected missing ListenBrainz columns on user_settings; applying schema repair');
+      db.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1));
+        ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
+        ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
+        PRAGMA user_version = 2;
+        COMMIT;
+      `);
+    }
+
+    ddlMs = performance.now() - tDdl;
   }
 
   const { orm, preparedObj } = buildDrizzle(db);
