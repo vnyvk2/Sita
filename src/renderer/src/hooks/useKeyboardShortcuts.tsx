@@ -11,11 +11,12 @@ import { useOverlayNavigation } from './useOverlayNavigation';
 const AppShortcutsPrompt = lazy(() => import('../components/SettingsPage/AppShortcutsPrompt'));
 
 /**
- * Shortcut labels persisted in localStorage are stable i18n KEYS (e.g. 'appShortcutsPrompt.playPause'),
- * never runtime translations. Translate them with i18n.t only at display time.
+ * Shortcut labels persisted in localStorage are stable i18n KEYS (e.g.
+ * 'appShortcutsPrompt.playPause'), never runtime translations. Translate them with i18n.t only at
+ * display time.
  *
- * In mini player mode only these playback-centric shortcuts (plus the queue/search entries backed by
- * mini surfaces) may act; navigation and library shortcuts would otherwise mutate router history
+ * In mini player mode only these playback-centric shortcuts (plus the queue/search entries backed
+ * by mini surfaces) may act; navigation and library shortcuts would otherwise mutate router history
  * behind the unmounted main UI.
  */
 export const MINI_ALLOWED_SHORTCUT_KEYS = new Set([
@@ -34,6 +35,7 @@ export const MINI_ALLOWED_SHORTCUT_KEYS = new Set([
   'appShortcutsPrompt.downPlaybackRate',
   'appShortcutsPrompt.resetPlaybackRate',
   'appShortcutsPrompt.openMiniPlayer',
+  'appShortcutsPrompt.openCompactPlayer',
   'appShortcutsPrompt.goToQueue',
   'appShortcutsPrompt.goToSearch'
 ]);
@@ -207,7 +209,10 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
         // In mini player mode only playback-centric shortcuts (plus the mini player toggle and
         // the queue/search entries backed by mini surfaces) may act. Navigation and library
         // shortcuts would otherwise mutate router history behind the unmounted main UI.
-        if (store.state.playerType === 'mini' && !MINI_ALLOWED_SHORTCUT_KEYS.has(matchedShortcut.label)) {
+        if (
+          store.state.playerType === 'mini' &&
+          !MINI_ALLOWED_SHORTCUT_KEYS.has(matchedShortcut.label)
+        ) {
           return;
         }
 
@@ -321,6 +326,14 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             break;
           case 'appShortcutsPrompt.openMiniPlayer':
             updatePlayerType(store.state.playerType === 'mini' ? 'normal' : 'mini');
+            break;
+          case 'appShortcutsPrompt.openCompactPlayer':
+            if (store.state.playerType === 'mini') {
+              updatePlayerType('normal');
+            } else {
+              void window.api.miniPlayer.setMiniPlayerMode('compact');
+              updatePlayerType('mini');
+            }
             break;
           case 'appShortcutsPrompt.selectMultipleItems':
             toggleMultipleSelections(true);

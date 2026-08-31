@@ -576,6 +576,10 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
           keys: [normalizedKeys.ctrlKey, 'N']
         },
         {
+          label: 'appShortcutsPrompt.openCompactPlayer',
+          keys: [normalizedKeys.ctrlKey, normalizedKeys.shiftKey, 'N']
+        },
+        {
           label: 'appShortcutsPrompt.goToLyrics',
           keys: [normalizedKeys.ctrlKey, 'L']
         },
