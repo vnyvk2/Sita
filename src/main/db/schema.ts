@@ -121,7 +121,6 @@ export const musicFolders = sqliteTable(
   },
   (t) => [
     index('idx_parent_id').on(t.parentId),
-    index('idx_music_folders_path').on(t.path),
     index('idx_music_folders_is_blacklisted').on(t.isBlacklisted),
     index('idx_music_folders_parent_path').on(t.parentId, t.path)
   ]
@@ -356,7 +355,7 @@ export const smartPlaylistRules = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_smart_playlist_rules_playlist_id').on(t.playlistId)]
+  () => []
 );
 
 export const playEvents = sqliteTable(
@@ -622,7 +621,7 @@ export const ignoredArtists = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_ignored_artists_artist_id').on(t.artistId)]
+  () => []
 );
 
 export const ignoredFeaturingArtists = sqliteTable(
@@ -639,7 +638,7 @@ export const ignoredFeaturingArtists = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_ignored_featuring_artists_artist_id').on(t.artistId)]
+  () => []
 );
 
 export const ignoredDuplicateMetadata = sqliteTable(
@@ -679,8 +678,7 @@ export const artworksSongs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.songId, table.artworkId] }),
-    index('idx_artworks_songs_artwork_id').on(table.artworkId),
-    index('idx_artworks_songs_song_id').on(table.songId)
+    index('idx_artworks_songs_artwork_id').on(table.artworkId)
   ]
 );
 
@@ -704,8 +702,7 @@ export const artistsArtworks = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.artistId, table.artworkId] }),
-    index('idx_artists_artworks_artwork_id').on(table.artworkId),
-    index('idx_artists_artworks_artist_id').on(table.artistId)
+    index('idx_artists_artworks_artwork_id').on(table.artworkId)
   ]
 );
 
@@ -729,8 +726,7 @@ export const albumsArtworks = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.artworkId] }),
-    index('idx_albums_artworks_artwork_id').on(table.artworkId),
-    index('idx_albums_artworks_album_id').on(table.albumId)
+    index('idx_albums_artworks_artwork_id').on(table.artworkId)
   ]
 );
 
@@ -751,8 +747,7 @@ export const artistsSongs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.songId, table.artistId] }),
-    index('idx_artists_songs_artist_id').on(table.artistId),
-    index('idx_artists_songs_song_id').on(table.songId)
+    index('idx_artists_songs_artist_id').on(table.artistId)
   ]
 );
 
@@ -773,7 +768,6 @@ export const albumsSongs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.songId] }),
-    index('idx_album_songs_album_id').on(table.albumId),
     index('idx_album_songs_song_id').on(table.songId)
   ]
 );
@@ -795,7 +789,6 @@ export const genresSongs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.genreId, table.songId] }),
-    index('idx_genres_songs_genre_id').on(table.genreId),
     index('idx_genres_songs_song_id').on(table.songId)
   ]
 );
@@ -820,7 +813,6 @@ export const artworksGenres = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.genreId, table.artworkId] }),
-    index('idx_artworks_genres_genre_id').on(table.genreId),
     index('idx_artworks_genres_artwork_id').on(table.artworkId)
   ]
 );
@@ -842,7 +834,6 @@ export const playlistsSongs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.playlistId, table.songId] }),
-    index('idx_playlists_songs_playlist_id').on(table.playlistId),
     index('idx_playlists_songs_song_id').on(table.songId)
   ]
 );
@@ -867,7 +858,6 @@ export const artworksPlaylists = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.playlistId, table.artworkId] }),
-    index('idx_artworks_playlists_playlist_id').on(table.playlistId),
     index('idx_artworks_playlists_artwork_id').on(table.artworkId)
   ]
 );
@@ -892,7 +882,6 @@ export const albumsArtists = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.artistId] }),
-    index('idx_albums_artists_album_id').on(table.albumId),
     index('idx_albums_artists_artist_id').on(table.artistId)
   ]
 );
@@ -1214,7 +1203,7 @@ export const waveforms = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_waveforms_song_id').on(t.songId)]
+  () => []
 );
 
 export const lyrics = sqliteTable(
@@ -1232,7 +1221,7 @@ export const lyrics = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_lyrics_song_id').on(t.songId)]
+  () => []
 );
 
 export const replayGain = sqliteTable(
@@ -1251,7 +1240,7 @@ export const replayGain = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [index('idx_replay_gain_song_id').on(t.songId)]
+  () => []
 );
 
 export const waveformsRelations = relations(waveforms, ({ one }) => ({

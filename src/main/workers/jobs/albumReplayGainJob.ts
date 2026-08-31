@@ -185,7 +185,6 @@ export class AlbumReplayGainJob implements Job {
 
       // Snapshot validation timestamp to guard against stale album updates (Constraint #6)
       const snapshotMap = new Map(rgRows.map((r) => [r.songId, r.updatedAt.getTime()]));
-
       let committed = false;
       try {
         await db.transaction(async (trx) => {
@@ -248,10 +247,15 @@ export class AlbumReplayGainJob implements Job {
         });
       } catch (trxErr) {
         logger.warn(`[AlbumReplayGainJob] Transaction rolled back for album ${this.albumId}:`, { trxErr });
-        committed = false;
+        // Re-throw so the outer catch propagates to JobScheduler for backoff/retry.
+        // Previously this was swallowed (committed = false; return;), silently marking
+        // the job as completed and preventing retry on SQLITE_BUSY or concurrency conflicts.
+        throw trxErr;
       }
 
       if (!committed) {
+        // Cancelled or aborted without error (stale snapshot, row count mismatch).
+        // Return silently — not a retriable failure, just a no-op.
         return;
       }
 

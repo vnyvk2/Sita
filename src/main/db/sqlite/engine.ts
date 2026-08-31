@@ -13,13 +13,13 @@ import { BASELINE_DDL, SCHEMA_VERSION } from './ddl';
 /**
  * SQLite engine (node:sqlite) for Nora's main process.
  *
- * Durability posture (sqlite-poc RESULTS.md §3b / b14): WAL + synchronous=FULL —
- * commits survive power loss; measured cost is acceptable for Nora's batch-commit
- * write pattern. busy_timeout covers straggler writers during close windows.
+ * Durability posture (sqlite-poc RESULTS.md §3b / b14): WAL + synchronous=NORMAL —
+ * commits survive power loss (at worst the last uncommitted WAL frame is lost; no
+ * corruption). busy_timeout covers straggler writers during close windows.
  */
 export const SQLITE_PRAGMAS = [
   'PRAGMA journal_mode = WAL;',
-  'PRAGMA synchronous = FULL;',
+  'PRAGMA synchronous = NORMAL;',
   'PRAGMA busy_timeout = 5000;',
   'PRAGMA foreign_keys = ON;',
   'PRAGMA temp_store = MEMORY;',

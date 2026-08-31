@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS ${name} (
   PRIMARY KEY (${pkCols[0]}, ${pkCols[1]})
 );
 CREATE INDEX IF NOT EXISTS idx_${name}_${colB} ON ${name} (${colB});
-CREATE INDEX IF NOT EXISTS idx_${name}_${colA} ON ${name} (${colA});
 `;
 
 export const BASELINE_TABLE_DDL = `
@@ -69,7 +68,6 @@ CREATE TABLE IF NOT EXISTS music_folders (
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
 CREATE INDEX IF NOT EXISTS idx_parent_id ON music_folders (parent_id);
-CREATE INDEX IF NOT EXISTS idx_music_folders_path ON music_folders (path);
 CREATE INDEX IF NOT EXISTS idx_music_folders_is_blacklisted ON music_folders (is_blacklisted);
 CREATE INDEX IF NOT EXISTS idx_music_folders_parent_path ON music_folders (parent_id, path);
 
@@ -239,7 +237,6 @@ CREATE TABLE IF NOT EXISTS smart_playlist_rules (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_smart_playlist_rules_playlist_id ON smart_playlist_rules (playlist_id);
 
 CREATE TABLE IF NOT EXISTS play_events (
   id INTEGER PRIMARY KEY,
@@ -399,7 +396,6 @@ CREATE TABLE IF NOT EXISTS ignored_artists (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_ignored_artists_artist_id ON ignored_artists (artist_id);
 
 CREATE TABLE IF NOT EXISTS ignored_featuring_artists (
   id INTEGER PRIMARY KEY,
@@ -407,7 +403,6 @@ CREATE TABLE IF NOT EXISTS ignored_featuring_artists (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_ignored_featuring_artists_artist_id ON ignored_featuring_artists (artist_id);
 
 CREATE TABLE IF NOT EXISTS ignored_duplicate_metadata (
   id INTEGER PRIMARY KEY,
@@ -454,7 +449,6 @@ CREATE TABLE IF NOT EXISTS waveforms (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_waveforms_song_id ON waveforms (song_id);
 
 CREATE TABLE IF NOT EXISTS lyrics (
   id INTEGER PRIMARY KEY,
@@ -466,7 +460,6 @@ CREATE TABLE IF NOT EXISTS lyrics (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_lyrics_song_id ON lyrics (song_id);
 
 CREATE TABLE IF NOT EXISTS replay_gain (
   id INTEGER PRIMARY KEY,
@@ -479,7 +472,6 @@ CREATE TABLE IF NOT EXISTS replay_gain (
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
-CREATE INDEX IF NOT EXISTS idx_replay_gain_song_id ON replay_gain (song_id);
 
 CREATE TABLE IF NOT EXISTS operation_journal (
   id INTEGER PRIMARY KEY,

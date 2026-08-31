@@ -285,9 +285,11 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     const emitSpy = vi.spyOn(scheduler, 'emit');
     const job = new AlbumReplayGainJob(1, scheduler);
-    await job.execute();
 
-    // Verify event was NOT emitted because optimistic concurrency update conflict rolled back
+    // Optimistic concurrency conflict now throws (propagates to JobScheduler for retry)
+    await expect(job.execute()).rejects.toThrow('Optimistic concurrency conflict on song 102');
+
+    // Verify event was NOT emitted because the error was thrown before emission
     expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
   });
 

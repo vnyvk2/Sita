@@ -196,9 +196,9 @@ describe('Gate D4.1: Real PGlite Concurrency Stress & Transaction Rollback', () 
         });
       }) as unknown as typeof testDb.transaction;
 
-      // 4. Execute AlbumReplayGainJob (first run should detect race, abort, and roll back)
+      // 4. Execute AlbumReplayGainJob (first run should detect race, throw, and roll back)
       const job = new AlbumReplayGainJob(album.id, eventBus);
-      await job.execute();
+      await expect(job.execute()).rejects.toThrow('Optimistic concurrency conflict');
 
       // Restore original transaction method
       testDb.transaction = originalTransaction;
