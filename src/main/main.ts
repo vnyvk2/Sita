@@ -50,8 +50,6 @@ if (memProfiler.enabled) {
   });
 }
 
-import { version, appPreferences } from '../../package.json';
-import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import {
   COMPACT_MINI_PLAYER_HEIGHT,
   COMPACT_MINI_PLAYER_MIN_WIDTH,
@@ -60,6 +58,9 @@ import {
   MINI_PLAYER_MIN_SIZE_X,
   MINI_PLAYER_MIN_SIZE_Y
 } from '@common/miniPlayerConstants';
+
+import { version, appPreferences } from '../../package.json';
+import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import roundTo from '../common/roundTo';
 import manageLastFmAuth from './auth/manageLastFmAuth';
 import changeAppTheme from './core/changeAppTheme';
@@ -70,7 +71,6 @@ import { recoverLibraryAssets } from './core/recovery';
 import { closeDatabaseInstance, isDatabaseStubbed } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
-import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
@@ -83,8 +83,9 @@ import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
-import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
+import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import memProfiler from './utils/memProfiler';
+import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
 
 // / / / / / / / CONSTANTS / / / / / / / / /
 const DEFAULT_APP_PROTOCOL = 'nora';
@@ -128,6 +129,24 @@ const DEFAULT_SAVE_DIALOG_OPTIONS: SaveDialogOptions = {
 
 // / / / / / / VARIABLES / / / / / / /
 export let mainWindow: BrowserWindow;
+
+interface EventEmitterLike {
+  on(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+export function setMainWindowForTests(window: unknown) {
+  mainWindow = window as BrowserWindow;
+  if (window && typeof window === 'object' && 'on' in window) {
+    const emitter = window as EventEmitterLike;
+    if (typeof emitter.on === 'function') {
+      emitter.on('moved', manageAppMoveEvent);
+      emitter.on('resized', () => {
+        manageAppMoveEvent();
+        manageAppResizeEvent();
+      });
+    }
+  }
+}
 let tray: Tray;
 let playerType: PlayerTypes = 'normal';
 let isChangingPlayerType = false;
@@ -273,8 +292,7 @@ const installExtensions = async () => {
     }
 
     const REACT_DEVELOPER_TOOLS =
-      devtoolsModule.REACT_DEVELOPER_TOOLS ??
-      devtoolsModule.default?.REACT_DEVELOPER_TOOLS;
+      devtoolsModule.REACT_DEVELOPER_TOOLS ?? devtoolsModule.default?.REACT_DEVELOPER_TOOLS;
 
     if (!REACT_DEVELOPER_TOOLS) {
       throw new TypeError('electron-devtools-installer does not expose REACT_DEVELOPER_TOOLS');
@@ -870,8 +888,8 @@ function manageAppMoveEvent() {
   if (isChangingPlayerType) return;
 
   // Windows teleports minimized windows to (-32000, -32000) which Electron reports
-  // through the 'moved' event. Never treat that as a user-chosen position.
-  if (mainWindow.isMinimized()) return;
+  // through the 'moved' event. Never treat that or maximized positions as a user-chosen position.
+  if (mainWindow.isMinimized() || mainWindow.isMaximized()) return;
 
   const [x, y] = mainWindow.getPosition();
   const [width, height] = mainWindow.getSize();
@@ -923,8 +941,8 @@ function manageAppMoveEvent() {
 function manageAppResizeEvent() {
   if (isChangingPlayerType) return;
 
-  // Avoid persisting sizes reported while Windows has the window minimized
-  if (mainWindow.isMinimized()) return;
+  // Avoid persisting sizes reported while Windows has the window minimized or maximized
+  if (mainWindow.isMinimized() || mainWindow.isMaximized()) return;
 
   const [width, height] = mainWindow.getSize();
   logger.debug(`User resized the player`, {
@@ -939,13 +957,25 @@ function manageAppResizeEvent() {
   if (playerType === 'mini') {
     if (currentMiniPlayerMode === 'compact') {
       // In Compact Mode, only save width so standard mode height is preserved
-      saveUserSettings({ miniPlayerWidth: width }).catch((error) =>
+      const clampedWidth = Math.min(
+        Math.max(width, COMPACT_MINI_PLAYER_MIN_WIDTH),
+        MINI_PLAYER_MAX_SIZE_X
+      );
+      saveUserSettings({ miniPlayerWidth: clampedWidth }).catch((error) =>
         logger.error('Failed to persist mini player size', { error })
       );
     } else {
-      savedStandardHeight = height;
-      saveUserSettings({ miniPlayerWidth: width, miniPlayerHeight: height }).catch((error) =>
-        logger.error('Failed to persist mini player size', { error })
+      const clampedWidth = Math.min(
+        Math.max(width, currentMiniPlayerMinWidth),
+        MINI_PLAYER_MAX_SIZE_X
+      );
+      const clampedHeight = Math.min(
+        Math.max(height, currentMiniPlayerMinHeight),
+        MINI_PLAYER_MAX_SIZE_Y
+      );
+      savedStandardHeight = clampedHeight;
+      saveUserSettings({ miniPlayerWidth: clampedWidth, miniPlayerHeight: clampedHeight }).catch(
+        (error) => logger.error('Failed to persist mini player size', { error })
       );
     }
   } else if (playerType === 'normal') {
@@ -1203,88 +1233,113 @@ export function setMiniPlayerMinimumBounds(minWidth: number, minHeight: number) 
   }
 }
 
-export async function setMiniPlayerMode(mode: 'standard' | 'compact') {
-  if (!mainWindow || playerType !== 'mini') return { mode };
-  logger.debug('Switching mini player mode', { mode, currentMiniPlayerMode });
-  currentMiniPlayerMode = mode;
+let miniPlayerModeTransitionPromise: Promise<{ mode: 'standard' | 'compact' }> = Promise.resolve({
+  mode: 'standard'
+});
 
-  const [currentX, currentY] = mainWindow.getPosition();
-  const [currentW, currentH] = mainWindow.getSize();
+export function setMiniPlayerMode(
+  mode: 'standard' | 'compact'
+): Promise<{ mode: 'standard' | 'compact' }> {
+  const runTransition = async () => {
+    if (!mainWindow || playerType !== 'mini') return { mode };
+    logger.debug('Switching mini player mode', { mode, currentMiniPlayerMode });
+    currentMiniPlayerMode = mode;
 
-  // Resolve resting unexpanded origin before collapsing geometry state
-  const restoreX = compactX ?? currentX;
-  const restoreY = compactY ?? currentY;
+    const [currentX, currentY] = mainWindow.getPosition();
+    const [currentW, currentH] = mainWindow.getSize();
 
-  if (mode === 'compact') {
-    // 1. If currently in standard mode, remember the standard height
-    if (!isQueueExpanded && currentH > COMPACT_MINI_PLAYER_HEIGHT) {
-      savedStandardHeight = currentH;
-      await saveUserSettings({ miniPlayerHeight: currentH });
-    } else if (
-      isQueueExpanded &&
-      compactHeight !== null &&
-      compactHeight > COMPACT_MINI_PLAYER_HEIGHT
-    ) {
-      savedStandardHeight = compactHeight;
-      await saveUserSettings({ miniPlayerHeight: compactHeight });
+    // Resolve resting unexpanded origin before collapsing geometry state
+    const restoreX = compactX ?? currentX;
+    const restoreY = compactY ?? currentY;
+
+    if (mode === 'compact') {
+      // 1. If currently in standard mode, remember the standard height
+      if (!isQueueExpanded && currentH > COMPACT_MINI_PLAYER_HEIGHT) {
+        savedStandardHeight = currentH;
+        await saveUserSettings({ miniPlayerHeight: currentH });
+      } else if (
+        isQueueExpanded &&
+        compactHeight !== null &&
+        compactHeight > COMPACT_MINI_PLAYER_HEIGHT
+      ) {
+        savedStandardHeight = compactHeight;
+        await saveUserSettings({ miniPlayerHeight: compactHeight });
+      }
+
+      // 2. Collapse any open spatial extension geometry state
+      isQueueExpanded = false;
+      compactHeight = null;
+      compactY = null;
+      compactX = null;
+      expandedHeight = null;
+      expandedDirection = null;
+
+      // 3. Arm programmatic guard before applying constraints or setting bounds
+      if (restoreX !== currentX || restoreY !== currentY) {
+        setProgrammaticMoveTarget(restoreX, restoreY);
+      }
+
+      // 4. Constrain native window size to compact constraints
+      applyMiniPlayerModeConstraints('compact');
+
+      // 5. Atomically set bounds
+      const targetWidth = Math.min(
+        Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH),
+        MINI_PLAYER_MAX_SIZE_X
+      );
+      setMiniPlayerBoundsProgrammatically({
+        x: restoreX,
+        y: restoreY,
+        width: targetWidth,
+        height: COMPACT_MINI_PLAYER_HEIGHT
+      });
+    } else {
+      // Standard Mode:
+      // 1. Collapse any open spatial extension geometry state
+      isQueueExpanded = false;
+      compactHeight = null;
+      compactY = null;
+      compactX = null;
+      expandedHeight = null;
+      expandedDirection = null;
+
+      // 2. Restore standard height
+      const targetHeight = Math.min(
+        Math.max(savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight),
+        MINI_PLAYER_MAX_SIZE_Y
+      );
+      const targetWidth = Math.min(
+        Math.max(currentW, currentMiniPlayerMinWidth),
+        MINI_PLAYER_MAX_SIZE_X
+      );
+
+      // 3. Arm programmatic guard before applying constraints or setting bounds
+      if (restoreX !== currentX || restoreY !== currentY) {
+        setProgrammaticMoveTarget(restoreX, restoreY);
+      }
+
+      // 4. Restore standard window constraints
+      applyMiniPlayerModeConstraints('standard');
+
+      // 5. Atomically set bounds
+      setMiniPlayerBoundsProgrammatically({
+        x: restoreX,
+        y: restoreY,
+        width: targetWidth,
+        height: targetHeight
+      });
     }
 
-    // 2. Collapse any open spatial extension geometry state
-    isQueueExpanded = false;
-    compactHeight = null;
-    compactY = null;
-    compactX = null;
-    expandedHeight = null;
-    expandedDirection = null;
+    clearProgrammaticMoveTarget();
+    await saveUserSettings({ miniPlayerMode: mode });
+    return { mode };
+  };
 
-    // 3. Arm programmatic guard before applying constraints or setting bounds
-    setProgrammaticMoveTarget(restoreX, restoreY);
-
-    // 4. Constrain native window size to compact constraints
-    applyMiniPlayerModeConstraints('compact');
-
-    // 5. Atomically set bounds
-    const targetWidth = Math.max(currentW, COMPACT_MINI_PLAYER_MIN_WIDTH);
-    setMiniPlayerBoundsProgrammatically({
-      x: restoreX,
-      y: restoreY,
-      width: targetWidth,
-      height: COMPACT_MINI_PLAYER_HEIGHT
-    });
-  } else {
-    // Standard Mode:
-    // 1. Collapse any open spatial extension geometry state
-    isQueueExpanded = false;
-    compactHeight = null;
-    compactY = null;
-    compactX = null;
-    expandedHeight = null;
-    expandedDirection = null;
-
-    // 2. Restore standard height
-    const targetHeight = Math.max(
-      savedStandardHeight || MINI_PLAYER_DEFAULT_SIZE_Y,
-      currentMiniPlayerMinHeight
-    );
-    const targetWidth = Math.max(currentW, currentMiniPlayerMinWidth);
-
-    // 3. Arm programmatic guard before applying constraints or setting bounds
-    setProgrammaticMoveTarget(restoreX, restoreY);
-
-    // 4. Restore standard window constraints
-    applyMiniPlayerModeConstraints('standard');
-
-    // 5. Atomically set bounds
-    setMiniPlayerBoundsProgrammatically({
-      x: restoreX,
-      y: restoreY,
-      width: targetWidth,
-      height: targetHeight
-    });
-  }
-
-  await saveUserSettings({ miniPlayerMode: mode });
-  return { mode };
+  miniPlayerModeTransitionPromise = miniPlayerModeTransitionPromise.then(
+    runTransition,
+    runTransition
+  );
+  return miniPlayerModeTransitionPromise;
 }
 
 function getDefaultMiniPlayerBounds(targetWidth: number, targetHeight: number) {
@@ -1303,16 +1358,24 @@ function getDefaultMiniPlayerBounds(targetWidth: number, targetHeight: number) {
 export async function resetMiniPlayerToDefault() {
   if (mainWindow && playerType === 'mini') {
     logger.debug('Resetting mini player to default position and dimensions');
-    const targetWidth = Math.max(
-      MINI_PLAYER_DEFAULT_SIZE_X,
-      currentMiniPlayerMode === 'compact'
-        ? COMPACT_MINI_PLAYER_MIN_WIDTH
-        : currentMiniPlayerMinWidth
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+
+    const targetWidth = Math.min(
+      Math.max(
+        MINI_PLAYER_DEFAULT_SIZE_X,
+        currentMiniPlayerMode === 'compact'
+          ? COMPACT_MINI_PLAYER_MIN_WIDTH
+          : currentMiniPlayerMinWidth
+      ),
+      MINI_PLAYER_MAX_SIZE_X
     );
     const targetHeight =
       currentMiniPlayerMode === 'compact'
         ? COMPACT_MINI_PLAYER_HEIGHT
-        : Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight);
+        : Math.min(
+            Math.max(MINI_PLAYER_DEFAULT_SIZE_Y, currentMiniPlayerMinHeight),
+            MINI_PLAYER_MAX_SIZE_Y
+          );
 
     const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
 
@@ -1368,6 +1431,7 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
 
       if (type === 'mini') {
         if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
+        if (mainWindow.isMaximized()) mainWindow.unmaximize();
 
         currentMiniPlayerMode = miniPlayerMode || 'standard';
         savedStandardHeight = miniPlayerHeight || MINI_PLAYER_DEFAULT_SIZE_Y;
@@ -1375,23 +1439,33 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         mainWindow.setMaximizable(false);
         mainWindow.setAlwaysOnTop(isMiniPlayerAlwaysOnTop);
 
-        let targetWidth = miniPlayerWidth
-          ? Math.max(miniPlayerWidth, currentMiniPlayerMinWidth)
-          : MINI_PLAYER_DEFAULT_SIZE_X;
+        let targetWidth = Math.min(
+          Math.max(
+            miniPlayerWidth || MINI_PLAYER_DEFAULT_SIZE_X,
+            currentMiniPlayerMode === 'compact'
+              ? COMPACT_MINI_PLAYER_MIN_WIDTH
+              : currentMiniPlayerMinWidth
+          ),
+          MINI_PLAYER_MAX_SIZE_X
+        );
 
         let targetHeight: number;
         if (currentMiniPlayerMode === 'compact') {
-          targetWidth = Math.max(targetWidth, COMPACT_MINI_PLAYER_MIN_WIDTH);
+          targetWidth = Math.min(
+            Math.max(targetWidth, COMPACT_MINI_PLAYER_MIN_WIDTH),
+            MINI_PLAYER_MAX_SIZE_X
+          );
           targetHeight = COMPACT_MINI_PLAYER_HEIGHT;
           mainWindow.setMinimumSize(COMPACT_MINI_PLAYER_MIN_WIDTH, COMPACT_MINI_PLAYER_HEIGHT);
           mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, COMPACT_MINI_PLAYER_HEIGHT);
         } else {
-          targetHeight = Math.max(savedStandardHeight, currentMiniPlayerMinHeight);
+          targetHeight = Math.min(
+            Math.max(savedStandardHeight, currentMiniPlayerMinHeight),
+            MINI_PLAYER_MAX_SIZE_Y
+          );
           mainWindow.setMaximumSize(MINI_PLAYER_MAX_SIZE_X, MINI_PLAYER_MAX_SIZE_Y);
           mainWindow.setMinimumSize(currentMiniPlayerMinWidth, currentMiniPlayerMinHeight);
         }
-
-        mainWindow.setSize(targetWidth, targetHeight, true);
 
         // Reset queue expansion state when switching to mini player
         isQueueExpanded = false;
@@ -1402,9 +1476,12 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         expandedDirection = null;
         clearProgrammaticMoveTarget();
 
+        let targetX: number;
+        let targetY: number;
+
         if (isValidPersistedPosition(miniPlayerX, miniPlayerY, targetWidth, targetHeight)) {
-          moveWindowProgrammatically(miniPlayerX as number, miniPlayerY as number, true);
-          ensureWindowIsVisible(mainWindow);
+          targetX = miniPlayerX as number;
+          targetY = miniPlayerY as number;
         } else {
           // First launch, or the saved position was corrupted/off-screen (e.g. the
           // Windows minimized-position leak or a disconnected monitor): restore to
@@ -1417,13 +1494,23 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
           }
           // Smart bottom-right screen anchoring on first launch
           const defaultBounds = getDefaultMiniPlayerBounds(targetWidth, targetHeight);
-          compactX = defaultBounds.x;
-          compactY = defaultBounds.y;
-          moveWindowProgrammatically(defaultBounds.x, defaultBounds.y, true);
-          await saveUserSettings({ miniPlayerX: defaultBounds.x, miniPlayerY: defaultBounds.y }).catch(
-            (error) => logger.error('Failed to persist default mini player position', { error })
+          targetX = defaultBounds.x;
+          targetY = defaultBounds.y;
+          await saveUserSettings({ miniPlayerX: targetX, miniPlayerY: targetY }).catch((error) =>
+            logger.error('Failed to persist default mini player position', { error })
           );
         }
+
+        compactX = targetX;
+        compactY = targetY;
+
+        setMiniPlayerBoundsProgrammatically({
+          x: targetX,
+          y: targetY,
+          width: targetWidth,
+          height: targetHeight
+        });
+        ensureWindowIsVisible(mainWindow);
         mainWindow.setAspectRatio(MINI_PLAYER_ASPECT_RATIO);
         playerType = 'mini';
       } else if (type === 'normal') {
@@ -1441,12 +1528,7 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         } else mainWindow.setSize(MAIN_WINDOW_DEFAULT_SIZE_X, MAIN_WINDOW_DEFAULT_SIZE_Y, true);
 
         if (
-          isValidPersistedPosition(
-            mainWindowX,
-            mainWindowY,
-            normalTargetWidth,
-            normalTargetHeight
-          )
+          isValidPersistedPosition(mainWindowX, mainWindowY, normalTargetWidth, normalTargetHeight)
         ) {
           moveWindowProgrammatically(mainWindowX as number, mainWindowY as number, true);
           ensureWindowIsVisible(mainWindow);

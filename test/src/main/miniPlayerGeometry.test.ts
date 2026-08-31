@@ -11,9 +11,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Track calls and mock state
 let persistedUserSettings: Record<string, unknown> = {};
-const mockSaveUserSettings = vi.fn(async (settings: Record<string, unknown>) => {
+const mockSaveUserSettings = vi.fn((settings: Record<string, unknown>) => {
   persistedUserSettings = { ...persistedUserSettings, ...settings };
-  return persistedUserSettings;
+  return Promise.resolve(persistedUserSettings);
 });
 
 const mockGetUserSettings = vi.fn(async () => ({
@@ -33,7 +33,7 @@ const mockGetUserSettings = vi.fn(async () => ({
 // Mock main module dependencies
 vi.mock('@main/db/queries/settings', () => ({
   getUserSettings: () => mockGetUserSettings(),
-  saveUserSettings: (s: any) => mockSaveUserSettings(s)
+  saveUserSettings: (s: Record<string, unknown>) => mockSaveUserSettings(s)
 }));
 
 vi.mock('@main/db/queries/songs', () => ({
@@ -68,7 +68,21 @@ vi.mock('@main/core/manageTaskbarPlaybackButtonControls', () => ({
 }));
 
 vi.mock('@main/db/db', () => ({
+  db: {
+    transaction: vi.fn(async (cb: (tx: { select: () => unknown }) => Promise<unknown>) =>
+      cb({
+        select: vi.fn().mockReturnThis(),
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([])
+      })
+    )
+  } as unknown as typeof import('@main/db/db').db,
+  isDatabaseStubbed: false,
   closeDatabaseInstance: vi.fn()
+}));
+
+vi.mock('@main/updateSong/updateSongId3Tags', () => ({
+  restorePersistedPendingWrites: vi.fn().mockResolvedValue(undefined)
 }));
 
 describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () => {
@@ -81,6 +95,13 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
+    isMaximized: vi.fn(() => false),
+    unmaximize: vi.fn(() => {
+      mockWindow.isMaximized.mockReturnValue(false);
+      eventCallSequence.push('unmaximize');
+    }),
+    isFullScreen: vi.fn(() => false),
+    fullScreen: false,
     getPosition: vi.fn(() => [currentBounds.x, currentBounds.y]),
     getSize: vi.fn(() => [currentBounds.width, currentBounds.height]),
     getBounds: vi.fn(() => ({ ...currentBounds })),
@@ -150,7 +171,9 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
 
     mainModule = await import('../../../src/main/main');
     // Attach mocked window
-    (mainModule as any).mainWindow = mockWindow;
+    mainModule.setMainWindowForTests(mockWindow);
+    await mainModule.changePlayerType('normal');
+    mockWindow.isMaximized.mockReturnValue(false);
   });
 
   describe('F7: Dynamic Minimum Bounds Validation and Rejection', () => {
@@ -185,7 +208,8 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
       expect(mockWindow.setMinimumSize).not.toHaveBeenCalled();
     });
 
-    it('accepts valid dynamic bounds meeting canonical constraints', () => {
+    it('accepts valid dynamic bounds meeting canonical constraints', async () => {
+      await mainModule.changePlayerType('mini');
       mockWindow.setMinimumSize.mockClear();
 
       mainModule.setMiniPlayerMinimumBounds(300, 150);
@@ -210,7 +234,9 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
       expect(persistedUserSettings.miniPlayerY).toBe(500);
       // Window bounds must settle at compact dimensions
       expect(currentBounds.height).toBe(COMPACT_MINI_PLAYER_HEIGHT);
-      expect(currentBounds.width).toBe(Math.max(MINI_PLAYER_DEFAULT_SIZE_X, COMPACT_MINI_PLAYER_MIN_WIDTH));
+      expect(currentBounds.width).toBe(
+        Math.max(MINI_PLAYER_DEFAULT_SIZE_X, COMPACT_MINI_PLAYER_MIN_WIDTH)
+      );
     });
 
     it('handles rapid back-to-back mode transitions without corrupting geometry or swallowing subsequent user movement', async () => {
@@ -247,12 +273,77 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
       // Expand lyrics
       const expandResult = mainModule.expandMiniPlayer(true, 0, COMPACT_LYRICS_EXTENSION_HEIGHT);
       expect(expandResult.isExpanded).toBe(true);
-      expect(expandResult.height).toBe(COMPACT_MINI_PLAYER_HEIGHT + COMPACT_LYRICS_EXTENSION_HEIGHT);
+      expect(expandResult.height).toBe(
+        COMPACT_MINI_PLAYER_HEIGHT + COMPACT_LYRICS_EXTENSION_HEIGHT
+      );
 
       // Collapse lyrics
       const collapseResult = mainModule.expandMiniPlayer(false);
       expect(collapseResult.isExpanded).toBe(false);
       expect(collapseResult.height).toBe(COMPACT_MINI_PLAYER_HEIGHT);
+    });
+  });
+
+  describe('Mini Player Maximized State & Upper Bound Clamping Safety', () => {
+    it('unmaximizes the window and applies smart bottom-right default bounds on first launch / reset', async () => {
+      // Simulate app was maximized in normal mode
+      mockWindow.isMaximized.mockReturnValue(true);
+      persistedUserSettings = {
+        miniPlayerX: null,
+        miniPlayerY: null,
+        miniPlayerWidth: null,
+        miniPlayerHeight: null
+      };
+
+      await mainModule.changePlayerType('mini');
+
+      // Must unmaximize window
+      expect(mockWindow.unmaximize).toHaveBeenCalled();
+      expect(eventCallSequence).toContain('unmaximize');
+
+      // Must set bounds to canonical default mini player dimensions clamped to max limits
+      expect(currentBounds.width).toBe(MINI_PLAYER_DEFAULT_SIZE_X);
+      expect(currentBounds.height).toBe(MINI_PLAYER_DEFAULT_SIZE_Y);
+      // Position must be anchored to bottom-right of screen (e.g. not 0, 0)
+      expect(currentBounds.x).toBeGreaterThan(0);
+      expect(currentBounds.y).toBeGreaterThan(0);
+    });
+
+    it('strictly clamps corrupted / huge persisted dimensions to canonical maximums', async () => {
+      // Corrupted huge dimensions in DB (e.g. from screen resolution leak)
+      persistedUserSettings = {
+        miniPlayerX: 100,
+        miniPlayerY: 100,
+        miniPlayerWidth: 1920,
+        miniPlayerHeight: 1080,
+        miniPlayerMode: 'standard'
+      };
+
+      await mainModule.changePlayerType('mini');
+
+      // Clamped to MINI_PLAYER_MAX_SIZE_X (540) and MINI_PLAYER_MAX_SIZE_Y (405)
+      expect(currentBounds.width).toBeLessThanOrEqual(540);
+      expect(currentBounds.height).toBeLessThanOrEqual(405);
+    });
+
+    it('ignores move and resize events when window is maximized to prevent settings corruption', async () => {
+      await mainModule.changePlayerType('mini');
+      mockSaveUserSettings.mockClear();
+
+      // Window gets maximized by OS
+      mockWindow.isMaximized.mockReturnValue(true);
+      currentBounds.x = 0;
+      currentBounds.y = 0;
+      currentBounds.width = 1920;
+      currentBounds.height = 1080;
+
+      moveEventHandler?.();
+      resizeEventHandler?.();
+
+      // Settings must NOT be updated with maximized bounds
+      expect(mockSaveUserSettings).not.toHaveBeenCalled();
+      expect(persistedUserSettings.miniPlayerWidth).not.toBe(1920);
+      expect(persistedUserSettings.miniPlayerHeight).not.toBe(1080);
     });
   });
 });
