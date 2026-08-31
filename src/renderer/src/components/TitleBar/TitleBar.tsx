@@ -42,18 +42,8 @@ const TitleBar = memo(() => {
               alt="Nora Logo"
             />
           </span>
-          <span className="app-name-container">
-            <span>
-              Sita
-              <sup
-                className={`app-version text-font-color-highlight dark:text-dark-font-color-highlight ml-1 cursor-pointer text-[0.6rem] font-semibold uppercase ${
-                  bodyBackgroundImage && 'text-dark-font-color-highlight!'
-                } `}
-                title={`v${version}`}
-              >
-                {appReleasePhase}
-              </sup>
-            </span>
+          <span className="app-name-container" title={`Sita v${version}`}>
+            <span className="font-medium tracking-wide">Sita</span>
           </span>
         </div>
         {!isFullScreenPlayer ? <NavigationControlsContainer /> : <div />}
