@@ -1,7 +1,6 @@
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useEffect } from 'react';
 
-import { useEffectiveAppearance } from './useEffectiveAppearance';
 import { type ThemePreset } from '../../../common/themeRegistry';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
@@ -12,6 +11,7 @@ import {
   THEME_TOKEN_KEYS,
   type DynamicThemeMode
 } from '../utils/themeResolver';
+import { useEffectiveAppearance } from './useEffectiveAppearance';
 
 const resetStyles = () => {
   const root = document.getElementById('root');
@@ -25,9 +25,9 @@ const resetStyles = () => {
 };
 
 /**
- * Efficiently applies resolved dynamic tokens to #root using diff-based writes.
- * Reads inline custom-property values on #root and writes only when that value differs,
- * while removing tokens that are no longer active.
+ * Efficiently applies resolved dynamic tokens to #root using diff-based writes. Reads inline
+ * custom-property values on #root and writes only when that value differs, while removing tokens
+ * that are no longer active.
  */
 const applyThemeTokens = (
   palette?: NodeVibrantPalette,
@@ -82,9 +82,9 @@ export interface UseDynamicThemeReturn {
 /**
  * Hook for managing dynamic themes, background images, and dark mode.
  *
- * Integrates with Dynamic Theme v2 engine (semanticPalette & themeResolver)
- * with diff-based CSS variable writes to avoid redundant property updates
- * and eliminate unnecessary remove-and-reapply cycles.
+ * Integrates with Dynamic Theme v2 engine (semanticPalette & themeResolver) with diff-based CSS
+ * variable writes to avoid redundant property updates and eliminate unnecessary remove-and-reapply
+ * cycles.
  */
 export function useDynamicTheme(): UseDynamicThemeReturn {
   const themePreset = useStore(
@@ -94,7 +94,8 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
 
   const dynamicThemeMode = useStore(
     store,
-    (state) => (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
+    (state) =>
+      (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
   );
 
   const dynamicThemeIntensity = useStore(
@@ -110,11 +111,7 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
   const currentSongPaletteData = useStore(store, (state) => state.currentSongData?.paletteData);
 
   const setDynamicThemesFromSongPalette = useCallback(
-    (
-      palette?: NodeVibrantPalette,
-      customMode?: DynamicThemeMode,
-      customIntensity?: number
-    ) => {
+    (palette?: NodeVibrantPalette, customMode?: DynamicThemeMode, customIntensity?: number) => {
       const mode = customMode ?? dynamicThemeMode;
       const intensity = customIntensity ?? dynamicThemeIntensity;
       applyThemeTokens(palette, themePreset, mode, intensity);
@@ -176,6 +173,36 @@ export function useDynamicTheme(): UseDynamicThemeReturn {
       document.documentElement.removeAttribute('data-theme');
     }
   }, [themePreset]);
+
+  const customThemeOverrides = useStore(
+    store,
+    (state) => state.localStorage.preferences?.customThemeOverrides
+  );
+
+  // Monitor customThemeOverrides and apply active preset overrides to #root with diffing
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+
+    const presetOverrides = customThemeOverrides?.[themePreset] ?? {};
+    const overrideKeySet = new Set(Object.keys(presetOverrides));
+
+    // Write or update active custom token overrides
+    for (const [token, val] of Object.entries(presetOverrides)) {
+      if (val && root.style.getPropertyValue(token) !== val) {
+        root.style.setProperty(token, val, 'important');
+      }
+    }
+
+    // Clean up override tokens that are no longer present
+    if (!isImageBasedDynamicThemesEnabled) {
+      for (const token of THEME_TOKEN_KEYS) {
+        if (!overrideKeySet.has(token) && root.style.getPropertyValue(token) !== '') {
+          root.style.removeProperty(token);
+        }
+      }
+    }
+  }, [customThemeOverrides, themePreset, isImageBasedDynamicThemesEnabled]);
 
   return {
     setDynamicThemesFromSongPalette,

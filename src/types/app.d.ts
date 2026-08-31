@@ -590,6 +590,7 @@ declare global {
     showEqualizerOnTracklist?: boolean;
     reduceVisualEffectsOnBattery?: boolean;
     ambientParticles?: boolean;
+    customThemeOverrides?: Record<string, Record<string, string>>;
   }
 
   interface CurrentSong {

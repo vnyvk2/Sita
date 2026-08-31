@@ -434,7 +434,8 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     isSongCardDynamicArtworkBackgroundEnabled: false,
     showEqualizerOnTracklist: true,
     reduceVisualEffectsOnBattery: false,
-    ambientParticles: false
+    ambientParticles: false,
+    customThemeOverrides: {}
   },
   playback: {
     currentSong: {

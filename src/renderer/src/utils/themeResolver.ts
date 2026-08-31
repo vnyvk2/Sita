@@ -691,3 +691,182 @@ export function resolveTheme(options: ResolveThemeOptions): ThemeTokens {
 
   return result;
 }
+
+export function hexToHsl(hex: string): HslColor {
+  const sanitized = hex.replace('#', '').trim();
+  if (sanitized.length !== 6 && sanitized.length !== 3) {
+    return { h: 0, s: 0, l: 0 };
+  }
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (sanitized.length === 3) {
+    r = parseInt(sanitized[0] + sanitized[0], 16) / 255;
+    g = parseInt(sanitized[1] + sanitized[1], 16) / 255;
+    b = parseInt(sanitized[2] + sanitized[2], 16) / 255;
+  } else {
+    r = parseInt(sanitized.substring(0, 2), 16) / 255;
+    g = parseInt(sanitized.substring(2, 4), 16) / 255;
+    b = parseInt(sanitized.substring(4, 6), 16) / 255;
+  }
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100)
+  };
+}
+
+export function hexToHslString(hex: string): string {
+  return formatHsl(hexToHsl(hex));
+}
+
+export function hslStringToHex(hslStr: string): string {
+  const { h, s, l } = parseHslString(hslStr);
+  const sNorm = s / 100;
+  const lNorm = l / 100;
+
+  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lNorm - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h >= 0 && h < 60) {
+    r = c;
+    g = x;
+    b = 0;
+  } else if (h >= 60 && h < 120) {
+    r = x;
+    g = c;
+    b = 0;
+  } else if (h >= 120 && h < 180) {
+    r = 0;
+    g = c;
+    b = x;
+  } else if (h >= 180 && h < 240) {
+    r = 0;
+    g = x;
+    b = c;
+  } else if (h >= 240 && h < 300) {
+    r = x;
+    g = 0;
+    b = c;
+  } else if (h >= 300 && h <= 360) {
+    r = c;
+    g = 0;
+    b = x;
+  }
+
+  const toHex = (val: number) => {
+    const hexVal = Math.round(Math.min(Math.max((val + m) * 255, 0), 255)).toString(16);
+    return hexVal.length === 1 ? '0' + hexVal : hexVal;
+  };
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+export interface ThemeLayerDescriptor {
+  key: string;
+  name: string;
+  category: 'surfaces' | 'text' | 'controls';
+  lightToken: ThemeTokenKey;
+  darkToken: ThemeTokenKey;
+}
+
+export const THEME_CUSTOMIZABLE_LAYERS: ThemeLayerDescriptor[] = [
+  {
+    key: 'base_bg',
+    name: 'Base Background',
+    category: 'surfaces',
+    lightToken: '--background-color-1',
+    darkToken: '--dark-background-color-1'
+  },
+  {
+    key: 'surface_bg',
+    name: 'Elevated Surface (Cards)',
+    category: 'surfaces',
+    lightToken: '--background-color-2',
+    darkToken: '--dark-background-color-2'
+  },
+  {
+    key: 'container_bg',
+    name: 'Active Container & Hover',
+    category: 'surfaces',
+    lightToken: '--background-color-3',
+    darkToken: '--dark-background-color-3'
+  },
+  {
+    key: 'sidebar_bg',
+    name: 'Sidebar Background',
+    category: 'surfaces',
+    lightToken: '--side-bar-background',
+    darkToken: '--dark-side-bar-background'
+  },
+  {
+    key: 'primary_text',
+    name: 'Primary Text',
+    category: 'text',
+    lightToken: '--text-color',
+    darkToken: '--dark-text-color'
+  },
+  {
+    key: 'dimmed_text',
+    name: 'Dimmed / Secondary Text',
+    category: 'text',
+    lightToken: '--text-color-dimmed',
+    darkToken: '--dark-text-color-dimmed'
+  },
+  {
+    key: 'highlight_accent',
+    name: 'Accent Highlight',
+    category: 'text',
+    lightToken: '--text-color-highlight',
+    darkToken: '--dark-text-color-highlight'
+  },
+  {
+    key: 'secondary_accent',
+    name: 'Secondary Accent',
+    category: 'text',
+    lightToken: '--text-color-highlight-2',
+    darkToken: '--dark-text-color-highlight-2'
+  },
+  {
+    key: 'seekbar_thumb',
+    name: 'Seekbar & Controls',
+    category: 'controls',
+    lightToken: '--seekbar-background-color',
+    darkToken: '--dark-seekbar-background-color'
+  },
+  {
+    key: 'seekbar_track',
+    name: 'Seekbar Track',
+    category: 'controls',
+    lightToken: '--seekbar-track-background-color',
+    darkToken: '--dark-seekbar-track-background-color'
+  }
+];
