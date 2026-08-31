@@ -8,7 +8,7 @@ import { ElapsedSongDuration, RemainingSongDuration } from './SongDurationLabels
 const SeekBarContainer = () => {
   const isWaveformSeekbarEnabled = useStore(
     store,
-    (state) => state.localStorage.preferences.isWaveformSeekbarEnabled ?? true
+    (state) => state.localStorage?.preferences?.isWaveformSeekbarEnabled ?? true
   );
 
   return (

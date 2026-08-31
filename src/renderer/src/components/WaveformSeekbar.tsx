@@ -155,9 +155,13 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       const isHoverCovered = hoverProgress !== null && barProgress <= hoverProgress;
 
       ctx.beginPath();
-      // Draw rounded vertical pill
+      // Draw rounded vertical pill with fallback for browsers without roundRect
       const radius = Math.min(barWidth / 2, 2);
-      ctx.roundRect(x, y, barWidth, barHeight, radius);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, barWidth, barHeight, radius);
+      } else {
+        ctx.rect(x, y, barWidth, barHeight);
+      }
 
       if (isPlayed) {
         ctx.fillStyle = playedColor;
@@ -198,25 +202,31 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     progressPercentRef.current = 0;
     drawCanvas();
 
-    window.api
-      .getSongWaveform(songId)
-      .then((data) => {
-        // Discard stale responses if song changed while in-flight
-        if (requestSeqRef.current !== currentReqId) return;
+    if (typeof window.api?.getSongWaveform === 'function') {
+      window.api
+        .getSongWaveform(songId)
+        .then((data) => {
+          // Discard stale responses if song changed while in-flight
+          if (requestSeqRef.current !== currentReqId) return;
 
-        if (data && data.length > 0) {
-          peaksRef.current = data instanceof Float32Array ? data : new Float32Array(data);
-        } else {
-          // Deterministic fallback for unindexed / external tracks
+          if (data && data.length > 0) {
+            peaksRef.current = data instanceof Float32Array ? data : new Float32Array(data);
+          } else {
+            // Deterministic fallback for unindexed / external tracks
+            peaksRef.current = generateSynthesizedWaveform(songId);
+          }
+          drawCanvas();
+        })
+        .catch(() => {
+          if (requestSeqRef.current !== currentReqId) return;
           peaksRef.current = generateSynthesizedWaveform(songId);
-        }
-        drawCanvas();
-      })
-      .catch(() => {
-        if (requestSeqRef.current !== currentReqId) return;
-        peaksRef.current = generateSynthesizedWaveform(songId);
-        drawCanvas();
-      });
+          drawCanvas();
+        });
+    } else {
+      // Graceful fallback if IPC bridge is reloading
+      peaksRef.current = generateSynthesizedWaveform(songId);
+      drawCanvas();
+    }
   }, [currentSongData.songId, drawCanvas]);
 
   // Position change listener: updates playhead directly without React state churn
@@ -267,7 +277,11 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     isDraggingRef.current = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    try {
+      (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+    } catch {
+      // Ignore unsupported pointer capture
+    }
 
     const targetPos = calculateSeekFromEvent(e.clientX);
     const totalDuration = durationRef.current || 0;
@@ -303,6 +317,11 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
+      try {
+        (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+      } catch {
+        // Ignore unsupported pointer release
+      }
       const finalPos = calculateSeekFromEvent(e.clientX);
       updateSongPosition(finalPos);
       onSeek?.(finalPos);
