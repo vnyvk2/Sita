@@ -1,12 +1,11 @@
 import { memo } from 'react';
 
 /**
- * Nora-signature dot-matrix take on the "insights" motif: four columns of
- * dots forming an ascending trend. Static at rest; on hover of the parent
- * `.insights` sidebar item the mark scales up slightly and the column peaks
- * ripple upward (pure CSS, compositor-only, honors reduced motion).
+ * Nora-signature dot-matrix take on the "insights" motif: four columns of dots forming an ascending
+ * trend. Static at rest; on hover of the parent `.insights` sidebar item the mark scales up
+ * slightly and the column peaks ripple upward (pure CSS, compositor-only, honors reduced motion).
  */
-const COLUMN_DOT_COUNTS = [2, 3, 2, 4];
+const COLUMN_DOT_COUNTS = [2, 3, 4];
 
 const InsightsIcon = memo(function InsightsIcon({ className = '' }: { className?: string }) {
   return (
