@@ -32,10 +32,10 @@ const AutoGraphIcon = memo(function AutoGraphIcon({ className = '' }: { classNam
         d="M8.5 9l.94-2.06L11.5 6l-2.06-.94L8.5 3l-.94 2.06L5.5 6l2.06.94L8.5 9z"
       />
 
-      {/* Sparkle Dot 3 (Right) */}
+      {/* Sparkle Dot 3 (Right - positioned above the trendline) */}
       <path
         className="fx-auto-graph-dot fx-auto-graph-dot-3"
-        d="M14.06 9.94L12 9l2.06-.94L15 6l.94 2.06L18 9l-2.06.94L15 12l-.94-2.06z"
+        d="M14.56 6.94L12.5 6l2.06-.94L15.5 3l.94 2.06L18.5 6l-2.06.94L15.5 9l-.94-2.06z"
       />
     </svg>
   );
