@@ -508,12 +508,11 @@
 @keyframes fx-auto-graph-float {
   0% {
     transform: translateY(1.5px) scale(0.9);
-    opacity: 0.75;
+    opacity: 0.7;
   }
   100% {
     transform: translateY(-2.5px) scale(1.2);
     opacity: 1;
-    filter: drop-shadow(0 0 2px currentColor);
   }
 }
 
