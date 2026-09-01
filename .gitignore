@@ -57,4 +57,14 @@ audits/
 # Downloaded external binaries for online downloads (fetched via `npm run fetch:binaries`)
 resources/bin/
 
-
+# Local planning, experiment logs, memory benchmarks & scratchpads (kept in local workspace only)
+sqlite-migration-progress.md
+PHASE_13_METADATA_PLATFORM.md
+HANDOFF.md
+tasks/
+plans/
+phases imp/
+sqlite-poc/
+architecture/tiny-mini/
+architecture/b-fix-final-report.md
+architecture/b-data-layer-windowed-hydration-design.md
