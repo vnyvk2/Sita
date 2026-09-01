@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Nora",
+  "license": "GPL-3.0-or-later",
   "devEngines": {
     "packageManager": [
       {
