@@ -1,11 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
-import type {
-  SpotifyPlaylistItemDTO,
-  SpotifyPlaylistItemsResponse
-} from '@main/spotify/api/types';
 import type { IHttpClient } from '@main/platform/networking/IHttpClient';
 import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
+import type { SpotifyPlaylistItemDTO, SpotifyPlaylistItemsResponse } from '@main/spotify/api/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary Tests)', () => {
   const fakeToken = 'test-spotify-access-token';
@@ -55,7 +52,10 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
       url: 'https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGoYBM5M/items'
     });
 
-    const result = await client.getPlaylistItems(fakeToken, fakePlaylistId, { limit: 50, offset: 0 });
+    const result = await client.getPlaylistItems(fakeToken, fakePlaylistId, {
+      limit: 50,
+      offset: 0
+    });
 
     expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
     expect(mockHttpClient.request).toHaveBeenCalledWith(
@@ -139,8 +139,20 @@ describe('SpotifyApiClient (Items API, additional_types, and Pagination Boundary
 
     mockHttpClient.request = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, statusText: 'OK', headers: {}, data: page1, url: 'url1' })
-      .mockResolvedValueOnce({ status: 200, statusText: 'OK', headers: {}, data: page2, url: 'url2' });
+      .mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: page1,
+        url: 'url1'
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: page2,
+        url: 'url2'
+      });
 
     const allItems = await client.getAllPlaylistItems(fakeToken, fakePlaylistId);
 

@@ -106,7 +106,9 @@ describe('SpotifyExportValidator (Anti-Tampering & Security Boundary)', () => {
         isPublic: false,
         revision: updatedAt.toISOString()
       })
-    ).rejects.toThrow('Spotify integration lacks required permissions for private playlist modification');
+    ).rejects.toThrow(
+      'Spotify integration lacks required permissions for private playlist modification'
+    );
 
     await expect(
       SpotifyExportValidator.validateExportRequest({
@@ -115,7 +117,9 @@ describe('SpotifyExportValidator (Anti-Tampering & Security Boundary)', () => {
         isPublic: true,
         revision: updatedAt.toISOString()
       })
-    ).rejects.toThrow('Spotify integration lacks required permissions for public playlist modification');
+    ).rejects.toThrow(
+      'Spotify integration lacks required permissions for public playlist modification'
+    );
   });
 
   it('should accept valid export request when all invariants and permissions match', async () => {

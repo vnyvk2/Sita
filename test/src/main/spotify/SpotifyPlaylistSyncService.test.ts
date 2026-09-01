@@ -24,10 +24,30 @@ describe('SpotifyPlaylistSyncService', () => {
         owner: { id: 'spotify_user_1' },
         tracks: { total: 2 }
       }),
-      getAllPlaylistItems: vi.fn().mockResolvedValue([
-        { item: { track: { id: 't1', name: 'Track 1', uri: 'spotify:track:t1', artists: [{ name: 'Artist 1' }] } } },
-        { item: { track: { id: 't2', name: 'Track 2', uri: 'spotify:track:t2', artists: [{ name: 'Artist 2' }] } } }
-      ]),
+      getAllPlaylistItems: vi
+        .fn()
+        .mockResolvedValue([
+          {
+            item: {
+              track: {
+                id: 't1',
+                name: 'Track 1',
+                uri: 'spotify:track:t1',
+                artists: [{ name: 'Artist 1' }]
+              }
+            }
+          },
+          {
+            item: {
+              track: {
+                id: 't2',
+                name: 'Track 2',
+                uri: 'spotify:track:t2',
+                artists: [{ name: 'Artist 2' }]
+              }
+            }
+          }
+        ]),
       replacePlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_101' }),
       addPlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_102' }),
       removePlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_103' }),
@@ -45,9 +65,7 @@ describe('SpotifyPlaylistSyncService', () => {
       vi.spyOn(db.query.playlists, 'findFirst').mockResolvedValue({
         id: 10,
         name: 'Local Playlist',
-        entries: [
-          { songId: 101, position: 0, song: { id: 101, isrc: 'ISRC1' } }
-        ]
+        entries: [{ songId: 101, position: 0, song: { id: 101, isrc: 'ISRC1' } }]
       } as any);
 
       vi.spyOn(db.query.spotifyPlaylistLinks, 'findFirst')
@@ -160,15 +178,59 @@ describe('SpotifyPlaylistSyncService', () => {
         strategy: 'UNION_MERGE',
         base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_remote_100' },
         localTarget: [
-          { occurrenceId: 't1#0', identityKey: 't1', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'T1', artists: ['A'] }, localSongId: 101 },
-          { occurrenceId: 't2#0', identityKey: 't2', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'T2', artists: ['A'] }, localSongId: 102 }
+          {
+            occurrenceId: 't1#0',
+            identityKey: 't1',
+            occurrenceIndex: 0,
+            position: 0,
+            canonicalTrack: { title: 'T1', artists: ['A'] },
+            localSongId: 101
+          },
+          {
+            occurrenceId: 't2#0',
+            identityKey: 't2',
+            occurrenceIndex: 0,
+            position: 1,
+            canonicalTrack: { title: 'T2', artists: ['A'] },
+            localSongId: 102
+          }
         ],
         remoteTarget: [
-          { occurrenceId: 't1#0', identityKey: 't1', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'T1', artists: ['A'] }, spotifyUri: 'spotify:track:t1' },
-          { occurrenceId: 't2#0', identityKey: 't2', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'T2', artists: ['A'] }, spotifyUri: 'spotify:track:t2' }
+          {
+            occurrenceId: 't1#0',
+            identityKey: 't1',
+            occurrenceIndex: 0,
+            position: 0,
+            canonicalTrack: { title: 'T1', artists: ['A'] },
+            spotifyUri: 'spotify:track:t1'
+          },
+          {
+            occurrenceId: 't2#0',
+            identityKey: 't2',
+            occurrenceIndex: 0,
+            position: 1,
+            canonicalTrack: { title: 'T2', artists: ['A'] },
+            spotifyUri: 'spotify:track:t2'
+          }
         ],
-        localOperations: [{ action: 'ADD', songId: 102, occurrenceId: 't2#0', title: 'Track 2', artists: ['Artist 2'] }],
-        remoteOperations: [{ action: 'ADD', spotifyUri: 'spotify:track:t1', occurrenceId: 't1#0', title: 'Track 1', artists: ['Artist 1'] }],
+        localOperations: [
+          {
+            action: 'ADD',
+            songId: 102,
+            occurrenceId: 't2#0',
+            title: 'Track 2',
+            artists: ['Artist 2']
+          }
+        ],
+        remoteOperations: [
+          {
+            action: 'ADD',
+            spotifyUri: 'spotify:track:t1',
+            occurrenceId: 't1#0',
+            title: 'Track 1',
+            artists: ['Artist 1']
+          }
+        ],
         unresolvedRemoteOccurrences: [],
         statistics: {
           inSyncOccurrences: 0,
@@ -196,7 +258,8 @@ describe('SpotifyPlaylistSyncService', () => {
         return await cb({
           query: {
             playlistEntries: {
-              findMany: vi.fn()
+              findMany: vi
+                .fn()
                 .mockResolvedValueOnce(localEntries)
                 .mockResolvedValueOnce([
                   { songId: 101, position: 0 },
@@ -246,10 +309,25 @@ describe('SpotifyPlaylistSyncService', () => {
         base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_remote_100' },
         localTarget: [],
         remoteTarget: [
-          { occurrenceId: 't1#0', identityKey: 't1', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'T1', artists: ['A'] }, spotifyUri: 'spotify:track:t1' }
+          {
+            occurrenceId: 't1#0',
+            identityKey: 't1',
+            occurrenceIndex: 0,
+            position: 0,
+            canonicalTrack: { title: 'T1', artists: ['A'] },
+            spotifyUri: 'spotify:track:t1'
+          }
         ],
         localOperations: [],
-        remoteOperations: [{ action: 'ADD', spotifyUri: 'spotify:track:t1', occurrenceId: 't1#0', title: 'Track 1', artists: ['Artist 1'] }],
+        remoteOperations: [
+          {
+            action: 'ADD',
+            spotifyUri: 'spotify:track:t1',
+            occurrenceId: 't1#0',
+            title: 'Track 1',
+            artists: ['Artist 1']
+          }
+        ],
         unresolvedRemoteOccurrences: [],
         statistics: {
           inSyncOccurrences: 0,
@@ -262,7 +340,9 @@ describe('SpotifyPlaylistSyncService', () => {
         plannedAt: new Date().toISOString()
       });
 
-      vi.spyOn(mockApiClient, 'replacePlaylistItems').mockRejectedValue(new Error('Spotify HTTP 429'));
+      vi.spyOn(mockApiClient, 'replacePlaylistItems').mockRejectedValue(
+        new Error('Spotify HTTP 429')
+      );
 
       vi.spyOn(db, 'update').mockReturnValue({
         set: vi.fn().mockReturnValue({

@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@main/db/db';
 import { spotifyIntegrations } from '@main/db/schema';
 import { SpotifyPkceService } from '@main/spotify/auth/SpotifyPkceService';
 import { SpotifyTokenStore } from '@main/spotify/auth/SpotifyTokenStore';
 import { encrypt as legacyEncrypt } from '@main/utils/safeStorage';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('SpotifyTokenStore (Security, Legacy Migration & Account Mutex)', () => {
   beforeEach(async () => {

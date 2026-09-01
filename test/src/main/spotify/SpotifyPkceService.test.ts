@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { SpotifyPkceService } from '@main/spotify/auth/SpotifyPkceService';
+import { describe, expect, it } from 'vitest';
 
 describe('SpotifyPkceService', () => {
   it('should generate valid PKCE credentials', () => {

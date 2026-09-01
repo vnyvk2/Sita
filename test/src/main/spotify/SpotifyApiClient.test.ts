@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
 import type { IHttpClient } from '@main/platform/networking/IHttpClient';
 import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('SpotifyApiClient', () => {
   it('should fetch user profile from /me', async () => {

@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IHttpClient } from '@main/platform/networking/IHttpClient';
 import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
 import { SpotifyApiClient } from '@main/spotify/api/SpotifyApiClient';
 import { SpotifyPkceService } from '@main/spotify/auth/SpotifyPkceService';
 import { SpotifyTokenStore } from '@main/spotify/auth/SpotifyTokenStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('Spotify Integration End-to-End Lifecycle', () => {
   beforeEach(async () => {

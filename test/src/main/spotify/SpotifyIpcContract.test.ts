@@ -18,14 +18,17 @@ describe('Spotify IPC Contract Parity (Dynamic Preload Literal Extraction & Main
   });
 
   /**
-   * Dynamically extracts all direct spotify/* ipcRenderer.invoke literal channels declared in src/preload/index.ts.
+   * Dynamically extracts all direct spotify/* ipcRenderer.invoke literal channels declared in
+   * src/preload/index.ts.
    */
   function extractPreloadSpotifyChannels(): string[] {
     const preloadPath = path.resolve(__dirname, '../../../../src/preload/index.ts');
     expect(fs.existsSync(preloadPath), 'Preload file must exist').toBe(true);
     const content = fs.readFileSync(preloadPath, 'utf8');
 
-    const channelMatches = [...content.matchAll(/ipcRenderer\.invoke\(\s*['"](spotify\/[^'"]+)['"]/g)];
+    const channelMatches = [
+      ...content.matchAll(/ipcRenderer\.invoke\(\s*['"](spotify\/[^'"]+)['"]/g)
+    ];
     const channels = Array.from(new Set(channelMatches.map((m) => m[1])));
 
     expect(channels.length).toBeGreaterThan(0);

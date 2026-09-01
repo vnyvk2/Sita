@@ -115,7 +115,11 @@ describe('SpotifyPlaylistSyncPlanner', () => {
       ]);
 
       // 3. REMOTE_WINS on [A, A, A]
-      const remoteToLocalMap = new Map<number, number>([[1, 1], [2, 1], [3, 1]]);
+      const remoteToLocalMap = new Map<number, number>([
+        [1, 1],
+        [2, 1],
+        [3, 1]
+      ]);
       const planAAA = SpotifyPlaylistSyncPlanner.planSync({
         playlistId: 10,
         spotifyPlaylistId: 'sp_10',

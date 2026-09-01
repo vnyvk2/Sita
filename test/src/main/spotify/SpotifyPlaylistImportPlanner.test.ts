@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import type { CanonicalTrackIdentity } from '@main/metadata/identity/CanonicalTrackIdentity';
 import type { SpotifyPlaylistItemDTO } from '@main/spotify/api/types';
 import { SpotifyPlaylistImportPlanner } from '@main/spotify/import/SpotifyPlaylistImportPlanner';
+import { describe, expect, it } from 'vitest';
 
 describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
   const localSongLibrary: CanonicalTrackIdentity[] = [
@@ -133,11 +133,7 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
       }
     ];
 
-    const plan = SpotifyPlaylistImportPlanner.generatePlan(
-      { name: 'GNR' },
-      items,
-      customLibrary
-    );
+    const plan = SpotifyPlaylistImportPlanner.generatePlan({ name: 'GNR' }, items, customLibrary);
 
     expect(plan.entries[0].decision).toBe('IMPORT');
     expect(plan.entries[0].source.trackReference.libraryMatch.matchedSongId).toBe(202);
@@ -176,7 +172,9 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
 
     expect(plan.entries[0].decision).toBe('SKIP_NOT_IN_LIBRARY');
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('NOT_IN_LIBRARY');
-    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('VARIANT_CONFLICT');
+    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain(
+      'VARIANT_CONFLICT'
+    );
     expect(plan.statistics.importedEntries).toBe(0);
     expect(plan.statistics.notInLibraryEntries).toBe(1);
   });
@@ -203,7 +201,9 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
 
     expect(plan.entries[0].decision).toBe('SKIP_INVALID');
     expect(plan.entries[0].source.trackReference.libraryMatch.status).toBe('INVALID_URI');
-    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('SPOTIFY_LOCAL_FILE');
+    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain(
+      'SPOTIFY_LOCAL_FILE'
+    );
     expect(plan.statistics.invalidEntries).toBe(1);
   });
 
@@ -331,7 +331,9 @@ describe('SpotifyPlaylistImportPlanner (Pure Deterministic Engine)', () => {
     );
 
     expect(plan.entries[0].decision).toBe('SKIP_NOT_IN_LIBRARY');
-    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain('VARIANT_CONFLICT');
+    expect(plan.entries[0].source.trackReference.libraryMatch.diagnostics).toContain(
+      'VARIANT_CONFLICT'
+    );
     expect(plan.statistics.importedEntries).toBe(0);
     expect(plan.statistics.notInLibraryEntries).toBe(1);
   });

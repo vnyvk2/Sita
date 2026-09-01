@@ -1,11 +1,11 @@
-import { eq } from 'drizzle-orm';
-import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@main/db/db';
 import { playlistEntries, playlists, songs } from '@main/db/schema';
 import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistImportExecutor';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 import { importExecutor } from '@main/playlistImport/setup';
 import { SpotifyImportValidator } from '@main/spotify/ipc/SpotifyImportValidator';
+import { eq } from 'drizzle-orm';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback)', () => {
   let testSongId1: number;
@@ -26,7 +26,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         .insert(songs)
         .values({
           title: 'Execution Test Song 1',
-          duration: 200.000,
+          duration: 200.0,
           path: '/test/music/exec_test_song_1.mp3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
@@ -38,7 +38,7 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         .insert(songs)
         .values({
           title: 'Execution Test Song 2',
-          duration: 300.000,
+          duration: 300.0,
           path: '/test/music/exec_test_song_2.mp3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
@@ -62,7 +62,17 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
         SpotifyImportValidator.validateAndSanitizePlan({
           playlistName: '   ',
           entries: [],
-          statistics: { totalEntries: 0, importedEntries: 0, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 0, repairedEntries: 0 },
+          statistics: {
+            totalEntries: 0,
+            importedEntries: 0,
+            skippedEntries: 0,
+            missingEntries: 0,
+            notInLibraryEntries: 0,
+            invalidEntries: 0,
+            warningCount: 0,
+            plannedImportPercentage: 0,
+            repairedEntries: 0
+          },
           warnings: []
         })
       ).rejects.toThrow(/playlistName must be a non-empty string/i);
@@ -76,19 +86,38 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
             decision: 'UNKNOWN_DECISION_TYPE'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 1,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
       await expect(
-        SpotifyImportValidator.validateAndSanitizePlan(badDecisionPlan as unknown as PlaylistImportPlan)
+        SpotifyImportValidator.validateAndSanitizePlan(
+          badDecisionPlan as unknown as PlaylistImportPlan
+        )
       ).rejects.toThrow(/unrecognized decision/i);
     });
 
@@ -101,14 +130,35 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'UNRESOLVED', verificationStatus: 'MISSING' } },
-                libraryMatch: { status: 'NOT_IN_LIBRARY', matchedSongId: testSongId1, confidence: 0 }
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'UNRESOLVED',
+                    verificationStatus: 'MISSING'
+                  }
+                },
+                libraryMatch: {
+                  status: 'NOT_IN_LIBRARY',
+                  matchedSongId: testSongId1,
+                  confidence: 0
+                }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 1,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -125,7 +175,14 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
@@ -135,20 +192,37 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 3, // Out of order: expected 2
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId2, confidence: 1 }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 2, importedEntries: 2, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 2,
+          importedEntries: 2,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
-      await expect(SpotifyImportValidator.validateAndSanitizePlan(invalidOrderPlan)).rejects.toThrow(
-        /entry at index 1 has position 3, expected 2/i
-      );
+      await expect(
+        SpotifyImportValidator.validateAndSanitizePlan(invalidOrderPlan)
+      ).rejects.toThrow(/entry at index 1 has position 3, expected 2/i);
     });
 
     it('should reject IMPORT entries with invalid or non-integer matchedSongId', async () => {
@@ -159,14 +233,31 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: -5, confidence: 1 }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 1,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -183,14 +274,31 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'UNRESOLVED', verificationStatus: 'MISSING' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'UNRESOLVED',
+                    verificationStatus: 'MISSING'
+                  }
+                },
                 libraryMatch: { status: 'NOT_IN_LIBRARY', matchedSongId: 99, confidence: 0 }
               }
             },
             decision: 'SKIP_NOT_IN_LIBRARY'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 0, skippedEntries: 1, missingEntries: 0, notInLibraryEntries: 1, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 0, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 0,
+          skippedEntries: 1,
+          missingEntries: 0,
+          notInLibraryEntries: 1,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 0,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -208,14 +316,31 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: nonExistentSongId, confidence: 1 }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 1,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -232,7 +357,14 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
@@ -242,14 +374,31 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 2,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'UNRESOLVED', verificationStatus: 'MISSING' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'UNRESOLVED',
+                    verificationStatus: 'MISSING'
+                  }
+                },
                 libraryMatch: { status: 'NOT_IN_LIBRARY', confidence: 0 }
               }
             },
             decision: 'SKIP_NOT_IN_LIBRARY'
           }
         ],
-        statistics: { totalEntries: 999, importedEntries: 999, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 999, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 999,
+          importedEntries: 999,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 999,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -271,7 +420,14 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
@@ -281,7 +437,14 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 2,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId2, confidence: 1 }
               }
             },
@@ -291,14 +454,31 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 3,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 3, importedEntries: 3, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 3,
+          importedEntries: 3,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
@@ -338,21 +518,41 @@ describe('SpotifyImportExecution (Validation, Persistence & Transaction Rollback
             source: {
               position: 1,
               trackReference: {
-                resolvedTrack: { track: { originalLocation: '' }, resolution: { originalReference: '', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+                resolvedTrack: {
+                  track: { originalLocation: '' },
+                  resolution: {
+                    originalReference: '',
+                    resolutionStatus: 'RESOLVED',
+                    verificationStatus: 'FOUND'
+                  }
+                },
                 libraryMatch: { status: 'MATCHED', matchedSongId: testSongId1, confidence: 1 }
               }
             },
             decision: 'IMPORT'
           }
         ],
-        statistics: { totalEntries: 1, importedEntries: 1, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100, repairedEntries: 0 },
+        statistics: {
+          totalEntries: 1,
+          importedEntries: 1,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100,
+          repairedEntries: 0
+        },
         warnings: []
       };
 
       let txInstance: unknown;
       const transactionalPersistence = {
         createPlaylist: async (name: string) => {
-          const res = await (txInstance as typeof db).insert(playlists).values({ name }).returning();
+          const res = await (txInstance as typeof db)
+            .insert(playlists)
+            .values({ name })
+            .returning();
           return res[0].id;
         },
         addEntries: async () => {

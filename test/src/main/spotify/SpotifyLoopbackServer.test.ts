@@ -1,7 +1,8 @@
 import http from 'http';
 import type { AddressInfo } from 'net';
-import { describe, expect, it } from 'vitest';
+
 import { SpotifyLoopbackServer } from '@main/spotify/auth/SpotifyLoopbackServer';
+import { describe, expect, it } from 'vitest';
 
 describe('SpotifyLoopbackServer (Full Adversarial Lifecycle & Boundary Tests)', () => {
   it('should automatically recover and bind to an ephemeral port if preferred port has EADDRINUSE collision', async () => {

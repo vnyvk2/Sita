@@ -64,9 +64,30 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
     });
 
     const mockLocalTarget: PlaylistOccurrence[] = [
-      { occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: ['Art'] }, localSongId: 101 },
-      { occurrenceId: 'C#0', identityKey: 'C', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'C', artists: ['Art'] }, localSongId: 103 },
-      { occurrenceId: 'D#0', identityKey: 'D', occurrenceIndex: 0, position: 2, canonicalTrack: { title: 'D', artists: ['Art'] }, localSongId: 104 }
+      {
+        occurrenceId: 'A#0',
+        identityKey: 'A',
+        occurrenceIndex: 0,
+        position: 0,
+        canonicalTrack: { title: 'A', artists: ['Art'] },
+        localSongId: 101
+      },
+      {
+        occurrenceId: 'C#0',
+        identityKey: 'C',
+        occurrenceIndex: 0,
+        position: 1,
+        canonicalTrack: { title: 'C', artists: ['Art'] },
+        localSongId: 103
+      },
+      {
+        occurrenceId: 'D#0',
+        identityKey: 'D',
+        occurrenceIndex: 0,
+        position: 2,
+        canonicalTrack: { title: 'D', artists: ['Art'] },
+        localSongId: 104
+      }
     ];
 
     vi.spyOn(service, 'generateSyncPlan').mockResolvedValue({
@@ -76,14 +97,42 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
       localTarget: mockLocalTarget,
       remoteTarget: [
-        { occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: ['Art'] }, spotifyUri: 'spotify:track:A' },
-        { occurrenceId: 'C#0', identityKey: 'C', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'C', artists: ['Art'] }, spotifyUri: 'spotify:track:C' },
-        { occurrenceId: 'D#0', identityKey: 'D', occurrenceIndex: 0, position: 2, canonicalTrack: { title: 'D', artists: ['Art'] }, spotifyUri: 'spotify:track:D' }
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: ['Art'] },
+          spotifyUri: 'spotify:track:A'
+        },
+        {
+          occurrenceId: 'C#0',
+          identityKey: 'C',
+          occurrenceIndex: 0,
+          position: 1,
+          canonicalTrack: { title: 'C', artists: ['Art'] },
+          spotifyUri: 'spotify:track:C'
+        },
+        {
+          occurrenceId: 'D#0',
+          identityKey: 'D',
+          occurrenceIndex: 0,
+          position: 2,
+          canonicalTrack: { title: 'D', artists: ['Art'] },
+          spotifyUri: 'spotify:track:D'
+        }
       ],
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 2, localAdditionsCount: 1, localRemovalsCount: 1, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 2,
+        localAdditionsCount: 1,
+        localRemovalsCount: 1,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -100,7 +149,8 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       return await cb({
         query: {
           playlistEntries: {
-            findMany: vi.fn()
+            findMany: vi
+              .fn()
               .mockResolvedValueOnce(localEntries)
               .mockResolvedValueOnce([
                 { songId: 101, position: 0 },
@@ -169,19 +219,68 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       strategy: 'LOCAL_WINS',
       base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
       localTarget: [
-        { occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: ['Art'] }, localSongId: 101 },
-        { occurrenceId: 'B#0', identityKey: 'B', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'B', artists: ['Art'] }, localSongId: 102 },
-        { occurrenceId: 'C#0', identityKey: 'C', occurrenceIndex: 0, position: 2, canonicalTrack: { title: 'C', artists: ['Art'] }, localSongId: 103 }
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: ['Art'] },
+          localSongId: 101
+        },
+        {
+          occurrenceId: 'B#0',
+          identityKey: 'B',
+          occurrenceIndex: 0,
+          position: 1,
+          canonicalTrack: { title: 'B', artists: ['Art'] },
+          localSongId: 102
+        },
+        {
+          occurrenceId: 'C#0',
+          identityKey: 'C',
+          occurrenceIndex: 0,
+          position: 2,
+          canonicalTrack: { title: 'C', artists: ['Art'] },
+          localSongId: 103
+        }
       ],
       remoteTarget: [
-        { occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: ['Art'] }, spotifyUri: 'spotify:track:A' },
-        { occurrenceId: 'B#0', identityKey: 'B', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'B', artists: ['Art'] }, spotifyUri: 'spotify:track:B' },
-        { occurrenceId: 'C#0', identityKey: 'C', occurrenceIndex: 0, position: 2, canonicalTrack: { title: 'C', artists: ['Art'] }, spotifyUri: 'spotify:track:C' }
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: ['Art'] },
+          spotifyUri: 'spotify:track:A'
+        },
+        {
+          occurrenceId: 'B#0',
+          identityKey: 'B',
+          occurrenceIndex: 0,
+          position: 1,
+          canonicalTrack: { title: 'B', artists: ['Art'] },
+          spotifyUri: 'spotify:track:B'
+        },
+        {
+          occurrenceId: 'C#0',
+          identityKey: 'C',
+          occurrenceIndex: 0,
+          position: 2,
+          canonicalTrack: { title: 'C', artists: ['Art'] },
+          spotifyUri: 'spotify:track:C'
+        }
       ],
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 2, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 1, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 2,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 1,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -195,7 +294,8 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       return await cb({
         query: {
           playlistEntries: {
-            findMany: vi.fn()
+            findMany: vi
+              .fn()
               .mockResolvedValueOnce(localEntries)
               .mockResolvedValueOnce([
                 { songId: 101, position: 0 },
@@ -267,7 +367,14 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -279,7 +386,9 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
         insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) })
       });
     });
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     await firstCallPromise;
     expect(SpotifyPlaylistSyncService.activeSyncLocks.has(10)).toBe(false);
@@ -309,12 +418,28 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       spotifyPlaylistId: 'sp_pl_1',
       strategy: 'LOCAL_WINS',
       base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
-      localTarget: [{ occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: [] }, localSongId: 101 }],
+      localTarget: [
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: [] },
+          localSongId: 101
+        }
+      ],
       remoteTarget: [],
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -326,7 +451,11 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       return await cb({
         query: {
           playlistEntries: {
-            findMany: vi.fn().mockResolvedValue([{ songId: 999, position: 0, song: { id: 999, isrc: 'NEW_ISRC' } }])
+            findMany: vi
+              .fn()
+              .mockResolvedValue([
+                { songId: 999, position: 0, song: { id: 999, isrc: 'NEW_ISRC' } }
+              ])
           }
         },
         delete: vi.fn().mockImplementation(() => {
@@ -337,7 +466,9 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       });
     });
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
@@ -367,12 +498,28 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       spotifyPlaylistId: 'sp_pl_1',
       strategy: 'LOCAL_WINS',
       base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
-      localTarget: [{ occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: [] }, localSongId: 101 }],
+      localTarget: [
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: [] },
+          localSongId: 101
+        }
+      ],
       remoteTarget: [],
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -383,7 +530,8 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       return await cb({
         query: {
           playlistEntries: {
-            findMany: vi.fn()
+            findMany: vi
+              .fn()
               .mockResolvedValueOnce([]) // before check
               .mockResolvedValueOnce([]) // after check returns 0 rows (mismatch!)
           }
@@ -393,7 +541,9 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       });
     });
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
@@ -437,7 +587,14 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 250, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 250,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -453,15 +610,31 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       });
     });
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
     expect(result.status).toBe('SUCCESS');
     expect(result.completedRemoteBatches).toBe(3);
-    expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith('mock_access_token', 'sp_pl_1', target250Uris.slice(0, 100));
-    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(1, 'mock_access_token', 'sp_pl_1', target250Uris.slice(100, 200));
-    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(2, 'mock_access_token', 'sp_pl_1', target250Uris.slice(200, 250));
+    expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith(
+      'mock_access_token',
+      'sp_pl_1',
+      target250Uris.slice(0, 100)
+    );
+    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
+      1,
+      'mock_access_token',
+      'sp_pl_1',
+      target250Uris.slice(100, 200)
+    );
+    expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
+      2,
+      'mock_access_token',
+      'sp_pl_1',
+      target250Uris.slice(200, 250)
+    );
   });
 
   it('Test 7 (Staged Remote Batch Failure on POST #2): PUT succeeds, POST #1 succeeds, POST #2 throws', async () => {
@@ -499,11 +672,20 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 250, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 250,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
-    vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({ snapshot_id: 'snap_put_1' });
+    vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({
+      snapshot_id: 'snap_put_1'
+    });
     let postCallCount = 0;
     vi.spyOn(mockApiClient, 'addPlaylistItems').mockImplementation(async () => {
       postCallCount++;
@@ -513,7 +695,9 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       return { snapshot_id: `snap_post_${postCallCount}` };
     });
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
@@ -546,22 +730,47 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       base: { localEntriesHash: baseHash, remoteSnapshotId: 'snap_base_100' },
       localTarget: [],
       remoteTarget: [
-        { occurrenceId: 'A#0', identityKey: 'A', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'A', artists: ['Art'] }, spotifyUri: 'spotify:track:A' },
-        { occurrenceId: 'B#0', identityKey: 'B', occurrenceIndex: 0, position: 1, canonicalTrack: { title: 'B', artists: ['Art'] }, spotifyUri: 'spotify:track:B' }
+        {
+          occurrenceId: 'A#0',
+          identityKey: 'A',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'A', artists: ['Art'] },
+          spotifyUri: 'spotify:track:A'
+        },
+        {
+          occurrenceId: 'B#0',
+          identityKey: 'B',
+          occurrenceIndex: 0,
+          position: 1,
+          canonicalTrack: { title: 'B', artists: ['Art'] },
+          spotifyUri: 'spotify:track:B'
+        }
       ],
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 2, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 2,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
-    vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({ snapshot_id: 'snap_put_1' });
+    vi.spyOn(mockApiClient, 'replacePlaylistItems').mockResolvedValue({
+      snapshot_id: 'snap_put_1'
+    });
     vi.spyOn(mockApiClient, 'getAllPlaylistItems').mockResolvedValue([
       { item: { track: { uri: 'spotify:track:A' } } }
     ] as any);
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
@@ -597,9 +806,22 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [
-        { occurrenceId: 'X#0', identityKey: 'X', occurrenceIndex: 0, position: 0, canonicalTrack: { title: 'X', artists: [] } }
+        {
+          occurrenceId: 'X#0',
+          identityKey: 'X',
+          occurrenceIndex: 0,
+          position: 0,
+          canonicalTrack: { title: 'X', artists: [] }
+        }
       ],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 1 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 1
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -656,7 +878,14 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       localOperations: [],
       remoteOperations: [],
       unresolvedRemoteOccurrences: [],
-      statistics: { inSyncOccurrences: 0, localAdditionsCount: 0, localRemovalsCount: 0, remoteAdditionsCount: 0, remoteRemovalsCount: 0, unresolvedRemoteCount: 0 },
+      statistics: {
+        inSyncOccurrences: 0,
+        localAdditionsCount: 0,
+        localRemovalsCount: 0,
+        remoteAdditionsCount: 0,
+        remoteRemovalsCount: 0,
+        unresolvedRemoteCount: 0
+      },
       plannedAt: new Date().toISOString()
     });
 
@@ -669,7 +898,9 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       owner: { id: 'sp_user_1' }
     } as any);
 
-    vi.spyOn(db, 'update').mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) } as any);
+    vi.spyOn(db, 'update').mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) })
+    } as any);
 
     const result = await service.executeSync(10, 'LOCAL_WINS');
 
@@ -698,8 +929,14 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
       displayName: 'User B'
     });
 
-    await expect(service.detectDrift(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
-    await expect(service.generateSyncPlan(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
-    await expect(service.executeSync(10)).rejects.toThrow('Linked Spotify playlist belongs to user');
+    await expect(service.detectDrift(10)).rejects.toThrow(
+      'Linked Spotify playlist belongs to user'
+    );
+    await expect(service.generateSyncPlan(10)).rejects.toThrow(
+      'Linked Spotify playlist belongs to user'
+    );
+    await expect(service.executeSync(10)).rejects.toThrow(
+      'Linked Spotify playlist belongs to user'
+    );
   });
 });
