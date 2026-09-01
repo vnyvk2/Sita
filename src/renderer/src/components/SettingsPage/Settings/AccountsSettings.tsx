@@ -205,389 +205,389 @@ const AccountsSettings = () => {
         </span>
       </button>
       {isExpanded && (
-        <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6 appear-from-bottom">
-        {/* Spotify Integration */}
-        <li className="spotify-integration mb-8">
-          <div className="description">
-            Connect your Spotify account to import and sync playlists.
-          </div>
-          <div className="flex items-start p-4 pb-0">
-            <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[#1DB954]/10 text-[#1DB954]">
-              <span className="material-icons-round text-4xl">graphic_eq</span>
+        <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 appear-from-bottom list-disc pl-6">
+          {/* Spotify Integration */}
+          <li className="spotify-integration mb-8">
+            <div className="description">
+              Connect your Spotify account to import and sync playlists.
             </div>
-            <div className="grow">
-              <p
-                className={`flex items-center font-semibold uppercase ${
-                  isSpotifyConnected ? 'text-green-500' : 'text-red-500'
-                }`}
-              >
-                {isSpotifyConnected
-                  ? `Connected as ${spotifyStatus?.user?.displayName || spotifyStatus?.user?.spotifyUserId}`
-                  : 'Spotify Not Connected'}
-              </p>
-              <p className="text-font-color-dim dark:text-dark-font-color-dim mt-1 text-sm">
-                {isSpotifyConnected
-                  ? 'Your Spotify account is connected. Nora can discover and bridge your playlists.'
-                  : 'Connect Nora to Spotify using secure OAuth PKCE to browse and bridge playlists.'}
-              </p>
-
-              <div className="mt-3 flex items-center gap-3">
-                {isSpotifyConnected ? (
-                  <Button
-                    label={isDisconnectingSpotify ? 'Disconnecting...' : 'Disconnect Spotify'}
-                    iconName="link_off"
-                    className="border-red-500 text-red-500 hover:bg-red-500/10"
-                    clickHandler={() => disconnectSpotify()}
-                    isDisabled={isDisconnectingSpotify}
-                  />
-                ) : (
-                  <Button
-                    label={isConnectingSpotify ? 'Waiting for Browser...' : 'Connect Spotify'}
-                    iconName="open_in_new"
-                    className="bg-[#1DB954]! text-white!"
-                    clickHandler={() => connectSpotify()}
-                    isDisabled={isConnectingSpotify || isSpotifyStatusLoading}
-                  />
-                )}
+            <div className="flex items-start p-4 pb-0">
+              <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[#1DB954]/10 text-[#1DB954]">
+                <span className="material-icons-round text-4xl">graphic_eq</span>
               </div>
+              <div className="grow">
+                <p
+                  className={`flex items-center font-semibold uppercase ${
+                    isSpotifyConnected ? 'text-green-500' : 'text-red-500'
+                  }`}
+                >
+                  {isSpotifyConnected
+                    ? `Connected as ${spotifyStatus?.user?.displayName || spotifyStatus?.user?.spotifyUserId}`
+                    : 'Spotify Not Connected'}
+                </p>
+                <p className="text-font-color-dim dark:text-dark-font-color-dim mt-1 text-sm">
+                  {isSpotifyConnected
+                    ? 'Your Spotify account is connected. Nora can discover and bridge your playlists.'
+                    : 'Connect Nora to Spotify using secure OAuth PKCE to browse and bridge playlists.'}
+                </p>
 
-              {isSpotifyConnected && (
-                <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 mt-4 rounded-lg p-4">
-                  <div className="flex items-center justify-between text-sm font-medium">
-                    <span>Remote Playlists</span>
-                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight">
-                      {isPlaylistsLoading
-                        ? 'Loading playlists...'
-                        : `${spotifyPlaylists?.total ?? 0} Playlists found`}
-                    </span>
-                  </div>
-                  {spotifyPlaylists && spotifyPlaylists.items.length > 0 && (
-                    <ul className="text-font-color-dim dark:text-dark-font-color-dim mt-2 max-h-48 space-y-1.5 overflow-y-auto text-xs">
-                      {spotifyPlaylists.items.slice(0, 10).map((pl) => (
-                        <li
-                          key={pl.id}
-                          className="border-background-color-3/20 flex items-center justify-between border-b py-1.5"
-                        >
-                          <div className="flex items-center gap-2 truncate pr-2">
-                            <span className="material-icons-round text-sm text-[#1DB954]">
-                              playlist_play
-                            </span>
-                            <span className="text-font-color-black dark:text-font-color-white truncate font-medium">
-                              {pl.name}
-                            </span>
-                            <span className="text-[11px] opacity-70">
-                              ({pl.tracksTotal} tracks)
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPlaylistForImport(pl)}
-                            className="flex shrink-0 items-center gap-1 rounded bg-[#1DB954]/15 px-2.5 py-1 text-[11px] font-semibold text-[#1DB954] transition hover:bg-[#1DB954]/25"
-                          >
-                            <span className="material-icons-round text-xs">download</span>
-                            Import
-                          </button>
-                        </li>
-                      ))}
-                      {spotifyPlaylists.items.length > 10 && (
-                        <li className="pt-1 text-center text-xs italic">
-                          + {spotifyPlaylists.items.length - 10} more playlists
-                        </li>
-                      )}
-                    </ul>
+                <div className="mt-3 flex items-center gap-3">
+                  {isSpotifyConnected ? (
+                    <Button
+                      label={isDisconnectingSpotify ? 'Disconnecting...' : 'Disconnect Spotify'}
+                      iconName="link_off"
+                      className="border-red-500 text-red-500 hover:bg-red-500/10"
+                      clickHandler={() => disconnectSpotify()}
+                      isDisabled={isDisconnectingSpotify}
+                    />
+                  ) : (
+                    <Button
+                      label={isConnectingSpotify ? 'Waiting for Browser...' : 'Connect Spotify'}
+                      iconName="open_in_new"
+                      className="bg-[#1DB954]! text-white!"
+                      clickHandler={() => connectSpotify()}
+                      isDisabled={isConnectingSpotify || isSpotifyStatusLoading}
+                    />
                   )}
                 </div>
-              )}
 
-              {/* Spotify Playlist Import Modal */}
-              <SpotifyPlaylistImportModal
-                playlist={selectedPlaylistForImport}
-                isOpen={Boolean(selectedPlaylistForImport)}
-                onClose={() => setSelectedPlaylistForImport(null)}
-              />
+                {isSpotifyConnected && (
+                  <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 mt-4 rounded-lg p-4">
+                    <div className="flex items-center justify-between text-sm font-medium">
+                      <span>Remote Playlists</span>
+                      <span className="text-font-color-highlight dark:text-dark-font-color-highlight">
+                        {isPlaylistsLoading
+                          ? 'Loading playlists...'
+                          : `${spotifyPlaylists?.total ?? 0} Playlists found`}
+                      </span>
+                    </div>
+                    {spotifyPlaylists && spotifyPlaylists.items.length > 0 && (
+                      <ul className="text-font-color-dim dark:text-dark-font-color-dim mt-2 max-h-48 space-y-1.5 overflow-y-auto text-xs">
+                        {spotifyPlaylists.items.slice(0, 10).map((pl) => (
+                          <li
+                            key={pl.id}
+                            className="border-background-color-3/20 flex items-center justify-between border-b py-1.5"
+                          >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <span className="material-icons-round text-sm text-[#1DB954]">
+                                playlist_play
+                              </span>
+                              <span className="text-font-color-black dark:text-font-color-white truncate font-medium">
+                                {pl.name}
+                              </span>
+                              <span className="text-[11px] opacity-70">
+                                ({pl.tracksTotal} tracks)
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPlaylistForImport(pl)}
+                              className="flex shrink-0 items-center gap-1 rounded bg-[#1DB954]/15 px-2.5 py-1 text-[11px] font-semibold text-[#1DB954] transition hover:bg-[#1DB954]/25"
+                            >
+                              <span className="material-icons-round text-xs">download</span>
+                              Import
+                            </button>
+                          </li>
+                        ))}
+                        {spotifyPlaylists.items.length > 10 && (
+                          <li className="pt-1 text-center text-xs italic">
+                            + {spotifyPlaylists.items.length - 10} more playlists
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Spotify Playlist Import Modal */}
+                <SpotifyPlaylistImportModal
+                  playlist={selectedPlaylistForImport}
+                  isOpen={Boolean(selectedPlaylistForImport)}
+                  onClose={() => setSelectedPlaylistForImport(null)}
+                />
+              </div>
             </div>
-          </div>
-        </li>
+          </li>
 
-        {/* Discord RPC */}
-        <li className="discord-rpc-integration mb-4">
-          <div className="description">{t('settingsPage.enableDiscordRpcDescription')}</div>
-          <Checkbox
-            id="enableDiscordRpc"
-            isChecked={userSettings?.enableDiscordRPC ?? false}
-            checkedStateUpdateFunction={(state) => updateDiscordRpcState(state)}
-            labelContent={t('settingsPage.enableDiscordRpc')}
-          />
-        </li>
-
-        {/* Last.fm Integration */}
-        <li className="last-fm-integration mb-4">
-          <div className="description">{t('settingsPage.integrateLastFm')}</div>
-          <div className="flex p-4 pb-0">
-            <img
-              src={LastFMIcon}
-              alt={t('settingsPage.lastFmLogo')}
-              className={`mr-4 h-16 w-16 rounded-md ${
-                !isLastFmConnected && 'brightness-90 grayscale'
-              }`}
+          {/* Discord RPC */}
+          <li className="discord-rpc-integration mb-4">
+            <div className="description">{t('settingsPage.enableDiscordRpcDescription')}</div>
+            <Checkbox
+              id="enableDiscordRpc"
+              isChecked={userSettings?.enableDiscordRPC ?? false}
+              checkedStateUpdateFunction={(state) => updateDiscordRpcState(state)}
+              labelContent={t('settingsPage.enableDiscordRpc')}
             />
-            <div className="grow-0">
-              <p
-                className={`flex items-center font-semibold uppercase ${
-                  isLastFmConnected ? 'text-green-500' : 'text-red-500'
-                } `}
+          </li>
+
+          {/* Last.fm Integration */}
+          <li className="last-fm-integration mb-4">
+            <div className="description">{t('settingsPage.integrateLastFm')}</div>
+            <div className="flex p-4 pb-0">
+              <img
+                src={LastFMIcon}
+                alt={t('settingsPage.lastFmLogo')}
+                className={`mr-4 h-16 w-16 rounded-md ${
+                  !isLastFmConnected && 'brightness-90 grayscale'
+                }`}
+              />
+              <div className="grow-0">
+                <p
+                  className={`flex items-center font-semibold uppercase ${
+                    isLastFmConnected ? 'text-green-500' : 'text-red-500'
+                  } `}
+                >
+                  {t(
+                    isLastFmConnected
+                      ? 'settingsPage.lastFmConnected'
+                      : 'settingsPage.lastFmNotConnected'
+                  )}{' '}
+                  {isLastFmConnected &&
+                    userSettings?.lastFmSessionName &&
+                    `(${t('settingsPage.loggedInAs')} ${userSettings.lastFmSessionName})`}
+                </p>
+                <ul className="list-inside list-disc text-sm">
+                  <li>{t('settingsPage.lastFmDescription1')}</li>
+                  <li>{t('settingsPage.lastFmDescription2')}</li>
+                  <li>{t('settingsPage.lastFmDescription3')}</li>
+                  <li>{t('settingsPage.lastFmDescription4')}</li>
+                </ul>
+                <div className="mt-3 flex items-center gap-3">
+                  {isLastFmConnected ? (
+                    <>
+                      <Button
+                        label={
+                          isDisconnectingLastFm
+                            ? 'Disconnecting...'
+                            : t('settingsPage.disconnectLastFm', 'Disconnect Last.fm')
+                        }
+                        iconName="link_off"
+                        className="border-red-500 text-red-500 hover:bg-red-500/10"
+                        clickHandler={() => disconnectLastFm()}
+                        isDisabled={isDisconnectingLastFm}
+                      />
+                      <Button
+                        label={t('settingsPage.switchAccount', 'Switch account')}
+                        iconName="swap_horiz"
+                        clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
+                        isDisabled={isDisconnectingLastFm}
+                      />
+                    </>
+                  ) : (
+                    <Button
+                      label={t('settingsPage.loginInBrowser')}
+                      iconName="open_in_new"
+                      className="mt-2"
+                      clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+            <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
+              <li
+                className={`last-fm-integration mb-4 transition-opacity ${
+                  !isLastFmConnected && 'cursor-not-allowed opacity-50'
+                }`}
               >
-                {t(
-                  isLastFmConnected
-                    ? 'settingsPage.lastFmConnected'
-                    : 'settingsPage.lastFmNotConnected'
-                )}{' '}
-                {isLastFmConnected &&
-                  userSettings?.lastFmSessionName &&
-                  `(${t('settingsPage.loggedInAs')} ${userSettings.lastFmSessionName})`}
-              </p>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('settingsPage.lastFmDescription1')}</li>
-                <li>{t('settingsPage.lastFmDescription2')}</li>
-                <li>{t('settingsPage.lastFmDescription3')}</li>
-                <li>{t('settingsPage.lastFmDescription4')}</li>
-              </ul>
-              <div className="mt-3 flex items-center gap-3">
-                {isLastFmConnected ? (
-                  <>
+                <div className="description">{t('settingsPage.scrobblingDescription')}</div>
+                <Checkbox
+                  id="sendSongScrobblingDataToLastFM"
+                  isChecked={!!userSettings?.sendSongScrobblingDataToLastFM}
+                  checkedStateUpdateFunction={(state) => updateSongScrobblingToLastFMState(state)}
+                  labelContent={t('settingsPage.enableScrobbling')}
+                  isDisabled={!isLastFmConnected}
+                />
+              </li>
+              <li
+                className={`last-fm-integration mb-4 transition-opacity ${
+                  !isLastFmConnected && 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <div className="description">
+                  {t('settingsPage.sendFavoritesToLastFmDescription')}
+                </div>
+                <Checkbox
+                  id="sendSongFavoritesDataToLastFM"
+                  isChecked={!!userSettings?.sendSongFavoritesDataToLastFM}
+                  checkedStateUpdateFunction={(state) => updateSongFavoritesToLastFMState(state)}
+                  labelContent={t('settingsPage.sendFavoritesToLastFm')}
+                  isDisabled={!isLastFmConnected}
+                />
+              </li>
+              <li
+                className={`last-fm-integration mb-4 transition-opacity ${
+                  !isLastFmConnected && 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <div className="description">
+                  {t('settingsPage.sendNowPlayingToLastFmDescription')}
+                </div>
+                <Checkbox
+                  id="sendNowPlayingSongDataToLastFM"
+                  isChecked={!!userSettings?.sendNowPlayingSongDataToLastFM}
+                  checkedStateUpdateFunction={(state) =>
+                    updateSendNowPlayingSongDataToLastFMState(state)
+                  }
+                  labelContent={t('settingsPage.sendNowPlayingToLastFm')}
+                  isDisabled={!isLastFmConnected}
+                />
+              </li>
+            </ul>
+          </li>
+
+          {/* ListenBrainz Integration */}
+          <li className="listenbrainz-integration mb-8">
+            <div className="description">{t('settingsPage.integrateListenBrainz')}</div>
+            <div className="flex items-start p-4 pb-0">
+              <div className="mr-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#EB743B]/10 text-[#EB743B]">
+                <span className="material-icons-round text-4xl">psychology</span>
+              </div>
+              <div className="grow">
+                <p
+                  className={`flex items-center font-semibold uppercase ${
+                    isListenBrainzConnected ? 'text-green-500' : 'text-red-500'
+                  }`}
+                >
+                  {t(
+                    isListenBrainzConnected
+                      ? 'settingsPage.listenBrainzConnected'
+                      : 'settingsPage.listenBrainzNotConnected'
+                  )}{' '}
+                  {isListenBrainzConnected &&
+                    userSettings?.listenBrainzUsername &&
+                    `(${t('settingsPage.loggedInAs')} ${userSettings.listenBrainzUsername})`}
+                </p>
+                <ul className="list-inside list-disc text-sm">
+                  <li>{t('settingsPage.listenBrainzDescription1')}</li>
+                  <li>{t('settingsPage.listenBrainzDescription2')}</li>
+                  <li>{t('settingsPage.listenBrainzDescription3')}</li>
+                  <li>{t('settingsPage.listenBrainzDescription4')}</li>
+                </ul>
+
+                {!isListenBrainzConnected ? (
+                  <div className="mt-4 max-w-md space-y-2">
+                    <div className="relative flex items-center">
+                      <input
+                        type={showListenBrainzToken ? 'text' : 'password'}
+                        value={listenBrainzTokenInput}
+                        onChange={(e) => setListenBrainzTokenInput(e.target.value)}
+                        placeholder={t('settingsPage.listenBrainzTokenPlaceholder')}
+                        className="bg-background-color-2 text-font-color-black dark:text-font-color-white focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight w-full rounded-md border border-gray-300 p-2 pr-10 text-sm focus:outline-none dark:border-zinc-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowListenBrainzToken(!showListenBrainzToken)}
+                        className="text-font-color-dim dark:text-dark-font-color-dim hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight absolute right-2 p-1"
+                        title={showListenBrainzToken ? 'Hide token' : 'Show token'}
+                      >
+                        <span className="material-icons-round text-lg">
+                          {showListenBrainzToken ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                      <Button
+                        label={
+                          isConnectingListenBrainz
+                            ? 'Validating...'
+                            : t('settingsPage.connectListenBrainz')
+                        }
+                        iconName="link"
+                        className="bg-[#EB743B]! text-white!"
+                        clickHandler={() => connectListenBrainz(listenBrainzTokenInput)}
+                        isDisabled={isConnectingListenBrainz || !listenBrainzTokenInput.trim()}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.api.settingsHelpers.openInBrowser(
+                            'https://listenbrainz.org/profile/'
+                          )
+                        }
+                        className="text-font-color-highlight dark:text-dark-font-color-highlight flex items-center gap-1 text-xs hover:underline"
+                      >
+                        <span>{t('settingsPage.getListenBrainzToken')}</span>
+                        <span className="material-icons-round text-xs">open_in_new</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex items-center gap-3">
                     <Button
                       label={
-                        isDisconnectingLastFm
+                        isDisconnectingListenBrainz
                           ? 'Disconnecting...'
-                          : t('settingsPage.disconnectLastFm', 'Disconnect Last.fm')
+                          : t('settingsPage.disconnectListenBrainz')
                       }
                       iconName="link_off"
                       className="border-red-500 text-red-500 hover:bg-red-500/10"
-                      clickHandler={() => disconnectLastFm()}
-                      isDisabled={isDisconnectingLastFm}
+                      clickHandler={() => disconnectListenBrainz()}
+                      isDisabled={isDisconnectingListenBrainz}
                     />
-                    <Button
-                      label={t('settingsPage.switchAccount', 'Switch account')}
-                      iconName="swap_horiz"
-                      clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
-                      isDisabled={isDisconnectingLastFm}
-                    />
-                  </>
-                ) : (
-                  <Button
-                    label={t('settingsPage.loginInBrowser')}
-                    iconName="open_in_new"
-                    className="mt-2"
-                    clickHandler={() => window.api.settingsHelpers.loginToLastFmInBrowser()}
-                  />
+                  </div>
                 )}
               </div>
             </div>
-          </div>
-          <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">{t('settingsPage.scrobblingDescription')}</div>
-              <Checkbox
-                id="sendSongScrobblingDataToLastFM"
-                isChecked={!!userSettings?.sendSongScrobblingDataToLastFM}
-                checkedStateUpdateFunction={(state) => updateSongScrobblingToLastFMState(state)}
-                labelContent={t('settingsPage.enableScrobbling')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendFavoritesToLastFmDescription')}
-              </div>
-              <Checkbox
-                id="sendSongFavoritesDataToLastFM"
-                isChecked={!!userSettings?.sendSongFavoritesDataToLastFM}
-                checkedStateUpdateFunction={(state) => updateSongFavoritesToLastFMState(state)}
-                labelContent={t('settingsPage.sendFavoritesToLastFm')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-            <li
-              className={`last-fm-integration mb-4 transition-opacity ${
-                !isLastFmConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendNowPlayingToLastFmDescription')}
-              </div>
-              <Checkbox
-                id="sendNowPlayingSongDataToLastFM"
-                isChecked={!!userSettings?.sendNowPlayingSongDataToLastFM}
-                checkedStateUpdateFunction={(state) =>
-                  updateSendNowPlayingSongDataToLastFMState(state)
-                }
-                labelContent={t('settingsPage.sendNowPlayingToLastFm')}
-                isDisabled={!isLastFmConnected}
-              />
-            </li>
-          </ul>
-        </li>
 
-        {/* ListenBrainz Integration */}
-        <li className="listenbrainz-integration mb-8">
-          <div className="description">{t('settingsPage.integrateListenBrainz')}</div>
-          <div className="flex items-start p-4 pb-0">
-            <div className="mr-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#EB743B]/10 text-[#EB743B]">
-              <span className="material-icons-round text-4xl">psychology</span>
-            </div>
-            <div className="grow">
-              <p
-                className={`flex items-center font-semibold uppercase ${
-                  isListenBrainzConnected ? 'text-green-500' : 'text-red-500'
+            <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
+              <li
+                className={`listenbrainz-integration mb-4 transition-opacity ${
+                  !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
                 }`}
               >
-                {t(
-                  isListenBrainzConnected
-                    ? 'settingsPage.listenBrainzConnected'
-                    : 'settingsPage.listenBrainzNotConnected'
-                )}{' '}
-                {isListenBrainzConnected &&
-                  userSettings?.listenBrainzUsername &&
-                  `(${t('settingsPage.loggedInAs')} ${userSettings.listenBrainzUsername})`}
-              </p>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('settingsPage.listenBrainzDescription1')}</li>
-                <li>{t('settingsPage.listenBrainzDescription2')}</li>
-                <li>{t('settingsPage.listenBrainzDescription3')}</li>
-                <li>{t('settingsPage.listenBrainzDescription4')}</li>
-              </ul>
-
-              {!isListenBrainzConnected ? (
-                <div className="mt-4 max-w-md space-y-2">
-                  <div className="relative flex items-center">
-                    <input
-                      type={showListenBrainzToken ? 'text' : 'password'}
-                      value={listenBrainzTokenInput}
-                      onChange={(e) => setListenBrainzTokenInput(e.target.value)}
-                      placeholder={t('settingsPage.listenBrainzTokenPlaceholder')}
-                      className="bg-background-color-2 text-font-color-black dark:text-font-color-white focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight w-full rounded-md border border-gray-300 p-2 pr-10 text-sm focus:outline-none dark:border-zinc-700"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowListenBrainzToken(!showListenBrainzToken)}
-                      className="text-font-color-dim dark:text-dark-font-color-dim hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight absolute right-2 p-1"
-                      title={showListenBrainzToken ? 'Hide token' : 'Show token'}
-                    >
-                      <span className="material-icons-round text-lg">
-                        {showListenBrainzToken ? 'visibility_off' : 'visibility'}
-                      </span>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-3 pt-1">
-                    <Button
-                      label={
-                        isConnectingListenBrainz
-                          ? 'Validating...'
-                          : t('settingsPage.connectListenBrainz')
-                      }
-                      iconName="link"
-                      className="bg-[#EB743B]! text-white!"
-                      clickHandler={() => connectListenBrainz(listenBrainzTokenInput)}
-                      isDisabled={isConnectingListenBrainz || !listenBrainzTokenInput.trim()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.api.settingsHelpers.openInBrowser(
-                          'https://listenbrainz.org/profile/'
-                        )
-                      }
-                      className="text-font-color-highlight dark:text-dark-font-color-highlight flex items-center gap-1 text-xs hover:underline"
-                    >
-                      <span>{t('settingsPage.getListenBrainzToken')}</span>
-                      <span className="material-icons-round text-xs">open_in_new</span>
-                    </button>
-                  </div>
+                <div className="description">
+                  {t('settingsPage.listenBrainzScrobblingDescription')}
                 </div>
-              ) : (
-                <div className="mt-3 flex items-center gap-3">
-                  <Button
-                    label={
-                      isDisconnectingListenBrainz
-                        ? 'Disconnecting...'
-                        : t('settingsPage.disconnectListenBrainz')
-                    }
-                    iconName="link_off"
-                    className="border-red-500 text-red-500 hover:bg-red-500/10"
-                    clickHandler={() => disconnectListenBrainz()}
-                    isDisabled={isDisconnectingListenBrainz}
-                  />
+                <Checkbox
+                  id="sendSongScrobblingDataToListenBrainz"
+                  isChecked={!!userSettings?.sendSongScrobblingDataToListenBrainz}
+                  checkedStateUpdateFunction={(state) =>
+                    updateSongScrobblingToListenBrainzState(state)
+                  }
+                  labelContent={t('settingsPage.enableListenBrainzScrobbling')}
+                  isDisabled={!isListenBrainzConnected}
+                />
+              </li>
+              <li
+                className={`listenbrainz-integration mb-4 transition-opacity ${
+                  !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <div className="description">
+                  {t('settingsPage.sendFavoritesToListenBrainzDescription')}
                 </div>
-              )}
-            </div>
-          </div>
-
-          <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 mt-4 list-disc pl-8">
-            <li
-              className={`listenbrainz-integration mb-4 transition-opacity ${
-                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.listenBrainzScrobblingDescription')}
-              </div>
-              <Checkbox
-                id="sendSongScrobblingDataToListenBrainz"
-                isChecked={!!userSettings?.sendSongScrobblingDataToListenBrainz}
-                checkedStateUpdateFunction={(state) =>
-                  updateSongScrobblingToListenBrainzState(state)
-                }
-                labelContent={t('settingsPage.enableListenBrainzScrobbling')}
-                isDisabled={!isListenBrainzConnected}
-              />
-            </li>
-            <li
-              className={`listenbrainz-integration mb-4 transition-opacity ${
-                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendFavoritesToListenBrainzDescription')}
-              </div>
-              <Checkbox
-                id="sendSongFavoritesDataToListenBrainz"
-                isChecked={!!userSettings?.sendSongFavoritesDataToListenBrainz}
-                checkedStateUpdateFunction={(state) =>
-                  updateSongFavoritesToListenBrainzState(state)
-                }
-                labelContent={t('settingsPage.sendFavoritesToListenBrainz')}
-                isDisabled={!isListenBrainzConnected}
-              />
-            </li>
-            <li
-              className={`listenbrainz-integration mb-4 transition-opacity ${
-                !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              <div className="description">
-                {t('settingsPage.sendNowPlayingToListenBrainzDescription')}
-              </div>
-              <Checkbox
-                id="sendNowPlayingSongDataToListenBrainz"
-                isChecked={!!userSettings?.sendNowPlayingSongDataToListenBrainz}
-                checkedStateUpdateFunction={(state) =>
-                  updateSendNowPlayingSongDataToListenBrainzState(state)
-                }
-                labelContent={t('settingsPage.sendNowPlayingToListenBrainz')}
-                isDisabled={!isListenBrainzConnected}
-              />
-            </li>
-          </ul>
-        </li>
-      </ul>
+                <Checkbox
+                  id="sendSongFavoritesDataToListenBrainz"
+                  isChecked={!!userSettings?.sendSongFavoritesDataToListenBrainz}
+                  checkedStateUpdateFunction={(state) =>
+                    updateSongFavoritesToListenBrainzState(state)
+                  }
+                  labelContent={t('settingsPage.sendFavoritesToListenBrainz')}
+                  isDisabled={!isListenBrainzConnected}
+                />
+              </li>
+              <li
+                className={`listenbrainz-integration mb-4 transition-opacity ${
+                  !isListenBrainzConnected && 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <div className="description">
+                  {t('settingsPage.sendNowPlayingToListenBrainzDescription')}
+                </div>
+                <Checkbox
+                  id="sendNowPlayingSongDataToListenBrainz"
+                  isChecked={!!userSettings?.sendNowPlayingSongDataToListenBrainz}
+                  checkedStateUpdateFunction={(state) =>
+                    updateSendNowPlayingSongDataToListenBrainzState(state)
+                  }
+                  labelContent={t('settingsPage.sendNowPlayingToListenBrainz')}
+                  isDisabled={!isListenBrainzConnected}
+                />
+              </li>
+            </ul>
+          </li>
+        </ul>
       )}
     </li>
   );

@@ -24,30 +24,28 @@ describe('SpotifyPlaylistSyncService', () => {
         owner: { id: 'spotify_user_1' },
         tracks: { total: 2 }
       }),
-      getAllPlaylistItems: vi
-        .fn()
-        .mockResolvedValue([
-          {
-            item: {
-              track: {
-                id: 't1',
-                name: 'Track 1',
-                uri: 'spotify:track:t1',
-                artists: [{ name: 'Artist 1' }]
-              }
-            }
-          },
-          {
-            item: {
-              track: {
-                id: 't2',
-                name: 'Track 2',
-                uri: 'spotify:track:t2',
-                artists: [{ name: 'Artist 2' }]
-              }
+      getAllPlaylistItems: vi.fn().mockResolvedValue([
+        {
+          item: {
+            track: {
+              id: 't1',
+              name: 'Track 1',
+              uri: 'spotify:track:t1',
+              artists: [{ name: 'Artist 1' }]
             }
           }
-        ]),
+        },
+        {
+          item: {
+            track: {
+              id: 't2',
+              name: 'Track 2',
+              uri: 'spotify:track:t2',
+              artists: [{ name: 'Artist 2' }]
+            }
+          }
+        }
+      ]),
       replacePlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_101' }),
       addPlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_102' }),
       removePlaylistItems: vi.fn().mockResolvedValue({ snapshot_id: 'snap_remote_103' }),

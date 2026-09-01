@@ -367,13 +367,30 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
       expect(onScrollingStateChange).toHaveBeenLastCalledWith(false);
     });
 
-    it('should forward scrollSeekConfiguration and default ScrollSeekPlaceholder to Virtuoso', () => {
+    it('should not forward scrollSeekConfiguration by default, but forward when explicitly provided', () => {
       const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
 
+      // Default: scrollSeekConfiguration is false/undefined to prevent double-swap flashes
+      const { unmount } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.scrollSeekConfiguration).toBeUndefined();
+      unmount();
+
+      // Opt-in: explicitly provided
       render(
         <VirtualizedList
           data={dummyData}
           fixedItemHeight={60}
+          scrollSeekConfiguration={{
+            enter: (v) => Math.abs(v) > 800,
+            exit: (v) => Math.abs(v) < 300
+          }}
           itemContent={(idx) => <div>Item {idx}</div>}
         />
       );

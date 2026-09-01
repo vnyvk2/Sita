@@ -220,7 +220,8 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
   /**
    * Stage 7 — Apply & Stage 8 — Verify Strict Confidence Threshold: Auto-apply ONLY if confidence
-   * >= 0.90
+   *
+   * > = 0.90
    */
   public async applyAlbum(
     preview: AlbumPreview

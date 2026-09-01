@@ -460,18 +460,16 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
         }
       ] as any);
 
-      const searchSpy = vi
-        .spyOn(apiClient, 'searchTracks')
-        .mockResolvedValue([
-          {
-            id: 'sp_50',
-            uri: 'spotify:track:sp_50',
-            name: 'Cache Song',
-            artists: [{ name: 'Cache Artist' }],
-            duration_ms: 180000,
-            type: 'track'
-          }
-        ]);
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        {
+          id: 'sp_50',
+          uri: 'spotify:track:sp_50',
+          name: 'Cache Song',
+          artists: [{ name: 'Cache Artist' }],
+          duration_ms: 180000,
+          type: 'track'
+        }
+      ]);
 
       const sessionCache: any = {};
       await exportService.generateExportPlan(10, 'test-client', sessionCache);
@@ -504,18 +502,16 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
         }
       ] as any);
 
-      const searchSpy = vi
-        .spyOn(apiClient, 'searchTracks')
-        .mockResolvedValue([
-          {
-            id: 'sp_50',
-            uri: 'spotify:track:sp_50',
-            name: 'Cache Song',
-            artists: [{ name: 'Cache Artist' }],
-            duration_ms: 180000,
-            type: 'track'
-          }
-        ]);
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        {
+          id: 'sp_50',
+          uri: 'spotify:track:sp_50',
+          name: 'Cache Song',
+          artists: [{ name: 'Cache Artist' }],
+          duration_ms: 180000,
+          type: 'track'
+        }
+      ]);
 
       const sessionCache: any = {};
       await exportService.generateExportPlan(10, 'test-client', sessionCache);
@@ -548,18 +544,16 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
         }
       ] as any);
 
-      const searchSpy = vi
-        .spyOn(apiClient, 'searchTracks')
-        .mockResolvedValue([
-          {
-            id: 'sp_50',
-            uri: 'spotify:track:sp_50',
-            name: 'Cache Song',
-            artists: [{ name: 'Cache Artist' }],
-            duration_ms: 180000,
-            type: 'track'
-          }
-        ]);
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        {
+          id: 'sp_50',
+          uri: 'spotify:track:sp_50',
+          name: 'Cache Song',
+          artists: [{ name: 'Cache Artist' }],
+          duration_ms: 180000,
+          type: 'track'
+        }
+      ]);
 
       const sessionCache: any = {};
       await exportService.generateExportPlan(10, 'test-client', sessionCache);
@@ -592,18 +586,16 @@ describe('SpotifyPlaylistExportService (Batch Boundaries, Race Guards & Position
         }
       ] as any);
 
-      const searchSpy = vi
-        .spyOn(apiClient, 'searchTracks')
-        .mockResolvedValue([
-          {
-            id: 'sp_50',
-            uri: 'spotify:track:sp_50',
-            name: 'Duplicate Song',
-            artists: [{ name: 'Cache Artist' }],
-            duration_ms: 180000,
-            type: 'track'
-          }
-        ]);
+      const searchSpy = vi.spyOn(apiClient, 'searchTracks').mockResolvedValue([
+        {
+          id: 'sp_50',
+          uri: 'spotify:track:sp_50',
+          name: 'Duplicate Song',
+          artists: [{ name: 'Cache Artist' }],
+          duration_ms: 180000,
+          type: 'track'
+        }
+      ]);
 
       const plan = await exportService.generateExportPlan(12, 'test-client');
       expect(searchSpy).toHaveBeenCalledTimes(1);

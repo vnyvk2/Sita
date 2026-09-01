@@ -78,7 +78,9 @@ describe('LyricsSettings collapsible behavior', () => {
   it('expands when clicking the header and renders lyrics options', () => {
     const { container } = renderWithQueryClient(<LyricsSettings />);
 
-    const headerButton = container.querySelector('button[aria-expanded="false"]') as HTMLButtonElement;
+    const headerButton = container.querySelector(
+      'button[aria-expanded="false"]'
+    ) as HTMLButtonElement;
     expect(headerButton).not.toBeNull();
 
     fireEvent.click(headerButton);
@@ -95,7 +97,9 @@ describe('LyricsSettings collapsible behavior', () => {
   it('collapses again when clicking the header a second time', () => {
     const { container } = renderWithQueryClient(<LyricsSettings />);
 
-    const headerButton = container.querySelector('button[aria-expanded="false"]') as HTMLButtonElement;
+    const headerButton = container.querySelector(
+      'button[aria-expanded="false"]'
+    ) as HTMLButtonElement;
     fireEvent.click(headerButton);
     expect(headerButton.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.lyrics-appearance-section')).not.toBeNull();

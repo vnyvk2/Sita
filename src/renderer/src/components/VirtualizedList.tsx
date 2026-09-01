@@ -62,7 +62,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     onChange,
     onDebouncedScroll,
     onScrollingStateChange,
-    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG
+    scrollSeekConfiguration = false
   } = props;
 
   // Retrieve initial saved position for scrollKey if available
@@ -199,7 +199,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   };
 
   const resolvedComponents = {
-    ScrollSeekPlaceholder: DefaultScrollSeekPlaceholder,
+    ...(scrollSeekConfiguration ? { ScrollSeekPlaceholder: DefaultScrollSeekPlaceholder } : {}),
     ...components
   };
 
@@ -215,12 +215,12 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
             }
       }
       data={data}
-      overscan={25}
+      overscan={{ main: 1200, reverse: 600 }}
       useWindowScroll={useWindowScroll}
       fixedItemHeight={fixedItemHeight}
       components={resolvedComponents}
       ref={setCombinedVirtuosoRef}
-      {...(scrollSeekConfiguration !== false ? { scrollSeekConfiguration } : {})}
+      {...(scrollSeekConfiguration ? { scrollSeekConfiguration } : {})}
       {...(initialItemCount !== undefined ? { initialItemCount } : {})}
       {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
       scrollerRef={(element) => {

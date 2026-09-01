@@ -25,6 +25,7 @@ type ImgProps = {
   showAltAsTooltipLabel?: boolean;
   draggable?: boolean;
   enableImgFadeIns?: boolean;
+  decoding?: 'async' | 'auto' | 'sync';
 };
 
 /* <picture
@@ -87,7 +88,8 @@ const Img = memo((props: ImgProps) => {
     tabIndex = -1,
     showAltAsTooltipLabel = false,
     draggable = false,
-    enableImgFadeIns = true
+    enableImgFadeIns = true,
+    decoding = 'async'
   } = props;
 
   const imgRef = useRef<HTMLImageElement>(null);
@@ -101,6 +103,7 @@ const Img = memo((props: ImgProps) => {
       src={src || fallbackSrc}
       alt={alt}
       ref={imgRef}
+      decoding={decoding}
       className={`relative outline-offset-4 focus-visible:!outline ${
         enableImgFadeIns && isFirstTimeRef.current
           ? 'opacity-0 transition-opacity delay-[250ms]'

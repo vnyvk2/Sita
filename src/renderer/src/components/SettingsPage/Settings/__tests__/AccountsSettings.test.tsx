@@ -75,7 +75,9 @@ describe('AccountsSettings collapsible behavior', () => {
   it('expands when clicking the header and renders integration items', () => {
     const { container } = renderWithQueryClient(<AccountsSettings />);
 
-    const headerButton = container.querySelector('button[aria-expanded="false"]') as HTMLButtonElement;
+    const headerButton = container.querySelector(
+      'button[aria-expanded="false"]'
+    ) as HTMLButtonElement;
     expect(headerButton).not.toBeNull();
 
     fireEvent.click(headerButton);
@@ -90,7 +92,9 @@ describe('AccountsSettings collapsible behavior', () => {
   it('collapses again when clicking the header a second time', () => {
     const { container } = renderWithQueryClient(<AccountsSettings />);
 
-    const headerButton = container.querySelector('button[aria-expanded="false"]') as HTMLButtonElement;
+    const headerButton = container.querySelector(
+      'button[aria-expanded="false"]'
+    ) as HTMLButtonElement;
     fireEvent.click(headerButton);
     expect(headerButton.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.spotify-integration')).not.toBeNull();

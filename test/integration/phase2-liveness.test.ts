@@ -24,11 +24,9 @@ vi.mock('@main/db/db', () => ({
     },
     select: vi.fn().mockReturnValue({ from: vi.fn().mockResolvedValue([]) }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
-    update: vi
-      .fn()
-      .mockReturnValue({
-        set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 1 }]) })
-      }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 1 }]) })
+    }),
     transaction: vi.fn(async (cb) => {
       const updateSetMock = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({

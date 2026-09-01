@@ -82,17 +82,15 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
       supports: () => true,
       lookup: vi.fn(),
       search: vi.fn(),
-      searchAlbums: vi
-        .fn()
-        .mockResolvedValue([
-          {
-            title: 'SOUR',
-            artist: 'Olivia Rodrigo',
-            releaseId: 'mb-sour',
-            provider: 'musicbrainz',
-            year: 2021
-          }
-        ])
+      searchAlbums: vi.fn().mockResolvedValue([
+        {
+          title: 'SOUR',
+          artist: 'Olivia Rodrigo',
+          releaseId: 'mb-sour',
+          provider: 'musicbrainz',
+          year: 2021
+        }
+      ])
     };
 
     const runtime = new MetadataProviderRuntime([failingAdapter, successfulAdapter]);

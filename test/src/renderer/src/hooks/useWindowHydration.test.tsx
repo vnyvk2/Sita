@@ -1,7 +1,7 @@
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getSongListIdentity, songCacheKeys } from '@renderer/queries/songs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -197,5 +197,59 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
     expect(result.current.getItem(1)).toBeUndefined(); // Requested ID 2 missing
     expect(result.current.getItem(2)?.id).toBe(3); // Requested ID 3
     expect(result.current.getItem(3)?.id).toBe(4); // Requested ID 4
+  });
+
+  it('bails out of state updates during intra-window scroll and preserves stable getItem reference', async () => {
+    const timestamp = 1700000000000;
+    // 500 ids -> spans 3 windows (0..199, 200..399, 400..499)
+    const ids = Array.from({ length: 500 }, (_, i) => i + 1);
+
+    (window as any).api.audioLibraryControls.getSongInfo = vi.fn().mockImplementation((batchIds: number[]) => {
+      return Promise.resolve(batchIds.map((id) => ({ id, songId: id, title: `Song ${id}` })));
+    });
+
+    let renderCount = 0;
+    const { result } = renderHook(
+      () => {
+        renderCount++;
+        return useWindowHydration(ids, timestamp, {
+          listIdentity: 'default',
+          keyPrefix: 'songs'
+        });
+      },
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.getItem(0)).toBeDefined();
+    });
+
+    // Sync initial range
+    act(() => {
+      result.current.onRangeChange({ startIndex: 0, endIndex: 15 });
+    });
+
+    const initialGetItem = result.current.getItem;
+    const settledRenderCount = renderCount;
+
+    // 1. Pure intra-window scrolling: 50 scroll ticks where visible range + buffer stays within window 0 (indices 1..30)
+    act(() => {
+      for (let i = 1; i <= 30; i++) {
+        result.current.onRangeChange({ startIndex: i, endIndex: i + 15 });
+      }
+    });
+
+    // ZERO additional hook re-renders during intra-window scrolling!
+    expect(renderCount).toBe(settledRenderCount);
+    expect(result.current.getItem).toBe(initialGetItem);
+
+    // 2. Crossing prefetch boundary: scroll to index 50 (50 + 150 buffer = 200 -> prefetch window 1)
+    act(() => {
+      result.current.onRangeChange({ startIndex: 50, endIndex: 65 });
+    });
+
+    // Exactly 1 state update to prefetch the next 200-row window chunk
+    expect(renderCount).toBe(settledRenderCount + 1);
+    expect(result.current.getItem).toBe(initialGetItem);
   });
 });
