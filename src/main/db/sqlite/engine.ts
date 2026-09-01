@@ -22,7 +22,8 @@ export const SQLITE_PRAGMAS = [
   'PRAGMA busy_timeout = 5000;',
   'PRAGMA foreign_keys = ON;',
   'PRAGMA temp_store = MEMORY;',
-  'PRAGMA cache_size = -16000;'
+  'PRAGMA cache_size = -16000;',
+  'PRAGMA analysis_limit = 1000;'
 ] as const;
 
 export type NoraDrizzle = ReturnType<typeof buildDrizzle>['orm'];
@@ -274,6 +275,11 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
     close: async () => {
       const t = performance.now();
+      try {
+        db.exec('PRAGMA optimize;');
+      } catch (error) {
+        logger.warn('[db] optimize skipped on close', { error });
+      }
       try {
         db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
       } catch {

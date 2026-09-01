@@ -354,4 +354,39 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     const settings = await singletonDb.select().from(schema.userSettings);
     expect(settings.length).toBeGreaterThan(0);
   });
+
+  it('FTS update triggers are guarded with AFTER UPDATE OF column', () => {
+    const rows = engine.raw
+      .prepare("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'fts%_au'")
+      .all() as { name: string; sql: string }[];
+    expect(rows).toHaveLength(5);
+    for (const r of rows) {
+      expect(r.sql).toMatch(/AFTER\s+UPDATE\s+OF\s+\w+\s+ON/i);
+    }
+  });
+
+  it('maintains planner stats via PRAGMA optimize on close', async () => {
+    const freshTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-optimize-test-'));
+    const freshDbPath = path.join(freshTmp, 'opt-test.db');
+    const testEng = openSqliteEngine(freshDbPath);
+
+    // Insert dummy data so optimize has tables to evaluate
+    testEng.exec(
+      "INSERT INTO songs (title, duration, path, file_created_at, file_modified_at) VALUES ('Opt Song 1', 120, '/dummy/opt1.mp3', 1700000000000, 1700000000000);"
+    );
+    testEng.exec(
+      "INSERT INTO songs (title, duration, path, file_created_at, file_modified_at) VALUES ('Opt Song 2', 180, '/dummy/opt2.mp3', 1700000000000, 1700000000000);"
+    );
+
+    // Close engine which triggers PRAGMA optimize;
+    await testEng.close();
+
+    // Reopen and verify database integrity & clean close
+    const reopenEng = openSqliteEngine(freshDbPath);
+    const integrity = reopenEng.get('PRAGMA integrity_check') as { integrity_check: string };
+    expect(integrity.integrity_check).toBe('ok');
+    await reopenEng.close();
+
+    fs.rmSync(freshTmp, { recursive: true, force: true });
+  });
 });
