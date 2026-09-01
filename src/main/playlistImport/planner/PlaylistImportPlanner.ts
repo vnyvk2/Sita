@@ -1,13 +1,16 @@
-import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
-import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
-import type { PlaylistImportPlanEntry } from '../models/PlaylistImportPlanEntry';
+import logger from '../../logger';
 import type { ImportDecision } from '../models/ImportDecision';
 import type { ImportStatistics } from '../models/ImportStatistics';
 import type { ImportWarning } from '../models/ImportWarning';
-import logger from '../../logger';
+import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
+import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
+import type { PlaylistImportPlanEntry } from '../models/PlaylistImportPlanEntry';
 
 export class PlaylistImportPlanner {
-  createPlan(playlist: LibraryResolvedPlaylist, initialWarnings: ImportWarning[] = []): PlaylistImportPlan {
+  createPlan(
+    playlist: LibraryResolvedPlaylist,
+    initialWarnings: ImportWarning[] = []
+  ): PlaylistImportPlan {
     const planEntries: PlaylistImportPlanEntry[] = [];
     const warnings: ImportWarning[] = [...initialWarnings];
 
@@ -50,7 +53,9 @@ export class PlaylistImportPlanner {
           notInLibraryEntries++;
           warnings.push({
             code: 'NOT_IN_LIBRARY',
-            message: getDiagReason(match.diagnostics?.[0]) ?? 'File exists on disk but is not scanned into Nora library',
+            message:
+              getDiagReason(match.diagnostics?.[0]) ??
+              'File exists on disk but is not scanned into Nora library',
             lineNumber: entry.sourceLine
           });
           break;
@@ -63,7 +68,8 @@ export class PlaylistImportPlanner {
           invalidEntries++;
           warnings.push({
             code: 'INVALID_REFERENCE',
-            message: getDiagReason(match.diagnostics?.[0]) ?? 'Unresolvable or invalid track reference',
+            message:
+              getDiagReason(match.diagnostics?.[0]) ?? 'Unresolvable or invalid track reference',
             lineNumber: entry.sourceLine
           });
           break;
@@ -92,7 +98,8 @@ export class PlaylistImportPlanner {
 
     const totalEntries = playlist.entries.length;
     const skippedEntries = missingEntries + notInLibraryEntries + invalidEntries;
-    const plannedImportPercentage = totalEntries > 0 ? Math.round((importedEntries / totalEntries) * 100) : 0;
+    const plannedImportPercentage =
+      totalEntries > 0 ? Math.round((importedEntries / totalEntries) * 100) : 0;
 
     const statistics: ImportStatistics = {
       totalEntries,

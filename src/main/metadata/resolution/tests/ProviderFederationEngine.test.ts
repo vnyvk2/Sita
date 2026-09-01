@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ProviderRegistry } from '../ProviderRegistry';
+
+import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { MetadataContext } from '../../domain/MetadataContext';
+import type { ProviderCandidate } from '../../domain/MetadataResolution';
+import { DefaultMetadataLookupGateway, type MetadataLookupGateway } from '../MetadataLookupGateway';
 import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
 import { MetadataResolutionManager } from '../MetadataResolutionManager';
-import { DefaultMetadataLookupGateway, type MetadataLookupGateway } from '../MetadataLookupGateway';
-import type { ProviderCandidate } from '../../domain/MetadataResolution';
-import type { MetadataContext } from '../../domain/MetadataContext';
-import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
-import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
+import { ProviderRegistry } from '../ProviderRegistry';
 
 describe('Provider Federation & Merge Engine Test Suite', () => {
   it('resolves provider descriptors and display names via ProviderRegistry', () => {
@@ -68,10 +69,25 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     const mergeEngine = new MetadataMergeEngine(registry);
 
     const rawContributions: FieldContribution[] = [
-      { fieldId: 'title', providerId: 'musicbrainz', value: 'drivers license', confidenceScore: 0.98 },
-      { fieldId: 'artist', providerId: 'musicbrainz', value: 'Olivia Rodrigo', confidenceScore: 0.98 },
+      {
+        fieldId: 'title',
+        providerId: 'musicbrainz',
+        value: 'drivers license',
+        confidenceScore: 0.98
+      },
+      {
+        fieldId: 'artist',
+        providerId: 'musicbrainz',
+        value: 'Olivia Rodrigo',
+        confidenceScore: 0.98
+      },
       { fieldId: 'genre', providerId: 'discogs', value: 'Bedroom Pop', confidenceScore: 0.92 },
-      { fieldId: 'artworkUrl', providerId: 'coverartarchive', value: 'https://coverartarchive.org/dl.jpg', confidenceScore: 0.99 }
+      {
+        fieldId: 'artworkUrl',
+        providerId: 'coverartarchive',
+        value: 'https://coverartarchive.org/dl.jpg',
+        confidenceScore: 0.99
+      }
     ];
 
     const merged = mergeEngine.mergeFieldContributions(rawContributions);
@@ -112,7 +128,10 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     const manager = new MetadataResolutionManager({ lookupGateway: mockGateway });
 
     const context: MetadataContext = {
-      resources: { primaryType: 'track', targetResources: [{ id: 42, type: 'track', attributes: {} }] },
+      resources: {
+        primaryType: 'track',
+        targetResources: [{ id: 42, type: 'track', attributes: {} }]
+      },
       execution: { mode: 'Interactive' }
     };
 
@@ -166,7 +185,12 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
         confidenceScore: 0.98,
         contributions: [
           { fieldId: 'title', providerId: 'musicbrainz', value: 'good 4 u', confidenceScore: 0.98 },
-          { fieldId: 'artist', providerId: 'musicbrainz', value: 'Olivia Rodrigo', confidenceScore: 0.98 }
+          {
+            fieldId: 'artist',
+            providerId: 'musicbrainz',
+            value: 'Olivia Rodrigo',
+            confidenceScore: 0.98
+          }
         ]
       })
     };
@@ -188,7 +212,12 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
         providerName: 'Cover Art Archive',
         confidenceScore: 0.99,
         contributions: [
-          { fieldId: 'artworkUrl', providerId: 'coverartarchive', value: 'https://coverartarchive.org/sour.jpg', confidenceScore: 0.99 }
+          {
+            fieldId: 'artworkUrl',
+            providerId: 'coverartarchive',
+            value: 'https://coverartarchive.org/sour.jpg',
+            confidenceScore: 0.99
+          }
         ]
       })
     };
@@ -198,7 +227,10 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     registry.registerInstance('coverartarchive', caaAdapter as any);
 
     const gateway = new DefaultMetadataLookupGateway(undefined, registry);
-    const manager = new MetadataResolutionManager({ lookupGateway: gateway, providerRegistry: registry });
+    const manager = new MetadataResolutionManager({
+      lookupGateway: gateway,
+      providerRegistry: registry
+    });
 
     const resolution = await manager.resolve({
       operationId: 'op-single-pass',
@@ -236,7 +268,9 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
           providerId: 'musicbrainz',
           providerName: 'MusicBrainz',
           confidenceScore: 0.95,
-          contributions: [{ fieldId: 'title', providerId: 'musicbrainz', value: 'traitor', confidenceScore: 0.95 }]
+          contributions: [
+            { fieldId: 'title', providerId: 'musicbrainz', value: 'traitor', confidenceScore: 0.95 }
+          ]
         };
       })
     };
@@ -257,7 +291,10 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
 
     const gateway = new DefaultMetadataLookupGateway(undefined, registry);
     const result = await gateway.resolveFederated({
-      resources: { primaryType: 'album', targetResources: [{ id: 1, type: 'album', attributes: {} }] },
+      resources: {
+        primaryType: 'album',
+        targetResources: [{ id: 1, type: 'album', attributes: {} }]
+      },
       execution: { mode: 'Batch' },
       request: {
         id: 'req-concurrency',
@@ -287,7 +324,14 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
         providerId: 'musicbrainz',
         providerName: 'MusicBrainz',
         confidenceScore: 0.98,
-        contributions: [{ fieldId: 'title', providerId: 'musicbrainz', value: '1 step forward, 3 steps back', confidenceScore: 0.98 }]
+        contributions: [
+          {
+            fieldId: 'title',
+            providerId: 'musicbrainz',
+            value: '1 step forward, 3 steps back',
+            confidenceScore: 0.98
+          }
+        ]
       })
     };
 
@@ -295,7 +339,10 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     const gateway = new DefaultMetadataLookupGateway(undefined, registry);
 
     const context: MetadataContext = {
-      resources: { primaryType: 'album', targetResources: [{ id: 1, type: 'album', attributes: {} }] },
+      resources: {
+        primaryType: 'album',
+        targetResources: [{ id: 1, type: 'album', attributes: {} }]
+      },
       execution: { mode: 'Batch' },
       request: {
         id: 'req-legacy-dup-test',

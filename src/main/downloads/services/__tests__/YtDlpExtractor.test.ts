@@ -5,8 +5,8 @@ import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { YtDlpExtractor } from '../YtDlpExtractor';
 import { ExtractorError } from '../OnlineExtractor';
+import { YtDlpExtractor } from '../YtDlpExtractor';
 
 const spawnMock = vi.fn();
 
@@ -26,7 +26,12 @@ interface FakeChildOptions {
   beforeClose?: (outputDir?: string) => void;
 }
 
-function makeFakeChild({ stdoutData = '', stderrData = '', exitCode = 0, beforeClose }: FakeChildOptions) {
+function makeFakeChild({
+  stdoutData = '',
+  stderrData = '',
+  exitCode = 0,
+  beforeClose
+}: FakeChildOptions) {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter & { setEncoding: (encoding: string) => void };
     stderr: EventEmitter & { setEncoding: (encoding: string) => void };
@@ -57,9 +62,9 @@ describe('YtDlpExtractor', () => {
 
   describe('resolvePlaylist', () => {
     it('rejects unbounded radio mixes without spawning yt-dlp', async () => {
-      await expect(extractor.resolvePlaylist('https://www.youtube.com/watch?v=abc&list=RDAMVMxyz')).rejects.toMatchObject(
-        { code: 'UNSUPPORTED_SOURCE' } satisfies Partial<ExtractorError>
-      );
+      await expect(
+        extractor.resolvePlaylist('https://www.youtube.com/watch?v=abc&list=RDAMVMxyz')
+      ).rejects.toMatchObject({ code: 'UNSUPPORTED_SOURCE' } satisfies Partial<ExtractorError>);
       expect(spawnMock).not.toHaveBeenCalled();
     });
 
@@ -74,7 +79,10 @@ describe('YtDlpExtractor', () => {
             title: 'Song One',
             channel: 'Artist - Topic',
             duration: 200,
-            thumbnails: [{ url: 'https://img/small', width: 120 }, { url: 'https://img/big', width: 640 }]
+            thumbnails: [
+              { url: 'https://img/small', width: 120 },
+              { url: 'https://img/big', width: 640 }
+            ]
           },
           {
             id: 'vid2',
@@ -97,16 +105,15 @@ describe('YtDlpExtractor', () => {
         makeFakeChild({ stdoutData: JSON.stringify(playlistJson) })
       );
 
-      const info = await extractor.resolvePlaylist('https://www.youtube.com/watch?v=abc&list=PL123');
+      const info = await extractor.resolvePlaylist(
+        'https://www.youtube.com/watch?v=abc&list=PL123'
+      );
 
       expect(info.playlistId).toBe('PL123');
       expect(info.title).toBe('My Playlist');
       expect(info.entries.map((entry) => entry.videoId)).toEqual(['vid1']);
       expect(info.excludedCount).toBe(3);
-      expect(info.entries[0].thumbnails).toEqual([
-        'https://img/small',
-        'https://img/big'
-      ]);
+      expect(info.entries[0].thumbnails).toEqual(['https://img/small', 'https://img/big']);
       expect(info.entries[0].channel).toBe('Artist - Topic');
     });
   });
@@ -220,12 +227,14 @@ describe('YtDlpExtractor', () => {
         return child;
       });
 
-      await extractor.download({
-        videoId: 'abc123',
-        outputDir,
-        abortSignal: new AbortController().signal,
-        onProgress: (p) => percents.push(p)
-      }).catch(() => undefined);
+      await extractor
+        .download({
+          videoId: 'abc123',
+          outputDir,
+          abortSignal: new AbortController().signal,
+          onProgress: (p) => percents.push(p)
+        })
+        .catch(() => undefined);
 
       expect(percents).toEqual([12.5, 87]);
     });

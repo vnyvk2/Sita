@@ -12,7 +12,9 @@ export class DefaultMetadataMergePolicy implements IMetadataMergePolicy {
     }
 
     // Sort by provider priority descending (highest priority first)
-    const sorted = [...validResults].sort((a, b) => b.providerInfo.priority - a.providerInfo.priority);
+    const sorted = [...validResults].sort(
+      (a, b) => b.providerInfo.priority - a.providerInfo.priority
+    );
 
     if (sorted.length === 1) {
       return sorted[0].payload as TDTO;

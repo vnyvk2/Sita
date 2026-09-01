@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 
+import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import Button from '../Button';
@@ -81,12 +81,10 @@ const AlbumImgAndInfoContainer = (props: Props) => {
                 alt="Album Cover"
               />
             )}
-            <div className="absolute -bottom-4 right-4 flex items-center justify-center">
+            <div className="absolute right-4 -bottom-4 flex items-center justify-center">
               <Button
                 className="bg-background-color-1 text-font-color-highlight hover:bg-background-color-1 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-2 m-0! flex rounded-full border-0! p-2.5! shadow-xl -outline-offset-[6px] focus-visible:outline!"
-                tooltipLabel={t(
-                  `common.${isFavorite ? 'dislike' : 'like'}`
-                )}
+                tooltipLabel={t(`common.${isFavorite ? 'dislike' : 'like'}`)}
                 iconName="favorite"
                 iconClassName={`text-3xl! leading-none! ${
                   isFavorite

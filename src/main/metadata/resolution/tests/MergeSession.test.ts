@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ProviderRegistry } from '../ProviderRegistry';
-import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
+
 import { MergeSession } from '../MergeSession';
+import { MetadataMergeEngine, type FieldContribution } from '../MetadataMergeEngine';
+import { ProviderRegistry } from '../ProviderRegistry';
 
 describe('Interactive MergeSession Test Suite', () => {
   it('initializes MergeSession and recomputes preview via policy updating when selecting alternate provider', () => {

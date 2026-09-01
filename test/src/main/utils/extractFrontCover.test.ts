@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { PictureType } from 'node-taglib-sharp';
 import { extractFrontCover } from '@main/utils/extractFrontCover';
+import { PictureType } from 'node-taglib-sharp';
+import { describe, expect, it } from 'vitest';
 
 describe('extractFrontCover (BUG-18 PictureType.FrontCover Filtering)', () => {
   const createMockPicture = (type: number, byteVal: number) => ({
@@ -14,7 +14,7 @@ describe('extractFrontCover (BUG-18 PictureType.FrontCover Filtering)', () => {
     const pictures = [
       createMockPicture(PictureType.BackCover, 10), // index 0: BackCover
       createMockPicture(PictureType.LeadArtist, 20), // index 1: Artist
-      createMockPicture(PictureType.FrontCover, 30)  // index 2: FrontCover
+      createMockPicture(PictureType.FrontCover, 30) // index 2: FrontCover
     ];
 
     const result = extractFrontCover(pictures);

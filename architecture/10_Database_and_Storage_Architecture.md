@@ -12,46 +12,46 @@ The relational schema ([`src/main/db/schema.ts`](file:///C:/Users/VINAY/.gemini/
 erDiagram
     music_folders ||--o{ music_folders : "parent/child"
     music_folders ||--o{ songs : "contains"
-    
+
     songs ||--o{ artists_songs : "has"
     artists ||--o{ artists_songs : "performs"
-    
+
     songs ||--o{ album_songs : "belongs_to"
     albums ||--o{ album_songs : "groups"
-    
+
     songs ||--o{ genres_songs : "categorized_by"
     genres ||--o{ genres_songs : "classifies"
-    
+
     songs ||--o{ artworks_songs : "displays"
     artworks ||--o{ artworks_songs : "attached_to"
-    
+
     artworks ||--o| palettes : "generates"
     palettes ||--o{ palette_swatches : "contains"
-    
+
     albums ||--o{ albums_artists : "credits"
     artists ||--o{ albums_artists : "releases"
-    
+
     albums ||--o{ albums_artworks : "featured_in"
     artworks ||--o{ albums_artworks : "illustrates"
-    
+
     playlists ||--o{ playlist_entries : "contains"
     songs ||--o{ playlist_entries : "included_in"
-    
+
     playlists ||--o| smart_playlist_rules : "defined_by"
     playlists ||--o{ playlists : "parent/child"
-    
+
     songs ||--o{ play_events : "logged_in"
     songs ||--o{ seek_events : "tracks"
     songs ||--o{ skip_events : "monitors"
     songs ||--o{ play_history : "records"
-    
+
     songs ||--o| waveforms : "visualized_as"
     songs ||--o| lyrics : "displays"
     songs ||--o| replay_gain : "normalized_by"
-    
+
     songs ||--o{ scrobble_queue : "scrobbles"
     songs ||--o{ metadata_overrides : "overrides"
-    
+
     playlists ||--o{ operation_journal : "journals"
 ```
 
@@ -60,9 +60,11 @@ erDiagram
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Many-to-Many Junctions & Cascade Rules
+
 Ensures data integrity across many-to-many relationships using strict foreign key cascade rules.
 
 **Cascade Invariant Matrix**:
+
 - When a `song` is deleted: All associated junction records (`artworks_songs`, `artists_songs`, `album_songs`, `genres_songs`, `playlist_entries`, `play_history`) automatically delete via `ON DELETE CASCADE`.
 - When an `artwork` is deleted: Associated `palettes` and `palette_swatches` delete via `ON DELETE CASCADE`.
 - When a `music_folder` is deleted: `songs.folderId` is safely updated to `NULL` via `ON DELETE SET NULL`.
@@ -94,6 +96,7 @@ flowchart TD
 ---
 
 ### Process 2: Index Optimization Strategy
+
 Maintains optimized indices across three distinct query patterns:
 
 1. **Case-Insensitive Exact Lookups**: Generated `citext` columns with B-Tree indices (`idx_songs_title_ci`, `idx_artists_name_ci`, `idx_albums_title_ci`).
@@ -123,6 +126,7 @@ flowchart TD
 ---
 
 ### Process 3: Short ACID Database Transactions
+
 All database transactions follow Rule 10: **CPU-intensive and filesystem operations are performed strictly OUTSIDE transactions**.
 
 ```mermaid
@@ -149,6 +153,7 @@ sequenceDiagram
 ---
 
 ### Process 4: Derived Asset Caching & Versioned Schema
+
 Derived assets (`artworks`, `palettes`, `waveforms`, `lyrics`, `replay_gain`) track an integer `generatorVersion` column. If generator algorithms evolve (e.g. Palette Generator V2), obsolete caches are detected and regenerated automatically without database migration scripts.
 
 ```mermaid
@@ -168,6 +173,7 @@ flowchart TD
 ---
 
 ### Process 5: User Preferences & State Serialization
+
 Stores application settings, custom keyboard shortcuts, equalizer presets, and mini player geometry in structured tables:
 
 - **`user_settings`**: Global app settings, Last.fm session keys, metadata preferences, library scan modes.

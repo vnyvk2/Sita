@@ -1,5 +1,6 @@
 import { clearScrobbleQueue } from '@main/db/queries/scrobble_queue';
 import { saveUserSettings } from '@main/db/queries/settings';
+
 import logger from '../../logger';
 import { dataUpdateEvent } from '../../main';
 import { invalidateListenBrainzSession } from './listenBrainzSession';

@@ -32,9 +32,7 @@ export class LibraryRelationalSyncService {
     this.dbUpdater = dbUpdater;
   }
 
-  /**
-   * Synchronizes song metadata changes to the relational database tables (albums, artists, genres).
-   */
+  /** Synchronizes song metadata changes to the relational database tables (albums, artists, genres). */
   public async syncRelationalDatabase(
     songId: number,
     filePath: string,

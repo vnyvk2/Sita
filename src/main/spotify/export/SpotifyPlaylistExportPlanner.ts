@@ -18,9 +18,9 @@ export interface ExportPlanGenerationParams {
 
 export class SpotifyPlaylistExportPlanner {
   /**
-   * Pure deterministic planner that maps local playlist tracks and their catalog resolutions
-   * into a SpotifyPlaylistExportPlan with exact ordering 1..N and duplicate preservation.
-   * Free of network/database dependencies.
+   * Pure deterministic planner that maps local playlist tracks and their catalog resolutions into a
+   * SpotifyPlaylistExportPlan with exact ordering 1..N and duplicate preservation. Free of
+   * network/database dependencies.
    */
   public static generatePlan(params: ExportPlanGenerationParams): SpotifyPlaylistExportPlan {
     const { playlistId, playlistName, description, revision, tracks, resolutions } = params;
@@ -100,7 +100,8 @@ export class SpotifyPlaylistExportPlanner {
       unmatchedEntries: unmatchedCount,
       variantConflictEntries: variantConflictCount,
       searchFailedEntries: searchFailedCount,
-      plannedExportPercentage: totalEntries > 0 ? Math.round((exportableCount / totalEntries) * 100) : 0
+      plannedExportPercentage:
+        totalEntries > 0 ? Math.round((exportableCount / totalEntries) * 100) : 0
     };
 
     return {

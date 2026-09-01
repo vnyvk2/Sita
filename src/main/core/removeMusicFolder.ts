@@ -9,7 +9,6 @@ import { sendMessageToRenderer } from '../main';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
 import { libraryScheduler } from '../workers/jobScheduler';
 
-
 const abortController = new AbortController();
 saveAbortController('removeMusicFolder', abortController);
 
@@ -114,7 +113,7 @@ const removeMusicFolder = async (folderPath: string): Promise<boolean> => {
     logger.debug(`Deleted ${relatedFolderIds.length} directories.`, {
       relatedFolders: relatedFolders.map((f) => f.path)
     });
-    
+
     // Enqueue GC after folder removal to clean up orphaned artworks/palettes
     libraryScheduler.requestMaintenance();
 

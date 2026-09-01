@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { DependencyAnalyzer } from '../../../../../src/main/collections/engine/DependencyAnalyzer';
 import type { SmartPlaylistDefinition } from '../../../../../src/main/collections/query/ast';
 
@@ -35,9 +36,7 @@ describe('DependencyAnalyzer', () => {
           }
         ]
       },
-      orderBy: [
-        { field: 'duration', direction: 'desc' }
-      ]
+      orderBy: [{ field: 'duration', direction: 'desc' }]
     };
 
     const deps = DependencyAnalyzer.extractDependencies(def);
@@ -56,6 +55,8 @@ describe('DependencyAnalyzer', () => {
     expect(DependencyAnalyzer.isAffectedByMetadataChange(cachedDeps, ['artist'])).toBe(true);
 
     // Does not affect
-    expect(DependencyAnalyzer.isAffectedByMetadataChange(cachedDeps, ['playCount', 'duration'])).toBe(false);
+    expect(
+      DependencyAnalyzer.isAffectedByMetadataChange(cachedDeps, ['playCount', 'duration'])
+    ).toBe(false);
   });
 });

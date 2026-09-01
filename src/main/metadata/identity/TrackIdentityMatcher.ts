@@ -60,16 +60,21 @@ export class TrackIdentityMatcher {
    * Pure, deterministic, and free of database/caller dependencies.
    *
    * Matching Taxonomy:
+   *
    * 1. Authoritative Tier (MBID / ISRC):
+   *
    *    - Industry-standard, cryptographic/registry recording identifiers.
    *    - Yield 100% confidence and `isAuthoritative: true`.
-   *    - Policy Invariant: Authoritative identifiers intentionally override textual/cosmetic title differences.
-   *
+   *    - Policy Invariant: Authoritative identifiers intentionally override textual/cosmetic title
+   *      differences.
    * 2. Heuristic Tier:
-   *    - Weighted heuristic evaluation: Title (35pts), Artist (25pts), Album (10pts), Year (5pts), Duration (30pts).
-   *    - Hard Variant Conflict Invariant: Major variant mismatches (Live, Acoustic, Remix, Demo, Instrumental)
-   *      strictly enforce `isMatch = false` and `matchType = 'NONE'`.
-   *    - Scores >= 90 with matching title/artist and zero variant penalty yield `HIGH_CONFIDENCE_METADATA` (`isAuthoritative: false`).
+   *
+   *    - Weighted heuristic evaluation: Title (35pts), Artist (25pts), Album (10pts), Year (5pts),
+   *      Duration (30pts).
+   *    - Hard Variant Conflict Invariant: Major variant mismatches (Live, Acoustic, Remix, Demo,
+   *      Instrumental) strictly enforce `isMatch = false` and `matchType = 'NONE'`.
+   *    - Scores >= 90 with matching title/artist and zero variant penalty yield
+   *      `HIGH_CONFIDENCE_METADATA` (`isAuthoritative: false`).
    */
   public static scorePair(
     source: CanonicalTrackIdentity,
@@ -323,9 +328,7 @@ export class TrackIdentityMatcher {
     };
   }
 
-  /**
-   * Jaro-Winkler / Bigram similarity metric
-   */
+  /** Jaro-Winkler / Bigram similarity metric */
   private static calculateSimilarity(str1: string, str2: string): number {
     if (str1 === str2) return 1.0;
     if (!str1 || !str2) return 0.0;

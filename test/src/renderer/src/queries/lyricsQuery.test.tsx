@@ -1,10 +1,10 @@
-﻿// @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useLyricsQuery } from '@renderer/queries/lyrics';
+﻿import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('Lyrics TanStack Query Unification & Deduplication (Phase L2)', () => {
   let queryClient: QueryClient;

@@ -5,7 +5,10 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LyricsDrawer from '../../../../../../src/renderer/src/components/LyricsPage/LyricsDrawer';
-import { AppUpdateContext, type AppUpdateContextType } from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
+import {
+  AppUpdateContext,
+  type AppUpdateContextType
+} from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
 import { store } from '../../../../../../src/renderer/src/store/store';
 
 const mockNavigate = vi.fn();

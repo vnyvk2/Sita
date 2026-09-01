@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { MetadataQueryNormalizer } from '../MetadataQueryNormalizer';
 import {
   classifyQualityBand,
@@ -9,9 +10,12 @@ import {
 
 describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
   it('normalizes query strings by stripping noise suffixes like Remastered while preserving raw title', () => {
-    const norm = MetadataQueryNormalizer.normalize('1989 (Taylor\'s Version) [Explicit]', 'Taylor Swift (feat. Guest)');
-    expect(norm.rawTitle).toBe('1989 (Taylor\'s Version) [Explicit]');
-    expect(norm.cleanTitle).toBe('1989 (Taylor\'s Version)');
+    const norm = MetadataQueryNormalizer.normalize(
+      "1989 (Taylor's Version) [Explicit]",
+      'Taylor Swift (feat. Guest)'
+    );
+    expect(norm.rawTitle).toBe("1989 (Taylor's Version) [Explicit]");
+    expect(norm.cleanTitle).toBe("1989 (Taylor's Version)");
     expect(norm.cleanArtist).toBe('Taylor Swift');
   });
 
@@ -19,7 +23,10 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
     const simExact = MetadataQueryNormalizer.compareStringSimilarity('Abbey Road', 'Abbey Road');
     expect(simExact).toBe(1.0);
 
-    const simClose = MetadataQueryNormalizer.compareStringSimilarity('Abbey Road', 'Abbey Road (Remastered)');
+    const simClose = MetadataQueryNormalizer.compareStringSimilarity(
+      'Abbey Road',
+      'Abbey Road (Remastered)'
+    );
     expect(simClose).toBeGreaterThanOrEqual(0.85);
   });
 
@@ -114,7 +121,14 @@ describe('MetadataSearchRankingEngine & QueryNormalizer Test Suite', () => {
   it('classifies candidates into Definitive, Probable, and Weak bands with exact threshold boundaries', () => {
     // Case 1: Exact Title + Exact Artist + Official Studio Album with score >= 160 -> Definitive
     const definitiveCandidate = {
-      candidate: { id: 'c-def', title: 'SOUR', artist: 'Olivia Rodrigo', status: 'Official', primaryType: 'Album', baseScore: 80 },
+      candidate: {
+        id: 'c-def',
+        title: 'SOUR',
+        artist: 'Olivia Rodrigo',
+        status: 'Official',
+        primaryType: 'Album',
+        baseScore: 80
+      },
       totalScore: 160,
       breakdown: {
         baseScore: 80,

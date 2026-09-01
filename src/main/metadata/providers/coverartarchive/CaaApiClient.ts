@@ -1,5 +1,5 @@
-import type { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 import { HttpError } from '../../../platform/networking/FetchHttpClient';
+import type { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 
 export interface CaaThumbnailDto {
   250?: string;
@@ -40,7 +40,9 @@ export class CaaApiClient {
     this.pipeline = pipeline;
   }
 
-  public async getReleaseCoverArt(mbid: string): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
+  public async getReleaseCoverArt(
+    mbid: string
+  ): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
     if (!mbid || mbid.trim().length === 0) return { data: null, isNotFound: false };
 
     const url = `${this.baseUrl}/release/${encodeURIComponent(mbid)}`;
@@ -67,7 +69,9 @@ export class CaaApiClient {
     }
   }
 
-  public async getReleaseGroupCoverArt(mbid: string): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
+  public async getReleaseGroupCoverArt(
+    mbid: string
+  ): Promise<{ data: CaaReleaseResponseDto | null; isNotFound: boolean }> {
     if (!mbid || mbid.trim().length === 0) return { data: null, isNotFound: false };
 
     const url = `${this.baseUrl}/release-group/${encodeURIComponent(mbid)}`;

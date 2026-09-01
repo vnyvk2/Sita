@@ -1,7 +1,7 @@
 import { db } from '@db/db';
 import { albumsArtists, albums, albumsSongs } from '@db/schema';
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { parseAlbumArtworks } from '@main/fs/resolveFilePaths';
+import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 
 export const isAlbumWithIdAvailable = async (albumId: number, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(albums).where(eq(albums.id, albumId));
@@ -28,7 +28,13 @@ export const getAllAlbums = async (
   options: GetAllAlbumsOptions = defaultGetAllAlbumsOptions,
   trx: DB | DBTransaction = db
 ) => {
-  const { albumIds = [], start = 0, end = 0, filterType = 'notSelected', sortType = 'aToZ' } = options;
+  const {
+    albumIds = [],
+    start = 0,
+    end = 0,
+    filterType = 'notSelected',
+    sortType = 'aToZ'
+  } = options;
 
   const limit = end - start === 0 ? undefined : end - start;
 
@@ -91,9 +97,7 @@ export interface AlbumSummary {
   songCount: number;
 }
 
-export type GetAllAlbumSummariesReturnType = Awaited<
-  ReturnType<typeof getAlbumSummaries>
->['data'];
+export type GetAllAlbumSummariesReturnType = Awaited<ReturnType<typeof getAlbumSummaries>>['data'];
 
 export const getAlbumSummaries = async (
   options: Omit<GetAllAlbumsOptions, 'albumIds'> & { albumIds?: number[] } = {},
@@ -104,7 +108,13 @@ export const getAlbumSummaries = async (
   start: number;
   end: number;
 }> => {
-  const { albumIds = [], start = 0, end = 0, filterType = 'notSelected', sortType = 'aToZ' } = options;
+  const {
+    albumIds = [],
+    start = 0,
+    end = 0,
+    filterType = 'notSelected',
+    sortType = 'aToZ'
+  } = options;
 
   const limit = end - start === 0 ? undefined : end - start;
 

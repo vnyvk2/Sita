@@ -107,7 +107,7 @@ const OtherSongControlsContainer = () => {
         }`}
         title={t('player.currentQueue')}
       >
-        <QueueIcon className="h-6 w-6 opacity-60 transition-[color,opacity] group-[.active]:text-font-color-highlight group-[.active]:opacity-100 dark:group-[.active]:text-dark-font-color-highlight hover:opacity-80" />
+        <QueueIcon className="group-[.active]:text-font-color-highlight dark:group-[.active]:text-dark-font-color-highlight h-6 w-6 opacity-60 transition-[color,opacity] group-[.active]:opacity-100 hover:opacity-80" />
       </NavLink>
 
       <Button

@@ -6,9 +6,7 @@ import type {
 } from '../query/ast';
 
 export class DependencyAnalyzer {
-  /**
-   * Extracts all field dependencies from a Smart Playlist Definition.
-   */
+  /** Extracts all field dependencies from a Smart Playlist Definition. */
   public static extractDependencies(definition: SmartPlaylistDefinition): SmartPlaylistField[] {
     const fields = new Set<SmartPlaylistField>();
 
@@ -23,7 +21,10 @@ export class DependencyAnalyzer {
     return Array.from(fields);
   }
 
-  private static walkAst(node: SmartPlaylistRuleAST | RuleCondition, fields: Set<SmartPlaylistField>): void {
+  private static walkAst(
+    node: SmartPlaylistRuleAST | RuleCondition,
+    fields: Set<SmartPlaylistField>
+  ): void {
     if (node.type === 'condition') {
       fields.add(node.field);
     } else if (node.type === 'group') {
@@ -33,9 +34,7 @@ export class DependencyAnalyzer {
     }
   }
 
-  /**
-   * Checks if a smart playlist should be regenerated based on the changed metadata fields.
-   */
+  /** Checks if a smart playlist should be regenerated based on the changed metadata fields. */
   public static isAffectedByMetadataChange(
     cachedDependencies: readonly string[],
     changedFields: readonly string[]
@@ -53,9 +52,7 @@ export class DependencyAnalyzer {
     return false;
   }
 
-  /**
-   * Maps domain events to potentially changed fields to check against dependencies.
-   */
+  /** Maps domain events to potentially changed fields to check against dependencies. */
   public static getFieldsForDomainEvent(eventName: string): SmartPlaylistField[] | null {
     switch (eventName) {
       case 'SongPlayCountChanged':

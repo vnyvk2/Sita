@@ -1,9 +1,11 @@
 import { getArtistById, getArtistsByName } from '@main/db/queries/artists';
-import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
-import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
-import { WikipediaApiClient } from '@main/platform/networking/WikipediaApiClient';
 import getArtistInfoFromLastFM from '@main/other/lastFm/getArtistInfoFromLastFM';
-import getArtistTopTracksFromLastFM, { type LastFmTopTrack } from '@main/other/lastFm/getArtistTopTracksFromLastFM';
+import getArtistTopTracksFromLastFM, {
+  type LastFmTopTrack
+} from '@main/other/lastFm/getArtistTopTracksFromLastFM';
+import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
+import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
+import { WikipediaApiClient } from '@main/platform/networking/WikipediaApiClient';
 import { convertToArtist } from '@main/utils/convert';
 import { normalizeBioText } from '@main/utils/normalizeBioText';
 import {
@@ -12,6 +14,7 @@ import {
   normalizeTrackTitle,
   type LocalSongMatchCandidate
 } from '@main/utils/normalizeTrackTitle';
+
 import type {
   ArtistFeaturedImage,
   ArtistOnlineProfilePayload,
@@ -50,8 +53,8 @@ export class ArtistProfileService {
   }
 
   /**
-   * Resolves the full enriched online profile for an artist.
-   * Leverages in-flight deduplication and bounded caching.
+   * Resolves the full enriched online profile for an artist. Leverages in-flight deduplication and
+   * bounded caching.
    */
   public getProfile(artistId: number, artistName: string): Promise<ArtistOnlineProfilePayload> {
     const trimmedName = artistName.trim();
@@ -121,19 +124,14 @@ export class ArtistProfileService {
         }));
 
       // Parallel independent pipelines using Promise.allSettled with shared abort signal
-      const [
-        lastFmInfoRes,
-        lastFmTracksRes,
-        itunesTracksRes,
-        deezerArtistRes,
-        wikiBioRes
-      ] = await Promise.allSettled([
-        getArtistInfoFromLastFM(artistName, controller.signal),
-        getArtistTopTracksFromLastFM(artistName, 15, controller.signal),
-        this.itunesClient.getArtistTopTracks(artistName, 15, controller.signal),
-        this.deezerClient.searchArtist(artistName, controller.signal),
-        this.wikiClient.getArtistBiography(artistName, controller.signal)
-      ]);
+      const [lastFmInfoRes, lastFmTracksRes, itunesTracksRes, deezerArtistRes, wikiBioRes] =
+        await Promise.allSettled([
+          getArtistInfoFromLastFM(artistName, controller.signal),
+          getArtistTopTracksFromLastFM(artistName, 15, controller.signal),
+          this.itunesClient.getArtistTopTracks(artistName, 15, controller.signal),
+          this.deezerClient.searchArtist(artistName, controller.signal),
+          this.wikiClient.getArtistBiography(artistName, controller.signal)
+        ]);
 
       const lastFmInfo = lastFmInfoRes.status === 'fulfilled' ? lastFmInfoRes.value : null;
       const lastFmTracks = lastFmTracksRes.status === 'fulfilled' ? lastFmTracksRes.value : [];
@@ -159,7 +157,11 @@ export class ArtistProfileService {
       let deezerTopTracks: any[] = [];
       if (lastFmTracks.length === 0 && deezerArtist?.id) {
         try {
-          deezerTopTracks = await this.deezerClient.getArtistTopTracks(deezerArtist.id, 15, controller.signal);
+          deezerTopTracks = await this.deezerClient.getArtistTopTracks(
+            deezerArtist.id,
+            15,
+            controller.signal
+          );
         } catch {
           deezerTopTracks = [];
         }
@@ -208,7 +210,9 @@ export class ArtistProfileService {
 
       return payload;
     } catch (err) {
-      logger.error(`[ArtistProfileService] Failed to resolve profile for ${artistName}`, { error: err });
+      logger.error(`[ArtistProfileService] Failed to resolve profile for ${artistName}`, {
+        error: err
+      });
       this.addToCache(artistId, fallbackPayload);
       return fallbackPayload;
     } finally {
@@ -216,9 +220,7 @@ export class ArtistProfileService {
     }
   }
 
-  /**
-   * Resolves the biography using quality-gated Last.fm -> Wikipedia fallback.
-   */
+  /** Resolves the biography using quality-gated Last.fm -> Wikipedia fallback. */
   private resolveBiography(
     lastFmInfo: any,
     wikiBio: any
@@ -265,8 +267,13 @@ export class ArtistProfileService {
 
   private extractLocalArtwork(localArtist: any): string | undefined {
     if (!localArtist) return undefined;
-    if (localArtist.onlineArtworkPaths?.picture_xl || localArtist.onlineArtworkPaths?.picture_medium) {
-      return localArtist.onlineArtworkPaths.picture_xl || localArtist.onlineArtworkPaths.picture_medium;
+    if (
+      localArtist.onlineArtworkPaths?.picture_xl ||
+      localArtist.onlineArtworkPaths?.picture_medium
+    ) {
+      return (
+        localArtist.onlineArtworkPaths.picture_xl || localArtist.onlineArtworkPaths.picture_medium
+      );
     }
     if (localArtist.artworkPaths?.artworkPath) {
       return localArtist.artworkPaths.artworkPath;
@@ -286,9 +293,7 @@ export class ArtistProfileService {
     return undefined;
   }
 
-  /**
-   * Resolves the featured image prioritizing Local -> Deezer -> Wikipedia -> iTunes.
-   */
+  /** Resolves the featured image prioritizing Local -> Deezer -> Wikipedia -> iTunes. */
   private resolveFeaturedImage(
     localArtist: any,
     deezerArtist: any,
@@ -305,7 +310,8 @@ export class ArtistProfileService {
     }
 
     // 2. Deezer high-resolution photo
-    const deezerArt = deezerArtist?.picture_xl || deezerArtist?.picture_big || deezerArtist?.picture_medium;
+    const deezerArt =
+      deezerArtist?.picture_xl || deezerArtist?.picture_big || deezerArtist?.picture_medium;
     if (deezerArt && !deezerArt.includes('placeholder')) {
       return {
         url: deezerArt,
@@ -335,8 +341,8 @@ export class ArtistProfileService {
   }
 
   /**
-   * Builds the top tracks array with strict global rankings, title deduplication,
-   * 30s preview enrichment, and local library matching.
+   * Builds the top tracks array with strict global rankings, title deduplication, 30s preview
+   * enrichment, and local library matching.
    */
   private buildTopTracks(
     lastFmTracks: LastFmTopTrack[],
@@ -418,8 +424,16 @@ export class ArtistProfileService {
 
         const itunesMatch = itunesMap.get(normalizeTrackTitle(dt.title));
         const previewUrl = dt.previewUrl || itunesMatch?.previewUrl;
-        const previewProvider = dt.previewUrl ? 'Deezer' : itunesMatch?.previewUrl ? 'iTunes' : undefined;
-        const durationSec = dt.durationSec || (itunesMatch?.trackTimeMillis ? Math.round(itunesMatch.trackTimeMillis / 1000) : undefined);
+        const previewProvider = dt.previewUrl
+          ? 'Deezer'
+          : itunesMatch?.previewUrl
+            ? 'iTunes'
+            : undefined;
+        const durationSec =
+          dt.durationSec ||
+          (itunesMatch?.trackTimeMillis
+            ? Math.round(itunesMatch.trackTimeMillis / 1000)
+            : undefined);
 
         const localMatch = matchOnlineTrackToLocalSong(dt.title, durationSec, localSongs);
 
@@ -482,9 +496,7 @@ export class ArtistProfileService {
     return popularTracks;
   }
 
-  /**
-   * Resolves similar artists from Last.fm with Deezer related artists fallback.
-   */
+  /** Resolves similar artists from Last.fm with Deezer related artists fallback. */
   private async resolveSimilarArtists(
     lastFmInfo: any,
     deezerArtistId?: number,
@@ -570,7 +582,11 @@ export class ArtistProfileService {
     if (wikiUrl) {
       links.push({ name: 'Wikipedia', url: wikiUrl, icon: 'menu_book' });
     } else {
-      links.push({ name: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encoded}`, icon: 'menu_book' });
+      links.push({
+        name: 'Wikipedia',
+        url: `https://en.wikipedia.org/wiki/${encoded}`,
+        icon: 'menu_book'
+      });
     }
 
     links.push({

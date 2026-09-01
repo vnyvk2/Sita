@@ -2,15 +2,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { searchQuery } from '@renderer/queries/search';
 import { songQuery } from '@renderer/queries/songs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type VirtuosoHandle } from 'react-virtuoso';
 
@@ -62,7 +54,9 @@ const MiniSearchSongRow = memo((props: MiniSearchSongRowProps) => {
       tabIndex={-1}
       data-testid={`mini-search-song-${song.songId}`}
       className={`group/search-song flex h-[52px] max-h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
-        isActive ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20' : 'hover:bg-font-color-white/10'
+        isActive
+          ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
+          : 'hover:bg-font-color-white/10'
       }`}
       onClick={() => onPlay(song)}
     >
@@ -77,7 +71,7 @@ const MiniSearchSongRow = memo((props: MiniSearchSongRowProps) => {
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm leading-tight text-font-color-white">{song.title}</div>
+        <div className="text-font-color-white truncate text-sm leading-tight">{song.title}</div>
         <div className="text-font-color-white/60 mt-0.5 truncate text-xs leading-tight">
           {song.artists?.map((a) => a.name).join(', ') || unknownArtistText}
         </div>
@@ -88,7 +82,7 @@ const MiniSearchSongRow = memo((props: MiniSearchSongRowProps) => {
           role="button"
           tabIndex={0}
           aria-label={addToQueueText}
-          className="text-font-color-white/40 hover:text-font-color-highlight flex h-7 w-7 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all hover:bg-white/10 group-hover/search-song:opacity-100"
+          className="text-font-color-white/40 hover:text-font-color-highlight flex h-7 w-7 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/search-song:opacity-100 hover:bg-white/10"
           title={addToQueueText}
           onClick={(e) => {
             e.stopPropagation();
@@ -132,8 +126,15 @@ type MiniSearchEntityRowProps = {
 };
 
 const MiniSearchEntityRow = memo((props: MiniSearchEntityRowProps) => {
-  const { title, subtitle, artworkSrc, isCircularArtwork = false, isActive, testId, onPlay } =
-    props;
+  const {
+    title,
+    subtitle,
+    artworkSrc,
+    isCircularArtwork = false,
+    isActive,
+    testId,
+    onPlay
+  } = props;
 
   return (
     <button
@@ -141,7 +142,9 @@ const MiniSearchEntityRow = memo((props: MiniSearchEntityRowProps) => {
       tabIndex={-1}
       data-testid={testId}
       className={`flex h-[52px] max-h-[52px] min-h-[52px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 ${
-        isActive ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20' : 'hover:bg-font-color-white/10'
+        isActive
+          ? 'bg-font-color-highlight/20 dark:bg-dark-font-color-highlight/20'
+          : 'hover:bg-font-color-white/10'
       }`}
       onClick={onPlay}
     >
@@ -158,12 +161,12 @@ const MiniSearchEntityRow = memo((props: MiniSearchEntityRowProps) => {
           className="h-full w-full object-cover"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity hover:opacity-100">
-          <span className="material-icons-round text-lg! text-font-color-white">play_arrow</span>
+          <span className="material-icons-round text-font-color-white text-lg!">play_arrow</span>
         </div>
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm leading-tight text-font-color-white">{title}</div>
+        <div className="text-font-color-white truncate text-sm leading-tight">{title}</div>
         <div className="text-font-color-white/60 mt-0.5 truncate text-xs leading-tight">
           {subtitle}
         </div>
@@ -230,7 +233,11 @@ const SearchContainer = (props: Props) => {
   // Keep the keyboard-selected row visible within the virtualized viewport
   useEffect(() => {
     if (activeRowIndex >= 0 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index: activeRowIndex, align: 'center', behavior: 'auto' });
+      virtuosoRef.current.scrollToIndex({
+        index: activeRowIndex,
+        align: 'center',
+        behavior: 'auto'
+      });
     }
   }, [activeRowIndex]);
 
@@ -324,21 +331,13 @@ const SearchContainer = (props: Props) => {
 
   const handleAddToQueue = useCallback(
     (song: SongData) => {
-      getQueuesManager()
-        .getActiveQueue()
-        .addSongIdToEnd(song.songId);
+      getQueuesManager().getActiveQueue().addSongIdToEnd(song.songId);
       addNewNotifications([
         {
           id: `miniPlayerSearchAddedToQueue-${song.songId}`,
           duration: 5000,
           content: <span>{t('notifications.addedToQueue', { count: 1 })}</span>,
-          icon: (
-            <Img
-              src={song.artworkPaths?.artworkPath}
-              alt={t('song.artwork')}
-              loading="eager"
-            />
-          )
+          icon: <Img src={song.artworkPaths?.artworkPath} alt={t('song.artwork')} loading="eager" />
         }
       ]);
     },
@@ -384,7 +383,11 @@ const SearchContainer = (props: Props) => {
   );
 
   const selectableRowIndices = useMemo(
-    () => rows.reduce<number[]>((acc, row, index) => (row.kind !== 'header' ? [...acc, index] : acc), []),
+    () =>
+      rows.reduce<number[]>(
+        (acc, row, index) => (row.kind !== 'header' ? [...acc, index] : acc),
+        []
+      ),
     [rows]
   );
 
@@ -404,7 +407,10 @@ const SearchContainer = (props: Props) => {
         setActiveRowIndex((prev) => {
           if (selectableRowIndices.length === 0) return -1;
           const currentPos = selectableRowIndices.indexOf(prev);
-          if (currentPos === -1) return selectableRowIndices[e.key === 'ArrowDown' ? 0 : selectableRowIndices.length - 1];
+          if (currentPos === -1)
+            return selectableRowIndices[
+              e.key === 'ArrowDown' ? 0 : selectableRowIndices.length - 1
+            ];
           const nextPos =
             e.key === 'ArrowDown'
               ? Math.min(currentPos + 1, selectableRowIndices.length - 1)
@@ -461,8 +467,7 @@ const SearchContainer = (props: Props) => {
             title={row.artist.name}
             subtitle={t('common.songWithCount', { count: row.artist.songs.length })}
             artworkSrc={
-              row.artist.onlineArtworkPaths?.picture_small ||
-              row.artist.artworkPaths?.artworkPath
+              row.artist.onlineArtworkPaths?.picture_small || row.artist.artworkPaths?.artworkPath
             }
             isCircularArtwork
             isActive={rows[activeRowIndex]?.id === row.id}
@@ -475,25 +480,16 @@ const SearchContainer = (props: Props) => {
         <MiniSearchEntityRow
           testId={`mini-search-album-${row.album.albumId}`}
           title={row.album.title}
-          subtitle={
-            row.album.artists?.map((a) => a.name).join(', ') ||
-            t('common.unknownArtist')
+          subtitle={row.album.artists?.map((a) => a.name).join(', ') || t('common.unknownArtist')}
+          artworkSrc={
+            row.album.artworkPaths?.optimizedArtworkPath || row.album.artworkPaths?.artworkPath
           }
-          artworkSrc={row.album.artworkPaths?.optimizedArtworkPath || row.album.artworkPaths?.artworkPath}
           isActive={rows[activeRowIndex]?.id === row.id}
           onPlay={() => handlePlayAlbum(row.album)}
         />
       );
     },
-    [
-      activeRowIndex,
-      handleAddToQueue,
-      handlePlayAlbum,
-      handlePlayArtist,
-      handlePlaySong,
-      rows,
-      t
-    ]
+    [activeRowIndex, handleAddToQueue, handlePlayAlbum, handlePlayArtist, handlePlaySong, rows, t]
   );
 
   if (!isSearchVisible) return null;
@@ -551,7 +547,7 @@ const SearchContainer = (props: Props) => {
               className={`shrink-0 cursor-pointer rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
                 filter === f
                   ? 'bg-font-color-highlight/25 text-font-color-highlight dark:bg-dark-font-color-highlight/25 dark:text-dark-font-color-highlight'
-                  : 'text-font-color-white/50 hover:bg-white/10 hover:text-font-color-white'
+                  : 'text-font-color-white/50 hover:text-font-color-white hover:bg-white/10'
               }`}
               onClick={() => {
                 setFilter(f);

@@ -51,11 +51,11 @@ export const usePageSearch = ({
     [debouncedSearch]
   );
 
-  return { 
-    value: searchInput, 
-    inputRef: searchInputRef, 
-    onChange, 
-    onCompositionStart, 
-    onCompositionEnd 
+  return {
+    value: searchInput,
+    inputRef: searchInputRef,
+    onChange,
+    onCompositionStart,
+    onCompositionEnd
   };
 };

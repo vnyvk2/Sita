@@ -1,6 +1,4 @@
-/**
- * Comprehensive HTML Entity and Unicode Decoder Map.
- */
+/** Comprehensive HTML Entity and Unicode Decoder Map. */
 const HTML_ENTITIES: Record<string, string> = {
   '&quot;': '"',
   '&apos;': "'",
@@ -60,38 +58,36 @@ const HTML_ENTITIES: Record<string, string> = {
   '&trade;': '™'
 };
 
-/**
- * Decodes all HTML entities including named, decimal (&#123;), and hex (&#x1F;).
- */
+/** Decodes all HTML entities including named, decimal (&#123;), and hex (&#x1F;). */
 export function decodeHtmlEntities(text: string): string {
   if (!text) return '';
 
-  return text
-    // Hex entities: &#x1F600;
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
-      try {
-        const codePoint = parseInt(hex, 16);
-        return String.fromCodePoint(codePoint);
-      } catch {
-        return '';
-      }
-    })
-    // Decimal entities: &#8217;
-    .replace(/&#(\d+);/g, (_, dec) => {
-      try {
-        const codePoint = parseInt(dec, 10);
-        return String.fromCodePoint(codePoint);
-      } catch {
-        return '';
-      }
-    })
-    // Named entities: &hellip;, &quot;, etc.
-    .replace(/&[a-zA-Z]+;/g, (match) => HTML_ENTITIES[match] ?? match);
+  return (
+    text
+      // Hex entities: &#x1F600;
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+        try {
+          const codePoint = parseInt(hex, 16);
+          return String.fromCodePoint(codePoint);
+        } catch {
+          return '';
+        }
+      })
+      // Decimal entities: &#8217;
+      .replace(/&#(\d+);/g, (_, dec) => {
+        try {
+          const codePoint = parseInt(dec, 10);
+          return String.fromCodePoint(codePoint);
+        } catch {
+          return '';
+        }
+      })
+      // Named entities: &hellip;, &quot;, etc.
+      .replace(/&[a-zA-Z]+;/g, (match) => HTML_ENTITIES[match] ?? match)
+  );
 }
 
-/**
- * Known placeholder / non-informative patterns from Last.fm / Wikipedia.
- */
+/** Known placeholder / non-informative patterns from Last.fm / Wikipedia. */
 const BIO_PLACEHOLDER_PATTERNS = [
   /does not have a biography/i,
   /we don'?t have a biography/i,
@@ -115,6 +111,7 @@ export const BIO_QUALITY_MIN_LENGTH = 250;
 
 /**
  * Robustly normalizes HTML and raw text biographies:
+ *
  * 1. Strips `<a href="...">...</a>` anchor tags (which typically link to external wiki pages)
  * 2. Converts `<p>`, `<div>`, `<br>` to clean `\n\n` paragraph boundaries
  * 3. Strips remaining HTML tags
@@ -122,7 +119,10 @@ export const BIO_QUALITY_MIN_LENGTH = 250;
  * 5. Collapses excessive internal whitespace per paragraph
  * 6. Applies a quality gate (length >= 250, not placeholder)
  */
-export function normalizeBioText(rawInput?: string, minLength = BIO_QUALITY_MIN_LENGTH): NormalizedBioResult {
+export function normalizeBioText(
+  rawInput?: string,
+  minLength = BIO_QUALITY_MIN_LENGTH
+): NormalizedBioResult {
   if (!rawInput || typeof rawInput !== 'string') {
     return {
       isValid: false,

@@ -98,9 +98,11 @@ graph TD
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Operation Lifecycle & Inverse Computation (`OperationExecutor.ts`)
+
 All collection mutations execute through a standardized, reversible lifecycle that automatically computes and journals its exact reverse mutation.
 
 **4-Step Lifecycle**:
+
 1. **Pre-Validation**: Validates inputs, target playlist existence, and permissions.
 2. **Transactional SQL Execution**: Executes raw mutations via `ctx.trx` and `PlaylistRepository`.
 3. **Inversion Computation**: Computes exact inverse parameters (e.g. `AddSongsOp` computes `RemoveSongsInput`; `DeleteOp` computes a full restore payload with original IDs).
@@ -127,13 +129,15 @@ flowchart TD
 ---
 
 ### Process 2: Pointer-Based Linear Undo/Redo Model (`UndoEngine.ts`)
+
 Undo/Redo uses a **pointer-based linear history** rather than branching operation trees.
 
 **Invariants**:
+
 - **Zero Journal Writes on Undo/Redo**: Reverting or reapplying an operation does not create new journal records; it merely navigates the `sequenceNumber` pointer.
 - **`Undo`**: Decrements pointer (`-1`), fetches `inverseInput`, and executes the registered inverse operation.
 - **`Redo`**: Increments pointer (`+1`), fetches `operationInput`, and executes the forward operation.
-- **Redo Branch Discard**: If a user undoes, and then performs a *new* forward mutation, the new operation takes the current sequence pointer and overwrites future history, cleanly discarding the old redo branch.
+- **Redo Branch Discard**: If a user undoes, and then performs a _new_ forward mutation, the new operation takes the current sequence pointer and overwrites future history, cleanly discarding the old redo branch.
 
 ```mermaid
 flowchart TD
@@ -161,9 +165,11 @@ flowchart TD
 ---
 
 ### Process 3: Membership Caching & Fast In-Memory Lookups (`MembershipService.ts`)
-Provides ultra-high-speed answers to *"Is song X in playlist Y or favorites?"* without running repetitive SQL joins.
+
+Provides ultra-high-speed answers to _"Is song X in playlist Y or favorites?"_ without running repetitive SQL joins.
 
 **Mechanics**:
+
 - Maintains an in-memory hash set of relationships (`Set<"playlistId:songId">`).
 - When mutations occur, `PlaylistEngine` selectively invalidates only the `affectedSongIds`.
 
@@ -186,6 +192,7 @@ flowchart TD
 ---
 
 ### Process 4: Hierarchical Folder Nesting & Subtree Mutations (`HierarchyService.ts`)
+
 Manages nested playlist folders with arbitrary depth, circular parentage prevention, and recursive subtree deletion.
 
 ```mermaid
@@ -210,9 +217,11 @@ flowchart TD
 ---
 
 ### Process 5: Smart Playlist AST Evaluation & Dynamic SQL Compilation (`SmartPlaylistEngine.ts`)
+
 Compiles JSON rule ASTs into safe, parameterized SQL WHERE queries.
 
 **Supported AST Node Types**:
+
 - **Field Comparisons**: `title`, `artist`, `album`, `genre`, `year`, `playCount`, `skipCount`, `rating`, `duration`, `dateAdded`.
 - **Operators**: `equals`, `contains`, `startsWith`, `endsWith`, `greaterThan`, `lessThan`, `inRange`, `isTrue`, `isFalse`.
 - **Combinators**: `AND`, `OR`, `NOT`.
@@ -236,6 +245,7 @@ flowchart TD
 ---
 
 ### Process 6: Smart Playlist Scheduler & Reactive Invalidation (`SmartPlaylistScheduler.ts`)
+
 Listens to global system event buses and automatically invalidates or regenerates smart playlists when their dependent fields change.
 
 ```mermaid
@@ -255,6 +265,7 @@ flowchart TD
 ---
 
 ### Process 7: Playlist Import Pipeline (Parsing & Path Resolution)
+
 Parses external playlist files (M3U, M3U8) and transforms relative file paths into normalized, absolute OS paths.
 
 ```mermaid
@@ -277,9 +288,11 @@ flowchart TD
 ---
 
 ### Process 8: Intelligent Repair Strategies (`PlaylistRepairEngine.ts`)
+
 Executes recovery strategies for tracks labeled `NOT_IN_LIBRARY`.
 
 **Strategy Chain**:
+
 1. **`ExactFilenameStrategy`**: Matches library tracks having exact filename equality.
 2. **`NormalizedFilenameStrategy`**: Matches after stripping punctuation, track numbers, and case differences.
 3. Generates **`RepairDiagnostics`** detailing strategy confidence scores and match provenance.
@@ -307,6 +320,7 @@ flowchart TD
 ---
 
 ### Process 9: Import Plan Generation & Transactional Execution
+
 Converts resolved entries into a [`PlaylistImportPlan`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/main/playlistImport/models/PlaylistImportPlan.ts) for user review before committing writes in a single atomic transaction.
 
 ```mermaid
@@ -332,6 +346,7 @@ flowchart TD
 ---
 
 ### Process 10: Import Session Management & One-Click Undo
+
 Maintains an audit history of imported playlists and enables one-click undo (deleting the imported playlist without losing user songs).
 
 ```mermaid

@@ -1,32 +1,35 @@
-import { describe, expect, it } from 'vitest';
 import { MetadataCapabilities } from '@main/metadata/common/types';
-import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
+import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderExecutionContext } from '@main/metadata/models/ProviderExecutionContext';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
-import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
 import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
 import { ProviderExecutionStageContext } from '@main/metadata/providers/execution/ProviderExecutionStageContext';
-import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
+import { describe, expect, it } from 'vitest';
 
 describe('CircuitBreakerStage', () => {
   const createMockProvider = (id: string): IMetadataProvider => {
     const info = new MetadataProviderInfo({ id, displayName: id, priority: 50 });
     return {
       info,
-      initialize: async () => { info.setReady(); },
+      initialize: async () => {
+        info.setReady();
+      },
       supports: () => true,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
-      fetch: async () => new ProviderResult({
-        payload: null,
-        confidence: MetadataConfidence.default(),
-        providerInfo: info,
-        latencyMs: 1,
-        status: 'success'
-      }),
+      fetch: async () =>
+        new ProviderResult({
+          payload: null,
+          confidence: MetadataConfidence.default(),
+          providerInfo: info,
+          latencyMs: 1,
+          status: 'success'
+        }),
       fetchMany: async () => []
     };
   };
@@ -44,7 +47,10 @@ describe('CircuitBreakerStage', () => {
       action: async () => provider.fetch(identity)
     });
 
-    const breaker = stage.getCircuitBreaker(provider.info.id, context as unknown as ProviderExecutionStageContext);
+    const breaker = stage.getCircuitBreaker(
+      provider.info.id,
+      context as unknown as ProviderExecutionStageContext
+    );
 
     await expect(
       stage.execute(context, async () => {
@@ -73,7 +79,10 @@ describe('CircuitBreakerStage', () => {
       action: async () => provider.fetch(identity)
     });
 
-    const breaker = stage.getCircuitBreaker(provider.info.id, context as unknown as ProviderExecutionStageContext);
+    const breaker = stage.getCircuitBreaker(
+      provider.info.id,
+      context as unknown as ProviderExecutionStageContext
+    );
 
     await expect(
       stage.execute(context, async () => {
@@ -98,7 +107,10 @@ describe('CircuitBreakerStage', () => {
       action: async () => provider.fetch(identity)
     });
 
-    const breaker = stage.getCircuitBreaker(provider.info.id, context as unknown as ProviderExecutionStageContext);
+    const breaker = stage.getCircuitBreaker(
+      provider.info.id,
+      context as unknown as ProviderExecutionStageContext
+    );
 
     // Fail 5 times to trip default failureThreshold
     for (let i = 0; i < 5; i++) {

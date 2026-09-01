@@ -22,8 +22,8 @@ export interface DiskWalkResult {
 }
 
 /**
- * Local in-process directory traversal.
- * Used in Vitest unit test suites or as an emergency fallback if the utilityProcess is unavailable.
+ * Local in-process directory traversal. Used in Vitest unit test suites or as an emergency fallback
+ * if the utilityProcess is unavailable.
  */
 export const fastDiskWalkLocal = async (
   roots: ScanRoot[],
@@ -162,8 +162,8 @@ export const fastDiskWalkLocal = async (
  * scan roots.
  *
  * In Electron runtime (Phase C2), delegates directory traversal to the utilityProcess media worker
- * via MediaWorkerBridge, keeping all fs.readdir and fs.stat operations off the Main process event loop.
- * In Vitest or non-Electron environments, transparently falls back to fastDiskWalkLocal.
+ * via MediaWorkerBridge, keeping all fs.readdir and fs.stat operations off the Main process event
+ * loop. In Vitest or non-Electron environments, transparently falls back to fastDiskWalkLocal.
  */
 export const fastDiskWalk = async (
   roots: ScanRoot[],

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
+import { describe, expect, it } from 'vitest';
 
 describe('normalizeForMatching (Canonical Normalization Contract)', () => {
   it('preserves CJK script characters intact', () => {

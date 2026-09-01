@@ -17,7 +17,8 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     collection: MembershipReference,
     _memberKind: MembershipEntityKind
   ): Promise<MembershipEntry[]> {
-    const colId = typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
+    const colId =
+      typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
     if (isNaN(colId)) return [];
 
     switch (collection.kind) {
@@ -235,7 +236,8 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     collection: MembershipReference,
     member: MembershipReference
   ): Promise<boolean> {
-    const colId = typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
+    const colId =
+      typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
     const memId = typeof member.id === 'number' ? member.id : parseInt(String(member.id), 10);
     if (isNaN(colId) || isNaN(memId)) return false;
 
@@ -280,7 +282,8 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
 
     if (members.length === 0) return resultMap;
 
-    const colId = typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
+    const colId =
+      typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
     if (isNaN(colId)) return resultMap;
 
     const memberIds = members
@@ -292,7 +295,10 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     switch (collection.kind) {
       case 'playlist': {
         const entries = await this.database.query.playlistEntries.findMany({
-          where: and(eq(playlistEntries.playlistId, colId), inArray(playlistEntries.songId, memberIds))
+          where: and(
+            eq(playlistEntries.playlistId, colId),
+            inArray(playlistEntries.songId, memberIds)
+          )
         });
         for (const entry of entries) {
           resultMap.set(entry.songId, true);
@@ -335,7 +341,8 @@ export class DatabaseMembershipRepository implements IMembershipRepository {
     collection: MembershipReference,
     _memberKind: MembershipEntityKind
   ): Promise<number> {
-    const colId = typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
+    const colId =
+      typeof collection.id === 'number' ? collection.id : parseInt(String(collection.id), 10);
     if (isNaN(colId)) return 0;
 
     switch (collection.kind) {

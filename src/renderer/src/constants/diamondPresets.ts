@@ -1,10 +1,7 @@
 import type { ClipPathArtworkCount, DiamondVariant, LayoutPreset } from '../types/playlistCover';
 
 const CLASSIC_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(50% 0, 100% 0, 50% 100%, 0 100%)',
-    'polygon(0 0, 50% 0, 100% 100%, 50% 100%)'
-  ],
+  2: ['polygon(50% 0, 100% 0, 50% 100%, 0 100%)', 'polygon(0 0, 50% 0, 100% 100%, 50% 100%)'],
   3: [
     'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
     'polygon(0 0, 100% 0, 50% 0, 0 50%, 0 0)',
@@ -26,10 +23,7 @@ const CLASSIC_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> =
 } as const;
 
 const HERO_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%)',
-    'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
-  ],
+  2: ['polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'],
   3: [
     'polygon(50% 15%, 85% 50%, 50% 85%, 15% 50%)',
     'polygon(0 0, 100% 0, 100% 45%, 0 45%)',
@@ -51,10 +45,7 @@ const HERO_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 } as const;
 
 const ROTATED_DIAMOND_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
-    'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
-  ],
+  2: ['polygon(50% 0, 100% 50%, 50% 100%, 0 50%)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'],
   3: [
     'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
     'polygon(0 0, 100% 0, 50% 0, 0 50%)',

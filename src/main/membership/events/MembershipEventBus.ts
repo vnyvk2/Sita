@@ -22,9 +22,7 @@ export class MembershipEventBus {
     this.emitter.emit('MembershipChanged', payload);
   }
 
-  public onMembershipChanged(
-    handler: (payload: MembershipChangedPayload) => void
-  ): () => void {
+  public onMembershipChanged(handler: (payload: MembershipChangedPayload) => void): () => void {
     this.emitter.on('MembershipChanged', handler);
     return () => {
       this.emitter.off('MembershipChanged', handler);

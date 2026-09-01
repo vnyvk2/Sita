@@ -1,9 +1,14 @@
-import { smartPlaylistRules } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
+
 import { createCollectionId } from '../../../../common/collections/id';
-import type { CollectionOperation, OperationContext, OperationResult } from '../types';
-import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, OrderDefinition } from '../../query/ast';
+import { smartPlaylistRules } from '../../../db/schema';
 import { DependencyAnalyzer } from '../../engine/DependencyAnalyzer';
+import type {
+  SmartPlaylistDefinition,
+  SmartPlaylistRuleAST,
+  OrderDefinition
+} from '../../query/ast';
+import type { CollectionOperation, OperationContext, OperationResult } from '../types';
 
 export interface UpdateSmartPlaylistInput {
   playlistId: number;

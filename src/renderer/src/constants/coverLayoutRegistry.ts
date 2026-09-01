@@ -8,7 +8,7 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     icon: 'grid_view',
     enabled: true,
     minImages: 1,
-    maxImages: 4,
+    maxImages: 4
   },
   {
     id: 'triangle',
@@ -17,7 +17,7 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     icon: 'change_history',
     enabled: true,
     minImages: 1,
-    maxImages: 4,
+    maxImages: 4
   },
   {
     id: 'fan',
@@ -26,7 +26,7 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     icon: 'style',
     enabled: true,
     minImages: 1,
-    maxImages: 4,
+    maxImages: 4
   },
   {
     id: 'diamond',
@@ -35,6 +35,6 @@ export const COVER_LAYOUT_DEFINITIONS: CoverLayoutDefinition[] = [
     icon: 'diamond',
     enabled: true,
     minImages: 1,
-    maxImages: 5,
-  },
+    maxImages: 5
+  }
 ];

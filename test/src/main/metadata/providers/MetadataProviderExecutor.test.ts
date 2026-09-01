@@ -13,9 +13,10 @@ vi.mock('@db/db', () => ({
 }));
 
 import { MetadataCapabilities } from '@main/metadata/common/types';
-import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
+import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
@@ -24,9 +25,8 @@ import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
 import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
-import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('MetadataProviderExecutor', () => {
   it('should execute registered providers sorted by priority and handle cancellation', async () => {
@@ -58,8 +58,14 @@ describe('MetadataProviderExecutor', () => {
       skippedFired = true;
     });
 
-    const cancelledContext = new ProviderExecutionContext({ cancellationToken: { isCancelled: true } });
-    const skippedResults = await executor.execute<SongPersistenceDTO>(identity, MetadataCapabilities.Tags, cancelledContext);
+    const cancelledContext = new ProviderExecutionContext({
+      cancellationToken: { isCancelled: true }
+    });
+    const skippedResults = await executor.execute<SongPersistenceDTO>(
+      identity,
+      MetadataCapabilities.Tags,
+      cancelledContext
+    );
 
     expect(skippedResults.length).toBe(1);
     expect(skippedResults[0].status).toBe('skipped');
@@ -70,8 +76,14 @@ describe('MetadataProviderExecutor', () => {
     const executionOrder: string[] = [];
 
     const providerHigh: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'high-priority', displayName: 'High Priority', priority: 100 }),
-      initialize: async () => { providerHigh.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'high-priority',
+        displayName: 'High Priority',
+        priority: 100
+      }),
+      initialize: async () => {
+        providerHigh.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async (id) => {
@@ -89,8 +101,14 @@ describe('MetadataProviderExecutor', () => {
     await providerHigh.initialize();
 
     const providerLow: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'low-priority', displayName: 'Low Priority', priority: 50 }),
-      initialize: async () => { providerLow.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'low-priority',
+        displayName: 'Low Priority',
+        priority: 50
+      }),
+      initialize: async () => {
+        providerLow.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async (id) => {
@@ -126,8 +144,14 @@ describe('MetadataProviderExecutor', () => {
     const executedProviders: string[] = [];
 
     const providerA: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'provider-a', displayName: 'Provider A', priority: 100 }),
-      initialize: async () => { providerA.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'provider-a',
+        displayName: 'Provider A',
+        priority: 100
+      }),
+      initialize: async () => {
+        providerA.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {
@@ -148,7 +172,9 @@ describe('MetadataProviderExecutor', () => {
 
     const providerB: IMetadataProvider = {
       info: new MetadataProviderInfo({ id: 'provider-b', displayName: 'Provider B', priority: 50 }),
-      initialize: async () => { providerB.info.setReady(); },
+      initialize: async () => {
+        providerB.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {

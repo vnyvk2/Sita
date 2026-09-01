@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('ProviderCircuitBreaker (Phase 2 State Machine & HalfOpen Probes)', () => {
   it('opens circuit when failure threshold is reached', () => {

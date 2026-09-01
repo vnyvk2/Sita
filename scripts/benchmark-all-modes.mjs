@@ -41,7 +41,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -112,7 +115,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -126,7 +129,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -142,7 +149,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -157,7 +164,7 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
           return page;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -166,10 +173,10 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 async function benchmark() {
@@ -190,7 +197,13 @@ async function benchmark() {
   console.log('[Runner] Launching Nora in dev mode with --remoteDebuggingPort 9876...');
   spawn(
     process.execPath,
-    [path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'dev', '--watch=false', '--remoteDebuggingPort', '9876'],
+    [
+      path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'),
+      'dev',
+      '--watch=false',
+      '--remoteDebuggingPort',
+      '9876'
+    ],
     {
       cwd: rootDir,
       env,
@@ -218,10 +231,14 @@ async function benchmark() {
       let cdpMetrics = null;
       try {
         cdpMetrics = await cdp.getPerformanceMetrics();
-      } catch (e) { }
+      } catch (e) {}
 
-      const jsHeapUsedMB = cdpMetrics?.JSHeapUsedSize ? Math.round((cdpMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100 : null;
-      const jsHeapTotalMB = cdpMetrics?.JSHeapTotalSize ? Math.round((cdpMetrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100 : null;
+      const jsHeapUsedMB = cdpMetrics?.JSHeapUsedSize
+        ? Math.round((cdpMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100
+        : null;
+      const jsHeapTotalMB = cdpMetrics?.JSHeapTotalSize
+        ? Math.round((cdpMetrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100
+        : null;
       const listeners = cdpMetrics?.JSEventListeners ?? null;
 
       const record = {
@@ -239,7 +256,9 @@ async function benchmark() {
         listeners
       };
 
-      console.log(`  [${label}] Total WS: ${record.totalWS} MB (PM: ${record.totalPM} MB) | Renderer: ${record.rendererWS} MB | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | JS Heap: ${record.jsHeapUsedMB} MB`);
+      console.log(
+        `  [${label}] Total WS: ${record.totalWS} MB (PM: ${record.totalPM} MB) | Renderer: ${record.rendererWS} MB | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | JS Heap: ${record.jsHeapUsedMB} MB`
+      );
       return record;
     }
 
@@ -334,7 +353,9 @@ async function benchmark() {
       })()`);
       await sleep(1500);
     }
-    results['StandardMini_TraversingQueue'] = await recordSnapshot('Standard MiniPlayer: Traversing Queue');
+    results['StandardMini_TraversingQueue'] = await recordSnapshot(
+      'Standard MiniPlayer: Traversing Queue'
+    );
 
     // Close lyrics in standard mini
     await cdp.evaluate(`(async () => {
@@ -381,7 +402,9 @@ async function benchmark() {
       })()`);
       await sleep(1500);
     }
-    results['CompactMini_TraversingQueue'] = await recordSnapshot('Compact MiniPlayer: Traversing Queue');
+    results['CompactMini_TraversingQueue'] = await recordSnapshot(
+      'Compact MiniPlayer: Traversing Queue'
+    );
 
     cdp.close();
   } catch (err) {

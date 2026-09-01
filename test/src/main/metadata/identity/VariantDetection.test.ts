@@ -1,8 +1,5 @@
+import { TrackIdentityMatcher, type CanonicalTrackIdentity } from '@main/metadata/identity';
 import { describe, expect, it } from 'vitest';
-import {
-  TrackIdentityMatcher,
-  type CanonicalTrackIdentity
-} from '@main/metadata/identity';
 
 describe('TrackIdentityMatcher (Variant Detection & Strict False-Positive Prevention)', () => {
   const baseTrack: CanonicalTrackIdentity = {
@@ -95,10 +92,7 @@ describe('TrackIdentityMatcher (Variant Detection & Strict False-Positive Preven
       durationSecs: 276.5
     };
 
-    const result = TrackIdentityMatcher.scorePair(
-      trackWithFeatInTitle,
-      trackWithFeatInArtists
-    );
+    const result = TrackIdentityMatcher.scorePair(trackWithFeatInTitle, trackWithFeatInArtists);
     expect(result.isMatch).toBe(true);
     expect(result.breakdown.variantPenalty).toBe(0);
   });

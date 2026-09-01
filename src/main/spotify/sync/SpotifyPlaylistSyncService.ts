@@ -4,10 +4,10 @@ import { db } from '../../db/db';
 import { getAllSongs } from '../../db/queries/songs';
 import { playlistEntries, playlists, spotifyPlaylistLinks } from '../../db/schema';
 import logger from '../../logger';
-import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
-import { TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
 import { toCanonicalFromSong } from '../../metadata/identity/adapters/SongToCanonicalIdentity';
 import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
+import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
+import { TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
 import { MetadataNormalizer } from '../../metadata/matching/MetadataNormalizer';
 import { SpotifyApiClient } from '../api/SpotifyApiClient';
 import {
@@ -34,10 +34,11 @@ export class SpotifyPlaylistSyncService {
     this.catalogSearcher = new SpotifyTrackCatalogSearcher(this.apiClient);
   }
 
-  /**
-   * Asserts that a persistent link belongs to the currently connected Spotify account.
-   */
-  private assertLinkBelongsToCurrentUser(link: SpotifyPlaylistLinkDTO, currentUserId: string): void {
+  /** Asserts that a persistent link belongs to the currently connected Spotify account. */
+  private assertLinkBelongsToCurrentUser(
+    link: SpotifyPlaylistLinkDTO,
+    currentUserId: string
+  ): void {
     if (link.spotifyUserId !== currentUserId) {
       throw new Error(
         `Linked Spotify playlist belongs to user "${link.spotifyUserId}", but active account is "${currentUserId}". Please re-link with the active account.`
@@ -45,9 +46,7 @@ export class SpotifyPlaylistSyncService {
     }
   }
 
-  /**
-   * Retrieves persistent Spotify link record for a given Nora playlist ID.
-   */
+  /** Retrieves persistent Spotify link record for a given Nora playlist ID. */
   public async getLinkedPlaylist(playlistId: number): Promise<SpotifyPlaylistLinkDTO | null> {
     const link = await db.query.spotifyPlaylistLinks.findFirst({
       where: eq(spotifyPlaylistLinks.playlistId, playlistId)
@@ -74,8 +73,8 @@ export class SpotifyPlaylistSyncService {
   }
 
   /**
-   * Links a local Nora playlist to a remote Spotify playlist.
-   * Verifies account ownership/collaboration, write permissions, and establishes initial baseline.
+   * Links a local Nora playlist to a remote Spotify playlist. Verifies account
+   * ownership/collaboration, write permissions, and establishes initial baseline.
    */
   public async linkPlaylist(
     playlistId: number,
@@ -181,9 +180,7 @@ export class SpotifyPlaylistSyncService {
     return saved!;
   }
 
-  /**
-   * Unlinks a playlist by deleting its persistent synchronization record.
-   */
+  /** Unlinks a playlist by deleting its persistent synchronization record. */
   public async unlinkPlaylist(playlistId: number): Promise<void> {
     await db.delete(spotifyPlaylistLinks).where(eq(spotifyPlaylistLinks.playlistId, playlistId));
     SpotifyPlaylistSyncService.activeSyncLocks.delete(playlistId);
@@ -191,7 +188,8 @@ export class SpotifyPlaylistSyncService {
   }
 
   /**
-   * Detects drift state between local Nora playlist and remote Spotify playlist against stored baseline.
+   * Detects drift state between local Nora playlist and remote Spotify playlist against stored
+   * baseline.
    */
   public async detectDrift(playlistId: number, clientId?: string): Promise<SpotifySyncDriftStatus> {
     const link = await this.getLinkedPlaylist(playlistId);
@@ -242,9 +240,7 @@ export class SpotifyPlaylistSyncService {
     });
   }
 
-  /**
-   * Generates a 3-way synchronization preview plan without performing any mutations.
-   */
+  /** Generates a 3-way synchronization preview plan without performing any mutations. */
   public async generateSyncPlan(
     playlistId: number,
     chosenStrategy?: SyncStrategy,
@@ -268,7 +264,8 @@ export class SpotifyPlaylistSyncService {
     // 1. Load local Nora entries and canonicalize
     const localEntries = await this.loadPlaylistEntries(playlistId);
     const songIds = localEntries.map((e) => e.songId);
-    const songsResult = songIds.length > 0 ? await getAllSongs({ songIds, preserveIdOrder: true }) : [];
+    const songsResult =
+      songIds.length > 0 ? await getAllSongs({ songIds, preserveIdOrder: true }) : [];
     const songsData = Array.isArray(songsResult) ? songsResult : songsResult.data;
     const songMap = new Map<number, (typeof songsData)[0]>();
     for (const s of songsData) {
@@ -344,7 +341,9 @@ export class SpotifyPlaylistSyncService {
       const rawNormTitle = MetadataNormalizer.normalizeTitle(lSong.title || '');
       if (rawNormTitle) titlesToIndex.add(rawNormTitle);
 
-      const primaryArtist = lSong.artists[0] ? MetadataNormalizer.normalizeArtist(lSong.artists[0]) : '';
+      const primaryArtist = lSong.artists[0]
+        ? MetadataNormalizer.normalizeArtist(lSong.artists[0])
+        : '';
 
       for (const normTitle of titlesToIndex) {
         if (primaryArtist) {
@@ -377,7 +376,9 @@ export class SpotifyPlaylistSyncService {
         for (const c of mbidIndex.get(mbidKey) || []) candidateSet.add(c);
       }
 
-      const primaryArtist = rTrack.artists[0] ? MetadataNormalizer.normalizeArtist(rTrack.artists[0]) : '';
+      const primaryArtist = rTrack.artists[0]
+        ? MetadataNormalizer.normalizeArtist(rTrack.artists[0])
+        : '';
       const titlesToQuery = new Set<string>();
       const effectiveTitle = MetadataNormalizer.getEffectiveTitle(rTrack);
       if (effectiveTitle) titlesToQuery.add(effectiveTitle);
@@ -410,7 +411,8 @@ export class SpotifyPlaylistSyncService {
       accessToken,
       link.spotifyPlaylistId
     );
-    const currentSnapshotId = currentRemoteDetails.snapshot_id || currentRemoteDetails.snapshotId || '';
+    const currentSnapshotId =
+      currentRemoteDetails.snapshot_id || currentRemoteDetails.snapshotId || '';
 
     const currentLocalEntries = await this.loadPlaylistEntries(playlistId);
     const currentEntriesHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
@@ -436,9 +438,7 @@ export class SpotifyPlaylistSyncService {
     });
   }
 
-  /**
-   * Executes coordinated 2-way target-state synchronization with pre/post-write verification.
-   */
+  /** Executes coordinated 2-way target-state synchronization with pre/post-write verification. */
   public async executeSync(
     playlistId: number,
     chosenStrategy?: SyncStrategy,
@@ -491,7 +491,8 @@ export class SpotifyPlaylistSyncService {
           .update(spotifyPlaylistLinks)
           .set({
             syncState: 'CONFLICT',
-            lastError: 'Local playlist was modified during sync preparation. Please generate a fresh plan.',
+            lastError:
+              'Local playlist was modified during sync preparation. Please generate a fresh plan.',
             updatedAt: new Date()
           })
           .where(eq(spotifyPlaylistLinks.id, link.id));
@@ -504,7 +505,8 @@ export class SpotifyPlaylistSyncService {
           syncState: 'CONFLICT',
           completedRemoteBatches: 0,
           totalRemoteBatches: 0,
-          error: 'Local playlist was modified during sync preparation. Please generate a fresh plan.'
+          error:
+            'Local playlist was modified during sync preparation. Please generate a fresh plan.'
         };
       }
 
@@ -513,13 +515,15 @@ export class SpotifyPlaylistSyncService {
         accessToken,
         link.spotifyPlaylistId
       );
-      const preFlightSnapshotId = preFlightRemoteDetails.snapshot_id || preFlightRemoteDetails.snapshotId || '';
+      const preFlightSnapshotId =
+        preFlightRemoteDetails.snapshot_id || preFlightRemoteDetails.snapshotId || '';
       if (plan.base.remoteSnapshotId && preFlightSnapshotId !== plan.base.remoteSnapshotId) {
         await db
           .update(spotifyPlaylistLinks)
           .set({
             syncState: 'CONFLICT',
-            lastError: 'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.',
+            lastError:
+              'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.',
             updatedAt: new Date()
           })
           .where(eq(spotifyPlaylistLinks.id, link.id));
@@ -532,13 +536,16 @@ export class SpotifyPlaylistSyncService {
           syncState: 'CONFLICT',
           completedRemoteBatches: 0,
           totalRemoteBatches: 0,
-          error: 'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.'
+          error:
+            'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.'
         };
       }
 
       let currentSnapshotId = preFlightSnapshotId;
       let completedRemoteBatches = 0;
-      const targetUris = plan.remoteTarget.map((o) => o.spotifyUri).filter((uri): uri is string => Boolean(uri));
+      const targetUris = plan.remoteTarget
+        .map((o) => o.spotifyUri)
+        .filter((uri): uri is string => Boolean(uri));
       const totalRemoteBatches = targetUris.length === 0 ? 1 : Math.ceil(targetUris.length / 100);
 
       // ==========================================
@@ -631,13 +638,21 @@ export class SpotifyPlaylistSyncService {
             if (item && typeof item === 'object') {
               const rec = item as Record<string, unknown>;
               if (typeof rec.uri === 'string') return rec.uri;
-              if (rec.track && typeof rec.track === 'object' && typeof (rec.track as Record<string, unknown>).uri === 'string') {
+              if (
+                rec.track &&
+                typeof rec.track === 'object' &&
+                typeof (rec.track as Record<string, unknown>).uri === 'string'
+              ) {
                 return (rec.track as Record<string, unknown>).uri as string;
               }
               if (rec.item && typeof rec.item === 'object') {
                 const it = rec.item as Record<string, unknown>;
                 if (typeof it.uri === 'string') return it.uri;
-                if (it.track && typeof it.track === 'object' && typeof (it.track as Record<string, unknown>).uri === 'string') {
+                if (
+                  it.track &&
+                  typeof it.track === 'object' &&
+                  typeof (it.track as Record<string, unknown>).uri === 'string'
+                ) {
                   return (it.track as Record<string, unknown>).uri as string;
                 }
               }
@@ -717,7 +732,8 @@ export class SpotifyPlaylistSyncService {
             inTrxEntries.map((e, idx) => ({
               position: idx + 1,
               songId: e.songId,
-              isrc: (e as { songId: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
+              isrc:
+                (e as { songId: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
             }))
           );
 
@@ -753,7 +769,10 @@ export class SpotifyPlaylistSyncService {
           }
 
           for (let i = 0; i < plan.localTarget.length; i++) {
-            if (insertedEntries[i].songId !== plan.localTarget[i].localSongId || insertedEntries[i].position !== i) {
+            if (
+              insertedEntries[i].songId !== plan.localTarget[i].localSongId ||
+              insertedEntries[i].position !== i
+            ) {
               throw new Error(
                 `Local DB positional verification failed at index ${i}: expected song ${plan.localTarget[i].localSongId}, found ${insertedEntries[i].songId}.`
               );
@@ -896,7 +915,9 @@ export class SpotifyPlaylistSyncService {
     return playlist.entries.map((e) => ({
       songId: e.songId,
       position: e.position,
-      isrc: (e as { songId: number; position: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
+      isrc:
+        (e as { songId: number; position: number; song?: { isrc: string | null } }).song?.isrc ??
+        undefined
     }));
   }
 }

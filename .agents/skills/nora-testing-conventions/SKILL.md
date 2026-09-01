@@ -278,8 +278,6 @@ When refactoring source files:
 
 ---
 
-
-
 ## Nora — AI Testing Engineering Rules
 
 ### 1. Tests must prove behavior, not implementation
@@ -339,11 +337,13 @@ Do not blindly derive tests from the current implementation.
 For every meaningful function/module, consider at least:
 
 ### Normal cases
+
 - typical valid input
 - multiple valid inputs
 - expected common workflows
 
 ### Boundary cases
+
 - empty input
 - one item
 - maximum/reasonably large input
@@ -352,12 +352,14 @@ For every meaningful function/module, consider at least:
 - missing optional values
 
 ### Invalid cases
+
 - malformed input
 - unsupported values
 - missing resources
 - invalid state
 
 ### Failure cases
+
 - filesystem failure
 - database failure
 - network failure
@@ -487,7 +489,7 @@ Never rely on timing accidentally making a test pass.
 Avoid arbitrary:
 
 ```ts
-await new Promise(resolve => setTimeout(resolve, 100));
+await new Promise((resolve) => setTimeout(resolve, 100));
 ```
 
 unless testing actual time-dependent behavior.
@@ -519,10 +521,7 @@ await operation();
 Strong:
 
 ```ts
-await Promise.all([
-  operation(),
-  operation(),
-]);
+await Promise.all([operation(), operation()]);
 ```
 
 For more complex races, deliberately control execution ordering.
@@ -908,25 +907,25 @@ when the tests clearly belong to specific source modules.
 Prefer:
 
 ```ts
-it('preserves queue order when removing the current track')
+it('preserves queue order when removing the current track');
 ```
 
 over:
 
 ```ts
-it('works correctly')
+it('works correctly');
 ```
 
 Prefer:
 
 ```ts
-it('reuses an existing watcher when the same folder is registered twice')
+it('reuses an existing watcher when the same folder is registered twice');
 ```
 
 over:
 
 ```ts
-it('handles duplicate folders')
+it('handles duplicate folders');
 ```
 
 A test name should explain **what contract is being protected**.
@@ -1063,5 +1062,3 @@ That's much stronger than putting every Nora-specific rule into the global promp
 **Nora instructions teach it how Nora works.**
 
 And I would keep those separate. That way your global agent becomes genuinely strong across projects, while the Nora skill acts as the project's local engineering constitution.
-
-

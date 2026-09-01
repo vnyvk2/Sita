@@ -8,12 +8,27 @@ import type {
 } from './types';
 
 const MINOR_WORDS = new Set([
-  'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from', 'by', 'of', 'in', 'with', 'vs', 'v'
+  'a',
+  'an',
+  'the',
+  'and',
+  'but',
+  'or',
+  'for',
+  'nor',
+  'on',
+  'at',
+  'to',
+  'from',
+  'by',
+  'of',
+  'in',
+  'with',
+  'vs',
+  'v'
 ]);
 
-/**
- * Converts a string to standard Title Case with minor-word preservation.
- */
+/** Converts a string to standard Title Case with minor-word preservation. */
 export function toTitleCase(input: string): string {
   if (!input) return '';
 
@@ -72,18 +87,14 @@ function capitalizeWord(word: string): string {
   return prefix + firstChar.toUpperCase() + rest.toLowerCase();
 }
 
-/**
- * Converts string to Sentence case.
- */
+/** Converts string to Sentence case. */
 export function toSentenceCase(input: string): string {
   if (!input) return '';
   const lower = input.toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-/**
- * Applies selected case mode to a string or array of strings.
- */
+/** Applies selected case mode to a string or array of strings. */
 function transformCase(val: unknown, mode: CaseConvertMode): { changed: boolean; value: unknown } {
   const transformString = (str: string): string => {
     switch (mode) {
@@ -122,9 +133,7 @@ function transformCase(val: unknown, mode: CaseConvertMode): { changed: boolean;
   return { changed: false, value: val };
 }
 
-/**
- * Computes live preview of case conversions across target rows and fields.
- */
+/** Computes live preview of case conversions across target rows and fields. */
 export function previewCaseTransform(
   context: BatchTransformContext,
   config: CaseTransformConfig
@@ -160,9 +169,7 @@ export function previewCaseTransform(
   return previews;
 }
 
-/**
- * Pure transformation to apply case conversion across target fields and rows.
- */
+/** Pure transformation to apply case conversion across target fields and rows. */
 export function caseTransform(
   context: BatchTransformContext,
   config: CaseTransformConfig

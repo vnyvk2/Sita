@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', async (importOriginal) => {
@@ -24,9 +25,10 @@ vi.mock('@main/other/artworks', () => ({
 import { PGlite } from '@electric-sql/pglite';
 import { citext } from '@electric-sql/pglite/contrib/citext';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import * as drizzlePgliteMod from 'drizzle-orm/pglite';
-import * as migrateMod from 'drizzle-orm/pglite/migrator';
-
+import { SmartPlaylistCompiler } from '@main/collections/query/SmartPlaylistCompiler';
+import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
+import getSongInfo from '@main/core/getSongInfo';
+import { getAllSongs } from '@main/db/queries/songs';
 import {
   songs,
   artists,
@@ -48,16 +50,14 @@ import {
   playEvents,
   userSettings
 } from '@main/db/schema';
-import { migrateFromPgliteIfNeeded } from '@main/db/sqlite/migrate-from-pglite';
 import { openSqliteEngine, type SqliteEngine } from '@main/db/sqlite/engine';
-import { getAllSongs } from '@main/db/queries/songs';
-import getSongInfo from '@main/core/getSongInfo';
+import { migrateFromPgliteIfNeeded } from '@main/db/sqlite/migrate-from-pglite';
+import { rawAll, rawGet } from '@main/db/sqlite/raw';
 import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
 import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
-import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
-import { SmartPlaylistCompiler } from '@main/collections/query/SmartPlaylistCompiler';
-import { rawAll, rawGet } from '@main/db/sqlite/raw';
 import { eq, sql, and } from 'drizzle-orm';
+import * as drizzlePgliteMod from 'drizzle-orm/pglite';
+import * as migrateMod from 'drizzle-orm/pglite/migrator';
 
 describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App Boot 1 -> Writes -> App Boot 2', () => {
   let tmpDir: string;
@@ -93,12 +93,17 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
 
     const q = async (sqlText: string, params: unknown[] = []) => {
       let i = 0;
-      return pg.query(sqlText.replace(/\?/g, () => `$${++i}`), params);
+      return pg.query(
+        sqlText.replace(/\?/g, () => `$${++i}`),
+        params
+      );
     };
 
     // 1. Folders (hierarchical parent-child)
     await q(`INSERT INTO music_folders (path, name) VALUES ('C:\\\\Music', 'Music')`);
-    await q(`INSERT INTO music_folders (path, name, parent_id) VALUES ('C:\\\\Music\\\\Synthwave', 'Synthwave', 1)`);
+    await q(
+      `INSERT INTO music_folders (path, name, parent_id) VALUES ('C:\\\\Music\\\\Synthwave', 'Synthwave', 1)`
+    );
 
     // 2. Artists, Albums, Genres, Artworks
     await q(`INSERT INTO artists (name, is_favorite) VALUES ('M83', true)`);
@@ -107,8 +112,12 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
     await q(`INSERT INTO albums (title, year) VALUES ('Discovery', 2001)`);
     await q(`INSERT INTO genres (name) VALUES ('Electronic')`);
     await q(`INSERT INTO genres (name) VALUES ('French House')`);
-    await q(`INSERT INTO artworks (hash, path, width, height) VALUES ('art-1', 'C:\\\\art1.webp', 500, 500)`);
-    await q(`INSERT INTO artworks (hash, path, width, height) VALUES ('art-2', 'C:\\\\art2.webp', 500, 500)`);
+    await q(
+      `INSERT INTO artworks (hash, path, width, height) VALUES ('art-1', 'C:\\\\art1.webp', 500, 500)`
+    );
+    await q(
+      `INSERT INTO artworks (hash, path, width, height) VALUES ('art-2', 'C:\\\\art2.webp', 500, 500)`
+    );
 
     // 3. Songs with full metadata
     const iso1 = '2023-01-15T10:00:00.000Z';
@@ -117,13 +126,37 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
     await q(
       `INSERT INTO songs (title, duration, path, is_favorite, year, folder_id, file_created_at, file_modified_at, language, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['Midnight City', '243.2', 'C:\\\\Music\\\\Synthwave\\\\midnight.mp3', true, 2011, 2, iso1, iso1, 'en', iso1, iso1]
+      [
+        'Midnight City',
+        '243.2',
+        'C:\\\\Music\\\\Synthwave\\\\midnight.mp3',
+        true,
+        2011,
+        2,
+        iso1,
+        iso1,
+        'en',
+        iso1,
+        iso1
+      ]
     );
 
     await q(
       `INSERT INTO songs (title, duration, path, is_favorite, year, folder_id, file_created_at, file_modified_at, language, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['One More Time', '320.0', 'C:\\\\Music\\\\Synthwave\\\\onemoretime.mp3', true, 2001, 2, iso2, iso2, 'en', iso2, iso2]
+      [
+        'One More Time',
+        '320.0',
+        'C:\\\\Music\\\\Synthwave\\\\onemoretime.mp3',
+        true,
+        2001,
+        2,
+        iso2,
+        iso2,
+        'en',
+        iso2,
+        iso2
+      ]
     );
 
     // 4. Junctions
@@ -156,7 +189,9 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
     );
 
     for (let s = 1; s <= 3; s++) {
-      await q(`INSERT INTO metadata_undo_snapshots (id, payload) VALUES ('snap-${s}', '{"version":${s}}')`);
+      await q(
+        `INSERT INTO metadata_undo_snapshots (id, payload) VALUES ('snap-${s}', '{"version":${s}}')`
+      );
     }
 
     await q(
@@ -230,10 +265,14 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
     expect(positions).toHaveLength(2);
 
     // Reorder playlist (swap positions: entry 1 -> pos 1, entry 2 -> pos 0)
-    await repo.updatePositionsBulk(1, [
-      { entryId: positions[0].entryId, position: 1 },
-      { entryId: positions[1].entryId, position: 0 }
-    ], db1);
+    await repo.updatePositionsBulk(
+      1,
+      [
+        { entryId: positions[0].entryId, position: 1 },
+        { entryId: positions[1].entryId, position: 0 }
+      ],
+      db1
+    );
 
     // 5. Smart Playlist AST Compilation
     const compiler = new SmartPlaylistCompiler();
@@ -246,9 +285,12 @@ describe('Final Migration Lifecycle & Persistence Gate: PGlite -> SQLite -> App 
       ]
     };
     const compiledPredicate = compiler.compilePredicate(ast)!;
-    const smartResults = await rawAll<{ id: number }>(sql`
+    const smartResults = await rawAll<{ id: number }>(
+      sql`
       SELECT id FROM songs WHERE ${compiledPredicate} ORDER BY id
-    `, db1);
+    `,
+      db1
+    );
     expect(smartResults.map((r) => r.id)).toEqual([1, 2]);
 
     // 6. Live Writes: Add new Play History, Play Event, and New Metadata Override

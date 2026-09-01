@@ -1,14 +1,27 @@
-import type { AvailableSearchProviderInfo, MetadataSearchOptions } from '../../../common/metadata/api';
+import type {
+  AvailableSearchProviderInfo,
+  MetadataSearchOptions
+} from '../../../common/metadata/api';
 import { getProviderDisplayName } from '../../../common/metadata/displayNames';
-import type { IMetadataProviderAdapter, IProviderLifecycle } from '../contracts/IMetadataProviderAdapter';
+import type {
+  IMetadataProviderAdapter,
+  IProviderLifecycle
+} from '../contracts/IMetadataProviderAdapter';
 import { ProviderCapability } from '../contracts/ProviderCapabilities';
 import type { ProviderConfiguration } from '../contracts/ProviderConfiguration';
 import { ProviderState, type ProviderStatus } from '../contracts/ProviderStatus';
 import { MetadataNormalizer } from '../matching/MetadataNormalizer';
-import type { AlbumMetadata, MetadataProviderId, ResolvedAlbumRelease } from '../models/RecordingMetadata';
+import type {
+  AlbumMetadata,
+  MetadataProviderId,
+  ResolvedAlbumRelease
+} from '../models/RecordingMetadata';
 import { DiscoveryCandidateSorter } from '../search/DiscoveryCandidateSorter';
 import { MetadataQueryNormalizer } from '../search/MetadataQueryNormalizer';
-import { MetadataSearchRankingEngine, type SearchCandidate } from '../search/MetadataSearchRankingEngine';
+import {
+  MetadataSearchRankingEngine,
+  type SearchCandidate
+} from '../search/MetadataSearchRankingEngine';
 import { MetadataPreferencesService } from '../services/MetadataPreferencesService';
 
 export interface ProviderRuntimeOptions {
@@ -21,13 +34,14 @@ export interface ProviderRuntimeOptions {
  * Per-provider wall-clock budget for a single searchAlbums call.
  *
  * Timeout hierarchy (innermost -> outermost):
- *   1. HTTP socket safety net ........ FetchHttpClient defaultTimeoutMs = 10_000ms
- *   2. Metadata stage timeout ........ ProviderTimeoutPolicy default = 5_000ms
- *                                      (execution-pipeline path only)
- *   3. Runtime search race ........... SEARCH_RACE_TIMEOUT_MS = 4_000ms (this file)
  *
- * Each layer must stay strictly smaller than the one above it so the outer
- * layer never fires first and masks the real cause.
+ * 1. HTTP socket safety net ........ FetchHttpClient defaultTimeoutMs = 10_000ms
+ * 2. Metadata stage timeout ........ ProviderTimeoutPolicy default = 5_000ms (execution-pipeline path
+ *    only)
+ * 3. Runtime search race ........... SEARCH_RACE_TIMEOUT_MS = 4_000ms (this file)
+ *
+ * Each layer must stay strictly smaller than the one above it so the outer layer never fires first
+ * and masks the real cause.
  */
 const SEARCH_RACE_TIMEOUT_MS = 4000;
 
@@ -89,16 +103,12 @@ export class MetadataProviderRuntime {
     return this.getSortedAdapters();
   }
 
-  /**
-   * Primary adapter instance accessor for single-provider registry compatibility.
-   */
+  /** Primary adapter instance accessor for single-provider registry compatibility. */
   public get primaryAdapter(): IMetadataProviderAdapter | undefined {
     return this.getSortedAdapters()[0];
   }
 
-  /**
-   * Compatibility accessor returning primary adapter instance for single-adapter consumers.
-   */
+  /** Compatibility accessor returning primary adapter instance for single-adapter consumers. */
   public get adapterInstance(): IMetadataProviderAdapter {
     const primary = this.getSortedAdapters()[0];
     if (!primary) {
@@ -135,7 +145,8 @@ export class MetadataProviderRuntime {
 
   public get status(): ProviderStatus {
     const statuses = Array.from(this.providerStatuses.values());
-    if (statuses.length === 0) return { state: ProviderState.Uninitialized, consecutiveFailures: 0 };
+    if (statuses.length === 0)
+      return { state: ProviderState.Uninitialized, consecutiveFailures: 0 };
     const hasUninitialized = statuses.every((s) => s.state === ProviderState.Uninitialized);
     if (hasUninitialized) return { state: ProviderState.Uninitialized, consecutiveFailures: 0 };
     const hasHealthy = statuses.some((s) => s.state === ProviderState.Healthy);
@@ -191,14 +202,18 @@ export class MetadataProviderRuntime {
           await lifecycle.shutdown();
         }
       } finally {
-        this.providerStatuses.set(id, { state: ProviderState.Uninitialized, consecutiveFailures: 0 });
+        this.providerStatuses.set(id, {
+          state: ProviderState.Uninitialized,
+          consecutiveFailures: 0
+        });
       }
     }
   }
 
   /**
-   * Search albums concurrently across registered providers according to preferences and timeout isolation.
-   * Normalizes candidates into common SearchCandidate, ranks them, and applies priority tie-breakers.
+   * Search albums concurrently across registered providers according to preferences and timeout
+   * isolation. Normalizes candidates into common SearchCandidate, ranks them, and applies priority
+   * tie-breakers.
    */
   public async searchAlbums(
     album: string,
@@ -211,7 +226,9 @@ export class MetadataProviderRuntime {
     const limit = options?.limit ?? 10;
     const targetTrackCount = options?.targetTrackCount;
     const sourceOverride = options?.source;
-    const prefs = this.preferencesService ? await this.preferencesService.getPreferences() : undefined;
+    const prefs = this.preferencesService
+      ? await this.preferencesService.getPreferences()
+      : undefined;
 
     let targetAdapters: IMetadataProviderAdapter[] = [];
     let providerPriority: MetadataProviderId[] = ['musicbrainz'];
@@ -226,7 +243,9 @@ export class MetadataProviderRuntime {
     } else {
       if (!this.isAvailable()) return [];
       if (prefs) {
-        const enabledSet = new Set((prefs.enabledSearchProviders ?? ['musicbrainz']).map((s) => s.toLowerCase()));
+        const enabledSet = new Set(
+          (prefs.enabledSearchProviders ?? ['musicbrainz']).map((s) => s.toLowerCase())
+        );
         providerPriority = prefs.searchProviderPriority ?? ['musicbrainz'];
         targetAdapters = this.getSortedAdapters().filter((adapter) =>
           enabledSet.has(adapter.identity.id.toLowerCase())
@@ -271,7 +290,12 @@ export class MetadataProviderRuntime {
             adapter.searchAlbums(
               album,
               artist,
-              { limit, targetTrackCount, source: sourceOverride, operationId: options?.operationId },
+              {
+                limit,
+                targetTrackCount,
+                source: sourceOverride,
+                operationId: options?.operationId
+              },
               controller.signal
             ),
             timeoutPromise
@@ -355,9 +379,7 @@ export class MetadataProviderRuntime {
     return finalRanked.slice(0, limit);
   }
 
-  /**
-   * Resolve album release details preserved by specific provider identity.
-   */
+  /** Resolve album release details preserved by specific provider identity. */
   public async resolveRelease(
     providerReleaseId: string,
     providerId?: MetadataProviderId
@@ -386,7 +408,8 @@ export class MetadataProviderRuntime {
   }
 
   public recordSuccess(providerIdOrLatency?: string | number, latencyMs?: number): void {
-    let targetProviderId = typeof providerIdOrLatency === 'string' ? providerIdOrLatency : undefined;
+    let targetProviderId =
+      typeof providerIdOrLatency === 'string' ? providerIdOrLatency : undefined;
     const latency = typeof providerIdOrLatency === 'number' ? providerIdOrLatency : latencyMs;
 
     if (!targetProviderId) {
@@ -415,7 +438,10 @@ export class MetadataProviderRuntime {
     }
 
     const key = targetProviderId.toLowerCase();
-    const current = this.providerStatuses.get(key) ?? { state: ProviderState.Healthy, consecutiveFailures: 0 };
+    const current = this.providerStatuses.get(key) ?? {
+      state: ProviderState.Healthy,
+      consecutiveFailures: 0
+    };
     const consecutive = current.consecutiveFailures + 1;
 
     let newState = ProviderState.Healthy;
@@ -434,6 +460,8 @@ export class MetadataProviderRuntime {
   }
 
   private getSortedAdapters(): IMetadataProviderAdapter[] {
-    return Array.from(this.providers.values()).sort((a, b) => (b.priority ?? 100) - (a.priority ?? 100));
+    return Array.from(this.providers.values()).sort(
+      (a, b) => (b.priority ?? 100) - (a.priority ?? 100)
+    );
   }
 }

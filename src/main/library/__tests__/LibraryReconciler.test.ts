@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LibraryReconciler } from '../LibraryReconciler';
 import { processSongsWithWorkerPool } from '../../core/songWorkerPool';
 import reParseSong from '../../parseSong/reParseSong';
 import removeSongsFromLibrary from '../../removeSongsFromLibrary';
 import { resolveOrCreateMusicFolders } from '../folderHierarchy';
+import { LibraryReconciler } from '../LibraryReconciler';
 
 vi.mock('../folderHierarchy', () => ({
   resolveOrCreateMusicFolders: vi.fn()
@@ -38,8 +38,18 @@ describe('LibraryReconciler', () => {
   describe('reconcileAdded', () => {
     it('should create folder hierarchy and dispatch eligible songs to worker pool', async () => {
       const added = [
-        { path: 'C:\\Music\\Rock\\Song1.mp3', fileModifiedAt: new Date(), rootId: 1, dirPath: 'C:\\Music\\Rock' },
-        { path: 'C:\\Music\\Jazz\\Song2.mp3', fileModifiedAt: new Date(), rootId: 1, dirPath: 'C:\\Music\\Jazz' }
+        {
+          path: 'C:\\Music\\Rock\\Song1.mp3',
+          fileModifiedAt: new Date(),
+          rootId: 1,
+          dirPath: 'C:\\Music\\Rock'
+        },
+        {
+          path: 'C:\\Music\\Jazz\\Song2.mp3',
+          fileModifiedAt: new Date(),
+          rootId: 1,
+          dirPath: 'C:\\Music\\Jazz'
+        }
       ];
 
       const folderMap = new Map<string, number>();
@@ -54,7 +64,10 @@ describe('LibraryReconciler', () => {
       });
 
       const onProgress = vi.fn();
-      const result = await reconciler.reconcileAdded(added, [root], { onProgress, platform: 'win32' });
+      const result = await reconciler.reconcileAdded(added, [root], {
+        onProgress,
+        platform: 'win32'
+      });
 
       expect(resolveOrCreateMusicFolders).toHaveBeenCalled();
       expect(processSongsWithWorkerPool).toHaveBeenCalledWith(
@@ -71,7 +84,12 @@ describe('LibraryReconciler', () => {
 
     it('should record an error if a folder ID cannot be resolved', async () => {
       const added = [
-        { path: 'C:\\Music\\Unknown\\Song1.mp3', fileModifiedAt: new Date(), rootId: 1, dirPath: 'C:\\Music\\Unknown' }
+        {
+          path: 'C:\\Music\\Unknown\\Song1.mp3',
+          fileModifiedAt: new Date(),
+          rootId: 1,
+          dirPath: 'C:\\Music\\Unknown'
+        }
       ];
 
       // Return empty folder map (resolution failed)
@@ -87,13 +105,20 @@ describe('LibraryReconciler', () => {
 
     it('should return cancelled: true when AbortSignal triggers', async () => {
       const added = [
-        { path: 'C:\\Music\\Song1.mp3', fileModifiedAt: new Date(), rootId: 1, dirPath: 'C:\\Music' }
+        {
+          path: 'C:\\Music\\Song1.mp3',
+          fileModifiedAt: new Date(),
+          rootId: 1,
+          dirPath: 'C:\\Music'
+        }
       ];
 
       const controller = new AbortController();
       controller.abort();
 
-      const result = await reconciler.reconcileAdded(added, [root], { abortSignal: controller.signal });
+      const result = await reconciler.reconcileAdded(added, [root], {
+        abortSignal: controller.signal
+      });
 
       expect(result.cancelled).toBe(true);
       expect(resolveOrCreateMusicFolders).not.toHaveBeenCalled();
@@ -158,7 +183,9 @@ describe('LibraryReconciler', () => {
         return { id: 1 } as any;
       });
 
-      const result = await reconciler.reconcileModified(modified, { abortSignal: controller.signal });
+      const result = await reconciler.reconcileModified(modified, {
+        abortSignal: controller.signal
+      });
 
       expect(result.cancelled).toBe(true);
       expect(reParseSong).toHaveBeenCalledTimes(1);

@@ -1,4 +1,3 @@
-import type { MetadataProviderId } from '../../../common/metadata/provider';
 import {
   DEFAULT_METADATA_PREFERENCES,
   DEFAULT_SEARCH_RANKING_WEIGHTS,
@@ -9,6 +8,7 @@ import {
   type SearchRankingWeights,
   type MetadataProviderPreferences
 } from '../../../common/metadata/preferences';
+import type { MetadataProviderId } from '../../../common/metadata/provider';
 import { getUserSettings, saveUserSettings } from '../../db/queries/settings';
 
 export interface MetadataPreferencesServiceOptions {
@@ -28,7 +28,9 @@ export class MetadataPreferencesService {
       return this.cachedPreferences;
     }
 
-    const registered = this.getRegisteredSearchProviders ? this.getRegisteredSearchProviders() : undefined;
+    const registered = this.getRegisteredSearchProviders
+      ? this.getRegisteredSearchProviders()
+      : undefined;
 
     try {
       const settings = await getUserSettings();
@@ -88,7 +90,9 @@ export class MetadataPreferencesService {
     // Check uniqueness
     const uniquePriority = new Set(prefs.searchProviderPriority);
     if (uniquePriority.size !== prefs.searchProviderPriority.length) {
-      throw new Error('Search provider priority must contain unique provider entries without duplicates.');
+      throw new Error(
+        'Search provider priority must contain unique provider entries without duplicates.'
+      );
     }
 
     // Priority must be a subset of enabled providers
@@ -116,7 +120,9 @@ export class MetadataPreferencesService {
   private validateRankingWeights(weights?: SearchRankingWeights): void {
     if (!weights) return;
 
-    for (const key of Object.keys(DEFAULT_SEARCH_RANKING_WEIGHTS) as (keyof SearchRankingWeights)[]) {
+    for (const key of Object.keys(
+      DEFAULT_SEARCH_RANKING_WEIGHTS
+    ) as (keyof SearchRankingWeights)[]) {
       const value = weights[key];
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         throw new Error(`Ranking weight '${key}' must be a finite number.`);
@@ -152,9 +158,10 @@ export class MetadataPreferencesService {
     raw: Partial<MetadataProviderPreferences>,
     availableSearchProviders?: string[]
   ): MetadataProviderPreferences {
-    let enabled = Array.isArray(raw.enabledSearchProviders) && raw.enabledSearchProviders.length > 0
-      ? (Array.from(new Set(raw.enabledSearchProviders)) as MetadataProviderId[])
-      : [...DEFAULT_METADATA_PREFERENCES.enabledSearchProviders];
+    let enabled =
+      Array.isArray(raw.enabledSearchProviders) && raw.enabledSearchProviders.length > 0
+        ? (Array.from(new Set(raw.enabledSearchProviders)) as MetadataProviderId[])
+        : [...DEFAULT_METADATA_PREFERENCES.enabledSearchProviders];
 
     // Filter against registered providers if provided
     if (availableSearchProviders && availableSearchProviders.length > 0) {
@@ -168,9 +175,10 @@ export class MetadataPreferencesService {
     }
 
     const enabledSet = new Set(enabled);
-    let priority = Array.isArray(raw.searchProviderPriority) && raw.searchProviderPriority.length > 0
-      ? (Array.from(new Set(raw.searchProviderPriority)) as MetadataProviderId[])
-      : [...enabled];
+    let priority =
+      Array.isArray(raw.searchProviderPriority) && raw.searchProviderPriority.length > 0
+        ? (Array.from(new Set(raw.searchProviderPriority)) as MetadataProviderId[])
+        : [...enabled];
 
     // Filter priority to be a subset of enabled
     priority = priority.filter((p) => enabledSet.has(p));

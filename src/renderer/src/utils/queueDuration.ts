@@ -8,8 +8,8 @@ export type QueueDurationResult = {
 /**
  * Computes the total queue duration and a suffix sum array in a single O(N) backward pass.
  *
- * Suffix array allows O(1) constant-time querying of remaining playback duration
- * from any active song position: remaining = suffixDurations[position].
+ * Suffix array allows O(1) constant-time querying of remaining playback duration from any active
+ * song position: remaining = suffixDurations[position].
  *
  * @param songIds - Array of song IDs in playback order
  * @param queuedSongsMap - Map of song metadata containing duration
@@ -40,9 +40,7 @@ export function calculateQueueSuffixDurations(
   };
 }
 
-/**
- * Returns remaining queue duration formatted string from the active playback position in O(1) time.
- */
+/** Returns remaining queue duration formatted string from the active playback position in O(1) time. */
 export function getRemainingQueueDuration(
   suffixDurations: Float64Array | null,
   activeQueuePosition: number

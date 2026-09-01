@@ -1,5 +1,5 @@
-import type { UndoToken } from './UndoToken';
 import type { ProviderId } from './MetadataResolution';
+import type { UndoToken } from './UndoToken';
 
 export type TransactionState = 'created' | 'executing' | 'committed' | 'rolledBack' | 'failed';
 

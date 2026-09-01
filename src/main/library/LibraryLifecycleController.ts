@@ -242,9 +242,7 @@ export class LibraryLifecycleController {
 
   public async scanNow(options?: ScanOptions): Promise<ScanSummary> {
     if (this.isShuttingDown) {
-      logger.warn(
-        '[LibraryLifecycleController] scanNow rejected: controller is shutting down.'
-      );
+      logger.warn('[LibraryLifecycleController] scanNow rejected: controller is shutting down.');
       return {
         status: 'CANCELLED',
         added: 0,
@@ -312,7 +310,12 @@ export class LibraryLifecycleController {
 
     this.changeDebounceTimer = setTimeout(() => {
       this.changeDebounceTimer = null;
-      if (this.canAttachWatchers() && !this.inFlightScan && this.isInitialized && !this.isShuttingDown) {
+      if (
+        this.canAttachWatchers() &&
+        !this.inFlightScan &&
+        this.isInitialized &&
+        !this.isShuttingDown
+      ) {
         this.scanNow().catch((error) => {
           logger.error('[LibraryLifecycleController] Follow-up background scan failed:', { error });
         });

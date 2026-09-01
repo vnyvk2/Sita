@@ -1,4 +1,9 @@
-import type { Collection, CollectionEntry, CollectionId, PlaylistViewMode } from '../../../common/collections/types';
+import type {
+  Collection,
+  CollectionEntry,
+  CollectionId,
+  PlaylistViewMode
+} from '../../../common/collections/types';
 import type { OrderDefinition } from '../query/ast';
 
 export interface CollectionQueryOptions {

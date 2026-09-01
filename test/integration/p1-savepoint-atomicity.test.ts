@@ -1,6 +1,16 @@
+import {
+  albums,
+  albumsArtists,
+  albumsSongs,
+  artists,
+  artistsSongs,
+  artworksSongs,
+  genres,
+  genresSongs,
+  musicFolders,
+  songs
+} from '@main/db/schema';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { albums, albumsArtists, albumsSongs, artists, artistsSongs, artworksSongs, genres, genresSongs, musicFolders, songs } from '@main/db/schema';
 
 // Mock DB with real in-memory SQLite (baseline schema applied by the engine)
 vi.mock('@main/db/db', async () => {
@@ -40,10 +50,13 @@ describe('P1 FORENSIC INTEGRATION: Real PGlite Savepoint / Per-Track Ingestion A
     await db.delete(genres);
     await db.delete(musicFolders);
 
-    const [folder] = await db.insert(musicFolders).values({
-      name: 'TestMusic',
-      path: '/mock/music'
-    }).returning();
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'TestMusic',
+        path: '/mock/music'
+      })
+      .returning();
     rootFolderId = folder.id;
   });
 
@@ -87,14 +100,17 @@ describe('P1 FORENSIC INTEGRATION: Real PGlite Savepoint / Per-Track Ingestion A
           const res = await trx.transaction(async (savepointTrx) => {
             if (track.songPath.includes('track_B')) {
               // Perform partial write (song row inserted)
-              const [partialSong] = await savepointTrx.insert(songs).values({
-                title: track.title,
-                duration: track.duration,
-                path: track.songPath,
-                folderId: track.folderId,
-                fileCreatedAt: new Date(),
-                fileModifiedAt: new Date()
-              }).returning();
+              const [partialSong] = await savepointTrx
+                .insert(songs)
+                .values({
+                  title: track.title,
+                  duration: track.duration,
+                  path: track.songPath,
+                  folderId: track.folderId,
+                  fileCreatedAt: new Date(),
+                  fileModifiedAt: new Date()
+                })
+                .returning();
 
               expect(partialSong.id).toBeDefined();
 

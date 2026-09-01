@@ -1,5 +1,5 @@
-import { copyFile, rename, rm } from 'fs/promises';
 import { randomBytes } from 'crypto';
+import { copyFile, rename, rm } from 'fs/promises';
 import path from 'path';
 
 import { File } from 'node-taglib-sharp';
@@ -9,19 +9,17 @@ import logger from '../logger';
 /**
  * Atomic physical tag write.
  *
- * Strategy: copy the original to a temp sibling, run mutations against the
- * copy, save it, dispose the handle, then rename over the original.
+ * Strategy: copy the original to a temp sibling, run mutations against the copy, save it, dispose
+ * the handle, then rename over the original.
  *
- * Invariants:
- * - A failed mutation/save can NEVER leave a partially written original -
- *   the original is only replaced by a fully saved temp file.
- * - The temp handle is disposed BEFORE the rename (required on Windows,
- *   otherwise the open handle makes the rename fail with EBUSY).
- * - On any failure the temp file is removed and the error rethrown;
- *   callers see the same failure surface as before.
+ * Invariants: - A failed mutation/save can NEVER leave a partially written original - the original
+ * is only replaced by a fully saved temp file. - The temp handle is disposed BEFORE the rename
+ * (required on Windows, otherwise the open handle makes the rename fail with EBUSY). - On any
+ * failure the temp file is removed and the error rethrown; callers see the same failure surface as
+ * before.
  *
- * The callback receives the COPY and must not call save() itself - saving is
- * owned here so it cannot be skipped or duplicated accidentally.
+ * The callback receives the COPY and must not call save() itself - saving is owned here so it
+ * cannot be skipped or duplicated accidentally.
  */
 export async function withAtomicFileWrite<T>(
   filePath: string,

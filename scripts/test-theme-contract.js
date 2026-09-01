@@ -27,15 +27,16 @@ const requiredLightVars = [
   '--context-menu-list-hover'
 ];
 
-const requiredDarkVars = requiredLightVars.map(v => v.replace('--', '--dark-'));
+const requiredDarkVars = requiredLightVars.map((v) => v.replace('--', '--dark-'));
 
-// Since we can't easily import a TS file directly without ts-node in a plain script, 
+// Since we can't easily import a TS file directly without ts-node in a plain script,
 // let's just parse the TS file with a regex to extract the modes for now.
 
 const registryPath = path.join(__dirname, '../src/common/themeRegistry.ts');
 const registryCode = fs.readFileSync(registryPath, 'utf8');
 const themes = [];
-const regex = /(\w+):\s*\{\s*id:\s*['"](\w+)['"],\s*nameKey:[^,]+,\s*mode:\s*['"](light|dark|adaptive)['"]/g;
+const regex =
+  /(\w+):\s*\{\s*id:\s*['"](\w+)['"],\s*nameKey:[^,]+,\s*mode:\s*['"](light|dark|adaptive)['"]/g;
 let match;
 while ((match = regex.exec(registryCode)) !== null) {
   themes.push({ id: match[2], mode: match[3] });
@@ -58,7 +59,7 @@ for (const theme of themes) {
   }
 
   const cssContent = match[1];
-  
+
   const checkVars = (requiredVars, modeLabel) => {
     const missing = [];
     for (const v of requiredVars) {
@@ -67,7 +68,9 @@ for (const theme of themes) {
       }
     }
     if (missing.length > 0) {
-      console.error(`❌ Theme '${theme.id}' (mode: ${theme.mode}) is missing ${modeLabel} variables:\n  ${missing.join(', ')}`);
+      console.error(
+        `❌ Theme '${theme.id}' (mode: ${theme.mode}) is missing ${modeLabel} variables:\n  ${missing.join(', ')}`
+      );
       allPassed = false;
     } else {
       console.log(`✅ Theme '${theme.id}' has all required ${modeLabel} variables.`);
@@ -77,7 +80,7 @@ for (const theme of themes) {
   if (theme.mode === 'light' || theme.mode === 'adaptive') {
     checkVars(requiredLightVars, 'Light');
   }
-  
+
   if (theme.mode === 'dark' || theme.mode === 'adaptive') {
     checkVars(requiredDarkVars, 'Dark');
   }

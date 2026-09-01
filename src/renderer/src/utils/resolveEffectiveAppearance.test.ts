@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+
 import { resolveEffectiveAppearance } from './resolveEffectiveAppearance';
 
 vi.mock('../../../common/themeRegistry', () => ({
@@ -6,8 +7,8 @@ vi.mock('../../../common/themeRegistry', () => ({
     default: { mode: 'adaptive' },
     nord: { mode: 'adaptive' },
     dracula: { mode: 'dark' },
-    'test-fixture-light-theme': { mode: 'light' },
-  },
+    'test-fixture-light-theme': { mode: 'light' }
+  }
 }));
 
 describe('resolveEffectiveAppearance', () => {
@@ -32,17 +33,23 @@ describe('resolveEffectiveAppearance', () => {
   });
 
   it('should coerce fixed-light theme + light appearance to light', () => {
-    const result = resolveEffectiveAppearance({ themePreset: 'test-fixture-light-theme', userAppearance: false });
+    const result = resolveEffectiveAppearance({
+      themePreset: 'test-fixture-light-theme',
+      userAppearance: false
+    });
     expect(result).toEqual({ isDark: false, mode: 'light', isThemeControlled: true });
   });
 
   it('should coerce fixed-light theme + dark appearance to light', () => {
     // User prefers dark, but theme is fixed-light
-    const result = resolveEffectiveAppearance({ themePreset: 'test-fixture-light-theme', userAppearance: true });
+    const result = resolveEffectiveAppearance({
+      themePreset: 'test-fixture-light-theme',
+      userAppearance: true
+    });
     expect(result).toEqual({
       isDark: false,
       mode: 'light',
-      isThemeControlled: true,
+      isThemeControlled: true
     });
   });
 });

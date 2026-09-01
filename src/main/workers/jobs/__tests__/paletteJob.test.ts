@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { db } from '@main/db/db';
 import generatePalette, { savePalette } from '@main/other/generatePalette';
 import generateCoverBuffer from '@main/parseSong/generateCoverBuffer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CURRENT_PALETTE_GENERATOR_VERSION, PaletteJob } from '../paletteJob';
 
 vi.mock('@main/db/db', () => ({

@@ -1,4 +1,5 @@
 import { getUserSettings } from '@main/db/queries/settings';
+
 import { decrypt } from '../../utils/safeStorage';
 
 export interface ListenBrainzAuthData {

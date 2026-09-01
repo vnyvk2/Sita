@@ -1,9 +1,7 @@
 ﻿import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
 import type { AutoNumberConfig, BatchTransformContext, BatchTransformResult } from './types';
 
-/**
- * Pure transformation that auto-numbers tracks sequentially in the active visual sort order.
- */
+/** Pure transformation that auto-numbers tracks sequentially in the active visual sort order. */
 export function autoNumber(
   context: BatchTransformContext,
   config: AutoNumberConfig = {}

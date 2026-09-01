@@ -1,19 +1,20 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { File } from 'node-taglib-sharp';
 
 import { eq } from 'drizzle-orm';
+import { File } from 'node-taglib-sharp';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
 import { db } from '../../../db/db';
 import { songs, metadataUndoSnapshots } from '../../../db/schema';
+import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
+import { AlbumAutoTagService } from '../../services/AlbumAutoTagService';
+import { MetadataApplyService } from '../../services/MetadataApplyService';
+import { TagWriterService } from '../../services/TagWriterService';
 import type { NormalizedMutation } from '../contract';
 import { MetadataApplyOrchestrator } from '../MetadataApplyOrchestrator';
-import { TagWriterService } from '../../services/TagWriterService';
-import { MetadataApplyService } from '../../services/MetadataApplyService';
-import { AlbumAutoTagService } from '../../services/AlbumAutoTagService';
-import { MetadataHistoryService } from '../../history/MetadataHistoryService';
-import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
 
 vi.mock('@main/main', () => ({
   getCurrentSongPath: vi.fn(() => undefined),
@@ -26,13 +27,16 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
   beforeEach(async () => {
     await db.delete(songs);
-    tempSongPath = path.join(os.tmpdir(), `orch_test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.mp3`);
+    tempSongPath = path.join(
+      os.tmpdir(),
+      `orch_test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.mp3`
+    );
     fs.copyFileSync(path.join(process.cwd(), 'test', 'assets', 'test_song.mp3'), tempSongPath);
 
     // Seed one song row pointing at the fixture
     await db.insert(songs).values({
       title: 'Seed Title',
-      duration: 180.000,
+      duration: 180.0,
       path: tempSongPath,
       fileCreatedAt: new Date(),
       fileModifiedAt: new Date(),
@@ -117,9 +121,7 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       operationId: 'op-isrc',
       songId: seeded!.id,
       filePath: tempSongPath,
-      fields: [
-        { fieldId: 'isrc', oldValue: 'USRC17607839', newValue: 'NEWISRC99999' }
-      ],
+      fields: [{ fieldId: 'isrc', oldValue: 'USRC17607839', newValue: 'NEWISRC99999' }],
       fileWrite: { deferredIfPlaying: true },
       undo: { description: 'Update ISRC' }
     };
@@ -146,7 +148,10 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
   it('G2-02 / G2-04 (b): existing MBID survives apply -> undo', async () => {
     const seeded = await db.query.songs.findFirst();
-    await db.update(songs).set({ musicBrainzRecordingId: 'existing-mbid-uuid-1' }).where(eq(songs.id, seeded!.id));
+    await db
+      .update(songs)
+      .set({ musicBrainzRecordingId: 'existing-mbid-uuid-1' })
+      .where(eq(songs.id, seeded!.id));
 
     const f1 = File.createFromPath(tempSongPath);
     f1.tag.musicBrainzTrackId = 'existing-mbid-uuid-1';
@@ -168,7 +173,11 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       songId: seeded!.id,
       filePath: tempSongPath,
       fields: [
-        { fieldId: 'musicBrainzRecordingId', oldValue: 'existing-mbid-uuid-1', newValue: 'new-mbid-uuid-2' }
+        {
+          fieldId: 'musicBrainzRecordingId',
+          oldValue: 'existing-mbid-uuid-1',
+          newValue: 'new-mbid-uuid-2'
+        }
       ],
       fileWrite: { deferredIfPlaying: true },
       undo: { description: 'Update MBID' }
@@ -194,7 +203,10 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
   it('G2-02 / G2-04 (c): absent ISRC/MBID remains absent after apply -> undo', async () => {
     const seeded = await db.query.songs.findFirst();
-    await db.update(songs).set({ isrc: null, musicBrainzRecordingId: null }).where(eq(songs.id, seeded!.id));
+    await db
+      .update(songs)
+      .set({ isrc: null, musicBrainzRecordingId: null })
+      .where(eq(songs.id, seeded!.id));
 
     const tagWriter = new TagWriterService();
     const history = new MetadataHistoryService(new MetadataHistoryRepository(db));
@@ -241,11 +253,14 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
 
   it('G2-02 / G2-04 (d): stale/tampered renderer previousSongs cannot overwrite the real baseline', async () => {
     const seeded = await db.query.songs.findFirst();
-    await db.update(songs).set({
-      title: 'Real DB Title',
-      isrc: 'REAL_DB_ISRC',
-      musicBrainzRecordingId: 'real-db-mbid'
-    }).where(eq(songs.id, seeded!.id));
+    await db
+      .update(songs)
+      .set({
+        title: 'Real DB Title',
+        isrc: 'REAL_DB_ISRC',
+        musicBrainzRecordingId: 'real-db-mbid'
+      })
+      .where(eq(songs.id, seeded!.id));
 
     const tagWriter = new TagWriterService();
     const history = new MetadataHistoryService(new MetadataHistoryRepository(db));
@@ -300,21 +315,27 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     fs.copyFileSync(path.join(process.cwd(), 'test', 'assets', 'test_song.mp3'), tempSong2);
 
     try {
-      const [song1] = await db.insert(songs).values({
-        title: 'Song 1 Old',
-        duration: 180.000,
-        path: tempSong1,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date()
-      }).returning();
+      const [song1] = await db
+        .insert(songs)
+        .values({
+          title: 'Song 1 Old',
+          duration: 180.0,
+          path: tempSong1,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
 
-      const [song2] = await db.insert(songs).values({
-        title: 'Song 2 Old',
-        duration: 200.000,
-        path: tempSong2,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date()
-      }).returning();
+      const [song2] = await db
+        .insert(songs)
+        .values({
+          title: 'Song 2 Old',
+          duration: 200.0,
+          path: tempSong2,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
 
       const historyService = new MetadataHistoryService(new MetadataHistoryRepository(db));
       const tagWriter = new TagWriterService();
@@ -339,13 +360,23 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
             oldTitle: 'Song 1 Old',
             applyTrack: true,
             fieldDiffs: [
-              { fieldId: 'title', applyField: true, suggestedValue: 'Airbag', oldValue: 'Song 1 Old' }
+              {
+                fieldId: 'title',
+                applyField: true,
+                suggestedValue: 'Airbag',
+                oldValue: 'Song 1 Old'
+              }
             ]
           }
         ]
       };
 
-      const res1 = await autoTagService.applyPreview(preview1, undefined, undefined, 'op-album-ok-computer');
+      const res1 = await autoTagService.applyPreview(
+        preview1,
+        undefined,
+        undefined,
+        'op-album-ok-computer'
+      );
       expect(res1.success).toBe(true);
 
       // Apply Album 2 with distinct operationId
@@ -358,13 +389,23 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
             oldTitle: 'Song 2 Old',
             applyTrack: true,
             fieldDiffs: [
-              { fieldId: 'title', applyField: true, suggestedValue: 'Everything in Its Right Place', oldValue: 'Song 2 Old' }
+              {
+                fieldId: 'title',
+                applyField: true,
+                suggestedValue: 'Everything in Its Right Place',
+                oldValue: 'Song 2 Old'
+              }
             ]
           }
         ]
       };
 
-      const res2 = await autoTagService.applyPreview(preview2, undefined, undefined, 'op-album-kid-a');
+      const res2 = await autoTagService.applyPreview(
+        preview2,
+        undefined,
+        undefined,
+        'op-album-kid-a'
+      );
       expect(res2.success).toBe(true);
 
       // 1. Verify in-memory undo history: 2 distinct snapshots, not collapsed
@@ -377,7 +418,9 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       const durableSnapshots = await db.query.metadataUndoSnapshots.findMany();
       expect(durableSnapshots).toHaveLength(2);
       const groupIds = durableSnapshots.map((s) => s.id).sort();
-      expect(groupIds).toEqual(['orch-group-op-album-kid-a', 'orch-group-op-album-ok-computer'].sort());
+      expect(groupIds).toEqual(
+        ['orch-group-op-album-kid-a', 'orch-group-op-album-ok-computer'].sort()
+      );
 
       // 3. Independent undo step 1: Undo Album 2
       const undo1 = await applyService.undoLastAutoTag();
@@ -397,8 +440,12 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       const song1AfterUndo2 = await db.query.songs.findFirst({ where: eq(songs.id, song1.id) });
       expect(song1AfterUndo2?.title).toBe('Song 1 Old');
     } finally {
-      try { fs.unlinkSync(tempSong1); } catch {}
-      try { fs.unlinkSync(tempSong2); } catch {}
+      try {
+        fs.unlinkSync(tempSong1);
+      } catch {}
+      try {
+        fs.unlinkSync(tempSong2);
+      } catch {}
     }
   });
 
@@ -411,21 +458,27 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     fs.copyFileSync(process.cwd() + '/test/assets/test_song.mp3', tempSong2);
 
     try {
-      const [song1] = await db.insert(songs).values({
-        title: 'Title 1',
-        duration: 180.000,
-        path: tempSong1,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date()
-      }).returning();
+      const [song1] = await db
+        .insert(songs)
+        .values({
+          title: 'Title 1',
+          duration: 180.0,
+          path: tempSong1,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
 
-      const [song2] = await db.insert(songs).values({
-        title: 'Title 2',
-        duration: 200.000,
-        path: tempSong2,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date()
-      }).returning();
+      const [song2] = await db
+        .insert(songs)
+        .values({
+          title: 'Title 2',
+          duration: 200.0,
+          path: tempSong2,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
 
       const historyService = new MetadataHistoryService(new MetadataHistoryRepository(db));
       const tagWriter = new TagWriterService();
@@ -443,12 +496,42 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       // Apply without specifying operationId (uses default)
       await autoTagService.applyPreview({
         album: { title: 'Album One' },
-        matches: [{ localSongId: song1.id, songPath: tempSong1, oldTitle: 'Title 1', applyTrack: true, fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'New Title 1', oldValue: 'Title 1' }] }]
+        matches: [
+          {
+            localSongId: song1.id,
+            songPath: tempSong1,
+            oldTitle: 'Title 1',
+            applyTrack: true,
+            fieldDiffs: [
+              {
+                fieldId: 'title',
+                applyField: true,
+                suggestedValue: 'New Title 1',
+                oldValue: 'Title 1'
+              }
+            ]
+          }
+        ]
       } as any);
 
       await autoTagService.applyPreview({
         album: { title: 'Album Two' },
-        matches: [{ localSongId: song2.id, songPath: tempSong2, oldTitle: 'Title 2', applyTrack: true, fieldDiffs: [{ fieldId: 'title', applyField: true, suggestedValue: 'New Title 2', oldValue: 'Title 2' }] }]
+        matches: [
+          {
+            localSongId: song2.id,
+            songPath: tempSong2,
+            oldTitle: 'Title 2',
+            applyTrack: true,
+            fieldDiffs: [
+              {
+                fieldId: 'title',
+                applyField: true,
+                suggestedValue: 'New Title 2',
+                oldValue: 'Title 2'
+              }
+            ]
+          }
+        ]
       } as any);
 
       const durableSnapshots = await db.query.metadataUndoSnapshots.findMany();
@@ -458,8 +541,12 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       expect(durableSnapshots[0].id).not.toBe('orch-group-default');
       expect(durableSnapshots[1].id).not.toBe('orch-group-default');
     } finally {
-      try { fs.unlinkSync(tempSong1); } catch {}
-      try { fs.unlinkSync(tempSong2); } catch {}
+      try {
+        fs.unlinkSync(tempSong1);
+      } catch {}
+      try {
+        fs.unlinkSync(tempSong2);
+      } catch {}
     }
   }, 15000);
 });

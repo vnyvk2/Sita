@@ -1,7 +1,8 @@
 ﻿import { describe, expect, it } from 'vitest';
+
+import type { BatchTrackRow } from '../../types';
 import { bulkApply } from '../bulkApply';
 import type { BatchTransformContext } from '../types';
-import type { BatchTrackRow } from '../../types';
 
 function createMockRow(songId: number): BatchTrackRow {
   const data = {
@@ -20,7 +21,12 @@ function createMockRow(songId: number): BatchTrackRow {
     path: data.path,
     duration: data.duration,
     original: data,
-    draft: { ...data, artists: [...data.artists], albumArtists: [...data.albumArtists], genres: [...data.genres] },
+    draft: {
+      ...data,
+      artists: [...data.artists],
+      albumArtists: [...data.albumArtists],
+      genres: [...data.genres]
+    },
     dirtyFields: new Set(),
     validationErrors: new Map()
   };

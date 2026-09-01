@@ -1,5 +1,5 @@
-import type { MembershipService } from '../membership/MembershipService';
 import type { CollectionId } from '../../../common/collections/types';
+import type { MembershipService } from '../membership/MembershipService';
 
 export type OperationType =
   | 'playlist.addSongs'
@@ -53,8 +53,5 @@ export interface OperationResult<T> {
 }
 
 export interface CollectionOperation<TInput, TResult> {
-  execute(
-    input: TInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<TResult>>;
+  execute(input: TInput, ctx: OperationContext): Promise<OperationResult<TResult>>;
 }

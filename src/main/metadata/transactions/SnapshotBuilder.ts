@@ -1,5 +1,8 @@
-import type { SongMetadataSnapshot, MetadataHistorySnapshot } from '../history/MetadataHistoryService';
 import type { UndoToken } from '../domain/UndoToken';
+import type {
+  SongMetadataSnapshot,
+  MetadataHistorySnapshot
+} from '../history/MetadataHistoryService';
 
 export interface DraftSnapshot {
   songId: number;
@@ -22,8 +25,10 @@ export class SnapshotBuilder {
       artist: d.previousTags.artist as string | undefined,
       album: d.previousTags.album as string | undefined,
       year: d.previousTags.year as number | undefined,
-      trackNumber: d.previousTags.trackNumber !== undefined ? Number(d.previousTags.trackNumber) : undefined,
-      discNumber: d.previousTags.discNumber !== undefined ? Number(d.previousTags.discNumber) : undefined,
+      trackNumber:
+        d.previousTags.trackNumber !== undefined ? Number(d.previousTags.trackNumber) : undefined,
+      discNumber:
+        d.previousTags.discNumber !== undefined ? Number(d.previousTags.discNumber) : undefined,
       genre: d.previousTags.genre as string | undefined,
       isrc: d.previousTags.isrc as string | undefined,
       musicBrainzRecordingId: d.previousTags.musicBrainzRecordingId as string | undefined
@@ -36,8 +41,10 @@ export class SnapshotBuilder {
       artist: d.appliedTags.artist as string | undefined,
       album: d.appliedTags.album as string | undefined,
       year: d.appliedTags.year as number | undefined,
-      trackNumber: d.appliedTags.trackNumber !== undefined ? Number(d.appliedTags.trackNumber) : undefined,
-      discNumber: d.appliedTags.discNumber !== undefined ? Number(d.appliedTags.discNumber) : undefined,
+      trackNumber:
+        d.appliedTags.trackNumber !== undefined ? Number(d.appliedTags.trackNumber) : undefined,
+      discNumber:
+        d.appliedTags.discNumber !== undefined ? Number(d.appliedTags.discNumber) : undefined,
       genre: d.appliedTags.genre as string | undefined,
       isrc: d.appliedTags.isrc as string | undefined,
       musicBrainzRecordingId: d.appliedTags.musicBrainzRecordingId as string | undefined

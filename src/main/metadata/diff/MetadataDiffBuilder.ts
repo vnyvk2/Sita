@@ -1,5 +1,9 @@
-import type { MetadataFieldDiff, MetadataFieldId, TrackMatchPreview } from '../../../common/metadata/types';
 import { getMetadataFieldDisplayName } from '../../../common/metadata/displayNames';
+import type {
+  MetadataFieldDiff,
+  MetadataFieldId,
+  TrackMatchPreview
+} from '../../../common/metadata/types';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
 import { extractStringValue, type OfficialTrackInput } from '../matching/TrackMatcher';
 import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
@@ -20,7 +24,8 @@ export interface CreateFieldDiffOptions {
 
 export class MetadataDiffBuilder {
   /**
-   * Constructs presentation-friendly TrackMatchPreview for a remote release track that is missing from the local library.
+   * Constructs presentation-friendly TrackMatchPreview for a remote release track that is missing
+   * from the local library.
    */
   public static buildMissingTrackPreview(
     remoteTrack: OfficialTrackInput,
@@ -57,7 +62,8 @@ export class MetadataDiffBuilder {
   }
 
   /**
-   * Constructs presentation-friendly TrackMatchPreview consuming an already-merged MergedCandidateResult with self-contained field-level alternatives.
+   * Constructs presentation-friendly TrackMatchPreview consuming an already-merged
+   * MergedCandidateResult with self-contained field-level alternatives.
    */
   public static buildTrackPreviewFromMergedResult(
     songOrPair: LocalSongInput | TrackMatchPair,
@@ -72,11 +78,14 @@ export class MetadataDiffBuilder {
     const rawSongArtist = extractStringValue(song.artist);
     const rawSongGenre = extractStringValue(song.genre);
 
-    const suggestedAlbum = rawSongAlbum && merged.album
-      ? AlbumSuffixPreserver.preserveAlbumSuffix(rawSongAlbum, merged.album)
-      : merged.album;
+    const suggestedAlbum =
+      rawSongAlbum && merged.album
+        ? AlbumSuffixPreserver.preserveAlbumSuffix(rawSongAlbum, merged.album)
+        : merged.album;
 
-    const mapAlternatives = (fieldId: string): Array<{ providerId: string; providerName: string; value: string | number }> | undefined => {
+    const mapAlternatives = (
+      fieldId: string
+    ): Array<{ providerId: string; providerName: string; value: string | number }> | undefined => {
       const contribs = merged.fieldAlternatives?.[fieldId];
       if (!contribs || contribs.length === 0) return undefined;
       return contribs.map((c) => ({
@@ -89,29 +98,97 @@ export class MetadataDiffBuilder {
 
     const recTrackNo = pair?.remoteTrack?.recording?.trackNumber;
     const recDiscNo = pair?.remoteTrack?.recording?.discNumber;
-    const recIsrc = pair?.remoteTrack?.provider?.isrc ?? pair?.remoteTrack?.recording?.isrc ?? merged.isrc;
+    const recIsrc =
+      pair?.remoteTrack?.provider?.isrc ?? pair?.remoteTrack?.recording?.isrc ?? merged.isrc;
     const recMbid =
       pair?.remoteTrack?.provider?.providerRecordingId ??
       pair?.remoteTrack?.recording?.musicBrainzRecordingId ??
       merged.musicBrainzRecordingId;
 
     const fieldDiffs: MetadataFieldDiff[] = [
-      this.compareField('title', 'Title', song.title, pair?.remoteTrack?.recording?.title ?? merged.title, merged.fieldAttributions.title, mapAlternatives('title')),
-      this.compareField('artist', 'Artist', rawSongArtist, merged.artist, merged.fieldAttributions.artist, mapAlternatives('artist')),
-      this.compareField('album', 'Album', rawSongAlbum, suggestedAlbum, merged.fieldAttributions.album, mapAlternatives('album')),
-      this.compareField('year', 'Year', song.year, merged.year, merged.fieldAttributions.year, mapAlternatives('year')),
-      this.compareField('trackNumber', 'Track Number', song.trackNumber, recTrackNo, merged.fieldAttributions.trackNumber, mapAlternatives('trackNumber')),
-      this.compareField('discNumber', 'Disc Number', song.discNumber, recDiscNo, merged.fieldAttributions.discNumber, mapAlternatives('discNumber')),
-      this.compareField('genre', 'Genre', rawSongGenre, merged.genre, merged.fieldAttributions.genre, mapAlternatives('genre')),
-      this.compareField('isrc', 'ISRC', song.isrc, recIsrc, merged.fieldAttributions.isrc, mapAlternatives('isrc')),
-      this.compareField('musicBrainzRecordingId', 'MusicBrainz Recording ID', song.musicBrainzRecordingId, recMbid, merged.fieldAttributions.musicBrainzRecordingId, mapAlternatives('musicBrainzRecordingId'))
+      this.compareField(
+        'title',
+        'Title',
+        song.title,
+        pair?.remoteTrack?.recording?.title ?? merged.title,
+        merged.fieldAttributions.title,
+        mapAlternatives('title')
+      ),
+      this.compareField(
+        'artist',
+        'Artist',
+        rawSongArtist,
+        merged.artist,
+        merged.fieldAttributions.artist,
+        mapAlternatives('artist')
+      ),
+      this.compareField(
+        'album',
+        'Album',
+        rawSongAlbum,
+        suggestedAlbum,
+        merged.fieldAttributions.album,
+        mapAlternatives('album')
+      ),
+      this.compareField(
+        'year',
+        'Year',
+        song.year,
+        merged.year,
+        merged.fieldAttributions.year,
+        mapAlternatives('year')
+      ),
+      this.compareField(
+        'trackNumber',
+        'Track Number',
+        song.trackNumber,
+        recTrackNo,
+        merged.fieldAttributions.trackNumber,
+        mapAlternatives('trackNumber')
+      ),
+      this.compareField(
+        'discNumber',
+        'Disc Number',
+        song.discNumber,
+        recDiscNo,
+        merged.fieldAttributions.discNumber,
+        mapAlternatives('discNumber')
+      ),
+      this.compareField(
+        'genre',
+        'Genre',
+        rawSongGenre,
+        merged.genre,
+        merged.fieldAttributions.genre,
+        mapAlternatives('genre')
+      ),
+      this.compareField(
+        'isrc',
+        'ISRC',
+        song.isrc,
+        recIsrc,
+        merged.fieldAttributions.isrc,
+        mapAlternatives('isrc')
+      ),
+      this.compareField(
+        'musicBrainzRecordingId',
+        'MusicBrainz Recording ID',
+        song.musicBrainzRecordingId,
+        recMbid,
+        merged.fieldAttributions.musicBrainzRecordingId,
+        mapAlternatives('musicBrainzRecordingId')
+      )
     ];
 
     const conf = pair?.confidence ?? 0.95;
     const applyTrack = conf >= 0.75;
-    const warnings = pair?.reasons.filter(
-      (r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch') || r.toLowerCase().includes('duplicate')
-    ) ?? [];
+    const warnings =
+      pair?.reasons.filter(
+        (r) =>
+          r.toLowerCase().includes('penalty') ||
+          r.toLowerCase().includes('mismatch') ||
+          r.toLowerCase().includes('duplicate')
+      ) ?? [];
 
     return {
       localSongId: song.songId,
@@ -143,9 +220,13 @@ export class MetadataDiffBuilder {
   }
 
   /**
-   * Constructs presentation-friendly TrackMatchPreview with per-field diffs and ProviderAttribution domain models from a TrackMatchPair.
+   * Constructs presentation-friendly TrackMatchPreview with per-field diffs and ProviderAttribution
+   * domain models from a TrackMatchPair.
    */
-  public static buildTrackPreview(pair: TrackMatchPair, registry?: ProviderRegistry): TrackMatchPreview {
+  public static buildTrackPreview(
+    pair: TrackMatchPair,
+    registry?: ProviderRegistry
+  ): TrackMatchPreview {
     const song = pair.localSong;
     const rawSongAlbum = extractStringValue(song.album);
     const rawSongArtist = extractStringValue(song.artist);
@@ -168,20 +249,53 @@ export class MetadataDiffBuilder {
 
     const fieldDiffs: MetadataFieldDiff[] = [
       this.compareField('title', 'Title', song.title, recording.title, makeAttribution('title')),
-      this.compareField('artist', 'Artist', rawSongArtist, recording.artist, makeAttribution('artist')),
+      this.compareField(
+        'artist',
+        'Artist',
+        rawSongArtist,
+        recording.artist,
+        makeAttribution('artist')
+      ),
       this.compareField('album', 'Album', rawSongAlbum, suggestedAlbum, makeAttribution('album')),
       this.compareField('year', 'Year', song.year, recording.year, makeAttribution('year')),
-      this.compareField('trackNumber', 'Track Number', song.trackNumber, recording.trackNumber, makeAttribution('trackNumber')),
-      this.compareField('discNumber', 'Disc Number', song.discNumber, recording.discNumber, makeAttribution('discNumber')),
-      this.compareField('genre', 'Genre', rawSongGenre, recording.genres?.[0], makeAttribution('genre')),
+      this.compareField(
+        'trackNumber',
+        'Track Number',
+        song.trackNumber,
+        recording.trackNumber,
+        makeAttribution('trackNumber')
+      ),
+      this.compareField(
+        'discNumber',
+        'Disc Number',
+        song.discNumber,
+        recording.discNumber,
+        makeAttribution('discNumber')
+      ),
+      this.compareField(
+        'genre',
+        'Genre',
+        rawSongGenre,
+        recording.genres?.[0],
+        makeAttribution('genre')
+      ),
       this.compareField('isrc', 'ISRC', song.isrc, provider.isrc, makeAttribution('isrc')),
-      this.compareField('musicBrainzRecordingId', 'MusicBrainz ID', song.musicBrainzRecordingId, provider.providerRecordingId, makeAttribution('musicBrainzRecordingId'))
+      this.compareField(
+        'musicBrainzRecordingId',
+        'MusicBrainz ID',
+        song.musicBrainzRecordingId,
+        provider.providerRecordingId,
+        makeAttribution('musicBrainzRecordingId')
+      )
     ];
 
     const applyTrack = pair.confidence >= 0.75;
 
     const warnings = pair.reasons.filter(
-      (r) => r.toLowerCase().includes('penalty') || r.toLowerCase().includes('mismatch') || r.toLowerCase().includes('duplicate')
+      (r) =>
+        r.toLowerCase().includes('penalty') ||
+        r.toLowerCase().includes('mismatch') ||
+        r.toLowerCase().includes('duplicate')
     );
 
     return {
@@ -214,8 +328,8 @@ export class MetadataDiffBuilder {
   }
 
   /**
-   * Public helper to build a consistent MetadataFieldDiff between old and new values.
-   * Supports both object-style options parameter and legacy positional arguments.
+   * Public helper to build a consistent MetadataFieldDiff between old and new values. Supports both
+   * object-style options parameter and legacy positional arguments.
    */
   public static createFieldDiff(
     optionsOrFieldId: MetadataFieldId | CreateFieldDiffOptions,
@@ -272,7 +386,8 @@ export class MetadataDiffBuilder {
       status = 'missing';
       applyField = false;
     } else if (strOld && strNew) {
-      const isNumericField = fieldId === 'trackNumber' || fieldId === 'discNumber' || fieldId === 'year';
+      const isNumericField =
+        fieldId === 'trackNumber' || fieldId === 'discNumber' || fieldId === 'year';
       const isDifferent = isNumericField
         ? Number(strOld) !== Number(strNew)
         : strOld.toLowerCase().replace(/\s+/g, ' ') !== strNew.toLowerCase().replace(/\s+/g, ' ');

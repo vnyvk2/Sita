@@ -3,8 +3,8 @@ import { getTargetRowIds } from './transformHelpers';
 import type { BatchTransformContext, BatchTransformResult } from './types';
 
 /**
- * Pure transformation that restores selected rows to their snapshot original baseline,
- * clearing their dirty fields and validation errors.
+ * Pure transformation that restores selected rows to their snapshot original baseline, clearing
+ * their dirty fields and validation errors.
  */
 export function revertSelected(context: BatchTransformContext): BatchTransformResult {
   const { rows } = context;

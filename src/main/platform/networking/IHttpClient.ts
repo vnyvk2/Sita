@@ -20,6 +20,13 @@ export interface HttpResponse<T = unknown> {
 
 export interface IHttpClient {
   request<T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>>;
-  get<T = unknown>(url: string, options?: Omit<HttpRequestOptions, 'url' | 'method'>): Promise<HttpResponse<T>>;
-  post<T = unknown>(url: string, body?: unknown, options?: Omit<HttpRequestOptions, 'url' | 'method' | 'body'>): Promise<HttpResponse<T>>;
+  get<T = unknown>(
+    url: string,
+    options?: Omit<HttpRequestOptions, 'url' | 'method'>
+  ): Promise<HttpResponse<T>>;
+  post<T = unknown>(
+    url: string,
+    body?: unknown,
+    options?: Omit<HttpRequestOptions, 'url' | 'method' | 'body'>
+  ): Promise<HttpResponse<T>>;
 }

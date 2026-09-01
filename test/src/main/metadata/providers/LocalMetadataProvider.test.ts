@@ -16,15 +16,16 @@ import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('LocalMetadataProvider', () => {
   it('should fetch raw persistence DTO inside ProviderResult', async () => {
     const mockLoader: IEntityLoader<SongPersistenceDTO> = {
       kind: MetadataKinds.Song,
       load: async (id) => ({ id: Number(id), title: 'Hotel California', year: 1976 }),
-      loadMany: async (ids) => ids.map((id) => ({ id: Number(id), title: 'Hotel California', year: 1976 }))
+      loadMany: async (ids) =>
+        ids.map((id) => ({ id: Number(id), title: 'Hotel California', year: 1976 }))
     };
 
     const repository = new DatabaseMetadataRepository([mockLoader as IEntityLoader<unknown>]);

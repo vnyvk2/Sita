@@ -58,8 +58,8 @@ export const expandDirectoryAncestors = (
  * Invariants:
  *
  * - Uses platform-aware path manipulation (path.win32 vs path.posix).
- * - Expands intermediate ancestor directories up to rootPath so nested structures (e.g. Root/Artist/Album)
- *   are created in shallow-to-deep topological order.
+ * - Expands intermediate ancestor directories up to rootPath so nested structures (e.g.
+ *   Root/Artist/Album) are created in shallow-to-deep topological order.
  * - Non-root directories must strictly resolve their immediate parent folder ID; never falls back to
  *   rootId.
  * - Never silently falls back to rootId on insertion failure; throws so the scan reports failure and
@@ -81,7 +81,9 @@ export const resolveOrCreateMusicFolders = async (
   const folderMap = new Map<string, number>();
   const pathModule = platform === 'win32' ? path.win32 : path.posix;
 
-  const rootPathWithSep = rootPath.endsWith(pathModule.sep) ? rootPath : `${rootPath}${pathModule.sep}`;
+  const rootPathWithSep = rootPath.endsWith(pathModule.sep)
+    ? rootPath
+    : `${rootPath}${pathModule.sep}`;
 
   // 1. Selectively fetch existing folders under this root from DB
   const existingFolders = await database
@@ -91,12 +93,7 @@ export const resolveOrCreateMusicFolders = async (
       parentId: musicFolders.parentId
     })
     .from(musicFolders)
-    .where(
-      or(
-        eq(musicFolders.path, rootPath),
-        like(musicFolders.path, `${rootPathWithSep}%`)
-      )
-    );
+    .where(or(eq(musicFolders.path, rootPath), like(musicFolders.path, `${rootPathWithSep}%`)));
 
   const existingMap = new Map<string, FolderNode>();
   for (const folder of existingFolders) {
@@ -116,7 +113,9 @@ export const resolveOrCreateMusicFolders = async (
   }
 
   // 3. Sort directories by path depth (shallowest first) to ensure parents are created before children
-  const uniqueDirs = Array.from(new Set(allDirsToProcess.map((d) => normalizeLibraryPath(d, platform))))
+  const uniqueDirs = Array.from(
+    new Set(allDirsToProcess.map((d) => normalizeLibraryPath(d, platform)))
+  )
     .filter((d) => getNormalizedPathKey(d, platform) !== rootKey)
     .sort((a, b) => a.length - b.length);
 

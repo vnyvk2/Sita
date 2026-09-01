@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
 import { DiscogsApiClient } from '@main/metadata/providers/discogs/DiscogsApiClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('DiscogsApiClient (Phase 1 Canonical Matching)', () => {
   const mockPipeline = {

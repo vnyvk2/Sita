@@ -1,11 +1,17 @@
-import { describe, expect, it } from 'vitest';
 import { normalizeBioText, decodeHtmlEntities } from '@main/utils/normalizeBioText';
+import { describe, expect, it } from 'vitest';
 
 describe('normalizeBioText', () => {
   it('decodes named, decimal, and hex HTML entities', () => {
-    expect(decodeHtmlEntities('&quot;Hello&quot; &amp; &#039;World&#039; &hellip;')).toBe('"Hello" & \'World\' ...');
-    expect(decodeHtmlEntities('Gracie&#x27;s debut track &mdash; &lsquo;Mean It&rsquo;')).toBe("Gracie's debut track — 'Mean It'");
-    expect(decodeHtmlEntities('&copy; 2024 &bull; All Rights Reserved')).toBe('© 2024 • All Rights Reserved');
+    expect(decodeHtmlEntities('&quot;Hello&quot; &amp; &#039;World&#039; &hellip;')).toBe(
+      '"Hello" & \'World\' ...'
+    );
+    expect(decodeHtmlEntities('Gracie&#x27;s debut track &mdash; &lsquo;Mean It&rsquo;')).toBe(
+      "Gracie's debut track — 'Mean It'"
+    );
+    expect(decodeHtmlEntities('&copy; 2024 &bull; All Rights Reserved')).toBe(
+      '© 2024 • All Rights Reserved'
+    );
   });
 
   it('strips Last.fm HTML links, converts paragraph tags, and preserves paragraph breaks', () => {

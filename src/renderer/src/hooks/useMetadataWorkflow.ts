@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { metadataApi } from '../services/metadataApi';
+import { useCallback, useEffect, useState } from 'react';
+
 import { albumQuery } from '../queries/albums';
 import { songQuery } from '../queries/songs';
+import { metadataApi } from '../services/metadataApi';
 
 export type WorkflowType = 'album' | 'track' | 'genre' | 'artwork';
 
@@ -17,7 +18,9 @@ export function useMetadataWorkflow(options: UseMetadataWorkflowOptions = {}) {
   const queryClient = useQueryClient();
   const operationId = options.operationId ?? 'default';
 
-  const [workflowType, setWorkflowType] = useState<WorkflowType>(options.initialWorkflow ?? 'album');
+  const [workflowType, setWorkflowType] = useState<WorkflowType>(
+    options.initialWorkflow ?? 'album'
+  );
   const [query, setQuery] = useState({
     title: options.initialAlbumName ?? '',
     artist: options.initialArtistName ?? '',

@@ -1,8 +1,8 @@
+import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 
 describe('Glassmorphic Dropdown Popover Component', () => {
   const options: DropdownOption<string>[] = [
@@ -174,14 +174,7 @@ describe('Glassmorphic Dropdown Popover Component', () => {
 
   it('renders selector mode when iconName is absent and opens matching popover', () => {
     const handleChange = vi.fn();
-    render(
-      <Dropdown
-        name="customSelect"
-        value="aToZ"
-        options={options}
-        onChange={handleChange}
-      />
-    );
+    render(<Dropdown name="customSelect" value="aToZ" options={options} onChange={handleChange} />);
 
     const trigger = screen.getByRole('button', { name: /A to Z/i });
     expect(trigger).toBeDefined();

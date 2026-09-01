@@ -1,5 +1,11 @@
 import { useRef } from 'react';
-import type { CoverLayoutVariant, CoverSlotIndex, PlaylistCoverLayout, ResolvedPlaylistCover } from '../../types/playlistCover';
+
+import type {
+  CoverLayoutVariant,
+  CoverSlotIndex,
+  PlaylistCoverLayout,
+  ResolvedPlaylistCover
+} from '../../types/playlistCover';
 import { getLayoutClipPaths } from '../../utils/getLayoutClipPaths';
 import MultipleArtworksCover from './MultipleArtworksCover';
 
@@ -28,17 +34,23 @@ const CoverLivePreview = ({
 }: Props) => {
   const count = requestedCount ?? resolvedCover.artworks.length ?? 4;
   const activeVariant = variant || resolvedCover.variant;
-  const clipPaths = getLayoutClipPaths(resolvedCover.layout as PlaylistCoverLayout, activeVariant, count);
+  const clipPaths = getLayoutClipPaths(
+    resolvedCover.layout as PlaylistCoverLayout,
+    activeVariant,
+    count
+  );
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   return (
     <div className="cover-live-preview mb-6 flex flex-col items-center">
       <div className="mb-2 flex w-full items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Live Preview</label>
-        <span className="text-xs text-neutral-400 font-medium">Click any region to select slot</span>
+        <span className="text-xs font-medium text-neutral-400">
+          Click any region to select slot
+        </span>
       </div>
 
-      <div className="relative h-48 w-48 overflow-hidden rounded-2xl border-2 border-neutral-700/80 shadow-2xl bg-neutral-900 transition-all duration-200 ease-out hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] hover:border-neutral-600">
+      <div className="relative h-48 w-48 overflow-hidden rounded-2xl border-2 border-neutral-700/80 bg-neutral-900 shadow-2xl transition-all duration-200 ease-out hover:border-neutral-600 hover:shadow-[0_0_30px_rgba(251,191,36,0.15)]">
         {/* Render Presentation Cover Engine */}
         <MultipleArtworksCover
           resolvedArtworks={resolvedCover.artworks}
@@ -49,7 +61,11 @@ const CoverLivePreview = ({
         />
 
         {/* Single Source of Truth Interactive Overlay Layer */}
-        <div className="absolute inset-0 pointer-events-auto" role="region" aria-label="Interactive Cover Slots">
+        <div
+          className="pointer-events-auto absolute inset-0"
+          role="region"
+          aria-label="Interactive Cover Slots"
+        >
           {clipPaths.slice(0, count).map((clipPath, i) => {
             const slotIndex = i as CoverSlotIndex;
             const isActive = activeSlotIndex === slotIndex;
@@ -59,7 +75,9 @@ const CoverLivePreview = ({
             return (
               <button
                 key={i}
-                ref={(el) => { buttonRefs.current[i] = el; }}
+                ref={(el) => {
+                  buttonRefs.current[i] = el;
+                }}
                 type="button"
                 aria-label={`Cover Slot ${i + 1}`}
                 aria-selected={isActive}
@@ -84,23 +102,23 @@ const CoverLivePreview = ({
                   }
                 }}
                 style={{ clipPath }}
-                className={`absolute inset-0 transition-all duration-150 ease-out cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 z-20 ${
+                className={`absolute inset-0 z-20 flex cursor-pointer items-center justify-center transition-all duration-150 ease-out focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:outline-none ${
                   isActive
-                    ? 'bg-amber-500/25 ring-4 ring-amber-400/90 z-30 shadow-2xl scale-[1.01]'
+                    ? 'z-30 scale-[1.01] bg-amber-500/25 shadow-2xl ring-4 ring-amber-400/90'
                     : isHovered
-                      ? 'bg-amber-400/15 ring-2 ring-amber-300/80 z-20 scale-[1.01]'
+                      ? 'z-20 scale-[1.01] bg-amber-400/15 ring-2 ring-amber-300/80'
                       : isFocused
-                        ? 'bg-blue-400/15 ring-2 ring-blue-400/80 z-20'
+                        ? 'z-20 bg-blue-400/15 ring-2 ring-blue-400/80'
                         : 'hover:bg-neutral-900/10'
                 }`}
               >
                 <span
                   className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black shadow-lg transition-transform duration-150 ease-out ${
                     isActive
-                      ? 'bg-amber-500 text-neutral-950 scale-125 ring-2 ring-white shadow-[0_0_15px_rgba(245,158,11,0.6)]'
+                      ? 'scale-125 bg-amber-500 text-neutral-950 shadow-[0_0_15px_rgba(245,158,11,0.6)] ring-2 ring-white'
                       : isHovered
-                        ? 'bg-neutral-100 text-neutral-900 scale-110 shadow-md'
-                        : 'bg-neutral-900/90 text-neutral-100 border border-neutral-700'
+                        ? 'scale-110 bg-neutral-100 text-neutral-900 shadow-md'
+                        : 'border border-neutral-700 bg-neutral-900/90 text-neutral-100'
                   }`}
                 >
                   {BADGES[i]}

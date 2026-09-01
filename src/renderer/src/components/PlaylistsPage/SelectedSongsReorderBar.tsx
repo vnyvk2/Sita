@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { CoverSlotIndex, EffectiveCoverSlot } from '../../types/playlistCover';
+
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
+import type { CoverSlotIndex, EffectiveCoverSlot } from '../../types/playlistCover';
 import Img from '../Img';
 
 interface Props {
@@ -55,12 +56,14 @@ const SelectedSongsReorderBar = ({
 
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">Selected Cover Slots</label>
-        <span className="text-xs font-medium text-neutral-400">
-          Drag cards to reorder
-        </span>
+        <span className="text-xs font-medium text-neutral-400">Drag cards to reorder</span>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-xl bg-neutral-900/80 p-2 border border-neutral-800" role="listbox" aria-label="Cover slots list">
+      <div
+        className="flex flex-col gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-2"
+        role="listbox"
+        aria-label="Cover slots list"
+      >
         {Array.from({ length: maxSize }).map((_, i) => {
           const slotIndex = i as CoverSlotIndex;
           const slotData = effectiveSlots ? effectiveSlots[i] : undefined;
@@ -129,25 +132,23 @@ const SelectedSongsReorderBar = ({
                   handleSwapWithAnnouncement(slotIndex, (i + 1) as CoverSlotIndex);
                 }
               }}
-              className={`group relative flex items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
-                isDragging ? 'opacity-40 scale-95 border-dashed border-amber-400' : ''
-              } ${
-                isDragOver ? 'ring-2 ring-amber-400 bg-amber-500/20 scale-[1.02]' : ''
-              } ${
+              className={`group relative flex cursor-grab items-center justify-between rounded-lg p-2 transition-all duration-150 ease-out focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none active:cursor-grabbing ${
+                isDragging ? 'scale-95 border-dashed border-amber-400 opacity-40' : ''
+              } ${isDragOver ? 'scale-[1.02] bg-amber-500/20 ring-2 ring-amber-400' : ''} ${
                 isActive
-                  ? 'bg-amber-500/15 border-2 border-amber-500/80 shadow-lg ring-2 ring-amber-500/30 scale-[1.01]'
+                  ? 'scale-[1.01] border-2 border-amber-500/80 bg-amber-500/15 shadow-lg ring-2 ring-amber-500/30'
                   : isHovered || isFocused
-                    ? 'bg-neutral-800 border border-neutral-700 scale-[1.01] shadow-md'
-                    : 'bg-neutral-950/60 border border-neutral-800/80 hover:bg-neutral-800/60'
+                    ? 'scale-[1.01] border border-neutral-700 bg-neutral-800 shadow-md'
+                    : 'border border-neutral-800/80 bg-neutral-950/60 hover:bg-neutral-800/60'
               }`}
             >
               <div className="flex items-center gap-2 overflow-hidden">
                 {/* Drag Grip Handle */}
-                <span className="text-neutral-500 text-xs font-mono select-none px-0.5 cursor-grab">
+                <span className="cursor-grab px-0.5 font-mono text-xs text-neutral-500 select-none">
                   ⋮⋮
                 </span>
 
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-xs font-bold text-neutral-200 shrink-0">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-bold text-neutral-200">
                   {BADGES[i]}
                 </span>
 
@@ -161,25 +162,28 @@ const SelectedSongsReorderBar = ({
                 </div>
 
                 <div className="flex flex-col overflow-hidden">
-                  <span className={`truncate text-xs font-semibold ${song ? 'text-neutral-200' : 'text-neutral-500 italic'}`}>
+                  <span
+                    className={`truncate text-xs font-semibold ${song ? 'text-neutral-200' : 'text-neutral-500 italic'}`}
+                  >
                     {song?.title || 'Empty Slot (Default Cover)'}
                   </span>
                   {artistText && (
-                    <span className="truncate text-[11px] text-neutral-400">
-                      {artistText}
-                    </span>
+                    <span className="truncate text-[11px] text-neutral-400">{artistText}</span>
                   )}
                 </div>
               </div>
 
               {/* Slot Actions: Swap & Clear */}
-              <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="flex shrink-0 items-center gap-1 opacity-90 group-hover:opacity-100"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {i > 0 && (
                   <button
                     type="button"
                     title="Move Up / Swap Left"
                     onClick={() => onSwapSlots(slotIndex, (i - 1) as CoverSlotIndex)}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
                   >
                     ◀
                   </button>
@@ -189,7 +193,7 @@ const SelectedSongsReorderBar = ({
                     type="button"
                     title="Move Down / Swap Right"
                     onClick={() => onSwapSlots(slotIndex, (i + 1) as CoverSlotIndex)}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
                   >
                     ▶
                   </button>
@@ -199,7 +203,7 @@ const SelectedSongsReorderBar = ({
                     type="button"
                     title="Reset to Auto Selection"
                     onClick={() => onClearSlot(slotIndex)}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-400 hover:bg-amber-500/20 hover:text-amber-300 transition-colors ml-1"
+                    className="ml-1 flex h-7 w-7 items-center justify-center rounded-md bg-neutral-800 text-neutral-400 transition-colors hover:bg-amber-500/20 hover:text-amber-300"
                   >
                     ↺
                   </button>

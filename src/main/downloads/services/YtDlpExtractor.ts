@@ -60,7 +60,8 @@ export class YtDlpExtractor implements OnlineExtractor {
 
   async resolvePlaylist(urlOrId: string): Promise<OnlinePlaylistInfo> {
     const playlistId = extractPlaylistId(urlOrId);
-    if (!playlistId) throw new ExtractorError('No YouTube playlist id found in the input.', 'NOT_FOUND');
+    if (!playlistId)
+      throw new ExtractorError('No YouTube playlist id found in the input.', 'NOT_FOUND');
     if (/^(RD|UL|LM)/.test(playlistId)) {
       throw new ExtractorError(
         'Radio mixes and auto playlists are unbounded and cannot be downloaded as a playlist.',
@@ -69,7 +70,12 @@ export class YtDlpExtractor implements OnlineExtractor {
     }
 
     const url = `https://www.youtube.com/playlist?list=${playlistId}`;
-    const json = await this.runJson(['--flat-playlist', '--playlist-items', `1:${ONLINE_PLAYLIST_MAX_ENTRIES}`, url]);
+    const json = await this.runJson([
+      '--flat-playlist',
+      '--playlist-items',
+      `1:${ONLINE_PLAYLIST_MAX_ENTRIES}`,
+      url
+    ]);
 
     const rawEntries = Array.isArray(json.entries) ? json.entries : [];
     const mapped = this.mapEntries(rawEntries);
@@ -79,7 +85,8 @@ export class YtDlpExtractor implements OnlineExtractor {
       title: json.title || playlistId,
       channel: json.channel || json.uploader,
       entries: mapped.tracks,
-      excludedCount: mapped.excludedCount + Math.max(0, rawEntries.length - ONLINE_PLAYLIST_MAX_ENTRIES)
+      excludedCount:
+        mapped.excludedCount + Math.max(0, rawEntries.length - ONLINE_PLAYLIST_MAX_ENTRIES)
     };
   }
 
@@ -201,7 +208,10 @@ export class YtDlpExtractor implements OnlineExtractor {
           'UNSUPPORTED_SOURCE'
         );
       }
-      throw new ExtractorError('yt-dlp finished but no media file was found in staging.', 'EXTRACTION_FAILED');
+      throw new ExtractorError(
+        'yt-dlp finished but no media file was found in staging.',
+        'EXTRACTION_FAILED'
+      );
     }
 
     const containerExt = path.extname(completed).toLowerCase();
@@ -216,12 +226,11 @@ export class YtDlpExtractor implements OnlineExtractor {
   }
 
   private async runJson(args: string[]): Promise<YtDlpPlaylistJson> {
-    const child = spawn(resolveBinaryPath('yt-dlp'), [
-      ...args,
-      '--dump-single-json',
-      '--no-warnings',
-      '--windows-filenames'
-    ], { windowsHide: true });
+    const child = spawn(
+      resolveBinaryPath('yt-dlp'),
+      [...args, '--dump-single-json', '--no-warnings', '--windows-filenames'],
+      { windowsHide: true }
+    );
 
     let stdout = '';
     let stderrTail = '';
@@ -254,7 +263,10 @@ export class YtDlpExtractor implements OnlineExtractor {
     }
   }
 
-  private mapEntries(entries: YtDlpFlatEntry[]): { tracks: OnlineTrackResult[]; excludedCount: number } {
+  private mapEntries(entries: YtDlpFlatEntry[]): {
+    tracks: OnlineTrackResult[];
+    excludedCount: number;
+  } {
     const tracks: OnlineTrackResult[] = [];
     let excludedCount = 0;
 
@@ -263,10 +275,12 @@ export class YtDlpExtractor implements OnlineExtractor {
         excludedCount += 1;
         continue;
       }
-      const isLive = entry.is_live === true || entry.live_status === 'is_live' || entry.live_status === 'is_upcoming';
+      const isLive =
+        entry.is_live === true ||
+        entry.live_status === 'is_live' ||
+        entry.live_status === 'is_upcoming';
       const tooLong =
-        typeof entry.duration === 'number' &&
-        entry.duration > ONLINE_DOWNLOADS_MAX_DURATION_SECS;
+        typeof entry.duration === 'number' && entry.duration > ONLINE_DOWNLOADS_MAX_DURATION_SECS;
 
       if (isLive || tooLong) {
         excludedCount += 1;
@@ -297,9 +311,9 @@ function watchUrlFor(videoId: string): string {
 }
 
 /**
- * Kills yt-dlp AND any processes it spawned (e.g. ffmpeg). Plain child.kill()
- * on Windows terminates only the direct process, orphaning its children which
- * then keep file handles open inside the staging directory.
+ * Kills yt-dlp AND any processes it spawned (e.g. ffmpeg). Plain child.kill() on Windows terminates
+ * only the direct process, orphaning its children which then keep file handles open inside the
+ * staging directory.
  */
 function killProcessTree(child: ReturnType<typeof spawn>): void {
   if (process.platform === 'win32' && child.pid) {
@@ -312,14 +326,14 @@ function killProcessTree(child: ReturnType<typeof spawn>): void {
   child.kill('SIGTERM');
 }
 
-/**
- * Accepts a playlist id, a playlist URL or a watch URL that also carries list=.
- */
+/** Accepts a playlist id, a playlist URL or a watch URL that also carries list=. */
 function extractPlaylistId(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
   try {
-    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://www.youtube.com/playlist?list=${trimmed}`);
+    const url = new URL(
+      trimmed.startsWith('http') ? trimmed : `https://www.youtube.com/playlist?list=${trimmed}`
+    );
     const listParam = url.searchParams.get('list');
     if (listParam) return listParam;
   } catch {

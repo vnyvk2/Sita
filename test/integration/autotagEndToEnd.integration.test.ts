@@ -1,35 +1,36 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
 import { ByteVector, File, Picture, PictureType } from 'node-taglib-sharp';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 // Measured: ~1.1s standalone but >5s under full-suite parallel load
 // (real files + real PGlite + provider mocks). Scoped to this file.
 vi.setConfig({ testTimeout: 30_000 });
-import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
+import { db } from '@main/db/db';
+import * as albumsDb from '@main/db/queries/albums';
+import * as artistsDb from '@main/db/queries/artists';
+import * as artworksDb from '@main/db/queries/artworks';
+import * as genresDb from '@main/db/queries/genres';
+import * as songsDb from '@main/db/queries/songs';
+import { getSongArtworkPath } from '@main/fs/resolveFilePaths';
+import * as mainModule from '@main/main';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
-import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
+import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto/ReleaseDto';
+import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
 import { TagWriterService } from '@main/metadata/services/TagWriterService';
 import { ArtworkCacheInvalidator } from '@main/metadata/transactions/ArtworkCacheInvalidator';
-import { getSongArtworkPath } from '@main/fs/resolveFilePaths';
+import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import * as parseAlbumModule from '@main/parseSong/manageAlbumsOfParsedSong';
+import * as parseSongModule from '@main/parseSong/manageArtistsOfParsedSong';
+import * as parseGenreModule from '@main/parseSong/manageGenresOfParsedSong';
 import reParseSong from '@main/parseSong/reParseSong';
 import updateSongId3Tags, {
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
 } from '@main/updateSong/updateSongId3Tags';
-import * as mainModule from '@main/main';
-import * as songsDb from '@main/db/queries/songs';
-import * as artistsDb from '@main/db/queries/artists';
-import * as albumsDb from '@main/db/queries/albums';
-import * as genresDb from '@main/db/queries/genres';
-import * as artworksDb from '@main/db/queries/artworks';
-import * as parseSongModule from '@main/parseSong/manageArtistsOfParsedSong';
-import * as parseAlbumModule from '@main/parseSong/manageAlbumsOfParsedSong';
-import * as parseGenreModule from '@main/parseSong/manageGenresOfParsedSong';
-import { db } from '@main/db/db';
-import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto/ReleaseDto';
-import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
 
 vi.mock('@main/main', () => ({
   getCurrentSongPath: vi.fn(),
@@ -228,7 +229,11 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
         fieldMutations: [
           { fieldId: 'title', oldValue: 'Airbag (Demo)', newValue: 'Airbag' },
           { fieldId: 'artist', oldValue: 'Radiohead', newValue: 'Radiohead' },
-          { fieldId: 'album', oldValue: 'OK Computer', newValue: 'OK Computer (Collector Edition)' },
+          {
+            fieldId: 'album',
+            oldValue: 'OK Computer',
+            newValue: 'OK Computer (Collector Edition)'
+          },
           { fieldId: 'year', oldValue: 1996, newValue: 1997 },
           { fieldId: 'trackNumber', oldValue: 1, newValue: 1 },
           { fieldId: 'discNumber', oldValue: 1, newValue: 1 },
@@ -354,7 +359,15 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     vi.spyOn(genresDb, 'deleteGenre').mockResolvedValue(true as any);
 
     vi.spyOn(artworksDb, 'saveArtworks').mockResolvedValue([
-      { id: 900, hash: 'hash900', path: 'artworks/hash900.webp', width: 500, height: 500, source: 'embedded', generatorVersion: 1 } as any
+      {
+        id: 900,
+        hash: 'hash900',
+        path: 'artworks/hash900.webp',
+        width: 500,
+        height: 500,
+        source: 'embedded',
+        generatorVersion: 1
+      } as any
     ]);
     vi.spyOn(artworksDb, 'syncSongArtworks').mockImplementation(async () => {
       reParsedArtworkLinked = true;
@@ -374,7 +387,10 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     expect(reParsedSongRow.diskNumber).toBe(2);
     expect(reParsedSongRow.musicBrainzRecordingId).toBe('rec-scanner-uuid-999');
     expect(reParsedSongRow.isrc).toBe('USRC20230004');
-    expect(Array.from(new Set(reParsedArtists))).toEqual(['Scanner Lead Artist', 'Scanner Featured Artist']);
+    expect(Array.from(new Set(reParsedArtists))).toEqual([
+      'Scanner Lead Artist',
+      'Scanner Featured Artist'
+    ]);
     expect(reParsedAlbum).toBe('Scanner Relational Album');
     expect(reParsedGenres).toEqual(['Post-Rock']);
     expect(reParsedArtworkLinked).toBe(true);
@@ -426,7 +442,8 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
     } as any);
     vi.spyOn(songsDb, 'updateSongBasicFields').mockImplementation(async (_id, fields) => {
       if (fields.title !== undefined) currentDbTitle = fields.title;
-      if (fields.musicBrainzRecordingId !== undefined) currentDbMbid = fields.musicBrainzRecordingId;
+      if (fields.musicBrainzRecordingId !== undefined)
+        currentDbMbid = fields.musicBrainzRecordingId;
       if (fields.isrc !== undefined) currentDbIsrc = fields.isrc;
       return true as any;
     });
@@ -568,7 +585,9 @@ describe('AutoTag End-to-End Modular Integration Suite (Phase 5 Gate)', () => {
       {
         resourceId: 9999,
         filePath: tempTestFile,
-        fieldMutations: [{ fieldId: 'title', oldValue: 'Airbag (Demo)', newValue: 'Airbag Mutated' }]
+        fieldMutations: [
+          { fieldId: 'title', oldValue: 'Airbag (Demo)', newValue: 'Airbag Mutated' }
+        ]
       }
     ]);
 

@@ -3,8 +3,9 @@ const KNOWN_SUFFIX_REGEX =
 
 export class AlbumSuffixPreserver {
   /**
-   * Intelligently preserves local album title suffixes (e.g. "(Deluxe)", "(Gracie's Version)", "(Taylor's Version)", "[Explicit]")
-   * when the base album title matches the provider's canonical album title.
+   * Intelligently preserves local album title suffixes (e.g. "(Deluxe)", "(Gracie's Version)",
+   * "(Taylor's Version)", "[Explicit]") when the base album title matches the provider's canonical
+   * album title.
    */
   public static preserveAlbumSuffix(localAlbum?: string, remoteAlbum?: string): string | undefined {
     if (!localAlbum || !remoteAlbum) {

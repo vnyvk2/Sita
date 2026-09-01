@@ -1,5 +1,14 @@
-import type { MatchCriterion, MetadataCandidate, OfficialTrackInput, RecordingMetadata } from '../models/RecordingMetadata';
-import { getConfidenceLevel, type TrackMatchPair, type ScoreBreakdown } from '../services/AlbumMetadataService';
+import type {
+  MatchCriterion,
+  MetadataCandidate,
+  OfficialTrackInput,
+  RecordingMetadata
+} from '../models/RecordingMetadata';
+import {
+  getConfidenceLevel,
+  type TrackMatchPair,
+  type ScoreBreakdown
+} from '../services/AlbumMetadataService';
 import { MetadataNormalizer, type RecordingVariant } from './MetadataNormalizer';
 
 export type { OfficialTrackInput };
@@ -69,9 +78,9 @@ export class TrackMatcher {
   };
 
   /**
-   * Matches an array of local songs against official release tracks.
-   * Keyed duplicate candidate tracking on title + artist.
-   * Enforces strict ONE-TO-ONE candidate assignment with MIN_MATCH_SCORE threshold (50 pts).
+   * Matches an array of local songs against official release tracks. Keyed duplicate candidate
+   * tracking on title + artist. Enforces strict ONE-TO-ONE candidate assignment with
+   * MIN_MATCH_SCORE threshold (50 pts).
    */
   public matchTracks(
     localSongs: LocalSongInput[],
@@ -102,7 +111,11 @@ export class TrackMatcher {
       const isDuplicateTitle = (titleArtistCounts.get(key) ?? 0) > 1;
 
       for (const track of officialTracks) {
-        const { score, breakdown, matchedBy, reasons } = this.scorePair(song, track, releaseContext);
+        const { score, breakdown, matchedBy, reasons } = this.scorePair(
+          song,
+          track,
+          releaseContext
+        );
 
         if (isDuplicateTitle) {
           reasons.push('duplicate_local_candidate');
@@ -117,8 +130,10 @@ export class TrackMatcher {
       if (b.score !== a.score) return b.score - a.score;
       if (b.breakdown.title !== a.breakdown.title) return b.breakdown.title - a.breakdown.title;
       if (b.breakdown.artist !== a.breakdown.artist) return b.breakdown.artist - a.breakdown.artist;
-      if ((b.breakdown.album ?? 0) !== (a.breakdown.album ?? 0)) return (b.breakdown.album ?? 0) - (a.breakdown.album ?? 0);
-      if (b.breakdown.duration !== a.breakdown.duration) return b.breakdown.duration - a.breakdown.duration;
+      if ((b.breakdown.album ?? 0) !== (a.breakdown.album ?? 0))
+        return (b.breakdown.album ?? 0) - (a.breakdown.album ?? 0);
+      if (b.breakdown.duration !== a.breakdown.duration)
+        return b.breakdown.duration - a.breakdown.duration;
       return (a.track.trackNumber ?? 0) - (b.track.trackNumber ?? 0);
     });
 
@@ -237,7 +252,11 @@ export class TrackMatcher {
     }
 
     // MBID/ISRC are authoritative. Never combine with heuristic scoring.
-    if (song.isrc && track.isrc && song.isrc.trim().toUpperCase() === track.isrc.trim().toUpperCase()) {
+    if (
+      song.isrc &&
+      track.isrc &&
+      song.isrc.trim().toUpperCase() === track.isrc.trim().toUpperCase()
+    ) {
       return {
         score: 100,
         breakdown: { title: 0, artist: 0, album: 0, year: 0, duration: 0, mbid: 100, total: 100 },
@@ -321,7 +340,10 @@ export class TrackMatcher {
           albumScore = 10;
           matchedBy.push('album');
           reasons.push('exact_album_match');
-        } else if (normSongAlbum.includes(normTargetAlbum) || normTargetAlbum.includes(normSongAlbum)) {
+        } else if (
+          normSongAlbum.includes(normTargetAlbum) ||
+          normTargetAlbum.includes(normSongAlbum)
+        ) {
           albumScore = 5;
           matchedBy.push('album');
           reasons.push('partial_album_match');
@@ -363,7 +385,8 @@ export class TrackMatcher {
       }
     }
 
-    const unpenalizedScore = titleScore + artistScore + albumScore + yearScore + durationScore + mbidScore;
+    const unpenalizedScore =
+      titleScore + artistScore + albumScore + yearScore + durationScore + mbidScore;
     let totalScore = Math.max(0, unpenalizedScore - variantPenalty);
 
     // Invariant BUG-14: Conflicting variant pair (e.g. Live vs Acoustic) must never reach MIN_MATCH_SCORE (50)

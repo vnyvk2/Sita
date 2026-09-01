@@ -115,7 +115,7 @@ export class ShutdownCoordinator {
       const DB_BARRIER_TIMEOUT_MS = 5000;
       await Promise.race([
         Promise.allSettled(schedulerSurvivingPromises),
-        new Promise(resolve => setTimeout(resolve, DB_BARRIER_TIMEOUT_MS))
+        new Promise((resolve) => setTimeout(resolve, DB_BARRIER_TIMEOUT_MS))
       ]);
     }
 

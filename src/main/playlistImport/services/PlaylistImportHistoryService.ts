@@ -1,8 +1,8 @@
 import type { PlaylistImportHistoryRepository } from '../interfaces/PlaylistImportHistoryRepository';
 import type { PlaylistUndoPersistence } from '../interfaces/PlaylistUndoPersistence';
-import type { PlaylistImportWorkflow } from '../workflow/PlaylistImportWorkflow';
-import type { PlaylistImportSession } from '../models/PlaylistImportSession';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
+import type { PlaylistImportSession } from '../models/PlaylistImportSession';
+import type { PlaylistImportWorkflow } from '../workflow/PlaylistImportWorkflow';
 
 export class PlaylistImportHistoryService {
   constructor(
@@ -18,7 +18,10 @@ export class PlaylistImportHistoryService {
     return await this.historyRepository.getSession(sessionId);
   }
 
-  async undoImport(sessionId: string, customUndoPersistence?: PlaylistUndoPersistence): Promise<boolean> {
+  async undoImport(
+    sessionId: string,
+    customUndoPersistence?: PlaylistUndoPersistence
+  ): Promise<boolean> {
     const session = await this.historyRepository.getSession(sessionId);
 
     if (!session || session.status !== 'COMPLETED' || !session.execution) {

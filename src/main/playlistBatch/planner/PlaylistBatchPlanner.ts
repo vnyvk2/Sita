@@ -1,7 +1,7 @@
-import type { PlaylistDependencyGraph } from './PlaylistDependencyGraph';
-import type { BatchItem } from '../models/BatchItem';
-import type { BatchExecutionPolicy } from '../models/BatchExecutionPolicy';
 import type { BatchExecutionPlan } from '../models/BatchExecutionPlan';
+import type { BatchExecutionPolicy } from '../models/BatchExecutionPolicy';
+import type { BatchItem } from '../models/BatchItem';
+import type { PlaylistDependencyGraph } from './PlaylistDependencyGraph';
 
 export class PlaylistBatchPlanner {
   constructor(private dependencyGraph: PlaylistDependencyGraph) {}

@@ -1,9 +1,10 @@
 import { EventEmitter } from 'events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
 import { getSongById } from '@main/db/queries/songs';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION, ReplayGainJob } from '../replayGainJob';
 
@@ -178,7 +179,10 @@ describe('ReplayGainJob (Phase C4-C)', () => {
       songId: 20
     } as any);
 
-    vi.mocked(getSongById).mockResolvedValue({ id: 20, path: 'C:/Music/track_reanalyzed.wav' } as any);
+    vi.mocked(getSongById).mockResolvedValue({
+      id: 20,
+      path: 'C:/Music/track_reanalyzed.wav'
+    } as any);
     vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
       success: true,
       outputFilePath: 'C:/loudness_blocks/20_v1.bin',

@@ -10,9 +10,18 @@ vi.mock('@db/db', () => ({
         ]),
         findFirst: vi.fn().mockResolvedValue({ playlistId: 1, songId: 10, position: 1 })
       },
-      albumsSongs: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) },
-      artistsSongs: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) },
-      genresSongs: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) }
+      albumsSongs: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null)
+      },
+      artistsSongs: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null)
+      },
+      genresSongs: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null)
+      }
     },
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -38,7 +47,10 @@ describe('DatabaseMembershipRepository', () => {
 
   it('should check if collection contains member', async () => {
     const repository = new DatabaseMembershipRepository();
-    const contains = await repository.contains({ kind: 'playlist', id: 1 }, { kind: 'song', id: 10 });
+    const contains = await repository.contains(
+      { kind: 'playlist', id: 1 },
+      { kind: 'song', id: 10 }
+    );
 
     expect(contains).toBe(true);
   });

@@ -1,5 +1,5 @@
-import { normalizeForMatching } from '../../matching/normalizeForMatching';
 import type { RequestPipeline } from '../../../platform/networking/RequestPipeline';
+import { normalizeForMatching } from '../../matching/normalizeForMatching';
 
 export interface DiscogsSearchReleaseDto {
   id: number;
@@ -63,7 +63,9 @@ export class DiscogsApiClient {
         signal
       });
       const results = response.data?.results ?? [];
-      console.log(`[DiscogsApiClient] GET ${url} SUCCESS - Status: ${response.status}, Results count: ${results.length}`);
+      console.log(
+        `[DiscogsApiClient] GET ${url} SUCCESS - Status: ${response.status}, Results count: ${results.length}`
+      );
       return results;
     } catch (err: any) {
       if (err?.name === 'AbortError' || signal?.aborted) {
@@ -104,7 +106,11 @@ export class DiscogsApiClient {
     }
   }
 
-  private isCandidateMatching(discogsTitle: string, queryTitle?: string, queryArtist?: string): boolean {
+  private isCandidateMatching(
+    discogsTitle: string,
+    queryTitle?: string,
+    queryArtist?: string
+  ): boolean {
     if (!discogsTitle) return false;
     const normDiscogs = normalizeForMatching(discogsTitle);
     if (!normDiscogs) return false;
@@ -114,7 +120,11 @@ export class DiscogsApiClient {
       if (normTitle && normTitle.length > 2) {
         const titlePattern = new RegExp(`(^|\\s)${this.escapeRegex(normTitle)}(\\s|$)`, 'i');
         const candidatePattern = new RegExp(`(^|\\s)${this.escapeRegex(normDiscogs)}(\\s|$)`, 'i');
-        if (!titlePattern.test(normDiscogs) && !candidatePattern.test(normTitle) && !normDiscogs.includes(normTitle)) {
+        if (
+          !titlePattern.test(normDiscogs) &&
+          !candidatePattern.test(normTitle) &&
+          !normDiscogs.includes(normTitle)
+        ) {
           return false;
         }
       }
@@ -137,7 +147,10 @@ export class DiscogsApiClient {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  public async fetchContributionData(query: { title?: string; artist?: string }): Promise<DiscogsContributionData | null> {
+  public async fetchContributionData(query: {
+    title?: string;
+    artist?: string;
+  }): Promise<DiscogsContributionData | null> {
     const qStr = [query.artist, query.title].filter(Boolean).join(' ');
     if (!qStr) return null;
 
@@ -150,7 +163,9 @@ export class DiscogsApiClient {
     );
 
     if (!matchedCandidate) {
-      console.log(`[DiscogsApiClient] Rejected ${results.length} Discogs search candidate(s) due to low title/artist similarity for "${qStr}"`);
+      console.log(
+        `[DiscogsApiClient] Rejected ${results.length} Discogs search candidate(s) due to low title/artist similarity for "${qStr}"`
+      );
       return null;
     }
 

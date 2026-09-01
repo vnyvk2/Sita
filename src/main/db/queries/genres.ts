@@ -1,6 +1,7 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+
 import { parseGenreList } from '../../../common/genreUtils';
 import { linkArtworksToGenre } from './artworks';
 
@@ -42,7 +43,12 @@ export const getAllGenres = async (options: GetAllGenresOptions, trx: DB | DBTra
 
       // Filter by genre names (case-insensitive)
       if (genreNames && genreNames.length > 0) {
-        filters.push(inArray(s.nameCI, genreNames.map((n) => n.toLowerCase())));
+        filters.push(
+          inArray(
+            s.nameCI,
+            genreNames.map((n) => n.toLowerCase())
+          )
+        );
       }
 
       return and(...filters);
@@ -241,9 +247,10 @@ const reconcileExistingMultiGenresInTrx = async (trx: DBTransaction | DB) => {
 };
 
 /**
- * Scans existing genres in the database for delimiter-separated names (e.g. "Rock,pop", "Rock; Pop", "Rock / Pop").
- * Splits each malformed genre into canonical genres, migrates song relationships (genres_songs) and
- * artworks (artworks_genres), and removes the obsolete malformed genre records.
+ * Scans existing genres in the database for delimiter-separated names (e.g. "Rock,pop", "Rock;
+ * Pop", "Rock / Pop"). Splits each malformed genre into canonical genres, migrates song
+ * relationships (genres_songs) and artworks (artworks_genres), and removes the obsolete malformed
+ * genre records.
  *
  * Guaranteed atomic and idempotent.
  */
@@ -258,4 +265,3 @@ export const reconcileExistingMultiGenres = async (trx?: DB | DBTransaction) => 
     return reconcileExistingMultiGenresInTrx(tx);
   });
 };
-

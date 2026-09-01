@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
-import type { TrackMatchPair, LocalSongInput } from '@main/metadata/services/AlbumMetadataService';
 import type { MergedCandidateResult } from '@main/metadata/resolution/MetadataMergeEngine';
+import type { TrackMatchPair, LocalSongInput } from '@main/metadata/services/AlbumMetadataService';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataDiffBuilder', () => {
   const baseMerged: MergedCandidateResult = {
@@ -11,13 +11,48 @@ describe('MetadataDiffBuilder', () => {
     year: 1997,
     genre: 'Alternative Rock',
     fieldAttributions: {
-      title: { fieldId: 'title', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      artist: { fieldId: 'artist', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      album: { fieldId: 'album', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      year: { fieldId: 'year', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      trackNumber: { fieldId: 'trackNumber', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      discNumber: { fieldId: 'discNumber', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 },
-      genre: { fieldId: 'genre', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.95 }
+      title: {
+        fieldId: 'title',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      artist: {
+        fieldId: 'artist',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      album: {
+        fieldId: 'album',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      year: {
+        fieldId: 'year',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      trackNumber: {
+        fieldId: 'trackNumber',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      discNumber: {
+        fieldId: 'discNumber',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      },
+      genre: {
+        fieldId: 'genre',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.95
+      }
     },
     fieldAlternatives: {}
   };
@@ -95,7 +130,10 @@ describe('MetadataDiffBuilder', () => {
         reasons: ['Unmatched']
       };
 
-      const preview = MetadataDiffBuilder.buildTrackPreviewFromMergedResult(pairWithoutRemote as TrackMatchPair, baseMerged);
+      const preview = MetadataDiffBuilder.buildTrackPreviewFromMergedResult(
+        pairWithoutRemote as TrackMatchPair,
+        baseMerged
+      );
       const titleDiff = preview.fieldDiffs.find((f) => f.fieldId === 'title');
 
       expect(titleDiff).toBeDefined();
@@ -137,12 +175,20 @@ describe('MetadataDiffBuilder', () => {
         return MetadataDiffBuilder.buildTrackPreviewFromMergedResult(pair, baseMerged);
       });
 
-      expect(previews[0].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Airbag');
-      expect(previews[1].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Paranoid Android');
-      expect(previews[2].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Subterranean Homesick Alien');
+      expect(previews[0].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Airbag'
+      );
+      expect(previews[1].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Paranoid Android'
+      );
+      expect(previews[2].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Subterranean Homesick Alien'
+      );
 
       previews.forEach((p) => {
-        expect(p.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).not.toBe('OK Computer');
+        expect(p.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).not.toBe(
+          'OK Computer'
+        );
       });
     });
   });

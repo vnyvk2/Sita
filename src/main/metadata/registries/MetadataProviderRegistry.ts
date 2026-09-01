@@ -1,6 +1,5 @@
 import type { MetadataCapability } from '../common/types';
 import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
-
 import { MetadataProviderInfo } from '../models/MetadataProviderInfo';
 
 export class MetadataProviderRegistry {
@@ -22,9 +21,7 @@ export class MetadataProviderRegistry {
     return this.providers.delete(id);
   }
 
-  public getProvidersForCapability(
-    capability: MetadataCapability
-  ): IMetadataProvider[] {
+  public getProvidersForCapability(capability: MetadataCapability): IMetadataProvider[] {
     return Array.from(this.providers.values())
       .filter((p) => p.info.enabled && p.info.supports(capability))
       .sort((a, b) => b.info.priority - a.info.priority);

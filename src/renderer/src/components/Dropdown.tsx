@@ -124,7 +124,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
       const initialIdx =
         selectedIdx !== -1 && selectableIndices.includes(selectedIdx)
           ? selectedIdx
-          : selectableIndices[0] ?? -1;
+          : (selectableIndices[0] ?? -1);
 
       setHighlightedIndex(initialIdx);
       if (initialIdx !== -1) {
@@ -211,7 +211,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           disabled={isDisabled}
           onClick={toggleOpen}
           onKeyDown={handleTriggerKeyDown}
-          className={`group relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-3xl border-[3px] transition-[border,background,color,transform] duration-150 ease-in-out select-none outline-none ${
+          className={`group relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-3xl border-[3px] transition-[border,background,color,transform] duration-150 ease-in-out outline-none select-none ${
             isOpen
               ? 'border-font-color-highlight! bg-background-color-2/50 text-font-color-highlight dark:border-dark-font-color-highlight! dark:bg-dark-background-color-2/50 dark:text-dark-font-color-highlight scale-105'
               : 'border-background-color-2 bg-background-color-2/25 text-font-color-black hover:border-background-color-3 hover:bg-background-color-2/50 focus-visible:border-font-color-highlight-2 focus-visible:bg-background-color-2/50 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/25 dark:text-font-color-white dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-2/50 dark:focus-visible:border-dark-font-color-highlight-2 dark:focus-visible:bg-dark-background-color-2/50'
@@ -237,7 +237,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           disabled={isDisabled}
           onClick={toggleOpen}
           onKeyDown={handleTriggerKeyDown}
-          className={`flex h-10 w-52 cursor-pointer items-center justify-between gap-2 rounded-lg border-[3px] px-3 text-sm font-medium transition-[border-color,background-color] duration-150 ease-in-out select-none outline-none backdrop-blur-xs ${
+          className={`flex h-10 w-52 cursor-pointer items-center justify-between gap-2 rounded-lg border-[3px] px-3 text-sm font-medium backdrop-blur-xs transition-[border-color,background-color] duration-150 ease-in-out outline-none select-none ${
             isOpen
               ? 'border-font-color-highlight! bg-background-color-2/50 text-font-color-highlight dark:border-dark-font-color-highlight! dark:bg-dark-background-color-2/50 dark:text-dark-font-color-highlight'
               : 'border-background-color-2 bg-background-color-2/25 text-font-color-black hover:border-background-color-3 hover:bg-background-color-2/50 focus-visible:border-font-color-highlight-2 focus-visible:bg-background-color-2/50 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/25 dark:text-font-color-white dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-2/50 dark:focus-visible:border-dark-font-color-highlight-2 dark:focus-visible:bg-dark-background-color-2/50'
@@ -253,7 +253,9 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           </span>
           <span
             className={`material-icons-round text-base transition-transform duration-150 ${
-              isOpen ? 'rotate-180 text-font-color-highlight dark:text-dark-font-color-highlight' : 'opacity-60'
+              isOpen
+                ? 'text-font-color-highlight dark:text-dark-font-color-highlight rotate-180'
+                : 'opacity-60'
             }`}
           >
             expand_more
@@ -268,13 +270,13 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           ref={menuRef}
           role="menu"
           aria-label={tooltip}
-          className={`absolute z-50 mt-2 min-w-[13.5rem] max-w-[18rem] origin-top-right overflow-hidden rounded-2xl border p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-all duration-120 ease-out animate-in fade-in-0 zoom-in-95 ${
-            iconName ? 'right-0 top-full' : 'left-0 top-full w-full'
-          } border-black/10 bg-[#f8f9fa]/95 text-font-color-black dark:border-white/10 dark:bg-[#141418]/95 dark:text-font-color-white dark:shadow-[0_20px_48px_rgba(0,0,0,0.65)]`}
+          className={`animate-in fade-in-0 zoom-in-95 absolute z-50 mt-2 max-w-[18rem] min-w-[13.5rem] origin-top-right overflow-hidden rounded-2xl border p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-all duration-120 ease-out ${
+            iconName ? 'top-full right-0' : 'top-full left-0 w-full'
+          } text-font-color-black dark:text-font-color-white border-black/10 bg-[#f8f9fa]/95 dark:border-white/10 dark:bg-[#141418]/95 dark:shadow-[0_20px_48px_rgba(0,0,0,0.65)]`}
         >
           {/* Section Header */}
           {type && (
-            <div className="px-3 pt-1 pb-1.5 text-[10.5px] font-bold tracking-wider text-font-color-dimmed/75 uppercase select-none dark:text-font-color-dimmed/60">
+            <div className="text-font-color-dimmed/75 dark:text-font-color-dimmed/60 px-3 pt-1 pb-1.5 text-[10.5px] font-bold tracking-wider uppercase select-none">
               {type.replace(/\s*:\s*$/, '')}
             </div>
           )}
@@ -295,7 +297,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
                 return (
                   <div
                     key={`header-${idx}`}
-                    className="px-3 pt-2 pb-1 text-[10.5px] font-bold tracking-wider text-font-color-dimmed/75 uppercase select-none dark:text-font-color-dimmed/60"
+                    className="text-font-color-dimmed/75 dark:text-font-color-dimmed/60 px-3 pt-2 pb-1 text-[10.5px] font-bold tracking-wider uppercase select-none"
                   >
                     {option.label}
                   </div>
@@ -320,13 +322,13 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
                     option.isDisabled
                       ? 'cursor-not-allowed opacity-40'
                       : isSelected
-                        ? 'bg-font-color-highlight/15 text-font-color-highlight font-semibold dark:bg-dark-font-color-highlight/20 dark:text-dark-font-color-highlight'
-                        : 'text-font-color-black hover:bg-black/5 focus-visible:bg-black/5 active:bg-black/10 dark:text-font-color-white/90 dark:hover:bg-white/10 dark:focus-visible:bg-white/10 dark:active:bg-white/15'
+                        ? 'bg-font-color-highlight/15 text-font-color-highlight dark:bg-dark-font-color-highlight/20 dark:text-dark-font-color-highlight font-semibold'
+                        : 'text-font-color-black dark:text-font-color-white/90 hover:bg-black/5 focus-visible:bg-black/5 active:bg-black/10 dark:hover:bg-white/10 dark:focus-visible:bg-white/10 dark:active:bg-white/15'
                   }`}
                 >
                   <span className="truncate">{option.label}</span>
                   {isSelected && (
-                    <span className="material-icons-round text-base font-bold text-font-color-highlight dark:text-dark-font-color-highlight shrink-0">
+                    <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight shrink-0 text-base font-bold">
                       check
                     </span>
                   )}

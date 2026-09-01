@@ -21,14 +21,17 @@ export interface ReplayGainCalculationResult {
  * Computes the effective linear multiplier for Web Audio ReplayGain application.
  *
  * Implements:
+ *
  * 1. Mode fallback hierarchy:
+ *
  *    - 'album' mode: uses albumGain; falls back to trackGain if albumGain is null/undefined.
  *    - 'track' mode: uses trackGain.
  *    - 'off' mode: resolves to 1.0 (0 dB).
- * 2. Deterministic default: if both albumGain and trackGain are unavailable or unanalyzed,
- *    strictly resolves to 1.0 (0 dB).
+ * 2. Deterministic default: if both albumGain and trackGain are unavailable or unanalyzed, strictly
+ *    resolves to 1.0 (0 dB).
  * 3. Preamp application: applied in decibels prior to linear conversion (totalDb = baseDb + preampDb).
  * 4. Robust peak clipping prevention (Constraint #8):
+ *
  *    - Prevents post-gain discrete sample peak from exceeding 1.0: linearGain <= 1.0 / peak.
  *    - For peak < 1.0 (e.g. 0.5), permits safe headroom up to +6 dB (1.0 / 0.5 = 2.0).
  *    - For peak > 1.0 (e.g. 1.25), forces attenuation (1.0 / 1.25 = 0.8).

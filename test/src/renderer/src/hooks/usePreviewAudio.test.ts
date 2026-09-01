@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '../../../../../src/renderer/src/store/store';
+
 import {
   usePreviewAudio,
   resetPreviewAudioForTesting
 } from '../../../../../src/renderer/src/hooks/usePreviewAudio';
+import { store } from '../../../../../src/renderer/src/store/store';
 
 describe('usePreviewAudio Hook', () => {
   let playMock: ReturnType<typeof vi.fn>;

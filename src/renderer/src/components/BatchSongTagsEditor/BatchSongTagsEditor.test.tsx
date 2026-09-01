@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import BatchSongTagsEditor from './BatchSongTagsEditor';
 import {
   buildCanonicalSongTags,
@@ -19,8 +20,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) =>
-      (options?.defaultValue as string) ?? key
+    t: (key: string, options?: Record<string, unknown>) => (options?.defaultValue as string) ?? key
   })
 }));
 
@@ -121,7 +121,9 @@ describe('BatchSongTagsEditor — Utilities', () => {
       duration: 200,
       path: 'C:/Music/song.mp3',
       artists: [{ artistId: 10, name: 'Original Artist', artworkPath: 'art/artist10.jpg' }],
-      albums: [{ albumId: 20, title: 'Original Album', artworkPath: 'art/album20.jpg', noOfSongs: 12 }],
+      albums: [
+        { albumId: 20, title: 'Original Album', artworkPath: 'art/album20.jpg', noOfSongs: 12 }
+      ],
       genres: [{ genreId: 30, name: 'Rock', artworkPath: 'art/genre30.jpg' }],
       synchronizedLyrics: '[00:01.00] Hello',
       isrc: 'USRC12345678',

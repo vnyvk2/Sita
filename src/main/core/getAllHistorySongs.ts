@@ -24,4 +24,3 @@ export const getAllHistorySongs = async (
     throw error;
   }
 };
-

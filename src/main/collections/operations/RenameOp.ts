@@ -1,8 +1,7 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-
 import type { RenameInput } from '../../../common/collections/operationInputs';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class RenameOp implements CollectionOperation<RenameInput, void> {
   private readonly repository: PlaylistRepository;
@@ -11,10 +10,7 @@ export class RenameOp implements CollectionOperation<RenameInput, void> {
     this.repository = repository;
   }
 
-  public async execute(
-    input: RenameInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<void>> {
+  public async execute(input: RenameInput, ctx: OperationContext): Promise<OperationResult<void>> {
     const { playlistId, newName } = input;
     if (!newName.trim()) {
       throw new Error('Playlist name cannot be empty');

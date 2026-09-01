@@ -208,7 +208,6 @@ describe('tryToParseSong', () => {
       expect(logger.debug).toHaveBeenCalledWith('song added to the library.', { songPath });
     });
 
-
     test('should pass folderId to parseSong', async () => {
       const songPath = '/test/song9.mp3';
       const folderId = 42;

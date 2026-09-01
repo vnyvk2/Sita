@@ -3,9 +3,8 @@ import { songs } from '@db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 import type { SongPersistenceDTO } from '../../models/dtos';
-import type { IEntityLoader } from './IEntityLoader';
-
 import { MetadataKinds } from '../../models/MetadataKind';
+import type { IEntityLoader } from './IEntityLoader';
 
 const SONG_RELATIONS = {
   artists: {

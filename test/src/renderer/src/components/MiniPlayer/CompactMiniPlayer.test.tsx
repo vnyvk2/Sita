@@ -135,7 +135,10 @@ describe('CompactMiniPlayer (Single-Tier Progressive Strip)', () => {
     // Simulate two-finger touch
     const touchStartEvent = new Event('touchstart', { bubbles: true });
     Object.defineProperty(touchStartEvent, 'touches', {
-      value: [{ clientX: 10, clientY: 10 }, { clientX: 20, clientY: 20 }]
+      value: [
+        { clientX: 10, clientY: 10 },
+        { clientX: 20, clientY: 20 }
+      ]
     });
     compactPlayer.dispatchEvent(touchStartEvent);
 
@@ -158,7 +161,8 @@ describe('CompactMiniPlayer (Single-Tier Progressive Strip)', () => {
       toggleRepeat: vi.fn()
     };
 
-    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+    const { AppUpdateContext } =
+      await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
 
     const { container } = render(
       <AppUpdateContext.Provider value={mockContextValue as any}>

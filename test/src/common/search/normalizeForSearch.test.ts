@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { normalizeForSearch } from '../../../../src/common/search/normalizeForSearch';
 
 describe('normalizeForSearch', () => {

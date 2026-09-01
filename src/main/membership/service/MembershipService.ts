@@ -24,9 +24,7 @@ export class MembershipService {
     this.eventBus.onMembershipChanged((payload) => this.handleMembershipChanged(payload));
   }
 
-  /**
-   * Returns members in a collection. $O(1)$ on cache hit; loads from repository on cache miss.
-   */
+  /** Returns members in a collection. $O(1)$ on cache hit; loads from repository on cache miss. */
   public async getMembers(
     collection: MembershipReference,
     memberKind: MembershipEntityKind = 'song'
@@ -42,7 +40,8 @@ export class MembershipService {
   }
 
   /**
-   * Returns collections containing a member. $O(1)$ on cache hit; loads from repository on cache miss.
+   * Returns collections containing a member. $O(1)$ on cache hit; loads from repository on cache
+   * miss.
    */
   public async getCollectionsContaining(
     member: MembershipReference,
@@ -63,9 +62,7 @@ export class MembershipService {
     return collections;
   }
 
-  /**
-   * Returns collections containing any of the specified members in a single batched pass.
-   */
+  /** Returns collections containing any of the specified members in a single batched pass. */
   public async getCollectionsContainingMany(
     members: MembershipReference[],
     collectionKind: MembershipEntityKind
@@ -86,7 +83,10 @@ export class MembershipService {
       return resultMap;
     }
 
-    const entries = await this.repository.getCollectionsContainingMany(uncachedMembers, collectionKind);
+    const entries = await this.repository.getCollectionsContainingMany(
+      uncachedMembers,
+      collectionKind
+    );
 
     // Group fetched entries by memberId
     const fetchedMap = new Map<string | number, MembershipReference[]>();
@@ -105,9 +105,7 @@ export class MembershipService {
     return resultMap;
   }
 
-  /**
-   * Checks if a collection contains a specific member.
-   */
+  /** Checks if a collection contains a specific member. */
   public async contains(
     collection: MembershipReference,
     member: MembershipReference
@@ -120,9 +118,7 @@ export class MembershipService {
     return this.repository.contains(collection, member);
   }
 
-  /**
-   * Checks containment for multiple members in a collection.
-   */
+  /** Checks containment for multiple members in a collection. */
   public async containsMany(
     collection: MembershipReference,
     members: MembershipReference[]
@@ -145,9 +141,7 @@ export class MembershipService {
     return this.repository.containsMany(collection, members);
   }
 
-  /**
-   * Returns total member count in a collection.
-   */
+  /** Returns total member count in a collection. */
   public async countMembers(
     collection: MembershipReference,
     memberKind: MembershipEntityKind = 'song'
@@ -160,9 +154,7 @@ export class MembershipService {
     return this.repository.countMembers(collection, memberKind);
   }
 
-  /**
-   * Pre-warms cache for all memberships of a specified member kind.
-   */
+  /** Pre-warms cache for all memberships of a specified member kind. */
   public async warmCache(memberKind: MembershipEntityKind = 'song'): Promise<void> {
     const allEntries = await this.repository.getAllCollectionMemberships(memberKind);
 
@@ -186,9 +178,7 @@ export class MembershipService {
     }
   }
 
-  /**
-   * Handles granular cache invalidation on membership change events.
-   */
+  /** Handles granular cache invalidation on membership change events. */
   private handleMembershipChanged(payload: MembershipChangedPayload): void {
     // Invalidate affected collection
     this.cache.invalidateCollection(payload.collection.kind, payload.collection.id);

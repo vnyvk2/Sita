@@ -1,7 +1,12 @@
-import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
-import type { MetadataCandidate, RecordingMetadata, ProviderMetadata } from '@main/metadata/models/RecordingMetadata';
+import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import type {
+  MetadataCandidate,
+  RecordingMetadata,
+  ProviderMetadata
+} from '@main/metadata/models/RecordingMetadata';
+
 import type { MusicBrainzRecordingDto } from '../dto/RecordingDto';
 
 export class MusicBrainzRecordingMapper {
@@ -10,11 +15,12 @@ export class MusicBrainzRecordingMapper {
     confidence = 0.9,
     reasons: string[] = []
   ): MetadataCandidate {
-    const artists = dto['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean) ?? [];
+    const artists =
+      dto['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean) ?? [];
     const yearStr = dto['first-release-date'] ?? dto.releases?.[0]?.date;
     const parsedYear = yearStr ? parseInt(yearStr.split('-')[0], 10) : undefined;
     const year = isNaN(parsedYear!) ? undefined : parsedYear;
-    
+
     const primaryRelease = dto.releases?.[0];
     const albumTitle = primaryRelease?.title;
     const primaryMedia = primaryRelease?.media?.[0];

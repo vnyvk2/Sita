@@ -10,9 +10,9 @@ interface SongRowSkeletonProps {
 /**
  * Layout-stable placeholder for a not-yet-hydrated Song row.
  *
- * Mirrors the Song row's 60px grid (artwork square + title/artist/album/duration
- * columns) so swapping in the real row causes zero layout shift; content fades
- * in on the real row via its existing appear animation.
+ * Mirrors the Song row's 60px grid (artwork square + title/artist/album/duration columns) so
+ * swapping in the real row causes zero layout shift; content fades in on the real row via its
+ * existing appear animation.
  */
 const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
   ({ index, height: _height, style, className = '' }, ref) => {
@@ -23,14 +23,14 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
         ref={ref}
         data-skeleton-index={index}
         style={style}
-        className={`song-item list-row [contain:layout] relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 select-none items-center overflow-hidden ${
+        className={`song-item list-row relative mr-4 mb-2 flex h-13 w-[98%] items-center overflow-hidden rounded-lg p-[0.2rem] px-2 -outline-offset-2 [contain:layout] select-none ${
           isOdd
             ? 'bg-background-color-2/70! dark:bg-dark-background-color-2/50!'
             : 'bg-background-color-1! dark:bg-dark-background-color-1!'
         } ${className}`}
         aria-hidden="true"
       >
-        <div className="flex h-full w-full items-center gap-2 animate-pulse">
+        <div className="flex h-full w-full animate-pulse items-center gap-2">
           <div className="ml-1 w-[0.625rem] shrink-0">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! aspect-square rounded-sm opacity-60" />
           </div>

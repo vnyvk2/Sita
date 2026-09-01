@@ -1,19 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
-import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
-import { PlaylistImportService } from '@main/playlistImport/services/PlaylistImportService';
-import { PlaylistImporterRegistry } from '@main/playlistImport/registry/PlaylistImporterRegistry';
-import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
-import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
-import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
-import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
-import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
 import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistImportExecutor';
+import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
 import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
 import type { LibraryLookup } from '@main/playlistImport/interfaces/LibraryLookup';
 import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
 import type { PlaylistImportProgress } from '@main/playlistImport/models/PlaylistImportProgress';
+import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
+import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
+import { PlaylistImporterRegistry } from '@main/playlistImport/registry/PlaylistImporterRegistry';
+import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
+import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
+import { PlaylistImportService } from '@main/playlistImport/services/PlaylistImportService';
+import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
+import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('PlaylistImportWorkflow & PlaylistImportPipeline', () => {
   it('should orchestrate full pipeline via PlaylistImportPipeline abstraction', async () => {
@@ -67,10 +67,8 @@ missing.mp3`;
     const workflow = new PlaylistImportWorkflow(pipeline, executor);
 
     const progressLogs: PlaylistImportProgress[] = [];
-    const plan = await workflow.createPlanFromFile(
-      '/playlists/rock.m3u',
-      undefined,
-      (progress) => progressLogs.push(progress)
+    const plan = await workflow.createPlanFromFile('/playlists/rock.m3u', undefined, (progress) =>
+      progressLogs.push(progress)
     );
 
     expect(plan.playlistName).toBe('rock');

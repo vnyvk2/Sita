@@ -1,5 +1,6 @@
-import { db } from '@main/db/db';
 import crypto from 'crypto';
+
+import { db } from '@main/db/db';
 import { getArtistById, getArtistsByName } from '@main/db/queries/artists';
 import { linkArtworksToArtist, saveArtworks } from '@main/db/queries/artworks';
 import { default as stringSimilarity, ReturnTypeEnums } from 'didyoumean2';

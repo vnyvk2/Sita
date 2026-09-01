@@ -4,7 +4,10 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TheatreLyricsView from '../../../../../../src/renderer/src/components/LyricsPage/TheatreLyricsView';
-import { AppUpdateContext, type AppUpdateContextType } from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
+import {
+  AppUpdateContext,
+  type AppUpdateContextType
+} from '../../../../../../src/renderer/src/contexts/AppUpdateContext';
 import { store } from '../../../../../../src/renderer/src/store/store';
 
 describe('TheatreLyricsView', () => {

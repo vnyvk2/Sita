@@ -1,7 +1,8 @@
+import type { MetadataFieldDiff } from '@common/metadata/types';
+
+import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { MetadataProviderId } from '../models/RecordingMetadata';
 import type { LocalSongInput } from '../services/AlbumMetadataService';
-import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
-import type { MetadataFieldDiff } from '@common/metadata/types';
 
 export type WorkflowType = 'album' | 'track' | 'genre' | 'artwork';
 
@@ -76,10 +77,7 @@ export interface MetadataWorkflow {
     signal?: AbortSignal
   ): Promise<MetadataPreview>;
 
-  buildMutations(
-    preview: MetadataPreview,
-    selectedFieldIds?: string[]
-  ): ResourceMutationPayload[];
+  buildMutations(preview: MetadataPreview, selectedFieldIds?: string[]): ResourceMutationPayload[];
 }
 
 export abstract class BaseMetadataWorkflow implements MetadataWorkflow {

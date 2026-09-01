@@ -91,7 +91,9 @@ describe('LibraryLifecycleController', () => {
   };
 
   type UserSettingsSelect = Awaited<ReturnType<typeof getUserSettings>>;
-  const createMockUserSettings = (overrides: Partial<UserSettingsSelect> = {}): UserSettingsSelect =>
+  const createMockUserSettings = (
+    overrides: Partial<UserSettingsSelect> = {}
+  ): UserSettingsSelect =>
     ({
       id: 1,
       createdAt: new Date(),
@@ -145,7 +147,9 @@ describe('LibraryLifecycleController', () => {
     vi.clearAllMocks();
     libraryChangeTracker.reset();
 
-    vi.mocked(getUserSettings).mockResolvedValue(createMockUserSettings({ libraryScanMode: 'automatic' }));
+    vi.mocked(getUserSettings).mockResolvedValue(
+      createMockUserSettings({ libraryScanMode: 'automatic' })
+    );
     vi.mocked(saveUserSettings).mockResolvedValue(undefined as unknown as void);
     vi.mocked(initializePassiveWatchers).mockResolvedValue(undefined);
 
@@ -904,9 +908,7 @@ describe('LibraryLifecycleController', () => {
     it('throws in setScanMode when controller is not initialized or post-shutdown', async () => {
       await controller.shutdown();
 
-      await expect(controller.setScanMode('manual')).rejects.toThrow(
-        'controller is shutting down'
-      );
+      await expect(controller.setScanMode('manual')).rejects.toThrow('controller is shutting down');
     });
 
     it('forces stopWatchers when scan mode transition fails and rollback also throws', async () => {
@@ -916,7 +918,9 @@ describe('LibraryLifecycleController', () => {
       // Force saveUserSettings to throw
       vi.mocked(saveUserSettings).mockRejectedValueOnce(new Error('DB write failed'));
       // Force initializePassiveWatchers to throw on rollback
-      vi.mocked(initializePassiveWatchers).mockRejectedValueOnce(new Error('Watcher allocation failed'));
+      vi.mocked(initializePassiveWatchers).mockRejectedValueOnce(
+        new Error('Watcher allocation failed')
+      );
 
       await expect(controller.setScanMode('manual')).rejects.toThrow('DB write failed');
 

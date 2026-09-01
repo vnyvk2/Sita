@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import type { CoverSlotIndex } from '../../types/playlistCover';
 import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
+import type { CoverSlotIndex } from '../../types/playlistCover';
 import Img from '../Img';
 
 type Props = {
@@ -47,41 +47,42 @@ const NumberedSongPicker = ({
 
   return (
     <div className="numbered-song-picker mb-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <label className="text-sm font-semibold text-neutral-300">
           Selected Cover Songs ({selectedSongIds.length} / {maxSize})
         </label>
         <span className="text-xs text-neutral-500">Order determines quadrant position</span>
       </div>
 
-      <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-xl bg-neutral-900/60 p-2 border border-neutral-800">
+      <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900/60 p-2">
         {uniquePlaylistSongs.length === 0 ? (
           <div className="p-4 text-center text-sm text-neutral-500">No songs in playlist</div>
         ) : (
           uniquePlaylistSongs.map((song) => {
             const isSelected = selectedSet.has(song.songId);
             const badge = getPositionBadge(song.songId);
-            const isMaxReached = activeSlotIndex === null && !isSelected && selectedSongIds.length >= maxSize;
+            const isMaxReached =
+              activeSlotIndex === null && !isSelected && selectedSongIds.length >= maxSize;
 
             return (
               <div
                 key={song.songId}
                 onClick={() => !isMaxReached && onToggleSong(song.songId)}
-                className={`group flex items-center justify-between p-2 rounded-lg transition-all duration-150 ${
+                className={`group flex items-center justify-between rounded-lg p-2 transition-all duration-150 ${
                   isSelected
-                    ? 'bg-neutral-800/90 border border-neutral-700 text-white shadow-sm cursor-pointer'
+                    ? 'cursor-pointer border border-neutral-700 bg-neutral-800/90 text-white shadow-sm'
                     : isMaxReached
-                      ? 'bg-neutral-900/20 border border-transparent text-neutral-600 opacity-50 cursor-not-allowed'
-                      : 'bg-neutral-900/40 border border-transparent text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200 cursor-pointer'
+                      ? 'cursor-not-allowed border border-transparent bg-neutral-900/20 text-neutral-600 opacity-50'
+                      : 'cursor-pointer border border-transparent bg-neutral-900/40 text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200'
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
                   {/* Position Badge or Checkbox */}
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-bold text-sm">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm font-bold">
                     {isSelected ? (
-                      <span className="text-amber-400 text-base">{badge}</span>
+                      <span className="text-base text-amber-400">{badge}</span>
                     ) : (
-                      <span className="material-icons-round text-neutral-600 text-base group-hover:text-neutral-400">
+                      <span className="material-icons-round text-base text-neutral-600 group-hover:text-neutral-400">
                         add_circle_outline
                       </span>
                     )}
@@ -99,8 +100,10 @@ const NumberedSongPicker = ({
 
                   {/* Song Metadata */}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white leading-tight">{song.title}</p>
-                    <p className="truncate text-xs text-neutral-400 mt-0.5">
+                    <p className="truncate text-sm leading-tight font-medium text-white">
+                      {song.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-neutral-400">
                       {Array.isArray(song.artists)
                         ? song.artists.map((a) => (typeof a === 'string' ? a : a.name)).join(', ')
                         : 'Unknown Artist'}
@@ -109,7 +112,7 @@ const NumberedSongPicker = ({
                 </div>
 
                 {/* Duration */}
-                <span className="text-xs text-neutral-500 shrink-0 ml-3">
+                <span className="ml-3 shrink-0 text-xs text-neutral-500">
                   {formatDuration(song.duration)}
                 </span>
               </div>

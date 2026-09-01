@@ -28,9 +28,8 @@ const AppSource = readFileSync(resolve(process.cwd(), 'src/renderer/src/App.tsx'
  * - UserPreferencesQuery.* (5 preference DB round-trips)
  * - Remote changelog polling (useAppUpdates timers/prompt)
  *
- * Note: collection undo/redo shortcuts moved into the playlist route
- * (useCollectionMutations), which is unmounted entirely in mini mode, so they
- * no longer require a global playerType gate.
+ * Note: collection undo/redo shortcuts moved into the playlist route (useCollectionMutations),
+ * which is unmounted entirely in mini mode, so they no longer require a global playerType gate.
  */
 
 const changePromptMenuDataMock = vi.fn();

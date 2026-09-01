@@ -13,7 +13,7 @@ export const HeartBurst: React.FC<HeartBurstProps> = ({ isBursting }) => {
 
   return (
     <span
-      className="fx-heart-burst pointer-events-none absolute inset-0 flex items-center justify-center select-none font-sans"
+      className="fx-heart-burst pointer-events-none absolute inset-0 flex items-center justify-center font-sans select-none"
       aria-hidden="true"
     >
       {/* 6 Diverse floating mini hearts with staggered delays and organic paths */}
@@ -28,4 +28,3 @@ export const HeartBurst: React.FC<HeartBurstProps> = ({ isBursting }) => {
 };
 
 export default HeartBurst;
-

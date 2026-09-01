@@ -18,7 +18,10 @@ export class UserMetadataService {
     fieldId: MetadataFieldId,
     value: MetadataOverrideValue
   ): Promise<void> {
-    await this.repository.setOverrides(identity, { [fieldId]: value } as Record<MetadataFieldId, MetadataOverrideValue>);
+    await this.repository.setOverrides(identity, { [fieldId]: value } as Record<
+      MetadataFieldId,
+      MetadataOverrideValue
+    >);
     this.eventBus.emit('MetadataOverrideChanged', { identity });
   }
 
@@ -30,10 +33,7 @@ export class UserMetadataService {
     this.eventBus.emit('MetadataOverrideChanged', { identity });
   }
 
-  public async removeOverride(
-    identity: MetadataIdentity,
-    fieldId: MetadataFieldId
-  ): Promise<void> {
+  public async removeOverride(identity: MetadataIdentity, fieldId: MetadataFieldId): Promise<void> {
     await this.repository.removeOverride(identity, fieldId);
     this.eventBus.emit('MetadataOverrideChanged', { identity });
   }

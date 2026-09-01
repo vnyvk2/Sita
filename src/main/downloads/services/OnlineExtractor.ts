@@ -26,9 +26,8 @@ export interface OnlineSearchOptions {
 }
 
 /**
- * Pluggable backend for online track search + audio acquisition.
- * Implemented today by YtDlpExtractor; replaceable without touching the
- * DownloadManager or UI.
+ * Pluggable backend for online track search + audio acquisition. Implemented today by
+ * YtDlpExtractor; replaceable without touching the DownloadManager or UI.
  */
 export interface OnlineExtractor {
   readonly id: SourceType;
@@ -39,15 +38,15 @@ export interface OnlineExtractor {
   search(query: string, options?: OnlineSearchOptions): Promise<OnlineTrackResult[]>;
 
   /**
-   * Accepts a playlist URL/ID (a watch URL containing both video and list ids is
-   * also fine). Rejects unbounded radio mixes and caps entry count.
+   * Accepts a playlist URL/ID (a watch URL containing both video and list ids is also fine).
+   * Rejects unbounded radio mixes and caps entry count.
    */
   resolvePlaylist(urlOrId: string): Promise<OnlinePlaylistInfo>;
 
   /**
-   * Downloads a single track's audio into outputDir (the caller owns staging
-   * lifecycle) and returns the verified completed file. Rejects unsupported
-   * containers instead of silently returning them.
+   * Downloads a single track's audio into outputDir (the caller owns staging lifecycle) and returns
+   * the verified completed file. Rejects unsupported containers instead of silently returning
+   * them.
    */
   download(request: OnlineDownloadRequest): Promise<OnlineDownloadOutput>;
 }

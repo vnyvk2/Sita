@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
 import { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('DeezerApiClient', () => {
   it('searches for an artist and returns matching artist info', async () => {
@@ -9,7 +9,12 @@ describe('DeezerApiClient', () => {
         status: 200,
         data: {
           data: [
-            { id: 27, name: 'Daft Punk', link: 'https://deezer.com/artist/27', picture_medium: 'http://pic.jpg' }
+            {
+              id: 27,
+              name: 'Daft Punk',
+              link: 'https://deezer.com/artist/27',
+              picture_medium: 'http://pic.jpg'
+            }
           ],
           total: 1
         }
@@ -48,13 +53,26 @@ describe('DeezerApiClient', () => {
 
   it('fetches artist albums with pagination support', async () => {
     const page1 = [
-      { id: 101, title: 'Discovery', record_type: 'album', nb_tracks: 14, release_date: '2001-03-07' }
+      {
+        id: 101,
+        title: 'Discovery',
+        record_type: 'album',
+        nb_tracks: 14,
+        release_date: '2001-03-07'
+      }
     ];
     const page2 = [
-      { id: 102, title: 'Human After All', record_type: 'album', nb_tracks: 10, release_date: '2005-03-14' }
+      {
+        id: 102,
+        title: 'Human After All',
+        record_type: 'album',
+        nb_tracks: 10,
+        release_date: '2005-03-14'
+      }
     ];
 
-    const mockExecute = vi.fn()
+    const mockExecute = vi
+      .fn()
       .mockResolvedValueOnce({
         status: 200,
         data: { data: page1, total: 2, next: 'https://api.deezer.com/artist/27/albums?index=1' }

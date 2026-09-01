@@ -1,10 +1,11 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { db } from '@main/db/db';
-import { ASSET_EVENTS } from '@main/workers/libraryChoreography';
 import { AlbumReplayGainJob } from '@main/workers/jobs/albumReplayGainJob';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from '@main/workers/jobs/replayGainJob';
 import { JobScheduler } from '@main/workers/jobScheduler';
+import { ASSET_EVENTS } from '@main/workers/libraryChoreography';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('fs/promises');
 
@@ -50,8 +51,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     // Only 2 songs have replay_gain records
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.9, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() },
-      { songId: 102, trackGain: -6.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.9,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date()
+      },
+      {
+        songId: 102,
+        trackGain: -6.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date()
+      }
     ] as any);
 
     const deferSpy = vi.spyOn(scheduler, 'scheduleDeferred');
@@ -81,8 +98,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     // Both tracks have matching albumGain (-7.2) and albumPeak (0.95)
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -6.0, trackPeak: 0.8, albumGain: -7.2, albumPeak: 0.95, generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION, updatedAt: new Date() },
-      { songId: 102, trackGain: -8.0, trackPeak: 0.95, albumGain: -7.2, albumPeak: 0.95, generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION, updatedAt: new Date() }
+      {
+        songId: 101,
+        trackGain: -6.0,
+        trackPeak: 0.8,
+        albumGain: -7.2,
+        albumPeak: 0.95,
+        generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
+        updatedAt: new Date()
+      },
+      {
+        songId: 102,
+        trackGain: -8.0,
+        trackPeak: 0.95,
+        albumGain: -7.2,
+        albumPeak: 0.95,
+        generatorVersion: CURRENT_REPLAYGAIN_GENERATOR_VERSION,
+        updatedAt: new Date()
+      }
     ] as any);
 
     const job = new AlbumReplayGainJob(1, scheduler);
@@ -102,8 +135,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     const time102 = new Date('2026-08-27T10:00:00Z');
 
     const rgRows = [
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: time101 },
-      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: time102 }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: time101
+      },
+      {
+        songId: 102,
+        trackGain: -7.0,
+        trackPeak: 0.95,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: time102
+      }
     ];
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
 
@@ -168,8 +217,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     const initialTime = new Date('2026-08-27T10:00:00Z');
     const rgRows = [
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
-      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      },
+      {
+        songId: 102,
+        trackGain: -7.0,
+        trackPeak: 0.95,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      }
     ];
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
 
@@ -180,7 +245,15 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
       // Row 102 disappeared during aggregation!
       const currentRows = [
-        { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+        {
+          songId: 101,
+          trackGain: -5.0,
+          trackPeak: 0.8,
+          albumGain: null,
+          albumPeak: null,
+          generatorVersion: 1,
+          updatedAt: initialTime
+        }
       ];
 
       return callback({
@@ -198,7 +271,10 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     await job.execute();
 
     expect(updateSetMock).not.toHaveBeenCalled();
-    expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+    expect(emitSpy).not.toHaveBeenCalledWith(
+      ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED,
+      expect.anything()
+    );
   });
 
   it('detects stale aggregation and aborts commit if a song was updated before transaction validation', async () => {
@@ -209,8 +285,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     const initialTime = new Date('2026-08-27T10:00:00Z');
     const rgRows = [
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
-      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      },
+      {
+        songId: 102,
+        trackGain: -7.0,
+        trackPeak: 0.95,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      }
     ];
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
 
@@ -222,8 +314,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
       // Return a MODIFIED row during transaction (simulating concurrent track re-analysis)
       const modifiedTime = new Date('2026-08-27T10:05:00Z');
       const concurrentRows = [
-        { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
-        { songId: 102, trackGain: -9.0, trackPeak: 0.99, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: modifiedTime }
+        {
+          songId: 101,
+          trackGain: -5.0,
+          trackPeak: 0.8,
+          albumGain: null,
+          albumPeak: null,
+          generatorVersion: 1,
+          updatedAt: initialTime
+        },
+        {
+          songId: 102,
+          trackGain: -9.0,
+          trackPeak: 0.99,
+          albumGain: null,
+          albumPeak: null,
+          generatorVersion: 1,
+          updatedAt: modifiedTime
+        }
       ];
 
       return callback({
@@ -242,7 +350,10 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     // Verify commit was aborted due to stale detection
     expect(updateSetMock).not.toHaveBeenCalled();
-    expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+    expect(emitSpy).not.toHaveBeenCalledWith(
+      ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED,
+      expect.anything()
+    );
   });
 
   it('aborts commit when a race occurs after validation but before atomic update (True Optimistic Concurrency)', async () => {
@@ -253,8 +364,24 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     const initialTime = new Date('2026-08-27T10:00:00Z');
     const rgRows = [
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime },
-      { songId: 102, trackGain: -7.0, trackPeak: 0.95, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: initialTime }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      },
+      {
+        songId: 102,
+        trackGain: -7.0,
+        trackPeak: 0.95,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: initialTime
+      }
     ];
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue(rgRows as any);
 
@@ -290,7 +417,10 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     await expect(job.execute()).rejects.toThrow('Optimistic concurrency conflict on song 102');
 
     // Verify event was NOT emitted because the error was thrown before emission
-    expect(emitSpy).not.toHaveBeenCalledWith(ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED, expect.anything());
+    expect(emitSpy).not.toHaveBeenCalledWith(
+      ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED,
+      expect.anything()
+    );
   });
 
   it('safely rejects corrupt, truncated, or misaligned block caches (0, 7, 15 bytes) without throwing', async () => {
@@ -299,7 +429,15 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     ] as any);
 
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date()
+      }
     ] as any);
 
     // Test 1: 0 bytes (empty file)
@@ -327,7 +465,15 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     ] as any);
 
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date()
+      }
     ] as any);
 
     vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT: file not found'));
@@ -374,7 +520,15 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
     vi.mocked(db.query.replayGain.findMany).mockImplementation(async () => {
       job.cancel();
       return [
-        { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date() }
+        {
+          songId: 101,
+          trackGain: -5.0,
+          trackPeak: 0.8,
+          albumGain: null,
+          albumPeak: null,
+          generatorVersion: 1,
+          updatedAt: new Date()
+        }
       ] as any;
     });
 
@@ -395,7 +549,15 @@ describe('Gate D3: AlbumReplayGainJob (Multi-Track Aggregation, Atomic Concurren
 
     const now = new Date();
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: now }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: now
+      }
     ] as any);
 
     const blocks = new Float64Array(10).fill(0.04);

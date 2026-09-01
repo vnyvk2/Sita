@@ -1,7 +1,5 @@
-import { app } from 'electron';
-import { eq } from 'drizzle-orm';
-import fs from 'fs/promises';
 import type { Stats } from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 import { collectGarbageArtworks } from '@main/core/garbageCollector';
@@ -9,9 +7,15 @@ import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
 import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
-import { atomicPublishFile, isAssetTempFileFor } from '@main/workers/process/handlers/assetJobHandler';
-import { WAVEFORM_RESOLUTION } from './waveformJob';
+import {
+  atomicPublishFile,
+  isAssetTempFileFor
+} from '@main/workers/process/handlers/assetJobHandler';
+import { eq } from 'drizzle-orm';
+import { app } from 'electron';
+
 import type { Job, JobClass, JobState } from '../types';
+import { WAVEFORM_RESOLUTION } from './waveformJob';
 
 export class GarbageCollectionJob implements Job {
   id: string;
@@ -21,7 +25,7 @@ export class GarbageCollectionJob implements Job {
   retries = 0;
   description: string;
   private abortController = new AbortController();
-  
+
   // Provide a unique id so that multiple GC jobs don't queue up unnecessarily
   constructor() {
     this.id = 'garbage_collection_job';
@@ -57,7 +61,7 @@ export class GarbageCollectionJob implements Job {
   private async collectGarbageWaveforms(): Promise<number> {
     try {
       const cacheDir = path.join(app.getPath('userData'), 'cache', 'waveforms');
-      
+
       let files: string[] = [];
       try {
         files = await fs.readdir(cacheDir);
@@ -65,17 +69,22 @@ export class GarbageCollectionJob implements Job {
         if (isAnErrorWithCode(e) && e.code === 'ENOENT') return 0;
         throw e;
       }
-      
+
       const now = Date.now();
       let removedCount = 0;
 
-      const dbWaveforms = await db.select({ id: waveforms.id, path: waveforms.path }).from(waveforms);
+      const dbWaveforms = await db
+        .select({ id: waveforms.id, path: waveforms.path })
+        .from(waveforms);
       const validBinPaths = new Set(dbWaveforms.map((w) => path.basename(w.path)));
 
       // 1. Crash recovery & in-flight protection for DB rows
       for (const row of dbWaveforms) {
         if (this.isCancelled()) return removedCount;
-        const fileExists = await fs.stat(row.path).then(() => true).catch(() => false);
+        const fileExists = await fs
+          .stat(row.path)
+          .then(() => true)
+          .catch(() => false);
         if (!fileExists) {
           const rowBasename = path.basename(row.path);
           const matchingTempFiles = files.filter((f) => isAssetTempFileFor(f, rowBasename));
@@ -105,7 +114,10 @@ export class GarbageCollectionJob implements Job {
           } else {
             // 2. Deterministic crash recovery: Sort stale candidates newest first
             const staleCandidates = candidateEntries
-              .filter((c): c is { tempFileName: string; tempFilePath: string; tempStats: Stats } => c.tempStats !== null)
+              .filter(
+                (c): c is { tempFileName: string; tempFilePath: string; tempStats: Stats } =>
+                  c.tempStats !== null
+              )
               .sort((a, b) => b.tempStats.mtimeMs - a.tempStats.mtimeMs);
 
             if (staleCandidates.length > 0) {
@@ -119,7 +131,7 @@ export class GarbageCollectionJob implements Job {
               if (!isValidWaveform) {
                 logger.warn(
                   `[GarbageCollection] Rejecting corrupt/truncated waveform tmp file for DB row ${row.id}: ` +
-                  `${newestCandidate.tempFilePath} (${size} bytes, expected ${EXPECTED_WAVEFORM_BYTES} bytes)`
+                    `${newestCandidate.tempFilePath} (${size} bytes, expected ${EXPECTED_WAVEFORM_BYTES} bytes)`
                 );
                 continue;
               }
@@ -182,7 +194,7 @@ export class GarbageCollectionJob implements Job {
           }
         }
       }
-      
+
       return removedCount;
     } catch (error) {
       logger.error('Failed to collect garbage waveforms', { error });

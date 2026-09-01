@@ -1,25 +1,30 @@
+import { eq, sql, asc } from 'drizzle-orm';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { db } from '../../../../../src/main/db/db';
-import { playlists, playlistEntries, songs, operationJournal } from '../../../../../src/main/db/schema';
-import { UndoEngine } from '../../../../../src/main/collections/engine/UndoEngine';
+
+import { createCollectionId } from '../../../../../src/common/collections/id';
 import { PlaylistEngine } from '../../../../../src/main/collections/engine/PlaylistEngine';
+import { UndoEngine } from '../../../../../src/main/collections/engine/UndoEngine';
+import { MembershipCache } from '../../../../../src/main/collections/membership/MembershipCache';
+import { MembershipService } from '../../../../../src/main/collections/membership/MembershipService';
+import { AddSongsOp } from '../../../../../src/main/collections/operations/AddSongsOp';
+import { DeleteOp } from '../../../../../src/main/collections/operations/DeleteOp';
 import { OperationExecutor } from '../../../../../src/main/collections/operations/OperationExecutor';
 import { OperationJournalWriter } from '../../../../../src/main/collections/operations/OperationJournalWriter';
-import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
-import { OperationJournalRepository } from '../../../../../src/main/collections/repositories/OperationJournalRepository';
 import { OperationRegistry } from '../../../../../src/main/collections/operations/OperationRegistry';
-import { MembershipService } from '../../../../../src/main/collections/membership/MembershipService';
-import { MembershipCache } from '../../../../../src/main/collections/membership/MembershipCache';
-import { createCollectionId } from '../../../../../src/common/collections/id';
-
-import { AddSongsOp } from '../../../../../src/main/collections/operations/AddSongsOp';
 import { RemoveSongsOp } from '../../../../../src/main/collections/operations/RemoveSongsOp';
 import { RenameOp } from '../../../../../src/main/collections/operations/RenameOp';
 import { ReorderOp } from '../../../../../src/main/collections/operations/ReorderOp';
-import { DeleteOp } from '../../../../../src/main/collections/operations/DeleteOp';
-import { RestoreSongsOp } from '../../../../../src/main/collections/operations/RestoreSongsOp';
 import { RestorePlaylistOp } from '../../../../../src/main/collections/operations/RestorePlaylistOp';
-import { eq, sql, asc } from 'drizzle-orm';
+import { RestoreSongsOp } from '../../../../../src/main/collections/operations/RestoreSongsOp';
+import { OperationJournalRepository } from '../../../../../src/main/collections/repositories/OperationJournalRepository';
+import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
+import { db } from '../../../../../src/main/db/db';
+import {
+  playlists,
+  playlistEntries,
+  songs,
+  operationJournal
+} from '../../../../../src/main/db/schema';
 
 describe('UndoEngine', () => {
   let repository: PlaylistRepository;
@@ -28,7 +33,7 @@ describe('UndoEngine', () => {
   let registry: OperationRegistry;
   let journalRepo: OperationJournalRepository;
   let membershipService: MembershipService;
-  
+
   let playlistEngine: PlaylistEngine;
   let undoEngine: UndoEngine;
 
@@ -66,18 +71,48 @@ describe('UndoEngine', () => {
     playlistEngine = new PlaylistEngine(repository, membershipService, executor);
 
     // Setup initial data
-    const [insertedPlaylist] = await db.insert(playlists).values({
-      name: 'Test Playlist'
-    }).returning();
+    const [insertedPlaylist] = await db
+      .insert(playlists)
+      .values({
+        name: 'Test Playlist'
+      })
+      .returning();
     testPlaylistId = insertedPlaylist.id;
 
     const now = new Date();
-    const insertedSongs = await db.insert(songs).values([
-      { title: 'Song 1', artist: 'Artist 1', album: 'Album 1', path: '/1.mp3', duration: 100, fileCreatedAt: now, fileModifiedAt: now },
-      { title: 'Song 2', artist: 'Artist 2', album: 'Album 2', path: '/2.mp3', duration: 120, fileCreatedAt: now, fileModifiedAt: now },
-      { title: 'Song 3', artist: 'Artist 3', album: 'Album 3', path: '/3.mp3', duration: 140, fileCreatedAt: now, fileModifiedAt: now },
-    ]).returning();
-    testSongIds = insertedSongs.map(s => s.id);
+    const insertedSongs = await db
+      .insert(songs)
+      .values([
+        {
+          title: 'Song 1',
+          artist: 'Artist 1',
+          album: 'Album 1',
+          path: '/1.mp3',
+          duration: 100,
+          fileCreatedAt: now,
+          fileModifiedAt: now
+        },
+        {
+          title: 'Song 2',
+          artist: 'Artist 2',
+          album: 'Album 2',
+          path: '/2.mp3',
+          duration: 120,
+          fileCreatedAt: now,
+          fileModifiedAt: now
+        },
+        {
+          title: 'Song 3',
+          artist: 'Artist 3',
+          album: 'Album 3',
+          path: '/3.mp3',
+          duration: 140,
+          fileCreatedAt: now,
+          fileModifiedAt: now
+        }
+      ])
+      .returning();
+    testSongIds = insertedSongs.map((s) => s.id);
   });
 
   afterEach(async () => {
@@ -90,8 +125,11 @@ describe('UndoEngine', () => {
   const getCollectionId = () => createCollectionId('local', 'playlist', testPlaylistId);
 
   it('should undo and redo addSongs', async () => {
-    await playlistEngine.addSongs({ playlistId: testPlaylistId, songIds: [testSongIds[0], testSongIds[1]] });
-    
+    await playlistEngine.addSongs({
+      playlistId: testPlaylistId,
+      songIds: [testSongIds[0], testSongIds[1]]
+    });
+
     let entries = await repository.getEntries(testPlaylistId);
     expect(entries.length).toBe(2);
 
@@ -133,12 +171,16 @@ describe('UndoEngine', () => {
 
     // Let's break the registry so that undo throws an error
     const originalGet = registry.get.bind(registry);
-    registry.get = () => { throw new Error('Simulated failure during undo') };
+    registry.get = () => {
+      throw new Error('Simulated failure during undo');
+    };
 
     const initialJournalCount = (await db.select().from(operationJournal)).length;
     expect(initialJournalCount).toBe(1);
 
-    await expect(undoEngine.undo(getCollectionId())).rejects.toThrow('Simulated failure during undo');
+    await expect(undoEngine.undo(getCollectionId())).rejects.toThrow(
+      'Simulated failure during undo'
+    );
 
     // Restore registry
     registry.get = originalGet;
@@ -157,22 +199,36 @@ describe('UndoEngine', () => {
 
   it('should support multi-step undo and redo chain', async () => {
     // 1. Add songs
-    await playlistEngine.addSongs({ playlistId: testPlaylistId, songIds: [testSongIds[0], testSongIds[1]] });
-    let entries = await db.select().from(playlistEntries)
+    await playlistEngine.addSongs({
+      playlistId: testPlaylistId,
+      songIds: [testSongIds[0], testSongIds[1]]
+    });
+    let entries = await db
+      .select()
+      .from(playlistEntries)
       .where(eq(playlistEntries.playlistId, testPlaylistId))
       .orderBy(asc(playlistEntries.position));
     const entryIdToReorder = entries[0].id;
 
     // 2. Rename playlist
-    await playlistEngine.renamePlaylist({ playlistId: testPlaylistId, newName: 'Renamed Playlist' });
+    await playlistEngine.renamePlaylist({
+      playlistId: testPlaylistId,
+      newName: 'Renamed Playlist'
+    });
 
     // 3. Reorder songs
-    await playlistEngine.reorderSongs({ playlistId: testPlaylistId, entryId: entryIdToReorder, newPosition: 1 });
+    await playlistEngine.reorderSongs({
+      playlistId: testPlaylistId,
+      entryId: entryIdToReorder,
+      newPosition: 1
+    });
 
     // Verify state after 3 steps
     let p = await db.query.playlists.findFirst({ where: eq(playlists.id, testPlaylistId) });
     expect(p?.name).toBe('Renamed Playlist');
-    entries = await db.select().from(playlistEntries)
+    entries = await db
+      .select()
+      .from(playlistEntries)
       .where(eq(playlistEntries.playlistId, testPlaylistId))
       .orderBy(asc(playlistEntries.position));
     expect(entries[1].songId).toBe(testSongIds[0]); // was reordered
@@ -181,7 +237,9 @@ describe('UndoEngine', () => {
 
     // Undo 3: Reorder
     await undoEngine.undo(cid);
-    entries = await db.select().from(playlistEntries)
+    entries = await db
+      .select()
+      .from(playlistEntries)
       .where(eq(playlistEntries.playlistId, testPlaylistId))
       .orderBy(asc(playlistEntries.position));
     expect(entries[0].songId).toBe(testSongIds[0]); // reorder reverted
@@ -198,7 +256,9 @@ describe('UndoEngine', () => {
 
     // Redo 3: Reorder
     await undoEngine.redo(cid);
-    entries = await db.select().from(playlistEntries)
+    entries = await db
+      .select()
+      .from(playlistEntries)
       .where(eq(playlistEntries.playlistId, testPlaylistId))
       .orderBy(asc(playlistEntries.position));
     expect(entries[1].songId).toBe(testSongIds[0]); // reordered again
@@ -207,8 +267,10 @@ describe('UndoEngine', () => {
     await undoEngine.undo(cid); // Undo Reorder
     await undoEngine.undo(cid); // Undo Rename
     await undoEngine.undo(cid); // Undo Add
-    
-    entries = await db.select().from(playlistEntries)
+
+    entries = await db
+      .select()
+      .from(playlistEntries)
       .where(eq(playlistEntries.playlistId, testPlaylistId))
       .orderBy(asc(playlistEntries.position));
     expect(entries.length).toBe(0); // All gone
@@ -216,10 +278,10 @@ describe('UndoEngine', () => {
 
   it('should fully restore a deleted playlist (Undo DeleteOp)', async () => {
     await playlistEngine.addSongs({ playlistId: testPlaylistId, songIds: testSongIds });
-    
+
     // Delete playlist
     await playlistEngine.deletePlaylist({ playlistId: testPlaylistId });
-    
+
     let p = await repository.getById(testPlaylistId);
     expect(p).toBeNull();
     let entries = await repository.getEntries(testPlaylistId);

@@ -7,14 +7,14 @@ import type { SqliteEngine } from './engine';
 /**
  * Raw object-row queries against the SQLite engine.
  *
- * drizzle's sqlite-proxy returns positional arrays for raw `.all()`/`.get()` calls
- * (positional mapping is what the query-builder layer requires), so raw SQL that
- * expects object rows goes through the engine's object-mode statement cache instead.
+ * Drizzle's sqlite-proxy returns positional arrays for raw `.all()`/`.get()` calls (positional
+ * mapping is what the query-builder layer requires), so raw SQL that expects object rows goes
+ * through the engine's object-mode statement cache instead.
  *
- * Concurrency/transaction note: node:sqlite is a single connection. Statements issued
- * here while a drizzle transaction is open on the same connection participate in that
- * transaction (SQLite tx state lives on the connection), so these helpers are
- * transaction-safe when called inside `db.transaction(...)`.
+ * Concurrency/transaction note: node:sqlite is a single connection. Statements issued here while a
+ * drizzle transaction is open on the same connection participate in that transaction (SQLite tx
+ * state lives on the connection), so these helpers are transaction-safe when called inside
+ * `db.transaction(...)`.
  */
 
 const dialect = new SQLiteSyncDialect();

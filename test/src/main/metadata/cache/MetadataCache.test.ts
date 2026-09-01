@@ -1,10 +1,9 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataCache } from '@main/metadata/cache/MetadataCache';
 import { MetadataEntity } from '@main/metadata/models/MetadataEntity';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataValue } from '@main/metadata/models/MetadataValue';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataCache', () => {
   it('should store, retrieve, evict LRU, and invalidate by entity kind', () => {
@@ -13,9 +12,18 @@ describe('MetadataCache', () => {
     const id2 = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 2 });
     const id3 = new MetadataIdentity({ entityKind: MetadataKinds.Artist, entityId: 3 });
 
-    const entity1 = new MetadataEntity({ identity: id1, fields: { title: new MetadataValue({ value: 'Song 1' }) } });
-    const entity2 = new MetadataEntity({ identity: id2, fields: { title: new MetadataValue({ value: 'Song 2' }) } });
-    const entity3 = new MetadataEntity({ identity: id3, fields: { artist: new MetadataValue({ value: 'Artist 3' }) } });
+    const entity1 = new MetadataEntity({
+      identity: id1,
+      fields: { title: new MetadataValue({ value: 'Song 1' }) }
+    });
+    const entity2 = new MetadataEntity({
+      identity: id2,
+      fields: { title: new MetadataValue({ value: 'Song 2' }) }
+    });
+    const entity3 = new MetadataEntity({
+      identity: id3,
+      fields: { artist: new MetadataValue({ value: 'Artist 3' }) }
+    });
 
     cache.set(entity1);
     cache.set(entity2);

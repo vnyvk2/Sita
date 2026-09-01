@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { RequestPipeline } from '../../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../../cache/IdentityResolutionCache';
-import { DiscogsApiClient } from '../DiscogsApiClient';
 import { DiscogsAdapter } from '../DiscogsAdapter';
+import { DiscogsApiClient } from '../DiscogsApiClient';
 
 describe('Phase 14F — Discogs Contribution Adapter Suite', () => {
   it('fetchContribution() returns specialized Discogs contributions (genre, style, catalogNumber, masterRelease)', async () => {
@@ -34,7 +35,10 @@ describe('Phase 14F — Discogs Contribution Adapter Suite', () => {
       master_id: 7890
     });
 
-    const contribution = await adapter.fetchContribution({ title: 'SOUR', artist: 'Olivia Rodrigo' });
+    const contribution = await adapter.fetchContribution({
+      title: 'SOUR',
+      artist: 'Olivia Rodrigo'
+    });
 
     expect(contribution).not.toBeNull();
     expect(contribution?.providerId).toBe('discogs');

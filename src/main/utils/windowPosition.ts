@@ -1,12 +1,7 @@
-import {
-  MINI_PLAYER_MIN_SIZE_X,
-  MINI_PLAYER_MIN_SIZE_Y
-} from '@common/miniPlayerConstants';
+import { MINI_PLAYER_MIN_SIZE_X, MINI_PLAYER_MIN_SIZE_Y } from '@common/miniPlayerConstants';
 import { screen } from 'electron';
 
-/**
- * Checks whether a rectangle intersects any connected display.
- */
+/** Checks whether a rectangle intersects any connected display. */
 export function isRectOnAnyDisplay(bounds: {
   x: number;
   y: number;
@@ -25,9 +20,8 @@ export function isRectOnAnyDisplay(bounds: {
 }
 
 /**
- * Validates a persisted window position.
- * Guards against Windows' minimized-window coordinates (-32000) and positions
- * that do not intersect any connected display. Uses actual/minimum window
+ * Validates a persisted window position. Guards against Windows' minimized-window coordinates
+ * (-32000) and positions that do not intersect any connected display. Uses actual/minimum window
  * footprint rather than a 1x1 point to allow legitimate partial overhangs.
  */
 export function isValidPersistedPosition(

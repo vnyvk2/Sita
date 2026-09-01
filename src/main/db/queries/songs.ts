@@ -1,5 +1,4 @@
 import { db } from '@db/db';
-import { rawAll } from '@db/sqlite/raw';
 import {
   albums,
   albumsSongs,
@@ -11,6 +10,7 @@ import {
   musicFolders,
   songs
 } from '@db/schema';
+import { rawAll } from '@db/sqlite/raw';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
 
@@ -63,14 +63,12 @@ export const updateSongBasicFields = async (
   }
 
   if (Object.keys(updatePayload).length === 0) {
-    return (await trx.query.songs.findFirst({ where: eq(songs.id, songId) })) as typeof songs.$inferSelect;
+    return (await trx.query.songs.findFirst({
+      where: eq(songs.id, songId)
+    })) as typeof songs.$inferSelect;
   }
 
-  const res = await trx
-    .update(songs)
-    .set(updatePayload)
-    .where(eq(songs.id, songId))
-    .returning();
+  const res = await trx.update(songs).set(updatePayload).where(eq(songs.id, songId)).returning();
 
   return res[0];
 };
@@ -617,9 +615,7 @@ export interface SongListFacets {
   genres: string[];
 }
 
-export const getSongListFacets = async (
-  trx: DB | DBTransaction = db
-): Promise<SongListFacets> => {
+export const getSongListFacets = async (trx: DB | DBTransaction = db): Promise<SongListFacets> => {
   // rawAll: object rows (drizzle proxy .all() returns positional arrays for raw SQL)
   const languagesResult = await rawAll<{ val: string }>(sql`
     SELECT DISTINCT val FROM (

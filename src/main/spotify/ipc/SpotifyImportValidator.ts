@@ -1,4 +1,5 @@
 import { inArray } from 'drizzle-orm';
+
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
 import type { ImportDecision } from '../../playlistImport/models/ImportDecision';
@@ -14,19 +15,19 @@ const VALID_DECISIONS = new Set<ImportDecision>([
 
 export class SpotifyImportValidator {
   /**
-   * Deeply validates an untrusted PlaylistImportPlan from the renderer before persistence.
-   * Enforces structural integrity, strictly sequential 1..N ordering, exhaustive decision validation,
-   * decision <-> libraryMatch status consistency, database referential integrity, and recomputes all statistics on the backend.
+   * Deeply validates an untrusted PlaylistImportPlan from the renderer before persistence. Enforces
+   * structural integrity, strictly sequential 1..N ordering, exhaustive decision validation,
+   * decision <-> libraryMatch status consistency, database referential integrity, and recomputes
+   * all statistics on the backend.
    */
-  public static async validateAndSanitizePlan(untrustedPlan: PlaylistImportPlan): Promise<PlaylistImportPlan> {
+  public static async validateAndSanitizePlan(
+    untrustedPlan: PlaylistImportPlan
+  ): Promise<PlaylistImportPlan> {
     if (!untrustedPlan || typeof untrustedPlan !== 'object') {
       throw new Error('Invalid playlist import plan: payload is empty or not an object.');
     }
 
-    if (
-      typeof untrustedPlan.playlistName !== 'string' ||
-      !untrustedPlan.playlistName.trim()
-    ) {
+    if (typeof untrustedPlan.playlistName !== 'string' || !untrustedPlan.playlistName.trim()) {
       throw new Error('Invalid playlist import plan: playlistName must be a non-empty string.');
     }
 
@@ -64,7 +65,9 @@ export class SpotifyImportValidator {
 
       const match = entry.source.trackReference?.libraryMatch;
       if (!match) {
-        throw new Error(`Invalid playlist entry at position ${expectedPosition}: missing libraryMatch object.`);
+        throw new Error(
+          `Invalid playlist entry at position ${expectedPosition}: missing libraryMatch object.`
+        );
       }
 
       if (entry.decision === 'IMPORT') {

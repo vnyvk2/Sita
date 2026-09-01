@@ -78,9 +78,11 @@ graph TD
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Query Normalization & Tokenization (`normalizeQuery.ts`)
+
 Standardizes raw user keystrokes into clean, predictable search tokens.
 
 **Transformation Pipeline**:
+
 1. Unicode NFKC normalization.
 2. Case folding (lowercasing).
 3. Stripping diacritics and special punctuation (preserving alphanumeric characters and spaces).
@@ -103,16 +105,17 @@ flowchart TD
 ---
 
 ### Process 2: Parallel Sub-Engine Execution & Match Tier Scoring
+
 Dispatches the normalized query to 5 specialized sub-engines concurrently. Each engine classifies results according to standardized [`MatchTier`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/common/search/MatchTier.ts) constants:
 
-| Match Tier | Score Value | Match Criteria | Example Query: `"beatles"` |
-|---|---|---|---|
-| **`EXACT`** | 100 | Exact equality matching | Name = `"Beatles"` |
-| **`STARTS_WITH`** | 80 | Prefix equality | Name = `"Beatles For Sale"` |
-| **`WORD_BOUNDARY`** | 60 | Match begins at word boundary | Name = `"The Beatles"` |
-| **`SUBSTRING`** | 40 | Substring match anywhere | Name = `"Meet The Beatles!"` |
-| **`FUZZY_TRIGRAM`** | 20 | Trigram similarity score | Name = `"The Beetles"` |
-| **`METADATA_SECONDARY`**| 10 | Secondary field match | Song matches via Album Artist |
+| Match Tier               | Score Value | Match Criteria                | Example Query: `"beatles"`    |
+| ------------------------ | ----------- | ----------------------------- | ----------------------------- |
+| **`EXACT`**              | 100         | Exact equality matching       | Name = `"Beatles"`            |
+| **`STARTS_WITH`**        | 80          | Prefix equality               | Name = `"Beatles For Sale"`   |
+| **`WORD_BOUNDARY`**      | 60          | Match begins at word boundary | Name = `"The Beatles"`        |
+| **`SUBSTRING`**          | 40          | Substring match anywhere      | Name = `"Meet The Beatles!"`  |
+| **`FUZZY_TRIGRAM`**      | 20          | Trigram similarity score      | Name = `"The Beetles"`        |
+| **`METADATA_SECONDARY`** | 10          | Secondary field match         | Song matches via Album Artist |
 
 ```mermaid
 flowchart TD
@@ -143,6 +146,7 @@ flowchart TD
 ---
 
 ### Process 3: Trigram Index Matching & Database Acceleration
+
 Leverages generated `citext` columns and PostgreSQL `pg_trgm` GIN indexes inside the relational schema for fast fuzzy matching.
 
 ```mermaid
@@ -160,6 +164,7 @@ flowchart TD
 ---
 
 ### Process 4: Lightweight Match Reference Aggregation
+
 Engines return lightweight pointers ([`SearchMatchReference`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/main/search/models/SearchMatchReference.ts)) containing only `id`, `kind`, and `tier`—deferring expensive table joins until all matches are identified.
 
 ```mermaid
@@ -178,6 +183,7 @@ flowchart TD
 ---
 
 ### Process 5: Single-Pass Batched Hydration (`MetadataSearchGateway.ts`)
+
 Instead of executing dozens of small individual SQL queries per search result, the [`MetadataSearchGateway`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/main/metadata/search/MetadataSearchGateway.ts) fetches all matched entities in a single batched pass.
 
 ```mermaid
@@ -195,16 +201,19 @@ flowchart TD
 ---
 
 ### Process 6: Section Confidence Calculation & DTO Assembly
+
 Calculates section-level confidence scores based on the highest match tier found in that category.
 
-$$\text{confidence}(\text{section}) = \begin{cases} 
+$$
+\text{confidence}(\text{section}) = \begin{cases}
 100 & \text{if top match is } \text{EXACT} \\
 80 & \text{if top match is } \text{STARTS\_WITH} \\
 60 & \text{if top match is } \text{WORD\_BOUNDARY} \\
 40 & \text{if top match is } \text{SUBSTRING} \\
 20 & \text{if top match is } \text{FUZZY\_TRIGRAM} \\
 0 & \text{if section is empty}
-\end{cases}$$
+\end{cases}
+$$
 
 ```mermaid
 flowchart TD
@@ -220,6 +229,7 @@ flowchart TD
 ---
 
 ### Process 7: Recent Search History Tracking & Debounce
+
 Stores recent search queries asynchronously without delaying search response times.
 
 ```mermaid

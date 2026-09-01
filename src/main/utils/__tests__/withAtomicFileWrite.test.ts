@@ -1,8 +1,9 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { File } from 'node-taglib-sharp';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Scoped passthrough mock so individual tests can force the final rename to fail.
 // state.impl === null -> delegate to the real rename captured at factory time.

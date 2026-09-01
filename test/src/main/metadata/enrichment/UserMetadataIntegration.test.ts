@@ -6,7 +6,6 @@ vi.mock('@db/db', () => ({
 
 import { MetadataCache } from '@main/metadata/cache/MetadataCache';
 import { MetadataEngine } from '@main/metadata/engine/MetadataEngine';
-import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { AlbumMapper } from '@main/metadata/mappers/AlbumMapper';
 import { ArtistMapper } from '@main/metadata/mappers/ArtistMapper';
@@ -23,10 +22,11 @@ import { MetadataQueryPlanner } from '@main/metadata/planner/MetadataQueryPlanne
 import { DefaultConflictPolicy } from '@main/metadata/policies/DefaultConflictPolicy';
 import { DefaultValidationPolicy } from '@main/metadata/policies/DefaultValidationPolicy';
 import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
+import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
 import { DefaultMetadataMergePolicy } from '@main/metadata/providers/policies/DefaultMetadataMergePolicy';
-import { UserMetadataProvider } from '@main/metadata/providers/UserMetadataProvider';
 import { DefaultProviderExecutionStrategy } from '@main/metadata/providers/strategies/DefaultProviderExecutionStrategy';
 import { DefaultProviderSelectionStrategy } from '@main/metadata/providers/strategies/DefaultProviderSelectionStrategy';
+import { UserMetadataProvider } from '@main/metadata/providers/UserMetadataProvider';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
@@ -119,7 +119,8 @@ describe('UserMetadataIntegration (Phase 10A Platform Verification)', () => {
               return {
                 onConflictDoUpdate: (config: any) => {
                   if (config?.set) {
-                    let setVal: any = config.set.stringValue ?? config.set.numberValue ?? config.set.booleanValue;
+                    let setVal: any =
+                      config.set.stringValue ?? config.set.numberValue ?? config.set.booleanValue;
                     if (config.set.jsonValue) setVal = JSON.parse(config.set.jsonValue);
                     overridesStore.set(key, setVal);
                   }

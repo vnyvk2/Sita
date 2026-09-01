@@ -1,7 +1,7 @@
-import type { MetadataResourceType, MetadataResource } from './MetadataResource';
 import type { ExecutionMode } from './MetadataOperation';
 import type { MetadataPolicy } from './MetadataPolicy';
 import type { ProviderId } from './MetadataResolution';
+import type { MetadataResourceType, MetadataResource } from './MetadataResource';
 
 export interface AlbumLookupQuery {
   albumTitle: string;

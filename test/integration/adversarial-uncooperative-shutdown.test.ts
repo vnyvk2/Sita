@@ -1,5 +1,3 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 import path from 'path';
 
 import * as schema from '@main/db/schema';
@@ -7,13 +5,15 @@ import { songs, musicFolders } from '@main/db/schema';
 import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
 import { JobScheduler } from '@main/workers/jobScheduler';
 import type { Job, JobState } from '@main/workers/types';
+import { migrate } from 'drizzle-orm/pglite/migrator';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/logger', () => ({
   default: {
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
-    debug: vi.fn(),
+    debug: vi.fn()
   }
 }));
 

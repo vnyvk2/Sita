@@ -22,8 +22,7 @@ export class MetadataValue<T> {
 
   constructor(options: MetadataValueOptions<T>) {
     this.value = options.value;
-    this.source =
-      options.source ?? new MetadataSource({ type: MetadataSourceTypes.LocalTags });
+    this.source = options.source ?? new MetadataSource({ type: MetadataSourceTypes.LocalTags });
     this.confidence = options.confidence ?? MetadataConfidence.default();
     this.status = options.status ?? ValueStatuses.Pending;
     this.createdAt = options.createdAt ?? new Date();

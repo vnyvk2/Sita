@@ -2,6 +2,7 @@
  * Versioned IPC message protocol between Main Process and Media Worker (utilityProcess).
  *
  * Rules:
+ *
  * 1. Every message MUST carry protocolVersion = MEDIA_WORKER_PROTOCOL_VERSION.
  * 2. Handshake ensures version alignment before tasks can be dispatched.
  * 3. Unknown or malformed messages MUST fail safely with EVT_PROTOCOL_ERROR.
@@ -229,7 +230,9 @@ export type WorkerToMainEvent =
 // Validation Helpers
 // ============================================================================
 
-export function isValidProtocolEnvelope(data: unknown): data is { protocolVersion: number; type: string } {
+export function isValidProtocolEnvelope(
+  data: unknown
+): data is { protocolVersion: number; type: string } {
   return (
     typeof data === 'object' &&
     data !== null &&

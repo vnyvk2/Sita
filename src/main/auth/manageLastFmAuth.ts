@@ -48,10 +48,13 @@ const manageLastFmAuth = async (token: string) => {
       // invalidate in-flight session and wipe pending queue from the previous account to prevent cross-account queue submission.
       const currentSettings = await getUserSettings();
       if (currentSettings.lastFmSessionKey && currentSettings.lastFmSessionName !== name) {
-        logger.info('Switching Last.fm accounts: invalidating in-flight flush and clearing previous account queue', {
-          previousUser: currentSettings.lastFmSessionName,
-          newUser: name
-        });
+        logger.info(
+          'Switching Last.fm accounts: invalidating in-flight flush and clearing previous account queue',
+          {
+            previousUser: currentSettings.lastFmSessionName,
+            newUser: name
+          }
+        );
         invalidateLastFmSession();
         await clearScrobbleQueue('lastfm');
       }

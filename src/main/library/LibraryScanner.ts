@@ -165,11 +165,7 @@ export class LibraryScanner extends EventEmitter {
         return this.handleCancellation(startTime, skippedRoots);
       }
 
-      const {
-        snapshots: diskSnapshots,
-        failedSubtrees,
-        failedPaths
-      } = walkResult;
+      const { snapshots: diskSnapshots, failedSubtrees, failedPaths } = walkResult;
 
       logger.info('[LibraryScanner] Discovery complete', {
         executionMode: walkResult.executionMode,
@@ -299,7 +295,11 @@ export class LibraryScanner extends EventEmitter {
 
       performance.mark('scanner:reconcile-end');
       try {
-        performance.measure('scanner:reconcile', 'scanner:reconcile-start', 'scanner:reconcile-end');
+        performance.measure(
+          'scanner:reconcile',
+          'scanner:reconcile-start',
+          'scanner:reconcile-end'
+        );
       } catch {
         // Ignore performance measure errors
       }

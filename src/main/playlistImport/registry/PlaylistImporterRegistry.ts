@@ -31,7 +31,9 @@ export class PlaylistImporterRegistry {
   resolveByMimeType(mimeType: string): PlaylistImporter | undefined {
     const mime = mimeType.toLowerCase();
     for (const importer of this.importers.values()) {
-      if (importer.supportedMimeTypes?.some((supportedMime) => supportedMime.toLowerCase() === mime)) {
+      if (
+        importer.supportedMimeTypes?.some((supportedMime) => supportedMime.toLowerCase() === mime)
+      ) {
         return importer;
       }
     }

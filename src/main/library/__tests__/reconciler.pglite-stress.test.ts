@@ -1,10 +1,11 @@
 import path from 'path';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { eq } from 'drizzle-orm';
 
 import { musicFolders, songs } from '@main/db/schema';
-import { LibraryReconciler } from '../LibraryReconciler';
+import { eq } from 'drizzle-orm';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+
 import reParseSong from '../../parseSong/reParseSong';
+import { LibraryReconciler } from '../LibraryReconciler';
 
 vi.mock('@main/db/db', async () => {
   const { createSqliteMockDb } = await import('../../../../test/helpers/sqliteMockDb');

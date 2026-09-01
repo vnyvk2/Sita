@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import { ProviderTimeoutPolicy } from '@main/metadata/providers/timeout/ProviderTimeoutPolicy';
+import { describe, expect, it } from 'vitest';
 
 describe('ProviderTimeoutPolicy', () => {
   it('should resolve fast functions and reject timed out functions', async () => {

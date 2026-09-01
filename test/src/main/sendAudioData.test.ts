@@ -17,8 +17,9 @@ vi.mock('../../src/main/main', () => ({
   setCurrentSongPath: vi.fn()
 }));
 
-import sendAudioData from '../../../src/main/core/sendAudioData';
 import { getPlayableSongById } from '@main/db/queries/songs';
+
+import sendAudioData from '../../../src/main/core/sendAudioData';
 
 describe('Production sendAudioData Deterministic Tests', () => {
   beforeEach(() => {

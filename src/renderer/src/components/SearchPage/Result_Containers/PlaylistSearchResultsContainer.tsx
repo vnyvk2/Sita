@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import useSelectAllHandler from '../../../hooks/useSelectAllHandler';
+import { mapLegacyPlaylistToDto } from '../../../utils/playlistAdapter';
 import Button from '../../Button';
 import { Playlist } from '../../PlaylistsPage/Playlist';
-import { mapLegacyPlaylistToDto } from '../../../utils/playlistAdapter';
 import SecondaryContainer from '../../SecondaryContainer';
 
 type Props = {

@@ -1,10 +1,10 @@
 /**
- * pg_trgm's similarity algorithm, ported to JS (b3b-verified against PG:
- * reproduces PG's `%` / similarity() match sets exactly on 50k rows).
+ * Pg_trgm's similarity algorithm, ported to JS (b3b-verified against PG: reproduces PG's `%` /
+ * similarity() match sets exactly on 50k rows).
  *
- * pg_trgm: split into words (non-alphanumeric = separator), pad each word with
- * two leading spaces and one trailing space, take trigram SETS (deduped),
- * similarity = |A∩B| / (|A| + |B| - |A∩B|). Default threshold 0.3.
+ * Pg_trgm: split into words (non-alphanumeric = separator), pad each word with two leading spaces
+ * and one trailing space, take trigram SETS (deduped), similarity = |A∩B| / (|A| + |B| - |A∩B|).
+ * Default threshold 0.3.
  */
 
 const trigramsOfWord = (word: string): Set<string> => {
@@ -32,13 +32,12 @@ export const pgSimilarity = (a: string, b: string): number => {
   return m / (A.size + B.size - m);
 };
 
-/** pg_trgm.similarity_threshold default — the `%` operator's cutoff (pass 1). */
+/** Pg_trgm.similarity_threshold default — the `%` operator's cutoff (pass 1). */
 export const PG_SIMILARITY_THRESHOLD = 0.3;
 /**
- * Relaxed second-pass cutoff for typo resistance. Used ONLY when pass 1 (0.3)
- * found nothing, so normal searches keep pg-exact behavior. 0.2 catches
- * letter transpositions ('midngith' = 0.286) and short-ish typos ('goln' =
- * 0.214) that pg_trgm rejected.
+ * Relaxed second-pass cutoff for typo resistance. Used ONLY when pass 1 (0.3) found nothing, so
+ * normal searches keep pg-exact behavior. 0.2 catches letter transpositions ('midngith' = 0.286)
+ * and short-ish typos ('goln' = 0.214) that pg_trgm rejected.
  */
 export const PG_SIMILARITY_FLOOR = 0.2;
 

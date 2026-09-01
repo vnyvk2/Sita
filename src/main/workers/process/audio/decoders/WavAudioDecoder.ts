@@ -1,5 +1,12 @@
 import fs from 'fs';
-import type { AudioDecoder, AudioFormatInfo, ChannelPosition, DecodeChunk, DecodeStreamOptions } from '../types';
+
+import type {
+  AudioDecoder,
+  AudioFormatInfo,
+  ChannelPosition,
+  DecodeChunk,
+  DecodeStreamOptions
+} from '../types';
 
 const WAVE_FORMAT_PCM = 1;
 const WAVE_FORMAT_IEEE_FLOAT = 3;
@@ -53,10 +60,10 @@ export function deriveChannelLayout(channels: number, channelMask = 0): ChannelP
 }
 
 /**
- * Streaming WAV (RIFF/PCM/IEEE-FLOAT) Audio Decoder.
- * Decodes audio stream in bounded, incremental chunks (O(1) memory).
- * Supports arbitrary RIFF chunk ordering, extra metadata chunks (LIST, INFO, JUNK, bext),
- * 8-bit, 16-bit, 24-bit, 32-bit PCM integer, and 32-bit IEEE float formats across mono/stereo/multi-channel.
+ * Streaming WAV (RIFF/PCM/IEEE-FLOAT) Audio Decoder. Decodes audio stream in bounded, incremental
+ * chunks (O(1) memory). Supports arbitrary RIFF chunk ordering, extra metadata chunks (LIST, INFO,
+ * JUNK, bext), 8-bit, 16-bit, 24-bit, 32-bit PCM integer, and 32-bit IEEE float formats across
+ * mono/stereo/multi-channel.
  */
 export class WavAudioDecoder implements AudioDecoder {
   readonly codec = 'pcm_wav';
@@ -93,7 +100,8 @@ export class WavAudioDecoder implements AudioDecoder {
 
     try {
       const parsed = await this.parseWavStructure(handle, filePath);
-      const { channels, channelLayout, bitDepth, isFloat, dataOffset, dataLength, totalSamples } = parsed;
+      const { channels, channelLayout, bitDepth, isFloat, dataOffset, dataLength, totalSamples } =
+        parsed;
       const bytesPerSample = bitDepth / 8;
       const blockAlign = channels * bytesPerSample;
 
@@ -110,7 +118,12 @@ export class WavAudioDecoder implements AudioDecoder {
         }
 
         const bytesToRead = Math.min(bufferBytes, dataEndOffset - currentFileOffset);
-        const { bytesRead: actualRead } = await handle.read(readBuffer, 0, bytesToRead, currentFileOffset);
+        const { bytesRead: actualRead } = await handle.read(
+          readBuffer,
+          0,
+          bytesToRead,
+          currentFileOffset
+        );
         if (actualRead === 0) break;
 
         const framesInChunk = Math.floor(actualRead / blockAlign);
@@ -139,7 +152,7 @@ export class WavAudioDecoder implements AudioDecoder {
               const b0 = readBuffer[bytePos];
               const b1 = readBuffer[bytePos + 1];
               const b2 = readBuffer[bytePos + 2];
-              let int24 = (b0 | (b1 << 8) | (b2 << 16));
+              let int24 = b0 | (b1 << 8) | (b2 << 16);
               if (int24 & 0x800000) int24 |= 0xff000000;
               normalized = int24 / 8388608.0;
               bytePos += 3;
@@ -177,10 +190,11 @@ export class WavAudioDecoder implements AudioDecoder {
     }
   }
 
-  /**
-   * Scans RIFF/WAVE chunk headers iteratively to handle arbitrary chunk ordering and metadata.
-   */
-  private async parseWavStructure(handle: fs.promises.FileHandle, filePath: string): Promise<ParsedWavHeader> {
+  /** Scans RIFF/WAVE chunk headers iteratively to handle arbitrary chunk ordering and metadata. */
+  private async parseWavStructure(
+    handle: fs.promises.FileHandle,
+    filePath: string
+  ): Promise<ParsedWavHeader> {
     const stats = await handle.stat();
     const fileSize = stats.size;
 
@@ -275,9 +289,7 @@ export class WavAudioDecoder implements AudioDecoder {
     const blockAlign = channels * bytesPerSample;
     const totalSamples = Math.floor(dataLength / blockAlign);
 
-    const codecName = isFloat
-      ? `WAV (IEEE Float ${bitDepth}-bit)`
-      : `WAV (PCM ${bitDepth}-bit)`;
+    const codecName = isFloat ? `WAV (IEEE Float ${bitDepth}-bit)` : `WAV (PCM ${bitDepth}-bit)`;
 
     const channelLayout = deriveChannelLayout(channels, channelMask);
 

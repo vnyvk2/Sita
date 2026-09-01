@@ -2,8 +2,8 @@ import {
   COMPACT_MINI_PLAYER_HEIGHT,
   COMPACT_MINI_PLAYER_MIN_WIDTH
 } from '@common/miniPlayerConstants';
-import { queryClient } from '@renderer/queryClient';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
@@ -191,14 +191,13 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     const deckGap = hasArtwork ? 8 : 0;
     const deckPadding = hasArtwork || hasTitle ? 24 : 8; // px-3 vs px-1
 
-    const bottomMinWidth =
-      artworkWidth + titleFloor + deckGap + controlsWidth + deckPadding;
+    const bottomMinWidth = artworkWidth + titleFloor + deckGap + controlsWidth + deckPadding;
 
     // 3. Top layer intrinsic requirement (pip_exit 24px + minimize 36px + close 36px)
     const topMinWidth = 96;
     const topBaseHeight = topRef.current.offsetHeight || 32;
     // Top compressed target: 60% of base height (~20px) via container queries
-    const topCompressedHeight = Math.max(Math.round(topBaseHeight * 0.60), 20);
+    const topCompressedHeight = Math.max(Math.round(topBaseHeight * 0.6), 20);
 
     // 4. Middle layer intrinsic floor (sacrificial with text ellipsis, floor = 0)
     const middleMinWidth = 0;
@@ -292,7 +291,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     } finally {
       isLyricsTransitioningRef.current = false;
     }
-    }, [isLyricsVisible, isQueueVisible, isSearchVisible, queueLength]);
+  }, [isLyricsVisible, isQueueVisible, isSearchVisible, queueLength]);
 
   const handleToggleLyrics = useCallback(() => {
     if (miniPlayerMode === 'compact') {
@@ -696,10 +695,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
       {/* ── Compact Floating Lyrics Panel (Placed above strip when expanding upward) ── */}
       {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'up' && (
-        <CompactLyricsPanel
-          isLyricsVisible={isLyricsVisible}
-          onClose={handleToggleLyrics}
-        />
+        <CompactLyricsPanel isLyricsVisible={isLyricsVisible} onClose={handleToggleLyrics} />
       )}
 
       {/* ── Progressively Revealed Compact Mode Strip OR Standard 3-Tier Deck ── */}
@@ -717,7 +713,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         <div
           data-testid="mini-player-deck"
           className={`mini-player-deck relative flex ${
-            isQueueVisible ? 'shrink-0 flex-none' : 'flex-1'
+            isQueueVisible ? 'flex-none shrink-0' : 'flex-1'
           } flex-col overflow-hidden`}
         >
           {/* ═══ TIER 1 (TOP): Title Bar ═════════════════════════════════════════ */}
@@ -726,103 +722,35 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             <TitleBarContainer isLyricsVisible={isLyricsVisible} />
           </div>
 
-      {/* ═══ TIER 2 (MIDDLE): Song Info ══════════════════════════════════════ */}
-      {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
-      {/* Song info fades in on hover/focus/paused.                            */}
-      <div
-        className={`pointer-events-auto relative z-10 flex min-h-0 flex-col items-center justify-center overflow-hidden ${
-          isQueueVisible ? 'flex-none' : 'flex-1'
-        }`}
-        onContextMenu={handleContextMenu}
-      >
-        <div
-          className={`song-info-container text-font-color-white pointer-events-none flex w-full flex-col items-center justify-center px-4 text-center transition-[visibility,opacity] duration-200 ${
-            isLyricsVisible
-              ? 'invisible opacity-0'
-              : showControls
-                ? 'visible opacity-100'
-                : 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
-          }`}
-        >
-          <div className="text-font-color-highlight relative flex w-full flex-col items-center justify-center">
+          {/* ═══ TIER 2 (MIDDLE): Song Info ══════════════════════════════════════ */}
+          {/* flex-1 min-h-0 = flexible sponge, can shrink to 0px.                 */}
+          {/* Song info fades in on hover/focus/paused.                            */}
+          <div
+            className={`pointer-events-auto relative z-10 flex min-h-0 flex-col items-center justify-center overflow-hidden ${
+              isQueueVisible ? 'flex-none' : 'flex-1'
+            }`}
+            onContextMenu={handleContextMenu}
+          >
             <div
-              className="song-title max-w-full overflow-hidden text-xl font-medium text-ellipsis whitespace-nowrap"
-              title={currentSongData.title}
+              className={`song-info-container text-font-color-white pointer-events-none flex w-full flex-col items-center justify-center px-4 text-center transition-[visibility,opacity] duration-200 ${
+                isLyricsVisible
+                  ? 'invisible opacity-0'
+                  : showControls
+                    ? 'visible opacity-100'
+                    : 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
+              }`}
             >
-              {currentSongData.title}
-            </div>
-            {!isNextSongPopupVisible && (
-              <div
-                className="song-artists appear-from-bottom text-font-color-white/80 text-xs"
-                title={currentSongData.artists?.map((artist) => artist.name).join(', ')}
-              >
-                {currentSongData.songId && Array.isArray(currentSongData.artists)
-                  ? currentSongData.artists?.length > 0
-                    ? currentSongData.artists.map((artist) => artist.name).join(', ')
-                    : t('common.unknownArtist')
-                  : ''}
-              </div>
-            )}
-            <UpNextSongPopup
-              isSemiTransparent
-              onPopupAppears={(isVisible) => setIsNextSongPopupVisible(isVisible)}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ═══ TIER 3 (BOTTOM): SeekBar + Controls ════════════════════════════ */}
-      {/* Fades in on hover/focus/paused — hidden at rest like the old design.  */}
-      <div
-        ref={bottomRef}
-        className={`relative z-30 w-full shrink-0 [-webkit-app-region:no-drag] transition-[visibility,opacity] duration-200 ${
-          showControls || isQueueVisible
-            ? 'visible opacity-100'
-            : 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
-        }`}
-      >
-        {/* ── SeekBar: sits at the very top of the bottom tier ── */}
-        <SeekBarSlider
-          name="mini-player-seek-slider"
-          id="miniPlayerSeekSlider"
-          className="seek-slider [-webkit-app-region:no-drag] bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[height] ease-in-out before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
-        />
-
-        {/* ── Controls Row ─────────────────────────────────────── */}
-        <div
-          className={`controls-row relative z-20 flex w-full items-center ${
-            pinnedControls.includes('artwork') || pinnedControls.includes('title')
-              ? 'justify-between gap-2 px-3'
-              : 'justify-center px-1'
-          } pt-1 pb-2`}
-        >
-          {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
-          {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
-            <div
-              className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
-            >
-              {pinnedControls.includes('artwork') && (
-                <div className="mini-deck-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs">
-                  <Img
-                    src={currentSongData.artworkPath}
-                    fallbackSrc={DefaultSongCover}
-                    loading="eager"
-                    alt="Song Cover"
-                    className="h-full w-full object-cover"
-                  />
+              <div className="text-font-color-highlight relative flex w-full flex-col items-center justify-center">
+                <div
+                  className="song-title max-w-full overflow-hidden text-xl font-medium text-ellipsis whitespace-nowrap"
+                  title={currentSongData.title}
+                >
+                  {currentSongData.title}
                 </div>
-              )}
-              {pinnedControls.includes('title') && (
-                <div className="mini-deck-track-info flex min-w-0 w-0 max-w-full flex-1 flex-col justify-center overflow-hidden text-left">
+                {!isNextSongPopupVisible && (
                   <div
-                    className="truncate max-w-full text-xs font-medium text-font-color-white leading-tight"
-                    title={currentSongData.title}
-                  >
-                    {currentSongData.title}
-                  </div>
-                  <div
-                    className="truncate max-w-full text-[10px] text-font-color-white/70 leading-tight mt-0.5"
-                    title={currentSongData.artists?.map((a) => a.name).join(', ')}
+                    className="song-artists appear-from-bottom text-font-color-white/80 text-xs"
+                    title={currentSongData.artists?.map((artist) => artist.name).join(', ')}
                   >
                     {currentSongData.songId && Array.isArray(currentSongData.artists)
                       ? currentSongData.artists?.length > 0
@@ -830,214 +758,287 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                         : t('common.unknownArtist')
                       : ''}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Controls Deck */}
-          <div ref={controlsRef} className="mini-deck-controls flex shrink-0 items-center justify-center">
-            {/* Optional: Favorite */}
-          {pinnedControls.includes('love') && (
-            <Button
-              className={`favorite-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
-                isAFavorite && 'after:opacity-100'
-              }`}
-              iconClassName={`text-lg! ${
-                isAFavorite
-                  ? 'material-icons-round text-font-color-favorite!'
-                  : 'material-icons-round-outlined'
-              }`}
-              isDisabled={!currentSongData.isKnownSource}
-              tooltipLabel={
-                currentSongData.isKnownSource
-                  ? t('player.likeDislike')
-                  : t('player.likeDislikeDisabled')
-              }
-              clickHandler={() => currentSongData.isKnownSource && toggleIsFavorite(!isAFavorite)}
-              iconName="favorite"
-              removeFocusOnClick
-            />
-          )}
-
-          {/* Optional: Repeat */}
-          {pinnedControls.includes('repeat') && (
-            <Button
-              className={`repeat-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
-                isRepeating !== 'false' && 'after:opacity-100'
-              }`}
-              tooltipLabel={t('player.repeat')}
-              iconName={
-                isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'
-              }
-              iconClassName={`text-lg! ${
-                isRepeating !== 'false'
-                  ? 'text-dark-background-color-3!'
-                  : 'material-icons-round-outlined'
-              }`}
-              clickHandler={() => toggleRepeat()}
-              removeFocusOnClick
-            />
-          )}
-
-          {/* Fixed: Skip Backward */}
-          <Button
-            className="skip-backward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-            tooltipLabel={t('player.prevSong')}
-            iconClassName="text-3xl!"
-            clickHandler={handleSkipBackwardClickWithParams}
-            iconName="skip_previous"
-            removeFocusOnClick
-          />
-
-          {/* Fixed: Play / Pause */}
-          <Button
-            className="play-pause-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-0! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-            tooltipLabel={t('player.playPause')}
-            iconClassName="text-5xl!"
-            clickHandler={() => toggleSongPlayback()}
-            iconName={isCurrentSongPlaying ? 'pause_circle' : 'play_circle'}
-            removeFocusOnClick
-          />
-
-          {/* Fixed: Skip Forward */}
-          <Button
-            className="skip-forward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-            tooltipLabel={t('player.nextSong')}
-            iconClassName="text-3xl!"
-            clickHandler={handleSkipForwardClickWithParams}
-            iconName="skip_next"
-            removeFocusOnClick
-          />
-
-          {/* Optional: Shuffle */}
-          {pinnedControls.includes('shuffle') && (
-            <Button
-              className={`shuffle-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
-                isShuffling && 'after:opacity-100'
-              }`}
-              tooltipLabel={t('player.shuffle')}
-              iconName="shuffle"
-              iconClassName={`text-lg! ${
-                isShuffling ? 'text-dark-background-color-3!' : 'material-icons-round-outlined'
-              }`}
-              clickHandler={() => toggleShuffling()}
-              removeFocusOnClick
-            />
-          )}
-
-          {/* Optional: Stop */}
-          {pinnedControls.includes('stop') && (
-            <Button
-              className="stop-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-              tooltipLabel={t('player.playPause', 'Stop')}
-              iconClassName="material-icons-round-outlined text-lg!"
-              clickHandler={() => isCurrentSongPlaying && toggleSongPlayback()}
-              iconName="stop"
-              removeFocusOnClick
-            />
-          )}
-
-          {/* Optional: Lyrics Toggle */}
-          {pinnedControls.includes('lyrics') && (
-            <button
-              className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
-                isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
-              }`}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                handleToggleLyrics();
-              }}
-              title={t('player.lyrics')}
-            >
-              <LyricsIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
-            </button>
-          )}
-
-          {/* Optional: Volume button + vertical flyout slider */}
-          {pinnedControls.includes('volume') && (
-            <div
-              className="mini-optional-btn relative flex shrink-0 items-center justify-center"
-              onMouseEnter={handleVolumeMouseEnter}
-              onMouseLeave={handleVolumeMouseLeave}
-              onFocus={handleVolumeMouseEnter}
-              onBlur={handleVolumeBlur}
-            >
-              <Button
-                className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
-                  isMuted && 'after:opacity-100'
-                }`}
-                tooltipLabel={t('player.muteUnmute')}
-                iconName={isMuted ? 'volume_off' : 'volume_up'}
-                iconClassName={`material-icons-round text-lg! text-font-color-white opacity-80 transition-opacity hover:opacity-100 dark:text-font-color-white ${
-                  isMuted &&
-                  'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
-                }`}
-                clickHandler={() => toggleMutedState(!isMuted)}
-                removeFocusOnClick
-              />
-
-              {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
-              <div
-                className={`volume-flyout-card absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-40 flex flex-col items-center justify-center rounded-xl bg-[rgba(24,24,28,0.95)] px-1.5 py-2 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:top-full before:inset-x-0 before:h-4 before:bg-transparent transition-all duration-200 ease-out ${
-                  isVolumeHovered
-                    ? 'opacity-100 translate-y-0 pointer-events-auto visible scale-100'
-                    : 'opacity-0 translate-y-2 pointer-events-none invisible scale-95'
-                }`}
-              >
-                <span className="text-[10px] font-semibold text-font-color-white/70 mb-1.5 select-none">
-                  {isMuted ? '0%' : `${Math.round(volume)}%`}
-                </span>
-                <div className="relative flex h-28 w-6 items-center justify-center">
-                  <VolumeSlider
-                    name="mini-player-volume-slider"
-                    id="volumeSlider"
-                    sliderOpacity={0.85}
-                    className="absolute w-28 -rotate-90 origin-center before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
-                  />
-                </div>
+                )}
+                <UpNextSongPopup
+                  isSemiTransparent
+                  onPopupAppears={(isVisible) => setIsNextSongPopupVisible(isVisible)}
+                />
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Optional: Queue Toggle */}
-          {pinnedControls.includes('queue') && (
-            <button
-              type="button"
-              className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
-              title={t('player.currentQueue', 'Queue')}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                handleToggleQueue();
-              }}
-            >
-              <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
-            </button>
-          )}
+          {/* ═══ TIER 3 (BOTTOM): SeekBar + Controls ════════════════════════════ */}
+          {/* Fades in on hover/focus/paused — hidden at rest like the old design.  */}
+          <div
+            ref={bottomRef}
+            className={`relative z-30 w-full shrink-0 transition-[visibility,opacity] duration-200 [-webkit-app-region:no-drag] ${
+              showControls || isQueueVisible
+                ? 'visible opacity-100'
+                : 'invisible opacity-0 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
+            }`}
+          >
+            {/* ── SeekBar: sits at the very top of the bottom tier ── */}
+            <SeekBarSlider
+              name="mini-player-seek-slider"
+              id="miniPlayerSeekSlider"
+              className="seek-slider bg-background-color-3/25 before:bg-background-color-3 float-left m-0 h-fit w-full appearance-none p-0 outline-hidden outline-offset-1 backdrop-blur-xs transition-[height] ease-in-out [-webkit-app-region:no-drag] before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[height] before:ease-in-out before:content-[''] group-focus-within:before:h-2 group-hover:before:h-2 focus-visible:outline!"
+            />
 
-          {/* Optional: Search Toggle */}
-          {pinnedControls.includes('search') && (
-            <button
-              type="button"
-              className={`search-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
-                isSearchVisible ? 'text-dark-background-color-3!' : ''
-              }`}
-              title={t('player.search', 'Search')}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                handleToggleSearch();
-              }}
+            {/* ── Controls Row ─────────────────────────────────────── */}
+            <div
+              className={`controls-row relative z-20 flex w-full items-center ${
+                pinnedControls.includes('artwork') || pinnedControls.includes('title')
+                  ? 'justify-between gap-2 px-3'
+                  : 'justify-center px-1'
+              } pt-1 pb-2`}
             >
-              <span className="material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100">
-                search
-              </span>
-            </button>
-          )}
+              {/* Optional Pinned Metadata: Mini Artwork & Track Info */}
+              {(pinnedControls.includes('artwork') || pinnedControls.includes('title')) && (
+                <div className="mini-deck-meta flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                  {pinnedControls.includes('artwork') && (
+                    <div className="mini-deck-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs">
+                      <Img
+                        src={currentSongData.artworkPath}
+                        fallbackSrc={DefaultSongCover}
+                        loading="eager"
+                        alt="Song Cover"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  {pinnedControls.includes('title') && (
+                    <div className="mini-deck-track-info flex w-0 max-w-full min-w-0 flex-1 flex-col justify-center overflow-hidden text-left">
+                      <div
+                        className="text-font-color-white max-w-full truncate text-xs leading-tight font-medium"
+                        title={currentSongData.title}
+                      >
+                        {currentSongData.title}
+                      </div>
+                      <div
+                        className="text-font-color-white/70 mt-0.5 max-w-full truncate text-[10px] leading-tight"
+                        title={currentSongData.artists?.map((a) => a.name).join(', ')}
+                      >
+                        {currentSongData.songId && Array.isArray(currentSongData.artists)
+                          ? currentSongData.artists?.length > 0
+                            ? currentSongData.artists.map((artist) => artist.name).join(', ')
+                            : t('common.unknownArtist')
+                          : ''}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Controls Deck */}
+              <div
+                ref={controlsRef}
+                className="mini-deck-controls flex shrink-0 items-center justify-center"
+              >
+                {/* Optional: Favorite */}
+                {pinnedControls.includes('love') && (
+                  <Button
+                    className={`favorite-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                      isAFavorite && 'after:opacity-100'
+                    }`}
+                    iconClassName={`text-lg! ${
+                      isAFavorite
+                        ? 'material-icons-round text-font-color-favorite!'
+                        : 'material-icons-round-outlined'
+                    }`}
+                    isDisabled={!currentSongData.isKnownSource}
+                    tooltipLabel={
+                      currentSongData.isKnownSource
+                        ? t('player.likeDislike')
+                        : t('player.likeDislikeDisabled')
+                    }
+                    clickHandler={() =>
+                      currentSongData.isKnownSource && toggleIsFavorite(!isAFavorite)
+                    }
+                    iconName="favorite"
+                    removeFocusOnClick
+                  />
+                )}
+
+                {/* Optional: Repeat */}
+                {pinnedControls.includes('repeat') && (
+                  <Button
+                    className={`repeat-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                      isRepeating !== 'false' && 'after:opacity-100'
+                    }`}
+                    tooltipLabel={t('player.repeat')}
+                    iconName={
+                      isRepeating === 'false' || isRepeating === 'repeat' ? 'repeat' : 'repeat_one'
+                    }
+                    iconClassName={`text-lg! ${
+                      isRepeating !== 'false'
+                        ? 'text-dark-background-color-3!'
+                        : 'material-icons-round-outlined'
+                    }`}
+                    clickHandler={() => toggleRepeat()}
+                    removeFocusOnClick
+                  />
+                )}
+
+                {/* Fixed: Skip Backward */}
+                <Button
+                  className="skip-backward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+                  tooltipLabel={t('player.prevSong')}
+                  iconClassName="text-3xl!"
+                  clickHandler={handleSkipBackwardClickWithParams}
+                  iconName="skip_previous"
+                  removeFocusOnClick
+                />
+
+                {/* Fixed: Play / Pause */}
+                <Button
+                  className="play-pause-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-0! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+                  tooltipLabel={t('player.playPause')}
+                  iconClassName="text-5xl!"
+                  clickHandler={() => toggleSongPlayback()}
+                  iconName={isCurrentSongPlaying ? 'pause_circle' : 'play_circle'}
+                  removeFocusOnClick
+                />
+
+                {/* Fixed: Skip Forward */}
+                <Button
+                  className="skip-forward-btn text-font-color-white dark:text-font-color-white m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+                  tooltipLabel={t('player.nextSong')}
+                  iconClassName="text-3xl!"
+                  clickHandler={handleSkipForwardClickWithParams}
+                  iconName="skip_next"
+                  removeFocusOnClick
+                />
+
+                {/* Optional: Shuffle */}
+                {pinnedControls.includes('shuffle') && (
+                  <Button
+                    className={`shuffle-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                      isShuffling && 'after:opacity-100'
+                    }`}
+                    tooltipLabel={t('player.shuffle')}
+                    iconName="shuffle"
+                    iconClassName={`text-lg! ${
+                      isShuffling
+                        ? 'text-dark-background-color-3!'
+                        : 'material-icons-round-outlined'
+                    }`}
+                    clickHandler={() => toggleShuffling()}
+                    removeFocusOnClick
+                  />
+                )}
+
+                {/* Optional: Stop */}
+                {pinnedControls.includes('stop') && (
+                  <Button
+                    className="stop-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+                    tooltipLabel={t('player.playPause', 'Stop')}
+                    iconClassName="material-icons-round-outlined text-lg!"
+                    clickHandler={() => isCurrentSongPlaying && toggleSongPlayback()}
+                    iconName="stop"
+                    removeFocusOnClick
+                  />
+                )}
+
+                {/* Optional: Lyrics Toggle */}
+                {pinnedControls.includes('lyrics') && (
+                  <button
+                    className={`lyrics-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                      isLyricsVisible && 'text-dark-background-color-3! after:opacity-100'
+                    }`}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      handleToggleLyrics();
+                    }}
+                    title={t('player.lyrics')}
+                  >
+                    <LyricsIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
+                  </button>
+                )}
+
+                {/* Optional: Volume button + vertical flyout slider */}
+                {pinnedControls.includes('volume') && (
+                  <div
+                    className="mini-optional-btn relative flex shrink-0 items-center justify-center"
+                    onMouseEnter={handleVolumeMouseEnter}
+                    onMouseLeave={handleVolumeMouseLeave}
+                    onFocus={handleVolumeMouseEnter}
+                    onBlur={handleVolumeBlur}
+                  >
+                    <Button
+                      className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                        isMuted && 'after:opacity-100'
+                      }`}
+                      tooltipLabel={t('player.muteUnmute')}
+                      iconName={isMuted ? 'volume_off' : 'volume_up'}
+                      iconClassName={`material-icons-round text-lg! text-font-color-white opacity-80 transition-opacity hover:opacity-100 dark:text-font-color-white ${
+                        isMuted &&
+                        'text-font-color-highlight! opacity-100! dark:text-dark-font-color-highlight!'
+                      }`}
+                      clickHandler={() => toggleMutedState(!isMuted)}
+                      removeFocusOnClick
+                    />
+
+                    {/* Vertical Volume Popout Card (Absolute overlay - zero deck width contribution) */}
+                    <div
+                      className={`volume-flyout-card absolute bottom-full left-1/2 z-40 mb-2.5 flex -translate-x-1/2 flex-col items-center justify-center rounded-xl border border-white/10 bg-[rgba(24,24,28,0.95)] px-1.5 py-2 shadow-2xl backdrop-blur-md transition-all duration-200 ease-out before:absolute before:inset-x-0 before:top-full before:h-4 before:bg-transparent before:content-[''] ${
+                        isVolumeHovered
+                          ? 'pointer-events-auto visible translate-y-0 scale-100 opacity-100'
+                          : 'pointer-events-none invisible translate-y-2 scale-95 opacity-0'
+                      }`}
+                    >
+                      <span className="text-font-color-white/70 mb-1.5 text-[10px] font-semibold select-none">
+                        {isMuted ? '0%' : `${Math.round(volume)}%`}
+                      </span>
+                      <div className="relative flex h-28 w-6 items-center justify-center">
+                        <VolumeSlider
+                          name="mini-player-volume-slider"
+                          id="volumeSlider"
+                          sliderOpacity={0.85}
+                          className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight absolute w-28 origin-center -rotate-90 appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional: Queue Toggle */}
+                {pinnedControls.includes('queue') && (
+                  <button
+                    type="button"
+                    className="queue-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent!"
+                    title={t('player.currentQueue', 'Queue')}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      handleToggleQueue();
+                    }}
+                  >
+                    <QueueIcon className="h-5 w-5 opacity-80 transition-opacity hover:opacity-100" />
+                  </button>
+                )}
+
+                {/* Optional: Search Toggle */}
+                {pinnedControls.includes('search') && (
+                  <button
+                    type="button"
+                    className={`search-btn text-font-color-white dark:text-font-color-white mini-optional-btn m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
+                      isSearchVisible ? 'text-dark-background-color-3!' : ''
+                    }`}
+                    title={t('player.search', 'Search')}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      handleToggleSearch();
+                    }}
+                  >
+                    <span className="material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100">
+                      search
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-    )}
+      )}
 
       {/* ── Spatial Queue Container (Placed below deck when expanding downward) ── */}
       {isQueueVisible && queueDirection === 'down' && (
@@ -1051,10 +1052,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
 
       {/* ── Compact Floating Lyrics Panel (Placed below strip when expanding downward) ── */}
       {miniPlayerMode === 'compact' && isLyricsVisible && compactLyricsDirection === 'down' && (
-        <CompactLyricsPanel
-          isLyricsVisible={isLyricsVisible}
-          onClose={handleToggleLyrics}
-        />
+        <CompactLyricsPanel isLyricsVisible={isLyricsVisible} onClose={handleToggleLyrics} />
       )}
 
       {/* ── Standard Mode Lyrics overlay (absolute, within the entire window when lyrics on) ── */}

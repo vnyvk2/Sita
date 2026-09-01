@@ -1,8 +1,8 @@
-import { MetadataQueryNormalizer, type NormalizedQuery } from './MetadataQueryNormalizer';
 import {
   DEFAULT_SEARCH_RANKING_WEIGHTS,
   type SearchRankingWeights
 } from '../../../common/metadata/preferences';
+import { MetadataQueryNormalizer, type NormalizedQuery } from './MetadataQueryNormalizer';
 
 export type { SearchRankingWeights };
 
@@ -44,7 +44,9 @@ export enum MatchQualityBand {
 
 /**
  * Classifies candidate into intrinsic MatchQualityBands:
- * - Definitive (Score >= 160): Exact title and artist, with track match confirmation or official studio release, without track count mismatch penalty.
+ *
+ * - Definitive (Score >= 160): Exact title and artist, with track match confirmation or official
+ *   studio release, without track count mismatch penalty.
  * - Probable (120 <= Score < 160): Strong title or artist match above quality floor.
  * - Weak (Score < 120): Ambiguous or low-similarity matches.
  */
@@ -53,7 +55,8 @@ export function classifyQualityBand(scored: ScoredSearchCandidate): MatchQuality
   const hasExactTitle = scored.breakdown.titleScore >= 27;
   const hasTrackMatch = scored.breakdown.trackCountBonus > 0;
   const hasTrackMismatchPenalty = scored.breakdown.trackCountBonus < 0;
-  const isOfficialOrAlbum = scored.breakdown.statusScore > 0 || scored.breakdown.primaryTypeScore > 0;
+  const isOfficialOrAlbum =
+    scored.breakdown.statusScore > 0 || scored.breakdown.primaryTypeScore > 0;
 
   // Definitive: High similarity on title + artist without severe track mismatch, with track confirmation or official studio status
   if (
@@ -83,7 +86,9 @@ export class MetadataSearchRankingEngine {
   ): ScoredSearchCandidate[] {
     if (!candidates || candidates.length === 0) return [];
 
-    const scored = candidates.map((cand) => this.scoreCandidate(cand, query, targetTrackCount, weights));
+    const scored = candidates.map((cand) =>
+      this.scoreCandidate(cand, query, targetTrackCount, weights)
+    );
 
     // Sort descending by totalScore
     return scored.sort((a, b) => b.totalScore - a.totalScore);
@@ -99,12 +104,18 @@ export class MetadataSearchRankingEngine {
     const baseScore = typeof cand.baseScore === 'number' ? cand.baseScore : 50;
 
     // 2. Artist Similarity Score (Jaro-Winkler)
-    const artistSim = MetadataQueryNormalizer.compareStringSimilarity(cand.artist, query.cleanArtist ?? query.rawArtist);
+    const artistSim = MetadataQueryNormalizer.compareStringSimilarity(
+      cand.artist,
+      query.cleanArtist ?? query.rawArtist
+    );
     const artistScore = Math.round(artistSim * weights.artistMatch);
 
     // 3. Title Similarity Score (Jaro-Winkler against rawTitle and cleanTitle)
     const rawTitleSim = MetadataQueryNormalizer.compareStringSimilarity(cand.title, query.rawTitle);
-    const cleanTitleSim = MetadataQueryNormalizer.compareStringSimilarity(cand.title, query.cleanTitle);
+    const cleanTitleSim = MetadataQueryNormalizer.compareStringSimilarity(
+      cand.title,
+      query.cleanTitle
+    );
     const bestTitleSim = Math.max(rawTitleSim, cleanTitleSim);
     const titleScore = Math.round(bestTitleSim * weights.titleMatch);
 
@@ -168,7 +179,15 @@ export class MetadataSearchRankingEngine {
       }
     }
 
-    const totalScore = baseScore + artistScore + titleScore + statusScore + primaryTypeScore + secondaryTypePenalty + trackCountBonus + editionBoost;
+    const totalScore =
+      baseScore +
+      artistScore +
+      titleScore +
+      statusScore +
+      primaryTypeScore +
+      secondaryTypePenalty +
+      trackCountBonus +
+      editionBoost;
 
     return {
       candidate: cand,

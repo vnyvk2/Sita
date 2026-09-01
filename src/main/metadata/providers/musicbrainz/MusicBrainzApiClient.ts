@@ -1,5 +1,6 @@
 import { HttpError } from '@main/platform/networking/FetchHttpClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+
 import type {
   MusicBrainzArtistDto,
   MusicBrainzRecordingDto,
@@ -25,10 +26,7 @@ export class MusicBrainzApiClient {
       options?.userAgent ?? 'NoraMusicPlayer/1.0.0 (https://github.com/vnyvk2/MyNora)';
   }
 
-  public async searchRecordings(
-    query: string,
-    limit = 10
-  ): Promise<MusicBrainzRecordingDto[]> {
+  public async searchRecordings(query: string, limit = 10): Promise<MusicBrainzRecordingDto[]> {
     const url = `${this.baseUrl}/recording`;
     const response = await this.pipeline.execute<MusicBrainzRecordingSearchResultDto>({
       url,

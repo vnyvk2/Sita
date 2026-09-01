@@ -1,15 +1,12 @@
 import { EventEmitter } from 'events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  MediaWorkerBridge,
-  getMediaWorkerPath
-} from '@main/workers/process/MediaWorkerBridge';
+import { MediaWorkerBridge, getMediaWorkerPath } from '@main/workers/process/MediaWorkerBridge';
 import {
   MEDIA_WORKER_PROTOCOL_VERSION,
   type MainToWorkerCommand,
   type WorkerToMainEvent
 } from '@main/workers/process/workerProtocol';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 class MockUtilityProcess extends EventEmitter {
   public postMessage = vi.fn();
@@ -91,7 +88,9 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
     it('should reject start() on timeout if worker never responds', async () => {
       const startPromise = bridge.start(100);
 
-      await expect(startPromise).rejects.toThrow('Timeout waiting for worker EVT_READY after 100ms.');
+      await expect(startPromise).rejects.toThrow(
+        'Timeout waiting for worker EVT_READY after 100ms.'
+      );
       expect(bridge.getState()).toBe('CRASHED');
     });
   });
@@ -133,9 +132,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
     });
 
     it('should reject ping() if bridge is not in READY state', async () => {
-      await expect(bridge.ping()).rejects.toThrow(
-        'Cannot ping: worker is not in READY state.'
-      );
+      await expect(bridge.ping()).rejects.toThrow('Cannot ping: worker is not in READY state.');
     });
   });
 
@@ -232,9 +229,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       mockProcess.simulateExit(139); // e.g. SIGSEGV
 
       expect(bridge.hasPendingRestartTimer()).toBe(true);
-      expect(crashListener).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 139 })
-      );
+      expect(crashListener).toHaveBeenCalledWith(expect.objectContaining({ code: 139 }));
     });
   });
 
@@ -519,7 +514,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
             songPath: 'C:/Music/song1.mp3',
             folderId: 1,
             title: 'Song 1',
-            duration: 180.00,
+            duration: 180.0,
             artists: ['Artist 1'],
             albumArtists: [],
             genres: ['Rock'],
@@ -600,7 +595,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
             songPath: 'C:/Music/song1.mp3',
             folderId: 1,
             title: 'Song 1',
-            duration: 180.00,
+            duration: 180.0,
             artists: ['Artist 1'],
             albumArtists: [],
             genres: ['Rock'],
@@ -662,7 +657,7 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
             songPath: 'C:/Music/song1.mp3',
             folderId: 1,
             title: 'Song 1',
-            duration: 180.00,
+            duration: 180.0,
             artists: ['Artist 1'],
             albumArtists: [],
             genres: ['Rock'],
@@ -670,8 +665,22 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
             fileModifiedAt: new Date(),
             rawPictureBytes: undefined,
             artworkPayloads: [
-              { hash: 'abc', path: 'C:/Artworks/abc.webp', width: 500, height: 500, isOptimized: false, source: 'LOCAL' },
-              { hash: 'abc-optimized', path: 'C:/Artworks/abc-optimized.webp', width: 50, height: 50, isOptimized: true, source: 'LOCAL' }
+              {
+                hash: 'abc',
+                path: 'C:/Artworks/abc.webp',
+                width: 500,
+                height: 500,
+                isOptimized: false,
+                source: 'LOCAL'
+              },
+              {
+                hash: 'abc-optimized',
+                path: 'C:/Artworks/abc-optimized.webp',
+                width: 50,
+                height: 50,
+                isOptimized: true,
+                source: 'LOCAL'
+              }
             ]
           }
         ],
@@ -692,16 +701,23 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
         protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
         type: 'EVT_READY',
         pid: 12345,
-        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH', 'CMD_WALK_DIRECTORY', 'CMD_GENERATE_ASSET']
+        supportedOps: [
+          'CMD_PING',
+          'CMD_PARSE_TRACK_BATCH',
+          'CMD_WALK_DIRECTORY',
+          'CMD_GENERATE_ASSET'
+        ]
       });
       await startPromise;
 
       // 1. Walk directory abort -> late completion
       const walkController = new AbortController();
       const walkPromise = bridge.walkDirectory('C:/Music', { abortSignal: walkController.signal });
-      const walkTaskId = (mockProcess.postMessage.mock.calls.find(
-        (c) => (c[0] as any).type === 'CMD_WALK_DIRECTORY'
-      )![0] as any).taskId;
+      const walkTaskId = (
+        mockProcess.postMessage.mock.calls.find(
+          (c) => (c[0] as any).type === 'CMD_WALK_DIRECTORY'
+        )![0] as any
+      ).taskId;
 
       walkController.abort();
       const walkResult = await walkPromise;
@@ -721,10 +737,15 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
 
       // 2. Parse batch stream abort -> late batch
       const parseController = new AbortController();
-      const parsePromise = bridge.parseTrackBatchStream([{ songPath: 'C:/Music/test.wav' }], { abortSignal: parseController.signal });
-      const parseTaskId = (mockProcess.postMessage.mock.calls.find(
-        (c) => (c[0] as any).type === 'CMD_PARSE_TRACK_BATCH' && (c[0] as any).taskId !== walkTaskId
-      )![0] as any).taskId;
+      const parsePromise = bridge.parseTrackBatchStream([{ songPath: 'C:/Music/test.wav' }], {
+        abortSignal: parseController.signal
+      });
+      const parseTaskId = (
+        mockProcess.postMessage.mock.calls.find(
+          (c) =>
+            (c[0] as any).type === 'CMD_PARSE_TRACK_BATCH' && (c[0] as any).taskId !== walkTaskId
+        )![0] as any
+      ).taskId;
 
       parseController.abort();
       const parseResult = await parsePromise;
@@ -750,9 +771,11 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
         input: { sourceFilePath: 'C:/Music/test.wav', destinationPath: 'C:/Cache/1.bin' },
         abortSignal: assetController.signal
       });
-      const assetTaskId = (mockProcess.postMessage.mock.calls.find(
-        (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
-      )![0] as any).taskId;
+      const assetTaskId = (
+        mockProcess.postMessage.mock.calls.find(
+          (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
+        )![0] as any
+      ).taskId;
 
       assetController.abort();
       const assetResult = await assetPromise;
@@ -786,9 +809,11 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
         timeoutMs: 50
       });
 
-      const assetTaskId = (mockProcess.postMessage.mock.calls.find(
-        (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
-      )![0] as any).taskId;
+      const assetTaskId = (
+        mockProcess.postMessage.mock.calls.find(
+          (c) => (c[0] as any).type === 'CMD_GENERATE_ASSET'
+        )![0] as any
+      ).taskId;
 
       await expect(assetPromise).rejects.toThrow('timed out');
 

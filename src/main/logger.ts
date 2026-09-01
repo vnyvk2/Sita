@@ -159,7 +159,8 @@ export const serializeError = (err: unknown): SerializedError => {
     if (errorObj.syscall !== undefined) serialized.syscall = errorObj.syscall;
     if (errorObj.path !== undefined) serialized.path = errorObj.path;
     if (errorObj.cause !== undefined) {
-      serialized.cause = errorObj.cause instanceof Error ? serializeError(errorObj.cause) : errorObj.cause;
+      serialized.cause =
+        errorObj.cause instanceof Error ? serializeError(errorObj.cause) : errorObj.cause;
     }
     return serialized;
   }

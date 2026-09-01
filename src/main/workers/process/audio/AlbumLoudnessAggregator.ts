@@ -2,10 +2,7 @@ import {
   calculateIntegratedLoudnessFromBlocks,
   type GatedLoudnessResult
 } from './BS1770LoudnessEngine';
-import {
-  calculateLoudnessGain,
-  type ReplayGainOptions
-} from './ReplayGainPolicy';
+import { calculateLoudnessGain, type ReplayGainOptions } from './ReplayGainPolicy';
 
 export interface TrackLoudnessData {
   songId: number;
@@ -27,15 +24,17 @@ export interface AlbumLoudnessResult {
  * Implements pure ITU-R BS.1770-4 / EBU R128 multi-track album loudness aggregation.
  *
  * Architectural & Mathematical Invariants:
+ *
  * 1. Album integrated loudness is NEVER computed by averaging per-track LUFS numbers.
  * 2. 400ms block energies from all tracks in the album are pooled into a single collection.
- * 3. Absolute Gating (-70.0 LKFS) and Relative Gating (Gamma - 10.0 LU) are evaluated
- *    over the combined album blocks.
- * 4. Album peak is strictly the maximum discrete sample peak across all tracks:
- *    albumPeak = max(track1.samplePeak, ..., trackN.samplePeak).
+ * 3. Absolute Gating (-70.0 LKFS) and Relative Gating (Gamma - 10.0 LU) are evaluated over the
+ *    combined album blocks.
+ * 4. Album peak is strictly the maximum discrete sample peak across all tracks: albumPeak =
+ *    max(track1.samplePeak, ..., trackN.samplePeak).
  * 5. Album gain is computed from the target loudness policy using the album integrated loudness.
  *
  * Complexity:
+ *
  * - Working memory: O(total_album_blocks) where total_album_blocks ~= 10 per second across all tracks
  *   (e.g., ~216 KB of Float64 values for a 45-minute album).
  * - Computation: Two linear passes over the pooled album blocks.

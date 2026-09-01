@@ -1,6 +1,6 @@
-import type { ProviderAttribution } from './ProviderAttribution';
-import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
 import type { MergeSession } from '../resolution/MergeSession';
+import type { MergedCandidateResult } from '../resolution/MetadataMergeEngine';
+import type { ProviderAttribution } from './ProviderAttribution';
 
 export type ProviderId = string;
 

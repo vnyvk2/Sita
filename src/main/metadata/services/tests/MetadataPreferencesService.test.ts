@@ -190,7 +190,9 @@ describe('MetadataPreferencesService', () => {
     const junk = { ...DEFAULT_SEARCH_RANKING_WEIGHTS, futureWeightKey: 42 } as any;
     const saved = await service.savePreferences({ searchRankingWeights: junk });
 
-    expect((saved.searchRankingWeights as unknown as Record<string, unknown>).futureWeightKey).toBeUndefined();
+    expect(
+      (saved.searchRankingWeights as unknown as Record<string, unknown>).futureWeightKey
+    ).toBeUndefined();
     expect(saved.searchRankingWeights?.artistMatch).toBe(
       DEFAULT_SEARCH_RANKING_WEIGHTS.artistMatch
     );

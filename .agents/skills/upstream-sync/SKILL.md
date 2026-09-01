@@ -7,10 +7,11 @@ description: Safe workflow for auditing upstream sustainability, assessing archi
 
 ## 1. Core Operating Philosophy: Audit First, Merge Never Blindly
 
-In a heavily diverged codebase, **blind 3-way merges are prohibited**. 
+In a heavily diverged codebase, **blind 3-way merges are prohibited**.
 Upstream code assumes an architecture that our private codebase may have completely rewritten, decoupled, or deprecated.
 
 Whenever an upstream update, branch, or commit is mentioned:
+
 1. **Never auto-merge or apply code immediately.**
 2. **Perform a Zero-Touch Sustainability & Impact Audit** to analyze every affected line and architectural dependency.
 3. **Classify changes into sustainability tiers** (Clean Port, Adapted Port, Architectural Conflict / Incompatible).
@@ -20,13 +21,14 @@ Whenever an upstream update, branch, or commit is mentioned:
 
 ## 2. Remote Topology & Hard Boundaries
 
-| Remote | URL | Role | Push Permission | Fetch Policy |
-|---|---|---|---|---|
+| Remote     | URL                                    | Role                 | Push Permission                          | Fetch Policy                                                                 |
+| ---------- | -------------------------------------- | -------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
 | `upstream` | `https://github.com/Sandakan/Nora.git` | Original source repo | **BLOCKED** (`DISABLE_PUSH_TO_UPSTREAM`) | **On-demand explicit branch only** (`skipFetchAll=true`, `tagOpt=--no-tags`) |
-| `origin` | `https://github.com/vnyvk2/Nora.git` | Public fork | **BLOCKED** (`DISABLE_PUSH_TO_ORIGIN`) | Read-only |
-| `private` | `https://github.com/vnyvk2/MyNora.git` | Private repository | **ALLOWED** (Only push target) | Primary default |
+| `origin`   | `https://github.com/vnyvk2/Nora.git`   | Public fork          | **BLOCKED** (`DISABLE_PUSH_TO_ORIGIN`)   | Read-only                                                                    |
+| `private`  | `https://github.com/vnyvk2/MyNora.git` | Private repository   | **ALLOWED** (Only push target)           | Primary default                                                              |
 
 > [!CRITICAL]
+>
 > 1. Pushes to `origin` and `upstream` MUST remain blocked.
 > 2. NEVER run bare `git fetch upstream` or fetch all branches/tags globally. Fetch ONLY the specific branch requested.
 
@@ -37,14 +39,18 @@ Whenever an upstream update, branch, or commit is mentioned:
 When asked to check, review, or evaluate an upstream branch, follow this 5-step audit process:
 
 ### Step 1: Isolated On-Demand Fetch (Zero-Touch)
+
 Fetch ONLY the target branch from upstream without touching the current working tree or branches:
+
 ```bash
 # Fetch ONLY the specified branch
 git fetch upstream <upstream-branch-name>
 ```
 
 ### Step 2: Compute Merge Base & Isolated Upstream Diff
+
 Determine the exact delta that upstream introduced relative to the common ancestor:
+
 ```bash
 # 1. Identify common ancestor commit
 MERGE_BASE=$(git merge-base master upstream/<upstream-branch-name>)
@@ -60,6 +66,7 @@ git diff $MERGE_BASE upstream/<upstream-branch-name>
 ```
 
 ### Step 3: Deep Core Impact Mapping (Adversarial Audit)
+
 For every file and logic block changed upstream, audit against our private codebase:
 
 1. **Subsystem & Core Architecture Check:**
@@ -75,41 +82,48 @@ For every file and logic block changed upstream, audit against our private codeb
    - Is there risk of memory leaks or race conditions in our custom environment?
 
 ### Step 4: Classify Each Upstream Change
+
 Categorize every upstream change into one of three action categories:
 
-| Category | Definition | Recommendation |
-|---|---|---|
-| 🟢 **Clean Port** | Standalone utility, bugfix, or non-conflicting dependency update that fits directly. | Safe to cherry-pick or directly adapt. |
-| 🟡 **Adapted Port** | High-value logic or feature, but deeply conflicts with our core architecture. | Rewrite / re-implement using our private APIs, state stores, and patterns. |
-| 🔴 **Architectural Conflict** | Upstream assumes legacy patterns, rewrites systems we already redesigned, or introduces technical debt. | **Reject / Skip**. Document why it is unsustainable. |
+| Category                      | Definition                                                                                              | Recommendation                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 🟢 **Clean Port**             | Standalone utility, bugfix, or non-conflicting dependency update that fits directly.                    | Safe to cherry-pick or directly adapt.                                     |
+| 🟡 **Adapted Port**           | High-value logic or feature, but deeply conflicts with our core architecture.                           | Rewrite / re-implement using our private APIs, state stores, and patterns. |
+| 🔴 **Architectural Conflict** | Upstream assumes legacy patterns, rewrites systems we already redesigned, or introduces technical debt. | **Reject / Skip**. Document why it is unsustainable.                       |
 
 ### Step 5: Sustainability & Impact Report Structure
+
 Produce a structured engineering report for the user:
 
 ```markdown
 # Upstream Impact & Sustainability Audit: `<upstream-branch>`
 
 ## 1. Executive Verdict
+
 [Verdict: Safe to Adapt / Requires Significant Adaptation / Incompatible & Reject]
 
 ## 2. Upstream Summary
+
 - Commits analyzed: X
 - Files modified: Y
 - Core subsystems touched: [List of subsystems]
 
 ## 3. Subsystem-by-Subsystem Architectural Impact
+
 - **[Component A]**:
-  - *Upstream Intent:* ...
-  - *Our Divergent State:* ...
-  - *Conflict Severity:* [High / Medium / Low]
-  - *Impact on Private Code:* ...
+  - _Upstream Intent:_ ...
+  - _Our Divergent State:_ ...
+  - _Conflict Severity:_ [High / Medium / Low]
+  - _Impact on Private Code:_ ...
 
 ## 4. Sustainability & Regression Risks
+
 - [Risk 1: State management / IPC breakdown]
 - [Risk 2: Lifecycle or concurrency race condition]
 - [Risk 3: Build or dependency incompatibility]
 
 ## 5. Recommended Action & Adaptation Plan
+
 - [ ] Port cleanly: `git cherry-pick ...`
 - [ ] Adapt & rewrite: Custom implementation plan for [Module]
 - [ ] Reject / Ignore: [List of upstream commits to bypass]
@@ -154,6 +168,7 @@ Only proceed with code integration after the user reviews and approves the audit
 ---
 
 ## 5. Summary of Strict Rules
+
 1. **Default Mode is Audit, NOT Merge.** Never touch working tree or merge without explicit request.
 2. **Fetch On-Demand Only:** `git fetch upstream <specific-branch>`. No auto-fetching all branches or tags.
 3. **Pushes Strictly Private:** `origin` and `upstream` pushes are permanently disabled.

@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-
 import { MapperRegistry } from '@main/metadata/mappers/MapperRegistry';
 import { CORE_FIELD_DEFINITIONS } from '@main/metadata/models/CoreFieldDefinitions';
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
@@ -8,6 +6,7 @@ import { MetadataPipeline } from '@main/metadata/pipeline/MetadataPipeline';
 import { DefaultConflictPolicy } from '@main/metadata/policies/DefaultConflictPolicy';
 import { DefaultValidationPolicy } from '@main/metadata/policies/DefaultValidationPolicy';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataPipeline', () => {
   it('should process DTO into MetadataEntity deterministically using pipeline stages', async () => {

@@ -3,9 +3,9 @@ import { NORM_STRIP_CHARS } from './norm';
 /**
  * Baseline SQLite DDL for Nora (42 tables + FTS5 + triggers).
  *
- * Executed once at first open, stamped with `PRAGMA user_version = 1`.
- * Must stay column-for-column consistent with src/main/db/schema.ts —
- * enforced by test/src/main/db/sqlite/schema-ddl-consistency.test.ts.
+ * Executed once at first open, stamped with `PRAGMA user_version = 1`. Must stay column-for-column
+ * consistent with src/main/db/schema.ts — enforced by
+ * test/src/main/db/sqlite/schema-ddl-consistency.test.ts.
  */
 
 /** SQL expression mirroring the drizzle schema's normExpr(): lower() + strip punctuation/space. */

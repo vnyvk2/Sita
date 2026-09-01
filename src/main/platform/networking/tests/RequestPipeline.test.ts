@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { HttpError } from '../FetchHttpClient';
 import type { HttpRequestOptions, HttpResponse, IHttpClient } from '../IHttpClient';
 import { RateLimiter } from '../RateLimiter';
@@ -103,7 +104,11 @@ describe('Platform Networking — RequestPipeline & Utilities', () => {
     const pipeline = new RequestPipeline({ client: mockClient, retryPolicy });
 
     await expect(
-      pipeline.execute({ url: 'https://api.spotify.com/v1/playlists/123/items', method: 'POST', body: { uris: ['spotify:track:1'] } })
+      pipeline.execute({
+        url: 'https://api.spotify.com/v1/playlists/123/items',
+        method: 'POST',
+        body: { uris: ['spotify:track:1'] }
+      })
     ).rejects.toThrow('socket hang up');
 
     // Invariant: Non-idempotent POST mutation must NOT be auto-retried (attempt count === 1)
@@ -113,7 +118,9 @@ describe('Platform Networking — RequestPipeline & Utilities', () => {
   it('retries idempotent GET requests on network socket errors', async () => {
     let attempts = 0;
     const mockClient = new MockHttpClient();
-    mockClient.request = async <T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>> => {
+    mockClient.request = async <T = unknown>(
+      options: HttpRequestOptions
+    ): Promise<HttpResponse<T>> => {
       mockClient.calls.push(options);
       attempts += 1;
       if (attempts < 3) {
@@ -133,7 +140,9 @@ describe('Platform Networking — RequestPipeline & Utilities', () => {
   it('allows retrying POST mutation if allowNonIdempotentRetry is explicitly true', async () => {
     let attempts = 0;
     const mockClient = new MockHttpClient();
-    mockClient.request = async <T = unknown>(options: HttpRequestOptions): Promise<HttpResponse<T>> => {
+    mockClient.request = async <T = unknown>(
+      options: HttpRequestOptions
+    ): Promise<HttpResponse<T>> => {
       mockClient.calls.push(options);
       attempts += 1;
       if (attempts < 2) {

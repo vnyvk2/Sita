@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { validateAndSaveListenBrainzToken } from '../validateAndSaveListenBrainzToken';
 import { disconnectListenBrainz } from '../disconnectListenBrainz';
-import { sendNowPlayingSongDataToListenBrainz } from '../sendNowPlayingSongDataToListenBrainz';
+import {
+  getCurrentListenBrainzGeneration,
+  _resetListenBrainzSessionForTesting
+} from '../listenBrainzSession';
 import { scrobbleSongToListenBrainz } from '../scrobbleSongToListenBrainz';
 import {
   sendFavoritesDataToListenBrainz,
   resolveRecordingMbid,
   postFeedbackToListenBrainz
 } from '../sendFavoritesDataToListenBrainz';
-import {
-  getCurrentListenBrainzGeneration,
-  _resetListenBrainzSessionForTesting
-} from '../listenBrainzSession';
+import { sendNowPlayingSongDataToListenBrainz } from '../sendNowPlayingSongDataToListenBrainz';
+import { validateAndSaveListenBrainzToken } from '../validateAndSaveListenBrainzToken';
 
 vi.mock('@main/db/db', () => ({
   db: {}
@@ -108,7 +108,9 @@ const createMockSongRow = (overrides: Record<string, any> = {}) => ({
   isBlacklisted: false,
   path: '/music/time.mp3',
   artists: [{ artist: { id: 1, name: 'Pink Floyd' } }],
-  albums: [{ album: { id: 1, title: 'The Dark Side of the Moon', isFavorite: false, artists: [] } }],
+  albums: [
+    { album: { id: 1, title: 'The Dark Side of the Moon', isFavorite: false, artists: [] } }
+  ],
   artworks: [],
   genres: [],
   createdAt: new Date(),
@@ -176,9 +178,7 @@ describe('ListenBrainz Integration Module', () => {
       });
       globalThis.fetch = mockFetch;
 
-      await expect(validateAndSaveListenBrainzToken('bad_token')).rejects.toThrow(
-        'Invalid token.'
-      );
+      await expect(validateAndSaveListenBrainzToken('bad_token')).rejects.toThrow('Invalid token.');
       expect(mockSaveUserSettings).not.toHaveBeenCalled();
     });
 
@@ -242,7 +242,9 @@ describe('ListenBrainz Integration Module', () => {
           title: 'Shine On You Crazy Diamond',
           duration: 810.5,
           trackNumber: 1,
-          albums: [{ album: { id: 1, title: 'Wish You Were Here', isFavorite: false, artists: [] } }]
+          albums: [
+            { album: { id: 1, title: 'Wish You Were Here', isFavorite: false, artists: [] } }
+          ]
         })
       );
 

@@ -13,16 +13,14 @@ const SongCommentInput = (props: Props) => {
   const { t } = useTranslation();
 
   return (
-    <div className="tag-input flex max-w-2xl min-w-[10rem] flex-col col-span-2">
-      <div className="flex items-center justify-between mr-[5%] mb-2">
-        <label htmlFor="song-comment-override-tag">
-          {t('songTagsEditingPage.comment')}
-        </label>
+    <div className="tag-input col-span-2 flex max-w-2xl min-w-[10rem] flex-col">
+      <div className="mr-[5%] mb-2 flex items-center justify-between">
+        <label htmlFor="song-comment-override-tag">{t('songTagsEditingPage.comment')}</label>
         {onReset && (
           <button
             type="button"
             onClick={onReset}
-            className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight hover:underline opacity-80"
+            className="text-font-color-highlight dark:text-dark-font-color-highlight text-xs opacity-80 hover:underline"
           >
             {t('resetTagsToDefaultPrompt.resetToDefault')}
           </button>
@@ -31,7 +29,7 @@ const SongCommentInput = (props: Props) => {
       <textarea
         id="song-comment-override-tag"
         rows={3}
-        className="border-background-color-2 bg-background-color-2 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-2 dark:text-font-color-white dark:focus:border-dark-font-color-highlight mt-1 mr-2 w-[95%] rounded-2xl border-[.15rem] p-4 transition-colors resize-none"
+        className="border-background-color-2 bg-background-color-2 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-2 dark:text-font-color-white dark:focus:border-dark-font-color-highlight mt-1 mr-2 w-[95%] resize-none rounded-2xl border-[.15rem] p-4 transition-colors"
         name="song-comment"
         placeholder={t('songTagsEditingPage.commentPlaceholder')}
         value={comment ?? ''}

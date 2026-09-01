@@ -1,14 +1,12 @@
 /**
  * Process-wide single-flight mutex for metadata APPLY operations.
  *
- * Invariant: only ONE AutoTag / workflow apply may mutate physical files and
- * library state at any moment, across BOTH pipelines (they share this
- * instance).
+ * Invariant: only ONE AutoTag / workflow apply may mutate physical files and library state at any
+ * moment, across BOTH pipelines (they share this instance).
  *
- * Policy: a concurrent caller is REJECTED immediately with
- * {@link MetadataApplyBusyError} rather than queued - queued stale previews
- * applying later surprises users; explicit rejection lets the UI say "an
- * apply is already running".
+ * Policy: a concurrent caller is REJECTED immediately with {@link MetadataApplyBusyError} rather
+ * than queued - queued stale previews applying later surprises users; explicit rejection lets the
+ * UI say "an apply is already running".
  */
 export class MetadataApplyBusyError extends Error {
   constructor() {

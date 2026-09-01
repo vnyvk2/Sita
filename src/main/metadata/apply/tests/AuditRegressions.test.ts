@@ -1,17 +1,18 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { File } from 'node-taglib-sharp';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '../../../db/db';
 import { songs, albums, albumsArtists, artists } from '../../../db/schema';
-import { MetadataApplyOrchestrator } from '../MetadataApplyOrchestrator';
-import { TagWriterService } from '../../services/TagWriterService';
-import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import { MetadataWorkflowService } from '../../services/MetadataWorkflowService';
+import { TagWriterService } from '../../services/TagWriterService';
 import type { MetadataWorkflow, WorkflowPreview } from '../../workflows/MetadataWorkflow';
+import { MetadataApplyOrchestrator } from '../MetadataApplyOrchestrator';
 
 vi.mock('@main/main', () => ({
   getCurrentSongPath: vi.fn(() => undefined),
@@ -24,7 +25,7 @@ const seedSong = async (title: string, filePath: string): Promise<number> => {
     .insert(songs)
     .values({
       title,
-      duration: 180.000,
+      duration: 180.0,
       path: filePath,
       fileCreatedAt: new Date(),
       fileModifiedAt: new Date()
@@ -34,7 +35,10 @@ const seedSong = async (title: string, filePath: string): Promise<number> => {
 };
 
 const makeFixture = (): string => {
-  const p = path.join(os.tmpdir(), `audit_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`);
+  const p = path.join(
+    os.tmpdir(),
+    `audit_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`
+  );
   fs.copyFileSync(path.join(process.cwd(), 'test', 'assets', 'test_song.mp3'), p);
   return p;
 };
@@ -59,7 +63,10 @@ describe('Audit regressions (post-review fixes)', () => {
       getCurrentPlayingPath: () => undefined
     });
 
-    const workflowService = new MetadataWorkflowService({ transactionManager: {} as never, orchestrator });
+    const workflowService = new MetadataWorkflowService({
+      transactionManager: {} as never,
+      orchestrator
+    });
 
     const stubWorkflow: MetadataWorkflow = {
       type: 'album',
@@ -74,7 +81,9 @@ describe('Audit regressions (post-review fixes)', () => {
         {
           resourceId: songId,
           filePath: fixture,
-          fieldMutations: [{ fieldId: 'title', oldValue: 'Mutex Regression', newValue: 'Mutex Fixed' }]
+          fieldMutations: [
+            { fieldId: 'title', oldValue: 'Mutex Regression', newValue: 'Mutex Fixed' }
+          ]
         }
       ]
     } as unknown as MetadataWorkflow;

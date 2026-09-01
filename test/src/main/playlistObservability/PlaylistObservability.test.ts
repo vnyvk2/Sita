@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { TimelineBuilder } from '@main/playlistObservability/engine/TimelineBuilder';
+import { PlaylistEventBus } from '@main/playlistAutomation/events/PlaylistEventBus';
 import { DiagnosticEvaluator } from '@main/playlistObservability/engine/DiagnosticEvaluator';
 import { HealthEvaluator } from '@main/playlistObservability/engine/HealthEvaluator';
 import { RecommendationEngine } from '@main/playlistObservability/engine/RecommendationEngine';
+import { TimelineBuilder } from '@main/playlistObservability/engine/TimelineBuilder';
 import { PlaylistObservabilityService } from '@main/playlistObservability/services/PlaylistObservabilityService';
-import { PlaylistEventBus } from '@main/playlistAutomation/events/PlaylistEventBus';
+import { describe, it, expect } from 'vitest';
 
 describe('Phase 15 — Observability, Diagnostics & Operational Intelligence Refinements', () => {
   it('should passively ingest events and assemble execution timeline', () => {

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
 import Button from '@renderer/components/Button';
+import React, { useEffect, useState } from 'react';
+
 import type {
   SpotifyPlaylistSyncPlan,
   SpotifySyncDriftStatus,
@@ -112,10 +113,10 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl border border-white/10 bg-[#161722] text-white shadow-2xl overflow-hidden">
+    <div className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-white/10 bg-[#161722] text-white shadow-2xl">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-[#1a1b2a]">
+        <div className="flex items-center justify-between border-b border-white/10 bg-[#1a1b2a] px-6 py-4">
           <div className="flex items-center space-x-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DB954]/20 text-[#1DB954]">
               <span className="material-symbols-rounded text-2xl">sync_alt</span>
@@ -131,23 +132,23 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-full p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
           >
             <span className="material-symbols-rounded">close</span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-16 space-y-3">
+            <div className="flex flex-col items-center justify-center space-y-3 py-16">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1DB954] border-t-transparent" />
               <p className="text-sm text-white/70">Evaluating playlist drift and 3-way diff...</p>
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-start space-x-3">
+            <div className="flex items-start space-x-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
               <span className="material-symbols-rounded text-red-400">error</span>
               <div>
                 <p className="font-semibold text-red-200">Synchronization Error</p>
@@ -174,7 +175,7 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
                       ? 'Synchronization Complete!'
                       : 'Partial Synchronization Completed'}
                   </h3>
-                  <p className="text-xs text-white/80 mt-1">
+                  <p className="mt-1 text-xs text-white/80">
                     {syncResult.status === 'SUCCESS'
                       ? 'Local Nora playlist and remote Spotify playlist are now fully aligned.'
                       : `Remote batches completed: ${syncResult.completedRemoteBatches}/${syncResult.totalRemoteBatches}. Error: ${syncResult.error}`}
@@ -192,22 +193,25 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
                   <span
                     className={`inline-flex h-3 w-3 rounded-full ${
                       driftStatus.driftState === 'IN_SYNC'
-                        ? 'bg-green-400 animate-pulse'
+                        ? 'animate-pulse bg-green-400'
                         : driftStatus.driftState === 'NEEDS_RECOVERY'
-                          ? 'bg-red-400 animate-ping'
+                          ? 'animate-ping bg-red-400'
                           : 'bg-amber-400'
                     }`}
                   />
                   <div>
-                    <span className="text-xs font-medium uppercase tracking-wider text-white/50">
+                    <span className="text-xs font-medium tracking-wider text-white/50 uppercase">
                       Sync State
                     </span>
                     <h4 className="text-sm font-semibold text-white">
                       {driftStatus.driftState === 'IN_SYNC' && 'Playlists In Sync'}
                       {driftStatus.driftState === 'LOCAL_AHEAD' && 'Local Changes (Ready to Push)'}
-                      {driftStatus.driftState === 'REMOTE_AHEAD' && 'Remote Changes (Ready to Pull)'}
-                      {driftStatus.driftState === 'CONFLICT_DIVERGED' && 'Conflict: Both Sides Modified'}
-                      {driftStatus.driftState === 'NEEDS_RECOVERY' && 'Interrupted Sync (Recovery Mode)'}
+                      {driftStatus.driftState === 'REMOTE_AHEAD' &&
+                        'Remote Changes (Ready to Pull)'}
+                      {driftStatus.driftState === 'CONFLICT_DIVERGED' &&
+                        'Conflict: Both Sides Modified'}
+                      {driftStatus.driftState === 'NEEDS_RECOVERY' &&
+                        'Interrupted Sync (Recovery Mode)'}
                     </h4>
                   </div>
                 </div>
@@ -219,7 +223,7 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
 
               {/* Strategy Selector */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-white/60">
+                <label className="text-xs font-semibold tracking-wider text-white/60 uppercase">
                   Reconciliation Strategy
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -232,13 +236,13 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
                         : 'border-white/10 bg-[#1c1e2e] text-white/70 hover:border-white/20'
                     }`}
                   >
-                    <span className="text-sm font-semibold flex items-center">
-                      <span className="material-symbols-rounded text-sm mr-1.5 text-[#1DB954]">
+                    <span className="flex items-center text-sm font-semibold">
+                      <span className="material-symbols-rounded mr-1.5 text-sm text-[#1DB954]">
                         call_merge
                       </span>
                       Union Merge
                     </span>
-                    <span className="text-xs text-white/50 mt-1">
+                    <span className="mt-1 text-xs text-white/50">
                       Combines tracks from both sides with deterministic ordering.
                     </span>
                   </button>
@@ -252,13 +256,13 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
                         : 'border-white/10 bg-[#1c1e2e] text-white/70 hover:border-white/20'
                     }`}
                   >
-                    <span className="text-sm font-semibold flex items-center">
-                      <span className="material-symbols-rounded text-sm mr-1.5 text-blue-400">
+                    <span className="flex items-center text-sm font-semibold">
+                      <span className="material-symbols-rounded mr-1.5 text-sm text-blue-400">
                         arrow_forward
                       </span>
                       Local Wins
                     </span>
-                    <span className="text-xs text-white/50 mt-1">
+                    <span className="mt-1 text-xs text-white/50">
                       Overwrites remote Spotify playlist to match Nora state.
                     </span>
                   </button>
@@ -272,13 +276,13 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
                         : 'border-white/10 bg-[#1c1e2e] text-white/70 hover:border-white/20'
                     }`}
                   >
-                    <span className="text-sm font-semibold flex items-center">
-                      <span className="material-symbols-rounded text-sm mr-1.5 text-purple-400">
+                    <span className="flex items-center text-sm font-semibold">
+                      <span className="material-symbols-rounded mr-1.5 text-sm text-purple-400">
                         arrow_back
                       </span>
                       Remote Wins
                     </span>
-                    <span className="text-xs text-white/50 mt-1">
+                    <span className="mt-1 text-xs text-white/50">
                       Updates Nora playlist to match remote Spotify tracks.
                     </span>
                   </button>
@@ -315,10 +319,11 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
 
               {/* Unresolved Warning */}
               {plan.statistics.unresolvedRemoteCount > 0 && (
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-center space-x-2">
+                <div className="flex items-center space-x-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
                   <span className="material-symbols-rounded text-base text-amber-400">info</span>
                   <span>
-                    {plan.statistics.unresolvedRemoteCount} remote track(s) cannot be resolved to audio files in your local library and will be skipped in local insertions.
+                    {plan.statistics.unresolvedRemoteCount} remote track(s) cannot be resolved to
+                    audio files in your local library and will be skipped in local insertions.
                   </span>
                 </div>
               )}
@@ -327,7 +332,7 @@ export const SpotifyPlaylistSyncModal: React.FC<SpotifyPlaylistSyncModalProps> =
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 px-6 py-4 bg-[#1a1b2a]">
+        <div className="flex items-center justify-between border-t border-white/10 bg-[#1a1b2a] px-6 py-4">
           <Button
             label={syncResult ? 'Done' : 'Cancel'}
             className="hover:bg-white/10"

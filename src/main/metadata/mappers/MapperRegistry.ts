@@ -1,9 +1,8 @@
 import type { MetadataKind } from '../models/MetadataKind';
-import type { IMetadataMapper } from './IMetadataMapper';
-
 import { AlbumMapper } from './AlbumMapper';
 import { ArtistMapper } from './ArtistMapper';
 import { GenreMapper } from './GenreMapper';
+import type { IMetadataMapper } from './IMetadataMapper';
 import { PlaylistMapper } from './PlaylistMapper';
 import { SongMapper } from './SongMapper';
 

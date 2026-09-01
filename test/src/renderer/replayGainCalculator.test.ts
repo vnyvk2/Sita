@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { computeEffectiveReplayGain } from '../../../src/renderer/src/other/replayGainCalculator';
 
 describe('Gate D3: computeEffectiveReplayGain (Robust Limiter & Mode Fallback)', () => {

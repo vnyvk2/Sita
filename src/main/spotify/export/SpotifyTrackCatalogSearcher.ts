@@ -1,6 +1,6 @@
+import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
 import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
 import { TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
-import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
 import { MetadataNormalizer } from '../../metadata/matching/MetadataNormalizer';
 import type { SpotifyApiClient } from '../api/SpotifyApiClient';
 import type { CatalogResolution, SpotifyTrackInput } from '../api/types';

@@ -1,10 +1,9 @@
 import type { MetadataKind } from '../models/MetadataKind';
-import type { IEntityLoader } from './strategies/IEntityLoader';
-
 import { MetadataKinds } from '../models/MetadataKind';
 import { AlbumLoader } from './strategies/AlbumLoader';
 import { ArtistLoader } from './strategies/ArtistLoader';
 import { GenreLoader } from './strategies/GenreLoader';
+import type { IEntityLoader } from './strategies/IEntityLoader';
 import { PlaylistLoader } from './strategies/PlaylistLoader';
 import { SongLoader } from './strategies/SongLoader';
 

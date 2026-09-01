@@ -1,7 +1,9 @@
+import { createHash } from 'crypto';
 import http from 'http';
 import type { AddressInfo } from 'net';
-import { createHash } from 'crypto';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
 import { ArtworkDownloaderService, MAX_ARTWORK_BYTES } from '../ArtworkDownloaderService';
 
 const makeJpeg = (sizeBytes: number): Buffer => {

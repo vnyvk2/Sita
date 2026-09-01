@@ -10,8 +10,12 @@ export function sleep(ms) {
 }
 
 export function killAllNora() {
-  try { execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' }); } catch (e) { }
-  try { execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' }); } catch (e) { }
+  try {
+    execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
+  } catch (e) {}
+  try {
+    execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
+  } catch (e) {}
 }
 
 export class CDPClient {
@@ -36,7 +40,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -50,7 +54,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -70,7 +78,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -103,7 +111,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -155,11 +166,15 @@ async function main() {
 
   // Launch Nora with remote debugging port 9876 and DevTools closed
   console.log('[1/4] Launching Nora (DevTools Closed)...');
-  const child = spawn('npx.cmd', ['electron-vite', 'dev', '--watch=false', '--remoteDebuggingPort', '9876', '--inspect=9229'], {
-    shell: true,
-    env: { ...process.env, NORA_DEVTOOLS_CLOSED: '1' },
-    stdio: 'ignore'
-  });
+  const child = spawn(
+    'npx.cmd',
+    ['electron-vite', 'dev', '--watch=false', '--remoteDebuggingPort', '9876', '--inspect=9229'],
+    {
+      shell: true,
+      env: { ...process.env, NORA_DEVTOOLS_CLOSED: '1' },
+      stdio: 'ignore'
+    }
+  );
 
   // Wait for Renderer CDP target on 9876
   let rendererTarget = null;
@@ -174,7 +189,7 @@ async function main() {
           break;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
 
@@ -213,9 +228,15 @@ async function main() {
   const procBase = getProcessMemoryMetrics();
   const perfBase = await rendererCDP.getPerformanceMetrics();
   console.log('\n--- BASELINE METRICS (Home Page) ---');
-  console.log(`Total WS: ${procBase?.totalWS} MB | Renderer: ${procBase?.renderer.ws} MB | Main: ${procBase?.main.ws} MB | GPU: ${procBase?.gpu.ws} MB`);
-  console.log(`Renderer JS Heap Used: ${Math.round((perfBase.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB / ${Math.round((perfBase.JSHeapTotalSize || 0) / 1024 / 1024 * 100) / 100} MB`);
-  console.log(`DOM Nodes: ${perfBase.Nodes} | Documents: ${perfBase.Documents} | JS Event Listeners: ${perfBase.JSEventListeners}`);
+  console.log(
+    `Total WS: ${procBase?.totalWS} MB | Renderer: ${procBase?.renderer.ws} MB | Main: ${procBase?.main.ws} MB | GPU: ${procBase?.gpu.ws} MB`
+  );
+  console.log(
+    `Renderer JS Heap Used: ${Math.round(((perfBase.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB / ${Math.round(((perfBase.JSHeapTotalSize || 0) / 1024 / 1024) * 100) / 100} MB`
+  );
+  console.log(
+    `DOM Nodes: ${perfBase.Nodes} | Documents: ${perfBase.Documents} | JS Event Listeners: ${perfBase.JSEventListeners}`
+  );
 
   // Probe 2: Main Process Node.js memory breakdown (if connected to Node inspector)
   if (mainCDP) {
@@ -280,7 +301,9 @@ async function main() {
 
   const procSongs = getProcessMemoryMetrics();
   const perfSongs = await rendererCDP.getPerformanceMetrics();
-  console.log(`Songs Page Loaded: Total WS: ${procSongs?.totalWS} MB | Renderer: ${procSongs?.renderer.ws} MB | GPU: ${procSongs?.gpu.ws} MB | Nodes: ${perfSongs.Nodes} | JS Heap: ${Math.round((perfSongs.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB | Listeners: ${perfSongs.JSEventListeners}`);
+  console.log(
+    `Songs Page Loaded: Total WS: ${procSongs?.totalWS} MB | Renderer: ${procSongs?.renderer.ws} MB | GPU: ${procSongs?.gpu.ws} MB | Nodes: ${perfSongs.Nodes} | JS Heap: ${Math.round(((perfSongs.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB | Listeners: ${perfSongs.JSEventListeners}`
+  );
 
   console.log('Step B: Scroll through Songs List to trigger image decoding (10s)...');
   await rendererCDP.evaluate(`(() => {
@@ -296,7 +319,9 @@ async function main() {
 
   const procSongsScrolled = getProcessMemoryMetrics();
   const perfSongsScrolled = await rendererCDP.getPerformanceMetrics();
-  console.log(`After Scrolling Songs: Total WS: ${procSongsScrolled?.totalWS} MB | Renderer: ${procSongsScrolled?.renderer.ws} MB | GPU: ${procSongsScrolled?.gpu.ws} MB | Nodes: ${perfSongsScrolled.Nodes} | JS Heap: ${Math.round((perfSongsScrolled.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB | Listeners: ${perfSongsScrolled.JSEventListeners}`);
+  console.log(
+    `After Scrolling Songs: Total WS: ${procSongsScrolled?.totalWS} MB | Renderer: ${procSongsScrolled?.renderer.ws} MB | GPU: ${procSongsScrolled?.gpu.ws} MB | Nodes: ${perfSongsScrolled.Nodes} | JS Heap: ${Math.round(((perfSongsScrolled.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB | Listeners: ${perfSongsScrolled.JSEventListeners}`
+  );
 
   console.log('Step C: Navigate back to Home & Rest (30s)...');
   await rendererCDP.evaluate(`(() => {
@@ -309,8 +334,12 @@ async function main() {
   const procHomeRest = getProcessMemoryMetrics();
   const perfHomeRest = await rendererCDP.getPerformanceMetrics();
   console.log(`\n--- POST-NAVIGATION REST MEASUREMENT (Back on Home) ---`);
-  console.log(`Total WS: ${procHomeRest?.totalWS} MB | Renderer: ${procHomeRest?.renderer.ws} MB | Main: ${procHomeRest?.main.ws} MB | GPU: ${procHomeRest?.gpu.ws} MB`);
-  console.log(`Renderer JS Heap: ${Math.round((perfHomeRest.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB | Nodes: ${perfHomeRest.Nodes} | Listeners: ${perfHomeRest.JSEventListeners}`);
+  console.log(
+    `Total WS: ${procHomeRest?.totalWS} MB | Renderer: ${procHomeRest?.renderer.ws} MB | Main: ${procHomeRest?.main.ws} MB | GPU: ${procHomeRest?.gpu.ws} MB`
+  );
+  console.log(
+    `Renderer JS Heap: ${Math.round(((perfHomeRest.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB | Nodes: ${perfHomeRest.Nodes} | Listeners: ${perfHomeRest.JSEventListeners}`
+  );
 
   console.log('\n[Finished Diagnostic] Terminating Nora processes...');
   rendererCDP.close();

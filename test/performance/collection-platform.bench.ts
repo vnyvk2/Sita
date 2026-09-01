@@ -1,9 +1,10 @@
-import { describe, bench, beforeAll, afterAll } from 'vitest';
-import { db } from '../../src/main/db/db';
 import { sql } from 'drizzle-orm';
-import { PlaylistRepository as CollectionReadRepository } from '../../src/main/collections/repositories/PlaylistRepository';
+import { describe, bench, beforeAll, afterAll } from 'vitest';
+
 import { HierarchyService } from '../../src/main/collections/engine/HierarchyService';
 import { CollectionEventBus } from '../../src/main/collections/events/CollectionEventBus';
+import { PlaylistRepository as CollectionReadRepository } from '../../src/main/collections/repositories/PlaylistRepository';
+import { db } from '../../src/main/db/db';
 
 describe('Collection Platform Benchmarks', () => {
   let repository: CollectionReadRepository;

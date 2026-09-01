@@ -7,10 +7,8 @@ import { withAtomicFileWrite } from '../../utils/withAtomicFileWrite';
 export interface TagWritePayload {
   filePath: string;
   /**
-   * Field semantics:
-   * - `undefined`: leave the existing tag untouched.
-   * - `null` or `''`: explicitly clear the tag (required for value-complete rollback/undo).
-   * - otherwise: write the given value.
+   * Field semantics: - `undefined`: leave the existing tag untouched. - `null` or `''`: explicitly
+   * clear the tag (required for value-complete rollback/undo). - otherwise: write the given value.
    */
   title?: string | null;
   artist?: string | null;
@@ -33,9 +31,7 @@ export interface TagWriteResult {
 }
 
 export class TagWriterService {
-  /**
-   * Writes physical audio tags to disk for a file.
-   */
+  /** Writes physical audio tags to disk for a file. */
   public async writeTags(payload: TagWritePayload): Promise<TagWriteResult> {
     try {
       if (!payload.filePath) {
@@ -92,14 +88,19 @@ export class TagWriterService {
               .toBuffer();
 
             if (jpegBuffer) {
-              const picture = Picture.fromData(ByteVector.fromByteArray(new Uint8Array(jpegBuffer)));
+              const picture = Picture.fromData(
+                ByteVector.fromByteArray(new Uint8Array(jpegBuffer))
+              );
               picture.mimeType = 'image/jpeg';
               picture.type = PictureType.FrontCover;
               picture.description = 'artwork';
               file.tag.pictures = [picture];
             }
           } catch (artErr: unknown) {
-            console.warn(`[TagWriterService] Failed to embed artwork for ${payload.filePath}:`, artErr);
+            console.warn(
+              `[TagWriterService] Failed to embed artwork for ${payload.filePath}:`,
+              artErr
+            );
           }
         }
       });
@@ -111,9 +112,7 @@ export class TagWriterService {
     }
   }
 
-  /**
-   * Batch writes tags for multiple files.
-   */
+  /** Batch writes tags for multiple files. */
   public async writeBatch(payloads: TagWritePayload[]): Promise<TagWriteResult[]> {
     const results: TagWriteResult[] = [];
     for (const payload of payloads) {

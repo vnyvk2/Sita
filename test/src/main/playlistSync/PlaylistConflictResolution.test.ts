@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
 import { PlaylistConflictAnalyzer } from '@main/playlistSync/analyzer/PlaylistConflictAnalyzer';
-import { ConflictResolutionPlanner } from '@main/playlistSync/planner/ConflictResolutionPlanner';
-import { SourceWinsConflictStrategy } from '@main/playlistSync/strategies/SourceWinsConflictStrategy';
-import { KeepLocalConflictStrategy } from '@main/playlistSync/strategies/KeepLocalConflictStrategy';
 import type { PlaylistSyncPlan } from '@main/playlistSync/models/PlaylistSyncPlan';
+import { ConflictResolutionPlanner } from '@main/playlistSync/planner/ConflictResolutionPlanner';
+import { KeepLocalConflictStrategy } from '@main/playlistSync/strategies/KeepLocalConflictStrategy';
+import { SourceWinsConflictStrategy } from '@main/playlistSync/strategies/SourceWinsConflictStrategy';
+import { describe, it, expect } from 'vitest';
 
 describe('Phase 11 — Conflict Detection & Resolution Framework Refinements', () => {
   it('should detect duplicate entry additions objectively and resolve via SourceWinsConflictStrategy', () => {
@@ -29,7 +29,10 @@ describe('Phase 11 — Conflict Detection & Resolution Framework Refinements', (
     expect(analysis.conflicts).toHaveLength(1);
     expect(analysis.conflicts[0].type).toBe('DUPLICATE_ENTRY');
 
-    const { resolvedPlan, appliedResolutions, conflictSummary } = planner.resolveConflicts(plan, analysis);
+    const { resolvedPlan, appliedResolutions, conflictSummary } = planner.resolveConflicts(
+      plan,
+      analysis
+    );
     expect(resolvedPlan.operations).toHaveLength(1);
     expect(resolvedPlan.additionsCount).toBe(1);
     expect(appliedResolutions).toHaveLength(1);
@@ -49,9 +52,7 @@ describe('Phase 11 — Conflict Detection & Resolution Framework Refinements', (
       hasChanges: true,
       additionsCount: 0,
       removalsCount: 1,
-      operations: [
-        { type: 'REMOVE_SONG', songId: 999, reason: 'Absent from source' }
-      ]
+      operations: [{ type: 'REMOVE_SONG', songId: 999, reason: 'Absent from source' }]
     };
 
     const analysis = analyzer.analyzePlan(plan, [999]);

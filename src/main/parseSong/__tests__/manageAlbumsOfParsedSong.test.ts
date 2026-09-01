@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import manageAlbumsOfParsedSong from '../manageAlbumsOfParsedSong';
 import { createAlbum, getAlbumWithTitle, linkSongToAlbum } from '@main/db/queries/albums';
 import { linkArtworksToAlbum, syncAlbumArtworks } from '@main/db/queries/artworks';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import manageAlbumsOfParsedSong from '../manageAlbumsOfParsedSong';
 
 vi.mock('@main/db/queries/albums', () => ({
   createAlbum: vi.fn(),
@@ -36,7 +37,10 @@ describe('manageAlbumsOfParsedSong album artwork linking', () => {
     );
 
     expect(createAlbum).toHaveBeenCalledWith({ title: 'SOUR', year: 2021 }, expect.anything());
-    expect(linkArtworksToAlbum).toHaveBeenCalledWith([{ albumId: 100, artworkId: 50 }], expect.anything());
+    expect(linkArtworksToAlbum).toHaveBeenCalledWith(
+      [{ albumId: 100, artworkId: 50 }],
+      expect.anything()
+    );
     expect(linkSongToAlbum).toHaveBeenCalledWith(100, 1, expect.anything());
     expect(result.relevantAlbum?.id).toBe(100);
     expect(result.newAlbum?.id).toBe(100);

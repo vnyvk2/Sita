@@ -1,12 +1,10 @@
 import { normalizeForMatching } from '../metadata/matching/normalizeForMatching';
 
 /**
- * Common metadata suffix patterns to strip when comparing track titles.
- * Examples:
- * - "Bohemian Rhapsody (Remastered 2011)" -> "bohemian rhapsody"
- * - "Hotel California - Live at the Forum" -> "hotel california"
- * - "Save Your Tears (feat. Ariana Grande) [Remix]" -> "save your tears"
- * - "Cruel Summer (Live from The Eras Tour)" -> "cruel summer"
+ * Common metadata suffix patterns to strip when comparing track titles. Examples: - "Bohemian
+ * Rhapsody (Remastered 2011)" -> "bohemian rhapsody" - "Hotel California - Live at the Forum" ->
+ * "hotel california" - "Save Your Tears (feat. Ariana Grande) [Remix]" -> "save your tears" -
+ * "Cruel Summer (Live from The Eras Tour)" -> "cruel summer"
  */
 const TRACK_EXTRA_PATTERNS = [
   // Parentheses or brackets with remaster/live/deluxe/edit/version/mono/stereo/mix/bonus
@@ -20,8 +18,8 @@ const TRACK_EXTRA_PATTERNS = [
 ];
 
 /**
- * Normalizes a track title by stripping noise, features, and version variants,
- * then applying canonical Unicode and punctuation normalization.
+ * Normalizes a track title by stripping noise, features, and version variants, then applying
+ * canonical Unicode and punctuation normalization.
  */
 export function normalizeTrackTitle(title?: string): string {
   if (!title) return '';
@@ -51,8 +49,8 @@ export interface LocalSongMatchResult {
 }
 
 /**
- * Matches an online track against a list of local library songs for the same artist.
- * Uses normalized title matching and optional duration tolerance (±3s).
+ * Matches an online track against a list of local library songs for the same artist. Uses
+ * normalized title matching and optional duration tolerance (±3s).
  */
 export function matchOnlineTrackToLocalSong(
   onlineTitle: string,
@@ -70,9 +68,7 @@ export function matchOnlineTrackToLocalSong(
 
     if (normLocal === normOnline) {
       const durationDiff =
-        onlineDurationSec && song.duration
-          ? Math.abs(onlineDurationSec - song.duration)
-          : 0;
+        onlineDurationSec && song.duration ? Math.abs(onlineDurationSec - song.duration) : 0;
 
       // Exact title match: <= 3s variance is exact confidence, > 3s is fuzzy confidence
       const confidence: 'exact' | 'fuzzy' =
@@ -95,12 +91,12 @@ export function matchOnlineTrackToLocalSong(
 }
 
 /**
- * Deduplicates a list of candidate tracks by normalized title,
- * preserving the highest-ranked / highest-playcount entry.
+ * Deduplicates a list of candidate tracks by normalized title, preserving the highest-ranked /
+ * highest-playcount entry.
  */
-export function deduplicateCandidateTracks<T extends { title: string; playcount?: number; listeners?: number }>(
-  tracks: T[]
-): T[] {
+export function deduplicateCandidateTracks<
+  T extends { title: string; playcount?: number; listeners?: number }
+>(tracks: T[]): T[] {
   const seenMap = new Map<string, T>();
 
   for (const track of tracks) {

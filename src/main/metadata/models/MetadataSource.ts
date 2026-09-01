@@ -9,8 +9,7 @@ export const MetadataSourceTypes = {
   AI: 'AI'
 } as const;
 
-export type MetadataSourceType =
-  (typeof MetadataSourceTypes)[keyof typeof MetadataSourceTypes];
+export type MetadataSourceType = (typeof MetadataSourceTypes)[keyof typeof MetadataSourceTypes];
 
 export interface MetadataSourceOptions {
   type: MetadataSourceType;

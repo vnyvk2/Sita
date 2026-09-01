@@ -1,19 +1,43 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PlaylistDependencyGraph } from '@main/playlistBatch/planner/PlaylistDependencyGraph';
-import { PlaylistBatchPlanner } from '@main/playlistBatch/planner/PlaylistBatchPlanner';
-import { PlaylistBatchOrchestrator } from '@main/playlistBatch/orchestrator/PlaylistBatchOrchestrator';
 import type { BatchItem } from '@main/playlistBatch/models/BatchItem';
+import { PlaylistBatchOrchestrator } from '@main/playlistBatch/orchestrator/PlaylistBatchOrchestrator';
+import { PlaylistBatchPlanner } from '@main/playlistBatch/planner/PlaylistBatchPlanner';
+import { PlaylistDependencyGraph } from '@main/playlistBatch/planner/PlaylistDependencyGraph';
 import type { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinements', () => {
   it('should compute structured ExecutionLevel metadata for parallel dependency execution', () => {
     const graph = new PlaylistDependencyGraph();
 
     const items: BatchItem[] = [
-      { id: 'item_gym', action: 'IMPORT', sourceFile: 'gym.m3u', status: 'PENDING', dependencies: ['item_workout'] },
-      { id: 'item_workout', action: 'IMPORT', sourceFile: 'workout.m3u', status: 'PENDING', dependencies: ['item_rock'] },
-      { id: 'item_rock', action: 'IMPORT', sourceFile: 'rock.m3u', status: 'PENDING', dependencies: [] },
-      { id: 'item_pop', action: 'IMPORT', sourceFile: 'pop.m3u', status: 'PENDING', dependencies: [] }
+      {
+        id: 'item_gym',
+        action: 'IMPORT',
+        sourceFile: 'gym.m3u',
+        status: 'PENDING',
+        dependencies: ['item_workout']
+      },
+      {
+        id: 'item_workout',
+        action: 'IMPORT',
+        sourceFile: 'workout.m3u',
+        status: 'PENDING',
+        dependencies: ['item_rock']
+      },
+      {
+        id: 'item_rock',
+        action: 'IMPORT',
+        sourceFile: 'rock.m3u',
+        status: 'PENDING',
+        dependencies: []
+      },
+      {
+        id: 'item_pop',
+        action: 'IMPORT',
+        sourceFile: 'pop.m3u',
+        status: 'PENDING',
+        dependencies: []
+      }
     ];
 
     const levels = graph.computeExecutionLevels(items);
@@ -40,17 +64,38 @@ describe('Phase 14 — Batch Operations & Multi-Playlist Orchestration Refinemen
     const mockImportWorkflow = {
       createPlanFromFile: vi.fn(async () => ({
         playlistName: 'rock',
-        statistics: { totalEntries: 2, importedEntries: 2, skippedEntries: 0, missingEntries: 0, notInLibraryEntries: 0, invalidEntries: 0, warningCount: 0, plannedImportPercentage: 100 },
+        statistics: {
+          totalEntries: 2,
+          importedEntries: 2,
+          skippedEntries: 0,
+          missingEntries: 0,
+          notInLibraryEntries: 0,
+          invalidEntries: 0,
+          warningCount: 0,
+          plannedImportPercentage: 100
+        },
         warnings: [],
         entries: []
       })),
-      executePlan: vi.fn(async () => ({ playlistId: 101, importedSongIds: [1, 2], skippedEntriesCount: 0, success: true, durationMs: 15 }))
+      executePlan: vi.fn(async () => ({
+        playlistId: 101,
+        importedSongIds: [1, 2],
+        skippedEntriesCount: 0,
+        success: true,
+        durationMs: 15
+      }))
     } as unknown as PlaylistImportWorkflow;
 
     const orchestrator = new PlaylistBatchOrchestrator(mockImportWorkflow);
 
     const items: BatchItem[] = [
-      { id: 'item_1', action: 'IMPORT', sourceFile: 'rock.m3u', status: 'PENDING', dependencies: [] },
+      {
+        id: 'item_1',
+        action: 'IMPORT',
+        sourceFile: 'rock.m3u',
+        status: 'PENDING',
+        dependencies: []
+      },
       { id: 'item_2', action: 'IMPORT', sourceFile: 'pop.m3u', status: 'PENDING', dependencies: [] }
     ];
 

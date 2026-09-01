@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ArtistDiscographyService } from '@main/services/ArtistDiscographyService';
-import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
-import type { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
-import * as artistsDb from '@main/db/queries/artists';
 import * as albumsDb from '@main/db/queries/albums';
+import * as artistsDb from '@main/db/queries/artists';
+import type { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
+import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
+import { ArtistDiscographyService } from '@main/services/ArtistDiscographyService';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('@main/db/queries/artists', () => ({
   getArtistById: vi.fn()
@@ -23,10 +23,7 @@ describe('ArtistDiscographyService', () => {
     (artistsDb.getArtistById as any).mockResolvedValue({
       id: 1,
       name: 'Daft Punk',
-      albums: [
-        { album: { id: 10, title: 'Discovery' } },
-        { album: { id: 20, title: 'Homework' } }
-      ],
+      albums: [{ album: { id: 10, title: 'Discovery' } }, { album: { id: 20, title: 'Homework' } }],
       songs: [
         { song: { id: 101, title: 'One More Time' } },
         { song: { id: 102, title: 'Aerodynamic' } },
@@ -53,7 +50,9 @@ describe('ArtistDiscographyService', () => {
         {
           id: 20,
           title: 'Homework',
-          songs: Array.from({ length: 16 }, (_, i) => ({ song: { id: 200 + i, title: `Track ${i + 1}` } }))
+          songs: Array.from({ length: 16 }, (_, i) => ({
+            song: { id: 200 + i, title: `Track ${i + 1}` }
+          }))
         }
       ]
     });
@@ -131,15 +130,25 @@ describe('ArtistDiscographyService', () => {
     (artistsDb.getArtistById as any).mockResolvedValue({
       id: 1,
       name: 'Daft Punk',
-      songs: [
-        { song: { id: 101, title: 'One More Time' } }
-      ]
+      songs: [{ song: { id: 101, title: 'One More Time' } }]
     });
 
     const mockItunesClient: Partial<ITunesApiClient> = {
       getAlbumTracks: vi.fn().mockResolvedValue([
-        { trackId: 1001, trackName: 'One More Time', trackTimeMillis: 320000, previewUrl: 'https://preview1.m4a', wrapperType: 'track' },
-        { trackId: 1002, trackName: 'Aerodynamic', trackTimeMillis: 207000, previewUrl: 'https://preview2.m4a', wrapperType: 'track' }
+        {
+          trackId: 1001,
+          trackName: 'One More Time',
+          trackTimeMillis: 320000,
+          previewUrl: 'https://preview1.m4a',
+          wrapperType: 'track'
+        },
+        {
+          trackId: 1002,
+          trackName: 'Aerodynamic',
+          trackTimeMillis: 207000,
+          previewUrl: 'https://preview2.m4a',
+          wrapperType: 'track'
+        }
       ])
     };
 
@@ -157,7 +166,12 @@ describe('ArtistDiscographyService', () => {
   });
 
   it('gracefully returns empty collections if artist is not found online', async () => {
-    (artistsDb.getArtistById as any).mockResolvedValue({ id: 99, name: 'Local Band Only', albums: [], songs: [] });
+    (artistsDb.getArtistById as any).mockResolvedValue({
+      id: 99,
+      name: 'Local Band Only',
+      albums: [],
+      songs: []
+    });
     (albumsDb.getAllAlbums as any).mockResolvedValue({ data: [] });
 
     const mockItunesClient: Partial<ITunesApiClient> = {
@@ -167,7 +181,10 @@ describe('ArtistDiscographyService', () => {
       searchArtist: vi.fn().mockResolvedValue(null)
     };
 
-    const service = new ArtistDiscographyService(mockItunesClient as ITunesApiClient, mockDeezerClient as DeezerApiClient);
+    const service = new ArtistDiscographyService(
+      mockItunesClient as ITunesApiClient,
+      mockDeezerClient as DeezerApiClient
+    );
     const discography = await service.getDiscography(99, 'Local Band Only');
 
     expect(discography.albums).toHaveLength(0);

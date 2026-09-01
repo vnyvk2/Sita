@@ -1,6 +1,6 @@
+import logger from '../../logger';
 import { HttpError } from './FetchHttpClient';
 import { RequestPipeline } from './RequestPipeline';
-import logger from '../../logger';
 
 export const ITUNES_BASE_URL = 'https://itunes.apple.com';
 
@@ -50,9 +50,7 @@ export class ITunesApiClient {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
-  /**
-   * Search for all albums by an artist name.
-   */
+  /** Search for all albums by an artist name. */
   public async getArtistAlbums(
     artistName: string,
     limit = 100,
@@ -88,9 +86,7 @@ export class ITunesApiClient {
     }
   }
 
-  /**
-   * Lookup tracklist with 30s previews for a specific album by collectionId.
-   */
+  /** Lookup tracklist with 30s previews for a specific album by collectionId. */
   public async getAlbumTracks(
     collectionId: number,
     signal?: AbortSignal
@@ -116,14 +112,14 @@ export class ITunesApiClient {
       if (err instanceof HttpError && err.status === 404) {
         return [];
       }
-      logger.warn(`[ITunesApiClient] Failed to lookup tracks for collection ID: ${collectionId}`, { error: err });
+      logger.warn(`[ITunesApiClient] Failed to lookup tracks for collection ID: ${collectionId}`, {
+        error: err
+      });
       return [];
     }
   }
 
-  /**
-   * Get top / popular songs for an artist.
-   */
+  /** Get top / popular songs for an artist. */
   public async getArtistTopTracks(
     artistName: string,
     limit = 10,
@@ -156,7 +152,9 @@ export class ITunesApiClient {
       if (err instanceof HttpError && err.status === 404) {
         return [];
       }
-      logger.warn(`[ITunesApiClient] Failed to search top tracks for: ${artistName}`, { error: err });
+      logger.warn(`[ITunesApiClient] Failed to search top tracks for: ${artistName}`, {
+        error: err
+      });
       return [];
     }
   }

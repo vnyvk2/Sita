@@ -1,5 +1,4 @@
 import type { DBTransaction } from '../../db/db';
-
 import { MetadataHistoryRepository } from './MetadataHistoryRepository';
 
 export interface SongMetadataSnapshot {
@@ -30,10 +29,9 @@ export interface MetadataHistorySnapshot {
 /**
  * Undo history for metadata operations.
  *
- * When constructed with a {@link MetadataHistoryRepository} the undo stack is
- * durably persisted: snapshots survive app restarts and crashes. The in-memory
- * stack mirrors the durable rows for synchronous `canUndo` checks; it is
- * lazily hydrated from storage on first async access.
+ * When constructed with a {@link MetadataHistoryRepository} the undo stack is durably persisted:
+ * snapshots survive app restarts and crashes. The in-memory stack mirrors the durable rows for
+ * synchronous `canUndo` checks; it is lazily hydrated from storage on first async access.
  *
  * The redo stack remains intentionally memory-only.
  */
@@ -68,12 +66,11 @@ export class MetadataHistoryService {
   }
 
   /**
-   * P0 #3: durable-only journal insert inside a caller-owned DB transaction.
-   * The orchestrator stages the undo row in the SAME transaction as the
-   * mutation, then mirrors it into the memory stack via {@link adoptSnapshot}
-   * only after the commit succeeded. A crash can therefore never produce
-   * DB=new with undo=missing (and a rolled-back mutation never leaves a
-   * phantom journal entry behind).
+   * P0 #3: durable-only journal insert inside a caller-owned DB transaction. The orchestrator
+   * stages the undo row in the SAME transaction as the mutation, then mirrors it into the memory
+   * stack via {@link adoptSnapshot} only after the commit succeeded. A crash can therefore never
+   * produce DB=new with undo=missing (and a rolled-back mutation never leaves a phantom journal
+   * entry behind).
    */
   public async persistSnapshotInTransaction(
     snapshot: MetadataHistorySnapshot,
@@ -84,10 +81,9 @@ export class MetadataHistoryService {
   }
 
   /**
-   * P0 #2: grouped variant of {@link persistSnapshotInTransaction}. Appends one
-   * song's snapshots to the operation's single journal row, creating the row on
-   * first sight, so every committed song is journaled even when a later song
-   * in the group fails.
+   * P0 #2: grouped variant of {@link persistSnapshotInTransaction}. Appends one song's snapshots to
+   * the operation's single journal row, creating the row on first sight, so every committed song is
+   * journaled even when a later song in the group fails.
    */
   public async appendToGroupSnapshotInTransaction(
     args: {
@@ -113,9 +109,8 @@ export class MetadataHistoryService {
   }
 
   /**
-   * Returns the snapshot an undo would restore WITHOUT consuming it.
-   * Callers must invoke {@link confirmUndo} only after the restore succeeded,
-   * so a failed undo remains retryable.
+   * Returns the snapshot an undo would restore WITHOUT consuming it. Callers must invoke
+   * {@link confirmUndo} only after the restore succeeded, so a failed undo remains retryable.
    */
   public async peekUndo(targetSongId?: number): Promise<MetadataHistorySnapshot | undefined> {
     await this.hydrate();
@@ -124,7 +119,9 @@ export class MetadataHistoryService {
 
     if (targetSongId !== undefined) {
       const foundIdx = this.undoStack.findLastIndex(
-        (snap) => snap.songIds?.includes(targetSongId) || snap.previousSongs.some((s) => s.songId === targetSongId)
+        (snap) =>
+          snap.songIds?.includes(targetSongId) ||
+          snap.previousSongs.some((s) => s.songId === targetSongId)
       );
       return foundIdx !== -1 ? this.undoStack[foundIdx] : undefined;
     }
@@ -164,7 +161,8 @@ export class MetadataHistoryService {
   }
 
   private hydrate(): Promise<void> {
-    if (!this.repository || this.hydrationPromise) return this.hydrationPromise ?? Promise.resolve();
+    if (!this.repository || this.hydrationPromise)
+      return this.hydrationPromise ?? Promise.resolve();
 
     this.hydrationPromise = (async () => {
       const rows = await this.repository!.listNewestFirst(this.maxStackSize);

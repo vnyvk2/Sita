@@ -1,11 +1,10 @@
-﻿// @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+﻿import LyricsContainer from '@renderer/components/MiniPlayer/containers/LyricsContainer';
+import { store } from '@renderer/store/store';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// @vitest-environment jsdom
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import LyricsContainer from '@renderer/components/MiniPlayer/containers/LyricsContainer';
-import { store } from '@renderer/store/store';
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>();

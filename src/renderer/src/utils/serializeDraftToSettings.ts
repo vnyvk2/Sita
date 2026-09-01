@@ -1,9 +1,7 @@
 import type { PlaylistCoverSettings } from '../types/playlistCover';
 import type { MaterializedCoverDraft } from '../types/playlistCoverDraft';
 
-export function serializeDraftToSettings(
-  draft: MaterializedCoverDraft
-): PlaylistCoverSettings {
+export function serializeDraftToSettings(draft: MaterializedCoverDraft): PlaylistCoverSettings {
   if (draft.type === 'auto') {
     return {
       version: draft.version,

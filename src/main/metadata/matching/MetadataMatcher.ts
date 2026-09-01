@@ -4,6 +4,7 @@ import type {
   MetadataCandidate,
   MatchCriterion
 } from '@main/metadata/models/RecordingMetadata';
+
 import { normalizeForMatching } from './normalizeForMatching';
 
 export interface MatchTarget {
@@ -71,7 +72,10 @@ export class MetadataMatcher {
         score += 45;
         matchedBy.push('title');
         reasons.push('exact_title_match');
-      } else if (normTargetTitle.includes(normCandTitle) || normCandTitle.includes(normTargetTitle)) {
+      } else if (
+        normTargetTitle.includes(normCandTitle) ||
+        normCandTitle.includes(normTargetTitle)
+      ) {
         score += 30;
         matchedBy.push('title_partial');
         reasons.push('partial_title_match');
@@ -86,7 +90,10 @@ export class MetadataMatcher {
       if (
         normTargetArtist &&
         candArtists.some(
-          (ca) => ca === normTargetArtist || normTargetArtist.includes(ca) || ca.includes(normTargetArtist)
+          (ca) =>
+            ca === normTargetArtist ||
+            normTargetArtist.includes(ca) ||
+            ca.includes(normTargetArtist)
         )
       ) {
         score += 35;

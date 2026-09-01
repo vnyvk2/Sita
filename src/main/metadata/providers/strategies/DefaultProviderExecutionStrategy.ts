@@ -1,16 +1,15 @@
 import type { MetadataEventBus } from '../../events/MetadataEventBus';
 import type { IMetadataProvider } from '../../interfaces/IMetadataProvider';
+import { MetadataConfidence } from '../../models/MetadataConfidence';
 import type { MetadataIdentity } from '../../models/MetadataIdentity';
+import { ProviderBatchResult } from '../../models/ProviderBatchResult';
 import type { ProviderExecutionContext } from '../../models/ProviderExecutionContext';
 import type { ProviderResult } from '../../models/ProviderResult';
-import type { ProviderExecutionPipeline } from '../execution/ProviderExecutionPipeline';
-import type { IProviderExecutionStrategy } from './IProviderExecutionStrategy';
-
-import { MetadataConfidence } from '../../models/MetadataConfidence';
-import { ProviderBatchResult } from '../../models/ProviderBatchResult';
 import { ProviderResult as ConcreteProviderResult } from '../../models/ProviderResult';
+import type { ProviderExecutionPipeline } from '../execution/ProviderExecutionPipeline';
 import { ProviderExecutionPipeline as ConcreteExecutionPipeline } from '../execution/ProviderExecutionPipeline';
 import { ProviderExecutionStageContext } from '../execution/ProviderExecutionStageContext';
+import type { IProviderExecutionStrategy } from './IProviderExecutionStrategy';
 
 export class DefaultProviderExecutionStrategy implements IProviderExecutionStrategy {
   private readonly eventBus: MetadataEventBus;

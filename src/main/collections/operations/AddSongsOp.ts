@@ -1,11 +1,13 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
-
 import type { AddSongsInput } from '../../../common/collections/operationInputs';
+import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
-export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCount: number; deltaCount: number; deltaDuration: number }> {
+export class AddSongsOp implements CollectionOperation<
+  AddSongsInput,
+  { addedCount: number; deltaCount: number; deltaDuration: number }
+> {
   private readonly repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository) {
@@ -38,7 +40,10 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
     const inserted = await this.repository.insertEntries(newEntries, ctx.trx);
 
     // Compute delta using repository
-    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(songIds, ctx.trx);
+    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(
+      songIds,
+      ctx.trx
+    );
 
     const container = await MembershipBootstrap.getInstance();
     container.service.notifyMembershipChanged({
@@ -49,13 +54,17 @@ export class AddSongsOp implements CollectionOperation<AddSongsInput, { addedCou
     });
 
     return {
-      data: { addedCount: inserted.length, deltaCount: itemCountDelta, deltaDuration: durationDelta },
+      data: {
+        addedCount: inserted.length,
+        deltaCount: itemCountDelta,
+        deltaDuration: durationDelta
+      },
       collectionId: createCollectionId('local', 'playlist', playlistId),
       operationType: 'playlist.addSongs',
       operationInput: input as unknown as Record<string, unknown>,
       inverseInput: {
         operationType: 'playlist.removeSongs',
-        input: { playlistId, entryIds: inserted.map(e => e.id) }
+        input: { playlistId, entryIds: inserted.map((e) => e.id) }
       },
       version: 1,
       affectedSongIds: songIds,

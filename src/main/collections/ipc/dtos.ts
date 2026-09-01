@@ -8,11 +8,14 @@ export function mapPlaylistToDto(playlist: any): PlaylistDto {
     playlistType: playlist.playlistType,
     parentId: playlist.parentId,
     itemCount: playlist.itemCount,
-    totalDuration: typeof playlist.totalDuration === 'string' ? parseFloat(playlist.totalDuration) : playlist.totalDuration,
+    totalDuration:
+      typeof playlist.totalDuration === 'string'
+        ? parseFloat(playlist.totalDuration)
+        : playlist.totalDuration,
     isPinned: playlist.pinnedAt !== null,
     artworkPath: playlist.artworkPath,
     createdAt: playlist.createdAt.toISOString(),
-    updatedAt: playlist.updatedAt.toISOString(),
+    updatedAt: playlist.updatedAt.toISOString()
   };
 }
 
@@ -23,6 +26,6 @@ export function mapEntryToDto(row: any): PlaylistEntryDto {
     playlistId: entry.playlistId,
     songId: entry.songId,
     position: entry.position,
-    addedAt: entry.addedAt.toISOString(),
+    addedAt: entry.addedAt.toISOString()
   };
 }

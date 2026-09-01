@@ -30,15 +30,16 @@ import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProvi
 import { DefaultMetadataMergePolicy } from '@main/metadata/providers/policies/DefaultMetadataMergePolicy';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('MetadataEngine with Provider Resolution Pipeline', () => {
   it('should resolve metadata through ProviderExecutor, merge payload, run pipeline, and cache result', async () => {
     const mockSongLoader: IEntityLoader = {
       kind: MetadataKinds.Song,
       load: async (id) => ({ id: Number(id), title: 'Stairway to Heaven', year: 1971 }),
-      loadMany: async (ids) => ids.map((id) => ({ id: Number(id), title: 'Stairway to Heaven', year: 1971 }))
+      loadMany: async (ids) =>
+        ids.map((id) => ({ id: Number(id), title: 'Stairway to Heaven', year: 1971 }))
     };
 
     const repository = new DatabaseMetadataRepository([mockSongLoader]);

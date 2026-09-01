@@ -1,8 +1,6 @@
 import type { BatchTrackData, BatchTrackRow, EditableField } from './types';
 
-/**
- * Splits a comma or semicolon separated string into a trimmed string array.
- */
+/** Splits a comma or semicolon separated string into a trimmed string array. */
 export function parseStringList(val: string): string[] {
   if (!val) return [];
   return val
@@ -11,17 +9,13 @@ export function parseStringList(val: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Formats a string array into a comma-separated display string.
- */
+/** Formats a string array into a comma-separated display string. */
 export function formatStringList(list?: string[]): string {
   if (!list || list.length === 0) return '';
   return list.join(', ');
 }
 
-/**
- * Displays track numbers with zero-padding when appropriate (e.g. 01, 02).
- */
+/** Displays track numbers with zero-padding when appropriate (e.g. 01, 02). */
 export function formatTrackNumber(num?: number, maxTrackNum = 99): string {
   if (num == null || isNaN(num)) return '';
   if (maxTrackNum >= 10 && num < 10 && num >= 0) {
@@ -30,9 +24,7 @@ export function formatTrackNumber(num?: number, maxTrackNum = 99): string {
   return String(num);
 }
 
-/**
- * Validates editable field values and returns an error message if invalid.
- */
+/** Validates editable field values and returns an error message if invalid. */
 export function validateField(field: EditableField, value: unknown): string | null {
   if (value === undefined || value === null || value === '') {
     return null; // Empty values are permissible (allows clearing metadata)
@@ -55,9 +47,7 @@ export function validateField(field: EditableField, value: unknown): string | nu
   return null;
 }
 
-/**
- * Determines if a specific field has been modified between original and draft data.
- */
+/** Determines if a specific field has been modified between original and draft data. */
 export function isFieldDirty(
   field: EditableField,
   original: BatchTrackData,
@@ -74,14 +64,11 @@ export function isFieldDirty(
 }
 
 /**
- * Constructs a canonical SongTags object for persistence via updateSongId3Tags.
- * Safely starts with the original SongTags and overlays ONLY the explicitly dirty fields,
- * guaranteeing zero loss of unedited metadata or rich nested attributes.
+ * Constructs a canonical SongTags object for persistence via updateSongId3Tags. Safely starts with
+ * the original SongTags and overlays ONLY the explicitly dirty fields, guaranteeing zero loss of
+ * unedited metadata or rich nested attributes.
  */
-export function buildCanonicalSongTags(
-  row: BatchTrackRow,
-  rawOriginalTags?: SongTags
-): SongTags {
+export function buildCanonicalSongTags(row: BatchTrackRow, rawOriginalTags?: SongTags): SongTags {
   const { draft, dirtyFields } = row;
 
   const payload: SongTags = {

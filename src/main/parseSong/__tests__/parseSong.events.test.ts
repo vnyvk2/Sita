@@ -1,9 +1,10 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@db/db';
 import { isSongWithPathAvailable, saveSong } from '@db/queries/songs';
 import { dataUpdateEvent } from '@main/main';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { tryToParseSong } from '../parseSong';
 
 vi.mock('fs/promises', () => ({
@@ -97,9 +98,9 @@ describe('parseSong event emission deduplication', () => {
     await tryToParseSong('/music/single-event.mp3');
 
     // Verify songs/newSong was called exactly once with the song ID [555]
-    const songEventCalls = vi.mocked(dataUpdateEvent).mock.calls.filter(
-      (call) => call[0] === 'songs/newSong'
-    );
+    const songEventCalls = vi
+      .mocked(dataUpdateEvent)
+      .mock.calls.filter((call) => call[0] === 'songs/newSong');
 
     expect(songEventCalls).toHaveLength(1);
     expect(songEventCalls[0]).toEqual(['songs/newSong', [555]]);

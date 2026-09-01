@@ -141,10 +141,15 @@ describe('JobScheduler', () => {
       vi.useFakeTimers();
       try {
         let attempts = 0;
-        const job = new MockJob('retry_job', 'interactive', async () => {
-          attempts++;
-          throw new Error(`Failure on attempt ${attempts}`);
-        }, 2); // maxRetries = 2 (3 total attempts: initial + 2 retries)
+        const job = new MockJob(
+          'retry_job',
+          'interactive',
+          async () => {
+            attempts++;
+            throw new Error(`Failure on attempt ${attempts}`);
+          },
+          2
+        ); // maxRetries = 2 (3 total attempts: initial + 2 retries)
 
         const failedSpy = vi.fn();
         scheduler.on('JOB_FAILED', failedSpy);
@@ -173,9 +178,14 @@ describe('JobScheduler', () => {
 
     it('should re-enqueue failed jobs when retryRecoverableJobs is called', async () => {
       let fail = true;
-      const job = new MockJob('recoverable_job', 'interactive', async () => {
-        if (fail) throw new Error('First run fail');
-      }, 0); // maxRetries = 0 -> fails immediately
+      const job = new MockJob(
+        'recoverable_job',
+        'interactive',
+        async () => {
+          if (fail) throw new Error('First run fail');
+        },
+        0
+      ); // maxRetries = 0 -> fails immediately
 
       scheduler.start();
       scheduler.enqueue(job);

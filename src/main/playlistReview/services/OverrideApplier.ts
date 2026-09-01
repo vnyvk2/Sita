@@ -2,12 +2,13 @@ import type { PlaylistImportPlanEntry } from '../../playlistImport/models/Playli
 import type { UserOverride } from '../models/UserOverride';
 
 export class OverrideApplier {
-  applyOverrides(entries: PlaylistImportPlanEntry[], overrides: UserOverride[]): PlaylistImportPlanEntry[] {
+  applyOverrides(
+    entries: PlaylistImportPlanEntry[],
+    overrides: UserOverride[]
+  ): PlaylistImportPlanEntry[] {
     if (overrides.length === 0) return entries;
 
-    const overrideMap = new Map<number, UserOverride>(
-      overrides.map((o) => [o.entryPosition, o])
-    );
+    const overrideMap = new Map<number, UserOverride>(overrides.map((o) => [o.entryPosition, o]));
 
     return entries.map((entry) => {
       const override = overrideMap.get(entry.source.position);
@@ -35,7 +36,14 @@ export class OverrideApplier {
                 status: 'MATCHED',
                 matchType: 'REPAIRED',
                 confidence: 100,
-                diagnostics: [{ strategyName: 'UserOverride', confidence: 100, reason: override.reason ?? 'Selected manually', candidateCount: 1 }]
+                diagnostics: [
+                  {
+                    strategyName: 'UserOverride',
+                    confidence: 100,
+                    reason: override.reason ?? 'Selected manually',
+                    candidateCount: 1
+                  }
+                ]
               }
             }
           }

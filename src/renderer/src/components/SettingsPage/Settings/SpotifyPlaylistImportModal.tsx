@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import Button from '@renderer/components/Button';
+import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
+
 import type { PlaylistImportPlan } from '../../../../../main/playlistImport/models/PlaylistImportPlan';
 import type { SpotifyPlaylistSummary } from '../../../../../main/spotify/api/types';
 
@@ -72,9 +73,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
       setImportSuccess(true);
       void queryClient.invalidateQueries({ queryKey: ['songPlaylists'] });
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to execute Spotify playlist import.'
-      );
+      setError(err instanceof Error ? err.message : 'Failed to execute Spotify playlist import.');
     } finally {
       setIsImporting(false);
     }
@@ -116,7 +115,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                   href={`https://open.spotify.com/playlist/${encodeURIComponent(playlist.id)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#1DB954] hover:underline text-xs flex items-center gap-0.5"
+                  className="flex items-center gap-0.5 text-xs text-[#1DB954] hover:underline"
                   title="Open in Spotify"
                 >
                   <span className="material-icons-round text-xs">open_in_new</span>
@@ -171,7 +170,8 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                 Playlist Successfully Imported!
               </h3>
               <p className="text-font-color-dim dark:text-dark-font-color-dim mt-1 text-sm">
-                Created local playlist &quot;{playlist.name}&quot; with {matchedCount} matched tracks.
+                Created local playlist &quot;{playlist.name}&quot; with {matchedCount} matched
+                tracks.
               </p>
               <div className="mt-6">
                 <Button
@@ -206,8 +206,12 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                     </p>
                     <p className="text-font-color-dim dark:text-dark-font-color-dim text-xs">
                       {plan.statistics.notInLibraryEntries} missing locally
-                      {plan.statistics.invalidEntries > 0 ? ` • ${plan.statistics.invalidEntries} unsupported media` : ''}
-                      {plan.statistics.missingEntries > 0 ? ` • ${plan.statistics.missingEntries} unavailable` : ''}
+                      {plan.statistics.invalidEntries > 0
+                        ? ` • ${plan.statistics.invalidEntries} unsupported media`
+                        : ''}
+                      {plan.statistics.missingEntries > 0
+                        ? ` • ${plan.statistics.missingEntries} unavailable`
+                        : ''}
                     </p>
                   </div>
                 </div>
@@ -264,8 +268,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                     {filteredEntries.map((entry) => {
                       const match = entry.source.trackReference.libraryMatch;
                       const isMatched = entry.decision === 'IMPORT';
-                      const isVariantConflict =
-                        match.diagnostics?.includes('VARIANT_CONFLICT');
+                      const isVariantConflict = match.diagnostics?.includes('VARIANT_CONFLICT');
                       const isLocalFile = match.diagnostics?.includes('SPOTIFY_LOCAL_FILE');
                       const isInvalid = entry.decision === 'SKIP_INVALID';
                       const isMissing = entry.decision === 'SKIP_MISSING';
@@ -274,7 +277,10 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                       let badgeColor = 'bg-red-500/10 text-red-500 border-red-500/30';
 
                       if (isMatched) {
-                        if (match.diagnostics?.includes('ISRC') || match.diagnostics?.includes('MBID')) {
+                        if (
+                          match.diagnostics?.includes('ISRC') ||
+                          match.diagnostics?.includes('MBID')
+                        ) {
                           badgeText = 'Authoritative ID';
                           badgeColor = 'bg-green-500/10 text-green-500 border-green-500/30';
                         } else if (match.diagnostics?.includes('HIGH_CONFIDENCE_METADATA')) {
@@ -303,7 +309,7 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                           key={entry.source.position}
                           className="hover:bg-black/5 dark:hover:bg-white/5"
                         >
-                          <td className="py-2 pr-2 pl-4 text-font-color-dim dark:text-dark-font-color-dim font-mono">
+                          <td className="text-font-color-dim dark:text-dark-font-color-dim py-2 pr-2 pl-4 font-mono">
                             {entry.source.position}
                           </td>
                           <td className="py-2 pr-4 pl-2">
@@ -311,7 +317,8 @@ export const SpotifyPlaylistImportModal: React.FC<SpotifyPlaylistImportModalProp
                               {entry.source.trackReference.resolvedTrack.track.title}
                             </p>
                             <p className="text-font-color-dim dark:text-dark-font-color-dim">
-                              {entry.source.trackReference.resolvedTrack.track.artist || 'Unknown Artist'}
+                              {entry.source.trackReference.resolvedTrack.track.artist ||
+                                'Unknown Artist'}
                             </p>
                           </td>
                           <td className="py-2 pr-4 pl-2">

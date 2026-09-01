@@ -1,17 +1,16 @@
 import type { CollectionId } from '../../../common/collections/types';
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import type { OperationJournalWriter } from './OperationJournalWriter';
-
+import { FolderStatisticsService } from '../engine/FolderStatisticsService';
 /**
- * Executes a CollectionOperation and automatically delegates the result
- * to the OperationJournalWriter.
- * 
- * Important: The OperationExecutor does NOT own the transaction boundary.
- * The transaction is opened by the orchestrating layer (e.g., Playlist Engine)
- * and passed into the executor via the OperationContext.
+ * Executes a CollectionOperation and automatically delegates the result to the
+ * OperationJournalWriter.
+ *
+ * Important: The OperationExecutor does NOT own the transaction boundary. The transaction is opened
+ * by the orchestrating layer (e.g., Playlist Engine) and passed into the executor via the
+ * OperationContext.
  */
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { FolderStatisticsService } from '../engine/FolderStatisticsService';
+import type { OperationJournalWriter } from './OperationJournalWriter';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class OperationExecutor {
   private readonly journalWriter: OperationJournalWriter;
@@ -29,7 +28,9 @@ export class OperationExecutor {
     this.folderStats = folderStats;
   }
 
-  public setOnJournalWritten(listener: (collectionId: CollectionId, sequenceNumber: number) => void) {
+  public setOnJournalWritten(
+    listener: (collectionId: CollectionId, sequenceNumber: number) => void
+  ) {
     this.onJournalWrittenListener = listener;
   }
 

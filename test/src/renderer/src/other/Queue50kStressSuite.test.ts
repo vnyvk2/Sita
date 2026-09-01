@@ -17,14 +17,10 @@ type BenchmarkRecord = {
 const benchmarkResults: BenchmarkRecord[] = [];
 
 /**
- * Runs warmup cycles then measures multiple iterations and returns the median duration in ms.
- * This filters out JIT warm-up spikes, GC pauses, and Windows thread scheduling noise.
+ * Runs warmup cycles then measures multiple iterations and returns the median duration in ms. This
+ * filters out JIT warm-up spikes, GC pauses, and Windows thread scheduling noise.
  */
-function measureMedianMs(
-  fn: () => void,
-  iterations = 5,
-  warmups = 2
-): number {
+function measureMedianMs(fn: () => void, iterations = 5, warmups = 2): number {
   for (let w = 0; w < warmups; w += 1) {
     fn();
   }
@@ -279,7 +275,10 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
 
   describe('4. Active Position Boundary Extremes at 50,000 Scale', () => {
     it('handles removal and playNext when active position is at the very beginning (0)', () => {
-      const q = new PlayerQueue(Array.from({ length: 50000 }, (_, i) => i + 1), 0);
+      const q = new PlayerQueue(
+        Array.from({ length: 50000 }, (_, i) => i + 1),
+        0
+      );
       expect(q.currentSongId).toBe(1);
 
       // playNext with song 50000
@@ -296,7 +295,10 @@ describe('Phase 6: Automated 50k Queue Stress Suite & Performance Instrumentatio
 
     it('handles removal and playNext when active position is at the very end (N - 1)', () => {
       const N = 50000;
-      const q = new PlayerQueue(Array.from({ length: N }, (_, i) => i + 1), N - 1);
+      const q = new PlayerQueue(
+        Array.from({ length: N }, (_, i) => i + 1),
+        N - 1
+      );
       expect(q.currentSongId).toBe(N);
 
       // Remove active song at end

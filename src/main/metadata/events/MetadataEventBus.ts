@@ -13,18 +13,12 @@ export class MetadataEventBus implements IMetadataEventBus {
     return this.emitter.emit(event, ...args);
   }
 
-  public on<K extends keyof MetadataEventMap>(
-    event: K,
-    listener: MetadataEventMap[K]
-  ): this {
+  public on<K extends keyof MetadataEventMap>(event: K, listener: MetadataEventMap[K]): this {
     this.emitter.on(event, listener as (...args: unknown[]) => void);
     return this;
   }
 
-  public off<K extends keyof MetadataEventMap>(
-    event: K,
-    listener: MetadataEventMap[K]
-  ): this {
+  public off<K extends keyof MetadataEventMap>(event: K, listener: MetadataEventMap[K]): this {
     this.emitter.off(event, listener as (...args: unknown[]) => void);
     return this;
   }

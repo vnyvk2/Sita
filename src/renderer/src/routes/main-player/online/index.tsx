@@ -1,13 +1,12 @@
+import Button from '@renderer/components/Button';
+import MainContainer from '@renderer/components/MainContainer';
+import TitleContainer from '@renderer/components/TitleContainer';
+import { downloadsQuery } from '@renderer/queries/downloads';
+import { settingsQuery } from '@renderer/queries/settings';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import MainContainer from '@renderer/components/MainContainer';
-import TitleContainer from '@renderer/components/TitleContainer';
-import Button from '@renderer/components/Button';
-import { downloadsQuery } from '@renderer/queries/downloads';
-import { settingsQuery } from '@renderer/queries/settings';
 
 export const Route = createFileRoute('/main-player/online/')({
   component: OnlinePage
@@ -72,7 +71,7 @@ function DownloadsPanel({ snapshot }: { snapshot: DownloadsSnapshot }) {
   if (activeJobs.length === 0) return null;
 
   return (
-    <div className="mb-6 rounded-xl border border-background-color-2/70 bg-background-color-1/80 p-4 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/80">
+    <div className="border-background-color-2/70 bg-background-color-1/80 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/80 mb-6 rounded-xl border p-4">
       <h4 className="mb-3 text-sm font-semibold">
         {t('onlinePage.activeDownloads', 'Active downloads')}
       </h4>
@@ -136,11 +135,11 @@ function TrackRow({ track, playlist, jobState }: TrackRowProps) {
   };
 
   return (
-    <li className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/60">
+    <li className="hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/60 flex items-center gap-3 rounded-lg px-2 py-2">
       {thumbnail ? (
         <img src={thumbnail} alt="" className="h-11 w-20 rounded object-cover" loading="lazy" />
       ) : (
-        <span className="material-icons-round h-11 w-20 rounded bg-background-color-2 p-4 dark:bg-dark-background-color-2">
+        <span className="material-icons-round bg-background-color-2 dark:bg-dark-background-color-2 h-11 w-20 rounded p-4">
           music_note
         </span>
       )}
@@ -148,7 +147,7 @@ function TrackRow({ track, playlist, jobState }: TrackRowProps) {
         <p className="truncate text-sm" title={track.title}>
           {track.title}
         </p>
-        <p className="truncate text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+        <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
           {track.channel} &bull; {formatDuration(track.duration)}
         </p>
         {error && <p className="truncate text-xs text-rose-500">{error}</p>}
@@ -253,13 +252,13 @@ function OnlinePage() {
   const playlist = playlistMutation.data;
 
   return (
-    <MainContainer className="online-container relative flex h-full flex-col overflow-y-auto px-8 pb-12 pt-6">
+    <MainContainer className="online-container relative flex h-full flex-col overflow-y-auto px-8 pt-6 pb-12">
       <div className="mb-6">
         <TitleContainer
           title={t('onlinePage.title', 'Online')}
-          className="text-2xl font-bold tracking-tight text-font-color-black dark:text-font-color-white"
+          className="text-font-color-black dark:text-font-color-white text-2xl font-bold tracking-tight"
         />
-        <p className="mt-1 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+        <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs">
           {t('onlinePage.subtitle')}
         </p>
       </div>
@@ -274,7 +273,7 @@ function OnlinePage() {
       <DownloadsPanel snapshot={downloadStates} />
 
       {/* Mode tabs */}
-      <div className="mb-4 flex w-max items-center rounded-xl border border-background-color-2/70 bg-background-color-1/90 p-1 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90">
+      <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 mb-4 flex w-max items-center rounded-xl border p-1">
         {(['SEARCH', 'PLAYLIST'] as const).map((tab) => (
           <button
             key={tab}
@@ -282,13 +281,11 @@ function OnlinePage() {
             onClick={() => setMode(tab)}
             className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${
               mode === tab
-                ? 'bg-font-color-highlight text-white shadow-sm dark:bg-dark-font-color-highlight dark:text-dark-background-color-1'
+                ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 text-white shadow-sm'
                 : 'text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white'
             }`}
           >
-            {tab === 'SEARCH'
-              ? t('onlinePage.searchTab')
-              : t('onlinePage.playlistTab')}
+            {tab === 'SEARCH' ? t('onlinePage.searchTab') : t('onlinePage.playlistTab')}
           </button>
         ))}
       </div>
@@ -301,7 +298,7 @@ function OnlinePage() {
               value={searchText}
               onChange={(e) => setSearchText(e.currentTarget.value)}
               placeholder={t('onlinePage.searchPlaceholder')}
-              className="flex-1 rounded-lg border border-background-color-2 bg-background-color-1 px-4 py-2 text-sm outline-none focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1"
+              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
             />
             <Button
               label={searchMutation.isPending ? t('onlinePage.searching') : t('onlinePage.search')}
@@ -322,7 +319,7 @@ function OnlinePage() {
             ))}
           </ul>
           {searchMutation.isSuccess && results.length === 0 && (
-            <p className="mt-8 text-center text-sm text-font-color-dimmed dark:text-dark-font-color-dimmed">
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-8 text-center text-sm">
               {t('onlinePage.noResults')}
             </p>
           )}
@@ -334,10 +331,14 @@ function OnlinePage() {
               value={playlistUrl}
               onChange={(e) => setPlaylistUrl(e.currentTarget.value)}
               placeholder={t('onlinePage.playlistPlaceholder')}
-              className="flex-1 rounded-lg border border-background-color-2 bg-background-color-1 px-4 py-2 text-sm outline-none focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1"
+              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
             />
             <Button
-              label={playlistMutation.isPending ? t('onlinePage.loadingPlaylist') : t('onlinePage.loadPlaylist')}
+              label={
+                playlistMutation.isPending
+                  ? t('onlinePage.loadingPlaylist')
+                  : t('onlinePage.loadPlaylist')
+              }
               iconName="link"
               iconClassName="material-icons-round-outlined"
               clickHandler={() => undefined}
@@ -346,11 +347,11 @@ function OnlinePage() {
           </form>
 
           {playlist && (
-            <div className="rounded-xl border border-background-color-2/70 bg-background-color-1/60 p-4 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/60">
+            <div className="border-background-color-2/70 bg-background-color-1/60 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/60 rounded-xl border p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{playlist.title}</p>
-                  <p className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                  <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                     {t('onlinePage.songsCount', { count: playlist.entries.length })}
                     {playlist.excludedCount > 0 &&
                       ` • ${t('onlinePage.excludedCount', { count: playlist.excludedCount })}`}

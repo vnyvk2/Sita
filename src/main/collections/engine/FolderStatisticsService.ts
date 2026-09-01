@@ -1,7 +1,8 @@
-import { HierarchyService } from './HierarchyService';
+import { eq, sql } from 'drizzle-orm';
+
 import { db } from '../../db/db';
 import { playlists } from '../../db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { HierarchyService } from './HierarchyService';
 
 export class FolderStatisticsService {
   private readonly hierarchyService: HierarchyService;
@@ -11,9 +12,8 @@ export class FolderStatisticsService {
   }
 
   /**
-   * Propagates stat deltas up the ancestor chain.
-   * This ensures folders incrementally track the total item count and duration 
-   * of all their descendant playlists.
+   * Propagates stat deltas up the ancestor chain. This ensures folders incrementally track the
+   * total item count and duration of all their descendant playlists.
    */
   public async propagateStats(
     playlistId: number,

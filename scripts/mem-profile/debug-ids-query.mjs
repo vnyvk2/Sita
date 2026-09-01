@@ -2,7 +2,9 @@ import { PGlite } from '@electric-sql/pglite';
 import { citext } from '@electric-sql/pglite/contrib/citext';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 
-const db = await PGlite.create(process.argv[2] + '/nora.pglite.db', { extensions: { pg_trgm, citext } });
+const db = await PGlite.create(process.argv[2] + '/nora.pglite.db', {
+  extensions: { pg_trgm, citext }
+});
 
 const t0 = Date.now();
 const r = await db.query(

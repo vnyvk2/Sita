@@ -1,11 +1,11 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 
 import * as schema from '@main/db/schema';
 import { musicFolders, songs } from '@main/db/schema';
+import { migrate } from 'drizzle-orm/pglite/migrator';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock DB with in-memory PGlite
 vi.mock('@main/db/db', async () => {
@@ -31,7 +31,6 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
   let reconciler: LibraryReconciler;
 
   beforeAll(async () => {
-
     reconciler = new LibraryReconciler();
   });
 
@@ -49,10 +48,13 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
 
   it('Scenario A: Global walk failure with existing DB songs must result in ZERO removals and ZERO DB deletions', async () => {
     // 1. Setup scan root on disk
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: 'RootFolder'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: 'RootFolder'
+      })
+      .returning();
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
     // 2. Pre-populate DB with 3 existing songs
@@ -61,9 +63,30 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
     const song3Path = path.join(tempDir, 'Track3.wav');
 
     await db.insert(songs).values([
-      { title: 'Track 1', duration: 180, path: song1Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
-      { title: 'Track 2', duration: 200, path: song2Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() },
-      { title: 'Track 3', duration: 220, path: song3Path, folderId: rootFolder.id, fileCreatedAt: new Date(), fileModifiedAt: new Date() }
+      {
+        title: 'Track 1',
+        duration: 180,
+        path: song1Path,
+        folderId: rootFolder.id,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      },
+      {
+        title: 'Track 2',
+        duration: 200,
+        path: song2Path,
+        folderId: rootFolder.id,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      },
+      {
+        title: 'Track 3',
+        duration: 220,
+        path: song3Path,
+        folderId: rootFolder.id,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      }
     ]);
 
     const initialDbSongs = await db.select().from(songs);
@@ -101,10 +124,13 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
 
   it('Scenario B: Partial subtree failure protects songs in failed subtree while reconciling other additions', async () => {
     // 1. Setup scan root
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: 'RootFolder'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: 'RootFolder'
+      })
+      .returning();
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
     const rockDir = path.join(tempDir, 'Rock');
@@ -170,10 +196,13 @@ describe('P0 FORENSIC INTEGRATION: Mass-Deletion Invariant Under Real Pipeline',
   });
 
   it('Scenario C: Legitimate empty directory scan STILL performs removals (walkFailed: false, no failed subtrees)', async () => {
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: 'RootFolder'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: 'RootFolder'
+      })
+      .returning();
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
     // DB has a song that was deleted from disk

@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import {
   toCanonicalFromDiscogs,
   toCanonicalFromMusicBrainz,
   toCanonicalFromSong,
   toCanonicalFromSpotifyTrack
 } from '@main/metadata/identity';
+import { describe, expect, it } from 'vitest';
 
 describe('Canonical Track Identity Adapters', () => {
   it('should adapt local Nora SongData cleanly', () => {

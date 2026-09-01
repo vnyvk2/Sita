@@ -7,13 +7,12 @@ import { metadataPendingWrites } from '../../db/schema';
 /**
  * Durable storage for deferred metadata file writes.
  *
- * Lifecycle: a write is blocked (song currently playing) -> durable work item
- * persisted -> retried on flush triggers -> row DELETED on success.
+ * Lifecycle: a write is blocked (song currently playing) -> durable work item persisted -> retried
+ * on flush triggers -> row DELETED on success.
  *
- * Coalescing invariant: one row per song path. The in-memory queue performs
- * field-level merging before persisting; the durable layer stores the full
- * merged TagData so an item is self-contained and idempotently replayable
- * after restart.
+ * Coalescing invariant: one row per song path. The in-memory queue performs field-level merging
+ * before persisting; the durable layer stores the full merged TagData so an item is self-contained
+ * and idempotently replayable after restart.
  */
 export class MetadataPendingWritesRepository {
   private readonly database: typeof db;
@@ -23,11 +22,10 @@ export class MetadataPendingWritesRepository {
   }
 
   /**
-   * Inserts or replaces the pending item for a song path (latest wins).
-   * When `trx` is provided, the durable deferral joins the caller's
-   * transaction so the pending write commits atomically WITH the DB mutation
-   * it mirrors (P0 #1) - a rejected insert now fails the whole apply instead
-   * of silently losing the deferred file write.
+   * Inserts or replaces the pending item for a song path (latest wins). When `trx` is provided, the
+   * durable deferral joins the caller's transaction so the pending write commits atomically WITH
+   * the DB mutation it mirrors (P0 #1) - a rejected insert now fails the whole apply instead of
+   * silently losing the deferred file write.
    */
   public async upsert(
     item: {
@@ -56,7 +54,11 @@ export class MetadataPendingWritesRepository {
       });
   }
 
-  public async listAll(trx: DB | DBTransaction = this.database): Promise<Array<{ id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }>> {
+  public async listAll(
+    trx: DB | DBTransaction = this.database
+  ): Promise<
+    Array<{ id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }>
+  > {
     const rows = await trx.select().from(metadataPendingWrites);
     return rows.map((r) => ({
       id: r.id,
@@ -66,7 +68,10 @@ export class MetadataPendingWritesRepository {
     }));
   }
 
-  public async deleteBySongPath(songPath: string, trx: DB | DBTransaction = this.database): Promise<void> {
+  public async deleteBySongPath(
+    songPath: string,
+    trx: DB | DBTransaction = this.database
+  ): Promise<void> {
     await trx.delete(metadataPendingWrites).where(eq(metadataPendingWrites.songPath, songPath));
   }
 

@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Binary search to find the active lyric index in O(log N) time
- */
+/** Binary search to find the active lyric index in O(log N) time */
 function findActiveLyricIndex(
   parsedLyrics: ParsedLyricsLine[],
   pos: number,
@@ -33,14 +31,13 @@ function findActiveLyricIndex(
 }
 
 /**
- * Custom hook to track the active lyric line index using a single global event listener.
- * Employs O(1) monotonic active line tracking during linear playback with O(log N) binary
- * search fallback on seeks and jumps.
+ * Custom hook to track the active lyric line index using a single global event listener. Employs
+ * O(1) monotonic active line tracking during linear playback with O(log N) binary search fallback
+ * on seeks and jumps.
  *
- * Returns the index of the currently active line:
- * - `-1` for the intro placeholder line ('•••') before the first timestamp
- * - `0..N-1` for parsedLyrics[i]
- * - `null` when no lyric line is active (e.g. between distant lines or after the song ends)
+ * Returns the index of the currently active line: - `-1` for the intro placeholder line ('•••')
+ * before the first timestamp - `0..N-1` for parsedLyrics[i] - `null` when no lyric line is active
+ * (e.g. between distant lines or after the song ends)
  */
 export function useActiveLyricIndex(lyrics?: SongLyrics | null): number | null {
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);

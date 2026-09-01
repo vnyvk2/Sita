@@ -1,16 +1,15 @@
 import { db } from '@main/db/db';
 import { linkArtworkToPlaylist, saveArtworks } from '@main/db/queries/artworks';
+import { artworksPlaylists } from '@main/db/schema';
 import { generateLocalArtworkBuffer } from '@main/updateSong/updateSongId3Tags';
+// (GC job will be dispatched by Maintenance orchestrator)
+import { eq } from 'drizzle-orm';
 
 import { resetArtworkCache } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent } from '../main';
 import { processArtworkFiles } from '../other/artworks';
-
 import { libraryScheduler } from '../workers/jobScheduler';
-// (GC job will be dispatched by Maintenance orchestrator)
-import { eq } from 'drizzle-orm';
-import { artworksPlaylists } from '@main/db/schema';
 
 const addArtworkToAPlaylist = async (playlistId: number, artworkPath: string) => {
   try {
@@ -31,9 +30,9 @@ const addArtworkToAPlaylist = async (playlistId: number, artworkPath: string) =>
         await linkArtworkToPlaylist(playlistId, artworks[0].id, trx);
       }
     });
-    
+
     libraryScheduler.requestMaintenance();
-    
+
     resetArtworkCache('playlistArtworks');
     dataUpdateEvent('playlists');
 

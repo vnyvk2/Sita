@@ -1,12 +1,15 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { createCollectionId } from '../../../common/collections/id';
-import { playlistEntries } from '../../db/schema';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { inArray } from 'drizzle-orm';
 
+import { createCollectionId } from '../../../common/collections/id';
 import type { MergePlaylistsInput } from '../../../common/collections/operationInputs';
+import { playlistEntries } from '../../db/schema';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
-export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput, { deltaCount: number; deltaDuration: number }> {
+export class MergePlaylistsOp implements CollectionOperation<
+  MergePlaylistsInput,
+  { deltaCount: number; deltaDuration: number }
+> {
   private repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository = new PlaylistRepository()) {
@@ -21,11 +24,11 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
 
     // 1. Get current items in target to calculate starting position and for deduplication
     const targetEntries = await this.repository.getEntries(targetPlaylistId, {}, ctx.trx);
-    const targetSongIds = new Set(targetEntries.map(e => e.entry.songId));
-    
+    const targetSongIds = new Set(targetEntries.map((e) => e.entry.songId));
+
     let nextPosition = 0;
     if (targetEntries.length > 0) {
-      nextPosition = Math.max(...targetEntries.map(e => e.entry.position)) + 1;
+      nextPosition = Math.max(...targetEntries.map((e) => e.entry.position)) + 1;
     }
 
     // 2. Fetch all entries from all sources
@@ -64,9 +67,9 @@ export class MergePlaylistsOp implements CollectionOperation<MergePlaylistsInput
         .insert(playlistEntries)
         .values(entriesToInsert)
         .returning({ id: playlistEntries.id });
-        
-      insertedEntryIds.push(...inserted.map(i => i.id));
-      
+
+      insertedEntryIds.push(...inserted.map((i) => i.id));
+
       mergeDeltas = await this.repository.computeStatisticsDelta(Array.from(newSongIds), ctx.trx);
     }
 

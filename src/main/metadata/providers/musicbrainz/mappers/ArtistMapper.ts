@@ -1,6 +1,7 @@
-import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
+import { ProviderResult } from '@main/metadata/models/ProviderResult';
+
 import type { MusicBrainzArtistDto } from '../dto/ArtistDto';
 
 export class MusicBrainzArtistMapper {

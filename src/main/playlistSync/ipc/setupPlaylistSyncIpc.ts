@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron';
-import type { PlaylistSyncWorkflow } from '../workflow/PlaylistSyncWorkflow';
+
 import type { PlaylistLink } from '../models/PlaylistLink';
 import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
+import type { PlaylistSyncWorkflow } from '../workflow/PlaylistSyncWorkflow';
 
 export function setupPlaylistSyncIpc(workflow: PlaylistSyncWorkflow): void {
   ipcMain.handle(
@@ -11,10 +12,7 @@ export function setupPlaylistSyncIpc(workflow: PlaylistSyncWorkflow): void {
     }
   );
 
-  ipcMain.handle(
-    'playlistSync:execute',
-    async (_event, plan: PlaylistSyncPlan) => {
-      return await workflow.executeSyncPlan(plan);
-    }
-  );
+  ipcMain.handle('playlistSync:execute', async (_event, plan: PlaylistSyncPlan) => {
+    return await workflow.executeSyncPlan(plan);
+  });
 }

@@ -1,11 +1,10 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataCapabilities } from '@main/metadata/common/types';
 import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
 import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataProviderRegistry', () => {
   it('should register and query providers by capability', () => {

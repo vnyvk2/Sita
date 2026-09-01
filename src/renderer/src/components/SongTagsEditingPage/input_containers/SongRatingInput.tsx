@@ -40,25 +40,22 @@ const SongRatingInput = (props: Props) => {
 
   return (
     <div className="tag-input flex max-w-2xl min-w-[10rem] flex-col">
-      <div className="mb-2 flex items-center justify-between mr-[10%]">
-        <label className="font-medium text-sm text-font-color-black dark:text-font-color-white">
+      <div className="mr-[10%] mb-2 flex items-center justify-between">
+        <label className="text-font-color-black dark:text-font-color-white text-sm font-medium">
           {t('songTagsEditingPage.rating')}
         </label>
         {onReset && (
           <button
             type="button"
             onClick={onReset}
-            className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight hover:underline opacity-80 transition-opacity hover:opacity-100"
+            className="text-font-color-highlight dark:text-dark-font-color-highlight text-xs opacity-80 transition-opacity hover:underline hover:opacity-100"
           >
             {t('resetTagsToDefaultPrompt.resetToDefault')}
           </button>
         )}
       </div>
 
-      <div
-        className="flex items-center space-x-2 py-1"
-        onMouseLeave={() => setHoverRating(null)}
-      >
+      <div className="flex items-center space-x-2 py-1" onMouseLeave={() => setHoverRating(null)}>
         {[1, 2, 3, 4, 5].map((starIndex) => {
           const icon = renderStarIcon(starIndex);
           const isFilled = isStarFilled(starIndex);
@@ -66,18 +63,18 @@ const SongRatingInput = (props: Props) => {
           return (
             <div
               key={starIndex}
-              className="relative inline-flex items-center justify-center cursor-pointer select-none group transition-transform hover:scale-110"
+              className="group relative inline-flex cursor-pointer items-center justify-center transition-transform select-none hover:scale-110"
               title={`${starIndex - 0.5} - ${starIndex} Stars`}
             >
               {/* Left half hit target */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-1/2 z-10"
+                className="absolute top-0 bottom-0 left-0 z-10 w-1/2"
                 onMouseEnter={() => setHoverRating(starIndex - 0.5)}
                 onClick={() => handleRatingClick(starIndex - 0.5)}
               />
               {/* Right half hit target */}
               <div
-                className="absolute right-0 top-0 bottom-0 w-1/2 z-10"
+                className="absolute top-0 right-0 bottom-0 z-10 w-1/2"
                 onMouseEnter={() => setHoverRating(starIndex)}
                 onClick={() => handleRatingClick(starIndex)}
               />
@@ -86,8 +83,8 @@ const SongRatingInput = (props: Props) => {
               <span
                 className={`material-icons-round text-3xl transition-colors duration-150 ${
                   isFilled
-                    ? 'text-amber-400 dark:text-yellow-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]'
-                    : 'text-slate-400/60 dark:text-zinc-500/50 hover:text-slate-400 dark:hover:text-zinc-400'
+                    ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] dark:text-yellow-400'
+                    : 'text-slate-400/60 hover:text-slate-400 dark:text-zinc-500/50 dark:hover:text-zinc-400'
                 }`}
               >
                 {icon}
@@ -96,7 +93,7 @@ const SongRatingInput = (props: Props) => {
           );
         })}
 
-        <span className="ml-3 text-sm font-medium opacity-80 min-w-[3.5rem]">
+        <span className="ml-3 min-w-[3.5rem] text-sm font-medium opacity-80">
           {activeRating > 0 ? `${activeRating.toFixed(1).replace(/\.0$/, '')} / 5` : 'Unrated'}
         </span>
       </div>

@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataFieldDefinition } from '@main/metadata/models/MetadataFieldDefinition';
 import { MetadataFieldRegistry } from '@main/metadata/registries/MetadataFieldRegistry';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataFieldRegistry', () => {
   it('should initialize with default field definitions', () => {

@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type {
-  DriftState,
-  SpotifyPlaylistLinkDTO,
-  SpotifySyncDriftStatus
-} from '../api/types';
+import type { DriftState, SpotifyPlaylistLinkDTO, SpotifySyncDriftStatus } from '../api/types';
 
 export interface EntryHashInput {
   position: number;
@@ -14,8 +10,9 @@ export interface EntryHashInput {
 
 export class SpotifyPlaylistSyncDriftDetector {
   /**
-   * Deterministically computes a SHA-256 hash representing the exact ordered sequence of songs
-   * and their authoritative identity (ISRC). Immune to cosmetic playlist row updates (name/description/cover).
+   * Deterministically computes a SHA-256 hash representing the exact ordered sequence of songs and
+   * their authoritative identity (ISRC). Immune to cosmetic playlist row updates
+   * (name/description/cover).
    */
   public static computeEntriesHash(entries: EntryHashInput[]): string {
     const canonicalPayload = entries.map((entry) => [
@@ -24,17 +21,17 @@ export class SpotifyPlaylistSyncDriftDetector {
       entry.isrc ? entry.isrc.trim().toUpperCase() : null
     ]);
 
-    return createHash('sha256')
-      .update(JSON.stringify(canonicalPayload))
-      .digest('hex');
+    return createHash('sha256').update(JSON.stringify(canonicalPayload)).digest('hex');
   }
 
   /**
    * Evaluates drift between local Nora playlist state and remote Spotify playlist snapshot.
    * Enforces a fail-closed state machine for PARTIAL_FAILURE:
-   * - Only FINALIZATION with a non-empty, trustworthy baseline snapshot and hash produces IN_SYNC_WITH_UNRESOLVED
-   *   (or standard drift states if modified post-baseline).
-   * - All other mutation/verification failure stages (or missing/unknown stages/baselines) fail closed to NEEDS_RECOVERY.
+   *
+   * - Only FINALIZATION with a non-empty, trustworthy baseline snapshot and hash produces
+   *   IN_SYNC_WITH_UNRESOLVED (or standard drift states if modified post-baseline).
+   * - All other mutation/verification failure stages (or missing/unknown stages/baselines) fail
+   *   closed to NEEDS_RECOVERY.
    */
   public static evaluateDrift(params: {
     playlistId: number;

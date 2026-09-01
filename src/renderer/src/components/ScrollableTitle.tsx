@@ -96,7 +96,7 @@ const ScrollableTitle = ({ title, className = '', speed = 40 }: Props) => {
       <span
         ref={measureRef}
         aria-hidden="true"
-        className="pointer-events-none invisible absolute top-0 left-0 max-w-none w-max whitespace-nowrap select-none"
+        className="pointer-events-none invisible absolute top-0 left-0 w-max max-w-none whitespace-nowrap select-none"
       >
         {title}
       </span>

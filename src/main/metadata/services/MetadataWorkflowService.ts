@@ -1,4 +1,13 @@
 import { EventEmitter } from 'events';
+
+import type { ApplyFieldId } from '../apply/contract';
+import type { MetadataApplyOrchestrator } from '../apply/MetadataApplyOrchestrator';
+import type { ProgressEventPayload } from '../models/AlbumTagPreview';
+import type { MetadataOperationManager } from '../operations/MetadataOperationManager';
+import type {
+  MetadataTransactionManager,
+  TransactionExecutionOptions
+} from '../transactions/MetadataTransactionManager';
 import type {
   MetadataWorkflow,
   WorkflowCandidate,
@@ -6,12 +15,7 @@ import type {
   WorkflowType
 } from '../workflows/MetadataWorkflow';
 import type { LocalSongInput } from './AlbumMetadataService';
-import type { MetadataTransactionManager, TransactionExecutionOptions } from '../transactions/MetadataTransactionManager';
-import type { MetadataOperationManager } from '../operations/MetadataOperationManager';
-import type { ProgressEventPayload } from '../models/AlbumTagPreview';
 import type { ApplyResult } from './MetadataApplyService';
-import type { MetadataApplyOrchestrator } from '../apply/MetadataApplyOrchestrator';
-import type { ApplyFieldId } from '../apply/contract';
 
 export interface MetadataWorkflowServiceOptions {
   transactionManager: MetadataTransactionManager;
@@ -65,10 +69,20 @@ export class MetadataWorkflowService extends EventEmitter {
   ): Promise<WorkflowCandidate[]> {
     const signal = this.createAbortSignal(operationId);
     const workflow = this.getWorkflow(workflowType);
-    this.emitProgress('search', `Searching metadata for ${workflow.displayName}...`, 10, operationId);
+    this.emitProgress(
+      'search',
+      `Searching metadata for ${workflow.displayName}...`,
+      10,
+      operationId
+    );
 
     const candidates = await workflow.search(query, signal);
-    this.emitProgress('search_completed', `Found ${candidates.length} candidates.`, 40, operationId);
+    this.emitProgress(
+      'search_completed',
+      `Found ${candidates.length} candidates.`,
+      40,
+      operationId
+    );
     return candidates;
   }
 
@@ -81,7 +95,12 @@ export class MetadataWorkflowService extends EventEmitter {
   ): Promise<WorkflowPreview> {
     const signal = this.createAbortSignal(operationId);
     const workflow = this.getWorkflow(workflowType);
-    this.emitProgress('diffing', `Building preview diffs for ${workflow.displayName}...`, 60, operationId);
+    this.emitProgress(
+      'diffing',
+      `Building preview diffs for ${workflow.displayName}...`,
+      60,
+      operationId
+    );
 
     const preview = await workflow.buildPreview(localSongs, candidateId, providerId as any, signal);
     this.emitProgress('diff_completed', 'Preview diff generated.', 80, operationId);
@@ -109,7 +128,12 @@ export class MetadataWorkflowService extends EventEmitter {
   ): Promise<ApplyResult> {
     const signal = this.createAbortSignal(operationId);
     const workflow = this.getWorkflow(workflowType);
-    this.emitProgress('applying', `Applying updates for ${workflow.displayName}...`, 85, operationId);
+    this.emitProgress(
+      'applying',
+      `Applying updates for ${workflow.displayName}...`,
+      85,
+      operationId
+    );
 
     // 2c P2: workflow mutations flow through the single authoritative
     // orchestrator. Legacy TransactionManager remains for direct engine tests
@@ -149,7 +173,12 @@ export class MetadataWorkflowService extends EventEmitter {
     void signal;
 
     if (result.success) {
-      this.emitProgress('completed', `Successfully updated ${result.updatedCount} items.`, 100, operationId);
+      this.emitProgress(
+        'completed',
+        `Successfully updated ${result.updatedCount} items.`,
+        100,
+        operationId
+      );
     } else {
       this.emitProgress('failed', `Apply failed: ${result.errors.join('; ')}`, 100, operationId);
     }
@@ -157,11 +186,18 @@ export class MetadataWorkflowService extends EventEmitter {
     return result;
   }
 
-  public async undoLastAutoTag(_operationId = 'default'): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
+  public async undoLastAutoTag(
+    _operationId = 'default'
+  ): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
     return this.transactionManager.rollbackLastTransaction();
   }
 
-  private emitProgress(stage: string, message: string, progress: number, operationId: string): void {
+  private emitProgress(
+    stage: string,
+    message: string,
+    progress: number,
+    operationId: string
+  ): void {
     const payload: ProgressEventPayload = {
       stage: stage as any,
       message,

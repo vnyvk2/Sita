@@ -1,9 +1,10 @@
 import { dirname, isAbsolute, normalize, resolve } from 'path';
 import { fileURLToPath } from 'url';
+
 import type { ImportedPlaylist } from '../models/ImportedPlaylist';
+import type { PathResolutionResult } from '../models/PathResolutionResult';
 import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
 import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
-import type { PathResolutionResult } from '../models/PathResolutionResult';
 
 export class PlaylistPathResolver {
   resolvePlaylist(playlist: ImportedPlaylist, playlistFilePath: string): ResolvedPlaylist {
@@ -42,7 +43,11 @@ export class PlaylistPathResolver {
     const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(candidatePath);
 
     // Check for non-filesystem custom schemes (e.g. spotify:track:..., http://...)
-    if (!isWindowsDrive && /^[a-z0-9+-.]+:/i.test(candidatePath) && !candidatePath.toLowerCase().startsWith('file://')) {
+    if (
+      !isWindowsDrive &&
+      /^[a-z0-9+-.]+:/i.test(candidatePath) &&
+      !candidatePath.toLowerCase().startsWith('file://')
+    ) {
       return {
         originalReference,
         resolutionStatus: 'UNRESOLVED',

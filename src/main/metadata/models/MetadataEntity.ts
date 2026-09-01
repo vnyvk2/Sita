@@ -1,7 +1,6 @@
 import type { FieldId } from './MetadataFieldId';
 import type { MetadataIdentity } from './MetadataIdentity';
 import type { MetadataKind } from './MetadataKind';
-
 import { MetadataSnapshot } from './MetadataSnapshot';
 import { MetadataValue } from './MetadataValue';
 

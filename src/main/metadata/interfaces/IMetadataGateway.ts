@@ -23,8 +23,5 @@ export interface IMetadataGateway {
     execContext?: ProviderExecutionContext
   ): Promise<MetadataEntity[]>;
 
-  preload(
-    identities: MetadataIdentity[],
-    execContext?: ProviderExecutionContext
-  ): void;
+  preload(identities: MetadataIdentity[], execContext?: ProviderExecutionContext): void;
 }

@@ -1,7 +1,7 @@
+import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import type { PlaylistLink } from '../models/PlaylistLink';
 import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
 import type { SyncOperation } from '../models/SyncOperation';
-import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 
 export class PlaylistSyncPlanner {
   createSyncPlan(
@@ -14,7 +14,10 @@ export class PlaylistSyncPlanner {
     // Extract planned song IDs to import from target import plan
     const targetSongIds: number[] = [];
     for (const entry of targetImportPlan.entries) {
-      if (entry.decision === 'IMPORT' && entry.source.trackReference.libraryMatch.matchedSongId !== undefined) {
+      if (
+        entry.decision === 'IMPORT' &&
+        entry.source.trackReference.libraryMatch.matchedSongId !== undefined
+      ) {
         targetSongIds.push(entry.source.trackReference.libraryMatch.matchedSongId);
       }
     }

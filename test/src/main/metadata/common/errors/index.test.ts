@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-
 import {
   MetadataConflictError,
   MetadataError,
@@ -7,6 +5,7 @@ import {
   MetadataProviderError,
   MetadataValidationError
 } from '@main/metadata/common/errors';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataErrors', () => {
   it('should construct MetadataError correctly', () => {

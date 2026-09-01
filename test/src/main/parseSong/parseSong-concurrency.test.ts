@@ -511,6 +511,4 @@ describe('parseSong Concurrency and State Management', () => {
       expect(isSongWithPathAvailable).toHaveBeenCalled();
     });
   });
-
-
 });

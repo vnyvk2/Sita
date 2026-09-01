@@ -160,7 +160,7 @@ class MemProfiler {
       let jsonBytes = 0;
       let count: number | undefined;
       try {
-        jsonBytes = result === undefined ? 0 : JSON.stringify(result)?.length ?? 0;
+        jsonBytes = result === undefined ? 0 : (JSON.stringify(result)?.length ?? 0);
       } catch {
         jsonBytes = -1;
       }
@@ -310,7 +310,9 @@ class MemProfiler {
     await this.snapshotStep('home-baseline', wc);
 
     const settleStart = Date.now();
-    await wc.executeJavaScript(`location.hash = '#/main-player/songs'`, false).catch(() => undefined);
+    await wc
+      .executeJavaScript(`location.hash = '#/main-player/songs'`, false)
+      .catch(() => undefined);
     const songsSettleMs = await this.waitForQueriesSettled(wc, 20000);
     await sleep(2000);
     await this.snapshotStep('songs-loaded', wc, {
@@ -324,7 +326,12 @@ class MemProfiler {
       await this.snapshotStep('post-golden-master', wc);
     }
 
-    const likeProbe = await evalInRenderer<{ id: number; ms: number; isFavorite?: boolean; error?: string }>(
+    const likeProbe = await evalInRenderer<{
+      id: number;
+      ms: number;
+      isFavorite?: boolean;
+      error?: string;
+    }>(
       wc,
       `(async function(){
         try {
@@ -354,7 +361,9 @@ class MemProfiler {
     await this.snapshotStep('post-full-refetch', wc, { refetchMs, refetchResult });
 
     const albumsNavT0 = Date.now();
-    await wc.executeJavaScript(`location.hash = '#/main-player/albums'`, false).catch(() => undefined);
+    await wc
+      .executeJavaScript(`location.hash = '#/main-player/albums'`, false)
+      .catch(() => undefined);
     const albumsSettleMs = await this.waitForQueriesSettled(wc, 20000);
     await sleep(2000);
     await this.snapshotStep('albums-loaded', wc, {
@@ -363,7 +372,9 @@ class MemProfiler {
     });
 
     const queueNavT0 = Date.now();
-    await wc.executeJavaScript(`location.hash = '#/main-player/queue'`, false).catch(() => undefined);
+    await wc
+      .executeJavaScript(`location.hash = '#/main-player/queue'`, false)
+      .catch(() => undefined);
     const queueSettleMs = await this.waitForQueriesSettled(wc, 15000);
     await sleep(2000);
     await this.snapshotStep('queue-loaded', wc, {
@@ -375,7 +386,11 @@ class MemProfiler {
       wc,
       `(async function(){ var t0 = performance.now(); try { var r = await window.api.audioLibraryControls.getAllSongs('aToZ', undefined, {start:0,end:0}); return { ms: Math.round(performance.now() - t0), count: r.data.length }; } catch(e) { return { ms: Math.round(performance.now()-t0), error: String(e), count: -1 }; } })()`
     );
-    writeJsonl('scenario.jsonl', { kind: 'direct-getAllSongs-probe', probe: directProbe, ts: Date.now() });
+    writeJsonl('scenario.jsonl', {
+      kind: 'direct-getAllSongs-probe',
+      probe: directProbe,
+      ts: Date.now()
+    });
 
     const p1Probe = await evalInRenderer<{
       idsMs: number;
@@ -420,7 +435,9 @@ class MemProfiler {
     if (p1Probe) p1Probe.durationsMs = 0;
     writeJsonl('scenario.jsonl', { kind: 'p1-endpoints-probe', probe: p1Probe, ts: Date.now() });
 
-    await wc.executeJavaScript(`location.hash = '#/main-player/home'`, false).catch(() => undefined);
+    await wc
+      .executeJavaScript(`location.hash = '#/main-player/home'`, false)
+      .catch(() => undefined);
     await sleep(4000);
     await this.snapshotStep('return-home', wc);
 

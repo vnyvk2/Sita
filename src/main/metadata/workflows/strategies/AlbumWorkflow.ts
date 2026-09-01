@@ -1,3 +1,7 @@
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { AlbumMetadata, MetadataProviderId } from '../../models/RecordingMetadata';
+import type { AlbumMetadataService } from '../../services/AlbumMetadataService';
+import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type {
   WorkflowCandidate,
   WorkflowMatch,
@@ -6,10 +10,6 @@ import type {
   WorkflowType
 } from '../MetadataWorkflow';
 import { BaseMetadataWorkflow } from '../MetadataWorkflow';
-import type { AlbumMetadataService } from '../../services/AlbumMetadataService';
-import type { LocalSongInput } from '../../services/AlbumMetadataService';
-import type { AlbumMetadata, MetadataProviderId } from '../../models/RecordingMetadata';
-import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class AlbumWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'album';
@@ -40,11 +40,9 @@ export class AlbumWorkflow extends BaseMetadataWorkflow {
     const searchAlbum = query.album || query.title || '';
     if (!searchAlbum) return [];
 
-    const albums = await this.albumMetadataService.searchAlbums(
-      searchAlbum,
-      query.artist,
-      { limit: query.limit ?? 10 }
-    );
+    const albums = await this.albumMetadataService.searchAlbums(searchAlbum, query.artist, {
+      limit: query.limit ?? 10
+    });
 
     return albums.map((alb: AlbumMetadata) => ({
       id: alb.releaseId || alb.title,
@@ -66,7 +64,9 @@ export class AlbumWorkflow extends BaseMetadataWorkflow {
   ): Promise<MetadataPreview> {
     const release = await this.albumMetadataService.resolveRelease(candidateId, providerId);
     if (!release) {
-      throw new Error(`[AlbumWorkflow] Release ${candidateId} could not be resolved from provider ${providerId}`);
+      throw new Error(
+        `[AlbumWorkflow] Release ${candidateId} could not be resolved from provider ${providerId}`
+      );
     }
 
     const matches: WorkflowMatch[] = localSongs.map((local, idx) => {
@@ -90,10 +90,34 @@ export class AlbumWorkflow extends BaseMetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'title', oldVal: local.title, newVal: suggestedTitle, providerId, confidenceScore: 0.9 }),
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'artist', oldVal: local.artist, newVal: suggestedArtist, providerId, confidenceScore: 0.9 }),
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'album', oldVal: local.album, newVal: suggestedAlbum, providerId, confidenceScore: 0.9 }),
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'year', oldVal: local.year, newVal: suggestedYear, providerId, confidenceScore: 0.9 })
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'title',
+            oldVal: local.title,
+            newVal: suggestedTitle,
+            providerId,
+            confidenceScore: 0.9
+          }),
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'artist',
+            oldVal: local.artist,
+            newVal: suggestedArtist,
+            providerId,
+            confidenceScore: 0.9
+          }),
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'album',
+            oldVal: local.album,
+            newVal: suggestedAlbum,
+            providerId,
+            confidenceScore: 0.9
+          }),
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'year',
+            oldVal: local.year,
+            newVal: suggestedYear,
+            providerId,
+            confidenceScore: 0.9
+          })
         ]
       };
     });

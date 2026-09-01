@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { processSongsWithWorkerPool, type SongPoolInput } from '../songWorkerPool';
 import { tryToParseSong } from '../../parseSong/parseSong';
-import { libraryScheduler } from '../../workers/jobScheduler';
 import { ArtworkJob } from '../../workers/jobs/artworkJob';
 import { LyricsJob } from '../../workers/jobs/lyricsJob';
 import { ReplayGainJob } from '../../workers/jobs/replayGainJob';
 import { WaveformJob } from '../../workers/jobs/waveformJob';
+import { libraryScheduler } from '../../workers/jobScheduler';
+import { processSongsWithWorkerPool, type SongPoolInput } from '../songWorkerPool';
 
 vi.mock('../../parseSong/parseSong', () => ({
   tryToParseSong: vi.fn()

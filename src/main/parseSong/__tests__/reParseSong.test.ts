@@ -1,11 +1,12 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import { sendMessageToRenderer } from '@main/main';
 import { processArtworkFiles } from '@main/other/artworks';
 import { libraryScheduler } from '@main/workers/jobScheduler';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import reParseSong from '../reParseSong';
 
 vi.mock('fs/promises', () => ({

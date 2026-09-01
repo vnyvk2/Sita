@@ -4,6 +4,7 @@ import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DownloadManager, type DownloadSettings } from '../DownloadManager';
 import type {
   DownloadJobState,
   DownloadsSnapshot,
@@ -12,7 +13,6 @@ import type {
   OnlineDownloadRequest,
   OnlinePlaylistInfo
 } from '../models/downloadTypes';
-import { DownloadManager, type DownloadSettings } from '../DownloadManager';
 import { ExtractorError, type OnlineExtractor } from '../services/OnlineExtractor';
 
 const FIXTURE_M4A = path.resolve(__dirname, '../../../../test/fixtures/downloads/sample.m4a');
@@ -23,9 +23,9 @@ class StubExtractor implements OnlineExtractor {
 
   public calls: OnlineDownloadRequest[] = [];
   /** Overridable download behavior. Defaults to instantly "downloading" a fixture file. */
-  public behavior: (
-    request: OnlineDownloadRequest
-  ) => Promise<OnlineDownloadOutput> = async (request) => {
+  public behavior: (request: OnlineDownloadRequest) => Promise<OnlineDownloadOutput> = async (
+    request
+  ) => {
     const target = path.join(request.outputDir, 'Test Song [vid1].m4a');
     fs.copyFileSync(FIXTURE_M4A, target);
     return { filePath: target, containerExt: '.m4a', durationSecs: 0.5 };
@@ -88,9 +88,10 @@ describe('DownloadManager', () => {
   });
 
   const lastStateOf = (videoId: string): DownloadJobState | undefined =>
-    [...snapshots].reverse().find((snapshot) => snapshot.jobs.some((job) => job.videoId === videoId))?.jobs.find(
-      (job) => job.videoId === videoId
-    );
+    [...snapshots]
+      .reverse()
+      .find((snapshot) => snapshot.jobs.some((job) => job.videoId === videoId))
+      ?.jobs.find((job) => job.videoId === videoId);
 
   const waitForStatus = async (
     videoId: string,
@@ -220,10 +221,7 @@ describe('DownloadManager', () => {
     // Both calls are in flight simultaneously: each suspends on its own
     // resolveSettings() before the dedupe check runs. Run-to-completion
     // semantics must guarantee a single job + single download.
-    const [first, second] = await Promise.all([
-      manager.enqueue(track()),
-      manager.enqueue(track())
-    ]);
+    const [first, second] = await Promise.all([manager.enqueue(track()), manager.enqueue(track())]);
 
     expect(second.jobId).toBe(first.jobId);
     expect(extractor.calls).toHaveLength(1);

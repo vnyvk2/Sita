@@ -1,19 +1,16 @@
-import { getSongById } from '../../db/queries/songs';
 import { parseGenreList } from '../../../common/genreUtils';
+import { getSongById } from '../../db/queries/songs';
 
 /**
- * SongMetadataBuilder — builds a COMPLETE SongTags object by reading
- * the current song state from the database and merging changed fields.
+ * SongMetadataBuilder — builds a COMPLETE SongTags object by reading the current song state from
+ * the database and merging changed fields.
  *
- * This prevents the "undefined = remove" bug where partial field maps
- * caused albums/artists/genres to be unlinked and deleted.
+ * This prevents the "undefined = remove" bug where partial field maps caused albums/artists/genres
+ * to be unlinked and deleted.
  *
- * Design:
- * - Reads current DB state once per song
- * - Preserves existing IDs (artistId, albumId, genreId) to avoid unnecessary
- *   find-or-create cycles in updateSongId3Tags
- * - Patches only the fields that actually changed
- * - Returns a deterministic, complete SongTags object every time
+ * Design: - Reads current DB state once per song - Preserves existing IDs (artistId, albumId,
+ * genreId) to avoid unnecessary find-or-create cycles in updateSongId3Tags - Patches only the
+ * fields that actually changed - Returns a deterministic, complete SongTags object every time
  */
 
 export interface MetadataFieldChanges {
@@ -33,8 +30,8 @@ export interface MetadataFieldChanges {
 
 export class SongMetadataBuilder {
   /**
-   * Build a complete SongTags by merging field changes onto the current DB state.
-   * Every field in the resulting SongTags is populated — no undefined relational fields.
+   * Build a complete SongTags by merging field changes onto the current DB state. Every field in
+   * the resulting SongTags is populated — no undefined relational fields.
    */
   public static async buildCompleteTags(
     songId: number,
@@ -88,8 +85,14 @@ export class SongMetadataBuilder {
           : currentGenres,
 
       releasedYear: changes.year !== undefined ? changes.year : (currentSong.year ?? undefined),
-      trackNumber: changes.trackNumber !== undefined ? changes.trackNumber : (currentSong.trackNumber ?? undefined),
-      discNumber: changes.discNumber !== undefined ? changes.discNumber : (currentSong.diskNumber ?? undefined),
+      trackNumber:
+        changes.trackNumber !== undefined
+          ? changes.trackNumber
+          : (currentSong.trackNumber ?? undefined),
+      discNumber:
+        changes.discNumber !== undefined
+          ? changes.discNumber
+          : (currentSong.diskNumber ?? undefined),
       musicBrainzRecordingId:
         changes.musicBrainzRecordingId !== undefined
           ? changes.musicBrainzRecordingId
@@ -101,16 +104,14 @@ export class SongMetadataBuilder {
   }
 
   /**
-   * Merge artist change: if the name matches an existing artist, preserve the ID.
-   * Otherwise return a new entry that will trigger find-or-create.
+   * Merge artist change: if the name matches an existing artist, preserve the ID. Otherwise return
+   * a new entry that will trigger find-or-create.
    */
   private static mergeArtist(
     newName: string,
     currentArtists: SongTagsArtistData[]
   ): SongTagsArtistData[] {
-    const existing = currentArtists.find(
-      (a) => a.name.toLowerCase() === newName.toLowerCase()
-    );
+    const existing = currentArtists.find((a) => a.name.toLowerCase() === newName.toLowerCase());
     if (existing) {
       return [existing];
     }
@@ -118,16 +119,14 @@ export class SongMetadataBuilder {
   }
 
   /**
-   * Merge album change: if the title matches an existing album, preserve the ID.
-   * Otherwise return a new entry that will trigger find-or-create.
+   * Merge album change: if the title matches an existing album, preserve the ID. Otherwise return a
+   * new entry that will trigger find-or-create.
    */
   private static mergeAlbum(
     newTitle: string,
     currentAlbums: SongTagsAlbumData[]
   ): SongTagsAlbumData[] {
-    const existing = currentAlbums.find(
-      (a) => a.title.toLowerCase() === newTitle.toLowerCase()
-    );
+    const existing = currentAlbums.find((a) => a.title.toLowerCase() === newTitle.toLowerCase());
     if (existing) {
       return [existing];
     }
@@ -136,7 +135,8 @@ export class SongMetadataBuilder {
 
   /**
    * Merge genre & style changes: preserves existing IDs when names match case-insensitively,
-   * combining both genre and style strings into the SongTagsGenreData array through canonical tokenization.
+   * combining both genre and style strings into the SongTagsGenreData array through canonical
+   * tokenization.
    */
   private static mergeGenresAndStyles(
     genreStr: string | undefined,
@@ -148,9 +148,7 @@ export class SongMetadataBuilder {
     if (uniqueNames.length === 0) return currentGenres;
 
     return uniqueNames.map((name) => {
-      const existing = currentGenres.find(
-        (g) => g.name.toLowerCase() === name.toLowerCase()
-      );
+      const existing = currentGenres.find((g) => g.name.toLowerCase() === name.toLowerCase());
       if (existing) {
         return existing;
       }

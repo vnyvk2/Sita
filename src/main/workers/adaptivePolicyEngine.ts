@@ -1,4 +1,5 @@
 import { powerMonitor, BrowserWindow } from 'electron';
+
 import log from '../logger';
 import { libraryScheduler } from './jobScheduler';
 import type { JobClass } from './types';
@@ -6,10 +7,10 @@ import type { JobClass } from './types';
 export class AdaptivePolicyEngine {
   private pollingInterval: NodeJS.Timeout | null = null;
   private readonly defaultIntervalMs = 5000;
-  
+
   // Track state to avoid redundant updates
   private currentPolicyName = '';
-  
+
   private readonly boundEvaluatePolicy = () => this.evaluatePolicies('power-event');
   private readonly boundSuspendPolicy = () => this.evaluatePolicies('suspend');
 
@@ -46,7 +47,7 @@ export class AdaptivePolicyEngine {
     powerMonitor.on('lock-screen', this.boundEvaluatePolicy);
     powerMonitor.on('unlock-screen', this.boundEvaluatePolicy);
 
-    // Window Events are tricky as windows can be created/destroyed, 
+    // Window Events are tricky as windows can be created/destroyed,
     // but evaluatePolicies polls visibility anyway so it covers gaps.
   }
 
@@ -68,10 +69,10 @@ export class AdaptivePolicyEngine {
 
     const isOnBattery = powerMonitor.isOnBatteryPower();
     const idleTimeSeconds = powerMonitor.getSystemIdleTime();
-    
+
     let isAppFocused = false;
     let isAppMinimized = true;
-    
+
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
       for (const win of windows) {
@@ -93,7 +94,8 @@ export class AdaptivePolicyEngine {
       return;
     }
 
-    if (idleTimeSeconds > 300) { // 5 minutes
+    if (idleTimeSeconds > 300) {
+      // 5 minutes
       // Idle Policy: Run everything at max speed
       this.applyPolicy('IDLE', {
         interactive: 4,

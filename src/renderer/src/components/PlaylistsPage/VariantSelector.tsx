@@ -17,14 +17,14 @@ const VariantSelector = ({ layout, selectedVariant, onChange }: Props) => {
   return (
     <div className="mb-4">
       <label className="mb-2 block text-sm font-semibold text-neutral-300">Layout Sub-Style</label>
-      <div className="grid grid-cols-3 gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800">
+      <div className="grid grid-cols-3 gap-2 rounded-xl border border-neutral-800 bg-neutral-900/70 p-1.5">
         {availableVariants.map((v) => (
           <button
             key={v.id}
             type="button"
             onClick={() => onChange(v.id)}
             title={v.description}
-            className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-150 ease-out cursor-pointer hover:scale-[1.02] ${
+            className={`flex cursor-pointer items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-150 ease-out hover:scale-[1.02] ${
               activeVariant === v.id
                 ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
                 : 'text-neutral-400 hover:text-neutral-200'

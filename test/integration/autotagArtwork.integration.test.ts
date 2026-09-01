@@ -1,15 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
-import { PictureType } from 'node-taglib-sharp';
-import { ArtworkDownloaderService } from '@main/metadata/transactions/ArtworkDownloaderService';
-import { ArtworkWorkflow } from '@main/metadata/workflows/strategies/ArtworkWorkflow';
+import { syncAlbumArtworks } from '@main/db/queries/artworks';
 import { CaaApiClient } from '@main/metadata/providers/coverartarchive/CaaApiClient';
 import { CoverArtArchiveAdapter } from '@main/metadata/providers/coverartarchive/CoverArtArchiveAdapter';
 import { DiscogsAdapter } from '@main/metadata/providers/discogs/DiscogsAdapter';
 import { MusicBrainzAdapter } from '@main/metadata/providers/musicbrainz/MusicBrainzAdapter';
-import { extractFrontCover } from '@main/utils/extractFrontCover';
-import { syncAlbumArtworks } from '@main/db/queries/artworks';
-import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { ArtworkDownloaderService } from '@main/metadata/transactions/ArtworkDownloaderService';
+import { ArtworkWorkflow } from '@main/metadata/workflows/strategies/ArtworkWorkflow';
 import { HttpError } from '@main/platform/networking/FetchHttpClient';
+import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { extractFrontCover } from '@main/utils/extractFrontCover';
+import { PictureType } from 'node-taglib-sharp';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
   describe('1. Artwork Workflow & Field ID Consistency (BUG-07 & BUG-19 Wiring)', () => {
@@ -81,10 +81,14 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
       const match = preview.matches[0];
 
       // Invariant BUG-07: suggestedMetadata and fieldDiffs MUST use artworkPath
-      expect(match.suggestedMetadata.artworkPath).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
+      expect(match.suggestedMetadata.artworkPath).toBe(
+        'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg'
+      );
       expect(match.fieldDiffs).toHaveLength(1);
       expect(match.fieldDiffs[0].fieldId).toBe('artworkPath');
-      expect(match.fieldDiffs[0].suggestedValue).toBe('https://coverartarchive.org/release-group/rg-mbid-999/front.jpg');
+      expect(match.fieldDiffs[0].suggestedValue).toBe(
+        'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg'
+      );
 
       // Invariant BUG-19: ArtworkWorkflow resolved release -> extracted releaseGroupId -> queried release first -> cascaded to release group on 404
       expect(mockMbAdapter.resolveRelease).toHaveBeenCalledWith('release-mbid-001');
@@ -98,8 +102,8 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
   describe('2. Modern Image Format Validation (BUG-09)', () => {
     it('validates WebP, AVIF, JPEG, PNG through RequestPipeline and rejects invalid formats', async () => {
       const validWebp = Buffer.from([
-        0x52, 0x49, 0x46, 0x46, 0x20, 0x00, 0x00, 0x00,
-        0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20
+        0x52, 0x49, 0x46, 0x46, 0x20, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38,
+        0x20
       ]);
 
       const mockPipeline: Partial<RequestPipeline> = {
@@ -116,10 +120,14 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
 
       const downloader = new ArtworkDownloaderService(mockPipeline as RequestPipeline);
 
-      const webpResult = await downloader.fetchAndValidateArtwork('https://cdn.example.com/cover.webp');
+      const webpResult = await downloader.fetchAndValidateArtwork(
+        'https://cdn.example.com/cover.webp'
+      );
       expect(webpResult).toEqual(validWebp);
 
-      const htmlResult = await downloader.fetchAndValidateArtwork('https://cdn.example.com/404.html');
+      const htmlResult = await downloader.fetchAndValidateArtwork(
+        'https://cdn.example.com/404.html'
+      );
       expect(htmlResult).toBeNull();
     });
   });

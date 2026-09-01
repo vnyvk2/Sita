@@ -58,8 +58,8 @@ export function resetSongIngestionMetrics(): void {
 }
 
 /**
- * Local in-process fallback implementation.
- * Used in Vitest unit test environments or if the utilityProcess worker is unavailable.
+ * Local in-process fallback implementation. Used in Vitest unit test environments or if the
+ * utilityProcess worker is unavailable.
  */
 export const processSongsWithWorkerPoolLocal = async (
   songs: SongPoolInput[],
@@ -172,14 +172,13 @@ export const processSongsWithWorkerPoolLocal = async (
 /**
  * Single canonical ingestion pipeline for bulk song discovery.
  *
- * In Electron runtime (Phase C3):
- * 1. Delegates CPU-heavy ID3 tag parsing and file stats to the utilityProcess.
- * 2. Streams parsed tracks to Main in bounded 100-track batches with explicit backpressure.
- * 3. Pre-processes artwork files (Sharp decode + disk writes) OUTSIDE of the DB transaction.
- * 4. Commits pure DB operations within a single Drizzle transaction per 100 tracks.
- * 5. Measures DB transaction latency and artwork duration separately (P50/P95).
- * 6. Yields to the libuv event loop (setImmediate) between transactions to prevent UI starvation.
- * 7. Enforces batch-boundary cancellation: active batch commits atomically; subsequent batches are discarded.
+ * In Electron runtime (Phase C3): 1. Delegates CPU-heavy ID3 tag parsing and file stats to the
+ * utilityProcess. 2. Streams parsed tracks to Main in bounded 100-track batches with explicit
+ * backpressure. 3. Pre-processes artwork files (Sharp decode + disk writes) OUTSIDE of the DB
+ * transaction. 4. Commits pure DB operations within a single Drizzle transaction per 100 tracks. 5.
+ * Measures DB transaction latency and artwork duration separately (P50/P95). 6. Yields to the libuv
+ * event loop (setImmediate) between transactions to prevent UI starvation. 7. Enforces
+ * batch-boundary cancellation: active batch commits atomically; subsequent batches are discarded.
  */
 export const processSongsWithWorkerPool = async (
   songs: SongPoolInput[],
@@ -213,7 +212,9 @@ export const processSongsWithWorkerPool = async (
       const workerPid = mediaWorkerBridge.getWorkerPid();
       songIngestionMetrics.workerPid = workerPid;
 
-      logger.info(`[songWorkerPool] Ingesting ${songs.length} tracks via utilityProcess worker (pid: ${workerPid ?? 'unknown'})...`);
+      logger.info(
+        `[songWorkerPool] Ingesting ${songs.length} tracks via utilityProcess worker (pid: ${workerPid ?? 'unknown'})...`
+      );
 
       await mediaWorkerBridge.parseTrackBatchStream(songs, {
         batchSize: 100,
@@ -223,7 +224,9 @@ export const processSongsWithWorkerPool = async (
           // If the user cancelled the scan while this batch was in transit,
           // discard this and all subsequent batches immediately without touching DB.
           if (abortSignal?.aborted) {
-            logger.info(`[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`);
+            logger.info(
+              `[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`
+            );
             return;
           }
 
@@ -285,7 +288,11 @@ export const processSongsWithWorkerPool = async (
                     });
 
                     const album = res.newAlbum || res.relevantAlbum;
-                    if (album && !stagedAlbumAssets.has(album.id) && !albumAssetsToQueue.has(album.id)) {
+                    if (
+                      album &&
+                      !stagedAlbumAssets.has(album.id) &&
+                      !albumAssetsToQueue.has(album.id)
+                    ) {
                       stagedAlbumAssets.set(album.id, {
                         path: track.songPath,
                         title: album.title
@@ -336,10 +343,14 @@ export const processSongsWithWorkerPool = async (
               !abortSignal?.aborted &&
               (songIngestionMetrics.batchesProcessed === 1 || unnotifiedSongIds.length >= 500)
             ) {
-              if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', [...unnotifiedSongIds]);
-              if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', [...unnotifiedArtistIds]);
-              if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', [...unnotifiedAlbumIds]);
-              if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', [...unnotifiedGenreIds]);
+              if (unnotifiedSongIds.length > 0)
+                dataUpdateEvent('songs/newSong', [...unnotifiedSongIds]);
+              if (unnotifiedArtistIds.length > 0)
+                dataUpdateEvent('artists/newArtist', [...unnotifiedArtistIds]);
+              if (unnotifiedAlbumIds.length > 0)
+                dataUpdateEvent('albums/newAlbum', [...unnotifiedAlbumIds]);
+              if (unnotifiedGenreIds.length > 0)
+                dataUpdateEvent('genres/newGenre', [...unnotifiedGenreIds]);
               unnotifiedSongIds.length = 0;
               unnotifiedArtistIds.length = 0;
               unnotifiedAlbumIds.length = 0;
@@ -373,8 +384,8 @@ export const processSongsWithWorkerPool = async (
 
         logger.info(
           `[songWorkerPool] Ingestion complete: ${successCount} tracks in ${songIngestionMetrics.batchesProcessed} batches (${(songIngestionMetrics.totalArtworkBytes / 1024 / 1024).toFixed(1)} MB total artwork).\n` +
-          `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
-          `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
+            `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
+            `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
         );
       }
 
@@ -382,13 +393,17 @@ export const processSongsWithWorkerPool = async (
         // Enqueue background asset jobs
         if (albumAssetsToQueue.size > 0) {
           for (const [albumId, data] of albumAssetsToQueue.entries()) {
-            libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
+            );
           }
         }
 
         if (songAssetsToQueue.length > 0) {
           for (const song of songAssetsToQueue) {
-            libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new WaveformJob(song.id, song.path, song.title, libraryScheduler)
+            );
             libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
             libraryScheduler.enqueue(
               new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
@@ -398,7 +413,8 @@ export const processSongsWithWorkerPool = async (
 
         // Flush any remaining unnotified tracks to the renderer
         if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
-        if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+        if (unnotifiedArtistIds.length > 0)
+          dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
         if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
         if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
       }
@@ -418,12 +434,16 @@ export const processSongsWithWorkerPool = async (
       if (!abortSignal?.aborted) {
         if (albumAssetsToQueue.size > 0) {
           for (const [albumId, data] of albumAssetsToQueue.entries()) {
-            libraryScheduler.enqueue(new ArtworkJob(albumId, data.path, data.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
+            );
           }
         }
         if (songAssetsToQueue.length > 0) {
           for (const song of songAssetsToQueue) {
-            libraryScheduler.enqueue(new WaveformJob(song.id, song.path, song.title, libraryScheduler));
+            libraryScheduler.enqueue(
+              new WaveformJob(song.id, song.path, song.title, libraryScheduler)
+            );
             libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
             libraryScheduler.enqueue(
               new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
@@ -431,7 +451,8 @@ export const processSongsWithWorkerPool = async (
           }
         }
         if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
-        if (unnotifiedArtistIds.length > 0) dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+        if (unnotifiedArtistIds.length > 0)
+          dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
         if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
         if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
       }

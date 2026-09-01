@@ -23,7 +23,8 @@ export class PositionTimerScheduler {
 
   constructor(player: AudioPlayer, options?: PositionSchedulerOptions) {
     this.player = player;
-    this.documentRef = options?.documentRef || (typeof document !== 'undefined' ? document : ({} as Document));
+    this.documentRef =
+      options?.documentRef || (typeof document !== 'undefined' ? document : ({} as Document));
     this.onPositionChange =
       options?.onPositionChange ||
       ((time: number) => {

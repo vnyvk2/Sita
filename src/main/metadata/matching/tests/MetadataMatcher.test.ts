@@ -18,10 +18,7 @@ describe('MetadataMatcher — Empty Normalized String Invariant', () => {
   });
 
   it('does NOT match two symbol/punctuation-only titles that normalize to empty strings', () => {
-    const result = matcher.scoreCandidate(
-      { title: '!!!' },
-      { id: 'rec-2', title: '???' }
-    );
+    const result = matcher.scoreCandidate({ title: '!!!' }, { id: 'rec-2', title: '???' });
 
     expect(result.score).toBe(0);
   });

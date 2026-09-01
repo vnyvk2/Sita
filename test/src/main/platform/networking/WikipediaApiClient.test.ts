@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { WikipediaApiClient } from '@main/platform/networking/WikipediaApiClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { WikipediaApiClient } from '@main/platform/networking/WikipediaApiClient';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('@main/logger', () => ({
   default: {
@@ -41,7 +41,8 @@ describe('WikipediaApiClient', () => {
                 pages: {
                   '12345': {
                     title: 'Gracie Abrams',
-                    extract: 'Gracie Madigan Abrams (born September 7, 1999) is an American singer-songwriter.\n\nShe released her debut album in 2023.'
+                    extract:
+                      'Gracie Madigan Abrams (born September 7, 1999) is an American singer-songwriter.\n\nShe released her debut album in 2023.'
                   }
                 }
               }
@@ -97,7 +98,8 @@ describe('WikipediaApiClient', () => {
                   '67890': {
                     title: 'Bush (band)',
                     description: 'English rock band',
-                    extract: 'Bush are an English rock band formed in London in 1992.\n\nThe band consists of lead vocalist Gavin Rossdale.'
+                    extract:
+                      'Bush are an English rock band formed in London in 1992.\n\nThe band consists of lead vocalist Gavin Rossdale.'
                   }
                 }
               }
@@ -126,7 +128,8 @@ describe('WikipediaApiClient', () => {
               type: 'standard',
               title: 'Americas',
               description: 'Landmass in the Western Hemisphere',
-              extract: 'The Americas comprise the totality of the continents of North and South America.'
+              extract:
+                'The Americas comprise the totality of the continents of North and South America.'
             }
           };
         }

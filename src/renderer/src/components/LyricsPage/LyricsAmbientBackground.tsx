@@ -89,7 +89,7 @@ const LyricsAmbientBackground = ({
   return (
     <div
       aria-hidden="true"
-      className={`lyrics-ambient-background pointer-events-none absolute inset-0 z-0 select-none overflow-hidden ${
+      className={`lyrics-ambient-background pointer-events-none absolute inset-0 z-0 overflow-hidden select-none ${
         className ?? ''
       }`}
     >

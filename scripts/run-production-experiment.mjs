@@ -13,10 +13,10 @@ export function sleep(ms) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 export function getProcessMemoryMetrics() {
@@ -48,7 +48,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -115,7 +118,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -129,7 +132,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -149,7 +156,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -159,12 +166,14 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
       const res = await fetch(`http://127.0.0.1:${port}/json`);
       if (res.ok) {
         const list = await res.json();
-        const page = list.find((t) => t.type === 'page' && (t.title === 'Nora' || t.url?.includes('index.html')));
+        const page = list.find(
+          (t) => t.type === 'page' && (t.title === 'Nora' || t.url?.includes('index.html'))
+        );
         if (page && page.webSocketDebuggerUrl) {
           return page;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -183,7 +192,12 @@ async function runProductionWorkload() {
   console.log('[Runner] Launching Nora Production Bundle on port 9876...');
   spawn('npx.cmd', ['electron', './out/main/main.js', '--remote-debugging-port=9876'], {
     shell: true,
-    env: { ...process.env, NODE_ENV: 'production', NORA_DEVTOOLS_CLOSED: '1', REMOTE_DEBUGGING_PORT: '9876' },
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      NORA_DEVTOOLS_CLOSED: '1',
+      REMOTE_DEBUGGING_PORT: '9876'
+    },
     stdio: 'ignore'
   });
 
@@ -191,7 +205,9 @@ async function runProductionWorkload() {
 
   try {
     const pageTarget = await getCDPTarget(9876);
-    console.log(`[Runner] Connected to Nora Production CDP Target: ${pageTarget.title} (${pageTarget.url})`);
+    console.log(
+      `[Runner] Connected to Nora Production CDP Target: ${pageTarget.title} (${pageTarget.url})`
+    );
 
     const cdp = new CDPClient(pageTarget.webSocketDebuggerUrl);
     await cdp.connect();
@@ -226,10 +242,10 @@ async function runProductionWorkload() {
 
       console.log(
         `[T+${Math.floor(elapsedSec / 60)}m | ${stepName}] Total: ${row.totalWS} MB (PM: ${row.totalPM} MB) | ` +
-        `Renderer: ${row.rendererWS} MB (PM: ${row.rendererPM} MB) | ` +
-        `GPU: ${row.gpuWS} MB | ` +
-        `Main: ${row.mainWS} MB | ` +
-        `Heap: ${heapUsedMB} MB | Listeners: ${listeners} | Nodes: ${nodes}`
+          `Renderer: ${row.rendererWS} MB (PM: ${row.rendererPM} MB) | ` +
+          `GPU: ${row.gpuWS} MB | ` +
+          `Main: ${row.mainWS} MB | ` +
+          `Heap: ${heapUsedMB} MB | Listeners: ${listeners} | Nodes: ${nodes}`
       );
 
       return row;
@@ -338,9 +354,11 @@ async function runProductionWorkload() {
   return timeline;
 }
 
-runProductionWorkload().then(() => {
-  process.exit(0);
-}).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runProductionWorkload()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

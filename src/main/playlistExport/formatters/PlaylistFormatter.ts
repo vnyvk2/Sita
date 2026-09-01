@@ -12,4 +12,3 @@ export interface FormatterOptions {
 export interface PlaylistFormatter {
   format(entries: ExportEntry[], options?: FormatterOptions): string;
 }
-

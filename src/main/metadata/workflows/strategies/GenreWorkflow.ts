@@ -1,3 +1,7 @@
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { MetadataProviderId } from '../../models/RecordingMetadata';
+import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
+import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type {
   WorkflowCandidate,
   WorkflowMatch,
@@ -6,10 +10,6 @@ import type {
   WorkflowType
 } from '../MetadataWorkflow';
 import { BaseMetadataWorkflow } from '../MetadataWorkflow';
-import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
-import type { LocalSongInput } from '../../services/AlbumMetadataService';
-import type { MetadataProviderId } from '../../models/RecordingMetadata';
-import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class GenreWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'genre';
@@ -56,8 +56,12 @@ export class GenreWorkflow extends BaseMetadataWorkflow {
         artist: alb.artist
       });
 
-      const genreVal = contrib?.contributions.find((c) => c.fieldId === 'genre')?.value as string | undefined;
-      const styleVal = contrib?.contributions.find((c) => c.fieldId === 'style')?.value as string | undefined;
+      const genreVal = contrib?.contributions.find((c) => c.fieldId === 'genre')?.value as
+        | string
+        | undefined;
+      const styleVal = contrib?.contributions.find((c) => c.fieldId === 'style')?.value as
+        | string
+        | undefined;
 
       const candidateId = alb.releaseId || alb.title;
       const candidate: WorkflowCandidate = {
@@ -112,8 +116,12 @@ export class GenreWorkflow extends BaseMetadataWorkflow {
         });
 
         if (contrib) {
-          genreVal = contrib.contributions.find((c) => c.fieldId === 'genre')?.value as string | undefined;
-          styleVal = contrib.contributions.find((c) => c.fieldId === 'style')?.value as string | undefined;
+          genreVal = contrib.contributions.find((c) => c.fieldId === 'genre')?.value as
+            | string
+            | undefined;
+          styleVal = contrib.contributions.find((c) => c.fieldId === 'style')?.value as
+            | string
+            | undefined;
         }
 
         const candidate: WorkflowCandidate = {

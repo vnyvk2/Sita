@@ -1,8 +1,13 @@
-import type { MetadataOperation, OperationType, ExecutionMode, OperationState } from '../domain/MetadataOperation';
-import type { MetadataPolicy } from '../domain/MetadataPolicy';
-import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 import type { MetadataContext } from '../domain/MetadataContext';
+import type {
+  MetadataOperation,
+  OperationType,
+  ExecutionMode,
+  OperationState
+} from '../domain/MetadataOperation';
+import type { MetadataPolicy } from '../domain/MetadataPolicy';
 import type { MetadataResolution } from '../domain/MetadataResolution';
+import type { MetadataResolutionManager } from '../resolution/MetadataResolutionManager';
 
 export type OperationEventListener = (event: string, payload: unknown) => void;
 
@@ -41,7 +46,11 @@ export class MetadataOperationManager {
       ? {
           resources: {
             primaryType: 'album',
-            targetResources: contextOrResourceIds.map((rid) => ({ id: rid, type: 'album', attributes: {} }))
+            targetResources: contextOrResourceIds.map((rid) => ({
+              id: rid,
+              type: 'album',
+              attributes: {}
+            }))
           },
           execution: { mode }
         }
@@ -81,7 +90,10 @@ export class MetadataOperationManager {
       progressPercent: percent ?? existing.progressPercent,
       startedAt: nextState === 'Searching' && !existing.startedAt ? Date.now() : existing.startedAt,
       completedAt:
-        nextState === 'Completed' || nextState === 'Failed' || nextState === 'Cancelled' || nextState === 'Undone'
+        nextState === 'Completed' ||
+        nextState === 'Failed' ||
+        nextState === 'Cancelled' ||
+        nextState === 'Undone'
           ? Date.now()
           : existing.completedAt
     };

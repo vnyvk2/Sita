@@ -337,13 +337,7 @@ describe('folderHierarchy - resolveOrCreateMusicFolders', () => {
       insert: vi.fn()
     } as unknown as DB;
 
-    const folderMap = await resolveOrCreateMusicFolders(
-      1,
-      'C:\\Music',
-      [],
-      'win32',
-      mockDatabase
-    );
+    const folderMap = await resolveOrCreateMusicFolders(1, 'C:\\Music', [], 'win32', mockDatabase);
 
     expect(folderMap.get('c:\\music')).toBe(1);
     expect(mockDatabase.select).toHaveBeenCalled();
@@ -376,4 +370,3 @@ describe('expandDirectoryAncestors', () => {
     expect(result).toEqual(['/music/Adele/21', '/music/Adele']);
   });
 });
-

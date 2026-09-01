@@ -1,4 +1,7 @@
 import { eq, gte, inArray, sql } from 'drizzle-orm';
+
+import { parseArtistArtworks, parseSongArtworks } from '../../fs/resolveFilePaths';
+import logger from '../../logger';
 import { db, type DB, type DBTransaction } from '../db';
 import {
   albums,
@@ -15,8 +18,6 @@ import {
   skipEvents,
   songs
 } from '../schema';
-import { parseArtistArtworks, parseSongArtworks } from '../../fs/resolveFilePaths';
-import logger from '../../logger';
 
 export type HistoryPeriod = '7' | '30' | '180' | '365' | 'all';
 
@@ -103,9 +104,7 @@ export interface LibraryAudioStatsData {
   sampleRateBreakdown: Array<{ sampleRate: number; count: number }>;
 }
 
-/**
- * Aggregates listening analytics for a given time period using PGLite SQL queries.
- */
+/** Aggregates listening analytics for a given time period using PGLite SQL queries. */
 export const getListeningAnalytics = async (
   period: HistoryPeriod = '30',
   trx: DB | DBTransaction = db
@@ -150,7 +149,11 @@ export const getListeningAnalytics = async (
     const fullListens = eventsAgg?.fullListensCount ?? 0;
     const totalPlayAttempts = (eventsAgg?.totalRecordedEvents ?? 0) + totalSkipsCount;
     const completionRate =
-      totalPlayAttempts > 0 ? Math.min(1, Math.max(0, fullListens / totalPlayAttempts)) : totalPlaysCount > 0 ? 0.9 : 1.0;
+      totalPlayAttempts > 0
+        ? Math.min(1, Math.max(0, fullListens / totalPlayAttempts))
+        : totalPlaysCount > 0
+          ? 0.9
+          : 1.0;
 
     // Count unique artists in history
     const [uniqueArtistsAgg] = await trx
@@ -411,9 +414,7 @@ export const getListeningAnalytics = async (
   }
 };
 
-/**
- * Aggregates current audio library quality, formats, and codec statistics.
- */
+/** Aggregates current audio library quality, formats, and codec statistics. */
 export const getLibraryAudioStats = async (
   trx: DB | DBTransaction = db
 ): Promise<LibraryAudioStatsData> => {
@@ -440,7 +441,15 @@ export const getLibraryAudioStats = async (
     const codecCounts = new Map<string, number>();
     const sampleRateCounts = new Map<number, number>();
 
-    const LOSSLESS_EXTENSIONS = new Set(['.flac', '.alac', '.wav', '.aiff', '.dsf', '.dff', '.ape']);
+    const LOSSLESS_EXTENSIONS = new Set([
+      '.flac',
+      '.alac',
+      '.wav',
+      '.aiff',
+      '.dsf',
+      '.dff',
+      '.ape'
+    ]);
 
     for (const song of librarySongs) {
       totalDurationSeconds += song.duration || 0;

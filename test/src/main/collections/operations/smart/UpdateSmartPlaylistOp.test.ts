@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { db } from '../../../../../../src/main/db/db';
-import { playlists, smartPlaylistRules } from '../../../../../../src/main/db/schema';
 import { eq } from 'drizzle-orm';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { UpdateSmartPlaylistOp } from '../../../../../../src/main/collections/operations/smart/UpdateSmartPlaylistOp';
 import type { OperationContext } from '../../../../../../src/main/collections/operations/types';
 import type { SmartPlaylistDefinition } from '../../../../../../src/main/collections/query/ast';
+import { db } from '../../../../../../src/main/db/db';
+import { playlists, smartPlaylistRules } from '../../../../../../src/main/db/schema';
 
 describe('UpdateSmartPlaylistOp', () => {
   const op = new UpdateSmartPlaylistOp();
@@ -15,11 +16,14 @@ describe('UpdateSmartPlaylistOp', () => {
     await db.delete(smartPlaylistRules);
     await db.delete(playlists);
 
-    const [pl] = await db.insert(playlists).values({
-      name: 'Test Smart',
-      playlistType: 'smart'
-    }).returning({ id: playlists.id });
-    
+    const [pl] = await db
+      .insert(playlists)
+      .values({
+        name: 'Test Smart',
+        playlistType: 'smart'
+      })
+      .returning({ id: playlists.id });
+
     playlistId = pl.id;
 
     await db.insert(smartPlaylistRules).values({
@@ -49,19 +53,18 @@ describe('UpdateSmartPlaylistOp', () => {
       rule: {
         type: 'group',
         logicalOperator: 'and',
-        rules: [
-          { type: 'condition', field: 'title', operator: 'contains', value: 'Hello' }
-        ]
+        rules: [{ type: 'condition', field: 'title', operator: 'contains', value: 'Hello' }]
       },
-      orderBy: [
-        { field: 'title', direction: 'asc' }
-      ]
+      orderBy: [{ field: 'title', direction: 'asc' }]
     };
 
     const result = await op.execute({ playlistId, definition: newDef }, ctx);
 
     // Verify DB was updated
-    const [updated] = await db.select().from(smartPlaylistRules).where(eq(smartPlaylistRules.playlistId, playlistId));
+    const [updated] = await db
+      .select()
+      .from(smartPlaylistRules)
+      .where(eq(smartPlaylistRules.playlistId, playlistId));
     expect(updated.ruleAst).toEqual(newDef.rule);
     expect(updated.sortDefinition).toEqual(newDef.orderBy);
     expect(updated.ruleVersion).toBe(2);

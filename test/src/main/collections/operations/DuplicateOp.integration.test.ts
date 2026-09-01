@@ -1,12 +1,13 @@
+import { eq, inArray } from 'drizzle-orm';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
+import { DuplicateExecutor } from '../../../../../src/main/collections/operations/DuplicateExecutor';
+import { DuplicateOp } from '../../../../../src/main/collections/operations/DuplicateOp';
+import { DuplicatePlanner } from '../../../../../src/main/collections/operations/DuplicatePlanner';
+import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
 import { db } from '../../../../../src/main/db/db';
 import { playlists } from '../../../../../src/main/db/schema';
-import { eq, inArray } from 'drizzle-orm';
-import { DuplicateOp } from '../../../../../src/main/collections/operations/DuplicateOp';
-import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
-import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
-import { DuplicatePlanner } from '../../../../../src/main/collections/operations/DuplicatePlanner';
-import { DuplicateExecutor } from '../../../../../src/main/collections/operations/DuplicateExecutor';
 
 describe('DuplicateOp Integration', () => {
   let repository: PlaylistRepository;
@@ -16,7 +17,7 @@ describe('DuplicateOp Integration', () => {
   beforeEach(async () => {
     // Clean up
     await db.delete(playlists);
-    
+
     repository = new PlaylistRepository();
     hierarchyService = new HierarchyService();
     duplicateOp = new DuplicateOp(new DuplicatePlanner(hierarchyService), new DuplicateExecutor());
@@ -28,25 +29,34 @@ describe('DuplicateOp Integration', () => {
 
   it('duplicates a deeply nested folder structure identically', async () => {
     // Root
-    const [root] = await db.insert(playlists).values({
-      name: 'Root',
-      playlistType: 'folder',
-      parentId: null
-    }).returning();
+    const [root] = await db
+      .insert(playlists)
+      .values({
+        name: 'Root',
+        playlistType: 'folder',
+        parentId: null
+      })
+      .returning();
 
     // Folder under Root
-    const [folder] = await db.insert(playlists).values({
-      name: 'Folder',
-      playlistType: 'folder',
-      parentId: root.id
-    }).returning();
+    const [folder] = await db
+      .insert(playlists)
+      .values({
+        name: 'Folder',
+        playlistType: 'folder',
+        parentId: root.id
+      })
+      .returning();
 
     // Playlist under Folder
-    const [playlist] = await db.insert(playlists).values({
-      name: 'Playlist',
-      playlistType: 'standard',
-      parentId: folder.id
-    }).returning();
+    const [playlist] = await db
+      .insert(playlists)
+      .values({
+        name: 'Playlist',
+        playlistType: 'standard',
+        parentId: folder.id
+      })
+      .returning();
 
     // Duplicate Root
     let newRootId: number = -1;
@@ -58,18 +68,20 @@ describe('DuplicateOp Integration', () => {
     });
 
     const allPlaylists = await db.select().from(playlists).orderBy(playlists.id);
-    
+
     // We expect 6 playlists total (3 original, 3 duplicated)
     expect(allPlaylists.length).toBe(6);
 
-    const rootCopy = allPlaylists.find(p => p.name === 'Root (Copy)');
+    const rootCopy = allPlaylists.find((p) => p.name === 'Root (Copy)');
     expect(rootCopy).toBeDefined();
     expect(rootCopy?.parentId).toBeNull();
-    
-    const folderCopy = allPlaylists.find(p => p.name === 'Folder' && p.parentId === rootCopy?.id);
+
+    const folderCopy = allPlaylists.find((p) => p.name === 'Folder' && p.parentId === rootCopy?.id);
     expect(folderCopy).toBeDefined();
-    
-    const playlistCopy = allPlaylists.find(p => p.name === 'Playlist' && p.parentId === folderCopy?.id);
+
+    const playlistCopy = allPlaylists.find(
+      (p) => p.name === 'Playlist' && p.parentId === folderCopy?.id
+    );
     expect(playlistCopy).toBeDefined();
     expect(playlistCopy?.playlistType).toBe('standard');
 

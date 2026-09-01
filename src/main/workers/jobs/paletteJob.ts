@@ -37,7 +37,7 @@ export class PaletteJob implements Job {
       const existing = await db.query.palettes.findFirst({
         where: (p, { eq }) => eq(p.artworkId, this.artworkId)
       });
-      
+
       if (existing && CURRENT_PALETTE_GENERATOR_VERSION <= existing.generatorVersion) {
         logger.debug(`[PaletteJob] Artwork ${this.artworkId} already has a palette (up to date).`);
         return;
@@ -57,7 +57,9 @@ export class PaletteJob implements Job {
         });
       }
     } catch (error) {
-      logger.error(`[PaletteJob] Failed to generate palette for artwork ${this.artworkId}`, { error });
+      logger.error(`[PaletteJob] Failed to generate palette for artwork ${this.artworkId}`, {
+        error
+      });
       throw error;
     }
   }

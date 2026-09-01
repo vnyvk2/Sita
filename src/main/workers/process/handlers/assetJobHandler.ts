@@ -1,12 +1,14 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
+
 import { extractFrontCover } from '@main/utils/extractFrontCover';
+import sharp from 'sharp';
+
 import { defaultAudioDecoderRegistry } from '../audio/AudioDecoderRegistry';
-import { WaveformAccumulator } from '../audio/WaveformAccumulator';
 import { BS1770LoudnessEngine } from '../audio/BS1770LoudnessEngine';
 import { calculateReplayGainMetrics } from '../audio/ReplayGainPolicy';
+import { WaveformAccumulator } from '../audio/WaveformAccumulator';
 
 export const CURRENT_WAVEFORM_GENERATOR_VERSION = 1;
 export const WAVEFORM_RESOLUTION = 200;
@@ -40,23 +42,23 @@ export type AssetExecutionResult =
 /**
  * Worker-side asset generation handler for Phase C4 (Waveform, Artwork, ReplayGain).
  *
- * NOTE ON WAVEFORM & REPLAYGAIN ALGORITHMS:
- * This handler executes Nora's migrated deterministic asset algorithms (synthetic waveform peaks
- * and loudness analysis) in utilityProcess to prevent Main-process CPU contention.
- * Full audio decoding (e.g. via FFmpeg/WebAudio) is decoupled and reserved for future pipeline phases.
+ * NOTE ON WAVEFORM & REPLAYGAIN ALGORITHMS: This handler executes Nora's migrated deterministic
+ * asset algorithms (synthetic waveform peaks and loudness analysis) in utilityProcess to prevent
+ * Main-process CPU contention. Full audio decoding (e.g. via FFmpeg/WebAudio) is decoupled and
+ * reserved for future pipeline phases.
  *
  * CRITICAL ARCHITECTURAL INVARIANTS:
- * 1. Zero database dependencies, zero ORM imports.
-/**
- * Generates an isolated temporary file path for asset generation.
+ *
+ * 1. Zero database dependencies, zero ORM imports. /** Generates an isolated temporary file path for
+ *    asset generation.
  */
 export function getAssetTempPath(destinationPath: string, pid: number, taskId: string): string {
   return `${destinationPath}.${pid}.${taskId}.tmp`;
 }
 
 /**
- * Returns true if a given filename in the cache directory is an in-flight or abandoned
- * temp file created for the specified asset destination filename (e.g. '123_v1.bin').
+ * Returns true if a given filename in the cache directory is an in-flight or abandoned temp file
+ * created for the specified asset destination filename (e.g. '123_v1.bin').
  */
 export function isAssetTempFileFor(filename: string, destinationBasename: string): boolean {
   if (filename === `${destinationBasename}.tmp`) return true;
@@ -89,11 +91,26 @@ export async function executeAssetJob(options: ExecuteAssetOptions): Promise<Ass
 
   try {
     if (jobType === 'waveform') {
-      return await generateWaveformInWorker(taskId, input.sourceFilePath, input.destinationPath, abortSignal);
+      return await generateWaveformInWorker(
+        taskId,
+        input.sourceFilePath,
+        input.destinationPath,
+        abortSignal
+      );
     } else if (jobType === 'artwork') {
-      return await generateArtworkInWorker(taskId, input.sourceFilePath, input.destinationPath, abortSignal);
+      return await generateArtworkInWorker(
+        taskId,
+        input.sourceFilePath,
+        input.destinationPath,
+        abortSignal
+      );
     } else if (jobType === 'replaygain') {
-      return await generateReplayGainInWorker(taskId, input.sourceFilePath, input.destinationPath, abortSignal);
+      return await generateReplayGainInWorker(
+        taskId,
+        input.sourceFilePath,
+        input.destinationPath,
+        abortSignal
+      );
     } else {
       return {
         success: false,
@@ -110,9 +127,9 @@ export async function executeAssetJob(options: ExecuteAssetOptions): Promise<Ass
 }
 
 /**
- * Generates deterministic waveform peaks and writes atomically to destination.
- * Uses incremental streaming audio decoding (O(1) memory) when supported,
- * falling back to synthetic peaks if format is unsupported or file is corrupted.
+ * Generates deterministic waveform peaks and writes atomically to destination. Uses incremental
+ * streaming audio decoding (O(1) memory) when supported, falling back to synthetic peaks if format
+ * is unsupported or file is corrupted.
  */
 async function generateWaveformInWorker(
   taskId: string,
@@ -129,13 +146,9 @@ async function generateWaveformInWorker(
       const info = await decoder.probe(sourceFilePath);
       const accumulator = new WaveformAccumulator(info.totalSamples, WAVEFORM_RESOLUTION);
 
-      await decoder.decodeStream(
-        sourceFilePath,
-        { abortSignal, chunkSize: 16384 },
-        (chunk) => {
-          accumulator.processChunk(chunk);
-        }
-      );
+      await decoder.decodeStream(sourceFilePath, { abortSignal, chunkSize: 16384 }, (chunk) => {
+        accumulator.processChunk(chunk);
+      });
 
       peaks = accumulator.finish();
       metadata = {
@@ -203,8 +216,8 @@ async function generateWaveformInWorker(
 }
 
 /**
- * Extracts ID3 front cover, generates full WebP and 50x50 optimized WebP images atomically.
- * Rolled back if any part of the dual-image publication fails.
+ * Extracts ID3 front cover, generates full WebP and 50x50 optimized WebP images atomically. Rolled
+ * back if any part of the dual-image publication fails.
  */
 async function generateArtworkInWorker(
   taskId: string,
@@ -256,10 +269,7 @@ async function generateArtworkInWorker(
 
   try {
     // 1. Generate 50x50 optimized WebP for palette / fast rendering
-    await sharp(pictureData)
-      .webp({ quality: 50, effort: 0 })
-      .resize(50, 50)
-      .toFile(optTmpPath);
+    await sharp(pictureData).webp({ quality: 50, effort: 0 }).resize(50, 50).toFile(optTmpPath);
 
     if (abortSignal?.aborted) {
       await fs.unlink(optTmpPath).catch(() => {});
@@ -271,9 +281,7 @@ async function generateArtworkInWorker(
     }
 
     // 2. Generate full resolution WebP
-    const info = await sharp(pictureData, { animated: true })
-      .webp()
-      .toFile(imgTmpPath);
+    const info = await sharp(pictureData, { animated: true }).webp().toFile(imgTmpPath);
 
     if (abortSignal?.aborted) {
       await fs.unlink(optTmpPath).catch(() => {});
@@ -345,9 +353,7 @@ async function generateArtworkInWorker(
   }
 }
 
-/**
- * Computes ITU-R BS.1770-4 / EBU R128 loudness metrics and ReplayGain in utilityProcess (Gate D2).
- */
+/** Computes ITU-R BS.1770-4 / EBU R128 loudness metrics and ReplayGain in utilityProcess (Gate D2). */
 async function generateReplayGainInWorker(
   taskId: string,
   sourceFilePath: string,
@@ -360,13 +366,9 @@ async function generateReplayGainInWorker(
       const info = await decoder.probe(sourceFilePath);
       const engine = new BS1770LoudnessEngine(info.sampleRate, info.channels, info.channelLayout);
 
-      await decoder.decodeStream(
-        sourceFilePath,
-        { abortSignal, chunkSize: 16384 },
-        (chunk) => {
-          engine.processChunk(chunk);
-        }
-      );
+      await decoder.decodeStream(sourceFilePath, { abortSignal, chunkSize: 16384 }, (chunk) => {
+        engine.processChunk(chunk);
+      });
 
       const loudness = engine.finish();
       const metrics = calculateReplayGainMetrics(loudness);
@@ -377,7 +379,11 @@ async function generateReplayGainInWorker(
         await fs.mkdir(cacheDir, { recursive: true });
 
         const blockEnergies = engine.getBlockEnergies();
-        const buffer = Buffer.from(blockEnergies.buffer, blockEnergies.byteOffset, blockEnergies.byteLength);
+        const buffer = Buffer.from(
+          blockEnergies.buffer,
+          blockEnergies.byteOffset,
+          blockEnergies.byteLength
+        );
         const tempPath = `${destinationPath}.${process.pid}.${taskId}.tmp`;
         await fs.writeFile(tempPath, buffer);
 
@@ -438,17 +444,21 @@ async function generateReplayGainInWorker(
  * Atomically publishes a temp file to destination path.
  *
  * Invariants & Guarantees:
- * 1. Non-destructive: Never overwrites pre-existing destination files on any platform (POSIX or Windows).
- * 2. Hard-link primary: Uses fs.link for instantaneous, race-free publication on same-filesystem paths.
+ *
+ * 1. Non-destructive: Never overwrites pre-existing destination files on any platform (POSIX or
+ *    Windows).
+ * 2. Hard-link primary: Uses fs.link for instantaneous, race-free publication on same-filesystem
+ *    paths.
  * 3. Exclusive copy fallback: For cross-device (EXDEV) or restricted filesystems, uses fs.copyFile
- *    with COPYFILE_EXCL (O_CREAT | O_EXCL) to guarantee kernel-level exclusive creation without overwrite.
- * 4. Zero-byte safety: A zero-byte destination is considered corrupt / invalid. `already_existed` is returned
- *    ONLY when destination is non-empty (>0 bytes). If an existing file is 0-bytes, publication aborts with error
- *    to trigger garbage collection re-generation.
+ *    with COPYFILE_EXCL (O_CREAT | O_EXCL) to guarantee kernel-level exclusive creation without
+ *    overwrite.
+ * 4. Zero-byte safety: A zero-byte destination is considered corrupt / invalid. `already_existed` is
+ *    returned ONLY when destination is non-empty (>0 bytes). If an existing file is 0-bytes,
+ *    publication aborts with error to trigger garbage collection re-generation.
  * 5. Temp cleanup: Always unlinks tempPath on success, collision, or re-thrown error.
  *
- * Returns 'published' if this process successfully publishes the temp file to destination.
- * Returns 'already_existed' if destination already exists and is non-empty (idempotent collision).
+ * Returns 'published' if this process successfully publishes the temp file to destination. Returns
+ * 'already_existed' if destination already exists and is non-empty (idempotent collision).
  */
 export async function atomicPublishFile(
   tempPath: string,

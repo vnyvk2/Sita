@@ -1,22 +1,21 @@
+import { getNumericKey } from '../../../common/collections/id';
+import type { CollectionId } from '../../../common/collections/types';
 import { db } from '../../db/db';
 import type { MembershipService } from '../membership/MembershipService';
 import type { OperationExecutor } from '../operations/OperationExecutor';
 import type { OperationRegistry } from '../operations/OperationRegistry';
-import type { OperationJournalRepository } from '../repositories/OperationJournalRepository';
-import type { CollectionId } from '../../../common/collections/types';
-import { getNumericKey } from '../../../common/collections/id';
 import type { OperationInverseInput, OperationContext } from '../operations/types';
+import type { OperationJournalRepository } from '../repositories/OperationJournalRepository';
 
 /**
  * UndoEngine handles reverting and reapplying operations for collections.
- * 
- * Chosen Undo Model:
- * - Pointer-based history: We navigate a linear history using an in-memory pointer (`sequenceNumber`)
- *   rather than a branching tree of inverse operations.
- * - No journal writes during undo/redo: Reverting or reapplying an operation does not append new
- *   "undo" or "redo" entries to the journal. Instead, it simply shifts the pointer.
- * - Redo branch discarding: When a new external, forward operation is executed, the redo branch
- *   (any operations ahead of the current pointer) becomes unreachable and is logically discarded.
+ *
+ * Chosen Undo Model: - Pointer-based history: We navigate a linear history using an in-memory
+ * pointer (`sequenceNumber`) rather than a branching tree of inverse operations. - No journal
+ * writes during undo/redo: Reverting or reapplying an operation does not append new "undo" or
+ * "redo" entries to the journal. Instead, it simply shifts the pointer. - Redo branch discarding:
+ * When a new external, forward operation is executed, the redo branch (any operations ahead of the
+ * current pointer) becomes unreachable and is logically discarded.
  */
 export class UndoEngine {
   private readonly registry: OperationRegistry;
@@ -63,7 +62,11 @@ export class UndoEngine {
 
     if (currentSeq === undefined || currentSeq <= 0) return false; // Reached beginning of history
 
-    const journalEntry = await this.journalRepo.getCurrentOrPrevious(collectionId.type, numericKey, currentSeq);
+    const journalEntry = await this.journalRepo.getCurrentOrPrevious(
+      collectionId.type,
+      numericKey,
+      currentSeq
+    );
     if (!journalEntry) return false;
 
     const inverseInput = journalEntry.inverseInput as OperationInverseInput;
@@ -71,7 +74,9 @@ export class UndoEngine {
 
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      return await this.executor.execute(inverseOp, inverseInput.input, ctx, { writeJournal: false });
+      return await this.executor.execute(inverseOp, inverseInput.input, ctx, {
+        writeJournal: false
+      });
     });
 
     // Successfully undone. Update pointer.
@@ -98,7 +103,9 @@ export class UndoEngine {
 
     const result = await db.transaction(async (trx) => {
       const ctx: OperationContext = { trx, membershipService: this.membershipService };
-      return await this.executor.execute(op, nextEntry.operationInput, ctx, { writeJournal: false });
+      return await this.executor.execute(op, nextEntry.operationInput, ctx, {
+        writeJournal: false
+      });
     });
 
     // Successfully redone. Advance the pointer forwards only after successful execution
@@ -112,8 +119,8 @@ export class UndoEngine {
   }
 
   /**
-   * Called when a new operation is performed by a forward engine (like PlaylistEngine).
-   * This aligns the sequence pointer to the new operation.
+   * Called when a new operation is performed by a forward engine (like PlaylistEngine). This aligns
+   * the sequence pointer to the new operation.
    */
   public handleNewOperation(collectionId: CollectionId, newSequenceNumber: number): void {
     const key = collectionId.key;

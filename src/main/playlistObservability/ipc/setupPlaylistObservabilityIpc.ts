@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+
 import type { PlaylistObservabilityService } from '../services/PlaylistObservabilityService';
 
 export function setupPlaylistObservabilityIpc(

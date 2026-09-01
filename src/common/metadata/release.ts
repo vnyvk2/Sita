@@ -64,7 +64,10 @@ export interface AlbumMetadata {
   releaseId?: string;
   releaseGroupId?: string;
   provider?: MetadataProviderId;
-  /** Raw additive ranking score computed by MetadataSearchRankingEngine (heuristic range: ~-55 to 227). */
+  /**
+   * Raw additive ranking score computed by MetadataSearchRankingEngine (heuristic range: ~-55 to
+   * 227).
+   */
   rankingScore?: number;
   /** Per-component breakdown of rankingScore, when the search runtime provides it. */
   rankingBreakdown?: RankingScoreBreakdown;

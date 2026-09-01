@@ -69,7 +69,7 @@ describe('PlaylistEntryOps integration (real PGlite)', () => {
       .values(
         ['S1', 'S2', 'S3', 'S4'].map((title) => ({
           title,
-          duration: 180.000,
+          duration: 180.0,
           path: `C:\\music\\${randomUUID()}.mp3`,
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()

@@ -1,14 +1,14 @@
-import type { PlaylistImportService } from '../services/PlaylistImportService';
-import type { PlaylistPathResolver } from '../resolver/PlaylistPathResolver';
-import type { FilesystemVerifier } from '../verifier/FilesystemVerifier';
-import type { LibraryResolver } from '../resolver/LibraryResolver';
-import type { PlaylistRepairEngine } from '../repair/PlaylistRepairEngine';
-import type { PlaylistImportPlanner } from '../planner/PlaylistImportPlanner';
+import logger from '../../logger';
 import type { PlaylistImportOptions } from '../interfaces/PlaylistImporter';
 import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportProgress } from '../models/PlaylistImportProgress';
 import type { PlaylistImportStage } from '../models/PlaylistImportStage';
-import logger from '../../logger';
+import type { PlaylistImportPlanner } from '../planner/PlaylistImportPlanner';
+import type { PlaylistRepairEngine } from '../repair/PlaylistRepairEngine';
+import type { LibraryResolver } from '../resolver/LibraryResolver';
+import type { PlaylistPathResolver } from '../resolver/PlaylistPathResolver';
+import type { PlaylistImportService } from '../services/PlaylistImportService';
+import type { FilesystemVerifier } from '../verifier/FilesystemVerifier';
 
 export type ProgressListener = (progress: PlaylistImportProgress) => void;
 
@@ -36,10 +36,20 @@ export class PlaylistImportPipeline {
       this.emitProgress(onProgress, 'RESOLVING_PATHS', 'Resolving track file paths...', 50);
       const resolvedPlaylist = this.pathResolver.resolvePlaylist(importResult.playlist, filePath);
 
-      this.emitProgress(onProgress, 'VERIFYING_FILES', 'Checking track file existence on disk...', 70);
+      this.emitProgress(
+        onProgress,
+        'VERIFYING_FILES',
+        'Checking track file existence on disk...',
+        70
+      );
       const verifiedPlaylist = await this.verifier.verifyPlaylist(resolvedPlaylist);
 
-      this.emitProgress(onProgress, 'MATCHING_LIBRARY', 'Matching entries against Nora library...', 85);
+      this.emitProgress(
+        onProgress,
+        'MATCHING_LIBRARY',
+        'Matching entries against Nora library...',
+        85
+      );
       let libraryResolvedPlaylist = await this.libraryResolver.resolvePlaylist(verifiedPlaylist);
 
       for (const entry of libraryResolvedPlaylist.entries) {

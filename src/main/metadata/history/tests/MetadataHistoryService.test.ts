@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { db } from '../../../db/db';
+import { MetadataHistoryRepository } from '../MetadataHistoryRepository';
 import type { MetadataHistorySnapshot } from '../MetadataHistoryService';
 import { MetadataHistoryService } from '../MetadataHistoryService';
-import { MetadataHistoryRepository } from '../MetadataHistoryRepository';
 
 const makeSnapshot = (id: string, title: string): MetadataHistorySnapshot => ({
   id,

@@ -1,6 +1,7 @@
 import type { PlaylistDto } from '@common/collections/dtos';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useMergePlaylists } from '../../hooks/collections/useCollectionMutations';
 import { useRootCollections } from '../../hooks/collections/useCollectionQueries';
@@ -18,7 +19,8 @@ const formatSourcesText = (names: string[], ids: number[]) => {
 };
 
 export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = [] }: Props) => {
-  const { changePromptMenuData, toggleMultipleSelections, addNewNotifications } = useContext(AppUpdateContext);
+  const { changePromptMenuData, toggleMultipleSelections, addNewNotifications } =
+    useContext(AppUpdateContext);
   const { t } = useTranslation();
   const { data: allPlaylists = [] } = useRootCollections();
   const mergeMutation = useMergePlaylists();
@@ -51,7 +53,8 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
         onSuccess: () => {
           changePromptMenuData(false);
           toggleMultipleSelections(false);
-          const targetName = allPlaylists.find((p: PlaylistDto) => p.id === selectedTargetId)?.name || 'Playlist';
+          const targetName =
+            allPlaylists.find((p: PlaylistDto) => p.id === selectedTargetId)?.name || 'Playlist';
           const sourcesText = formatSourcesText(sourcePlaylistNames, sourcePlaylistIds);
           addNewNotifications([
             {
@@ -67,7 +70,10 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
           ]);
         },
         onError: (err) => {
-          const errorMessage = err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred.');
+          const errorMessage =
+            err instanceof Error
+              ? err.message
+              : t('common.unknownError', 'An unknown error occurred.');
           addNewNotifications([
             {
               id: 'playlistsMergeFailed',
@@ -78,15 +84,25 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
         }
       }
     );
-  }, [selectedTargetId, sourcePlaylistIds, sourcePlaylistNames, mergeMutation, changePromptMenuData, toggleMultipleSelections, allPlaylists, addNewNotifications, t]);
+  }, [
+    selectedTargetId,
+    sourcePlaylistIds,
+    sourcePlaylistNames,
+    mergeMutation,
+    changePromptMenuData,
+    toggleMultipleSelections,
+    allPlaylists,
+    addNewNotifications,
+    t
+  ]);
 
   return (
     <div className="flex flex-col gap-4 p-2">
-      <div className="text-2xl font-medium text-font-color-black dark:text-font-color-white">
+      <div className="text-font-color-black dark:text-font-color-white text-2xl font-medium">
         {t('playlistsPage.mergePlaylistsTitle', 'Merge Playlists')}
       </div>
 
-      <p className="text-sm opacity-80 text-font-color-black dark:text-font-color-white">
+      <p className="text-font-color-black dark:text-font-color-white text-sm opacity-80">
         {t('playlistsPage.mergeDescription', {
           count: sourcePlaylistIds.length,
           defaultValue: `Select a target playlist to merge ${sourcePlaylistIds.length} playlists into:`
@@ -94,9 +110,9 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
       </p>
 
       {sourcePlaylistNames.length > 0 && (
-        <div className="rounded-xl bg-background-color-2/50 dark:bg-dark-background-color-2/50 p-3 text-xs opacity-75">
-          <span className="font-semibold block mb-1">Source Playlists:</span>
-          <ul className="list-disc list-inside">
+        <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 rounded-xl p-3 text-xs opacity-75">
+          <span className="mb-1 block font-semibold">Source Playlists:</span>
+          <ul className="list-inside list-disc">
             {sourcePlaylistNames.map((name, i) => (
               <li key={i}>{name}</li>
             ))}
@@ -105,12 +121,12 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
       )}
 
       {candidateTargets.length > 0 ? (
-        <div className="flex flex-col gap-2 my-2">
-          <label className="text-xs font-semibold uppercase tracking-wider opacity-60">
+        <div className="my-2 flex flex-col gap-2">
+          <label className="text-xs font-semibold tracking-wider uppercase opacity-60">
             {t('playlistsPage.targetPlaylistLabel', 'Target Playlist')}
           </label>
           <select
-            className="w-full rounded-xl bg-background-color-2 dark:bg-dark-background-color-2 px-4 py-3 text-base text-font-color-black dark:text-font-color-white outline-none cursor-pointer"
+            className="bg-background-color-2 dark:bg-dark-background-color-2 text-font-color-black dark:text-font-color-white w-full cursor-pointer rounded-xl px-4 py-3 text-base outline-none"
             value={selectedTargetId ?? ''}
             onChange={(e) => setSelectedTargetId(Number(e.target.value))}
           >
@@ -130,7 +146,7 @@ export const MergePlaylistsPrompt = ({ sourcePlaylistIds, sourcePlaylistNames = 
       <div className="mt-4 flex justify-end gap-3">
         <Button
           label={t('common.cancel', 'Cancel')}
-          className="border-none bg-background-color-2/50 hover:bg-background-color-2 dark:bg-dark-background-color-2/50 dark:hover:bg-dark-background-color-2"
+          className="bg-background-color-2/50 hover:bg-background-color-2 dark:bg-dark-background-color-2/50 dark:hover:bg-dark-background-color-2 border-none"
           clickHandler={() => changePromptMenuData(false)}
         />
         <Button

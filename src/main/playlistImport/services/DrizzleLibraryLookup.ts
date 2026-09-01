@@ -1,11 +1,13 @@
 import { basename, extname } from 'path';
+
 import { eq, like, or, inArray } from 'drizzle-orm';
+
 import { db } from '../../db/db';
 import { songs } from '../../db/schema';
-import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
-import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
-import { normalizeCanonicalPath } from '../utils/normalizeCanonicalPath';
 import logger from '../../logger';
+import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
+import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
+import { normalizeCanonicalPath } from '../utils/normalizeCanonicalPath';
 
 export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProvider {
   async findByCanonicalPath(targetPath: string): Promise<LibrarySongRecord | null> {
@@ -91,7 +93,8 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       id: song.id,
       path: song.path,
       title: song.title ?? undefined,
-      duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+      duration:
+        song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
     };
   }
 
@@ -122,7 +125,10 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
           id: song.id,
           path: song.path,
           title: song.title ?? undefined,
-          duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+          duration:
+            song.duration !== null && song.duration !== undefined
+              ? Number(song.duration)
+              : undefined
         };
         exactMatchedMap.set(song.path, record);
       }
@@ -166,7 +172,10 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
           id: song.id,
           path: song.path,
           title: song.title ?? undefined,
-          duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+          duration:
+            song.duration !== null && song.duration !== undefined
+              ? Number(song.duration)
+              : undefined
         };
         altMatchedMap.set(song.path, record);
       }
@@ -221,7 +230,10 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
             id: song.id,
             path: song.path,
             title: song.title ?? undefined,
-            duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+            duration:
+              song.duration !== null && song.duration !== undefined
+                ? Number(song.duration)
+                : undefined
           });
         }
       }
@@ -273,12 +285,7 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
             duration: songs.duration
           })
           .from(songs)
-          .where(
-            or(
-              like(songs.path, `%${cleanTitle}%`),
-              like(songs.title, `%${cleanTitle}%`)
-            )
-          )
+          .where(or(like(songs.path, `%${cleanTitle}%`), like(songs.title, `%${cleanTitle}%`)))
           .limit(50);
       }
     }
@@ -287,7 +294,8 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       id: song.id,
       path: song.path,
       title: song.title ?? undefined,
-      duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+      duration:
+        song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
     }));
   }
 
@@ -318,12 +326,18 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
         const matchedForFn: LibrarySongRecord[] = [];
         for (const song of rows) {
           const songPathNormalized = song.path.replaceAll('\\', '/').toLowerCase();
-          if (songPathNormalized.endsWith(fnNormalized) || songPathNormalized.endsWith('/' + fnNormalized)) {
+          if (
+            songPathNormalized.endsWith(fnNormalized) ||
+            songPathNormalized.endsWith('/' + fnNormalized)
+          ) {
             matchedForFn.push({
               id: song.id,
               path: song.path,
               title: song.title ?? undefined,
-              duration: song.duration !== null && song.duration !== undefined ? Number(song.duration) : undefined
+              duration:
+                song.duration !== null && song.duration !== undefined
+                  ? Number(song.duration)
+                  : undefined
             });
           }
         }
@@ -333,7 +347,9 @@ export class DrizzleLibraryLookup implements LibraryLookup, LibraryCandidateProv
       }
     }
 
-    const unmatchedFilenames = uniqueFilenames.filter((fn) => !resultMap.has(fn) || resultMap.get(fn)!.length === 0);
+    const unmatchedFilenames = uniqueFilenames.filter(
+      (fn) => !resultMap.has(fn) || resultMap.get(fn)!.length === 0
+    );
     for (const fn of unmatchedFilenames) {
       const candidates = await this.getCandidatesForFilename(fn);
       if (candidates.length > 0) {

@@ -1,6 +1,6 @@
-import { shell, type SaveDialogOptions } from 'electron';
 import { writeFile, access } from 'fs/promises';
 import { dirname, relative, parse, join } from 'path';
+
 import type {
   PlaylistExportOptions,
   PlaylistExportFormat,
@@ -8,9 +8,11 @@ import type {
   BatchExportResult,
   BatchExportItemResult
 } from '@common/collections/types';
+import { shell, type SaveDialogOptions } from 'electron';
+
+import type { PlaylistRepository } from '../../collections/repositories/PlaylistRepository';
 import logger from '../../logger';
 import { sendMessageToRenderer, showSaveDialog, showOpenDialog } from '../../main';
-import type { PlaylistRepository } from '../../collections/repositories/PlaylistRepository';
 import { defaultFormatterRegistry, FormatterRegistry } from '../formatters/FormatterRegistry';
 
 const DEFAULT_OPTIONS: PlaylistExportOptions = {
@@ -32,9 +34,7 @@ export class ExportService {
     private formatterRegistry: FormatterRegistry = defaultFormatterRegistry
   ) {}
 
-  /**
-   * Core execution method: formats and writes a single playlist to a specific destination filepath.
-   */
+  /** Core execution method: formats and writes a single playlist to a specific destination filepath. */
   private async exportSinglePlaylistToFile(
     playlistId: number,
     destinationFilePath: string,
@@ -79,9 +79,7 @@ export class ExportService {
     await writeFile(destinationFilePath, fileData, 'utf-8');
   }
 
-  /**
-   * Export a single playlist using native Save File dialog.
-   */
+  /** Export a single playlist using native Save File dialog. */
   async exportPlaylist(
     playlistId: number,
     options?: Partial<PlaylistExportOptions>
@@ -133,8 +131,8 @@ export class ExportService {
   }
 
   /**
-   * Export multiple playlists in batch into a destination folder.
-   * Auto-resolves filename collisions and isolates errors per playlist.
+   * Export multiple playlists in batch into a destination folder. Auto-resolves filename collisions
+   * and isolates errors per playlist.
    */
   async exportPlaylists(
     playlistIds: number[],
@@ -198,7 +196,10 @@ export class ExportService {
       let candidateFilename = `${safeBaseName}${ext}`;
       let counter = 1;
 
-      while (usedFilenames.has(candidateFilename.toLowerCase()) || (await fileExists(join(destinationDir, candidateFilename)))) {
+      while (
+        usedFilenames.has(candidateFilename.toLowerCase()) ||
+        (await fileExists(join(destinationDir, candidateFilename)))
+      ) {
         candidateFilename = `${safeBaseName} (${counter})${ext}`;
         counter++;
       }
@@ -218,7 +219,10 @@ export class ExportService {
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Batch export failed for playlist '${playlistName}'`, { error: errorMessage, playlistId });
+        logger.error(`Batch export failed for playlist '${playlistName}'`, {
+          error: errorMessage,
+          playlistId
+        });
 
         items.push({
           playlistId,
@@ -235,7 +239,9 @@ export class ExportService {
       destinationDir
     };
 
-    logger.info(`Batch export completed. Total: ${result.totalCount}, Successful: ${items.filter(i => i.success).length}`);
+    logger.info(
+      `Batch export completed. Total: ${result.totalCount}, Successful: ${items.filter((i) => i.success).length}`
+    );
 
     // Open target folder upon batch completion
     if (destinationDir) {
@@ -247,7 +253,10 @@ export class ExportService {
     return result;
   }
 
-  private generateSaveDialogOptions(playlistName: string, format: PlaylistExportFormat): SaveDialogOptions {
+  private generateSaveDialogOptions(
+    playlistName: string,
+    format: PlaylistExportFormat
+  ): SaveDialogOptions {
     const extension = format;
     const formatLabel = extension === 'm3u' ? 'M3U Playlist (*.m3u)' : 'M3U8 Playlist (*.m3u8)';
     return {

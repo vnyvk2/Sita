@@ -1,5 +1,5 @@
-import type { AudioDecoder, AudioFormatInfo, DecodeChunk, DecodeStreamOptions } from './types';
 import { WavAudioDecoder } from './decoders/WavAudioDecoder';
+import type { AudioDecoder, AudioFormatInfo, DecodeChunk, DecodeStreamOptions } from './types';
 
 export class AudioDecoderRegistry {
   private readonly decoders: AudioDecoder[] = [];

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { MetadataQueryNormalizer } from '@main/metadata/search/MetadataQueryNormalizer';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataQueryNormalizer', () => {
   describe('compareStringSimilarity with Unicode', () => {

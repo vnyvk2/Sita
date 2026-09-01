@@ -1,6 +1,6 @@
 import type { ImportStatistics } from './ImportStatistics';
-import type { PlaylistImportExecutionResult } from './PlaylistImportExecutionResult';
 import type { ImportWarning } from './ImportWarning';
+import type { PlaylistImportExecutionResult } from './PlaylistImportExecutionResult';
 import type { RepairSummary } from './RepairSummary';
 
 export type SessionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'UNDONE';

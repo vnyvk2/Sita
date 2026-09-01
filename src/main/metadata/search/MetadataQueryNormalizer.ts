@@ -31,10 +31,17 @@ export class MetadataQueryNormalizer {
     const rawArtist = artist ?? '';
 
     const lowerTitle = rawTitle.toLowerCase();
-    const isDeluxeRequested = lowerTitle.includes('deluxe') || lowerTitle.includes('expanded') || lowerTitle.includes('bonus') || lowerTitle.includes('platinum');
+    const isDeluxeRequested =
+      lowerTitle.includes('deluxe') ||
+      lowerTitle.includes('expanded') ||
+      lowerTitle.includes('bonus') ||
+      lowerTitle.includes('platinum');
     const isRemasterRequested = lowerTitle.includes('remaster');
     const isLiveRequested = lowerTitle.includes('live') || lowerTitle.includes('concert');
-    const isCompilationRequested = lowerTitle.includes('greatest hits') || lowerTitle.includes('best of') || lowerTitle.includes('anthology');
+    const isCompilationRequested =
+      lowerTitle.includes('greatest hits') ||
+      lowerTitle.includes('best of') ||
+      lowerTitle.includes('anthology');
 
     let cleanTitle = rawTitle;
     for (const pattern of this.NOISE_PATTERNS) {

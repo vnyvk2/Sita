@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { collectionKeys } from '../../../../../src/renderer/src/api/collectionKeys';
 
 describe('collectionKeys Factory', () => {

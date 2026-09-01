@@ -1,8 +1,7 @@
+import NavigationControlsContainer from '@renderer/components/TitleBar/NavigationControlsContainer';
 // @vitest-environment jsdom
 import { fireEvent, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import NavigationControlsContainer from '@renderer/components/TitleBar/NavigationControlsContainer';
 
 // Mock dependencies
 const mockHistoryBack = vi.fn();
@@ -90,9 +89,7 @@ describe('NavigationControlsContainer', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/main-player/home' });
     // Verify it is NOT called with replace: true
-    expect(mockNavigate).not.toHaveBeenCalledWith(
-      expect.objectContaining({ replace: true })
-    );
+    expect(mockNavigate).not.toHaveBeenCalledWith(expect.objectContaining({ replace: true }));
   });
 
   it('respects disableHomeButton prop', () => {

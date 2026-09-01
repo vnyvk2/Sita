@@ -1,7 +1,8 @@
 ﻿import React, { memo, useState } from 'react';
+
 import Button from '../Button';
-import type { EditableField } from './types';
 import type { BulkFieldOperation } from './batchTransforms/types';
+import type { EditableField } from './types';
 
 export interface BulkSetValuesModalProps {
   isOpen: boolean;
@@ -93,15 +94,15 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-background-color-1 p-6 shadow-2xl dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 w-full max-w-lg rounded-2xl border p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
+            <h2 className="text-font-color-black dark:text-font-color-white text-lg font-semibold">
               Set Values Across Selection
             </h2>
-            <p className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
               Apply common metadata values to {selectedCount} selected tracks.
             </p>
           </div>
@@ -114,7 +115,7 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
         </div>
 
         {/* Fields list */}
-        <div className="max-h-96 overflow-y-auto space-y-3 pr-1 py-1">
+        <div className="max-h-96 space-y-3 overflow-y-auto py-1 pr-1">
           {FIELDS.map(({ field, label, type, placeholder }) => {
             const isEnabled = activeFields[field];
             const isClear = clearFlags[field];
@@ -129,20 +130,20 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-font-color-black dark:text-font-color-white">
+                  <label className="text-font-color-black dark:text-font-color-white flex cursor-pointer items-center gap-2 text-xs font-semibold select-none">
                     <input
                       type="checkbox"
                       checked={isEnabled}
                       onChange={(e) => {
                         setActiveFields((prev) => ({ ...prev, [field]: e.target.checked }));
                       }}
-                      className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+                      className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
                     />
                     <span>{label}</span>
                   </label>
 
                   {isEnabled && (
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                    <label className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex cursor-pointer items-center gap-1.5 text-xs">
                       <input
                         type="checkbox"
                         checked={isClear}
@@ -165,7 +166,7 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
                       onChange={(e) => {
                         setValues((prev) => ({ ...prev, [field]: e.target.value }));
                       }}
-                      className="w-full rounded-lg border border-background-color-2 bg-background-color-1 px-3 py-1.5 text-xs text-font-color-black focus:border-font-color-highlight focus:outline-none dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight"
+                      className="border-background-color-2 bg-background-color-1 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight w-full rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
                     />
                   </div>
                 )}
@@ -176,20 +177,20 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
 
         {/* Footer */}
         <div className="mt-6 flex items-center justify-between">
-          <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
             {enabledFieldCount} field{enabledFieldCount === 1 ? '' : 's'} selected
           </span>
           <div className="flex gap-2">
             <Button
               label="Cancel"
               clickHandler={onClose}
-              className="bg-transparent hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 text-font-color-black dark:text-font-color-white text-xs px-4 py-2 rounded-lg font-medium cursor-pointer"
+              className="hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 text-font-color-black dark:text-font-color-white cursor-pointer rounded-lg bg-transparent px-4 py-2 text-xs font-medium"
             />
             <Button
               label={`Apply to ${selectedCount} Tracks`}
               clickHandler={handleApply}
               isDisabled={enabledFieldCount === 0}
-              className="bg-font-color-highlight dark:bg-dark-font-color-highlight text-white text-xs px-4 py-2 rounded-lg font-medium cursor-pointer disabled:opacity-40"
+              className="bg-font-color-highlight dark:bg-dark-font-color-highlight cursor-pointer rounded-lg px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
             />
           </div>
         </div>

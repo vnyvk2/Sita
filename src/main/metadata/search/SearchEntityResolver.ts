@@ -1,4 +1,5 @@
 import type { SearchMatchReference } from '@main/search/models/SearchMatchReference';
+
 import { MetadataIdentity } from '../models/MetadataIdentity';
 import { MetadataKinds } from '../models/MetadataKind';
 

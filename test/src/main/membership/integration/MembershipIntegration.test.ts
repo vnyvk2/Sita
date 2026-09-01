@@ -1,15 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import { MembershipCache } from '@main/membership/cache/MembershipCache';
 import { MembershipEventBus } from '@main/membership/events/MembershipEventBus';
 import type { MembershipEntry } from '@main/membership/models/MembershipEntry';
 import type { IMembershipRepository } from '@main/membership/repository/IMembershipRepository';
 import { MembershipService } from '@main/membership/service/MembershipService';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('MembershipIntegration', () => {
   it('should verify Repository -> Cache -> Service -> EventBus pipeline', async () => {
     const mockEntries: MembershipEntry[] = [
-      { collectionKind: 'playlist', collectionId: 42, memberKind: 'song', memberId: 777, position: 1 }
+      {
+        collectionKind: 'playlist',
+        collectionId: 42,
+        memberKind: 'song',
+        memberId: 777,
+        position: 1
+      }
     ];
 
     const mockRepo: IMembershipRepository = {
@@ -50,7 +55,13 @@ describe('MembershipIntegration', () => {
     // When a transactional query runs (passing trx !== db), we expect it to query the database directly
     // and NOT fetch from or populate the in-memory cache.
     const mockEntries: MembershipEntry[] = [
-      { collectionKind: 'playlist', collectionId: 10, memberKind: 'song', memberId: 101, position: 1 }
+      {
+        collectionKind: 'playlist',
+        collectionId: 10,
+        memberKind: 'song',
+        memberId: 101,
+        position: 1
+      }
     ];
 
     const mockRepo: IMembershipRepository = {
@@ -72,12 +83,18 @@ describe('MembershipIntegration', () => {
     expect(cache.hasMembers('playlist', 10, 'song')).toBe(true);
 
     // Call contains (which checks cache)
-    const containsCached = await service.contains({ kind: 'playlist', id: 10 }, { kind: 'song', id: 101 });
+    const containsCached = await service.contains(
+      { kind: 'playlist', id: 10 },
+      { kind: 'song', id: 101 }
+    );
     expect(containsCached).toBe(true);
     expect(mockRepo.contains).not.toHaveBeenCalled();
 
     // Call contains with direct repo query bypassing service (simulating transactional path)
-    const containsDirect = await mockRepo.contains({ kind: 'playlist', id: 10 }, { kind: 'song', id: 101 });
+    const containsDirect = await mockRepo.contains(
+      { kind: 'playlist', id: 10 },
+      { kind: 'song', id: 101 }
+    );
     expect(containsDirect).toBe(true);
     expect(mockRepo.contains).toHaveBeenCalledTimes(1);
   });
@@ -104,7 +121,10 @@ describe('MembershipIntegration', () => {
     cache.setCollectionsContaining('song', 500, 'playlist', [{ kind: 'playlist', id: 5 }]);
 
     // Batch query both song 500 (cached) and song 501 (uncached)
-    const members = [{ kind: 'song' as const, id: 500 }, { kind: 'song' as const, id: 501 }];
+    const members = [
+      { kind: 'song' as const, id: 500 },
+      { kind: 'song' as const, id: 501 }
+    ];
     const result = await service.getCollectionsContainingMany(members, 'playlist');
 
     expect(result.get(500)?.length).toBe(1);
@@ -119,8 +139,20 @@ describe('MembershipIntegration', () => {
 
   it('should verify duplicate playlist entries are cached and handled correctly', async () => {
     const duplicateEntries: MembershipEntry[] = [
-      { collectionKind: 'playlist', collectionId: 200, memberKind: 'song', memberId: 99, position: 1 },
-      { collectionKind: 'playlist', collectionId: 200, memberKind: 'song', memberId: 99, position: 2 }
+      {
+        collectionKind: 'playlist',
+        collectionId: 200,
+        memberKind: 'song',
+        memberId: 99,
+        position: 1
+      },
+      {
+        collectionKind: 'playlist',
+        collectionId: 200,
+        memberKind: 'song',
+        memberId: 99,
+        position: 2
+      }
     ];
 
     const mockRepo: IMembershipRepository = {

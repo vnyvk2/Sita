@@ -1,7 +1,8 @@
-import { net } from 'electron';
 import { getUserSettings } from '@main/db/queries/settings';
 import { getSongById } from '@main/db/queries/songs';
 import { convertToSongData } from '@main/utils/convert';
+import { net } from 'electron';
+
 import type { ListenBrainzSubmitListensPayload } from '../../../types/listen_brainz_api';
 import logger from '../../logger';
 import getListenBrainzAuthData from './getListenBrainzAuthData';
@@ -53,7 +54,9 @@ export const sendNowPlayingSongDataToListenBrainz = async (songId: number): Prom
             additional_info: {
               media_player: 'Nora',
               submission_client: 'Nora',
-              submission_client_version: getListenBrainzUserAgent().split(' ')[0].replace('Nora/', ''),
+              submission_client_version: getListenBrainzUserAgent()
+                .split(' ')[0]
+                .replace('Nora/', ''),
               duration_ms: Math.round(song.duration * 1000),
               tracknumber: song.trackNo ?? undefined,
               musicbrainz_recording_id: song.musicBrainzId || undefined

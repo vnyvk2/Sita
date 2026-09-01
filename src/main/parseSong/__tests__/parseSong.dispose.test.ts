@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@db/db';
 import { isSongWithPathAvailable, saveSong } from '@db/queries/songs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { parseSong } from '../parseSong';
 
 vi.mock('fs/promises', () => ({
@@ -112,9 +113,13 @@ describe('parseSong native File.dispose() lifecycle', () => {
       mtime: new Date()
     } as any);
 
-    vi.mocked(isSongWithPathAvailable).mockRejectedValue(new Error('DB failure during eligibility check'));
+    vi.mocked(isSongWithPathAvailable).mockRejectedValue(
+      new Error('DB failure during eligibility check')
+    );
 
-    await expect(parseSong('/music/test.mp3')).rejects.toThrow('DB failure during eligibility check');
+    await expect(parseSong('/music/test.mp3')).rejects.toThrow(
+      'DB failure during eligibility check'
+    );
 
     // file.dispose() must still be called via finally block
     expect(mockDispose).toHaveBeenCalledTimes(1);

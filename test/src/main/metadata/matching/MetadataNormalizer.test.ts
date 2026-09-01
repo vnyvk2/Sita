@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataNormalizer', () => {
   describe('normalizeTitle', () => {
@@ -11,7 +11,9 @@ describe('MetadataNormalizer', () => {
 
     it('preserves Cyrillic characters in titles', () => {
       expect(MetadataNormalizer.normalizeTitle('Группа крови')).toBe('группа крови');
-      expect(MetadataNormalizer.normalizeTitle('Звезда по имени Солнце')).toBe('звезда по имени солнце');
+      expect(MetadataNormalizer.normalizeTitle('Звезда по имени Солнце')).toBe(
+        'звезда по имени солнце'
+      );
     });
 
     it('preserves Arabic characters in titles', () => {
@@ -24,19 +26,27 @@ describe('MetadataNormalizer', () => {
     });
 
     it('strips cosmetic noise and variants while preserving Unicode content', () => {
-      expect(MetadataNormalizer.normalizeTitle('YOASOBI - 夜に駆ける (Official Music Video)')).toBe('yoasobi 夜に駆ける');
-      expect(MetadataNormalizer.normalizeTitle('Кино - Группа крови [Live]')).toBe('кино группа крови');
+      expect(MetadataNormalizer.normalizeTitle('YOASOBI - 夜に駆ける (Official Music Video)')).toBe(
+        'yoasobi 夜に駆ける'
+      );
+      expect(MetadataNormalizer.normalizeTitle('Кино - Группа крови [Live]')).toBe(
+        'кино группа крови'
+      );
     });
 
     it('produces identical normalized output for composed and decomposed Unicode representations', () => {
       const composed = 'Café';
       const decomposed = 'Cafe\u0301';
-      expect(MetadataNormalizer.normalizeTitle(composed)).toBe(MetadataNormalizer.normalizeTitle(decomposed));
+      expect(MetadataNormalizer.normalizeTitle(composed)).toBe(
+        MetadataNormalizer.normalizeTitle(decomposed)
+      );
       expect(MetadataNormalizer.normalizeTitle(composed)).toBe('cafe');
 
       const cjkComposed = '夜に駆ける'.normalize('NFC');
       const cjkDecomposed = '夜に駆ける'.normalize('NFD');
-      expect(MetadataNormalizer.normalizeTitle(cjkComposed)).toBe(MetadataNormalizer.normalizeTitle(cjkDecomposed));
+      expect(MetadataNormalizer.normalizeTitle(cjkComposed)).toBe(
+        MetadataNormalizer.normalizeTitle(cjkDecomposed)
+      );
     });
 
     it('returns empty string for inputs without letters or digits (e.g. pure emojis or symbols)', () => {
@@ -56,14 +66,18 @@ describe('MetadataNormalizer', () => {
 
     it('normalizes collaborations while preserving international names', () => {
       expect(MetadataNormalizer.normalizeArtist('YOASOBI feat. 初音ミク')).toBe('yoasobi 初音ミク');
-      expect(MetadataNormalizer.normalizeArtist('A.R. Rahman with Sid Sriram')).toBe('ar rahman sid sriram');
+      expect(MetadataNormalizer.normalizeArtist('A.R. Rahman with Sid Sriram')).toBe(
+        'ar rahman sid sriram'
+      );
     });
   });
 
   describe('normalizeAlbum', () => {
     it('preserves international album names and strips cosmetic noise', () => {
       expect(MetadataNormalizer.normalizeAlbum('THE BOOK (Official Audio)')).toBe('the book');
-      expect(MetadataNormalizer.normalizeAlbum('Звезда по имени Солнце (Music Video)')).toBe('звезда по имени солнце');
+      expect(MetadataNormalizer.normalizeAlbum('Звезда по имени Солнце (Music Video)')).toBe(
+        'звезда по имени солнце'
+      );
     });
   });
 });

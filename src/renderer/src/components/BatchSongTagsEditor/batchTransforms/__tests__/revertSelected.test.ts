@@ -1,7 +1,8 @@
 ﻿import { describe, expect, it } from 'vitest';
+
+import type { BatchTrackRow } from '../../types';
 import { revertSelected } from '../revertSelected';
 import type { BatchTransformContext } from '../types';
-import type { BatchTrackRow } from '../../types';
 
 describe('batchTransforms — revertSelected', () => {
   it('reverts only selected dirty rows back to snapshot baseline and preserves unselected edits', () => {

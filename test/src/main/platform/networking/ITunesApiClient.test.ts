@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
 import { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('ITunesApiClient', () => {
   it('searches for artist albums and returns formatted results', async () => {

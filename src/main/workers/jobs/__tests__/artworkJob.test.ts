@@ -1,11 +1,12 @@
 import { EventEmitter } from 'events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { db } from '@main/db/db';
 import { getAlbumById } from '@main/db/queries/albums';
 import { linkArtworksToAlbum, saveArtworks } from '@main/db/queries/artworks';
-import { db } from '@main/db/db';
 import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { ArtworkJob, CURRENT_ARTWORK_GENERATOR_VERSION } from '../artworkJob';
 
@@ -84,12 +85,30 @@ describe('ArtworkJob (Phase C4-B)', () => {
 
   describe('Artwork Hash Reuse Permutations', () => {
     const payloads = [
-      { hash: 'full_hash', path: '/artworks/full.webp', isOptimized: false, width: 500, height: 500, source: 'LOCAL' as const },
-      { hash: 'opt_hash', path: '/artworks/opt.webp', isOptimized: true, width: 50, height: 50, source: 'LOCAL' as const }
+      {
+        hash: 'full_hash',
+        path: '/artworks/full.webp',
+        isOptimized: false,
+        width: 500,
+        height: 500,
+        source: 'LOCAL' as const
+      },
+      {
+        hash: 'opt_hash',
+        path: '/artworks/opt.webp',
+        isOptimized: true,
+        width: 50,
+        height: 50,
+        source: 'LOCAL' as const
+      }
     ];
 
     it('case 1: neither hash exists -> saveArtworks saves both, linkArtworksToAlbum links both', async () => {
-      vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+      vi.mocked(getAlbumById).mockResolvedValue({
+        id: 1,
+        title: 'Test Album',
+        artworks: []
+      } as any);
       vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
         success: true,
         outputFilePath: '/artworks/full.webp',
@@ -145,7 +164,11 @@ describe('ArtworkJob (Phase C4-B)', () => {
     });
 
     it('case 2: both hashes exist in DB -> reuses existing without calling saveArtworks', async () => {
-      vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+      vi.mocked(getAlbumById).mockResolvedValue({
+        id: 1,
+        title: 'Test Album',
+        artworks: []
+      } as any);
       vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
         success: true,
         outputFilePath: '/artworks/full.webp',
@@ -187,7 +210,11 @@ describe('ArtworkJob (Phase C4-B)', () => {
     });
 
     it('case 3: full exists but optimized is missing -> saveArtworks only saves missing opt and links both', async () => {
-      vi.mocked(getAlbumById).mockResolvedValue({ id: 1, title: 'Test Album', artworks: [] } as any);
+      vi.mocked(getAlbumById).mockResolvedValue({
+        id: 1,
+        title: 'Test Album',
+        artworks: []
+      } as any);
       vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
         success: true,
         outputFilePath: '/artworks/full.webp',
@@ -222,10 +249,7 @@ describe('ArtworkJob (Phase C4-B)', () => {
       await job.execute();
 
       // Verify saveArtworks was called ONLY for the missing 'opt_hash' payload
-      expect(saveArtworks).toHaveBeenCalledWith(
-        [payloads[1]],
-        expect.anything()
-      );
+      expect(saveArtworks).toHaveBeenCalledWith([payloads[1]], expect.anything());
       // Verify both are linked to the album
       expect(linkArtworksToAlbum).toHaveBeenCalledWith(
         [

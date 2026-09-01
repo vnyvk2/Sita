@@ -7,9 +7,7 @@ export interface TaglibPictureLike {
   pictureType?: number | string;
 }
 
-export function extractFrontCover(
-  pictures?: TaglibPictureLike[]
-): Uint8Array | undefined {
+export function extractFrontCover(pictures?: TaglibPictureLike[]): Uint8Array | undefined {
   if (!pictures || pictures.length === 0) {
     return undefined;
   }

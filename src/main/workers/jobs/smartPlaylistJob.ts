@@ -1,5 +1,5 @@
-import type { Job, JobClass, JobState } from '../types';
 import { SmartPlaylistEngine } from '../../collections/engine/SmartPlaylistEngine';
+import type { Job, JobClass, JobState } from '../types';
 
 export class SmartPlaylistJob implements Job {
   public state: JobState = 'queued';
@@ -7,7 +7,7 @@ export class SmartPlaylistJob implements Job {
   public retries = 0;
   public readonly maxRetries = 3;
   public readonly description: string;
-  
+
   private engine = new SmartPlaylistEngine();
 
   constructor(

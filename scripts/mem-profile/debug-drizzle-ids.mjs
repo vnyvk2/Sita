@@ -1,9 +1,9 @@
 import { PGlite } from '@electric-sql/pglite';
 import { citext } from '@electric-sql/pglite/contrib/citext';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { drizzle } from 'drizzle-orm/pglite';
-import { integer, varchar, boolean, pgTable } from 'drizzle-orm/pg-core';
 import { asc } from 'drizzle-orm';
+import { integer, varchar, boolean, pgTable } from 'drizzle-orm/pg-core';
+import { drizzle } from 'drizzle-orm/pglite';
 
 const songs = pgTable('songs', {
   id: integer('id').primaryKey(),

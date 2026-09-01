@@ -56,8 +56,6 @@ type GenreResult = { genreId?: number; name: string; artworkPath?: string };
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
-
-
 interface SongTagsEditingPageProps {
   routeParams?: { songId: number };
 }
@@ -139,8 +137,11 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
           return undefined;
         })
         .catch((err) => {
-          console.warn('[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:', err);
-           return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
+          console.warn(
+            '[SongTagsEditingPage] Embedded ID3 unavailable, using database metadata:',
+            err
+          );
+          return window.api.audioLibraryControls.getSongInfo([songId]).then((songs) => {
             if (songs?.[0]) {
               const song = songs[0];
               const fallbackData: EditableSongTags = {
@@ -173,7 +174,9 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                 }
                 return undefined;
               })
-              .catch((err) => console.error('[SongTagsEditingPage] Metadata override load error:', err));
+              .catch((err) =>
+                console.error('[SongTagsEditingPage] Metadata override load error:', err)
+              );
           }
         });
     }
@@ -188,7 +191,9 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
             getSongId3Tags();
             return undefined;
           })
-          .catch((err) => console.error(`[SongTagsEditingPage] Failed to reset field ${fieldId}:`, err));
+          .catch((err) =>
+            console.error(`[SongTagsEditingPage] Failed to reset field ${fieldId}:`, err)
+          );
       }
     },
     [songId, getSongId3Tags]
@@ -245,7 +250,12 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (artistKeyword.trim()) {
       window.api.search
-        .query({ filter: 'Artists', keyword: artistKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
+        .query({
+          filter: 'Artists',
+          keyword: artistKeyword,
+          updateSearchHistory: false,
+          isSimilaritySearchEnabled: false
+        })
         .then((res) => {
           console.log(res);
           if (res.artists.length > 0)
@@ -269,7 +279,12 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (albumKeyword.trim()) {
       window.api.search
-        .query({ filter: 'Albums', keyword: albumKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
+        .query({
+          filter: 'Albums',
+          keyword: albumKeyword,
+          updateSearchHistory: false,
+          isSimilaritySearchEnabled: false
+        })
         .then((res) => {
           console.log(res);
           if (res.albums.length > 0)
@@ -293,7 +308,12 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (albumArtistKeyword.trim()) {
       window.api.search
-        .query({ filter: 'Artists', keyword: albumArtistKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
+        .query({
+          filter: 'Artists',
+          keyword: albumArtistKeyword,
+          updateSearchHistory: false,
+          isSimilaritySearchEnabled: false
+        })
         .then((res) => {
           console.log(res);
           if (res.artists.length > 0)
@@ -317,7 +337,12 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
   useEffect(() => {
     if (genreKeyword.trim()) {
       window.api.search
-        .query({ filter: 'Genres', keyword: genreKeyword, updateSearchHistory: false, isSimilaritySearchEnabled: false })
+        .query({
+          filter: 'Genres',
+          keyword: genreKeyword,
+          updateSearchHistory: false,
+          isSimilaritySearchEnabled: false
+        })
         .then((res) => {
           console.log(res);
           if (res.genres.length > 0)
@@ -412,7 +437,9 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                   tags: songInfo.tags && songInfo.tags.length > 0 ? songInfo.tags : undefined
                 }
               )
-              .catch((err) => console.error('[SongTagsEditingPage] Metadata override save error:', err));
+              .catch((err) =>
+                console.error('[SongTagsEditingPage] Metadata override save error:', err)
+              );
           }
           // addNewNotifications([
           //   {
@@ -593,7 +620,7 @@ function SongTagsEditingPage({ routeParams }: SongTagsEditingPageProps = {}) {
                 />
               </div>
             </div>
-            <div className="mb-6 p-3 px-4 rounded-xl bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10 border border-font-color-highlight/20 text-xs flex items-center space-x-2 text-font-color-highlight dark:text-dark-font-color-highlight">
+            <div className="bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10 border-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight mb-6 flex items-center space-x-2 rounded-xl border p-3 px-4 text-xs">
               <span className="material-icons-round text-base">info</span>
               <span>{t('songTagsEditingPage.localOverrideNotice')}</span>
             </div>

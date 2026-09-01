@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-
+import { AlbumMapper } from '@main/metadata/mappers/AlbumMapper';
+import { ArtistMapper } from '@main/metadata/mappers/ArtistMapper';
+import { GenreMapper } from '@main/metadata/mappers/GenreMapper';
+import { MapperRegistry } from '@main/metadata/mappers/MapperRegistry';
+import { PlaylistMapper } from '@main/metadata/mappers/PlaylistMapper';
+import { SongMapper } from '@main/metadata/mappers/SongMapper';
 import type {
   AlbumPersistenceDTO,
   ArtistPersistenceDTO,
@@ -7,14 +11,8 @@ import type {
   PlaylistPersistenceDTO,
   SongPersistenceDTO
 } from '@main/metadata/models/dtos';
-
-import { AlbumMapper } from '@main/metadata/mappers/AlbumMapper';
-import { ArtistMapper } from '@main/metadata/mappers/ArtistMapper';
-import { GenreMapper } from '@main/metadata/mappers/GenreMapper';
-import { MapperRegistry } from '@main/metadata/mappers/MapperRegistry';
-import { PlaylistMapper } from '@main/metadata/mappers/PlaylistMapper';
-import { SongMapper } from '@main/metadata/mappers/SongMapper';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
+import { describe, expect, it } from 'vitest';
 
 describe('Entity Mappers & MapperRegistry', () => {
   it('should map SongPersistenceDTO to MetadataEntity', () => {

@@ -2,14 +2,17 @@ import type { LoudnessResult } from './BS1770LoudnessEngine';
 
 export interface ReplayGainOptions {
   /**
-   * Target loudness level in LUFS (default is -18.0 LUFS for Nora / ReplayGain 2.0 policy).
-   * Note: EBU R128 broadcast standard uses -23.0 LUFS.
+   * Target loudness level in LUFS (default is -18.0 LUFS for Nora / ReplayGain 2.0 policy). Note:
+   * EBU R128 broadcast standard uses -23.0 LUFS.
    */
   targetLufs?: number;
 }
 
 export interface ReplayGainMetrics {
-  /** Recommended gain adjustment in dB relative to target (trackGain = targetLufs - integratedLoudness) */
+  /**
+   * Recommended gain adjustment in dB relative to target (trackGain = targetLufs -
+   * integratedLoudness)
+   */
   trackGain: number;
   /** Peak discrete sample amplitude [0.0, 1.0+] */
   trackPeak: number;
@@ -22,9 +25,9 @@ export interface ReplayGainMetrics {
 }
 
 /**
- * Pure policy calculation of ReplayGain adjustment (dB) from integrated loudness (LUFS).
- * Gain (dB) = Target (LUFS) - Integrated Loudness (LUFS)
- * If integrated loudness is -Infinity (e.g. silence or <400ms), returns 0.0 dB.
+ * Pure policy calculation of ReplayGain adjustment (dB) from integrated loudness (LUFS). Gain (dB)
+ * = Target (LUFS) - Integrated Loudness (LUFS) If integrated loudness is -Infinity (e.g. silence or
+ * <400ms), returns 0.0 dB.
  */
 export function calculateLoudnessGain(
   integratedLoudness: number,
@@ -37,9 +40,7 @@ export function calculateLoudnessGain(
   return Math.round((targetLufs - integratedLoudness) * 100) / 100;
 }
 
-/**
- * Pure policy conversion from BS.1770 LoudnessResult to Nora ReplayGain metrics.
- */
+/** Pure policy conversion from BS.1770 LoudnessResult to Nora ReplayGain metrics. */
 export function calculateReplayGainMetrics(
   loudness: LoudnessResult,
   options?: ReplayGainOptions

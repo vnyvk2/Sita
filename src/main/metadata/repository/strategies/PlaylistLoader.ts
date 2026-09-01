@@ -3,9 +3,8 @@ import { playlists, playlistEntries } from '@db/schema';
 import { eq, inArray, asc } from 'drizzle-orm';
 
 import type { PlaylistPersistenceDTO } from '../../models/dtos';
-import type { IEntityLoader } from './IEntityLoader';
-
 import { MetadataKinds } from '../../models/MetadataKind';
+import type { IEntityLoader } from './IEntityLoader';
 
 const PLAYLIST_RELATIONS = {
   entries: {

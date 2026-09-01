@@ -1,13 +1,14 @@
 import { DIAMOND_PRESETS } from '../constants/diamondPresets';
 import { FAN_PRESETS } from '../constants/fanPresets';
 import { TRIANGLE_PRESETS } from '../constants/trianglePresets';
-import type { ClipPathArtworkCount, CoverLayoutVariant, PlaylistCoverLayout } from '../types/playlistCover';
+import type {
+  ClipPathArtworkCount,
+  CoverLayoutVariant,
+  PlaylistCoverLayout
+} from '../types/playlistCover';
 
 const GRID_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 50% 0, 50% 100%, 0 100%)',
-    'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'
-  ],
+  2: ['polygon(0 0, 50% 0, 50% 100%, 0 100%)', 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'],
   3: [
     'polygon(0 0, 50% 0, 50% 100%, 0 100%)',
     'polygon(50% 0, 100% 0, 100% 50%, 50% 50%)',
@@ -33,7 +34,7 @@ export function getLayoutClipPaths(
   variant?: CoverLayoutVariant,
   count: number = 4
 ): readonly string[] {
-  const validCount = (Math.max(2, Math.min(5, count)) as ClipPathArtworkCount);
+  const validCount = Math.max(2, Math.min(5, count)) as ClipPathArtworkCount;
 
   if (layout === 'grid') {
     return GRID_PRESETS[validCount] || GRID_PRESETS[4];

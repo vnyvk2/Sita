@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataNormalizer (Adversarial Normalization & Noise Stripping)', () => {
   describe('normalizeTitle', () => {

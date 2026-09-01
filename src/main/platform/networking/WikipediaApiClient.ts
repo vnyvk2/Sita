@@ -1,7 +1,7 @@
+import { version } from '../../../../package.json';
+import logger from '../../logger';
 import { HttpError } from './FetchHttpClient';
 import { RequestPipeline } from './RequestPipeline';
-import logger from '../../logger';
-import { version } from '../../../../package.json';
 
 export const WIKIPEDIA_REST_BASE_URL = 'https://en.wikipedia.org/api/rest_v1';
 export const WIKIPEDIA_ACTION_BASE_URL = 'https://en.wikipedia.org/w/api.php';
@@ -19,8 +19,8 @@ export interface WikipediaArtistProfile {
 }
 
 /**
- * Unambiguous keywords for classifying a Wikipedia article as a musical artist/group.
- * Precompiled with word-boundary regexes to prevent accidental substring collisions.
+ * Unambiguous keywords for classifying a Wikipedia article as a musical artist/group. Precompiled
+ * with word-boundary regexes to prevent accidental substring collisions.
  */
 const MUSIC_KEYWORDS = [
   'singer',
@@ -63,7 +63,8 @@ export class WikipediaApiClient {
   }
 
   /**
-   * Checks whether a text snippet contains keywords indicating a musical artist or group using word boundaries.
+   * Checks whether a text snippet contains keywords indicating a musical artist or group using word
+   * boundaries.
    */
   public isMusicRelated(text?: string): boolean {
     if (!text) return false;
@@ -71,8 +72,8 @@ export class WikipediaApiClient {
   }
 
   /**
-   * Resolves the biography and artwork for an artist from Wikipedia,
-   * handling disambiguation, fast-fail qualified lookups, and full article extracts.
+   * Resolves the biography and artwork for an artist from Wikipedia, handling disambiguation,
+   * fast-fail qualified lookups, and full article extracts.
    */
   public async getArtistBiography(
     artistName: string,
@@ -88,7 +89,8 @@ export class WikipediaApiClient {
       if (
         directSummary &&
         directSummary.type !== 'disambiguation' &&
-        (this.isMusicRelated(directSummary.description) || this.isMusicRelated(directSummary.extract))
+        (this.isMusicRelated(directSummary.description) ||
+          this.isMusicRelated(directSummary.extract))
       ) {
         const fullArticle = await this.fetchFullArticleExtract(directSummary.title, signal);
         return {
@@ -98,7 +100,9 @@ export class WikipediaApiClient {
           fullExtract: fullArticle?.extract || directSummary.extract,
           originalImage: directSummary.originalimage?.source || fullArticle?.originalImage,
           thumbnail: directSummary.thumbnail?.source || fullArticle?.thumbnail,
-          pageUrl: directSummary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(directSummary.title.replace(/\s+/g, '_'))}`
+          pageUrl:
+            directSummary.content_urls?.desktop?.page ||
+            `https://en.wikipedia.org/wiki/${encodeURIComponent(directSummary.title.replace(/\s+/g, '_'))}`
         };
       }
 
@@ -129,17 +133,25 @@ export class WikipediaApiClient {
               fullExtract: fullArticle?.extract || summary.extract,
               originalImage: summary.originalimage?.source || fullArticle?.originalImage,
               thumbnail: summary.thumbnail?.source || fullArticle?.thumbnail,
-              pageUrl: summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(summary.title.replace(/\s+/g, '_'))}`
+              pageUrl:
+                summary.content_urls?.desktop?.page ||
+                `https://en.wikipedia.org/wiki/${encodeURIComponent(summary.title.replace(/\s+/g, '_'))}`
             };
           }
         }
       }
 
       // 3. Fallback: Run ONE targeted MediaWiki search query
-      const searchTitle = await this.searchForMusicArticle(`"${trimmed}" (musician OR band OR singer)`, signal);
+      const searchTitle = await this.searchForMusicArticle(
+        `"${trimmed}" (musician OR band OR singer)`,
+        signal
+      );
       if (searchTitle) {
         const article = await this.fetchFullArticleExtract(searchTitle, signal);
-        if (article && (this.isMusicRelated(article.description) || this.isMusicRelated(article.extract))) {
+        if (
+          article &&
+          (this.isMusicRelated(article.description) || this.isMusicRelated(article.extract))
+        ) {
           return {
             title: article.title,
             description: article.description,
@@ -155,7 +167,9 @@ export class WikipediaApiClient {
       // Never return an unverified non-music collision entity
       return null;
     } catch (err) {
-      logger.warn(`[WikipediaApiClient] Failed to resolve biography for: ${artistName}`, { error: err });
+      logger.warn(`[WikipediaApiClient] Failed to resolve biography for: ${artistName}`, {
+        error: err
+      });
       return null;
     }
   }
@@ -190,7 +204,10 @@ export class WikipediaApiClient {
     }
   }
 
-  private async searchForMusicArticle(searchQuery: string, signal?: AbortSignal): Promise<string | null> {
+  private async searchForMusicArticle(
+    searchQuery: string,
+    signal?: AbortSignal
+  ): Promise<string | null> {
     const url = WIKIPEDIA_ACTION_BASE_URL;
     try {
       const res = await this.pipeline.execute<any>({
@@ -226,7 +243,14 @@ export class WikipediaApiClient {
   private async fetchFullArticleExtract(
     title: string,
     signal?: AbortSignal
-  ): Promise<{ title: string; summary: string; extract: string; description?: string; originalImage?: string; thumbnail?: string } | null> {
+  ): Promise<{
+    title: string;
+    summary: string;
+    extract: string;
+    description?: string;
+    originalImage?: string;
+    thumbnail?: string;
+  } | null> {
     const url = WIKIPEDIA_ACTION_BASE_URL;
     try {
       const res = await this.pipeline.execute<any>({
@@ -261,9 +285,10 @@ export class WikipediaApiClient {
           extract = extract.slice(0, paragraphBoundary);
         } else {
           const sentenceBoundary = extract.lastIndexOf('. ', MAX_EXTRACT_LENGTH);
-          extract = sentenceBoundary > MAX_EXTRACT_LENGTH * 0.7
-            ? extract.slice(0, sentenceBoundary + 1)
-            : extract.slice(0, MAX_EXTRACT_LENGTH) + '...';
+          extract =
+            sentenceBoundary > MAX_EXTRACT_LENGTH * 0.7
+              ? extract.slice(0, sentenceBoundary + 1)
+              : extract.slice(0, MAX_EXTRACT_LENGTH) + '...';
         }
       }
       const summary = extract.split(/\n{2,}/)[0] ?? extract;
@@ -277,7 +302,9 @@ export class WikipediaApiClient {
         thumbnail: page.thumbnail?.source
       };
     } catch (err) {
-      logger.warn(`[WikipediaApiClient] Failed to fetch full extract for: ${title}`, { error: err });
+      logger.warn(`[WikipediaApiClient] Failed to fetch full extract for: ${title}`, {
+        error: err
+      });
       return null;
     }
   }

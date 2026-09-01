@@ -58,11 +58,11 @@ export function parseHslString(hslStr: string): HslColor {
 }
 
 /**
- * Calculates the shortest angular distance between two hues on the 360-degree color wheel.
- * Example: getHueDistance(355, 5) === 10
+ * Calculates the shortest angular distance between two hues on the 360-degree color wheel. Example:
+ * getHueDistance(355, 5) === 10
  */
 export function getHueDistance(h1: number, h2: number): number {
-  const diff = Math.abs(((h1 % 360) + 360) % 360 - (((h2 % 360) + 360) % 360)) % 360;
+  const diff = Math.abs((((h1 % 360) + 360) % 360) - (((h2 % 360) + 360) % 360)) % 360;
   return diff > 180 ? 360 - diff : diff;
 }
 

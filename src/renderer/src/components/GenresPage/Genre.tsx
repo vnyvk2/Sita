@@ -87,8 +87,8 @@ const Genre = (props: GenreProp) => {
       window.api.genresData
         .getGenresData(genreIds)
         .then((genres) => {
-          if (Array.isArray(genres) && genres.length > 0) {
-            const genreSongIds = genres
+          if (Array.isArray(genres.data) && genres.data.length > 0) {
+            const genreSongIds = genres.data
               .map((genre) => genre.songs.map((song) => song.songId))
               .flat();
 
@@ -123,8 +123,10 @@ const Genre = (props: GenreProp) => {
     window.api.genresData
       .getGenresData(genreIds)
       .then((genres) => {
-        if (Array.isArray(genres) && genres.length > 0) {
-          const genreSongIds = genres.map((genre) => genre.songs.map((song) => song.songId)).flat();
+        if (Array.isArray(genres.data) && genres.data.length > 0) {
+          const genreSongIds = genres.data
+            .map((genre) => genre.songs.map((song) => song.songId))
+            .flat();
 
           return window.api.audioLibraryControls.getSongInfo(
             genreSongIds,
@@ -155,11 +157,7 @@ const Genre = (props: GenreProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [
-    addNewNotifications,
-    multipleSelectionsData,
-    t
-  ]);
+  }, [addNewNotifications, multipleSelectionsData, t]);
 
   const isAMultipleSelection = useMemo(() => {
     if (!multipleSelectionsData.isEnabled) return false;

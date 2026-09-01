@@ -2,11 +2,10 @@ import type { ProviderCircuitBreakerRegistry } from '../circuitbreaker/ProviderC
 import type { ProviderRetryPolicy } from '../retry/ProviderRetryPolicy';
 import type { ProviderTimeoutPolicy } from '../timeout/ProviderTimeoutPolicy';
 import type { IProviderExecutionStage } from './IProviderExecutionStage';
-
+import { ProviderExecutionPipeline } from './ProviderExecutionPipeline';
 import { CircuitBreakerStage } from './stages/CircuitBreakerStage';
 import { RetryStage } from './stages/RetryStage';
 import { TimeoutStage } from './stages/TimeoutStage';
-import { ProviderExecutionPipeline } from './ProviderExecutionPipeline';
 
 export class ProviderExecutionPipelineBuilder {
   private readonly stages: IProviderExecutionStage[] = [];

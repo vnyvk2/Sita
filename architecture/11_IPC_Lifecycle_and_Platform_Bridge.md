@@ -55,6 +55,7 @@ graph TD
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Electron Context Isolation & Preload Bridge (`src/preload/index.ts`)
+
 Hardens the UI sandbox by exposing only explicitly whitelisted IPC invocation signatures to the `window.api` global object.
 
 ```mermaid
@@ -73,6 +74,7 @@ flowchart TD
 ---
 
 ### Process 2: Type-Safe IPC Request/Response Dispatch
+
 Routes incoming asynchronous renderer requests to authoritative domain engines.
 
 ```mermaid
@@ -105,6 +107,7 @@ flowchart TD
 ---
 
 ### Process 3: Bi-Directional Event Streaming & Push Notifications
+
 Pushes background state changes (library scanning progress, asset generation, transaction completion) directly to the renderer.
 
 ```mermaid
@@ -129,6 +132,7 @@ flowchart TD
 ---
 
 ### Process 4: Custom Audio Streaming File Protocol (`nora://`)
+
 The [`handleFileProtocol.ts`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/main/handleFileProtocol.ts) handler registers a secure custom `nora://` protocol allowing smooth, low-latency audio streaming with HTTP 206 Partial Content Range header support.
 
 ```mermaid
@@ -151,6 +155,7 @@ flowchart TD
 ---
 
 ### Process 5: Power Monitor & Battery-Adaptive Worker Policy
+
 Dynamically throttles CPU-intensive background derived-asset workers when the host machine transitions to battery power.
 
 ```mermaid
@@ -176,6 +181,7 @@ flowchart TD
 ---
 
 ### Process 6: Discord Rich Presence & Last.fm Scrobbler
+
 Synchronizes currently playing track metadata to external social and scrobbling networks asynchronously.
 
 ```mermaid
@@ -200,9 +206,11 @@ flowchart TD
 ---
 
 ### Process 7: Native Window Management & Mini Player Modes
+
 Manages window states, screen sleeping inhibition, system tray toggles, and seamless transitions between normal and mini player modes.
 
 **Mini Player Modes**:
+
 - **`standard`**: 3-tier deck layout with dedicated controls and artwork.
 - **`compact`**: 1-tier progressive strip layout maximizing screen minimalism.
 

@@ -121,9 +121,7 @@ describe('SongGenresInput Component - Multi-Genre Delimiter & Tag Creation', () 
   });
 
   it('matches existing library genres when available', () => {
-    const genreResults = [
-      { name: 'Alternative Rock', genreId: 42, artworkPath: 'art/42.webp' }
-    ];
+    const genreResults = [{ name: 'Alternative Rock', genreId: 42, artworkPath: 'art/42.webp' }];
 
     const { container } = render(<TestWrapper genreResults={genreResults} />);
     const input = screen.getByPlaceholderText('Search for genres') as HTMLInputElement;

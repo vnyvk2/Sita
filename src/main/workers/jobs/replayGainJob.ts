@@ -1,12 +1,14 @@
-import path from 'path';
-import { app } from 'electron';
 import { EventEmitter } from 'events';
-import { eq } from 'drizzle-orm';
+import path from 'path';
+
 import { db } from '@main/db/db';
 import { getSongById } from '@main/db/queries/songs';
 import { replayGain } from '@main/db/schema';
 import logger from '@main/logger';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { eq } from 'drizzle-orm';
+import { app } from 'electron';
+
 import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
@@ -73,7 +75,11 @@ export class ReplayGainJob implements Job {
 
       // 2. Delegate CPU loudness analysis to utilityProcess worker
       const destinationPath = app?.getPath
-        ? path.join(app.getPath('userData'), 'loudness_blocks', `${this.songId}_v${CURRENT_REPLAYGAIN_GENERATOR_VERSION}.bin`)
+        ? path.join(
+            app.getPath('userData'),
+            'loudness_blocks',
+            `${this.songId}_v${CURRENT_REPLAYGAIN_GENERATOR_VERSION}.bin`
+          )
         : '';
 
       const result = await mediaWorkerBridge.generateAsset({

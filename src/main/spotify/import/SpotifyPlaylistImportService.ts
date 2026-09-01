@@ -9,10 +9,7 @@ export class SpotifyPlaylistImportService {
   private readonly apiClient: SpotifyApiClient;
   private readonly clientId: string;
 
-  constructor(
-    apiClient?: SpotifyApiClient,
-    clientId?: string
-  ) {
+  constructor(apiClient?: SpotifyApiClient, clientId?: string) {
     this.apiClient = apiClient ?? new SpotifyApiClient();
     this.clientId =
       clientId ??
@@ -23,8 +20,8 @@ export class SpotifyPlaylistImportService {
   }
 
   /**
-   * Generates a preview PlaylistImportPlan by fetching remote playlist metadata and items,
-   * fetching local library songs, and invoking the pure SpotifyPlaylistImportPlanner.
+   * Generates a preview PlaylistImportPlan by fetching remote playlist metadata and items, fetching
+   * local library songs, and invoking the pure SpotifyPlaylistImportPlanner.
    */
   public async generateImportPlan(playlistId: string): Promise<PlaylistImportPlan> {
     const accessToken = await SpotifyTokenStore.getValidAccessToken(this.clientId);

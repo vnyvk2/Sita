@@ -74,7 +74,8 @@ function isValidTrackObject(candidate: unknown): candidate is SpotifyTrackInput 
 
 /**
  * Strictly unwraps and validates a Spotify track payload from varying Spotify API response shapes.
- * Returns null if the item is missing, malformed, lacks a valid track name, or lacks track attributes/identifiers.
+ * Returns null if the item is missing, malformed, lacks a valid track name, or lacks track
+ * attributes/identifiers.
  */
 export function unwrapSpotifyTrack(rawItem: unknown): SpotifyTrackInput | null {
   if (!rawItem || typeof rawItem !== 'object') {
@@ -298,7 +299,13 @@ export interface SpotifyPlaylistLinkDTO {
   lastSyncedEntriesHash?: string | null;
   syncStrategy: SyncStrategy;
   syncState: SyncState;
-  failureStage?: 'REMOTE' | 'REMOTE_VERIFICATION' | 'LOCAL' | 'LOCAL_VERIFICATION' | 'FINALIZATION' | null;
+  failureStage?:
+    | 'REMOTE'
+    | 'REMOTE_VERIFICATION'
+    | 'LOCAL'
+    | 'LOCAL_VERIFICATION'
+    | 'FINALIZATION'
+    | null;
   completedRemoteBatches?: number | null;
   failedBatchIndex?: number | null;
   lastError?: string | null;

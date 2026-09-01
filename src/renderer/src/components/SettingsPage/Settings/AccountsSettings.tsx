@@ -1,9 +1,10 @@
-import { useContext, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from '@tanstack/react-query';
 import { settingsQuery } from '@renderer/queries/settings';
 import { spotifyQuery } from '@renderer/queries/spotify';
 import { queryClient } from '@renderer/queryClient';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useContext, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import type { SpotifyPlaylistSummary } from '../../../../../main/spotify/api/types';
 import LastFMIcon from '../../../assets/images/webp/last-fm-logo.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
@@ -255,7 +256,9 @@ const AccountsSettings = () => {
                             <span className="text-font-color-black dark:text-font-color-white truncate font-medium">
                               {pl.name}
                             </span>
-                            <span className="text-[11px] opacity-70">({pl.tracksTotal} tracks)</span>
+                            <span className="text-[11px] opacity-70">
+                              ({pl.tracksTotal} tracks)
+                            </span>
                           </div>
                           <button
                             type="button"
@@ -479,7 +482,9 @@ const AccountsSettings = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        window.api.settingsHelpers.openInBrowser('https://listenbrainz.org/profile/')
+                        window.api.settingsHelpers.openInBrowser(
+                          'https://listenbrainz.org/profile/'
+                        )
                       }
                       className="text-font-color-highlight dark:text-dark-font-color-highlight flex items-center gap-1 text-xs hover:underline"
                     >
@@ -536,7 +541,9 @@ const AccountsSettings = () => {
               <Checkbox
                 id="sendSongFavoritesDataToListenBrainz"
                 isChecked={!!userSettings?.sendSongFavoritesDataToListenBrainz}
-                checkedStateUpdateFunction={(state) => updateSongFavoritesToListenBrainzState(state)}
+                checkedStateUpdateFunction={(state) =>
+                  updateSongFavoritesToListenBrainzState(state)
+                }
                 labelContent={t('settingsPage.sendFavoritesToListenBrainz')}
                 isDisabled={!isListenBrainzConnected}
               />

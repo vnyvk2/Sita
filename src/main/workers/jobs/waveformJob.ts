@@ -1,11 +1,13 @@
-import { app } from 'electron';
-import { eq } from 'drizzle-orm';
-import path from 'path';
 import { EventEmitter } from 'events';
+import path from 'path';
+
 import { db } from '@main/db/db';
 import { waveforms } from '@main/db/schema';
 import logger from '@main/logger';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { eq } from 'drizzle-orm';
+import { app } from 'electron';
+
 import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
@@ -103,10 +105,11 @@ export class WaveformJob implements Job {
       await db.transaction(async (trx) => {
         if (existing) {
           // Update existing
-          await trx.update(waveforms)
-            .set({ 
-              path: filePath, 
-              resolution: WAVEFORM_RESOLUTION, 
+          await trx
+            .update(waveforms)
+            .set({
+              path: filePath,
+              resolution: WAVEFORM_RESOLUTION,
               generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION,
               updatedAt: new Date()
             })
@@ -127,7 +130,6 @@ export class WaveformJob implements Job {
         songId: this.songId,
         path: filePath
       });
-
     } catch (error) {
       logger.error(`[WaveformJob] Failed to generate waveform for song ${this.songId}`, { error });
       throw error;

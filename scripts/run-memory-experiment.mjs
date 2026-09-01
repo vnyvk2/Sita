@@ -5,50 +5,93 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const flagsFilePath = path.join(rootDir, 'src', 'renderer', 'src', 'utils', 'debug', 'memoryExperiments.ts');
+const flagsFilePath = path.join(
+  rootDir,
+  'src',
+  'renderer',
+  'src',
+  'utils',
+  'debug',
+  'memoryExperiments.ts'
+);
 
 export const RUN_CONFIGS = {
   '0A': {
     name: 'Run 0A: DevTools CLOSED (Current Code)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: false,
+      DISABLE_AMBIENT_BACKGROUND: false,
+      DISABLE_LYRICS_POSITION_LISTENERS: false,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: true
   },
   '0B': {
     name: 'Run 0B: DevTools OPEN (Current Code Baseline)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: false,
+      DISABLE_AMBIENT_BACKGROUND: false,
+      DISABLE_LYRICS_POSITION_LISTENERS: false,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: false
   },
-  '1': {
+  1: {
     name: 'Run 1: Disable cloneDeep logging (DevTools Open)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: true, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: true,
+      DISABLE_AMBIENT_BACKGROUND: false,
+      DISABLE_LYRICS_POSITION_LISTENERS: false,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: false
   },
-  '2': {
+  2: {
     name: 'Run 2: Disable Ambient Background (DevTools Open)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: true, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: false,
+      DISABLE_AMBIENT_BACKGROUND: true,
+      DISABLE_LYRICS_POSITION_LISTENERS: false,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: false
   },
-  '3': {
+  3: {
     name: 'Run 3: Disable Lyrics Position Listeners (DevTools Open)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: true, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: false,
+      DISABLE_AMBIENT_BACKGROUND: false,
+      DISABLE_LYRICS_POSITION_LISTENERS: true,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: false
   },
-  '4': {
+  4: {
     name: 'Run 4: Suppress Last.fm Errors (DevTools Open)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: false, DISABLE_AMBIENT_BACKGROUND: false, DISABLE_LYRICS_POSITION_LISTENERS: false, SUPPRESS_LASTFM_ERRORS: true },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: false,
+      DISABLE_AMBIENT_BACKGROUND: false,
+      DISABLE_LYRICS_POSITION_LISTENERS: false,
+      SUPPRESS_LASTFM_ERRORS: true
+    },
     devtoolsClosed: false
   },
-  '5': {
+  5: {
     name: 'Run 5: Combined Validation (A + B + C) (DevTools Open)',
-    flags: { DISABLE_STORE_CLONE_LOGGING: true, DISABLE_AMBIENT_BACKGROUND: true, DISABLE_LYRICS_POSITION_LISTENERS: true, SUPPRESS_LASTFM_ERRORS: false },
+    flags: {
+      DISABLE_STORE_CLONE_LOGGING: true,
+      DISABLE_AMBIENT_BACKGROUND: true,
+      DISABLE_LYRICS_POSITION_LISTENERS: true,
+      SUPPRESS_LASTFM_ERRORS: false
+    },
     devtoolsClosed: false
   },
-  'permanent': {
+  permanent: {
     name: 'Run Permanent: Production Fixes Applied (DevTools OPEN)',
     flags: {},
     devtoolsClosed: false
   },
-  'permanent_closed': {
+  permanent_closed: {
     name: 'Run Permanent: Production Fixes Applied (DevTools CLOSED)',
     flags: {},
     devtoolsClosed: true
@@ -75,7 +118,10 @@ export function writeFlags(flags) {
   SUPPRESS_LASTFM_ERRORS: ${flags.SUPPRESS_LASTFM_ERRORS ?? false},
 };
 `;
-  if (fs.existsSync(flagsFilePath) || (flags && Object.keys(flags).length > 0 && flags.DISABLE_STORE_CLONE_LOGGING !== undefined)) {
+  if (
+    fs.existsSync(flagsFilePath) ||
+    (flags && Object.keys(flags).length > 0 && flags.DISABLE_STORE_CLONE_LOGGING !== undefined)
+  ) {
     fs.writeFileSync(flagsFilePath, content, 'utf8');
   }
 }
@@ -115,7 +161,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -186,7 +235,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -200,7 +249,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -216,7 +269,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -231,7 +284,7 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
           return page;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -240,10 +293,10 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 export async function runExperiment(runKey) {
@@ -274,7 +327,13 @@ export async function runExperiment(runKey) {
   console.log('[Runner] Launching Nora in dev mode with --remoteDebuggingPort 9876...');
   spawn(
     process.execPath,
-    [path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'dev', '--watch=false', '--remoteDebuggingPort', '9876'],
+    [
+      path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'),
+      'dev',
+      '--watch=false',
+      '--remoteDebuggingPort',
+      '9876'
+    ],
     {
       cwd: rootDir,
       env,
@@ -300,10 +359,14 @@ export async function runExperiment(runKey) {
       let cdpMetrics = null;
       try {
         cdpMetrics = await cdp.getPerformanceMetrics();
-      } catch (e) { }
+      } catch (e) {}
 
-      const jsHeapUsedMB = cdpMetrics?.JSHeapUsedSize ? Math.round((cdpMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100 : null;
-      const jsHeapTotalMB = cdpMetrics?.JSHeapTotalSize ? Math.round((cdpMetrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100 : null;
+      const jsHeapUsedMB = cdpMetrics?.JSHeapUsedSize
+        ? Math.round((cdpMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100
+        : null;
+      const jsHeapTotalMB = cdpMetrics?.JSHeapTotalSize
+        ? Math.round((cdpMetrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100
+        : null;
       const listeners = cdpMetrics?.JSEventListeners ?? null;
 
       const record = {
@@ -323,7 +386,9 @@ export async function runExperiment(runKey) {
       };
 
       timeline.push(record);
-      console.log(`[T+${Math.round(elapsedSec / 60)}m | ${stepName}] Total: ${record.totalWS} MB (PM: ${record.totalPM} MB) | Renderer: ${record.rendererWS} MB (PM: ${record.rendererPM} MB) | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB ?? 'N/A'} MB | Listeners: ${listeners ?? 'N/A'}`);
+      console.log(
+        `[T+${Math.round(elapsedSec / 60)}m | ${stepName}] Total: ${record.totalWS} MB (PM: ${record.totalPM} MB) | Renderer: ${record.rendererWS} MB (PM: ${record.rendererPM} MB) | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB ?? 'N/A'} MB | Listeners: ${listeners ?? 'N/A'}`
+      );
       return record;
     }
 
@@ -448,9 +513,11 @@ const targetRun =
   process.argv.find((a) => a.startsWith('--run='))?.split('=')[1] ||
   (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : undefined) ||
   'permanent';
-runExperiment(targetRun).then(() => {
-  process.exit(0);
-}).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runExperiment(targetRun)
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

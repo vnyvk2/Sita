@@ -1,12 +1,10 @@
-
 import parseFolderStructuresForSongPaths, {
   doesFolderExistInFolderStructure
 } from '../fs/parseFolderStructuresForSongPaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
-import { processSongsWithWorkerPool } from './songWorkerPool';
-
 import { timeEnd, timeStart } from '../utils/measureTimeUsage';
+import { processSongsWithWorkerPool } from './songWorkerPool';
 
 const removeAlreadyAvailableStructures = async (structures: FolderStructure[]) => {
   const parents: FolderStructure[] = [];
@@ -37,13 +35,17 @@ const addMusicFromFolderStructures = async (
   });
 
   const eligableStructures = await removeAlreadyAvailableStructures(structures);
-  logger.info(`After removeAlreadyAvailableStructures`, { eligableStructures: eligableStructures.map(x => x.path) });
+  logger.info(`After removeAlreadyAvailableStructures`, {
+    eligableStructures: eligableStructures.map((x) => x.path)
+  });
   const songPathsData = await parseFolderStructuresForSongPaths(eligableStructures);
-  logger.info(`After parseFolderStructuresForSongPaths`, { songPathsDataLength: songPathsData?.length });
+  logger.info(`After parseFolderStructuresForSongPaths`, {
+    songPathsDataLength: songPathsData?.length
+  });
 
   if (songPathsData) {
     const startTime = timeStart();
-    
+
     const mappedSongs = songPathsData.map((data) => ({
       songPath: data.songPath,
       folderId: data.folder.id
@@ -69,4 +71,3 @@ const addMusicFromFolderStructures = async (
 };
 
 export default addMusicFromFolderStructures;
-

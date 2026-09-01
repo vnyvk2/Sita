@@ -48,9 +48,11 @@ const SeekBarSlider = (props: Props) => {
 
         // When not actively scrubbing or dragging, update the visual progress directly on the DOM element
         if (seekbarRef.current && !isMouseDownRef.current && !isMouseScrollRef.current) {
-          const liveDuration = currentSongData.duration || store.state.currentSongData?.duration || 0;
+          const liveDuration =
+            currentSongData.duration || store.state.currentSongData?.duration || 0;
           const songDuration = liveDuration > 0 ? liveDuration : songPosition;
-          const percent = songDuration > 0 ? Math.min(100, Math.max(0, (songPosition / songDuration) * 100)) : 0;
+          const percent =
+            songDuration > 0 ? Math.min(100, Math.max(0, (songPosition / songDuration) * 100)) : 0;
 
           seekbarRef.current.style.setProperty('--seek-before-width', `${percent}%`);
           seekbarRef.current.value = String(songPosition);

@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -56,17 +57,14 @@ describe('Artwork directory concurrency and error safety', () => {
       return undefined;
     });
 
-    const concurrentCalls = Array.from({ length: 20 }, () =>
-      checkForDefaultArtworkSaveLocation()
-    );
+    const concurrentCalls = Array.from({ length: 20 }, () => checkForDefaultArtworkSaveLocation());
 
     await expect(Promise.all(concurrentCalls)).resolves.toBeDefined();
 
     // Verify fs.mkdir was called with recursive: true
-    expect(fs.mkdir).toHaveBeenCalledWith(
-      expect.stringContaining('song_covers'),
-      { recursive: true }
-    );
+    expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('song_covers'), {
+      recursive: true
+    });
   });
 
   it('should handle permanent filesystem errors (e.g. EACCES) by logging and falling back gracefully', async () => {

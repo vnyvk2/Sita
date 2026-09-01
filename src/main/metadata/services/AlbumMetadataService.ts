@@ -1,6 +1,13 @@
 import type { MetadataSearchOptions } from '../../../common/metadata/api';
 import { TrackMatcher } from '../matching/TrackMatcher';
-import type { MetadataCandidate, MatchCriterion, AlbumMetadata, ResolvedAlbumRelease, OfficialTrackInput, MetadataProviderId } from '../models/RecordingMetadata';
+import type {
+  MetadataCandidate,
+  MatchCriterion,
+  AlbumMetadata,
+  ResolvedAlbumRelease,
+  OfficialTrackInput,
+  MetadataProviderId
+} from '../models/RecordingMetadata';
 import type { MetadataProviderRuntime } from '../runtime/MetadataProviderRuntime';
 
 export interface LocalSongInput {
@@ -31,14 +38,12 @@ export interface ScoreBreakdown {
 
 export type ConfidenceLevel = 'Excellent' | 'Very Good' | 'Good' | 'Review' | 'Poor';
 
-/**
- * Pure helper function returning presentation-agnostic confidence level.
- */
+/** Pure helper function returning presentation-agnostic confidence level. */
 export const getConfidenceLevel = (confidence: number): ConfidenceLevel => {
   if (confidence >= 0.95) return 'Excellent';
-  if (confidence >= 0.90) return 'Very Good';
-  if (confidence >= 0.80) return 'Good';
-  if (confidence >= 0.70) return 'Review';
+  if (confidence >= 0.9) return 'Very Good';
+  if (confidence >= 0.8) return 'Good';
+  if (confidence >= 0.7) return 'Review';
   return 'Poor';
 };
 
@@ -62,8 +67,15 @@ export interface AlbumPreview {
 }
 
 export interface IAlbumMetadataService {
-  search(albumName: string, artistName?: string, options?: MetadataSearchOptions): Promise<AlbumMetadata[]>;
-  resolveRelease(releaseId: string, providerId?: MetadataProviderId): Promise<ResolvedAlbumRelease | null>;
+  search(
+    albumName: string,
+    artistName?: string,
+    options?: MetadataSearchOptions
+  ): Promise<AlbumMetadata[]>;
+  resolveRelease(
+    releaseId: string,
+    providerId?: MetadataProviderId
+  ): Promise<ResolvedAlbumRelease | null>;
   buildAlbumMatch(
     localSongs: LocalSongInput[],
     album: AlbumMetadata,
@@ -81,33 +93,44 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     this.trackMatcher = trackMatcher;
   }
 
-  /**
-   * Stage 2 — Search Album Releases via MetadataProviderRuntime
-   */
-  public async search(albumName: string, artistName?: string, options?: MetadataSearchOptions): Promise<AlbumMetadata[]> {
+  /** Stage 2 — Search Album Releases via MetadataProviderRuntime */
+  public async search(
+    albumName: string,
+    artistName?: string,
+    options?: MetadataSearchOptions
+  ): Promise<AlbumMetadata[]> {
     if (!this.runtime) {
-      throw new Error('AlbumMetadataService.search requires active MetadataProviderRuntime instance.');
+      throw new Error(
+        'AlbumMetadataService.search requires active MetadataProviderRuntime instance.'
+      );
     }
     return this.runtime.searchAlbums(albumName, artistName, options);
   }
 
-  public async searchAlbums(albumName: string, artistName?: string, options?: MetadataSearchOptions): Promise<AlbumMetadata[]> {
+  public async searchAlbums(
+    albumName: string,
+    artistName?: string,
+    options?: MetadataSearchOptions
+  ): Promise<AlbumMetadata[]> {
     return this.search(albumName, artistName, options);
   }
 
-  /**
-   * Stage 3 — Download Complete Release via MetadataProviderRuntime
-   */
-  public async resolveRelease(releaseId: string, providerId?: MetadataProviderId): Promise<ResolvedAlbumRelease | null> {
+  /** Stage 3 — Download Complete Release via MetadataProviderRuntime */
+  public async resolveRelease(
+    releaseId: string,
+    providerId?: MetadataProviderId
+  ): Promise<ResolvedAlbumRelease | null> {
     if (!this.runtime) {
-      throw new Error('AlbumMetadataService.resolveRelease requires active MetadataProviderRuntime instance.');
+      throw new Error(
+        'AlbumMetadataService.resolveRelease requires active MetadataProviderRuntime instance.'
+      );
     }
     return this.runtime.resolveRelease(releaseId, providerId);
   }
 
   /**
-   * Stage 4 & 5 — Match Songs & Detect Ambiguities -> Stage 6 — Preview
-   * Incorporates Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers).
+   * Stage 4 & 5 — Match Songs & Detect Ambiguities -> Stage 6 — Preview Incorporates Album Sequence
+   * Continuity Assistance (MusicBee Feature - requires consecutive track numbers).
    */
   public async buildAlbumMatch(
     localSongs: LocalSongInput[],
@@ -115,21 +138,27 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     officialTracks: OfficialTrackInput[]
   ): Promise<AlbumPreview> {
     // Run 1-to-1 TrackMatcher assignment
-    let trackList = this.trackMatcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {
-      albumTitle: album.title,
-      discCount: album.discCount,
-      trackCount: album.trackCount,
-      releaseType: album.releaseType,
-      year: album.year
-    });
+    let trackList = this.trackMatcher.matchTracks(
+      localSongs,
+      album.releaseId ?? '',
+      officialTracks,
+      {
+        albumTitle: album.title,
+        discCount: album.discCount,
+        trackCount: album.trackCount,
+        releaseType: album.releaseType,
+        year: album.year
+      }
+    );
 
     // Album Sequence Continuity Assistance (MusicBee Feature - requires consecutive track numbers and track matching)
-    const highConfidenceCount = trackList.filter((t) => t.confidence >= 0.90).length;
-    const isHighAlbumAgreement = trackList.length > 0 && highConfidenceCount / trackList.length >= 0.65;
+    const highConfidenceCount = trackList.filter((t) => t.confidence >= 0.9).length;
+    const isHighAlbumAgreement =
+      trackList.length > 0 && highConfidenceCount / trackList.length >= 0.65;
 
     if (isHighAlbumAgreement && trackList.length >= 3) {
       trackList = trackList.map((pair, idx) => {
-        if (pair.confidence < 0.90 && idx > 0 && idx < trackList.length - 1) {
+        if (pair.confidence < 0.9 && idx > 0 && idx < trackList.length - 1) {
           const prevPair = trackList[idx - 1];
           const nextPair = trackList[idx + 1];
           const prevTrackNo = prevPair.remoteTrack.recording.trackNumber ?? 0;
@@ -138,8 +167,8 @@ export class AlbumMetadataService implements IAlbumMetadataService {
 
           // Strict consecutive track number check: Track N-1, Track N, Track N+1
           if (
-            prevPair.confidence >= 0.90 &&
-            nextPair.confidence >= 0.90 &&
+            prevPair.confidence >= 0.9 &&
+            nextPair.confidence >= 0.9 &&
             prevTrackNo + 1 === currentTrackNo &&
             currentTrackNo + 1 === nextTrackNo
           ) {
@@ -163,12 +192,18 @@ export class AlbumMetadataService implements IAlbumMetadataService {
     for (const pair of trackList) {
       totalConfidence += pair.confidence;
       if (pair.reasons.includes('duplicate_local_candidate')) {
-        warnings.push(`Duplicate local track title/artist detected for "${pair.localSong.title}". Manual verification recommended.`);
+        warnings.push(
+          `Duplicate local track title/artist detected for "${pair.localSong.title}". Manual verification recommended.`
+        );
       }
       if (pair.confidence < 0.75) {
-        warnings.push(`Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Manual review required.`);
-      } else if (pair.confidence < 0.90) {
-        warnings.push(`Uncertain match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Confirmation recommended.`);
+        warnings.push(
+          `Low confidence match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Manual review required.`
+        );
+      } else if (pair.confidence < 0.9) {
+        warnings.push(
+          `Uncertain match (${Math.round(pair.confidence * 100)}%) for local song "${pair.localSong.title}". Confirmation recommended.`
+        );
       }
     }
 
@@ -184,17 +219,19 @@ export class AlbumMetadataService implements IAlbumMetadataService {
   }
 
   /**
-   * Stage 7 — Apply & Stage 8 — Verify
-   * Strict Confidence Threshold: Auto-apply ONLY if confidence >= 0.90
+   * Stage 7 — Apply & Stage 8 — Verify Strict Confidence Threshold: Auto-apply ONLY if confidence
+   * >= 0.90
    */
-  public async applyAlbum(preview: AlbumPreview): Promise<{ success: boolean; updatedSongCount: number }> {
+  public async applyAlbum(
+    preview: AlbumPreview
+  ): Promise<{ success: boolean; updatedSongCount: number }> {
     if (!preview.trackList || preview.trackList.length === 0) {
       return { success: false, updatedSongCount: 0 };
     }
 
     let updatedCount = 0;
     for (const pair of preview.trackList) {
-      if (pair.confidence >= 0.90) {
+      if (pair.confidence >= 0.9) {
         updatedCount++;
       }
     }

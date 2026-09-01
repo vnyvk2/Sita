@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { SmartPlaylistCompiler } from '../../../../../src/main/collections/query/SmartPlaylistCompiler';
-import type { SmartPlaylistRuleAST } from '../../../../../src/main/collections/query/ast';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { describe, it, expect } from 'vitest';
+
+import type { SmartPlaylistRuleAST } from '../../../../../src/main/collections/query/ast';
+import { SmartPlaylistCompiler } from '../../../../../src/main/collections/query/SmartPlaylistCompiler';
 
 describe('SmartPlaylistCompiler', () => {
   it('should compile basic conditions deterministically', () => {
@@ -9,9 +10,7 @@ describe('SmartPlaylistCompiler', () => {
     const rule: SmartPlaylistRuleAST = {
       type: 'group',
       logicalOperator: 'and',
-      rules: [
-        { type: 'condition', field: 'title', operator: 'contains', value: 'hello' }
-      ]
+      rules: [{ type: 'condition', field: 'title', operator: 'contains', value: 'hello' }]
     };
 
     const sql1 = compiler.compilePredicate(rule);
@@ -47,7 +46,7 @@ describe('SmartPlaylistCompiler', () => {
 
     const compiled = compiler.compilePredicate(rule);
     expect(compiled).toBeDefined();
-    
+
     // Ensure both AND and OR are represented
     const queryStr = new PgDialect().sqlToQuery(compiled!).sql;
     expect(queryStr).toContain(' OR ');

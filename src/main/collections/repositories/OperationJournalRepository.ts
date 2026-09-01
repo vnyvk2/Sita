@@ -1,7 +1,8 @@
-import { db } from '../../db/db';
-import { operationJournal } from '../../db/schema';
 import { eq, and, desc, asc, lte, gt } from 'drizzle-orm';
+
+import { db } from '../../db/db';
 import type { DB, DBTransaction } from '../../db/db';
+import { operationJournal } from '../../db/schema';
 
 export class OperationJournalRepository {
   public async getCurrentOrPrevious(

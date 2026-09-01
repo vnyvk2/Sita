@@ -1,5 +1,4 @@
 import type { MetadataEventBus } from '../../events/MetadataEventBus';
-
 import { ProviderHealth } from './ProviderHealth';
 
 interface MutableHealthData {
@@ -52,7 +51,7 @@ export class ProviderHealthManager {
 
     const sortedLatencies = [...data.latencies].sort((a, b) => a - b);
     const p95Index = Math.floor(sortedLatencies.length * 0.95);
-    const p95LatencyMs = sortedLatencies.length === 0 ? 0 : sortedLatencies[p95Index] ?? 0;
+    const p95LatencyMs = sortedLatencies.length === 0 ? 0 : (sortedLatencies[p95Index] ?? 0);
 
     return new ProviderHealth({
       providerId: data.providerId,

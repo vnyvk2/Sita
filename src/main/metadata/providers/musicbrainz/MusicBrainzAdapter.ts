@@ -1,24 +1,27 @@
-import type { MetadataSearchOptions } from '../../../../common/metadata/api';
-import type { IMetadataProviderAdapter } from '@main/metadata/contracts/IMetadataProviderAdapter';
-import { ProviderCapabilities, ProviderCapability } from '@main/metadata/contracts/ProviderCapabilities';
-import type { ProviderIdentity } from '@main/metadata/contracts/ProviderIdentity';
 import type { IdentityResolutionCache } from '@main/metadata/cache/IdentityResolutionCache';
-import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
-import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
-import { ProviderResult } from '@main/metadata/models/ProviderResult';
-import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
-import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
-import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
-import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from './dto';
-import { MusicBrainzApiClient } from './MusicBrainzApiClient';
-import { MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
+import type { IMetadataProviderAdapter } from '@main/metadata/contracts/IMetadataProviderAdapter';
+import {
+  ProviderCapabilities,
+  ProviderCapability
+} from '@main/metadata/contracts/ProviderCapabilities';
+import type { ProviderIdentity } from '@main/metadata/contracts/ProviderIdentity';
 import type { MetadataContribution } from '@main/metadata/domain/MetadataContribution';
-
+import { MetadataMatcher, type CandidateItem } from '@main/metadata/matching';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
+import type { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
+import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
+import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import type { AlbumMetadata, ResolvedAlbumRelease } from '@main/metadata/models/RecordingMetadata';
 import type { ProviderRegistry } from '@main/metadata/resolution/ProviderRegistry';
+
+import type { MetadataSearchOptions } from '../../../../common/metadata/api';
 import type { FieldContribution } from '../../resolution/MetadataMergeEngine';
 import { MetadataQueryNormalizer } from '../../search/MetadataQueryNormalizer';
-import { escapeLuceneValue } from './luceneEscape';
 import { MetadataSearchRankingEngine } from '../../search/MetadataSearchRankingEngine';
+import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from './dto';
+import { escapeLuceneValue } from './luceneEscape';
+import { MusicBrainzRecordingMapper, MusicBrainzReleaseMapper } from './mappers';
+import { MusicBrainzApiClient } from './MusicBrainzApiClient';
 
 export interface MusicBrainzAdapterOptions {
   matcher?: MetadataMatcher;
@@ -70,22 +73,42 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     return this.registry?.getFieldConfidence(this.identity.id, fieldId, fallback) ?? fallback;
   }
 
-  public async fetchContribution(query: { title?: string; artist?: string; mbid?: string; releaseId?: string }): Promise<MetadataContribution | null> {
+  public async fetchContribution(query: {
+    title?: string;
+    artist?: string;
+    mbid?: string;
+    releaseId?: string;
+  }): Promise<MetadataContribution | null> {
     console.log('[MusicBrainzAdapter] fetchContribution input query:', query);
     const targetMbid = query.mbid ?? query.releaseId;
 
     if (query.title) {
       // Direct canonical contribution when title/artist are supplied from the resolved release
       const contributions: FieldContribution[] = [
-        { fieldId: 'title', providerId: 'musicbrainz', value: query.title, confidenceScore: this.getConfidence('title', 0.95) }
+        {
+          fieldId: 'title',
+          providerId: 'musicbrainz',
+          value: query.title,
+          confidenceScore: this.getConfidence('title', 0.95)
+        }
       ];
 
       if (query.artist) {
-        contributions.push({ fieldId: 'artist', providerId: 'musicbrainz', value: query.artist, confidenceScore: this.getConfidence('artist', 0.95) });
+        contributions.push({
+          fieldId: 'artist',
+          providerId: 'musicbrainz',
+          value: query.artist,
+          confidenceScore: this.getConfidence('artist', 0.95)
+        });
       }
 
       if (targetMbid) {
-        contributions.push({ fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) });
+        contributions.push({
+          fieldId: 'mbid',
+          providerId: 'musicbrainz',
+          value: targetMbid,
+          confidenceScore: this.getConfidence('mbid', 0.99)
+        });
       }
 
       return {
@@ -97,13 +120,18 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }
 
     if (!targetMbid) {
-      console.log('[MusicBrainzAdapter] fetchContribution returning null: No title or mbid provided in query');
+      console.log(
+        '[MusicBrainzAdapter] fetchContribution returning null: No title or mbid provided in query'
+      );
       return null;
     }
 
     const mbRelease = await this.apiClient.getReleaseById(targetMbid);
     if (!mbRelease) {
-      console.log('[MusicBrainzAdapter] fetchContribution returning null: getReleaseById returned null for MBID', targetMbid);
+      console.log(
+        '[MusicBrainzAdapter] fetchContribution returning null: getReleaseById returned null for MBID',
+        targetMbid
+      );
       return null;
     }
 
@@ -111,10 +139,30 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     const genreValue = this.extractGenre(mbRelease);
 
     const contributions: FieldContribution[] = [
-      { fieldId: 'title', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('title', 0.95) },
-      { fieldId: 'artist', providerId: 'musicbrainz', value: artistName, confidenceScore: this.getConfidence('artist', 0.95) },
-      { fieldId: 'album', providerId: 'musicbrainz', value: mbRelease.title, confidenceScore: this.getConfidence('album', 0.90) },
-      { fieldId: 'mbid', providerId: 'musicbrainz', value: targetMbid, confidenceScore: this.getConfidence('mbid', 0.99) }
+      {
+        fieldId: 'title',
+        providerId: 'musicbrainz',
+        value: mbRelease.title,
+        confidenceScore: this.getConfidence('title', 0.95)
+      },
+      {
+        fieldId: 'artist',
+        providerId: 'musicbrainz',
+        value: artistName,
+        confidenceScore: this.getConfidence('artist', 0.95)
+      },
+      {
+        fieldId: 'album',
+        providerId: 'musicbrainz',
+        value: mbRelease.title,
+        confidenceScore: this.getConfidence('album', 0.9)
+      },
+      {
+        fieldId: 'mbid',
+        providerId: 'musicbrainz',
+        value: targetMbid,
+        confidenceScore: this.getConfidence('mbid', 0.99)
+      }
     ];
 
     if (genreValue) {
@@ -164,7 +212,8 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     if (typeof options === 'object' && options !== null) {
       limit = options.limit ?? 10;
       targetTrackCount = options.targetTrackCount;
-      signal = targetTrackCountOrSignal instanceof AbortSignal ? targetTrackCountOrSignal : signalParam;
+      signal =
+        targetTrackCountOrSignal instanceof AbortSignal ? targetTrackCountOrSignal : signalParam;
     } else if (typeof options === 'number') {
       limit = options;
       if (typeof targetTrackCountOrSignal === 'number') {
@@ -191,7 +240,11 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       queryParts.push(`artist:"${escapeLuceneValue(normQuery.cleanArtist)}"`);
     }
 
-    let rawReleases = await this.apiClient.searchReleases(queryParts.join(' AND '), SEARCH_BUFFER, signal);
+    let rawReleases = await this.apiClient.searchReleases(
+      queryParts.join(' AND '),
+      SEARCH_BUFFER,
+      signal
+    );
 
     // Fallback: if clean title search returned nothing and we stripped edition info,
     // retry with the original raw title
@@ -200,7 +253,11 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       if (normQuery.cleanArtist) {
         fallbackParts.push(`artist:"${escapeLuceneValue(normQuery.cleanArtist)}"`);
       }
-      rawReleases = await this.apiClient.searchReleases(fallbackParts.join(' AND '), SEARCH_BUFFER, signal);
+      rawReleases = await this.apiClient.searchReleases(
+        fallbackParts.join(' AND '),
+        SEARCH_BUFFER,
+        signal
+      );
     }
 
     const searchCandidates = rawReleases.map((rel) => ({
@@ -220,9 +277,16 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       rawItem: rel
     }));
 
-    const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(searchCandidates, normQuery, targetTrackCount);
+    const rankedCandidates = MetadataSearchRankingEngine.rankCandidates(
+      searchCandidates,
+      normQuery,
+      targetTrackCount
+    );
     const results: AlbumMetadata[] = rankedCandidates.slice(0, limit).map((scored) => ({
-      ...this.releaseMapper.toAlbumMetadata(scored.candidate.rawItem as MusicBrainzReleaseDto, artist),
+      ...this.releaseMapper.toAlbumMetadata(
+        scored.candidate.rawItem as MusicBrainzReleaseDto,
+        artist
+      ),
       rankingScore: Math.round(scored.totalScore)
     }));
 
@@ -275,7 +339,10 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       if (cachedMbid) {
         const cachedRecording = await this.apiClient.getRecordingById(cachedMbid);
         if (cachedRecording) {
-          return this.recordingMapper.toProviderResult(cachedRecording, 1.0) as ProviderResult<TDTO>;
+          return this.recordingMapper.toProviderResult(
+            cachedRecording,
+            1.0
+          ) as ProviderResult<TDTO>;
         }
       }
     }
@@ -308,13 +375,14 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }
 
     // Adapt MusicBrainz DTOs to provider-generic CandidateItems
-    const adaptedCandidates: Array<CandidateItem & { original: MusicBrainzRecordingDto }> = candidates.map((c) => ({
-      id: c.id,
-      title: c.title,
-      artists: c['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean),
-      durationSeconds: c.length ? c.length / 1000 : undefined,
-      original: c
-    }));
+    const adaptedCandidates: Array<CandidateItem & { original: MusicBrainzRecordingDto }> =
+      candidates.map((c) => ({
+        id: c.id,
+        title: c.title,
+        artists: c['artist-credit']?.map((ac) => ac.name ?? ac.artist?.name ?? '').filter(Boolean),
+        durationSeconds: c.length ? c.length / 1000 : undefined,
+        original: c
+      }));
 
     const matchResult = this.matcher.findBestMatch(
       {
@@ -333,10 +401,26 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       this.cache.set(this.identity.id, cacheKey, matchResult.candidate.id);
     }
 
-    return this.recordingMapper.toProviderResult(recordingToMap, confidenceScore) as ProviderResult<TDTO>;
+    return this.recordingMapper.toProviderResult(
+      recordingToMap,
+      confidenceScore
+    ) as ProviderResult<TDTO>;
   }
 
-  public async searchRecordings(title: string, artist?: string, limit = 10): Promise<Array<{ id: string; title: string; artist?: string; album?: string; year?: number; confidenceScore?: number }>> {
+  public async searchRecordings(
+    title: string,
+    artist?: string,
+    limit = 10
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      artist?: string;
+      album?: string;
+      year?: number;
+      confidenceScore?: number;
+    }>
+  > {
     const query = artist
       ? `recording:"${escapeLuceneValue(title)}" AND artist:"${escapeLuceneValue(artist)}"`
       : `recording:"${escapeLuceneValue(title)}"`;
@@ -352,7 +436,9 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     }));
   }
 
-  public async resolveRecording(recordingId: string): Promise<{ id: string; title: string; artist?: string; trackNumber?: number } | null> {
+  public async resolveRecording(
+    recordingId: string
+  ): Promise<{ id: string; title: string; artist?: string; trackNumber?: number } | null> {
     if (!recordingId) return null;
     const details = await this.apiClient.getRecordingById(recordingId);
     if (!details) return null;
@@ -364,10 +450,15 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
     };
   }
 
-  public async search<TDTO = unknown>(query: string, options?: Record<string, unknown>): Promise<ProviderResult<TDTO>[]> {
+  public async search<TDTO = unknown>(
+    query: string,
+    options?: Record<string, unknown>
+  ): Promise<ProviderResult<TDTO>[]> {
     const limit = (options?.limit as number) ?? 10;
     const candidates = await this.apiClient.searchRecordings(query, limit);
-    return candidates.map((c) => this.recordingMapper.toProviderResult(c, 0.8) as ProviderResult<TDTO>);
+    return candidates.map(
+      (c) => this.recordingMapper.toProviderResult(c, 0.8) as ProviderResult<TDTO>
+    );
   }
 
   private isMbid(str: string): boolean {
@@ -375,7 +466,8 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
   }
 
   private buildSearchQuery(identity: MetadataIdentity): string {
-    const title = identity.getSearchTitle() ?? (typeof identity.entityId === 'string' ? identity.entityId : '');
+    const title =
+      identity.getSearchTitle() ?? (typeof identity.entityId === 'string' ? identity.entityId : '');
     const artist = identity.getSearchArtist();
 
     if (title && artist) {

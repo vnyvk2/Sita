@@ -1,7 +1,7 @@
-﻿// @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+﻿import { lyricsQuery } from '@renderer/queries/lyrics';
 import { QueryClient } from '@tanstack/react-query';
-import { lyricsQuery } from '@renderer/queries/lyrics';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('QueryCache Retention & Rapid Skip Workload (50-100 tracks)', () => {
   let queryClient: QueryClient;
@@ -69,7 +69,9 @@ describe('QueryCache Retention & Rapid Skip Workload (50-100 tracks)', () => {
     expect(allQueries.length).toBe(100);
 
     const heapDeltaMB = (afterHeap - beforeHeap) / (1024 * 1024);
-    console.log(`[QueryCache Benchmark] 100 cached SongLyrics heap delta: ~${heapDeltaMB.toFixed(2)} MB`);
+    console.log(
+      `[QueryCache Benchmark] 100 cached SongLyrics heap delta: ~${heapDeltaMB.toFixed(2)} MB`
+    );
 
     // Verify each query data is intact
     const firstQuery = allQueries[0];

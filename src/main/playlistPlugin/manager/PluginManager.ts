@@ -1,8 +1,8 @@
-import type { PluginRegistry } from '../registry/PluginRegistry';
 import type { PlaylistEventBus } from '../../playlistAutomation/events/PlaylistEventBus';
-import type { PlaylistPlugin } from '../interfaces/PlaylistPlugin';
 import type { PluginContext } from '../context/PluginContext';
+import type { PlaylistPlugin } from '../interfaces/PlaylistPlugin';
 import type { PluginInfo } from '../models/PluginStatus';
+import type { PluginRegistry } from '../registry/PluginRegistry';
 
 export class PluginManager {
   private plugins = new Map<string, PlaylistPlugin>();

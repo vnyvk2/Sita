@@ -93,6 +93,7 @@ graph TD
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Metadata Engine & Query Pipeline (`MetadataEngine.ts`)
+
 Executes domain metadata queries through a structured pipeline with identity resolution, cache lookups, and validation policies.
 
 ```mermaid
@@ -116,6 +117,7 @@ flowchart TD
 ---
 
 ### Process 2: Multi-Provider Discovery & Dynamic Priority Registration
+
 Dynamically discovers and configures local and remote providers based on user preferences and capability descriptors.
 
 ```mermaid
@@ -135,9 +137,11 @@ flowchart TD
 ---
 
 ### Process 3: Resilient Provider Execution Pipeline (`MetadataProviderExecutor.ts`)
+
 Guarantees 100% isolation for all external HTTP queries. No remote failure or rate limit (HTTP 429) can crash the UI or freeze the Node.js event loop.
 
 **Resilience Layers**:
+
 1. **`RateLimiter`**: Enforces 1 request/second per remote domain.
 2. **`CircuitBreaker`**: Opens after consecutive threshold failures to prevent cascading latency.
 3. **`RetryPolicy`**: 3 exponential backoff retries on network dropouts.
@@ -168,9 +172,11 @@ flowchart TD
 ---
 
 ### Process 4: Field-Level Policy Merging & Attribution Badges (`MetadataMergeEngine.ts`)
+
 Merges conflicting field contributions across disparate providers into a unified release snapshot, attaching explicit provider attribution badges.
 
 **Attribution Rule Matrix**:
+
 - **Title, Artist, Track Number, MBID**: MusicBrainz takes precedence (`badge: 'musicbrainz'`).
 - **Genres & Master Styles**: Discogs takes precedence (`badge: 'discogs'`).
 - **Cover Artwork URLs**: Cover Art Archive takes precedence (`badge: 'coverartarchive'`).
@@ -194,6 +200,7 @@ flowchart TD
 ---
 
 ### Process 5: Candidate Resolution & UI Preview Generation
+
 Coordinates user release searches, producing a typed [`MetadataPreview`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/common/metadata/preview.ts) showing old vs. new values before physical disk write.
 
 ```mermaid
@@ -212,6 +219,7 @@ flowchart TD
 ---
 
 ### Process 6: Option A Whole-Transaction Batch Execution (`MetadataTransactionManager.ts`)
+
 Executes metadata mutations in chunks of 50 files. If ANY mutation fails, the transaction coordinator automatically rolls back all previously written files and database records to their pre-transaction states.
 
 ```mermaid
@@ -248,6 +256,7 @@ flowchart TD
 ---
 
 ### Process 7: Atomic Rollback & Snapshot Playback
+
 Iterates backwards through `draftSnapshots`, using [`MutationExecutor`](file:///C:/Users/VINAY/.gemini/antigravity/worktrees/Nora/document_project_architecture_graphs/src/main/metadata/transactions/MutationExecutor.ts) to restore both physical disk tags and SQLite rows to their exact pre-transaction state.
 
 ```mermaid
@@ -268,6 +277,7 @@ flowchart TD
 ---
 
 ### Process 8: Artwork Downloading & Cache Invalidation
+
 Validates and fetches remote artwork images via the resilient request pipeline and invalidates local image caches upon successful commit.
 
 ```mermaid
@@ -290,6 +300,7 @@ flowchart TD
 ---
 
 ### Process 9: Undo Token & History Snapshot Management (`MetadataHistoryService.ts`)
+
 Manages immutable undo snapshots, allowing one-click multi-level rollback across app sessions.
 
 ```mermaid
@@ -313,7 +324,9 @@ flowchart TD
 ---
 
 ### Process 10: Metadata Domain Workflows (`MetadataWorkflowService.ts`)
+
 Encapsulates specialized domain workflows for granular tag editing:
+
 - **`AlbumWorkflow`**: Resolves multi-track album structures.
 - **`GenreWorkflow`**: Fetches community-tagged musical styles from Discogs.
 - **`ArtworkWorkflow`**: Resolves high-resolution cover artwork from CAA.

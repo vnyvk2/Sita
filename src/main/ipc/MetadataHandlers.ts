@@ -1,15 +1,21 @@
 import { randomUUID } from 'crypto';
+
 import { ipcMain, type BrowserWindow } from 'electron';
+
 import type { MetadataSearchOptions, AvailableSearchProviderInfo } from '../../common/metadata/api';
 import type { MetadataProviderPreferences } from '../../common/metadata/preferences';
 import { DEFAULT_METADATA_PREFERENCES } from '../../common/metadata/preferences';
-import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
-import type { MetadataWorkflowService } from '../metadata/services/MetadataWorkflowService';
-import type { MetadataPreferencesService } from '../metadata/services/MetadataPreferencesService';
-import type { MetadataProviderRuntime } from '../metadata/runtime/MetadataProviderRuntime';
-import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
-import type { AlbumTagPreview, ApplyPreviewOptions, ProgressEventPayload } from '../metadata/models/AlbumTagPreview';
+import type {
+  AlbumTagPreview,
+  ApplyPreviewOptions,
+  ProgressEventPayload
+} from '../metadata/models/AlbumTagPreview';
 import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
+import type { MetadataProviderRuntime } from '../metadata/runtime/MetadataProviderRuntime';
+import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
+import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
+import type { MetadataPreferencesService } from '../metadata/services/MetadataPreferencesService';
+import type { MetadataWorkflowService } from '../metadata/services/MetadataWorkflowService';
 import type { WorkflowPreview, WorkflowType } from '../metadata/workflows/MetadataWorkflow';
 
 const activeProgressListeners = new WeakSet<object>();
@@ -57,38 +63,58 @@ export function registerMetadataHandlers(
     return preferencesService.getPreferences();
   });
 
-  ipcMain.handle('metadata/savePreferences', async (_, prefs: Partial<MetadataProviderPreferences>) => {
-    if (!preferencesService) {
-      throw new Error('Preferences service not initialized');
+  ipcMain.handle(
+    'metadata/savePreferences',
+    async (_, prefs: Partial<MetadataProviderPreferences>) => {
+      if (!preferencesService) {
+        throw new Error('Preferences service not initialized');
+      }
+      const registered = providerRuntime
+        ? providerRuntime.getAvailableSearchProviders().map((p) => p.id)
+        : undefined;
+      return preferencesService.savePreferences(prefs, registered);
     }
-    const registered = providerRuntime ? providerRuntime.getAvailableSearchProviders().map((p) => p.id) : undefined;
-    return preferencesService.savePreferences(prefs, registered);
-  });
+  );
 
-  ipcMain.handle('metadata/getAvailableSearchProviders', async (): Promise<AvailableSearchProviderInfo[]> => {
-    if (providerRuntime) {
-      return providerRuntime.getAvailableSearchProviders();
+  ipcMain.handle(
+    'metadata/getAvailableSearchProviders',
+    async (): Promise<AvailableSearchProviderInfo[]> => {
+      if (providerRuntime) {
+        return providerRuntime.getAvailableSearchProviders();
+      }
+      return [{ id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }];
     }
-    return [{ id: 'musicbrainz', displayName: 'MusicBrainz', isOnline: true }];
-  });
+  );
 
   ipcMain.handle(
     'metadata/buildPreview',
-    async (_, localSongs: LocalSongInput[], releaseId: string, providerId?: MetadataProviderId, operationId = 'default') => {
+    async (
+      _,
+      localSongs: LocalSongInput[],
+      releaseId: string,
+      providerId?: MetadataProviderId,
+      operationId = 'default'
+    ) => {
       const signal = autoTagService.createAbortSignal(operationId);
       return autoTagService.buildPreview(localSongs, releaseId, providerId, signal, operationId);
     }
   );
 
-  ipcMain.handle('metadata/applyPreview', async (_, preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId = 'default') => {
-    const resolvedOpId = options?.operationId ?? (operationId !== 'default' ? operationId : undefined) ?? `op-${randomUUID()}`;
-    const applyOpts: ApplyPreviewOptions = {
-      ...options,
-      operationId: resolvedOpId
-    };
-    const signal = autoTagService.createAbortSignal(resolvedOpId);
-    return autoTagService.applyPreview(preview, applyOpts, signal, resolvedOpId);
-  });
+  ipcMain.handle(
+    'metadata/applyPreview',
+    async (_, preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId = 'default') => {
+      const resolvedOpId =
+        options?.operationId ??
+        (operationId !== 'default' ? operationId : undefined) ??
+        `op-${randomUUID()}`;
+      const applyOpts: ApplyPreviewOptions = {
+        ...options,
+        operationId: resolvedOpId
+      };
+      const signal = autoTagService.createAbortSignal(resolvedOpId);
+      return autoTagService.applyPreview(preview, applyOpts, signal, resolvedOpId);
+    }
+  );
 
   ipcMain.handle('metadata/undoLastAutoTag', async (_, operationId = 'default') => {
     return autoTagService.undoLastAutoTag(operationId);
@@ -103,15 +129,33 @@ export function registerMetadataHandlers(
   if (workflowService) {
     ipcMain.handle(
       'metadata/workflow/search',
-      async (_, workflowType: WorkflowType, query: { title?: string; artist?: string; album?: string; limit?: number }, operationId = 'default') => {
+      async (
+        _,
+        workflowType: WorkflowType,
+        query: { title?: string; artist?: string; album?: string; limit?: number },
+        operationId = 'default'
+      ) => {
         return workflowService.search(workflowType, query, operationId);
       }
     );
 
     ipcMain.handle(
       'metadata/workflow/buildPreview',
-      async (_, workflowType: WorkflowType, localSongs: LocalSongInput[], candidateId: string, providerId?: string, operationId = 'default') => {
-        return workflowService.buildPreview(workflowType, localSongs, candidateId, providerId, operationId);
+      async (
+        _,
+        workflowType: WorkflowType,
+        localSongs: LocalSongInput[],
+        candidateId: string,
+        providerId?: string,
+        operationId = 'default'
+      ) => {
+        return workflowService.buildPreview(
+          workflowType,
+          localSongs,
+          candidateId,
+          providerId,
+          operationId
+        );
       }
     );
 
@@ -125,7 +169,13 @@ export function registerMetadataHandlers(
         options?: ApplyPreviewOptions,
         operationId = 'default'
       ) => {
-        return workflowService.applyPreview(workflowType, preview, selectedFieldIds, options, operationId);
+        return workflowService.applyPreview(
+          workflowType,
+          preview,
+          selectedFieldIds,
+          options,
+          operationId
+        );
       }
     );
 

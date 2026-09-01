@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fastDiskWalk } from '../fastDiskWalk';
@@ -78,9 +79,7 @@ describe('fastDiskWalk', () => {
         ] as any;
       }
       if (dirPath === 'C:\\Music\\Rock') {
-        return [
-          { name: 'rock1.mp3', isFile: () => true, isDirectory: () => false }
-        ] as any;
+        return [{ name: 'rock1.mp3', isFile: () => true, isDirectory: () => false }] as any;
       }
       return [];
     });

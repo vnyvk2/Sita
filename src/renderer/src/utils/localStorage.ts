@@ -288,7 +288,8 @@ const getSortingStates = <Type extends keyof SortingStates>(type: Type) =>
  * Shortcut labels must be persisted as stable i18n KEYS ('appShortcutsPrompt.playPause'), never
  * runtime translations. Older versions stored translated strings, which permanently desynchronized
  * shortcut matching after a language switch. Rewrite any non-key label to the key at the same
- * category/shortcut position (the shortcut list shape is fixed; custom key bindings are preserved).
+ * category/shortcut position (the shortcut list shape is fixed; custom key bindings are
+ * preserved).
  *
  * Idempotent: labels that already match the template keys are left untouched.
  */
@@ -388,7 +389,9 @@ const getLyricsEditorSettings = <Type extends keyof LyricsEditorSettings>(type: 
   getItem('lyricsEditorSettings', type);
 
 // PLAYLIST COVER SETTINGS
-const getPlaylistCoverSettings = (playlistId: number): import('@renderer/types/playlistCover').PlaylistCoverSettings | undefined => {
+const getPlaylistCoverSettings = (
+  playlistId: number
+): import('@renderer/types/playlistCover').PlaylistCoverSettings | undefined => {
   try {
     const raw = localStorage.getItem(`playlist_cover_settings_${playlistId}`);
     return raw ? JSON.parse(raw) : undefined;
@@ -398,10 +401,15 @@ const getPlaylistCoverSettings = (playlistId: number): import('@renderer/types/p
   }
 };
 
-const setPlaylistCoverSettings = (playlistId: number, settings: import('@renderer/types/playlistCover').PlaylistCoverSettings): void => {
+const setPlaylistCoverSettings = (
+  playlistId: number,
+  settings: import('@renderer/types/playlistCover').PlaylistCoverSettings
+): void => {
   try {
     localStorage.setItem(`playlist_cover_settings_${playlistId}`, JSON.stringify(settings));
-    window.dispatchEvent(new CustomEvent('playlist-cover-settings-changed', { detail: { playlistId } }));
+    window.dispatchEvent(
+      new CustomEvent('playlist-cover-settings-changed', { detail: { playlistId } })
+    );
   } catch (err) {
     console.error('Failed to set playlist cover settings:', err);
   }

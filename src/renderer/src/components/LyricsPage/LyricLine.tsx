@@ -182,7 +182,7 @@ const LyricLine = (props: LyricProp) => {
           : 'text-font-color-black! dark:text-font-color-white! scale-100! text-4xl! font-medium blur-none! [&>div>span]:mr-3'
       } ${playerType === 'mini' && 'text-font-color-white/20! mb-2! text-2xl!'} ${
         playerType === 'drawer' &&
-        'mb-4! text-2xl! leading-snug items-center! justify-center! text-center! w-full!'
+        'mb-4! w-full! items-center! justify-center! text-center! text-2xl! leading-snug'
       } ${
         playerType === 'full' &&
         'text-font-color-white/20! mb-6! origin-left items-start! justify-start! text-left! text-7xl!'

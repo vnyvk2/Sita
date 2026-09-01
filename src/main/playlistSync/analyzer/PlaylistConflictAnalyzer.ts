@@ -1,6 +1,6 @@
-import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
-import type { PlaylistConflict } from '../models/PlaylistConflict';
 import type { ConflictAnalysis } from '../models/ConflictAnalysis';
+import type { PlaylistConflict } from '../models/PlaylistConflict';
+import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
 
 export class PlaylistConflictAnalyzer {
   analyzePlan(plan: PlaylistSyncPlan, _currentPlaylistSongIds: number[]): ConflictAnalysis {

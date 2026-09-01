@@ -5,7 +5,6 @@ export { songSortTypes, type SongSortTypes } from '../../../../common/songSortTy
 import type { SongSortTypes } from '../../../../common/songSortTypes';
 export type PlaylistViewMode = SongSortTypes;
 
-
 export function canReorder(viewMode?: PlaylistViewMode | string): boolean {
   return viewMode === 'customOrder';
 }

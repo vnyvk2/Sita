@@ -1,7 +1,13 @@
 import { type SQL, sql } from 'drizzle-orm';
-import type { SmartPlaylistRuleAST, RuleCondition, SmartPlaylistField, OrderDefinition } from './ast';
-import { songs, artists, albums, genres } from '../../db/schema';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+
+import { songs, artists, albums, genres } from '../../db/schema';
+import type {
+  SmartPlaylistRuleAST,
+  RuleCondition,
+  SmartPlaylistField,
+  OrderDefinition
+} from './ast';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,7 +16,7 @@ export class SmartPlaylistCompiler {
     if (rule.type === 'group') {
       if (rule.rules.length === 0) return undefined;
       const compiledRules = rule.rules
-        .map(r => this.compilePredicate(r))
+        .map((r) => this.compilePredicate(r))
         .filter((r): r is SQL<unknown> => r !== undefined);
 
       if (compiledRules.length === 0) return undefined;
@@ -24,7 +30,7 @@ export class SmartPlaylistCompiler {
   }
 
   public compileOrderBy(orderBy: OrderDefinition[]): SQL<unknown>[] {
-    return orderBy.map(order => {
+    return orderBy.map((order) => {
       const col = this.getColumnForField(order.field);
       return order.direction === 'asc' ? sql`${col} ASC` : sql`${col} DESC`;
     });
@@ -79,18 +85,30 @@ export class SmartPlaylistCompiler {
 
   private getColumnForField(field: SmartPlaylistField): AnySQLiteColumn {
     switch (field) {
-      case 'title': return songs.title;
-      case 'artist': return artists.name;
-      case 'album': return albums.title;
-      case 'genre': return genres.name;
-      case 'language': return songs.language;
-      case 'year': return songs.year;
-      case 'duration': return songs.duration;
-      case 'playCount': throw new Error('playCount is not supported');
-      case 'skipCount': return songs.skipCount;
-      case 'addedAt': return songs.createdAt;
-      case 'isFavorite': return songs.isFavorite;
-      case 'isBlacklisted': return songs.isBlacklisted;
+      case 'title':
+        return songs.title;
+      case 'artist':
+        return artists.name;
+      case 'album':
+        return albums.title;
+      case 'genre':
+        return genres.name;
+      case 'language':
+        return songs.language;
+      case 'year':
+        return songs.year;
+      case 'duration':
+        return songs.duration;
+      case 'playCount':
+        throw new Error('playCount is not supported');
+      case 'skipCount':
+        return songs.skipCount;
+      case 'addedAt':
+        return songs.createdAt;
+      case 'isFavorite':
+        return songs.isFavorite;
+      case 'isBlacklisted':
+        return songs.isBlacklisted;
       default:
         throw new Error(`Unknown field: ${field}`);
     }

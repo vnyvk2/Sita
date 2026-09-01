@@ -1,8 +1,7 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-
 import type { CreatePlaylistInput } from '../../../common/collections/operationInputs';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class CreatePlaylistOp implements CollectionOperation<CreatePlaylistInput, number> {
   private repository: PlaylistRepository;
@@ -15,11 +14,14 @@ export class CreatePlaylistOp implements CollectionOperation<CreatePlaylistInput
     input: CreatePlaylistInput,
     ctx: OperationContext
   ): Promise<OperationResult<number>> {
-    const inserted = await this.repository.createPlaylist({
-      name: input.name,
-      parentId: input.parentId ?? null,
-      playlistType: 'standard'
-    }, ctx.trx);
+    const inserted = await this.repository.createPlaylist(
+      {
+        name: input.name,
+        parentId: input.parentId ?? null,
+        playlistType: 'standard'
+      },
+      ctx.trx
+    );
 
     return {
       data: inserted.id,

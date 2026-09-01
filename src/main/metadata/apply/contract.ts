@@ -1,16 +1,14 @@
 import type { SongMetadataSnapshot } from '../history/MetadataHistoryService';
 
 /**
- * ─── Frozen contract (2c P2 prerequisite) ───────────────────────────────────
- * One normalized mutation = one authoritative state transition request for a
- * single song, owned end-to-end by MetadataApplyOrchestrator.
+ * ─── Frozen contract (2c P2 prerequisite) ─────────────────────────────────── One normalized
+ * mutation = one authoritative state transition request for a single song, owned end-to-end by
+ * MetadataApplyOrchestrator.
  *
- * Requirements encoded here (per 2c review):
- * - scalar metadata, release-level album artist, recording identity (isrc/mbid)
- * - artwork intent (buffer must already be size-validated)
- * - file-write intent incl. deferred eligibility
- * - snapshot/undo description
- * - stable identity (mutationId) making replay idempotent after restart
+ * Requirements encoded here (per 2c review): - scalar metadata, release-level album artist,
+ * recording identity (isrc/mbid) - artwork intent (buffer must already be size-validated) -
+ * file-write intent incl. deferred eligibility - snapshot/undo description - stable identity
+ * (mutationId) making replay idempotent after restart
  */
 
 export type ApplyFieldId =
@@ -54,9 +52,8 @@ export interface NormalizedMutation {
 
   fileWrite: {
     /**
-     * true  -> if the song is currently playing, the write is routed to the
-     *          durable pending queue instead of failing
-     * false -> attempt immediately regardless
+     * True -> if the song is currently playing, the write is routed to the durable pending queue
+     * instead of failing false -> attempt immediately regardless
      */
     deferredIfPlaying: boolean;
   };
@@ -65,8 +62,8 @@ export interface NormalizedMutation {
     description: string;
     albumTitle?: string;
     /**
-     * Optional caller-supplied pre-state. When omitted, the orchestrator
-     * captures a VALUE-COMPLETE snapshot from the DB before mutating.
+     * Optional caller-supplied pre-state. When omitted, the orchestrator captures a VALUE-COMPLETE
+     * snapshot from the DB before mutating.
      */
     previousSongs?: SongMetadataSnapshot[];
   };

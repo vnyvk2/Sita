@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
 import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistImportExecutor';
 import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
 import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('PlaylistImportExecutor', () => {
   it('should execute IMPORT decisions in order inside TransactionRunner and pass rich persistence write models', async () => {
@@ -38,7 +38,14 @@ describe('PlaylistImportExecutor', () => {
             position: 1,
             comments: 'Favorite track',
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'song1.mp3' }, resolution: { originalReference: 'song1.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'song1.mp3' },
+                resolution: {
+                  originalReference: 'song1.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 501 }
             }
           }
@@ -48,7 +55,14 @@ describe('PlaylistImportExecutor', () => {
           source: {
             position: 2,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'missing.mp3' }, resolution: { originalReference: 'missing.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'MISSING' } },
+              resolvedTrack: {
+                track: { originalLocation: 'missing.mp3' },
+                resolution: {
+                  originalReference: 'missing.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'MISSING'
+                }
+              },
               libraryMatch: { status: 'MISSING', confidence: 0 }
             }
           }
@@ -58,7 +72,14 @@ describe('PlaylistImportExecutor', () => {
           source: {
             position: 3,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'song2.mp3' }, resolution: { originalReference: 'song2.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'song2.mp3' },
+                resolution: {
+                  originalReference: 'song2.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 502 }
             }
           }
@@ -69,7 +90,10 @@ describe('PlaylistImportExecutor', () => {
     const result = await executor.execute(plan);
 
     expect(mockTransactionRunner.runInTransaction).toHaveBeenCalled();
-    expect(mockPersistence.createPlaylist).toHaveBeenCalledWith('My Awesome Playlist', 'Imported from M3U');
+    expect(mockPersistence.createPlaylist).toHaveBeenCalledWith(
+      'My Awesome Playlist',
+      'Imported from M3U'
+    );
     expect(mockPersistence.addEntries).toHaveBeenCalledWith(101, [
       { songId: 501, position: 1, dateAdded: undefined, comments: 'Favorite track' },
       { songId: 502, position: 3, dateAdded: undefined, comments: undefined }
@@ -115,7 +139,14 @@ describe('PlaylistImportExecutor', () => {
           source: {
             position: 1,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'song1.mp3' }, resolution: { originalReference: 'song1.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'song1.mp3' },
+                resolution: {
+                  originalReference: 'song1.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 501 }
             }
           }

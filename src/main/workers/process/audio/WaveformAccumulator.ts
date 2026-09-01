@@ -5,9 +5,9 @@ export const WAVEFORM_NUM_BINS = 200;
 /**
  * WaveformAccumulator
  *
- * Incremental, single-pass waveform peak generator.
- * Processes bounded Float32Array PCM chunks and accumulates maximum absolute amplitude
- * across channels into exactly 200 temporal bins without whole-file buffering.
+ * Incremental, single-pass waveform peak generator. Processes bounded Float32Array PCM chunks and
+ * accumulates maximum absolute amplitude across channels into exactly 200 temporal bins without
+ * whole-file buffering.
  *
  * Invariant: Memory consumption is strictly O(1) (fixed 200-element Float32Array).
  */
@@ -23,18 +23,14 @@ export class WaveformAccumulator {
     this.totalExpectedSamples = Math.max(1, totalExpectedSamples);
   }
 
-  /**
-   * Updates the total expected sample count if probed estimation differs from actual stream.
-   */
+  /** Updates the total expected sample count if probed estimation differs from actual stream. */
   public setTotalSamples(totalSamples: number): void {
     if (totalSamples > 0) {
       this.totalExpectedSamples = totalSamples;
     }
   }
 
-  /**
-   * Consumes a bounded PCM chunk from the audio decoder stream.
-   */
+  /** Consumes a bounded PCM chunk from the audio decoder stream. */
   public processChunk(chunk: DecodeChunk): void {
     const { channelData, sampleOffset, frameCount, totalSamples } = chunk;
     if (totalSamples > 0 && totalSamples !== this.totalExpectedSamples) {
@@ -70,9 +66,7 @@ export class WaveformAccumulator {
     }
   }
 
-  /**
-   * Finalizes the waveform extraction and returns a normalized Float32Array(200).
-   */
+  /** Finalizes the waveform extraction and returns a normalized Float32Array(200). */
   public finish(): Float32Array {
     // If total processed samples was shorter/longer than initially expected, rescale empty tail/gaps if needed
     const result = new Float32Array(this.numBins);

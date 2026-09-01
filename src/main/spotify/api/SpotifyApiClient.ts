@@ -24,9 +24,7 @@ export class SpotifyApiClient {
     this.pipeline = pipeline ?? new RequestPipeline();
   }
 
-  /**
-   * Fetches the currently authenticated Spotify user's profile.
-   */
+  /** Fetches the currently authenticated Spotify user's profile. */
   public async getCurrentUser(accessToken: string): Promise<SpotifyUserProfile> {
     const response = await this.pipeline.execute<{
       id: string;
@@ -55,9 +53,7 @@ export class SpotifyApiClient {
     };
   }
 
-  /**
-   * Fetches a paginated list of playlists owned or followed by the current user.
-   */
+  /** Fetches a paginated list of playlists owned or followed by the current user. */
   public async getUserPlaylists(
     accessToken: string,
     options?: { limit?: number; offset?: number; nextUrl?: string }
@@ -107,8 +103,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Recursively / iteratively fetches ALL playlists owned or followed by the current user.
-   * Purely governed by page.next URL authority with circular loop protection.
+   * Recursively / iteratively fetches ALL playlists owned or followed by the current user. Purely
+   * governed by page.next URL authority with circular loop protection.
    */
   public async getAllUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
     const allPlaylists: SpotifyPlaylistSummary[] = [];
@@ -156,9 +152,7 @@ export class SpotifyApiClient {
     return allPlaylists;
   }
 
-  /**
-   * Fetches metadata details for a specific playlist by ID.
-   */
+  /** Fetches metadata details for a specific playlist by ID. */
   public async getPlaylistDetails(
     accessToken: string,
     playlistId: string
@@ -183,9 +177,7 @@ export class SpotifyApiClient {
     };
   }
 
-  /**
-   * Alias for getPlaylistDetails.
-   */
+  /** Alias for getPlaylistDetails. */
   public async getPlaylist(
     accessToken: string,
     playlistId: string
@@ -194,8 +186,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Fetches a paginated slice of items (tracks) from a playlist.
-   * Supports active 2026 /playlists/{id}/items endpoint with additional_types=track,episode.
+   * Fetches a paginated slice of items (tracks) from a playlist. Supports active 2026
+   * /playlists/{id}/items endpoint with additional_types=track,episode.
    */
   public async getPlaylistItems(
     accessToken: string,
@@ -231,9 +223,7 @@ export class SpotifyApiClient {
     return response.data;
   }
 
-  /**
-   * Fetches ALL track items from a Spotify playlist by auto-traversing page.next.
-   */
+  /** Fetches ALL track items from a Spotify playlist by auto-traversing page.next. */
   public async getAllPlaylistItems(
     accessToken: string,
     playlistId: string
@@ -272,8 +262,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Searches the Spotify track catalog using GET /v1/search?type=track.
-   * Capped to limit 1..10 in compliance with the February 2026 Spotify Search API update.
+   * Searches the Spotify track catalog using GET /v1/search?type=track. Capped to limit 1..10 in
+   * compliance with the February 2026 Spotify Search API update.
    */
   public async searchTracks(
     accessToken: string,
@@ -306,8 +296,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Creates a new playlist for the authenticated user using POST /v1/me/playlists.
-   * Complies with the active Spotify 2026 API contract.
+   * Creates a new playlist for the authenticated user using POST /v1/me/playlists. Complies with
+   * the active Spotify 2026 API contract.
    */
   public async createPlaylist(
     accessToken: string,
@@ -341,8 +331,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Adds items to a Spotify playlist using POST /v1/playlists/{id}/items.
-   * Expects a single batch of 1..100 track URIs. Chunking is handled by caller.
+   * Adds items to a Spotify playlist using POST /v1/playlists/{id}/items. Expects a single batch of
+   * 1..100 track URIs. Chunking is handled by caller.
    */
   public async addPlaylistItems(
     accessToken: string,
@@ -379,8 +369,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Removes items from a Spotify playlist using DELETE /v1/playlists/{id}/items.
-   * Expects up to 100 items with optional snapshot_id concurrency guard.
+   * Removes items from a Spotify playlist using DELETE /v1/playlists/{id}/items. Expects up to 100
+   * items with optional snapshot_id concurrency guard.
    */
   public async removePlaylistItems(
     accessToken: string,
@@ -423,8 +413,8 @@ export class SpotifyApiClient {
   }
 
   /**
-   * Replaces all items in a Spotify playlist using PUT /v1/playlists/{id}/items.
-   * Strictly clamped to <= 100 items per Spotify Web API contract.
+   * Replaces all items in a Spotify playlist using PUT /v1/playlists/{id}/items. Strictly clamped
+   * to <= 100 items per Spotify Web API contract.
    */
   public async replacePlaylistItems(
     accessToken: string,
@@ -456,4 +446,3 @@ export class SpotifyApiClient {
     return response.data;
   }
 }
-

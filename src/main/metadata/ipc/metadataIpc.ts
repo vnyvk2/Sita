@@ -5,7 +5,10 @@ import type { MetadataFieldId } from '../models/MetadataFieldId';
 import { MetadataIdentity } from '../models/MetadataIdentity';
 import type { MetadataKind } from '../models/MetadataKind';
 import type { MetadataOverrideValue } from '../repository/models/MetadataOverride';
-import { MetadataSnapshotSerializer, type MetadataEntityDTO } from '../serializers/MetadataSnapshotSerializer';
+import {
+  MetadataSnapshotSerializer,
+  type MetadataEntityDTO
+} from '../serializers/MetadataSnapshotSerializer';
 import type { UserMetadataService } from '../services/UserMetadataService';
 
 export interface IdentityPayload {

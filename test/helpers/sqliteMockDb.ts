@@ -4,14 +4,11 @@ import { openSqliteEngine } from '../../src/main/db/sqlite/engine';
  * Shared vi.mock factory backing for the SQLite migration test suite.
  *
  * Replaces the in-memory PGlite + drizzle-migrate setup the PGlite tests used:
- * `openSqliteEngine(':memory:')` applies the same baseline DDL the production
- * engine uses (42 tables + FTS5 + triggers), so tests exercise the real schema.
+ * `openSqliteEngine(':memory:')` applies the same baseline DDL the production engine uses (42
+ * tables + FTS5 + triggers), so tests exercise the real schema.
  *
- * Usage inside a test file:
- *   vi.mock('@main/db/db', async () => {
- *     const { createSqliteMockDb } = await import('<relpath>/helpers/sqliteMockDb');
- *     return createSqliteMockDb();
- *   });
+ * Usage inside a test file: vi.mock('@main/db/db', async () => { const { createSqliteMockDb } =
+ * await import('<relpath>/helpers/sqliteMockDb'); return createSqliteMockDb(); });
  */
 export async function createSqliteMockDb() {
   const engine = openSqliteEngine(':memory:');

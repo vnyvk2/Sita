@@ -2,21 +2,21 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
+import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
 import { isSongWithPathAvailable, saveSong } from '@main/db/queries/songs';
 import type { albums, artists, genres, songs } from '@main/db/schema';
 import { File } from 'node-taglib-sharp';
 
+import { parseGenreList } from '../../common/genreUtils';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
-import { linkArtworksToSong, saveArtworks } from '@main/db/queries/artworks';
 import { extractFrontCover } from '../utils/extractFrontCover';
 import { detectSongLanguage } from './detectLanguage';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
 import manageGenresOfParsedSong from './manageGenresOfParsedSong';
-import { parseGenreList } from '../../common/genreUtils';
 // import { timeEnd, timeStart } from './utils/measureTimeUsage';
 
 const pathsQueue = new Set<string>();
@@ -26,12 +26,12 @@ export interface ParseSongResult {
   songData: typeof songs.$inferSelect;
   relevantAlbum: typeof albums.$inferSelect | undefined;
   newAlbum: typeof albums.$inferSelect | undefined;
-  newArtists: typeof artists.$inferSelect[];
-  relevantArtists: typeof artists.$inferSelect[];
-  newGenres: typeof genres.$inferSelect[];
-  relevantGenres: typeof genres.$inferSelect[];
-  relevantAlbumArtists: typeof artists.$inferSelect[];
-  newAlbumArtists: typeof artists.$inferSelect[];
+  newArtists: (typeof artists.$inferSelect)[];
+  relevantArtists: (typeof artists.$inferSelect)[];
+  newGenres: (typeof genres.$inferSelect)[];
+  relevantGenres: (typeof genres.$inferSelect)[];
+  relevantAlbumArtists: (typeof artists.$inferSelect)[];
+  newAlbumArtists: (typeof artists.$inferSelect)[];
 }
 
 export const tryToParseSong = (
@@ -59,10 +59,7 @@ export const tryToParseSong = (
       } catch (error) {
         const code = (error as any)?.code;
         const isTransientError =
-          code === 'EBUSY' ||
-          code === 'EAGAIN' ||
-          code === 'EWOULDBLOCK' ||
-          code === 'ETIMEDOUT';
+          code === 'EBUSY' || code === 'EAGAIN' || code === 'EWOULDBLOCK' || code === 'ETIMEDOUT';
 
         if (isTransientError && errRetryCount < 5) {
           // THIS ERROR OCCURRED WHEN THE APP STARTS READING DATA WHILE THE SONG IS STILL WRITING TO THE DISK.
@@ -74,14 +71,16 @@ export const tryToParseSong = (
           // Note: using a Promise wrapper to allow the recursive call to return its result
           return new Promise((resolve, reject) => {
             timeOutId = setTimeout(() => {
-              tryParseSong(errRetryCount + 1).then(resolve).catch(reject);
+              tryParseSong(errRetryCount + 1)
+                .then(resolve)
+                .catch(reject);
             }, 5000);
           });
         } else {
-          logger.debug(
-            `Failed to parse a song (non-transient error or retries exhausted).`,
-            { error, songPath }
-          );
+          logger.debug(`Failed to parse a song (non-transient error or retries exhausted).`, {
+            error,
+            songPath
+          });
           sendMessageToRenderer({
             messageCode: 'PARSE_FAILED',
             data: { name: songFileName }
@@ -165,15 +164,20 @@ export const parseSong = async (
 
         songInfo = {
           title: songTitle,
-          duration: Number(getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)),
+          duration: Number(
+            getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)
+          ),
           year: metadata.year || undefined,
           path: absoluteFilePath,
           sampleRate: file.properties.audioSampleRate,
-          bitRate: file.properties.audioBitrate ? Math.ceil(file.properties.audioBitrate) : undefined,
+          bitRate: file.properties.audioBitrate
+            ? Math.ceil(file.properties.audioBitrate)
+            : undefined,
           noOfChannels: file.properties.audioChannels,
           diskNumber: metadata.disc ?? undefined,
           trackNumber: metadata.track ?? undefined,
-          musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
+          musicBrainzRecordingId:
+            metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || undefined,
           isrc: metadata.isrc || undefined,
           language: detectedLanguage,
           fileCreatedAt: stats ? stats.birthtime : new Date(),
@@ -349,4 +353,3 @@ export const getAlbumInfoFromSong = (album?: string) => {
 export const getGenreInfoFromSong = (genres?: string[] | string | null): string[] => {
   return parseGenreList(genres);
 };
-

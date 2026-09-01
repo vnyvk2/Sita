@@ -1,10 +1,11 @@
-import type { MatchTierValue } from '../../../common/search/MatchTier';
-import type { MetadataSearchGateway } from '@main/metadata/search/MetadataSearchGateway';
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
 import logger from '@main/logger';
 import { dataUpdateEvent } from '@main/main';
+import type { MetadataSearchGateway } from '@main/metadata/search/MetadataSearchGateway';
 import { MetadataBootstrap } from '@main/metadata/setup';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
+
+import type { MatchTierValue } from '../../../common/search/MatchTier';
 import { MATCH_TIER } from '../../../common/search/MatchTier';
 import { AlbumSearchEngine } from '../engines/AlbumSearchEngine';
 import { ArtistSearchEngine } from '../engines/ArtistSearchEngine';
@@ -43,12 +44,9 @@ export interface SearchCoordinatorOptions {
 /**
  * Nora's central search coordinator.
  *
- * Owns:
- * - Query normalization
- * - Engine selection (based on filter)
- * - Parallel engine execution (returning SearchMatchReference[])
- * - Single-pass batched hydration via MetadataSearchGateway.hydrateReferences()
- * - Section confidence computation & history tracking
+ * Owns: - Query normalization - Engine selection (based on filter) - Parallel engine execution
+ * (returning SearchMatchReference[]) - Single-pass batched hydration via
+ * MetadataSearchGateway.hydrateReferences() - Section confidence computation & history tracking
  */
 const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> => {
   const {
@@ -109,17 +107,10 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
   timeEnd(timer, 'Engine Identity Discovery');
 
   // 2. Aggregate ALL search references into ONE single batched pass across all engines
-  const allReferences = [
-    ...songRefs,
-    ...artistRefs,
-    ...albumRefs,
-    ...playlistRefs,
-    ...genreRefs
-  ];
+  const allReferences = [...songRefs, ...artistRefs, ...albumRefs, ...playlistRefs, ...genreRefs];
 
   // Fallback to MetadataBootstrap singleton searchGateway if not explicitly passed
-  const activeGateway =
-    searchGateway ?? (await MetadataBootstrap.getInstance()).searchGateway;
+  const activeGateway = searchGateway ?? (await MetadataBootstrap.getInstance()).searchGateway;
 
   let hydratedResults: unknown[] = [];
   if (activeGateway && allReferences.length > 0) {
@@ -199,13 +190,13 @@ const query = async (options: SearchCoordinatorOptions): Promise<SearchResult> =
     }, 2000);
   }
 
-  console.log("SEARCH RETURN", {
+  console.log('SEARCH RETURN', {
     songs,
     artists,
     albums,
     playlists,
     genres,
-    confidence,
+    confidence
   });
 
   return {

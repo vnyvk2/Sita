@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
 import type { LibraryResolvedPlaylist } from '@main/playlistImport/models/LibraryResolvedPlaylist';
+import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('PlaylistImportPlanner', () => {
   let planner: PlaylistImportPlanner;
@@ -19,7 +19,11 @@ describe('PlaylistImportPlanner', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'song1.mp3' },
-              resolution: { originalReference: 'song1.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
+              resolution: {
+                originalReference: 'song1.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'FOUND'
+              }
             },
             libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 10 }
           }
@@ -30,7 +34,11 @@ describe('PlaylistImportPlanner', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'song2.mp3' },
-              resolution: { originalReference: 'song2.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'MISSING' }
+              resolution: {
+                originalReference: 'song2.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'MISSING'
+              }
             },
             libraryMatch: { status: 'MISSING', confidence: 0 }
           }
@@ -41,7 +49,11 @@ describe('PlaylistImportPlanner', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'song3.mp3' },
-              resolution: { originalReference: 'song3.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
+              resolution: {
+                originalReference: 'song3.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'FOUND'
+              }
             },
             libraryMatch: { status: 'NOT_IN_LIBRARY', confidence: 0 }
           }
@@ -52,7 +64,11 @@ describe('PlaylistImportPlanner', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'spotify:track:123' },
-              resolution: { originalReference: 'spotify:track:123', resolutionStatus: 'UNRESOLVED', verificationStatus: 'UNVERIFIED' }
+              resolution: {
+                originalReference: 'spotify:track:123',
+                resolutionStatus: 'UNRESOLVED',
+                verificationStatus: 'UNVERIFIED'
+              }
             },
             libraryMatch: { status: 'UNRESOLVED', confidence: 0 }
           }

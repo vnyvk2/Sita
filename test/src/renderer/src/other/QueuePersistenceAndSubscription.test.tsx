@@ -254,13 +254,14 @@ describe('Phase 2: Queue State, Persistence & Subscription Invariants', () => {
       const SimulatedSongCard = React.memo(({ songId }: { songId: number }) => {
         renderCounts[songId] = (renderCounts[songId] || 0) + 1;
 
-        const isPlayingNext = (store.state.localStorage?.queue?.queues?.[
-          store.state.localStorage?.queue?.currentQueueIndex ?? 0
-        ]?.songIds?.[
+        const isPlayingNext =
           (store.state.localStorage?.queue?.queues?.[
             store.state.localStorage?.queue?.currentQueueIndex ?? 0
-          ]?.position ?? 0) + 1
-        ] ?? null) === songId;
+          ]?.songIds?.[
+            (store.state.localStorage?.queue?.queues?.[
+              store.state.localStorage?.queue?.currentQueueIndex ?? 0
+            ]?.position ?? 0) + 1
+          ] ?? null) === songId;
 
         return <div data-testid={`song-${songId}`}>{isPlayingNext ? 'NEXT' : 'IDLE'}</div>;
       });

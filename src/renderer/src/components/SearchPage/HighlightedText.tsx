@@ -9,9 +9,8 @@ type Props = {
 };
 
 /**
- * Renders text with the matching portion highlighted via a styled `<mark>` tag.
- * Used in search result containers to visually indicate what part of a title/name
- * matched the search query.
+ * Renders text with the matching portion highlighted via a styled `<mark>` tag. Used in search
+ * result containers to visually indicate what part of a title/name matched the search query.
  */
 const HighlightedText = memo(({ text, highlight, className }: Props) => {
   if (!highlight.trim()) return <span className={className}>{text}</span>;

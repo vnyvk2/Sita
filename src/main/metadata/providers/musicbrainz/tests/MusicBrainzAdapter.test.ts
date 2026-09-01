@@ -1,12 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
 import { IdentityResolutionCache } from '@main/metadata/cache/IdentityResolutionCache';
 import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import type { RequestPipeline } from '@main/platform/networking/RequestPipeline';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from '../dto';
 import { MusicBrainzAdapter } from '../MusicBrainzAdapter';
 import { MusicBrainzApiClient } from '../MusicBrainzApiClient';
-import type { MusicBrainzRecordingDto, MusicBrainzReleaseDto } from '../dto';
 
 class MockRequestPipeline {
   public lastParams?: any;
@@ -100,7 +101,9 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     expect(payload.tags).toContain('rock');
 
     // Verify MBID was cached in IdentityResolutionCache
-    expect(cache.get<string>('musicbrainz', 'Bohemian Rhapsody:Queen')).toBe('b10bbbfc-cf9e-42e0-be17-e2c3e1d52000');
+    expect(cache.get<string>('musicbrainz', 'Bohemian Rhapsody:Queen')).toBe(
+      'b10bbbfc-cf9e-42e0-be17-e2c3e1d52000'
+    );
   });
 
   it('performs direct MBID lookup when entityId is UUID', async () => {
@@ -133,7 +136,9 @@ describe('MusicBrainz — End-to-End Adapter & Candidate Matching', () => {
     expect(resolved?.album.title).toBe('SOUR');
     expect(resolved?.tracks).toHaveLength(2);
     expect(mockPipeline.lastParams?.inc).not.toContain('record-level-relations');
-    expect(mockPipeline.lastParams?.inc).toContain('artists recordings release-groups media discids tags genres');
+    expect(mockPipeline.lastParams?.inc).toContain(
+      'artists recordings release-groups media discids tags genres'
+    );
   });
 
   it('propagates exact integer rankingScore from ranking engine to AlbumMetadata during searchAlbums', async () => {

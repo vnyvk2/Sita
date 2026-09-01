@@ -1,7 +1,7 @@
+import BatchSongTagsEditor from '@renderer/components/BatchSongTagsEditor';
+import { store } from '@renderer/store/store';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { store } from '@renderer/store/store';
-import BatchSongTagsEditor from '@renderer/components/BatchSongTagsEditor';
 
 export const Route = createFileRoute('/main-player/songs/batch-edit')({
   validateSearch: (search: Record<string, unknown>) => {
@@ -21,16 +21,13 @@ export const Route = createFileRoute('/main-player/songs/batch-edit')({
 
 function BatchEditPage() {
   const { songIds: querySongIds } = Route.useSearch();
-  const multiSelections = useStore(
-    store,
-    (state) =>
-      state.multipleSelectionsData.selectionType === 'songs'
-        ? state.multipleSelectionsData.multipleSelections
-        : []
+  const multiSelections = useStore(store, (state) =>
+    state.multipleSelectionsData.selectionType === 'songs'
+      ? state.multipleSelectionsData.multipleSelections
+      : []
   );
 
-  const effectiveSongIds =
-    querySongIds && querySongIds.length > 0 ? querySongIds : multiSelections;
+  const effectiveSongIds = querySongIds && querySongIds.length > 0 ? querySongIds : multiSelections;
 
   return <BatchSongTagsEditor initialSongIds={effectiveSongIds} />;
 }

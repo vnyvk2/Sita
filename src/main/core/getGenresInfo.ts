@@ -8,9 +8,7 @@ const getGenresInfo = async (
   start = 0,
   end = 0
 ): Promise<PaginatedResult<Genre, GenreSortTypes>> => {
-  const numericIds = genreNamesOrIds
-    .map((id) => Number(id))
-    .filter((id) => !isNaN(id));
+  const numericIds = genreNamesOrIds.map((id) => Number(id)).filter((id) => !isNaN(id));
   const stringNames = genreNamesOrIds.filter((item) => isNaN(Number(item)));
 
   if (genreNamesOrIds.length > 0 && numericIds.length === 0 && stringNames.length === 0) {
@@ -31,7 +29,12 @@ const getGenresInfo = async (
     sortType
   });
 
-  if (genreNamesOrIds.length > 0 && numericIds.length === 0 && stringNames.length > 0 && genres.data.length === 0) {
+  if (
+    genreNamesOrIds.length > 0 &&
+    numericIds.length === 0 &&
+    stringNames.length > 0 &&
+    genres.data.length === 0
+  ) {
     return {
       data: [],
       total: 0,

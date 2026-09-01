@@ -1,4 +1,5 @@
 import { stat } from 'fs/promises';
+
 import type { FileSystemAccess } from '../interfaces/FileSystemAccess';
 
 export class NodeFileSystemAccess implements FileSystemAccess {

@@ -114,16 +114,15 @@ export interface UseLyricsQueryOptions {
 }
 
 /**
- * Central hook for querying synced/unsynced song lyrics with automatic
- * translation, romanization, and shared TanStack Query caching across all views.
+ * Central hook for querying synced/unsynced song lyrics with automatic translation, romanization,
+ * and shared TanStack Query caching across all views.
  */
 export function useLyricsQuery(options?: UseLyricsQueryOptions) {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
   const isEnabled =
-    (options?.enabled ?? true) &&
-    Boolean(currentSongData?.title && currentSongData?.path);
+    (options?.enabled ?? true) && Boolean(currentSongData?.title && currentSongData?.path);
 
   const artists = useMemo(() => {
     return Array.isArray(currentSongData?.artists)

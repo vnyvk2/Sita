@@ -1,4 +1,8 @@
-import type { ClipPathArtworkCount, CoverRendererProps, LayoutPreset } from '../../../types/playlistCover';
+import type {
+  ClipPathArtworkCount,
+  CoverRendererProps,
+  LayoutPreset
+} from '../../../types/playlistCover';
 import ClipPathRenderer from './ClipPathRenderer';
 import CoverImageTile from './CoverImageTile';
 
@@ -37,7 +41,7 @@ function PresetRenderer<S extends string>({
 
   const targetStyle = variant && variant in presets ? (variant as S) : defaultStyle;
   const stylePresets = presets[targetStyle];
-  const clipPaths = stylePresets[(count as ClipPathArtworkCount)] || stylePresets[4];
+  const clipPaths = stylePresets[count as ClipPathArtworkCount] || stylePresets[4];
 
   return (
     <ClipPathRenderer

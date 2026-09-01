@@ -1,5 +1,5 @@
-import { queryClient } from '@renderer/queryClient';
 import { userPreferencesQuery, userPreferencesMutation } from '@renderer/queries/userPreferences';
+import { queryClient } from '@renderer/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
 /** Options accepted by useUserPreferences. */

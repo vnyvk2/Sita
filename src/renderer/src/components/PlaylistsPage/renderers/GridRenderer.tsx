@@ -22,7 +22,11 @@ const GridRenderer = ({
   if (count === 1) {
     return (
       <div className={containerClass}>
-        <CoverImageTile src={artworks[0] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 1" />
+        <CoverImageTile
+          src={artworks[0] ?? DefaultImgCover}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 1"
+        />
       </div>
     );
   }
@@ -30,8 +34,16 @@ const GridRenderer = ({
   if (count === 2) {
     return (
       <div className={`grid grid-cols-2 gap-0.5 ${containerClass}`}>
-        <CoverImageTile src={artworks[0] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 1" />
-        <CoverImageTile src={artworks[1] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 2" />
+        <CoverImageTile
+          src={artworks[0] ?? DefaultImgCover}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 1"
+        />
+        <CoverImageTile
+          src={artworks[1] ?? DefaultImgCover}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 2"
+        />
       </div>
     );
   }
@@ -40,10 +52,22 @@ const GridRenderer = ({
     return (
       <div className={`grid grid-cols-2 grid-rows-2 gap-0.5 ${containerClass}`}>
         <div className="row-span-2 h-full w-full">
-          <CoverImageTile src={artworks[0] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 1" />
+          <CoverImageTile
+            src={artworks[0] ?? DefaultImgCover}
+            enableImgFadeIns={enableImgFadeIns}
+            alt="Cover 1"
+          />
         </div>
-        <CoverImageTile src={artworks[1] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 2" />
-        <CoverImageTile src={artworks[2] ?? DefaultImgCover} enableImgFadeIns={enableImgFadeIns} alt="Cover 3" />
+        <CoverImageTile
+          src={artworks[1] ?? DefaultImgCover}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 2"
+        />
+        <CoverImageTile
+          src={artworks[2] ?? DefaultImgCover}
+          enableImgFadeIns={enableImgFadeIns}
+          alt="Cover 3"
+        />
       </div>
     );
   }

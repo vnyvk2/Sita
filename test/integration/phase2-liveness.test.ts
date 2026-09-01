@@ -1,12 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'events';
-import { JobScheduler } from '@main/workers/jobScheduler';
+
+import { db } from '@main/db/db';
 import { AlbumReplayGainJob } from '@main/workers/jobs/albumReplayGainJob';
 import { GarbageCollectionJob } from '@main/workers/jobs/garbageCollectionJob';
-import { MediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { JobScheduler } from '@main/workers/jobScheduler';
 import { ASSET_EVENTS } from '@main/workers/libraryChoreography';
-import { db } from '@main/db/db';
+import { MediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import type { Job, JobState } from '@main/workers/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 class MockChildProcess extends EventEmitter {
   public pid = 1234;
@@ -23,7 +24,11 @@ vi.mock('@main/db/db', () => ({
     },
     select: vi.fn().mockReturnValue({ from: vi.fn().mockResolvedValue([]) }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
-    update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 1 }]) }) }),
+    update: vi
+      .fn()
+      .mockReturnValue({
+        set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 1 }]) })
+      }),
     transaction: vi.fn(async (cb) => {
       const updateSetMock = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -52,7 +57,7 @@ vi.mock('@main/logger', () => ({
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
-    debug: vi.fn(),
+    debug: vi.fn()
   }
 }));
 
@@ -66,7 +71,9 @@ vi.mock('fs/promises', () => {
     default: {
       readFile: vi.fn().mockResolvedValue(float64Buffer),
       readdir: vi.fn().mockResolvedValue([]),
-      stat: vi.fn().mockResolvedValue({ isFile: () => true, size: 800, mtimeMs: Date.now() - 120_000 }),
+      stat: vi
+        .fn()
+        .mockResolvedValue({ isFile: () => true, size: 800, mtimeMs: Date.now() - 120_000 }),
       unlink: vi.fn().mockResolvedValue(undefined)
     }
   };
@@ -100,7 +107,15 @@ describe('Phase 2 FORENSIC: Liveness, Scheduler Invariants & Timeouts', () => {
 
     // First query for Job 1: incomplete
     vi.mocked(db.query.replayGain.findMany).mockResolvedValueOnce([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.9, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date(1000) }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.9,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date(1000)
+      }
     ] as any);
 
     const deferSpy = vi.spyOn(scheduler, 'scheduleDeferred');
@@ -120,8 +135,24 @@ describe('Phase 2 FORENSIC: Liveness, Scheduler Invariants & Timeouts', () => {
 
     // 3. Track 102 completes ReplayGain now
     vi.mocked(db.query.replayGain.findMany).mockResolvedValue([
-      { songId: 101, trackGain: -5.0, trackPeak: 0.9, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date(1000) },
-      { songId: 102, trackGain: -6.0, trackPeak: 0.8, albumGain: null, albumPeak: null, generatorVersion: 1, updatedAt: new Date(1000) }
+      {
+        songId: 101,
+        trackGain: -5.0,
+        trackPeak: 0.9,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date(1000)
+      },
+      {
+        songId: 102,
+        trackGain: -6.0,
+        trackPeak: 0.8,
+        albumGain: null,
+        albumPeak: null,
+        generatorVersion: 1,
+        updatedAt: new Date(1000)
+      }
     ] as any);
 
     // Track ASSET_EVENTS.ALBUM_REPLAYGAIN_UPDATED emission

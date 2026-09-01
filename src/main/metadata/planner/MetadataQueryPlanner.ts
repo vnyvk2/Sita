@@ -1,5 +1,5 @@
-import type { DatabaseMetadataRepository } from '../repository/DatabaseMetadataRepository';
 import type { MetadataQuery } from '../models/MetadataQuery';
+import type { DatabaseMetadataRepository } from '../repository/DatabaseMetadataRepository';
 
 export interface QueryPlanExecutionResult<TDTO = unknown> {
   kind: MetadataQuery['kind'];

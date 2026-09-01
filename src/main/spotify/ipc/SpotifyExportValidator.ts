@@ -13,16 +13,14 @@ export interface ValidatedExportRequest {
 }
 
 export class SpotifyExportValidator {
-  /**
-   * Helper to determine required Spotify OAuth scopes based on target visibility.
-   */
+  /** Helper to determine required Spotify OAuth scopes based on target visibility. */
   public static getRequiredExportScopes(isPublic: boolean): string[] {
     return isPublic ? ['playlist-modify-public'] : ['playlist-modify-private'];
   }
 
   /**
-   * Validates untrusted renderer parameters and verifies DB existence, revision consistency,
-   * active Spotify authorization scopes, and non-empty playlist invariant.
+   * Validates untrusted renderer parameters and verifies DB existence, revision consistency, active
+   * Spotify authorization scopes, and non-empty playlist invariant.
    */
   public static async validateExportRequest(request: unknown): Promise<ValidatedExportRequest> {
     if (!request || typeof request !== 'object') {
@@ -42,7 +40,8 @@ export class SpotifyExportValidator {
     }
     const playlistName = payload.name.trim();
 
-    const description = typeof payload.description === 'string' ? payload.description.trim() : undefined;
+    const description =
+      typeof payload.description === 'string' ? payload.description.trim() : undefined;
     const isPublic = Boolean(payload.isPublic);
 
     if (typeof payload.revision !== 'string' || !payload.revision.trim()) {

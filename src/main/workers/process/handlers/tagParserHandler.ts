@@ -1,14 +1,15 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+
 import { File } from 'node-taglib-sharp';
 import sharp from 'sharp';
 
 import { parseGenreList } from '../../../../common/genreUtils';
 import { detectSongLanguage } from '../../../parseSong/detectLanguage';
 import { extractFrontCover } from '../../../utils/extractFrontCover';
-import { atomicPublishFile } from './assetJobHandler';
 import type { ArtworkPayloadDTO, ParsedTrackDTO } from '../workerProtocol';
+import { atomicPublishFile } from './assetJobHandler';
 
 const ARTIST_SEPARATOR_REGEX = /[,&]/gm;
 
@@ -30,13 +31,12 @@ export function formatDuration(durationSeconds?: number): string {
 }
 
 /**
- * Worker-side single audio file parser.
- * Reads ID3/Vorbis/MP4 tags using node-taglib-sharp in the utilityProcess.
+ * Worker-side single audio file parser. Reads ID3/Vorbis/MP4 tags using node-taglib-sharp in the
+ * utilityProcess.
  *
- * CRITICAL ARCHITECTURAL INVARIANTS:
- * 1. Zero database dependencies, zero ORM imports.
- * 2. 100% read-only audio filesystem access (writes artwork only if artworkSaveLocation provided).
- * 3. Taglib file handles MUST be disposed in a finally block to prevent resource leaks.
+ * CRITICAL ARCHITECTURAL INVARIANTS: 1. Zero database dependencies, zero ORM imports. 2. 100%
+ * read-only audio filesystem access (writes artwork only if artworkSaveLocation provided). 3.
+ * Taglib file handles MUST be disposed in a finally block to prevent resource leaks.
  */
 export async function parseTrackMetadata(
   songPath: string,
@@ -49,9 +49,7 @@ export async function parseTrackMetadata(
   try {
     const metadata = file.tag;
     const songTitle =
-      metadata.title ||
-      path.basename(songPath, path.extname(songPath)) ||
-      'Unknown Title';
+      metadata.title || path.basename(songPath, path.extname(songPath)) || 'Unknown Title';
 
     const artists = getArtistNames(metadata.performers?.join(', '));
     const albumArtists = getArtistNames(metadata.albumArtists?.join(', '));
@@ -107,9 +105,7 @@ export async function parseTrackMetadata(
         if (imgIsMissing) {
           const imgTmp = `${imgPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
           try {
-            await sharp(rawPictureBytes, { animated: true })
-              .webp()
-              .toFile(imgTmp);
+            await sharp(rawPictureBytes, { animated: true }).webp().toFile(imgTmp);
             await atomicPublishFile(imgTmp, imgPath);
           } finally {
             await fs.unlink(imgTmp).catch(() => {});
@@ -118,7 +114,14 @@ export async function parseTrackMetadata(
 
         artworkPayloads = [
           { hash: fullHash, path: imgPath, width, height, isOptimized: false, source: 'LOCAL' },
-          { hash: optHash, path: optPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' }
+          {
+            hash: optHash,
+            path: optPath,
+            width: 50,
+            height: 50,
+            isOptimized: true,
+            source: 'LOCAL'
+          }
         ];
       } catch (err) {
         // Log diagnostic warning on worker side without failing the overall track parse.
@@ -145,7 +148,10 @@ export async function parseTrackMetadata(
       bitRate: file.properties.audioBitrate ? Math.ceil(file.properties.audioBitrate) : undefined,
       sampleRate: file.properties.audioSampleRate,
       noOfChannels: file.properties.audioChannels,
-      musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as unknown as Record<string, string>).musicBrainzRecordingId || undefined,
+      musicBrainzRecordingId:
+        metadata.musicBrainzTrackId ||
+        (metadata as unknown as Record<string, string>).musicBrainzRecordingId ||
+        undefined,
       isrc: metadata.isrc || undefined,
       language: detectedLanguage,
       fileCreatedAt: stats ? stats.birthtime : new Date(),
@@ -177,8 +183,8 @@ export interface ParseBatchOptions {
 }
 
 /**
- * Parses an array of tracks in bounded batches (default 100) with backpressure.
- * Pauses before parsing the next batch until onBatchReady (the Main process ACK) resolves.
+ * Parses an array of tracks in bounded batches (default 100) with backpressure. Pauses before
+ * parsing the next batch until onBatchReady (the Main process ACK) resolves.
  */
 export async function parseTracksStreaming(
   tracks: Array<{ songPath: string; folderId?: number }>,

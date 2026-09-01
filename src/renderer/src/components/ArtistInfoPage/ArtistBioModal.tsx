@@ -1,8 +1,9 @@
+import HashTag from '@renderer/components/Biography/HashTag';
+import Button from '@renderer/components/Button';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import Button from '@renderer/components/Button';
-import HashTag from '@renderer/components/Biography/HashTag';
+
 import type { Tag } from '../../../../types/last_fm_artist_info_api';
 
 export interface ArtistBioModalProps {
@@ -34,12 +35,12 @@ export function ArtistBioModal({
   };
 
   return (
-    <div className="flex flex-col space-y-6 pb-6 pt-2">
+    <div className="flex flex-col space-y-6 pt-2 pb-6">
       {/* Modal Header */}
-      <div className="flex flex-col space-y-2 border-b border-background-color-2/50 pb-4 dark:border-dark-background-color-2/50">
+      <div className="border-background-color-2/50 dark:border-dark-background-color-2/50 flex flex-col space-y-2 border-b pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <h2 className="text-2xl font-bold text-font-color-black dark:text-font-color-white">
+            <h2 className="text-font-color-black dark:text-font-color-white text-2xl font-bold">
               {artistName}
             </h2>
             {bioSource && (
@@ -58,24 +59,24 @@ export function ArtistBioModal({
             )}
           </div>
         </div>
-        <p className="text-xs text-font-color-dimmed dark:text-font-color-white/50">
+        <p className="text-font-color-dimmed dark:text-font-color-white/50 text-xs">
           {t('biography.aboutArtist', 'Biography & Background Details')}
         </p>
       </div>
 
       {/* Paragraphs Body (Scrollable, Clean React Text Nodes) */}
-      <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-2 [scrollbar-gutter:stable]">
+      <div className="max-h-[55vh] [scrollbar-gutter:stable] space-y-4 overflow-y-auto pr-2">
         {bioParagraphs.length > 0 ? (
           bioParagraphs.map((para, index) => (
             <p
               key={index}
-              className="text-sm leading-relaxed text-font-color-black/85 dark:text-font-color-white/85"
+              className="text-font-color-black/85 dark:text-font-color-white/85 text-sm leading-relaxed"
             >
               {para}
             </p>
           ))
         ) : (
-          <p className="py-8 text-center text-sm italic text-font-color-dimmed dark:text-font-color-white/50">
+          <p className="text-font-color-dimmed dark:text-font-color-white/50 py-8 text-center text-sm italic">
             {t('biography.noBioFound', 'No detailed biography available for this artist.')}
           </p>
         )}
@@ -83,7 +84,7 @@ export function ArtistBioModal({
 
       {/* Tags Section */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-background-color-2/50 pt-4 dark:border-dark-background-color-2/50">
+        <div className="border-background-color-2/50 dark:border-dark-background-color-2/50 flex flex-wrap gap-1.5 border-t pt-4">
           {tags.map((tag) => (
             <HashTag key={tag.url || tag.name} {...tag} />
           ))}
@@ -91,14 +92,19 @@ export function ArtistBioModal({
       )}
 
       {/* Footer Controls */}
-      <div className="flex items-center justify-between border-t border-background-color-2/50 pt-4 dark:border-dark-background-color-2/50">
+      <div className="border-background-color-2/50 dark:border-dark-background-color-2/50 flex items-center justify-between border-t pt-4">
         {bioUrl ? (
           <button
             type="button"
             onClick={handleOpenSource}
-            className="flex items-center space-x-1.5 text-xs font-medium text-font-color-highlight hover:underline dark:text-dark-font-color-highlight"
+            className="text-font-color-highlight dark:text-dark-font-color-highlight flex items-center space-x-1.5 text-xs font-medium hover:underline"
           >
-            <span>{t('biography.readFullArticleOnSource', { source: bioSource, defaultValue: `Read on ${bioSource}` })}</span>
+            <span>
+              {t('biography.readFullArticleOnSource', {
+                source: bioSource,
+                defaultValue: `Read on ${bioSource}`
+              })}
+            </span>
             <span className="material-icons-round text-xs">open_in_new</span>
           </button>
         ) : (
@@ -107,7 +113,7 @@ export function ArtistBioModal({
 
         <Button
           label={t('common.close', 'Close')}
-          className="rounded-full bg-background-color-2 px-5 py-1.5 text-xs font-medium dark:bg-dark-background-color-2"
+          className="bg-background-color-2 dark:bg-dark-background-color-2 rounded-full px-5 py-1.5 text-xs font-medium"
           clickHandler={() => changePromptMenuData(false)}
         />
       </div>

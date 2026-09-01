@@ -2,22 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import { db } from '../../../db/db';
 import { songs, metadataOverrides } from '../../../db/schema';
-import { SongMapper } from '../SongMapper';
-import { MapperRegistry } from '../MapperRegistry';
+import { MetadataEventBus } from '../../events/MetadataEventBus';
 import { MetadataFields } from '../../models/MetadataFieldId';
 import { MetadataIdentity } from '../../models/MetadataIdentity';
 import { MetadataKinds } from '../../models/MetadataKind';
-import { MetadataSnapshotSerializer } from '../../serializers/MetadataSnapshotSerializer';
-import { UserMetadataRepository } from '../../repository/UserMetadataRepository';
-import { UserMetadataService } from '../../services/UserMetadataService';
-import { MetadataEventBus } from '../../events/MetadataEventBus';
+import { MetadataPipeline } from '../../pipeline/MetadataPipeline';
+import { MapperStage } from '../../pipeline/stages/MapperStage';
 import { LocalMetadataProvider } from '../../providers/LocalMetadataProvider';
+import { DefaultMetadataMergePolicy } from '../../providers/policies/DefaultMetadataMergePolicy';
 import { UserMetadataProvider } from '../../providers/UserMetadataProvider';
 import { DatabaseMetadataRepository } from '../../repository/DatabaseMetadataRepository';
 import { LoaderRegistry } from '../../repository/LoaderRegistry';
-import { DefaultMetadataMergePolicy } from '../../providers/policies/DefaultMetadataMergePolicy';
-import { MetadataPipeline } from '../../pipeline/MetadataPipeline';
-import { MapperStage } from '../../pipeline/stages/MapperStage';
+import { UserMetadataRepository } from '../../repository/UserMetadataRepository';
+import { MetadataSnapshotSerializer } from '../../serializers/MetadataSnapshotSerializer';
+import { UserMetadataService } from '../../services/UserMetadataService';
+import { MapperRegistry } from '../MapperRegistry';
+import { SongMapper } from '../SongMapper';
 
 describe('SongMapper — G1-01 discNumber / diskNumber mapping & round-trip', () => {
   const mapper = new SongMapper();
@@ -86,15 +86,18 @@ describe('SongMapper — G1-01 discNumber / diskNumber mapping & round-trip', ()
     await db.delete(songs);
 
     // 1. Seed database row with diskNumber: 1 (as stored in SQLite songs table)
-    const [seeded] = await db.insert(songs).values({
-      title: 'Roundtrip Track',
-      duration: 210.000,
-      path: 'C:\\music\\track.mp3',
-      diskNumber: 1,
-      trackNumber: 5,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date()
-    }).returning();
+    const [seeded] = await db
+      .insert(songs)
+      .values({
+        title: 'Roundtrip Track',
+        duration: 210.0,
+        path: 'C:\\music\\track.mp3',
+        diskNumber: 1,
+        trackNumber: 5,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      })
+      .returning();
 
     const identity = new MetadataIdentity({
       entityKind: MetadataKinds.Song,

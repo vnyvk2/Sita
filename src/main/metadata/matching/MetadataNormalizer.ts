@@ -42,7 +42,8 @@ export class MetadataNormalizer {
   ];
 
   /**
-   * Evaluates if a track title is missing or a useless placeholder (e.g. "Track 01", "Unknown", "Audio Track").
+   * Evaluates if a track title is missing or a useless placeholder (e.g. "Track 01", "Unknown",
+   * "Audio Track").
    */
   public static isUselessTitle(title?: string): boolean {
     if (!title || !title.trim()) return true;
@@ -52,8 +53,8 @@ export class MetadataNormalizer {
   }
 
   /**
-   * Normalizes track title by stripping cosmetic noise (Official Video, Lyrics, etc.)
-   * and parenthetical variant markers while preserving meaningful tokens.
+   * Normalizes track title by stripping cosmetic noise (Official Video, Lyrics, etc.) and
+   * parenthetical variant markers while preserving meaningful tokens.
    */
   public static normalizeTitle(title: string): string {
     if (!title) return '';
@@ -74,9 +75,7 @@ export class MetadataNormalizer {
     return normalizeForMatching(cleaned);
   }
 
-  /**
-   * Dedicated filename normalizer stripping filename-specific track prefixes and quality tags.
-   */
+  /** Dedicated filename normalizer stripping filename-specific track prefixes and quality tags. */
   public static normalizeFilename(filename: string): string {
     if (!filename) return '';
 
@@ -92,7 +91,8 @@ export class MetadataNormalizer {
   }
 
   /**
-   * Resolves the effective normalized track title, falling back to normalized filename if the title is useless.
+   * Resolves the effective normalized track title, falling back to normalized filename if the title
+   * is useless.
    */
   public static getEffectiveTitle(identity: { title?: string; pathOrUri?: string }): string {
     if (this.isUselessTitle(identity?.title) && identity?.pathOrUri) {
@@ -102,7 +102,8 @@ export class MetadataNormalizer {
   }
 
   /**
-   * Detects recording variants (Live, Acoustic, Demo, Remix, etc.) present in a string using word boundaries.
+   * Detects recording variants (Live, Acoustic, Demo, Remix, etc.) present in a string using word
+   * boundaries.
    */
   public static extractVariants(str: string): Set<RecordingVariant> {
     const variants = new Set<RecordingVariant>();
@@ -118,9 +119,7 @@ export class MetadataNormalizer {
     return variants;
   }
 
-  /**
-   * Normalizes artist name, standardizing featuring/collaboration joiners and acronym punctuation.
-   */
+  /** Normalizes artist name, standardizing featuring/collaboration joiners and acronym punctuation. */
   public static normalizeArtist(artist: string): string {
     if (!artist) return '';
 
@@ -131,9 +130,7 @@ export class MetadataNormalizer {
     return normalizeForMatching(cleaned);
   }
 
-  /**
-   * Normalizes album title.
-   */
+  /** Normalizes album title. */
   public static normalizeAlbum(album: string): string {
     if (!album) return '';
 

@@ -70,7 +70,10 @@ vi.mock('@renderer/components/VirtualizedList', () => ({
     return (
       <div data-testid="virtualized-list">
         {data.map((item, i) => (
-          <div key={typeof item === 'object' ? item.songId ?? i : item ?? i} data-testid="song-item">
+          <div
+            key={typeof item === 'object' ? (item.songId ?? i) : (item ?? i)}
+            data-testid="song-item"
+          >
             {renderFn ? renderFn(i) : item?.title}
           </div>
         ))}
@@ -102,7 +105,9 @@ describe('SongsPage Search & Navigation State Split', () => {
     (window as any).api = {
       properties: { isInDevelopment: false },
       audioLibraryControls: {
-        getFilteredSongLibraryIds: vi.fn().mockResolvedValue({ ids: [], total: 0, blacklistedIds: [] }),
+        getFilteredSongLibraryIds: vi
+          .fn()
+          .mockResolvedValue({ ids: [], total: 0, blacklistedIds: [] }),
         getSongInfo: vi.fn().mockResolvedValue([]),
         getSongFacets: vi.fn().mockResolvedValue({ languages: [], genres: [] })
       },

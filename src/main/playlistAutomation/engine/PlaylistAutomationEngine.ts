@@ -1,9 +1,9 @@
-import type { PlaylistEventBus } from '../events/PlaylistEventBus';
-import type { AutomationScheduler } from '../scheduler/AutomationScheduler';
-import type { PlaylistSyncWorkflow } from '../../playlistSync/workflow/PlaylistSyncWorkflow';
 import type { PlaylistLink } from '../../playlistSync/models/PlaylistLink';
-import type { PlaylistAutomationEvent } from '../models/PlaylistAutomationEvent';
+import type { PlaylistSyncWorkflow } from '../../playlistSync/workflow/PlaylistSyncWorkflow';
+import type { PlaylistEventBus } from '../events/PlaylistEventBus';
 import type { AutomationRule } from '../models/AutomationRule';
+import type { PlaylistAutomationEvent } from '../models/PlaylistAutomationEvent';
+import type { AutomationScheduler } from '../scheduler/AutomationScheduler';
 
 export class PlaylistAutomationEngine {
   private enabled = true;

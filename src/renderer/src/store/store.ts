@@ -50,4 +50,3 @@ store.subscribe((state) => {
 
   storage.setLocalStorage(currentState.localStorage);
 });
-

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-forensic-'));
@@ -12,13 +13,11 @@ vi.mock('@main/other/artworks', () => ({
   sweepUnusedArtworks: vi.fn().mockResolvedValue(undefined)
 }));
 
-import {
-  db,
-  getEngine,
-  closeDatabaseInstance,
-  exportDatabase,
-  importDatabase
-} from '@main/db/db';
+import { SmartPlaylistCompiler } from '@main/collections/query/SmartPlaylistCompiler';
+import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
+import getSongInfo from '@main/core/getSongInfo';
+import { db, getEngine, closeDatabaseInstance, exportDatabase, importDatabase } from '@main/db/db';
+import { getAllSongs } from '@main/db/queries/songs';
 import {
   musicFolders,
   songs,
@@ -44,19 +43,15 @@ import {
   userSettings,
   shortcuts
 } from '@main/db/schema';
+import { rawAll, rawGet, rawRun } from '@main/db/sqlite/raw';
 import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
-import { getAllSongs } from '@main/db/queries/songs';
-import getSongInfo from '@main/core/getSongInfo';
-import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
-import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
 import { AlbumSearchEngine } from '@main/search/engines/AlbumSearchEngine';
+import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
 import { GenreSearchEngine } from '@main/search/engines/GenreSearchEngine';
 import { PlaylistSearchEngine } from '@main/search/engines/PlaylistSearchEngine';
+import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
 import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
-import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
-import { SmartPlaylistCompiler } from '@main/collections/query/SmartPlaylistCompiler';
 import { eq, sql, inArray, and } from 'drizzle-orm';
-import { rawAll, rawGet, rawRun } from '@main/db/sqlite/raw';
 
 describe('Autonomous Forensic Equivalence Verification Suite', () => {
   afterAll(async () => {
@@ -88,7 +83,9 @@ describe('Autonomous Forensic Equivalence Verification Suite', () => {
 
     // Verify FTS5 virtual tables
     const fts = (
-      engine.all("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'fts_%'") as { name: string }[]
+      engine.all("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'fts_%'") as {
+        name: string;
+      }[]
     ).map((r) => r.name);
     expect(fts).toContain('fts_songs');
     expect(fts).toContain('fts_artists');
@@ -164,25 +161,29 @@ describe('Autonomous Forensic Equivalence Verification Suite', () => {
     for (let i = 0; i < TRACKS.length; i++) {
       const t = TRACKS[i];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await ingestTrackDTO({
-        songPath: t.path,
-        title: t.title,
-        duration: t.duration,
-        artists: [t.artist],
-        albumArtists: [t.artist],
-        album: t.album,
-        genres: [t.genre],
-        year: t.year,
-        sampleRate: 44100,
-        bitRate: 320000,
-        noOfChannels: 2,
-        diskNumber: 1,
-        trackNumber: i + 1,
-        fileCreatedAt: new Date('2023-01-01T10:00:00Z'),
-        fileModifiedAt: new Date('2023-01-01T10:00:00Z'),
-        folderId: 1
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any, db, undefined);
+      const res = await ingestTrackDTO(
+        {
+          songPath: t.path,
+          title: t.title,
+          duration: t.duration,
+          artists: [t.artist],
+          albumArtists: [t.artist],
+          album: t.album,
+          genres: [t.genre],
+          year: t.year,
+          sampleRate: 44100,
+          bitRate: 320000,
+          noOfChannels: 2,
+          diskNumber: 1,
+          trackNumber: i + 1,
+          fileCreatedAt: new Date('2023-01-01T10:00:00Z'),
+          fileModifiedAt: new Date('2023-01-01T10:00:00Z'),
+          folderId: 1
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        db,
+        undefined
+      );
 
       ingestedIds.push(res.songData.id);
 
@@ -432,10 +433,13 @@ describe('Autonomous Forensic Equivalence Verification Suite', () => {
     // Clear live tables
     const engine = getEngine()!;
     engine.exec('PRAGMA foreign_keys = OFF;');
-    engine.exec('DELETE FROM playlist_entries; DELETE FROM playlists; DELETE FROM songs; DELETE FROM artists; DELETE FROM albums; DELETE FROM genres; DELETE FROM music_folders;');
+    engine.exec(
+      'DELETE FROM playlist_entries; DELETE FROM playlists; DELETE FROM songs; DELETE FROM artists; DELETE FROM albums; DELETE FROM genres; DELETE FROM music_folders;'
+    );
     engine.exec('PRAGMA foreign_keys = ON;');
 
-    const emptyCount = (engine.get('SELECT COUNT(*) as count FROM songs') as { count: number }).count;
+    const emptyCount = (engine.get('SELECT COUNT(*) as count FROM songs') as { count: number })
+      .count;
     expect(emptyCount).toBe(0);
 
     // Restore from dump

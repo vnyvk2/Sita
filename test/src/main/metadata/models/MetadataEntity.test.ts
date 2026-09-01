@@ -1,9 +1,8 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataEntity } from '@main/metadata/models/MetadataEntity';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataValue } from '@main/metadata/models/MetadataValue';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataEntity', () => {
   it('should initialize fields and manage metadata properties', () => {

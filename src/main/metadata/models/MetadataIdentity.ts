@@ -32,8 +32,7 @@ export class MetadataIdentity {
   constructor(options: MetadataIdentityOptions) {
     this.entityKind = options.entityKind;
     this.entityId = options.entityId;
-    this.metadataId =
-      options.metadataId ?? `${options.entityKind}:${options.entityId}`;
+    this.metadataId = options.metadataId ?? `${options.entityKind}:${options.entityId}`;
     this.version = options.version ?? 1;
     this.fields = options.fields;
   }

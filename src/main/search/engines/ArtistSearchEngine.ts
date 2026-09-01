@@ -3,16 +3,13 @@ import { artists } from '@db/schema';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { sql } from 'drizzle-orm';
 
-import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
-import type {
-  NormalizedQuery,
-  SearchEngineOptions
-} from '../../../common/search/MatchTier';
 import { computeTier } from '../../../common/search/computeTier';
-import type { SearchMatchReference } from '../models/SearchMatchReference';
+import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
+import type { NormalizedQuery, SearchEngineOptions } from '../../../common/search/MatchTier';
 import { fuzzySearch } from '../fuzzy/ftsFuzzySearch';
+import type { SearchMatchReference } from '../models/SearchMatchReference';
 
-/** query normalization with all whitespace removed — matches the *_norm columns */
+/** Query normalization with all whitespace removed — matches the *_norm columns */
 const normWithoutSpaces = (normalized: string) => normalized.replace(/\s+/g, '');
 
 export const ArtistSearchEngine = {

@@ -1,9 +1,15 @@
 import type { ChannelPosition, DecodeChunk } from './types';
 
 export interface LoudnessResult {
-  /** Integrated loudness in LUFS (or -Infinity if completely silent or shorter than 400ms gating window) */
+  /**
+   * Integrated loudness in LUFS (or -Infinity if completely silent or shorter than 400ms gating
+   * window)
+   */
   integratedLoudness: number;
-  /** Maximum absolute discrete sample value observed (0.0 to 1.0+). Note: this is discrete sample peak, NOT true peak. */
+  /**
+   * Maximum absolute discrete sample value observed (0.0 to 1.0+). Note: this is discrete sample
+   * peak, NOT true peak.
+   */
   samplePeak: number;
   /** Peak discrete sample value in dBFS (20 * log10(samplePeak)) */
   samplePeakDb: number;
@@ -33,9 +39,9 @@ export interface BiquadState {
 }
 
 /**
- * Calculates ITU-R BS.1770-4 K-weighting filter coefficients dynamically
- * for arbitrary sample rates using exact bilinear transformation with pre-warping
- * conforming bit-for-bit to ITU-R BS.1770-4 Table 1 & Table 2.
+ * Calculates ITU-R BS.1770-4 K-weighting filter coefficients dynamically for arbitrary sample rates
+ * using exact bilinear transformation with pre-warping conforming bit-for-bit to ITU-R BS.1770-4
+ * Table 1 & Table 2.
  */
 export function getKWeightingCoefficients(sampleRate: number): {
   stage1: BiquadCoefficients;
@@ -49,13 +55,13 @@ export function getKWeightingCoefficients(sampleRate: number): {
   const Vh = Math.pow(10.0, db / 20.0);
   const Vb = Math.pow(Vh, 0.4996667741545416);
 
-  const a0_1 = 1.0 + (K1 / Q_stage1) + (K1 * K1);
+  const a0_1 = 1.0 + K1 / Q_stage1 + K1 * K1;
   const stage1: BiquadCoefficients = {
-    b0: (Vh + ((Vb * K1) / Q_stage1) + (K1 * K1)) / a0_1,
-    b1: (2.0 * ((K1 * K1) - Vh)) / a0_1,
-    b2: (Vh - ((Vb * K1) / Q_stage1) + (K1 * K1)) / a0_1,
-    a1: (2.0 * ((K1 * K1) - 1.0)) / a0_1,
-    a2: (1.0 - (K1 / Q_stage1) + (K1 * K1)) / a0_1
+    b0: (Vh + (Vb * K1) / Q_stage1 + K1 * K1) / a0_1,
+    b1: (2.0 * (K1 * K1 - Vh)) / a0_1,
+    b2: (Vh - (Vb * K1) / Q_stage1 + K1 * K1) / a0_1,
+    a1: (2.0 * (K1 * K1 - 1.0)) / a0_1,
+    a2: (1.0 - K1 / Q_stage1 + K1 * K1) / a0_1
   };
 
   // Stage 2: RLB Filter (High-Pass Filter)
@@ -63,25 +69,27 @@ export function getKWeightingCoefficients(sampleRate: number): {
   const Q_stage2 = 0.5003270373238773;
   const K2 = Math.tan((Math.PI * f0_stage2) / sampleRate);
 
-  const a0_2 = 1.0 + (K2 / Q_stage2) + (K2 * K2);
+  const a0_2 = 1.0 + K2 / Q_stage2 + K2 * K2;
   const stage2: BiquadCoefficients = {
     b0: 1.0 / a0_2,
     b1: -2.0 / a0_2,
     b2: 1.0 / a0_2,
-    a1: (2.0 * ((K2 * K2) - 1.0)) / a0_2,
-    a2: (1.0 - (K2 / Q_stage2) + (K2 * K2)) / a0_2
+    a1: (2.0 * (K2 * K2 - 1.0)) / a0_2,
+    a2: (1.0 - K2 / Q_stage2 + K2 * K2) / a0_2
   };
 
   return { stage1, stage2 };
 }
 
 /**
- * Returns the ITU-R BS.1770-4 channel energy weighting G_i for a given semantic position.
- * Throws on unknown or unmapped multichannel positions to prevent silent mis-weighting.
+ * Returns the ITU-R BS.1770-4 channel energy weighting G_i for a given semantic position. Throws on
+ * unknown or unmapped multichannel positions to prevent silent mis-weighting.
  */
 export function getChannelWeighting(position?: ChannelPosition): number {
   if (!position || position === 'Unknown') {
-    throw new Error('Cannot compute BS.1770 loudness for unknown channel position. Explicit channel layout required.');
+    throw new Error(
+      'Cannot compute BS.1770 loudness for unknown channel position. Explicit channel layout required.'
+    );
   }
   switch (position) {
     case 'Ls':
@@ -101,10 +109,11 @@ export function getChannelWeighting(position?: ChannelPosition): number {
 
 /**
  * Streaming ITU-R BS.1770-4 / EBU R128 Loudness Engine.
+ *
  * - Frame processing is strictly O(1) computation and O(1) DSP state using Transposed Direct Form II
  *   and a sliding O(1) rolling energy ring buffer.
- * - Dual-stage gating stores block energies at O(N_blocks) where N_blocks ~= 10 per second
- *   (e.g. ~280 KB for a 1-hour audio track), eliminating any whole-file raw PCM buffering.
+ * - Dual-stage gating stores block energies at O(N_blocks) where N_blocks ~= 10 per second (e.g. ~280
+ *   KB for a 1-hour audio track), eliminating any whole-file raw PCM buffering.
  */
 export class BS1770LoudnessEngine {
   private readonly sampleRate: number;
@@ -153,18 +162,22 @@ export class BS1770LoudnessEngine {
 
     this.channelWeights = [];
     for (let ch = 0; ch < channelCount; ch++) {
-      const position = channelLayout?.[ch] ?? (channelCount === 1 ? 'Mono' : ch === 0 ? 'L' : ch === 1 ? 'R' : 'Unknown');
+      const position =
+        channelLayout?.[ch] ??
+        (channelCount === 1 ? 'Mono' : ch === 0 ? 'L' : ch === 1 ? 'R' : 'Unknown');
       this.channelWeights.push(getChannelWeighting(position));
     }
   }
 
   /**
-   * Consumes a bounded PCM chunk from the audio decoder stream.
-   * Throws if engine has already been finalized.
+   * Consumes a bounded PCM chunk from the audio decoder stream. Throws if engine has already been
+   * finalized.
    */
   public processChunk(chunk: DecodeChunk): void {
     if (this.finalizedResult !== null) {
-      throw new Error('BS1770LoudnessEngine has already been finalized. Cannot process additional chunks.');
+      throw new Error(
+        'BS1770LoudnessEngine has already been finalized. Cannot process additional chunks.'
+      );
     }
 
     const { channelData, frameCount, channelLayout } = chunk;
@@ -190,15 +203,15 @@ export class BS1770LoudnessEngine {
 
         // Stage 1: Pre-filter (Transposed Direct Form II)
         const s1_state = this.stage1States[ch];
-        const y1 = (this.stage1Coeffs.b0 * rawSample) + s1_state.s1;
-        s1_state.s1 = (this.stage1Coeffs.b1 * rawSample) - (this.stage1Coeffs.a1 * y1) + s1_state.s2;
-        s1_state.s2 = (this.stage1Coeffs.b2 * rawSample) - (this.stage1Coeffs.a2 * y1);
+        const y1 = this.stage1Coeffs.b0 * rawSample + s1_state.s1;
+        s1_state.s1 = this.stage1Coeffs.b1 * rawSample - this.stage1Coeffs.a1 * y1 + s1_state.s2;
+        s1_state.s2 = this.stage1Coeffs.b2 * rawSample - this.stage1Coeffs.a2 * y1;
 
         // Stage 2: RLB filter (Transposed Direct Form II)
         const s2_state = this.stage2States[ch];
-        const y2 = (this.stage2Coeffs.b0 * y1) + s2_state.s1;
-        s2_state.s1 = (this.stage2Coeffs.b1 * y1) - (this.stage2Coeffs.a1 * y2) + s2_state.s2;
-        s2_state.s2 = (this.stage2Coeffs.b2 * y1) - (this.stage2Coeffs.a2 * y2);
+        const y2 = this.stage2Coeffs.b0 * y1 + s2_state.s1;
+        s2_state.s1 = this.stage2Coeffs.b1 * y1 - this.stage2Coeffs.a1 * y2 + s2_state.s2;
+        s2_state.s2 = this.stage2Coeffs.b2 * y1 - this.stage2Coeffs.a2 * y2;
 
         weightedFrameEnergy += weight * (y2 * y2);
       }
@@ -223,16 +236,16 @@ export class BS1770LoudnessEngine {
   }
 
   /**
-   * Returns a defensive snapshot of the accumulated 400ms block energies.
-   * Preserves full 64-bit IEEE 754 precision for album aggregation and testing.
+   * Returns a defensive snapshot of the accumulated 400ms block energies. Preserves full 64-bit
+   * IEEE 754 precision for album aggregation and testing.
    */
   public getBlockEnergies(): Float64Array {
     return Float64Array.from(this.blockEnergies);
   }
 
   /**
-   * Finalizes the calculation and returns the pure LoudnessResult with dual-stage gating.
-   * This method is idempotent: subsequent calls return the cached final result.
+   * Finalizes the calculation and returns the pure LoudnessResult with dual-stage gating. This
+   * method is idempotent: subsequent calls return the cached final result.
    */
   public finish(): LoudnessResult {
     if (this.finalizedResult !== null) {
@@ -248,7 +261,9 @@ export class BS1770LoudnessEngine {
     this.finalizedResult = {
       integratedLoudness: gated.integratedLoudness,
       samplePeak: Math.round(samplePeak * 10000) / 10000,
-      samplePeakDb: Number.isFinite(samplePeakDb) ? Math.round(samplePeakDb * 100) / 100 : -Infinity,
+      samplePeakDb: Number.isFinite(samplePeakDb)
+        ? Math.round(samplePeakDb * 100) / 100
+        : -Infinity,
       truePeak: null,
       duration: Math.round(duration * 100) / 100,
       totalSamples: this.totalFramesProcessed,
@@ -266,8 +281,8 @@ export interface GatedLoudnessResult {
 }
 
 /**
- * Pure ITU-R BS.1770-4 / EBU R128 dual-stage gating calculation over an array of 400ms block energies.
- * Used for both per-track loudness finalization and multi-track album aggregation.
+ * Pure ITU-R BS.1770-4 / EBU R128 dual-stage gating calculation over an array of 400ms block
+ * energies. Used for both per-track loudness finalization and multi-track album aggregation.
  *
  * 1. Absolute Threshold Gating: -70.0 LKFS over all blocks.
  * 2. Ungated mean loudness over blocks surviving the absolute gate.
@@ -291,7 +306,7 @@ export function calculateIntegratedLoudnessFromBlocks(
   for (let i = 0; i < blocksProcessed; i++) {
     const z = blockEnergies[i];
     if (z <= 0) continue;
-    const lkfs = -0.691 + (10 * Math.log10(z));
+    const lkfs = -0.691 + 10 * Math.log10(z);
     if (lkfs >= -70.0) {
       absoluteGatedEnergies.push(z);
     }
@@ -311,14 +326,14 @@ export function calculateIntegratedLoudnessFromBlocks(
     absEnergySum += absoluteGatedEnergies[i];
   }
   const ungatedMeanEnergy = absEnergySum / absoluteGatedEnergies.length;
-  const ungatedLoudness = -0.691 + (10 * Math.log10(ungatedMeanEnergy));
+  const ungatedLoudness = -0.691 + 10 * Math.log10(ungatedMeanEnergy);
 
   // Step 3: Relative Threshold Gating (ungatedLoudness - 10.0 LU)
   const relativeThresholdLkfs = ungatedLoudness - 10.0;
   const relativeGatedEnergies: number[] = [];
   for (let i = 0; i < absoluteGatedEnergies.length; i++) {
     const z = absoluteGatedEnergies[i];
-    const lkfs = -0.691 + (10 * Math.log10(z));
+    const lkfs = -0.691 + 10 * Math.log10(z);
     if (lkfs >= relativeThresholdLkfs) {
       relativeGatedEnergies.push(z);
     }
@@ -338,7 +353,7 @@ export function calculateIntegratedLoudnessFromBlocks(
     relEnergySum += relativeGatedEnergies[i];
   }
   const finalMeanEnergy = relEnergySum / relativeGatedEnergies.length;
-  const integratedLoudness = -0.691 + (10 * Math.log10(finalMeanEnergy));
+  const integratedLoudness = -0.691 + 10 * Math.log10(finalMeanEnergy);
 
   return {
     integratedLoudness: Math.round(integratedLoudness * 100) / 100,

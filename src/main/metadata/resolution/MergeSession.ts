@@ -1,7 +1,7 @@
+import type { MetadataPolicy } from '../domain/MetadataPolicy';
+import type { ProviderAttribution } from '../domain/ProviderAttribution';
 import type { MergedCandidateResult, FieldContribution } from './MetadataMergeEngine';
 import type { MetadataMergeEngine } from './MetadataMergeEngine';
-import type { ProviderAttribution } from '../domain/ProviderAttribution';
-import type { MetadataPolicy } from '../domain/MetadataPolicy';
 
 export class MergeSession {
   private readonly mergeEngine: MetadataMergeEngine;
@@ -20,7 +20,14 @@ export class MergeSession {
     this.currentPolicy = policy ?? {
       level: 'operation',
       selection: {
-        enabledProviderIds: ['user', 'musicbrainz', 'coverartarchive', 'discogs', 'spotify', 'apple'],
+        enabledProviderIds: [
+          'user',
+          'musicbrainz',
+          'coverartarchive',
+          'discogs',
+          'spotify',
+          'apple'
+        ],
         maxCandidates: 10
       },
       merge: {
@@ -44,12 +51,14 @@ export class MergeSession {
         requireArtist: false
       }
     };
-    this.currentResult = initialResult ?? this.mergeEngine.mergeFieldContributions(this.rawContributions, this.currentPolicy);
+    this.currentResult =
+      initialResult ??
+      this.mergeEngine.mergeFieldContributions(this.rawContributions, this.currentPolicy);
   }
 
   /**
-   * Recomputes the entire session preview through policy updating and deterministic re-merge evaluation.
-   * Returns a new immutable MergeSession instance.
+   * Recomputes the entire session preview through policy updating and deterministic re-merge
+   * evaluation. Returns a new immutable MergeSession instance.
    */
   public selectProvider(fieldId: string, providerId: string): MergeSession {
     const updatedFieldPolicies = {
@@ -69,7 +78,10 @@ export class MergeSession {
       }
     };
 
-    const newResult = this.mergeEngine.mergeFieldContributions(this.rawContributions, updatedPolicy);
+    const newResult = this.mergeEngine.mergeFieldContributions(
+      this.rawContributions,
+      updatedPolicy
+    );
     return new MergeSession(this.mergeEngine, this.rawContributions, updatedPolicy, newResult);
   }
 

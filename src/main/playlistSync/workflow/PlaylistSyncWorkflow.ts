@@ -1,12 +1,15 @@
 import type { PlaylistImportPipeline } from '../../playlistImport/pipeline/PlaylistImportPipeline';
-import type { PlaylistSourceTracker } from '../services/PlaylistSourceTracker';
-import type { PlaylistSyncPlanner } from '../planner/PlaylistSyncPlanner';
 import type { PlaylistConflictAnalyzer } from '../analyzer/PlaylistConflictAnalyzer';
-import type { ConflictResolutionPlanner, ResolvedSyncPlanResult } from '../planner/ConflictResolutionPlanner';
 import type { PlaylistSyncExecutor, SyncExecutionResult } from '../executor/PlaylistSyncExecutor';
+import type { ConflictAnalysis } from '../models/ConflictAnalysis';
 import type { PlaylistLink } from '../models/PlaylistLink';
 import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
-import type { ConflictAnalysis } from '../models/ConflictAnalysis';
+import type {
+  ConflictResolutionPlanner,
+  ResolvedSyncPlanResult
+} from '../planner/ConflictResolutionPlanner';
+import type { PlaylistSyncPlanner } from '../planner/PlaylistSyncPlanner';
+import type { PlaylistSourceTracker } from '../services/PlaylistSourceTracker';
 
 export interface SyncPreviewResult {
   rawPlan: PlaylistSyncPlan;
@@ -38,8 +41,17 @@ export class PlaylistSyncWorkflow {
     const rawPlan = this.syncPlanner.createSyncPlan(link, importPlan, currentPlaylistSongIds);
 
     let resolvedPlan = rawPlan;
-    let analysis: ConflictAnalysis = { conflicts: [], hasConflicts: false, hasManualConflicts: false };
-    let conflictSummary = { totalConflicts: 0, resolvedAutomatically: 0, manualConflicts: 0, ignoredConflicts: 0 };
+    let analysis: ConflictAnalysis = {
+      conflicts: [],
+      hasConflicts: false,
+      hasManualConflicts: false
+    };
+    let conflictSummary = {
+      totalConflicts: 0,
+      resolvedAutomatically: 0,
+      manualConflicts: 0,
+      ignoredConflicts: 0
+    };
 
     if (this.analyzer) {
       analysis = this.analyzer.analyzePlan(rawPlan, currentPlaylistSongIds);

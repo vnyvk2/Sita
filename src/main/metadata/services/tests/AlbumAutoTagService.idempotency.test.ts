@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/RecordingMetadata';
-import { AlbumMetadataService } from '../AlbumMetadataService';
-import { AlbumAutoTagService } from '../AlbumAutoTagService';
-import type { LocalSongInput } from '../AlbumMetadataService';
+
 import { TrackMatcher } from '../../matching/TrackMatcher';
+import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/RecordingMetadata';
+import { AlbumAutoTagService } from '../AlbumAutoTagService';
+import { AlbumMetadataService } from '../AlbumMetadataService';
+import type { LocalSongInput } from '../AlbumMetadataService';
 
 describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () => {
   // Test mock candidate release
@@ -45,7 +46,11 @@ describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () =
     const mockMetadataService = {
       search: vi.fn().mockResolvedValue([mockRelease.album]),
       resolveRelease: vi.fn().mockResolvedValue(mockRelease),
-      buildAlbumMatch: async (localSongs: LocalSongInput[], album: AlbumMetadata, officialTracks: any[]) => {
+      buildAlbumMatch: async (
+        localSongs: LocalSongInput[],
+        album: AlbumMetadata,
+        officialTracks: any[]
+      ) => {
         const matcher = new TrackMatcher();
         const trackList = matcher.matchTracks(localSongs, album.releaseId ?? '', officialTracks, {
           albumTitle: album.title,
@@ -173,7 +178,9 @@ describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () =
     expect(yearDiff2?.oldValue).toBe(2021);
     expect(yearDiff2?.suggestedValue).toBe(2021);
 
-    const totalChanges = match2.fieldDiffs.filter((d) => d.status === 'changed' || d.status === 'new').length;
+    const totalChanges = match2.fieldDiffs.filter(
+      (d) => d.status === 'changed' || d.status === 'new'
+    ).length;
     expect(totalChanges).toBe(0);
   });
 
@@ -205,7 +212,9 @@ describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () =
     );
 
     const match = preview.matches[0];
-    const changedFields = match.fieldDiffs.filter((d) => d.status === 'changed' || d.status === 'new');
+    const changedFields = match.fieldDiffs.filter(
+      (d) => d.status === 'changed' || d.status === 'new'
+    );
     expect(changedFields.length).toBe(0);
   });
 
@@ -253,7 +262,9 @@ describe('AlbumAutoTagService: Authoritative Baseline & Idempotency Suite', () =
     expect(genreDiff?.oldValue).toBe('Pop, Alternative Rock');
     expect(genreDiff?.status).toBe('unchanged');
 
-    const changedDiffs = match.fieldDiffs.filter((d) => d.status === 'changed' || d.status === 'new');
+    const changedDiffs = match.fieldDiffs.filter(
+      (d) => d.status === 'changed' || d.status === 'new'
+    );
     expect(changedDiffs.length).toBe(0);
   });
 

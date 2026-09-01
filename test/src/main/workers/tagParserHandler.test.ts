@@ -1,5 +1,4 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   formatDuration,
@@ -7,6 +6,7 @@ import {
   parseTrackMetadata,
   parseTracksStreaming
 } from '@main/workers/process/handlers/tagParserHandler';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockFileInstance = {
   tag: {
@@ -106,9 +106,13 @@ describe('tagParserHandler (Phase C3)', () => {
         dispose: vi.fn()
       };
       const { File } = await import('node-taglib-sharp');
-      vi.mocked(File.createFromPath).mockReturnValueOnce(failingFile as unknown as typeof mockFileInstance);
+      vi.mocked(File.createFromPath).mockReturnValueOnce(
+        failingFile as unknown as typeof mockFileInstance
+      );
 
-      await expect(parseTrackMetadata('C:/Music/corrupt.mp3')).rejects.toThrow('Corrupted ID3 header');
+      await expect(parseTrackMetadata('C:/Music/corrupt.mp3')).rejects.toThrow(
+        'Corrupted ID3 header'
+      );
       expect(failingFile.dispose).toHaveBeenCalledTimes(1);
     });
   });

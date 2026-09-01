@@ -2,6 +2,7 @@
  * Canonical Normalization Contract for Metadata Matching & Search.
  *
  * Pipeline:
+ *
  * 1. NFC normalization (.normalize('NFC'))
  * 2. Lowercase (.toLowerCase())
  * 3. NFD decomposition, Latin diacritics stripping ([\u0300-\u036f]), NFC recomposition
@@ -9,6 +10,7 @@
  * 5. Collapse whitespace and trim (/\s+/g, ' ').trim()
  *
  * Guarantees:
+ *
  * - "Rock & Roll" -> "rock roll"
  * - "AC/DC" -> "ac dc"
  * - "夜に駆ける" -> "夜に駆ける"

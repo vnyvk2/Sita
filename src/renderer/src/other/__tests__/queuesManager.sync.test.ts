@@ -12,9 +12,9 @@ beforeAll(() => {
   };
 });
 
+import { store } from '../../store/store';
 import PlayerQueue from '../playerQueue';
 import { QueuesManager } from '../queuesManager';
-import { store } from '../../store/store';
 
 describe('QueuesManager — Store Sync Optimization & structureVersion Invariant', () => {
   it('does NOT call replaceQueue or churn queues on unrelated store updates when structureVersion is unchanged', () => {

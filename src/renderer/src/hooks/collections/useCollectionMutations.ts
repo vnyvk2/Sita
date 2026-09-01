@@ -1,13 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CollectionClient } from '../../api/CollectionClient';
-import { collectionKeys } from '../../api/collectionKeys';
-import type { 
+import type {
   CreateFolderInput,
   CreatePlaylistInput,
   AddSongsInput,
-  RenameInput, 
-  MoveCollectionInput, 
-  DeleteInput, 
+  RenameInput,
+  MoveCollectionInput,
+  DeleteInput,
   DuplicateInput,
   MergePlaylistsInput,
   BulkDeleteInput,
@@ -15,6 +12,10 @@ import type {
   PinInput,
   UnpinInput
 } from '@common/collections/operationInputs';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { CollectionClient } from '../../api/CollectionClient';
+import { collectionKeys } from '../../api/collectionKeys';
 
 export const useCreateFolder = () => {
   const queryClient = useQueryClient();

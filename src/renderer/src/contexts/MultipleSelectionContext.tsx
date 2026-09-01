@@ -17,8 +17,8 @@ export function getSelectedSongsSet(selections: number[]): Set<number> {
 }
 
 /**
- * Hook to check if a specific song is selected in constant O(1) time.
- * Automatically bails out of re-rendering when the selection boolean is unchanged.
+ * Hook to check if a specific song is selected in constant O(1) time. Automatically bails out of
+ * re-rendering when the selection boolean is unchanged.
  */
 export function useSongSelection(songId: number) {
   const isSelected = useStore(store, (state) => {

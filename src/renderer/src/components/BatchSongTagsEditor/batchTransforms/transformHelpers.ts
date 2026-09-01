@@ -3,8 +3,8 @@ import { isFieldDirty, validateField } from '../utils';
 import type { BatchTransformContext } from './types';
 
 /**
- * Deep clones a BatchTrackRow, creating a fresh draft object, dirtyFields set, and validationErrors map.
- * The original snapshot baseline remains strictly untouched.
+ * Deep clones a BatchTrackRow, creating a fresh draft object, dirtyFields set, and validationErrors
+ * map. The original snapshot baseline remains strictly untouched.
  */
 export function cloneRow(row: BatchTrackRow): BatchTrackRow {
   return {
@@ -24,8 +24,8 @@ export function cloneRow(row: BatchTrackRow): BatchTrackRow {
 }
 
 /**
- * Applies an updated field value to a row draft and recomputes dirty status and validation.
- * Returns true if the value changed relative to the previous draft value.
+ * Applies an updated field value to a row draft and recomputes dirty status and validation. Returns
+ * true if the value changed relative to the previous draft value.
  */
 export function applyFieldChange(
   row: BatchTrackRow,
@@ -70,9 +70,7 @@ export function applyFieldChange(
   return true;
 }
 
-/**
- * Resolves the target song IDs for a transform respecting visual table sort order.
- */
+/** Resolves the target song IDs for a transform respecting visual table sort order. */
 export function getTargetRowIds(
   context: BatchTransformContext,
   allowAllWhenNoneSelected = false
@@ -81,9 +79,7 @@ export function getTargetRowIds(
 
   // Use sortedSongIds if provided, falling back to rows order
   const orderedIds =
-    sortedSongIds && sortedSongIds.length > 0
-      ? sortedSongIds
-      : rows.map((r) => r.songId);
+    sortedSongIds && sortedSongIds.length > 0 ? sortedSongIds : rows.map((r) => r.songId);
 
   if (selectedSongIds.size > 0) {
     return orderedIds.filter((id) => selectedSongIds.has(id));

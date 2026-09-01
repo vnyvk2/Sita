@@ -389,7 +389,10 @@ class AudioPlayer {
     this.currentContext.close();
   }
 
-  /** Cancels any active fade transition, resetting scheduled audio ramps and settling pending promises immediately. */
+  /**
+   * Cancels any active fade transition, resetting scheduled audio ramps and settling pending
+   * promises immediately.
+   */
   private cancelActiveFade() {
     if (this.activeFade) {
       clearTimeout(this.activeFade.timeoutId);
@@ -566,8 +569,8 @@ class AudioPlayer {
   }
 
   /**
-   * Applies ReplayGain to this.replayGainNode using smooth exponential ramping.
-   * Master volume and ducking remain entirely separate on this.gainNode.
+   * Applies ReplayGain to this.replayGainNode using smooth exponential ramping. Master volume and
+   * ducking remain entirely separate on this.gainNode.
    */
   public applyReplayGain() {
     const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
@@ -687,7 +690,10 @@ class AudioPlayer {
       // Record listening data only if request was not discarded as stale
       if (loadedSongData && recordListening) {
         // Note: Listening data recording will be handled by the hook until fully migrated
-        this.emit('recordListening', { songId: loadedSongData.songId, duration: loadedSongData.duration });
+        this.emit('recordListening', {
+          songId: loadedSongData.songId,
+          duration: loadedSongData.duration
+        });
       }
     } catch (error) {
       if (onError) {

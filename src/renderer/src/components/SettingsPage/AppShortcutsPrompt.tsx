@@ -128,7 +128,9 @@ const AppShortcutsPrompt = () => {
                       : ''
                   }`}
                 >
-                  <div className="shortcut-label opacity-75">{translateShortcutKey(shortcut.label)}</div>
+                  <div className="shortcut-label opacity-75">
+                    {translateShortcutKey(shortcut.label)}
+                  </div>
                   <div className="shortcut-keys flex items-center">
                     {isEditing ? (
                       <div className="flex items-center">

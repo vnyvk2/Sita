@@ -1,12 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
 import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
-import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
-import { MetadataQueryNormalizer } from '@main/metadata/search/MetadataQueryNormalizer';
-import { SnapshotBuilder } from '@main/metadata/transactions/SnapshotBuilder';
-import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
-import type { MergedCandidateResult } from '@main/metadata/resolution/MetadataMergeEngine';
-import type { TrackMatchPair, LocalSongInput } from '@main/metadata/services/AlbumMetadataService';
 import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
+import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
+import type { MergedCandidateResult } from '@main/metadata/resolution/MetadataMergeEngine';
+import { MetadataQueryNormalizer } from '@main/metadata/search/MetadataQueryNormalizer';
+import type { TrackMatchPair, LocalSongInput } from '@main/metadata/services/AlbumMetadataService';
+import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import { SnapshotBuilder } from '@main/metadata/transactions/SnapshotBuilder';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
   const baseMerged: MergedCandidateResult = {
@@ -16,13 +16,48 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
     year: 1973,
     genre: 'Progressive Rock',
     fieldAttributions: {
-      title: { fieldId: 'title', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      artist: { fieldId: 'artist', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      album: { fieldId: 'album', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      year: { fieldId: 'year', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      trackNumber: { fieldId: 'trackNumber', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      discNumber: { fieldId: 'discNumber', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 },
-      genre: { fieldId: 'genre', providerId: 'musicbrainz', providerName: 'MusicBrainz', confidenceScore: 0.98 }
+      title: {
+        fieldId: 'title',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      artist: {
+        fieldId: 'artist',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      album: {
+        fieldId: 'album',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      year: {
+        fieldId: 'year',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      trackNumber: {
+        fieldId: 'trackNumber',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      discNumber: {
+        fieldId: 'discNumber',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      },
+      genre: {
+        fieldId: 'genre',
+        providerId: 'musicbrainz',
+        providerName: 'MusicBrainz',
+        confidenceScore: 0.98
+      }
     },
     fieldAlternatives: {}
   };
@@ -30,10 +65,34 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
   describe('Invariant I-1: Track Identity Protection', () => {
     it('never overwrites individual track titles with album title during preview construction', () => {
       const albumTracks = [
-        { songId: 1, file: '01_speak_to_me.mp3', currentTitle: 'Speak to Me (Live)', remoteTitle: 'Speak to Me', trackNo: 1 },
-        { songId: 2, file: '02_breathe.mp3', currentTitle: 'Breathe (In the Air)', remoteTitle: 'Breathe', trackNo: 2 },
-        { songId: 3, file: '03_on_the_run.mp3', currentTitle: 'On the Run (Studio)', remoteTitle: 'On the Run', trackNo: 3 },
-        { songId: 4, file: '04_time.mp3', currentTitle: 'Time (2011 Remaster)', remoteTitle: 'Time', trackNo: 4 }
+        {
+          songId: 1,
+          file: '01_speak_to_me.mp3',
+          currentTitle: 'Speak to Me (Live)',
+          remoteTitle: 'Speak to Me',
+          trackNo: 1
+        },
+        {
+          songId: 2,
+          file: '02_breathe.mp3',
+          currentTitle: 'Breathe (In the Air)',
+          remoteTitle: 'Breathe',
+          trackNo: 2
+        },
+        {
+          songId: 3,
+          file: '03_on_the_run.mp3',
+          currentTitle: 'On the Run (Studio)',
+          remoteTitle: 'On the Run',
+          trackNo: 3
+        },
+        {
+          songId: 4,
+          file: '04_time.mp3',
+          currentTitle: 'Time (2011 Remaster)',
+          remoteTitle: 'Time',
+          trackNo: 4
+        }
       ];
 
       const previews = albumTracks.map((t) => {
@@ -70,13 +129,23 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
       });
 
       // Verify each track preview has its specific recording title, NEVER the album title
-      expect(previews[0].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Speak to Me');
-      expect(previews[1].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Breathe');
-      expect(previews[2].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('On the Run');
-      expect(previews[3].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('Time');
+      expect(previews[0].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Speak to Me'
+      );
+      expect(previews[1].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Breathe'
+      );
+      expect(previews[2].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'On the Run'
+      );
+      expect(previews[3].fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+        'Time'
+      );
 
       previews.forEach((p) => {
-        expect(p.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).not.toBe('The Dark Side of the Moon');
+        expect(p.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).not.toBe(
+          'The Dark Side of the Moon'
+        );
       });
     });
 
@@ -89,8 +158,13 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
       };
 
       expect(() => {
-        const preview = MetadataDiffBuilder.buildTrackPreviewFromMergedResult(localOnly, baseMerged);
-        expect(preview.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe('The Dark Side of the Moon');
+        const preview = MetadataDiffBuilder.buildTrackPreviewFromMergedResult(
+          localOnly,
+          baseMerged
+        );
+        expect(preview.fieldDiffs.find((f) => f.fieldId === 'title')?.suggestedValue).toBe(
+          'The Dark Side of the Moon'
+        );
       }).not.toThrow();
     });
   });
@@ -119,12 +193,16 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
     it('produces identical normalized output for composed (NFC) and decomposed (NFD) Unicode representations', () => {
       const composed = 'Café';
       const decomposed = 'Cafe\u0301';
-      expect(MetadataNormalizer.normalizeTitle(composed)).toBe(MetadataNormalizer.normalizeTitle(decomposed));
+      expect(MetadataNormalizer.normalizeTitle(composed)).toBe(
+        MetadataNormalizer.normalizeTitle(decomposed)
+      );
       expect(MetadataNormalizer.normalizeTitle(composed)).toBe('cafe');
 
       const cjkComposed = '夜に駆ける'.normalize('NFC');
       const cjkDecomposed = '夜に駆ける'.normalize('NFD');
-      expect(MetadataNormalizer.normalizeTitle(cjkComposed)).toBe(MetadataNormalizer.normalizeTitle(cjkDecomposed));
+      expect(MetadataNormalizer.normalizeTitle(cjkComposed)).toBe(
+        MetadataNormalizer.normalizeTitle(cjkDecomposed)
+      );
     });
 
     it('returns empty string for inputs with only symbols/emojis and treats empty normalized values as 0 match points', () => {
@@ -140,10 +218,14 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
   describe('Invariant I-7: Rollback Completeness Across All 7 Mutable Fields', () => {
     it('records and restores all 7 metadata fields accurately on transaction rollback', async () => {
       let restoredPayload: Record<string, string | number | undefined> | null = null;
-      const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
-        restoredPayload = tags;
-        return { success: true };
-      });
+      const mockDbUpdater = vi
+        .fn()
+        .mockImplementation(
+          async (_songId: number, tags: Record<string, string | number | undefined>) => {
+            restoredPayload = tags;
+            return { success: true };
+          }
+        );
 
       const txManager = new MetadataTransactionManager({
         dbUpdater: mockDbUpdater
@@ -207,9 +289,7 @@ describe('AutoTag Safety Boundary (Phase 0 Integration Gate)', () => {
         {
           resourceId: 777,
           filePath: '/music/currently_playing.mp3',
-          fieldMutations: [
-            { fieldId: 'title', oldValue: 'Track', newValue: 'Track (AutoTagged)' }
-          ]
+          fieldMutations: [{ fieldId: 'title', oldValue: 'Track', newValue: 'Track (AutoTagged)' }]
         }
       ];
 

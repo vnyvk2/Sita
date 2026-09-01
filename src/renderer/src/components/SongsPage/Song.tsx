@@ -190,21 +190,18 @@ const Song = memo(
       }
 
       // 2. Optimistically update all hydrated window caches in React Query
-      queryClient.setQueriesData<SongData[]>(
-        { queryKey: songCacheKeys.windowsRoot },
-        (old) => {
-          if (!Array.isArray(old)) return old;
-          let changed = false;
-          const updated = old.map((s) => {
-            if (s && s.songId === songId) {
-              changed = true;
-              return { ...s, isAFavorite: nextFav };
-            }
-            return s;
-          });
-          return changed ? updated : old;
-        }
-      );
+      queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
+        if (!Array.isArray(old)) return old;
+        let changed = false;
+        const updated = old.map((s) => {
+          if (s && s.songId === songId) {
+            changed = true;
+            return { ...s, isAFavorite: nextFav };
+          }
+          return s;
+        });
+        return changed ? updated : old;
+      });
 
       // 3. Optimistically update legacy/non-windowed song queries
       queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
@@ -264,15 +261,10 @@ const Song = memo(
           console.error(err);
           // Revert cache on error
           setOptimisticFavorite({ songId, isFavorite: !nextFav });
-          queryClient.setQueriesData<SongData[]>(
-            { queryKey: songCacheKeys.windowsRoot },
-            (old) => {
-              if (!Array.isArray(old)) return old;
-              return old.map((s) =>
-                s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-              );
-            }
-          );
+          queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
+            if (!Array.isArray(old)) return old;
+            return old.map((s) => (s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s));
+          });
           queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
             { queryKey: songQuery.all._def },
             (old) => {

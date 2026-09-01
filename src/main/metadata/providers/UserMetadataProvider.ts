@@ -1,13 +1,12 @@
 import type { MetadataCapability } from '../common/types';
-import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
-import type { MetadataIdentity } from '../models/MetadataIdentity';
-import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
-import type { UserMetadataRepository } from '../repository/UserMetadataRepository';
-
 import { MetadataCapabilities } from '../common/types';
+import type { IMetadataProvider } from '../interfaces/IMetadataProvider';
 import { MetadataConfidence } from '../models/MetadataConfidence';
+import type { MetadataIdentity } from '../models/MetadataIdentity';
 import { MetadataProviderInfo } from '../models/MetadataProviderInfo';
+import type { ProviderExecutionContext } from '../models/ProviderExecutionContext';
 import { ProviderResult } from '../models/ProviderResult';
+import type { UserMetadataRepository } from '../repository/UserMetadataRepository';
 
 export class UserMetadataProvider implements IMetadataProvider {
   public readonly info: MetadataProviderInfo;

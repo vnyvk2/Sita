@@ -395,4 +395,3 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
     });
   });
 });
-

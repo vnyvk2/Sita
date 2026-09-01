@@ -21,12 +21,7 @@ export class UserMetadataRepository {
     const rows = await this.database
       .select()
       .from(metadataOverrides)
-      .where(
-        and(
-          eq(metadataOverrides.entityKind, kind),
-          eq(metadataOverrides.entityId, id)
-        )
-      );
+      .where(and(eq(metadataOverrides.entityKind, kind), eq(metadataOverrides.entityId, id)));
 
     return rows.map((row) => MetadataOverrideSerializer.deserializeRow(row));
   }
@@ -52,10 +47,7 @@ export class UserMetadataRepository {
         .select()
         .from(metadataOverrides)
         .where(
-          and(
-            eq(metadataOverrides.entityKind, kind),
-            inArray(metadataOverrides.entityId, ids)
-          )
+          and(eq(metadataOverrides.entityKind, kind), inArray(metadataOverrides.entityId, ids))
         );
 
       for (const row of rows) {
@@ -105,7 +97,11 @@ export class UserMetadataRepository {
             updatedAt: new Date()
           })
           .onConflictDoUpdate({
-            target: [metadataOverrides.entityKind, metadataOverrides.entityId, metadataOverrides.fieldId],
+            target: [
+              metadataOverrides.entityKind,
+              metadataOverrides.entityId,
+              metadataOverrides.fieldId
+            ],
             set: {
               ...serialized,
               updatedAt: new Date()
@@ -115,10 +111,7 @@ export class UserMetadataRepository {
     });
   }
 
-  public async removeOverride(
-    identity: MetadataIdentity,
-    fieldId: MetadataFieldId
-  ): Promise<void> {
+  public async removeOverride(identity: MetadataIdentity, fieldId: MetadataFieldId): Promise<void> {
     const kind = identity.entityKind;
     const id = String(identity.entityId);
 
@@ -137,19 +130,17 @@ export class UserMetadataRepository {
     const kind = identity.entityKind;
     const id = String(identity.entityId);
 
-    console.log('[STAGE 2: Repository clearOverrides] Executing DELETE FROM metadata_overrides for:', {
-      entityKind: kind,
-      entityId: id
-    });
+    console.log(
+      '[STAGE 2: Repository clearOverrides] Executing DELETE FROM metadata_overrides for:',
+      {
+        entityKind: kind,
+        entityId: id
+      }
+    );
 
     await this.database
       .delete(metadataOverrides)
-      .where(
-        and(
-          eq(metadataOverrides.entityKind, kind),
-          eq(metadataOverrides.entityId, id)
-        )
-      );
+      .where(and(eq(metadataOverrides.entityKind, kind), eq(metadataOverrides.entityId, id)));
 
     console.log('[STAGE 2: Repository clearOverrides] Successfully deleted overrides for:', {
       entityKind: kind,

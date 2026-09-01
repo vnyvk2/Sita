@@ -1,6 +1,7 @@
-import { net } from 'electron';
 import { insertScrobble } from '@main/db/queries/scrobble_queue';
 import { getUserSettings } from '@main/db/queries/settings';
+import { net } from 'electron';
+
 import type {
   ListenBrainzFeedbackPayload,
   ListenBrainzLookupResponse

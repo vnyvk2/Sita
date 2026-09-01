@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
 import { HttpError } from '@main/platform/networking/FetchHttpClient';
+import type {
+  IHttpClient,
+  HttpRequestOptions,
+  HttpResponse
+} from '@main/platform/networking/IHttpClient';
 import { RateLimiter } from '@main/platform/networking/RateLimiter';
 import { RequestPipeline } from '@main/platform/networking/RequestPipeline';
-import type { IHttpClient, HttpRequestOptions, HttpResponse } from '@main/platform/networking/IHttpClient';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('RequestPipeline (Phase 2 Concurrency & Cancellation)', () => {
   it('enforces bounded concurrency such that active HTTP attempts never exceed maxConcurrentRequests', async () => {

@@ -29,9 +29,9 @@ export interface DiffOptions {
   toleranceMs?: number;
   platform?: NodeJS.Platform;
   /**
-   * Defense-in-depth: When true, the walk result is NOT authoritative.
-   * The diff engine will produce zero removals regardless of snapshot content.
-   * This prevents a failed/incomplete walk from triggering mass deletion.
+   * Defense-in-depth: When true, the walk result is NOT authoritative. The diff engine will produce
+   * zero removals regardless of snapshot content. This prevents a failed/incomplete walk from
+   * triggering mass deletion.
    */
   walkFailed?: boolean;
 }
@@ -56,7 +56,8 @@ export interface DiffResult {
  * - $|disk - db| \le toleranceMs \implies unchanged$
  * - $disk > db + toleranceMs \implies modified$
  * - $disk < db - toleranceMs \implies unchanged$
- * - Blacklisted DB songs participate in path matching but are excluded from Added/Modified/Removed reconciliation.
+ * - Blacklisted DB songs participate in path matching but are excluded from Added/Modified/Removed
+ *   reconciliation.
  * - Songs belonging to skipped/disconnected roots are strictly excluded from the `removed` set.
  * - Songs belonging to failed/unscanned subtrees or failed-stat paths are strictly excluded from the
  *   `removed` set.

@@ -1,23 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PlaylistImportHistoryService } from '@main/playlistImport/services/PlaylistImportHistoryService';
-import { PlaylistImportSessionService } from '@main/playlistImport/services/PlaylistImportSessionService';
-import { RepairSummaryBuilder } from '@main/playlistImport/services/RepairSummaryBuilder';
-import { InMemoryPlaylistImportHistoryRepository } from '@main/playlistImport/services/InMemoryPlaylistImportHistoryRepository';
-import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
-import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
-import { PlaylistImportService } from '@main/playlistImport/services/PlaylistImportService';
-import { PlaylistImporterRegistry } from '@main/playlistImport/registry/PlaylistImporterRegistry';
-import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
-import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
-import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
-import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
-import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
 import { PlaylistImportExecutor } from '@main/playlistImport/executor/PlaylistImportExecutor';
+import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
 import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
 import type { LibraryLookup } from '@main/playlistImport/interfaces/LibraryLookup';
 import type { PlaylistPersistence } from '@main/playlistImport/interfaces/PlaylistPersistence';
 import type { PlaylistUndoPersistence } from '@main/playlistImport/interfaces/PlaylistUndoPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
+import { PlaylistImportPipeline } from '@main/playlistImport/pipeline/PlaylistImportPipeline';
+import { PlaylistImportPlanner } from '@main/playlistImport/planner/PlaylistImportPlanner';
+import { PlaylistImporterRegistry } from '@main/playlistImport/registry/PlaylistImporterRegistry';
+import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
+import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
+import { InMemoryPlaylistImportHistoryRepository } from '@main/playlistImport/services/InMemoryPlaylistImportHistoryRepository';
+import { PlaylistImportHistoryService } from '@main/playlistImport/services/PlaylistImportHistoryService';
+import { PlaylistImportService } from '@main/playlistImport/services/PlaylistImportService';
+import { PlaylistImportSessionService } from '@main/playlistImport/services/PlaylistImportSessionService';
+import { RepairSummaryBuilder } from '@main/playlistImport/services/RepairSummaryBuilder';
+import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
+import { PlaylistImportWorkflow } from '@main/playlistImport/workflow/PlaylistImportWorkflow';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('PlaylistImportHistoryService & PlaylistImportSessionService', () => {
   it('should track sessions via SessionService and allow undoing an import', async () => {
@@ -48,7 +48,10 @@ bohemian.mp3`;
     };
 
     const historyRepo = new InMemoryPlaylistImportHistoryRepository();
-    const sessionService = new PlaylistImportSessionService(historyRepo, new RepairSummaryBuilder());
+    const sessionService = new PlaylistImportSessionService(
+      historyRepo,
+      new RepairSummaryBuilder()
+    );
 
     const importService = new PlaylistImportService(registry, mockFs);
     const pathResolver = new PlaylistPathResolver();
@@ -57,7 +60,13 @@ bohemian.mp3`;
     const planner = new PlaylistImportPlanner();
     const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
-    const pipeline = new PlaylistImportPipeline(importService, pathResolver, verifier, libraryResolver, planner);
+    const pipeline = new PlaylistImportPipeline(
+      importService,
+      pathResolver,
+      verifier,
+      libraryResolver,
+      planner
+    );
     const workflow = new PlaylistImportWorkflow(pipeline, executor, sessionService);
     const historyService = new PlaylistImportHistoryService(historyRepo, mockPersistence);
 
@@ -109,7 +118,10 @@ bohemian.mp3`;
     };
 
     const historyRepo = new InMemoryPlaylistImportHistoryRepository();
-    const sessionService = new PlaylistImportSessionService(historyRepo, new RepairSummaryBuilder());
+    const sessionService = new PlaylistImportSessionService(
+      historyRepo,
+      new RepairSummaryBuilder()
+    );
 
     const importService = new PlaylistImportService(registry, mockFs);
     const pathResolver = new PlaylistPathResolver();
@@ -118,7 +130,13 @@ bohemian.mp3`;
     const planner = new PlaylistImportPlanner();
     const executor = new PlaylistImportExecutor(mockPersistence, mockTransactionRunner);
 
-    const pipeline = new PlaylistImportPipeline(importService, pathResolver, verifier, libraryResolver, planner);
+    const pipeline = new PlaylistImportPipeline(
+      importService,
+      pathResolver,
+      verifier,
+      libraryResolver,
+      planner
+    );
     const workflow = new PlaylistImportWorkflow(pipeline, executor, sessionService);
     const historyService = new PlaylistImportHistoryService(historyRepo, mockPersistence);
 

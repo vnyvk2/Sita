@@ -1,7 +1,6 @@
 /**
- * Canonical Mini Player Geometry Constants
- * Single source of truth shared across Main Process, IPC Handlers, and Renderer.
- * Preserves the exact original dimensions without accidental alteration.
+ * Canonical Mini Player Geometry Constants Single source of truth shared across Main Process, IPC
+ * Handlers, and Renderer. Preserves the exact original dimensions without accidental alteration.
  */
 
 export const MINI_PLAYER_DEFAULT_SIZE_X = 320;

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
+
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 
 import { appPreferences } from '../../../../package.json';
@@ -85,9 +86,9 @@ export interface AssetBridgeResult {
 }
 
 /**
- * Resolves the location of the compiled mediaWorker script.
- * Defensively probes multiple candidate paths to ensure reliable execution in both
- * local development/unpacked builds and packaged asar installations.
+ * Resolves the location of the compiled mediaWorker script. Defensively probes multiple candidate
+ * paths to ensure reliable execution in both local development/unpacked builds and packaged asar
+ * installations.
  */
 export function getMediaWorkerPath(): string {
   const candidates = [
@@ -192,20 +193,19 @@ export class MediaWorkerBridge extends EventEmitter {
     this.consecutiveCrashCount = 0;
   }
 
-  /**
-   * Called when a worker task completes successfully.
-   * Resets consecutive crash count back to 0.
-   */
+  /** Called when a worker task completes successfully. Resets consecutive crash count back to 0. */
   private onTaskCompletedSuccessfully(): void {
     if (this.consecutiveCrashCount > 0) {
       this.consecutiveCrashCount = 0;
-      logger.debug('[MediaWorkerBridge] Task completed successfully. Reset consecutiveCrashCount to 0.');
+      logger.debug(
+        '[MediaWorkerBridge] Task completed successfully. Reset consecutiveCrashCount to 0.'
+      );
     }
   }
 
   /**
-   * Spawns the utilityProcess and completes the versioned EVT_READY handshake.
-   * Idempotent: returns existing in-flight startup promise if already launching.
+   * Spawns the utilityProcess and completes the versioned EVT_READY handshake. Idempotent: returns
+   * existing in-flight startup promise if already launching.
    */
   public async start(timeoutMs = 5000): Promise<void> {
     if (this.state === 'READY') return;
@@ -241,7 +241,11 @@ export class MediaWorkerBridge extends EventEmitter {
             // Process may already be dead
           }
           this.childProcess = null;
-          reject(new Error(`[MediaWorkerBridge] Timeout waiting for worker EVT_READY after ${timeoutMs}ms.`));
+          reject(
+            new Error(
+              `[MediaWorkerBridge] Timeout waiting for worker EVT_READY after ${timeoutMs}ms.`
+            )
+          );
         }
       }, timeoutMs);
 
@@ -275,7 +279,11 @@ export class MediaWorkerBridge extends EventEmitter {
               this.restartTimer = null;
             }
             this.state = 'CRASHED';
-            reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during startup.`));
+            reject(
+              new Error(
+                `[MediaWorkerBridge] Worker process exited with code ${code} during startup.`
+              )
+            );
           }
         });
       } catch (error) {
@@ -287,8 +295,8 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
-   * Delegates directory walking and stat gathering to the utilityProcess.
-   * Phase C2: Moves fastDiskWalk off the Main process event loop.
+   * Delegates directory walking and stat gathering to the utilityProcess. Phase C2: Moves
+   * fastDiskWalk off the Main process event loop.
    */
   public async walkDirectory(
     roots: Array<{ id: number; path: string }>,
@@ -396,8 +404,8 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
-   * Streams track batch parsing through the utilityProcess with backpressure.
-   * Phase C3: Worker parses 100-track batches and pauses until Main commits each batch.
+   * Streams track batch parsing through the utilityProcess with backpressure. Phase C3: Worker
+   * parses 100-track batches and pauses until Main commits each batch.
    */
   public async parseTrackBatchStream(
     tracks: Array<{ songPath: string; folderId?: number }>,
@@ -510,9 +518,9 @@ export class MediaWorkerBridge extends EventEmitter {
   }
 
   /**
-   * Dispatches persistent asset generation (artwork or waveform) to the utilityProcess.
-   * Phase C4: Rejects cleanly on worker crash to let JobScheduler own retry.
-   * NEVER retries or replays jobs inside the Bridge.
+   * Dispatches persistent asset generation (artwork or waveform) to the utilityProcess. Phase C4:
+   * Rejects cleanly on worker crash to let JobScheduler own retry. NEVER retries or replays jobs
+   * inside the Bridge.
    */
   public async generateAsset(options: GenerateAssetBridgeOptions): Promise<AssetBridgeResult> {
     const { jobType, sourceFilePath, destinationPath, metadata, abortSignal, timeoutMs } = options;
@@ -613,9 +621,7 @@ export class MediaWorkerBridge extends EventEmitter {
     });
   }
 
-  /**
-   * Sends a ping to the worker and measures roundtrip IPC latency in milliseconds.
-   */
+  /** Sends a ping to the worker and measures roundtrip IPC latency in milliseconds. */
   public async ping(timeoutMs = 3000): Promise<number> {
     if (!this.isReady() || !this.childProcess) {
       throw new Error('[MediaWorkerBridge] Cannot ping: worker is not in READY state.');
@@ -642,9 +648,7 @@ export class MediaWorkerBridge extends EventEmitter {
     });
   }
 
-  /**
-   * Sends a typed command to the worker process over the IPC channel.
-   */
+  /** Sends a typed command to the worker process over the IPC channel. */
   public sendCommand(cmd: MainToWorkerCommand): void {
     if (!this.childProcess) {
       throw new Error('[MediaWorkerBridge] Cannot send command: worker process does not exist.');
@@ -675,7 +679,9 @@ export class MediaWorkerBridge extends EventEmitter {
         this.healthTimer = setTimeout(() => {
           if (this.state === 'READY') {
             this.consecutiveCrashCount = 0;
-            logger.debug('[MediaWorkerBridge] Worker demonstrated 10s stability. Reset consecutiveCrashCount to 0.');
+            logger.debug(
+              '[MediaWorkerBridge] Worker demonstrated 10s stability. Reset consecutiveCrashCount to 0.'
+            );
           }
         }, 10000);
         break;
@@ -694,7 +700,10 @@ export class MediaWorkerBridge extends EventEmitter {
       case 'EVT_WALK_PROGRESS': {
         const walk = this.activeWalkResolvers.get((event as EvtWalkProgress).taskId);
         if (walk?.onProgress) {
-          walk.onProgress((event as EvtWalkProgress).discoveredCount, (event as EvtWalkProgress).currentPath ?? '');
+          walk.onProgress(
+            (event as EvtWalkProgress).discoveredCount,
+            (event as EvtWalkProgress).currentPath ?? ''
+          );
         }
         break;
       }
@@ -711,7 +720,9 @@ export class MediaWorkerBridge extends EventEmitter {
           // as if it were an authoritative "no files on disk" result.
           if (!isCancelled && raw.error) {
             walk.reject(
-              new Error(`[MediaWorkerBridge] Worker walk failed: ${typeof raw.error === 'string' ? raw.error : 'unknown error'}`)
+              new Error(
+                `[MediaWorkerBridge] Worker walk failed: ${typeof raw.error === 'string' ? raw.error : 'unknown error'}`
+              )
             );
             break;
           }
@@ -725,7 +736,8 @@ export class MediaWorkerBridge extends EventEmitter {
             ? []
             : raw.snapshots.map((s) => ({
                 ...s,
-                fileModifiedAt: s.fileModifiedAt instanceof Date ? s.fileModifiedAt : new Date(s.fileModifiedAt)
+                fileModifiedAt:
+                  s.fileModifiedAt instanceof Date ? s.fileModifiedAt : new Date(s.fileModifiedAt)
               }));
 
           walk.resolve({
@@ -748,8 +760,10 @@ export class MediaWorkerBridge extends EventEmitter {
           // Normalize Date instances across IPC boundary
           const normalizedTracks: ParsedTrackDTO[] = batchEvt.tracks.map((t) => ({
             ...t,
-            fileCreatedAt: t.fileCreatedAt instanceof Date ? t.fileCreatedAt : new Date(t.fileCreatedAt),
-            fileModifiedAt: t.fileModifiedAt instanceof Date ? t.fileModifiedAt : new Date(t.fileModifiedAt)
+            fileCreatedAt:
+              t.fileCreatedAt instanceof Date ? t.fileCreatedAt : new Date(t.fileCreatedAt),
+            fileModifiedAt:
+              t.fileModifiedAt instanceof Date ? t.fileModifiedAt : new Date(t.fileModifiedAt)
           }));
 
           // Process batch in Main process (Drizzle transaction + artwork write)
@@ -780,8 +794,10 @@ export class MediaWorkerBridge extends EventEmitter {
                   // Worker-initiated cancellation (e.g., backpressure timeout).
                   // REJECT so the caller can fall back to local processing for remaining tracks.
                   parseTask.reject(
-                    new Error(`[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). ` +
-                      `Committed ${parseTask.totalParsed} tracks before cancellation.`)
+                    new Error(
+                      `[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). ` +
+                        `Committed ${parseTask.totalParsed} tracks before cancellation.`
+                    )
                   );
                 } else {
                   if (!batchEvt.cancelled) {
@@ -877,20 +893,30 @@ export class MediaWorkerBridge extends EventEmitter {
 
     // Fail any in-flight walk promises
     for (const walk of this.activeWalkResolvers.values()) {
-      walk.reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during directory walk.`));
+      walk.reject(
+        new Error(
+          `[MediaWorkerBridge] Worker process exited with code ${code} during directory walk.`
+        )
+      );
     }
     this.activeWalkResolvers.clear();
 
     // Fail any in-flight parse streaming promises
     for (const parseTask of this.activeParseResolvers.values()) {
-      parseTask.reject(new Error(`[MediaWorkerBridge] Worker process exited with code ${code} during track parsing.`));
+      parseTask.reject(
+        new Error(
+          `[MediaWorkerBridge] Worker process exited with code ${code} during track parsing.`
+        )
+      );
     }
     this.activeParseResolvers.clear();
 
     // Fail any in-flight asset generation promises immediately (CRITICAL: Bridge NEVER retries work!)
     for (const [taskId, assetTask] of this.activeAssetResolvers.entries()) {
       assetTask.reject(
-        new Error(`[MediaWorkerBridge] Worker process crashed (exit code ${code}) while generating asset ${taskId}.`)
+        new Error(
+          `[MediaWorkerBridge] Worker process crashed (exit code ${code}) while generating asset ${taskId}.`
+        )
       );
     }
     this.activeAssetResolvers.clear();
@@ -957,6 +983,7 @@ export class MediaWorkerBridge extends EventEmitter {
 
   /**
    * Performs an orderly shutdown:
+   *
    * 1. Cancels any pending restart or stability timers.
    * 2. Signals worker with CMD_SHUTDOWN.
    * 3. Waits for EVT_SHUTDOWN_DRAINED or process exit.
@@ -995,7 +1022,9 @@ export class MediaWorkerBridge extends EventEmitter {
 
       const timer = setTimeout(() => {
         if (!resolved) {
-          logger.warn(`[MediaWorkerBridge] Worker did not exit within ${timeoutMs}ms. Force killing.`);
+          logger.warn(
+            `[MediaWorkerBridge] Worker did not exit within ${timeoutMs}ms. Force killing.`
+          );
           try {
             this.childProcess?.kill();
           } catch {

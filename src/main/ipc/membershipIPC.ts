@@ -1,7 +1,10 @@
 import { ipcMain } from 'electron';
 
 import { MembershipBootstrap } from '../membership/bootstrap/MembershipBootstrap';
-import type { MembershipEntityKind, MembershipReference } from '../membership/models/MembershipReference';
+import type {
+  MembershipEntityKind,
+  MembershipReference
+} from '../membership/models/MembershipReference';
 
 export function registerMembershipIPCHandlers(): void {
   ipcMain.handle(

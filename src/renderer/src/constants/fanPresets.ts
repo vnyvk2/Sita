@@ -1,10 +1,7 @@
 import type { ClipPathArtworkCount, FanVariant, LayoutPreset } from '../types/playlistCover';
 
 const STANDARD_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 70% 0, 30% 100%, 0 100%)',
-    'polygon(70% 0, 100% 0, 100% 100%, 30% 100%)'
-  ],
+  2: ['polygon(0 0, 70% 0, 30% 100%, 0 100%)', 'polygon(70% 0, 100% 0, 100% 100%, 30% 100%)'],
   3: [
     'polygon(0 0, 45% 0, 20% 100%, 0 100%)',
     'polygon(45% 0, 75% 0, 55% 100%, 20% 100%)',
@@ -26,10 +23,7 @@ const STANDARD_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 } as const;
 
 const WIDE_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 85% 0, 15% 100%, 0 100%)',
-    'polygon(85% 0, 100% 0, 100% 100%, 15% 100%)'
-  ],
+  2: ['polygon(0 0, 85% 0, 15% 100%, 0 100%)', 'polygon(85% 0, 100% 0, 100% 100%, 15% 100%)'],
   3: [
     'polygon(0 0, 60% 0, 10% 100%, 0 100%)',
     'polygon(60% 0, 90% 0, 45% 100%, 10% 100%)',
@@ -51,10 +45,7 @@ const WIDE_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 } as const;
 
 const TIGHT_FAN_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 55% 0, 45% 100%, 0 100%)',
-    'polygon(55% 0, 100% 0, 100% 100%, 45% 100%)'
-  ],
+  2: ['polygon(0 0, 55% 0, 45% 100%, 0 100%)', 'polygon(55% 0, 100% 0, 100% 100%, 45% 100%)'],
   3: [
     'polygon(0 0, 36% 0, 30% 100%, 0 100%)',
     'polygon(36% 0, 68% 0, 62% 100%, 30% 100%)',

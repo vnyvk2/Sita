@@ -16,8 +16,8 @@ import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataQuery } from '@main/metadata/models/MetadataQuery';
 import { MetadataQueryPlanner } from '@main/metadata/planner/MetadataQueryPlanner';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('MetadataQueryPlanner', () => {
   it('should plan and execute queries targeting loaders', async () => {

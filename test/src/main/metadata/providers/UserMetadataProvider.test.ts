@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { UserMetadataProvider } from '@main/metadata/providers/UserMetadataProvider';
 import type { UserMetadataRepository } from '@main/metadata/repository/UserMetadataRepository';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('UserMetadataProvider', () => {
   it('should fetch overrides from repository and return ProviderResult with Priority 1000', async () => {

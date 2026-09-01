@@ -14,15 +14,13 @@ const SongDiscNumberInput = (props: Props) => {
 
   return (
     <div className="tag-input flex max-w-2xl min-w-[10rem] flex-col">
-      <div className="flex items-center justify-between mr-[10%]">
-        <label htmlFor="song-disc-number-override-tag">
-          {t('songTagsEditingPage.discNumber')}
-        </label>
+      <div className="mr-[10%] flex items-center justify-between">
+        <label htmlFor="song-disc-number-override-tag">{t('songTagsEditingPage.discNumber')}</label>
         {onReset && (
           <button
             type="button"
             onClick={onReset}
-            className="text-xs text-font-color-highlight dark:text-dark-font-color-highlight hover:underline opacity-80"
+            className="text-font-color-highlight dark:text-dark-font-color-highlight text-xs opacity-80 hover:underline"
           >
             {t('resetTagsToDefaultPrompt.resetToDefault')}
           </button>

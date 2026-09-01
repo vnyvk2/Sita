@@ -1,15 +1,17 @@
-import { describe, expect, it } from 'vitest';
 import {
   normalizeTrackTitle,
   matchOnlineTrackToLocalSong,
   deduplicateCandidateTracks
 } from '@main/utils/normalizeTrackTitle';
+import { describe, expect, it } from 'vitest';
 
 describe('normalizeTrackTitle', () => {
   it('strips remastered, live, bonus, and feature suffixes correctly', () => {
     expect(normalizeTrackTitle('Bohemian Rhapsody (Remastered 2011)')).toBe('bohemian rhapsody');
     expect(normalizeTrackTitle('Hotel California - Live at the Forum')).toBe('hotel california');
-    expect(normalizeTrackTitle('Save Your Tears (feat. Ariana Grande) [Remix]')).toBe('save your tears');
+    expect(normalizeTrackTitle('Save Your Tears (feat. Ariana Grande) [Remix]')).toBe(
+      'save your tears'
+    );
     expect(normalizeTrackTitle('Cruel Summer (Live from The Eras Tour)')).toBe('cruel summer');
     expect(normalizeTrackTitle('Anti-Hero (Acoustic Version)')).toBe('anti hero');
     expect(normalizeTrackTitle('Lose Yourself - 2002 Remaster')).toBe('lose yourself');
@@ -18,11 +20,15 @@ describe('normalizeTrackTitle', () => {
   it('matches online tracks against local songs with duration tolerance', () => {
     const localSongs = [
       { id: 101, title: 'Bohemian Rhapsody', duration: 354 },
-      { id: 102, title: 'Don\'t Stop Me Now', duration: 209 },
+      { id: 102, title: "Don't Stop Me Now", duration: 209 },
       { id: 103, title: 'Cruel Summer', duration: 178 }
     ];
 
-    const match1 = matchOnlineTrackToLocalSong('Bohemian Rhapsody (2011 Remaster)', 355, localSongs);
+    const match1 = matchOnlineTrackToLocalSong(
+      'Bohemian Rhapsody (2011 Remaster)',
+      355,
+      localSongs
+    );
     expect(match1).not.toBeNull();
     expect(match1?.localSongId).toBe(101);
     expect(match1?.confidence).toBe('exact');

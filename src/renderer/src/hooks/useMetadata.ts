@@ -87,10 +87,7 @@ export function useClearMetadataOverrides() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: {
-      entityKind: string;
-      entityId: string | number;
-    }) => {
+    mutationFn: async (payload: { entityKind: string; entityId: string | number }) => {
       return window.api.metadata.clearOverrides({
         entityKind: payload.entityKind,
         entityId: payload.entityId

@@ -182,9 +182,10 @@ const CompactMiniPlayer = (props: Props) => {
     const availableForOptional = containerWidth - fixedWidthRequirement;
     const maxSlots = Math.max(0, Math.floor(availableForOptional / BUTTON_SLOT_WIDTH));
 
-    return COMPACT_OPTIONAL_PRIORITY
-      .filter((control) => pinnedControls.includes(control))
-      .slice(0, maxSlots);
+    return COMPACT_OPTIONAL_PRIORITY.filter((control) => pinnedControls.includes(control)).slice(
+      0,
+      maxSlots
+    );
   }, [containerWidth, pinnedControls]);
 
   // Two-finger tap detection to show context menu on touch devices for Compact Mode
@@ -234,13 +235,13 @@ const CompactMiniPlayer = (props: Props) => {
         {/* ── Middle: Flexible Metadata (Truncates cleanly) ── */}
         <div className="compact-meta flex min-w-0 flex-1 flex-col justify-center overflow-hidden px-2.5 text-left [-webkit-app-region:drag]">
           <div
-            className="truncate max-w-full text-xs font-medium text-font-color-white leading-tight"
+            className="text-font-color-white max-w-full truncate text-xs leading-tight font-medium"
             title={currentSongData.title}
           >
             {currentSongData.title}
           </div>
           <div
-            className="truncate max-w-full text-[10px] text-font-color-white/70 leading-tight mt-0.5"
+            className="text-font-color-white/70 mt-0.5 max-w-full truncate text-[10px] leading-tight"
             title={currentSongData.artists?.map((a) => a.name).join(', ')}
           >
             {currentSongData.songId && Array.isArray(currentSongData.artists)
@@ -326,16 +327,16 @@ const CompactMiniPlayer = (props: Props) => {
 
               {/* Horizontal Volume Flyout Card (Absolute overlay extending leftwards into metadata area) */}
               <div
-                className={`volume-flyout-card absolute right-full top-1/2 -translate-y-1/2 mr-1.5 z-40 flex items-center gap-1.5 rounded-full bg-[rgba(20,20,24,0.96)] px-2.5 py-1 shadow-2xl backdrop-blur-md border border-white/10 before:content-[''] before:absolute before:inset-y-0 before:left-full before:w-3 before:bg-transparent transition-all duration-200 ease-out ${
+                className={`volume-flyout-card absolute top-1/2 right-full z-40 mr-1.5 flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-white/10 bg-[rgba(20,20,24,0.96)] px-2.5 py-1 shadow-2xl backdrop-blur-md transition-all duration-200 ease-out before:absolute before:inset-y-0 before:left-full before:w-3 before:bg-transparent before:content-[''] ${
                   isVolumeHovered
-                    ? 'opacity-100 translate-x-0 pointer-events-auto visible scale-100'
-                    : 'opacity-0 translate-x-2 pointer-events-none invisible scale-95'
+                    ? 'pointer-events-auto visible translate-x-0 scale-100 opacity-100'
+                    : 'pointer-events-none invisible translate-x-2 scale-95 opacity-0'
                 }`}
               >
-                <span className="text-[10px] font-semibold text-font-color-white/80 select-none min-w-[26px] text-right tabular-nums">
+                <span className="text-font-color-white/80 min-w-[26px] text-right text-[10px] font-semibold tabular-nums select-none">
                   {isMuted ? '0%' : `${Math.round(volume)}%`}
                 </span>
-                <div className="w-20 flex items-center">
+                <div className="flex w-20 items-center">
                   <VolumeSlider
                     name="compact-volume-slider"
                     id="compactVolumeSlider"
@@ -350,7 +351,9 @@ const CompactMiniPlayer = (props: Props) => {
             <button
               type="button"
               className={`queue-btn text-font-color-white dark:text-font-color-white m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
-                isQueueVisible ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!' : ''
+                isQueueVisible
+                  ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                  : ''
               }`}
               title={t('player.currentQueue', 'Queue')}
               onClick={(e) => {
@@ -368,7 +371,9 @@ const CompactMiniPlayer = (props: Props) => {
             <button
               type="button"
               className={`search-btn text-font-color-white dark:text-font-color-white m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
-                isSearchVisible ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!' : ''
+                isSearchVisible
+                  ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                  : ''
               }`}
               title={t('player.search', 'Search')}
               onClick={(e) => {
@@ -386,7 +391,9 @@ const CompactMiniPlayer = (props: Props) => {
             <button
               type="button"
               className={`lyrics-btn text-font-color-white dark:text-font-color-white m-0! flex h-fit shrink-0 cursor-pointer items-center justify-center rounded-none! border-0! bg-transparent! p-1! outline-offset-1 focus-visible:outline! dark:bg-transparent! ${
-                isLyricsVisible ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!' : ''
+                isLyricsVisible
+                  ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                  : ''
               }`}
               title={t('player.lyrics', 'Lyrics')}
               onClick={(e) => {
@@ -432,10 +439,10 @@ const CompactMiniPlayer = (props: Props) => {
         </div>
 
         {/* ── Hover Window Controls (Overlay - non-layout participating) ── */}
-        <div className="compact-window-controls absolute top-0 right-0 z-30 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/compact:opacity-100 group-focus-within/compact:opacity-100 [-webkit-app-region:no-drag]">
+        <div className="compact-window-controls absolute top-0 right-0 z-30 flex items-center gap-1 opacity-0 transition-opacity duration-150 [-webkit-app-region:no-drag] group-focus-within/compact:opacity-100 group-hover/compact:opacity-100">
           <button
             type="button"
-            className="m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 text-font-color-white/80 transition-colors hover:bg-black/80 hover:text-white"
+            className="text-font-color-white/80 m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-black/80 hover:text-white"
             onClick={() => window.api.windowControls.minimizeApp()}
             title={t('titleBar.minimize')}
           >
@@ -443,7 +450,7 @@ const CompactMiniPlayer = (props: Props) => {
           </button>
           <button
             type="button"
-            className="m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 text-font-color-white/80 transition-colors hover:bg-[#e81123] hover:text-white"
+            className="text-font-color-white/80 m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
             onClick={() => window.api.windowControls.closeApp()}
             title={t('titleBar.close')}
           >
@@ -453,8 +460,8 @@ const CompactMiniPlayer = (props: Props) => {
       </div>
 
       {/* ── Seek Bar Row (~20px): Elapsed + Interactive Track + Duration ── */}
-      <div className="compact-seek-row relative flex h-4.5 w-full shrink-0 items-center gap-2 z-20 pointer-events-auto [-webkit-app-region:no-drag]">
-        <span className="text-[10px] text-font-color-white/70 tabular-nums select-none shrink-0 min-w-[24px]">
+      <div className="compact-seek-row pointer-events-auto relative z-20 flex h-4.5 w-full shrink-0 items-center gap-2 [-webkit-app-region:no-drag]">
+        <span className="text-font-color-white/70 min-w-[24px] shrink-0 text-[10px] tabular-nums select-none">
           {songPositionFormatted}
         </span>
         <div className="relative flex flex-1 items-center">
@@ -462,10 +469,10 @@ const CompactMiniPlayer = (props: Props) => {
             name="compact-mini-player-seek-slider"
             id="compactMiniPlayerSeekSlider"
             onSeek={handleSeek}
-            className="seek-slider m-0 h-4 w-full cursor-pointer appearance-none bg-transparent p-0 outline-hidden before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:rounded-full before:bg-font-color-highlight hover:before:h-1.5 focus-visible:outline!"
+            className="seek-slider before:bg-font-color-highlight m-0 h-4 w-full cursor-pointer appearance-none bg-transparent p-0 outline-hidden before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:rounded-full hover:before:h-1.5 focus-visible:outline!"
           />
         </div>
-        <span className="text-[10px] text-font-color-white/70 tabular-nums select-none shrink-0 min-w-[24px] text-right">
+        <span className="text-font-color-white/70 min-w-[24px] shrink-0 text-right text-[10px] tabular-nums select-none">
           {songDurationFormatted}
         </span>
       </div>

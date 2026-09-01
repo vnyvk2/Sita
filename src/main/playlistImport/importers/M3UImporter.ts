@@ -1,13 +1,14 @@
 import { basename, extname } from 'path';
-import type { PlaylistImporter } from '../interfaces/PlaylistImporter';
-import type { PlaylistImportContext } from '../interfaces/PlaylistImportContext';
-import type { PlaylistImportResult } from '../models/PlaylistImportResult';
-import type { ImportedPlaylistEntry } from '../models/ImportedPlaylistEntry';
-import type { ImportedTrackReference } from '../models/ImportedTrackReference';
-import type { PlaylistImportWarning } from '../models/PlaylistImportWarning';
+
+import logger from '../../logger';
 import type { PlaylistFormat } from '../constants/PlaylistFormats';
 import { InvalidPlaylistError } from '../errors/PlaylistImportError';
-import logger from '../../logger';
+import type { PlaylistImportContext } from '../interfaces/PlaylistImportContext';
+import type { PlaylistImporter } from '../interfaces/PlaylistImporter';
+import type { ImportedPlaylistEntry } from '../models/ImportedPlaylistEntry';
+import type { ImportedTrackReference } from '../models/ImportedTrackReference';
+import type { PlaylistImportResult } from '../models/PlaylistImportResult';
+import type { PlaylistImportWarning } from '../models/PlaylistImportWarning';
 
 interface PendingExtInf {
   duration?: number;
@@ -118,7 +119,11 @@ export class M3UImporter implements PlaylistImporter {
     };
   }
 
-  private parseExtInf(line: string, lineNum: number, warnings: PlaylistImportWarning[]): PendingExtInf | null {
+  private parseExtInf(
+    line: string,
+    lineNum: number,
+    warnings: PlaylistImportWarning[]
+  ): PendingExtInf | null {
     const metadata: PendingExtInf = {};
     const content = line.substring(8).trim(); // Remove #EXTINF:
     const commaIndex = content.indexOf(',');

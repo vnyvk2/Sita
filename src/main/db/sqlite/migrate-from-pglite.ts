@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import logger from '@main/logger';
 import * as schema from '@db/schema';
+import logger from '@main/logger';
 import { getTableColumns, getTableName, type Table } from 'drizzle-orm';
 
 import type { SqliteEngine } from './engine';
@@ -10,15 +10,15 @@ import type { SqliteEngine } from './engine';
 /**
  * One-time PGlite -> SQLite user-data migration.
  *
- * Reads every table from a legacy `nora.pglite.db/` data dir and re-inserts rows
- * through the drizzle sqlite schema (which applies column coercion: Date -> epoch-ms,
- * boolean -> 0/1, json -> text). Explicit ids are preserved so every junction
- * reference stays intact; metadata_undo_snapshots.seq values are preserved (the
- * baseline trigger skips rows that supply seq).
+ * Reads every table from a legacy `nora.pglite.db/` data dir and re-inserts rows through the
+ * drizzle sqlite schema (which applies column coercion: Date -> epoch-ms, boolean -> 0/1, json ->
+ * text). Explicit ids are preserved so every junction reference stays intact;
+ * metadata_undo_snapshots.seq values are preserved (the baseline trigger skips rows that supply
+ * seq).
  *
- * Value-conversion correctness was verified by probe: drizzle-pg writes Date -> ISO
- * into `timestamp without time zone` and PGlite reads it back as UTC, so
- * Date.getTime() is an exact round-trip (no wall-clock drift).
+ * Value-conversion correctness was verified by probe: drizzle-pg writes Date -> ISO into `timestamp
+ * without time zone` and PGlite reads it back as UTC, so Date.getTime() is an exact round-trip (no
+ * wall-clock drift).
  */
 
 // Insert order respecting FK dependencies.
@@ -69,7 +69,11 @@ const TABLE_ORDER = [
 
 const schemaTablesByName = new Map<string, Table>();
 for (const exported of Object.values(schema)) {
-  if (typeof exported === 'object' && exported !== null && Symbol.for('drizzle:Columns') in exported) {
+  if (
+    typeof exported === 'object' &&
+    exported !== null &&
+    Symbol.for('drizzle:Columns') in exported
+  ) {
     const table = exported as unknown as Table;
     schemaTablesByName.set(getTableName(table), table);
   }
@@ -172,7 +176,10 @@ export const migrateFromPgliteIfNeeded = async (
   try {
     pg = await openLegacyPglite(legacyDir);
   } catch (err) {
-    logger.error('Failed to open legacy PGlite database for migration; continuing with an empty SQLite database.', { err });
+    logger.error(
+      'Failed to open legacy PGlite database for migration; continuing with an empty SQLite database.',
+      { err }
+    );
     return;
   }
 
@@ -201,87 +208,91 @@ export const migrateFromPgliteIfNeeded = async (
     // back every table, leaving a clean empty DB that the residue check on the
     // next boot re-migrates — no silent partial-library state.
     await engine.orm.transaction(async (trx) => {
-    for (const tableName of TABLE_ORDER) {
-      if (!pgTables.has(tableName)) continue;
-      const table = schemaTablesByName.get(tableName);
-      if (!table) {
-        skipped.push(tableName);
-        continue;
-      }
-      const columns = getTableColumns(table);
+      for (const tableName of TABLE_ORDER) {
+        if (!pgTables.has(tableName)) continue;
+        const table = schemaTablesByName.get(tableName);
+        if (!table) {
+          skipped.push(tableName);
+          continue;
+        }
+        const columns = getTableColumns(table);
 
-      // Only select columns that exist in the legacy source table (the SQLite
-      // schema has extra generated columns like *_norm the PG side never had)
-      const pgColumns = new Set(
-        (
-          await pg.query(
-            `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
-            [tableName]
+        // Only select columns that exist in the legacy source table (the SQLite
+        // schema has extra generated columns like *_norm the PG side never had)
+        const pgColumns = new Set(
+          (
+            await pg.query(
+              `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+              [tableName]
+            )
+          ).rows.map((r) => r.column_name as string)
+        );
+        // cast timestamp columns to text: drizzle-pg interprets the stored UTC
+        // wall-clock as UTC, while PGlite's raw parse would apply the local offset
+        const dateCols = Object.values(columns)
+          .filter((c) => c.dataType === 'date')
+          .map((c) => c.name);
+        const selectList = Object.values(columns)
+          .filter((c) => pgColumns.has(c.name))
+          .map((c) =>
+            dateCols.includes(c.name) ? `"${c.name}"::text AS "${c.name}"` : `"${c.name}"`
           )
-        ).rows.map((r) => r.column_name as string)
-      );
-      // cast timestamp columns to text: drizzle-pg interprets the stored UTC
-      // wall-clock as UTC, while PGlite's raw parse would apply the local offset
-      const dateCols = Object.values(columns)
-        .filter((c) => c.dataType === 'date')
-        .map((c) => c.name);
-      const selectList = Object.values(columns)
-        .filter((c) => pgColumns.has(c.name))
-        .map((c) => (dateCols.includes(c.name) ? `"${c.name}"::text AS "${c.name}"` : `"${c.name}"`))
-        .join(', ');
-      if (!selectList) {
-        summary[tableName] = 0;
-        continue;
-      }
-      const rows = (await pg.query(`SELECT ${selectList} FROM "${tableName}"`)).rows;
-      if (rows.length === 0) {
-        summary[tableName] = 0;
-        continue;
-      }
-
-      // map PG rows -> drizzle values. drizzle's insert().values() expects objects
-      // keyed by the drizzle PROPERTY name (isFavorite), not the DB column name, so
-      // build a PG-column-name -> property-name lookup. Generated columns (title_ci,
-      // *_norm) are recomputed by SQLite — they must not be inserted.
-      const pgColToProperty = new Map(
-        Object.entries(columns)
-          .filter(([, c]) => !c.generated)
-          .map(([property, c]) => [c.name, property])
-      );
-      const mapped: Record<string, unknown>[] = [];
-      for (const row of rows) {
-        const out: Record<string, unknown> = {};
-        for (const [pgCol, value] of Object.entries(row)) {
-          const property = pgColToProperty.get(pgCol);
-          if (!property) continue; // PG-only column (e.g. generated title_ci)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const col = (columns as any)[property];
-          out[property] = convertValue(col, value);
+          .join(', ');
+        if (!selectList) {
+          summary[tableName] = 0;
+          continue;
         }
-        mapped.push(out);
-      }
-
-      // batched insert into the caller's (migration-wide) transaction
-      {
-        const BATCH = 200;
-        for (let i = 0; i < mapped.length; i += BATCH) {
-          const chunk = mapped.slice(i, i + BATCH);
-          // drizzle multi-row insert; undefined fields use schema defaults
-          const insert = trx.insert(table as never) as unknown as {
-            values: (v: unknown) => Promise<unknown>;
-          };
-          await insert.values(chunk);
+        const rows = (await pg.query(`SELECT ${selectList} FROM "${tableName}"`)).rows;
+        if (rows.length === 0) {
+          summary[tableName] = 0;
+          continue;
         }
+
+        // map PG rows -> drizzle values. drizzle's insert().values() expects objects
+        // keyed by the drizzle PROPERTY name (isFavorite), not the DB column name, so
+        // build a PG-column-name -> property-name lookup. Generated columns (title_ci,
+        // *_norm) are recomputed by SQLite — they must not be inserted.
+        const pgColToProperty = new Map(
+          Object.entries(columns)
+            .filter(([, c]) => !c.generated)
+            .map(([property, c]) => [c.name, property])
+        );
+        const mapped: Record<string, unknown>[] = [];
+        for (const row of rows) {
+          const out: Record<string, unknown> = {};
+          for (const [pgCol, value] of Object.entries(row)) {
+            const property = pgColToProperty.get(pgCol);
+            if (!property) continue; // PG-only column (e.g. generated title_ci)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const col = (columns as any)[property];
+            out[property] = convertValue(col, value);
+          }
+          mapped.push(out);
+        }
+
+        // batched insert into the caller's (migration-wide) transaction
+        {
+          const BATCH = 200;
+          for (let i = 0; i < mapped.length; i += BATCH) {
+            const chunk = mapped.slice(i, i + BATCH);
+            // drizzle multi-row insert; undefined fields use schema defaults
+            const insert = trx.insert(table as never) as unknown as {
+              values: (v: unknown) => Promise<unknown>;
+            };
+            await insert.values(chunk);
+          }
+        }
+        summary[tableName] = mapped.length;
       }
-      summary[tableName] = mapped.length;
-    }
     }); // end migration-wide transaction
 
     // Re-enable foreign keys and verify integrity
     engine.exec('PRAGMA foreign_keys = ON;');
     const fkViolations = engine.all('PRAGMA foreign_key_check;');
     if (fkViolations.length > 0) {
-      logger.warn(`Foreign key check after migration reported ${fkViolations.length} issue(s)`, { fkViolations });
+      logger.warn(`Foreign key check after migration reported ${fkViolations.length} issue(s)`, {
+        fkViolations
+      });
     }
 
     // verify counts
@@ -294,7 +305,10 @@ export const migrateFromPgliteIfNeeded = async (
 
     const durationMs = Date.now() - t0;
     const total = Object.values(summary).reduce((a, b) => a + b, 0);
-    logger.info(`PGlite -> SQLite migration complete in ${durationMs}ms (${total} rows).`, { summary, skipped });
+    logger.info(`PGlite -> SQLite migration complete in ${durationMs}ms (${total} rows).`, {
+      summary,
+      skipped
+    });
     if (mismatches.length > 0) {
       logger.error(`Migration count mismatches: ${mismatches.join('; ')}`);
       throw new Error(`PGlite->SQLite migration verification failed: ${mismatches.join('; ')}`);

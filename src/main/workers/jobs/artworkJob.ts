@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import { inArray } from 'drizzle-orm';
 
 import { db } from '@main/db/db';
 import { getAlbumById } from '@main/db/queries/albums';
@@ -13,6 +12,7 @@ import { DEFAULT_ARTWORK_SAVE_LOCATION } from '@main/filesystem';
 import logger from '@main/logger';
 import type { ArtworkPayload } from '@main/other/artworks';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { inArray } from 'drizzle-orm';
 
 import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';

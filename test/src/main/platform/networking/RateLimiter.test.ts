@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { RateLimiter } from '@main/platform/networking/RateLimiter';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 describe('RateLimiter Optimization & Invariant Rigor (Phase 6)', () => {
   beforeEach(() => {

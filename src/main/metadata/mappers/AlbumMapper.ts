@@ -1,6 +1,4 @@
 import type { AlbumPersistenceDTO } from '../models/dtos';
-import type { IMetadataMapper } from './IMetadataMapper';
-
 import { MetadataConfidence } from '../models/MetadataConfidence';
 import { MetadataEntity } from '../models/MetadataEntity';
 import { MetadataFields } from '../models/MetadataFieldId';
@@ -8,6 +6,7 @@ import { MetadataIdentity } from '../models/MetadataIdentity';
 import { MetadataKinds } from '../models/MetadataKind';
 import { MetadataSource, MetadataSourceTypes } from '../models/MetadataSource';
 import { MetadataValue } from '../models/MetadataValue';
+import type { IMetadataMapper } from './IMetadataMapper';
 
 export class AlbumMapper implements IMetadataMapper<AlbumPersistenceDTO> {
   public readonly kind = MetadataKinds.Album;

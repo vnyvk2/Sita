@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MetadataOperationManager } from '../MetadataOperationManager';
-import { MetadataResolutionManager } from '../../resolution/MetadataResolutionManager';
-import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGateway';
+
 import type { MetadataContext } from '../../domain/MetadataContext';
+import type { MetadataLookupGateway } from '../../resolution/MetadataLookupGateway';
+import { MetadataResolutionManager } from '../../resolution/MetadataResolutionManager';
+import { MetadataOperationManager } from '../MetadataOperationManager';
 
 describe('Metadata Engine & Operation Resolution Blueprint Test Suite', () => {
   const dummyContext: MetadataContext = {

@@ -53,7 +53,10 @@ export interface EffectiveCoverSlot {
   draggable: boolean;
 }
 
-export type LayoutPreset<S extends string> = Record<S, Record<ClipPathArtworkCount, readonly string[]>>;
+export type LayoutPreset<S extends string> = Record<
+  S,
+  Record<ClipPathArtworkCount, readonly string[]>
+>;
 
 export interface CoverRendererProps {
   artworks: string[];

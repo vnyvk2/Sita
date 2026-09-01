@@ -3,12 +3,10 @@ import { fileURLToPath } from 'url';
 /**
  * Deterministically normalizes a file path or URI into a canonical path string.
  *
- * Operations performed:
- * 1. Decodes file:// scheme if present.
- * 2. Decodes URI percent-encoded characters (e.g. %20 -> space).
- * 3. Normalizes backslashes to forward slashes.
- * 4. Lowercases Windows drive letters (e.g. D:/ -> d:/) for case-insensitive drive letter comparisons.
- * 5. Strips trailing slashes.
+ * Operations performed: 1. Decodes file:// scheme if present. 2. Decodes URI percent-encoded
+ * characters (e.g. %20 -> space). 3. Normalizes backslashes to forward slashes. 4. Lowercases
+ * Windows drive letters (e.g. D:/ -> d:/) for case-insensitive drive letter comparisons. 5. Strips
+ * trailing slashes.
  */
 export function normalizeCanonicalPath(pathStr: string): string {
   if (!pathStr) return '';

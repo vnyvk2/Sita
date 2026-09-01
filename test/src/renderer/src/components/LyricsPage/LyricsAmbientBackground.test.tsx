@@ -39,24 +39,22 @@ describe('LyricsAmbientBackground', () => {
 
   it('should render the ambient background container with blurred artwork layer', () => {
     const { container } = render(
-      <LyricsAmbientBackground
-        artworkPath="nora://localfiles/artwork.jpg"
-      />
+      <LyricsAmbientBackground artworkPath="nora://localfiles/artwork.jpg" />
     );
 
     const backgroundContainer = container.querySelector('.lyrics-ambient-background');
     expect(backgroundContainer).not.toBeNull();
 
-    const blurredLayer = backgroundContainer?.querySelector('.animate-ambient-drift') as HTMLElement;
+    const blurredLayer = backgroundContainer?.querySelector(
+      '.animate-ambient-drift'
+    ) as HTMLElement;
     expect(blurredLayer).not.toBeNull();
     expect(blurredLayer.style.filter).toContain('blur(40px)');
   });
 
   it('should perform double-buffered crossfade on artwork change and clear previous artwork after transition', () => {
     const { rerender, container } = render(
-      <LyricsAmbientBackground
-        artworkPath="nora://localfiles/trackA.jpg"
-      />
+      <LyricsAmbientBackground artworkPath="nora://localfiles/trackA.jpg" />
     );
 
     // Initial render: 1 artwork image
@@ -95,9 +93,7 @@ describe('LyricsAmbientBackground', () => {
     }));
 
     const { container } = render(
-      <LyricsAmbientBackground
-        artworkPath="nora://localfiles/artwork.jpg"
-      />
+      <LyricsAmbientBackground artworkPath="nora://localfiles/artwork.jpg" />
     );
 
     const backgroundContainer = container.querySelector('.lyrics-ambient-background');
@@ -118,9 +114,7 @@ describe('LyricsAmbientBackground', () => {
     }));
 
     const { container } = render(
-      <LyricsAmbientBackground
-        artworkPath="nora://localfiles/artwork.jpg"
-      />
+      <LyricsAmbientBackground artworkPath="nora://localfiles/artwork.jpg" />
     );
 
     const blurredLayer = container.querySelector('.animate-ambient-drift');

@@ -1,12 +1,16 @@
-import type { MetadataLookupGateway, DefaultMetadataLookupGateway } from './MetadataLookupGateway';
-import type { MetadataResolution, ProviderCandidate } from '../domain/MetadataResolution';
+import type { CanonicalReleaseContext } from '@common/metadata/release';
+
 import type { MetadataContext } from '../domain/MetadataContext';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
-import { MetadataMergeEngine, type FieldContribution, type MergedCandidateResult } from './MetadataMergeEngine';
+import type { MetadataResolution, ProviderCandidate } from '../domain/MetadataResolution';
 import { MergeSession } from './MergeSession';
+import type { MetadataLookupGateway, DefaultMetadataLookupGateway } from './MetadataLookupGateway';
+import {
+  MetadataMergeEngine,
+  type FieldContribution,
+  type MergedCandidateResult
+} from './MetadataMergeEngine';
 import { ProviderRegistry } from './ProviderRegistry';
-
-import type { CanonicalReleaseContext } from '@common/metadata/release';
 
 export interface ResolutionRequest {
   operationId: string;
@@ -31,14 +35,19 @@ export class MetadataResolutionManager {
   private readonly mergeEngine: MetadataMergeEngine;
   private readonly providerRegistry: ProviderRegistry;
 
-  constructor(options?: MetadataLookupGateway | {
-    lookupGateway?: MetadataLookupGateway;
-    mergeEngine?: MetadataMergeEngine;
-    providerRegistry?: ProviderRegistry;
-  }) {
+  constructor(
+    options?:
+      | MetadataLookupGateway
+      | {
+          lookupGateway?: MetadataLookupGateway;
+          mergeEngine?: MetadataMergeEngine;
+          providerRegistry?: ProviderRegistry;
+        }
+  ) {
     if (options && 'searchCandidates' in options) {
       this.lookupGateway = options;
-      this.providerRegistry = (options as DefaultMetadataLookupGateway).registry ?? new ProviderRegistry();
+      this.providerRegistry =
+        (options as DefaultMetadataLookupGateway).registry ?? new ProviderRegistry();
       this.mergeEngine = new MetadataMergeEngine(this.providerRegistry);
     } else {
       this.lookupGateway = options?.lookupGateway;
@@ -49,8 +58,9 @@ export class MetadataResolutionManager {
   }
 
   /**
-   * Performs multi-provider resolution (lookup, candidate normalization, contribution harvesting, and field merge evaluation)
-   * driven by clean ResolutionRequest DTO. Constructing internal MetadataContext transparently.
+   * Performs multi-provider resolution (lookup, candidate normalization, contribution harvesting,
+   * and field merge evaluation) driven by clean ResolutionRequest DTO. Constructing internal
+   * MetadataContext transparently.
    */
   public async resolve(
     request: ResolutionRequest | string,
@@ -58,7 +68,9 @@ export class MetadataResolutionManager {
   ): Promise<MetadataResolution> {
     if (!this.lookupGateway) {
       const opId = typeof request === 'string' ? request : request.operationId;
-      throw new ResolutionUnavailableError(`No MetadataLookupGateway configured for operation ${opId}`);
+      throw new ResolutionUnavailableError(
+        `No MetadataLookupGateway configured for operation ${opId}`
+      );
     }
 
     // Support legacy signature (operationId: string, context: MetadataContext)
@@ -80,7 +92,11 @@ export class MetadataResolutionManager {
     const context: MetadataContext = {
       resources: {
         primaryType: 'album',
-        targetResources: request.targetResourceIds.map((id) => ({ id, type: 'album', attributes: {} }))
+        targetResources: request.targetResourceIds.map((id) => ({
+          id,
+          type: 'album',
+          attributes: {}
+        }))
       },
       execution: { mode: 'Interactive' },
       request: {
@@ -111,11 +127,17 @@ export class MetadataResolutionManager {
       candidates = await this.lookupGateway.searchCandidates(context);
     }
 
-    const mergedResult: MergedCandidateResult = fieldContributions.length > 0
-      ? this.mergeEngine.mergeFieldContributions(fieldContributions, request.policy)
-      : this.mergeEngine.mergeCandidates(candidates, request.policy);
+    const mergedResult: MergedCandidateResult =
+      fieldContributions.length > 0
+        ? this.mergeEngine.mergeFieldContributions(fieldContributions, request.policy)
+        : this.mergeEngine.mergeCandidates(candidates, request.policy);
 
-    const session = new MergeSession(this.mergeEngine, fieldContributions, request.policy, mergedResult);
+    const session = new MergeSession(
+      this.mergeEngine,
+      fieldContributions,
+      request.policy,
+      mergedResult
+    );
 
     return {
       operationId: request.operationId,

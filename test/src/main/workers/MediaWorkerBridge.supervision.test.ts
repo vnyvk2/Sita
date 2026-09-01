@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JobScheduler } from '@main/workers/jobScheduler';
 import { MediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
@@ -10,6 +9,7 @@ import {
   type MainToWorkerCommand
 } from '@main/workers/process/workerProtocol';
 import type { Job } from '@main/workers/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 class MockUtilityProcess extends EventEmitter {
   public pid: number;
@@ -117,7 +117,9 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
 
       // Verify command was sent
       const postCalls = mockProcess.postMessage.mock.calls;
-      const cmdCall = postCalls.find((c) => (c[0] as MainToWorkerCommand).type === 'CMD_GENERATE_ASSET');
+      const cmdCall = postCalls.find(
+        (c) => (c[0] as MainToWorkerCommand).type === 'CMD_GENERATE_ASSET'
+      );
       expect(cmdCall).toBeDefined();
 
       // Worker crashes while asset task is in-flight
@@ -350,7 +352,11 @@ describe('MediaWorkerBridge Supervision & Crash Recovery (Gate C4-A)', () => {
 
       // Respond with EVT_ASSET_COMPLETE for each
       for (const call of postCalls) {
-        const cmd = call[0] as { taskId: string; jobType: 'artwork' | 'waveform'; input: { destinationPath: string } };
+        const cmd = call[0] as {
+          taskId: string;
+          jobType: 'artwork' | 'waveform';
+          input: { destinationPath: string };
+        };
         mockProcess.simulateWorkerMessage({
           protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
           type: 'EVT_ASSET_COMPLETE',

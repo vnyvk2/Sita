@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { musicFolders, songs } from '@main/db/schema';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock DB with in-memory SQLite (baseline schema applied by the engine)
 vi.mock('@main/db/db', async () => {
@@ -14,14 +14,17 @@ vi.mock('@main/db/db', async () => {
 vi.mock('@main/parseSong/parseSong', () => ({
   tryToParseSong: vi.fn(async (songPath: string, folderId?: number) => {
     const fileName = path.basename(songPath, path.extname(songPath));
-    const [inserted] = await db.insert(songs).values({
-      title: fileName,
-      duration: 180,
-      path: songPath,
-      folderId,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date()
-    }).returning();
+    const [inserted] = await db
+      .insert(songs)
+      .values({
+        title: fileName,
+        duration: 180,
+        path: songPath,
+        folderId,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      })
+      .returning();
 
     return {
       songData: inserted,
@@ -46,8 +49,8 @@ vi.mock('@main/main', () => ({
   sendMessageToRenderer: vi.fn()
 }));
 
-
 import { db } from '@main/db/db';
+
 import { diffFilesystemSnapshot, type DbSongSnapshot } from '../diffEngine';
 import { fastDiskWalk } from '../fastDiskWalk';
 import { LibraryReconciler } from '../LibraryReconciler';
@@ -89,10 +92,13 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     await fs.writeFile(song2Path, 'dummy audio data');
 
     // Create scan root in DB
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: path.basename(tempDir) || 'Root'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: path.basename(tempDir) || 'Root'
+      })
+      .returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
@@ -129,10 +135,13 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     const songPath = path.join(rockDir, 'SteadyTrack.mp3');
     await fs.writeFile(songPath, 'audio data');
 
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: path.basename(tempDir) || 'Root'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: path.basename(tempDir) || 'Root'
+      })
+      .returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
@@ -143,13 +152,15 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
 
     // Secondary scan
     const walk2 = await fastDiskWalk([scanRoot]);
-    const dbSongs = await db.select({
-      id: songs.id,
-      path: songs.path,
-      fileModifiedAt: songs.fileModifiedAt,
-      folderId: songs.folderId,
-      isBlacklisted: songs.isBlacklisted
-    }).from(songs);
+    const dbSongs = await db
+      .select({
+        id: songs.id,
+        path: songs.path,
+        fileModifiedAt: songs.fileModifiedAt,
+        folderId: songs.folderId,
+        isBlacklisted: songs.isBlacklisted
+      })
+      .from(songs);
 
     const diff2 = diffFilesystemSnapshot(walk2.snapshots, dbSongs, [scanRoot]);
 
@@ -161,10 +172,13 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
 
   it('Pipeline Step 3: Incremental scan discovers newly added nested artist/album directory structure, creates hierarchical folders, and ingests songs with 0 errors', async () => {
     // 1. Initial DB state has only the scan root
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: path.basename(tempDir) || 'Root'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: path.basename(tempDir) || 'Root'
+      })
+      .returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
@@ -221,44 +235,59 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     await fs.mkdir(root2Dir, { recursive: true });
 
     // 2. Insert scan roots into DB
-    const [root1Folder] = await db.insert(musicFolders).values({
-      path: root1Dir,
-      name: 'Root1'
-    }).returning();
+    const [root1Folder] = await db
+      .insert(musicFolders)
+      .values({
+        path: root1Dir,
+        name: 'Root1'
+      })
+      .returning();
 
-    const [root2Folder] = await db.insert(musicFolders).values({
-      path: root2Dir,
-      name: 'Root2'
-    }).returning();
+    const [root2Folder] = await db
+      .insert(musicFolders)
+      .values({
+        path: root2Dir,
+        name: 'Root2'
+      })
+      .returning();
 
     // 3. Setup existing Artist (Adele) and Album (21) in DB under Root 1
     const adelePath = path.join(root1Dir, 'Adele');
     const album21Path = path.join(adelePath, '21');
     await fs.mkdir(album21Path, { recursive: true });
 
-    const [existingAdele] = await db.insert(musicFolders).values({
-      path: adelePath,
-      name: 'Adele',
-      parentId: root1Folder.id
-    }).returning();
+    const [existingAdele] = await db
+      .insert(musicFolders)
+      .values({
+        path: adelePath,
+        name: 'Adele',
+        parentId: root1Folder.id
+      })
+      .returning();
 
-    const [existing21] = await db.insert(musicFolders).values({
-      path: album21Path,
-      name: '21',
-      parentId: existingAdele.id
-    }).returning();
+    const [existing21] = await db
+      .insert(musicFolders)
+      .values({
+        path: album21Path,
+        name: '21',
+        parentId: existingAdele.id
+      })
+      .returning();
 
     // Existing song in DB
     const existingSongPath = path.join(album21Path, 'ExistingSong.mp3');
     await fs.writeFile(existingSongPath, 'existing audio');
-    const [existingSong] = await db.insert(songs).values({
-      title: 'ExistingSong',
-      duration: 180,
-      path: existingSongPath,
-      folderId: existing21.id,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date()
-    }).returning();
+    const [existingSong] = await db
+      .insert(songs)
+      .values({
+        title: 'ExistingSong',
+        duration: 180,
+        path: existingSongPath,
+        folderId: existing21.id,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      })
+      .returning();
 
     // 4. Create additions on disk:
     // Root 1 Case A: Track added to existing album (Adele/21)
@@ -358,10 +387,13 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
 
   it('Pipeline Step 5: Deleting tracks from disk removes them from the DB, leaves remaining tracks intact, and updates subsequent scan identity', async () => {
     // 1. Setup scan root in DB
-    const [rootFolder] = await db.insert(musicFolders).values({
-      path: tempDir,
-      name: 'Root'
-    }).returning();
+    const [rootFolder] = await db
+      .insert(musicFolders)
+      .values({
+        path: tempDir,
+        name: 'Root'
+      })
+      .returning();
 
     const scanRoot = { id: rootFolder.id, path: tempDir };
 
@@ -441,6 +473,3 @@ describe('Scanner Pipeline End-to-End Integration (B-5b)', () => {
     expect(thirdDiff.unchangedCount).toBe(1);
   });
 });
-
-
-

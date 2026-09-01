@@ -1,10 +1,7 @@
 import type { ClipPathArtworkCount, LayoutPreset, TriangleVariant } from '../types/playlistCover';
 
 const DIAGONAL_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 100% 0, 0 100%)',
-    'polygon(100% 0, 100% 100%, 0 100%)'
-  ],
+  2: ['polygon(0 0, 100% 0, 0 100%)', 'polygon(100% 0, 100% 100%, 0 100%)'],
   3: [
     'polygon(0 0, 100% 0, 50% 50%)',
     'polygon(0 0, 50% 50%, 0 100%)',
@@ -26,10 +23,7 @@ const DIAGONAL_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 } as const;
 
 const PINWHEEL_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 100% 0, 50% 50%)',
-    'polygon(100% 100%, 0 100%, 50% 50%)'
-  ],
+  2: ['polygon(0 0, 100% 0, 50% 50%)', 'polygon(100% 100%, 0 100%, 50% 50%)'],
   3: [
     'polygon(0 0, 100% 0, 50% 50%)',
     'polygon(100% 0, 100% 100%, 50% 50%)',
@@ -51,10 +45,7 @@ const PINWHEEL_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
 } as const;
 
 const CENTER_PRESETS: Record<ClipPathArtworkCount, readonly string[]> = {
-  2: [
-    'polygon(0 0, 100% 0, 50% 100%)',
-    'polygon(0 100%, 100% 100%, 50% 0)'
-  ],
+  2: ['polygon(0 0, 100% 0, 50% 100%)', 'polygon(0 100%, 100% 100%, 50% 0)'],
   3: [
     'polygon(0 0, 100% 0, 50% 60%)',
     'polygon(0 0, 50% 60%, 0 100%)',

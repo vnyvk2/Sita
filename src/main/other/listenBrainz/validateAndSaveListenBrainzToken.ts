@@ -1,5 +1,6 @@
 import { clearScrobbleQueue } from '@main/db/queries/scrobble_queue';
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
+
 import type { ListenBrainzValidateTokenResponse } from '../../../types/listen_brainz_api';
 import logger from '../../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../../main';
@@ -52,13 +53,10 @@ export const validateAndSaveListenBrainzToken = async (
         currentSettings.listenBrainzUserToken &&
         currentSettings.listenBrainzUsername !== userName
       ) {
-        logger.info(
-          'Switching ListenBrainz accounts: invalidating session and clearing queue',
-          {
-            previousUser: currentSettings.listenBrainzUsername,
-            newUser: userName
-          }
-        );
+        logger.info('Switching ListenBrainz accounts: invalidating session and clearing queue', {
+          previousUser: currentSettings.listenBrainzUsername,
+          newUser: userName
+        });
         invalidateListenBrainzSession();
         await clearScrobbleQueue('listenbrainz');
       }
@@ -79,7 +77,10 @@ export const validateAndSaveListenBrainzToken = async (
     }
 
     const errMessage = json.message || 'Invalid ListenBrainz User Token.';
-    logger.warn('ListenBrainz token validation failed', { status: res.status, message: errMessage });
+    logger.warn('ListenBrainz token validation failed', {
+      status: res.status,
+      message: errMessage
+    });
     throw new Error(errMessage);
   } catch (error) {
     logger.error('Error occurred when authenticating ListenBrainz user data.', {

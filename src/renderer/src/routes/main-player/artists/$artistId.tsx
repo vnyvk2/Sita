@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useStore } from '@tanstack/react-store';
+import ArtistProfileTab from '@renderer/components/ArtistInfoPage/ArtistProfileTab';
+import LibraryTab from '@renderer/components/ArtistInfoPage/LibraryTab';
+import MoreAlbumsTab from '@renderer/components/ArtistInfoPage/MoreAlbumsTab';
 import MainContainer from '@renderer/components/MainContainer';
 import { artistQuery } from '@renderer/queries/artists';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
-import LibraryTab from '@renderer/components/ArtistInfoPage/LibraryTab';
-import MoreAlbumsTab from '@renderer/components/ArtistInfoPage/MoreAlbumsTab';
-import ArtistProfileTab from '@renderer/components/ArtistInfoPage/ArtistProfileTab';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/artists/$artistId')({
   validateSearch: songSearchSchema,
@@ -24,10 +24,9 @@ export const Route = createFileRoute('/main-player/artists/$artistId')({
 export type ArtistTabType = 'library' | 'more_albums' | 'profile';
 
 /**
- * Renders the 3-tab artist page:
- * 1. Library (default, authoritative local songs, albums, and playback)
- * 2. More Albums (online discography browser with 30s previews)
- * 3. Artist Profile (lightweight discovery hub with bio, top tracks, tags, similar artists)
+ * Renders the 3-tab artist page: 1. Library (default, authoritative local songs, albums, and
+ * playback) 2. More Albums (online discography browser with 30s previews) 3. Artist Profile
+ * (lightweight discovery hub with bio, top tracks, tags, similar artists)
  */
 function ArtistInfoPage() {
   const { artistId } = Route.useParams({
@@ -62,7 +61,7 @@ function ArtistInfoPage() {
           onClick={() => setActiveTab('library')}
           className={`flex items-center space-x-2 rounded-full px-5 py-2 text-sm font-semibold transition-all ${
             activeTab === 'library'
-              ? 'bg-font-color-highlight text-white shadow-md dark:bg-dark-font-color-highlight'
+              ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-md'
               : 'bg-background-color-2/50 text-font-color-black hover:bg-background-color-2 dark:bg-dark-background-color-2/50 dark:text-font-color-white dark:hover:bg-dark-background-color-2'
           }`}
         >
@@ -75,7 +74,7 @@ function ArtistInfoPage() {
           onClick={() => setActiveTab('more_albums')}
           className={`flex items-center space-x-2 rounded-full px-5 py-2 text-sm font-semibold transition-all ${
             activeTab === 'more_albums'
-              ? 'bg-font-color-highlight text-white shadow-md dark:bg-dark-font-color-highlight'
+              ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-md'
               : 'bg-background-color-2/50 text-font-color-black hover:bg-background-color-2 dark:bg-dark-background-color-2/50 dark:text-font-color-white dark:hover:bg-dark-background-color-2'
           }`}
         >
@@ -88,7 +87,7 @@ function ArtistInfoPage() {
           onClick={() => setActiveTab('profile')}
           className={`flex items-center space-x-2 rounded-full px-5 py-2 text-sm font-semibold transition-all ${
             activeTab === 'profile'
-              ? 'bg-font-color-highlight text-white shadow-md dark:bg-dark-font-color-highlight'
+              ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-md'
               : 'bg-background-color-2/50 text-font-color-black hover:bg-background-color-2 dark:bg-dark-background-color-2/50 dark:text-font-color-white dark:hover:bg-dark-background-color-2'
           }`}
         >
@@ -102,7 +101,9 @@ function ArtistInfoPage() {
         <LibraryTab
           artistData={artistData}
           sortingOrder={sortingOrder as SongSortTypes}
-          onSortingOrderChange={(order) => navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) })}
+          onSortingOrderChange={(order) =>
+            navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) })
+          }
         />
       )}
 

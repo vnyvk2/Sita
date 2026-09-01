@@ -1,12 +1,17 @@
 import { EventEmitter } from 'events';
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { GarbageCollectionJob } from '../garbageCollectionJob';
-import { CURRENT_WAVEFORM_GENERATOR_VERSION, WAVEFORM_RESOLUTION, WaveformJob } from '../waveformJob';
+import {
+  CURRENT_WAVEFORM_GENERATOR_VERSION,
+  WAVEFORM_RESOLUTION,
+  WaveformJob
+} from '../waveformJob';
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -61,7 +66,10 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
       success: true,
       outputFilePath: 'C:/Cache/waveforms/123_v1.bin',
-      metadata: { resolution: WAVEFORM_RESOLUTION, generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION }
+      metadata: {
+        resolution: WAVEFORM_RESOLUTION,
+        generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION
+      }
     });
 
     const insertMock = vi.fn().mockReturnValue({ values: vi.fn() });
@@ -147,7 +155,10 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
       return {
         success: true,
         outputFilePath: 'C:/Cache/waveforms/123_v1.bin',
-        metadata: { resolution: WAVEFORM_RESOLUTION, generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION }
+        metadata: {
+          resolution: WAVEFORM_RESOLUTION,
+          generatorVersion: CURRENT_WAVEFORM_GENERATOR_VERSION
+        }
       };
     });
 
@@ -204,9 +215,7 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     });
 
     vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 1, path: '/cache/waveforms/100_v1.bin' }
-      ])
+      from: vi.fn().mockResolvedValue([{ id: 1, path: '/cache/waveforms/100_v1.bin' }])
     } as any);
 
     const deleteWhereMock = vi.fn();
@@ -239,9 +248,7 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     vi.mocked(fs.unlink).mockResolvedValue(undefined as any);
 
     vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 2, path: '/cache/waveforms/200_v1.bin' }
-      ])
+      from: vi.fn().mockResolvedValue([{ id: 2, path: '/cache/waveforms/200_v1.bin' }])
     } as any);
 
     const deleteWhereMock = vi.fn();
@@ -264,9 +271,7 @@ describe('WaveformJob & Publication Protocol (Phase C4-B)', () => {
     vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT')); // .bin does not exist
 
     vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 300, path: '/cache/waveforms/300_v1.bin' }
-      ])
+      from: vi.fn().mockResolvedValue([{ id: 300, path: '/cache/waveforms/300_v1.bin' }])
     } as any);
 
     const deleteWhereMock = vi.fn();

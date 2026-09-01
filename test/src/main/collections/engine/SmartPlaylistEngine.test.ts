@@ -32,21 +32,21 @@ describe('SmartPlaylistEngine', () => {
       .values([
         {
           title: 'Test Song 1',
-          duration: 120.000,
+          duration: 120.0,
           path: '/path/1',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
         },
         {
           title: 'Another Song',
-          duration: 180.000,
+          duration: 180.0,
           path: '/path/2',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()
         },
         {
           title: 'Test Song 3',
-          duration: 200.000,
+          duration: 200.0,
           path: '/path/3',
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()

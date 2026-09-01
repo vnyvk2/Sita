@@ -88,8 +88,8 @@ export interface SelectedMetadataFields {
 }
 
 /**
- * Pure helper to merge incoming online metadata into existing song tags non-destructively.
- * Only overwrites fields for which incoming metadata provides a non-empty, selected value.
+ * Pure helper to merge incoming online metadata into existing song tags non-destructively. Only
+ * overwrites fields for which incoming metadata provides a non-empty, selected value.
  */
 export const mergeSongMetadata = (
   prevData: SongTags,
@@ -115,9 +115,7 @@ export const mergeSongMetadata = (
   const isLyricsSynchronised = isLyricsSynced(lyrics || '');
 
   const newAlbum =
-    isAlbumSelected && album?.trim()
-      ? manageAlbumData(albumData, album, artworkPath)
-      : undefined;
+    isAlbumSelected && album?.trim() ? manageAlbumData(albumData, album, artworkPath) : undefined;
 
   const newArtists =
     isArtistsSelected && Array.isArray(artists) && artists.length > 0

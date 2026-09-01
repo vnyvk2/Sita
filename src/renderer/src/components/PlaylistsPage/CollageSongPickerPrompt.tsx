@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 import Button from '../Button';
 import Checkbox from '../Checkbox';
 import Img from '../Img';
-import DefaultImgCover from '../../assets/images/webp/song_cover_default.webp';
 
 interface Props {
   playlistSongs: SongData[];
@@ -45,15 +46,15 @@ const CollageSongPickerPrompt = (props: Props) => {
   return (
     <div className="flex h-[450px] w-[450px] flex-col p-4">
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-xl font-semibold text-font-color-black dark:text-font-color-white">
+        <span className="text-font-color-black dark:text-font-color-white text-xl font-semibold">
           {t('playlistsPage.chooseCollageSongs', 'Choose Cover Songs')}
         </span>
-        <span className="text-sm text-font-color-highlight dark:text-dark-font-color-highlight font-medium">
+        <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
           {selectedIds.length} / {maxSize} {t('common.selected', 'Selected')}
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+      <div className="flex-1 space-y-2 overflow-y-auto pr-1">
         {playlistSongs.map((song) => {
           const isChecked = selectedIds.includes(song.songId);
           const isMaxReached = !isChecked && maxSize > 1 && selectedIds.length >= maxSize;
@@ -62,12 +63,12 @@ const CollageSongPickerPrompt = (props: Props) => {
             <div
               key={song.songId}
               onClick={() => !isMaxReached && toggleSongSelection(song.songId)}
-              className={`flex items-center justify-between rounded-lg p-2 transition-colors cursor-pointer ${
+              className={`flex cursor-pointer items-center justify-between rounded-lg p-2 transition-colors ${
                 isChecked
                   ? 'bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10'
                   : isMaxReached
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:bg-font-color-black/5 dark:hover:bg-font-color-white/5'
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'hover:bg-font-color-black/5 dark:hover:bg-font-color-white/5'
               }`}
             >
               <div className="flex items-center gap-3 overflow-hidden">
@@ -77,10 +78,10 @@ const CollageSongPickerPrompt = (props: Props) => {
                   className="h-10 w-10 rounded-md object-cover"
                 />
                 <div className="flex flex-col overflow-hidden">
-                  <span className="truncate text-sm font-medium text-font-color-black dark:text-font-color-white">
+                  <span className="text-font-color-black dark:text-font-color-white truncate text-sm font-medium">
                     {song.title}
                   </span>
-                  <span className="truncate text-xs opacity-70 text-font-color-black dark:text-font-color-white">
+                  <span className="text-font-color-black dark:text-font-color-white truncate text-xs opacity-70">
                     {song.artists?.map((a) => a.name).join(', ') || 'Unknown Artist'}
                   </span>
                 </div>
@@ -96,15 +97,9 @@ const CollageSongPickerPrompt = (props: Props) => {
         })}
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-3 pt-3 border-t border-font-color-black/10 dark:border-font-color-white/10">
-        <Button
-          label={t('common.cancel')}
-          clickHandler={onCancel}
-        />
-        <Button
-          label={t('common.save', 'Save')}
-          clickHandler={handleSave}
-        />
+      <div className="border-font-color-black/10 dark:border-font-color-white/10 mt-4 flex items-center justify-end gap-3 border-t pt-3">
+        <Button label={t('common.cancel')} clickHandler={onCancel} />
+        <Button label={t('common.save', 'Save')} clickHandler={handleSave} />
       </div>
     </div>
   );

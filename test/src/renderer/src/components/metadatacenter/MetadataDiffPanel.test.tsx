@@ -3,8 +3,8 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import React, { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-import { MetadataDiffPanel } from '../../../../../../src/renderer/src/components/metadatacenter/MetadataDiffPanel';
 import type { MetadataFieldDiff } from '../../../../../../src/common/metadata/types';
+import { MetadataDiffPanel } from '../../../../../../src/renderer/src/components/metadatacenter/MetadataDiffPanel';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -1,16 +1,15 @@
-// @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-
+import { LOCAL_STORAGE_DEFAULT_TEMPLATE } from '@renderer/other/appReducer';
 // Import the store first: utils/localStorage participates in a circular import with it, and the
 // store must be the entry point of that cycle for its default export to be defined.
 import '@renderer/store/store';
-import { LOCAL_STORAGE_DEFAULT_TEMPLATE } from '@renderer/other/appReducer';
 import { normalizeShortcutLabelsToKeys } from '@renderer/utils/localStorage';
+// @vitest-environment jsdom
+import { describe, expect, it } from 'vitest';
 
 /**
  * Shortcut labels must be persisted as stable i18n keys ('appShortcutsPrompt.*'), never runtime
- * translations. Older versions stored translated strings which permanently desynchronized
- * shortcut matching after a language switch. normalizeShortcutLabelsToKeys repairs that.
+ * translations. Older versions stored translated strings which permanently desynchronized shortcut
+ * matching after a language switch. normalizeShortcutLabelsToKeys repairs that.
  */
 describe('normalizeShortcutLabelsToKeys', () => {
   const cloneTemplateShortcuts = () =>

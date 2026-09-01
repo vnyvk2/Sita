@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { db } from '@main/db/db';
-import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
-import { WaveformJob } from '@main/workers/jobs/waveformJob';
-import { ReplayGainJob } from '@main/workers/jobs/replayGainJob';
 
+import { db } from '@main/db/db';
+import { ReplayGainJob } from '@main/workers/jobs/replayGainJob';
+import { WaveformJob } from '@main/workers/jobs/waveformJob';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/db/db', () => ({
   db: {
@@ -56,7 +56,10 @@ describe('WaveformJob and ReplayGainJob (Unsupported Codec Graceful Handling)', 
   });
 
   it('ReplayGainJob gracefully skips without error or DB write when codec is unsupported', async () => {
-    vi.mocked(db.query.songs.findFirst).mockResolvedValue({ id: 101, path: 'C:/Music/test.mp3' } as any);
+    vi.mocked(db.query.songs.findFirst).mockResolvedValue({
+      id: 101,
+      path: 'C:/Music/test.mp3'
+    } as any);
     vi.mocked(db.query.replayGain.findFirst).mockResolvedValue(null as any);
     vi.mocked(mediaWorkerBridge.generateAsset).mockResolvedValue({
       success: false,

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
-import { useStore } from '@tanstack/react-store';
 import { useQuery } from '@tanstack/react-query';
+import { useStore } from '@tanstack/react-store';
+import { useMemo } from 'react';
+
 import { settingsQuery } from '../queries/settings';
 import { store } from '../store/store';
 import { resolveEffectiveAppearance } from '../utils/resolveEffectiveAppearance';

@@ -1,5 +1,5 @@
-import { queryClient } from '@renderer/queryClient';
 import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 

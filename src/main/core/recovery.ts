@@ -1,14 +1,14 @@
-import logger from '../logger';
+import { reconcileExistingMultiGenres } from '../db/queries/genres';
 import {
   getAlbumsWithoutArtwork,
   getSongsWithoutReplayGain,
   getSongsWithoutWaveform
 } from '../db/queries/recovery';
-import { reconcileExistingMultiGenres } from '../db/queries/genres';
-import { libraryScheduler } from '../workers/jobScheduler';
+import logger from '../logger';
 import { ArtworkJob } from '../workers/jobs/artworkJob';
-import { WaveformJob } from '../workers/jobs/waveformJob';
 import { ReplayGainJob } from '../workers/jobs/replayGainJob';
+import { WaveformJob } from '../workers/jobs/waveformJob';
+import { libraryScheduler } from '../workers/jobScheduler';
 
 export const recoverLibraryAssets = async (): Promise<{ remainingWork: boolean }> => {
   try {
@@ -36,7 +36,13 @@ export const recoverLibraryAssets = async (): Promise<{ remainingWork: boolean }
       );
       for (const song of songsWithoutWaveform) {
         libraryScheduler.enqueue(
-          new WaveformJob(song.songId, song.songPath, song.songTitle, libraryScheduler, 'background')
+          new WaveformJob(
+            song.songId,
+            song.songPath,
+            song.songTitle,
+            libraryScheduler,
+            'background'
+          )
         );
       }
     }

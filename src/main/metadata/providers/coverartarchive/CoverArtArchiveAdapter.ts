@@ -1,17 +1,16 @@
+import type { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
+import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import type { ProviderIdentity } from '../../contracts/ProviderIdentity';
-import type { MetadataIdentity } from '../../models/MetadataIdentity';
-import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/RecordingMetadata';
 import type { MetadataContribution } from '../../domain/MetadataContribution';
+import { MetadataConfidence } from '../../models/MetadataConfidence';
+import type { MetadataIdentity } from '../../models/MetadataIdentity';
+import { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
+import { ProviderResult } from '../../models/ProviderResult';
+import type { AlbumMetadata, ResolvedAlbumRelease } from '../../models/RecordingMetadata';
 import type { FieldContribution } from '../../resolution/MetadataMergeEngine';
 import type { ProviderRegistry } from '../../resolution/ProviderRegistry';
-import type { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
 import type { CaaApiClient } from './CaaApiClient';
-
-import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
-import { ProviderResult } from '../../models/ProviderResult';
-import { MetadataConfidence } from '../../models/MetadataConfidence';
-import { MetadataProviderInfo } from '../../models/MetadataProviderInfo';
 
 export interface CaaAdapterOptions {
   registry?: ProviderRegistry;
@@ -112,7 +111,7 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
         fieldId: 'back',
         providerId: this.identity.id,
         value: data.back,
-        confidenceScore: this.getConfidence('back', 0.90)
+        confidenceScore: this.getConfidence('back', 0.9)
       });
     }
 
@@ -121,7 +120,7 @@ export class CoverArtArchiveAdapter implements IMetadataProviderAdapter {
         fieldId: 'thumbnail',
         providerId: this.identity.id,
         value: data.thumbnail,
-        confidenceScore: this.getConfidence('thumbnail', 0.90)
+        confidenceScore: this.getConfidence('thumbnail', 0.9)
       });
     }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { DiscoveryCandidateSorter } from '../DiscoveryCandidateSorter';
 import { MatchQualityBand, type ScoredSearchCandidate } from '../MetadataSearchRankingEngine';
 
@@ -104,7 +105,10 @@ describe('DiscoveryCandidateSorter', () => {
     });
 
     // Both are in Definitive band. Discogs should rank first because of priority
-    const sorted = DiscoveryCandidateSorter.sortCandidates([definitiveMB, definitiveDiscogs], priority);
+    const sorted = DiscoveryCandidateSorter.sortCandidates(
+      [definitiveMB, definitiveDiscogs],
+      priority
+    );
 
     expect(sorted[0].album.releaseId).toBe('dg-def-1');
     expect(sorted[0].explainability.isPreferredSource).toBe(true);
@@ -129,7 +133,9 @@ describe('DiscoveryCandidateSorter', () => {
       totalScore: 175
     });
 
-    const sorted = DiscoveryCandidateSorter.sortCandidates([candidateB, candidateA], ['musicbrainz'] as any);
+    const sorted = DiscoveryCandidateSorter.sortCandidates([candidateB, candidateA], [
+      'musicbrainz'
+    ] as any);
     expect(sorted[0].album.releaseId).toBe('mb-1');
     expect(sorted[1].album.releaseId).toBe('mb-2');
   });

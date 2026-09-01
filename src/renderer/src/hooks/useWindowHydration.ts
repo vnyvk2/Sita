@@ -11,9 +11,8 @@ interface WindowRange {
 /**
  * Hydrates SongData for the visible region of an ID-first list.
  *
- * Rows are fetched in aligned windows of SONG_WINDOW_SIZE; `getItem` returns
- * undefined for indices that are not hydrated yet so callers can render a
- * layout-stable skeleton placeholder.
+ * Rows are fetched in aligned windows of SONG_WINDOW_SIZE; `getItem` returns undefined for indices
+ * that are not hydrated yet so callers can render a layout-stable skeleton placeholder.
  */
 export function useWindowHydration(
   ids: readonly number[],
@@ -22,7 +21,10 @@ export function useWindowHydration(
     enabled?: boolean;
     extraRowsBefore?: number;
     extraRowsAfter?: number;
-    /** Cache-key namespace; use a distinct prefix when list order is not library order (e.g. queues). */
+    /**
+     * Cache-key namespace; use a distinct prefix when list order is not library order (e.g.
+     * queues).
+     */
     keyPrefix?: string;
     /** Logical query/list identity to prevent cache collision across distinct filters/sorts */
     listIdentity?: string;
@@ -111,7 +113,7 @@ export function useWindowHydration(
         responseById.set(item.songId, item);
       }
 
-      for (let k = 0; k < (win.endIndex - win.startIndex); k += 1) {
+      for (let k = 0; k < win.endIndex - win.startIndex; k += 1) {
         const requestedId = ids[win.startIndex + k];
         if (requestedId !== undefined) {
           const item = responseById.get(requestedId);

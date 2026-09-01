@@ -39,7 +39,10 @@ describe('UserMetadataRepository', () => {
           insert: () => ({
             values: (val: any) => {
               const existingIdx = mockStore.findIndex(
-                (item) => item.entityKind === val.entityKind && item.entityId === val.entityId && item.fieldId === val.fieldId
+                (item) =>
+                  item.entityKind === val.entityKind &&
+                  item.entityId === val.entityId &&
+                  item.fieldId === val.fieldId
               );
               if (existingIdx >= 0) {
                 mockStore[existingIdx] = { ...mockStore[existingIdx], ...val };

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
 import { M3UImporter } from '@main/playlistImport/importers/M3UImporter';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('M3UImporter', () => {
   let importer: M3UImporter;
@@ -56,7 +56,10 @@ folder/song3.ogg
 Track2.flac
 `;
 
-    const result = await importer.parse({ filePath: '/music/Rock.m3u8', content: '\uFEFF' + content });
+    const result = await importer.parse({
+      filePath: '/music/Rock.m3u8',
+      content: '\uFEFF' + content
+    });
 
     expect(result.format).toBe('m3u8');
     expect(result.playlist.entries).toHaveLength(2);

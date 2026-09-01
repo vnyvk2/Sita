@@ -1,6 +1,6 @@
 import type { SearchMatchReference } from '@main/search/models/SearchMatchReference';
-import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
 
+import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
 import { SearchEntityResolver } from './SearchEntityResolver';
 import { SearchMetadataHydrator } from './SearchMetadataHydrator';
 

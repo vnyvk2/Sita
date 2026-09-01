@@ -1,12 +1,22 @@
-import { SpecialPlaylists } from '@common/playlists.enum';
 import type { PlaylistDto } from '@common/collections/dtos';
+import { SpecialPlaylists } from '@common/playlists.enum';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { usePlaylistCoverPreview } from '../../hooks/usePlaylistCoverPreview';
-import type { AutoCoverStrategyId, CoverLayoutVariant, CoverSlotIndex, PlaylistCoverLayout, PlaylistCoverSettings } from '../../types/playlistCover';
+import type {
+  AutoCoverStrategyId,
+  CoverLayoutVariant,
+  CoverSlotIndex,
+  PlaylistCoverLayout,
+  PlaylistCoverSettings
+} from '../../types/playlistCover';
 import type { MaterializedCoverDraft } from '../../types/playlistCoverDraft';
-import { buildMaterializedCoverDraft, getDraftSongs } from '../../utils/buildMaterializedCoverDraft';
+import {
+  buildMaterializedCoverDraft,
+  getDraftSongs
+} from '../../utils/buildMaterializedCoverDraft';
 import { isDraftEqual } from '../../utils/isDraftEqual';
 import storage from '../../utils/localStorage';
 import { serializeDraftToSettings } from '../../utils/serializeDraftToSettings';
@@ -95,7 +105,12 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
     setHoveredSlotIndex(null);
     setFocusedSlotIndex(null);
     setDraft((prev) => {
-      const nextSize = (newLayout !== 'diamond' && prev.size > 4 ? 4 : prev.size) as 1 | 2 | 3 | 4 | 5;
+      const nextSize = (newLayout !== 'diamond' && prev.size > 4 ? 4 : prev.size) as
+        | 1
+        | 2
+        | 3
+        | 4
+        | 5;
       const nextSlots = [...prev.slots];
       if (nextSlots.length > nextSize) {
         nextSlots.splice(nextSize);
@@ -270,23 +285,23 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
   }, [draft, playlistSongs, songMap]);
 
   return (
-    <div className="flex w-full h-full min-h-0 flex-col overflow-hidden text-font-color-black dark:text-font-color-white">
+    <div className="text-font-color-black dark:text-font-color-white flex h-full min-h-0 w-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="mb-5 flex items-center justify-between border-b border-neutral-800 pb-3 shrink-0">
+      <div className="mb-5 flex shrink-0 items-center justify-between border-b border-neutral-800 pb-3">
         <span className="text-xl font-bold tracking-tight">
           {t('playlistsPage.coverSettingsTitle', 'Customize Playlist Cover')}
         </span>
         {isDirty && (
-          <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400 border border-amber-500/20">
+          <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400">
             Unsaved Changes
           </span>
         )}
       </div>
 
       {/* Two-Column Desktop Workstation Shell */}
-      <div className="flex flex-row gap-6 min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-row gap-6 overflow-hidden">
         {/* Left Column (~360px Sticky Preview & Reorder Slot) */}
-        <div className="w-[360px] shrink-0 flex flex-col gap-4 sticky top-0 self-start">
+        <div className="sticky top-0 flex w-[360px] shrink-0 flex-col gap-4 self-start">
           {/* Production-Identical Live Preview */}
           <CoverLivePreview
             resolvedCover={resolvedPreviewCover}
@@ -315,7 +330,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         </div>
 
         {/* Right Column (Scrollable Controls & Song Picker) */}
-        <div className="flex-1 min-w-0 overflow-y-auto pr-1 flex flex-col gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pr-1">
           {/* Cover Mode Selector */}
           <CoverTypeSelector
             type={draft.type}
@@ -328,14 +343,18 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
             <>
               {/* Cover Images Count Selector */}
               <div>
-                <label className="mb-2 block text-sm font-semibold text-neutral-300">Cover Images</label>
-                <div className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl bg-neutral-900/70 p-1.5 border border-neutral-800`}>
+                <label className="mb-2 block text-sm font-semibold text-neutral-300">
+                  Cover Images
+                </label>
+                <div
+                  className={`grid ${isDiamond ? 'grid-cols-5' : 'grid-cols-4'} gap-2 rounded-xl border border-neutral-800 bg-neutral-900/70 p-1.5`}
+                >
                   {availableCounts.map((s) => (
                     <button
                       key={s}
                       type="button"
                       onClick={() => handleSizeChange(s as 1 | 2 | 3 | 4 | 5)}
-                      className={`flex items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                      className={`flex cursor-pointer items-center justify-center rounded-lg py-2 text-sm font-semibold transition-all duration-200 ${
                         currentSize === s
                           ? 'bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700'
                           : 'text-neutral-400 hover:text-neutral-200'
@@ -348,10 +367,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
               </div>
 
               {/* Layout Geometry Preset Selector */}
-              <LayoutSelector
-                selectedLayout={draft.layout}
-                onChange={handleLayoutChange}
-              />
+              <LayoutSelector selectedLayout={draft.layout} onChange={handleLayoutChange} />
 
               {/* Sub-style Variant Selector */}
               <VariantSelector
@@ -363,7 +379,9 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
               {/* Numbered Song Picker */}
               <NumberedSongPicker
                 playlistSongs={playlistSongs}
-                selectedSongIds={draft.slots.map((s) => s.songId).filter((id): id is number => id !== null)}
+                selectedSongIds={draft.slots
+                  .map((s) => s.songId)
+                  .filter((id): id is number => id !== null)}
                 activeSlotIndex={activeSlotIndex}
                 maxSize={currentSize}
                 onToggleSong={handleToggleSong}
@@ -374,7 +392,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
       </div>
 
       {/* Footer Controls */}
-      <div className="mt-5 flex items-center justify-end gap-3 border-t border-neutral-800 pt-4 shrink-0">
+      <div className="mt-5 flex shrink-0 items-center justify-end gap-3 border-t border-neutral-800 pt-4">
         <Button
           label={t('common.reset', 'Reset')}
           className="mr-0"
@@ -388,7 +406,7 @@ const PlaylistCoverSettingsPrompt = ({ playlist, playlistSongs }: Props) => {
         />
         <Button
           label={t('common.save', 'Save Changes')}
-          className="bg-amber-500! hover:bg-amber-400! text-neutral-950! font-bold! border-none! mr-0"
+          className="mr-0 border-none! bg-amber-500! font-bold! text-neutral-950! hover:bg-amber-400!"
           clickHandler={handleSave}
           isDisabled={!isDirty}
         />

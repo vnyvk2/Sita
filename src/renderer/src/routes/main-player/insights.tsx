@@ -1,13 +1,3 @@
-import React, { useState, useCallback } from 'react';
-import { createFileRoute } from '@tanstack/react-router';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import MainContainer from '@renderer/components/MainContainer';
-import TitleContainer from '@renderer/components/TitleContainer';
-import { queryClient } from '@renderer/queryClient';
-import {
-  analyticsQuery,
-  type HistoryPeriod
-} from '@renderer/queries/analytics';
 import {
   HeroListeningTimeCard,
   TopTracksLeaderboardCard,
@@ -17,6 +7,13 @@ import {
   CircadianRhythmCard,
   InsightsSkeleton
 } from '@renderer/components/Insights';
+import MainContainer from '@renderer/components/MainContainer';
+import TitleContainer from '@renderer/components/TitleContainer';
+import { analyticsQuery, type HistoryPeriod } from '@renderer/queries/analytics';
+import { queryClient } from '@renderer/queryClient';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import React, { useState, useCallback } from 'react';
 
 export const Route = createFileRoute('/main-player/insights')({
   component: InsightsPage,
@@ -58,17 +55,15 @@ export function InsightsPage() {
   const isRefetching = isListeningRefetching || isStatsRefetching;
 
   return (
-    <MainContainer
-      className="insights-container relative flex h-full flex-col overflow-y-auto px-8 pb-12 pt-6"
-    >
+    <MainContainer className="insights-container relative flex h-full flex-col overflow-y-auto px-8 pt-6 pb-12">
       {/* Header Bar */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <TitleContainer
             title="Insights & Audio Stats"
-            className="text-2xl font-bold tracking-tight text-font-color-black dark:text-font-color-white"
+            className="text-font-color-black dark:text-font-color-white text-2xl font-bold tracking-tight"
           />
-          <p className="mt-1 text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+          <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs">
             Listening trends, format breakdown, and circadian rhythm analysis
           </p>
         </div>
@@ -76,7 +71,7 @@ export function InsightsPage() {
         {/* Controls: Period Tabs + Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Period Selector Tabs */}
-          <div className="flex items-center rounded-xl border border-background-color-2/70 bg-background-color-1/90 p-1 shadow-sm backdrop-blur-md dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90">
+          <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 flex items-center rounded-xl border p-1 shadow-sm backdrop-blur-md">
             {PERIOD_TABS.map((tab) => {
               const isSelected = selectedPeriod === tab.id;
               return (
@@ -86,7 +81,7 @@ export function InsightsPage() {
                   onClick={() => setSelectedPeriod(tab.id)}
                   className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${
                     isSelected
-                      ? 'bg-font-color-highlight text-white shadow-sm dark:bg-dark-font-color-highlight dark:text-dark-background-color-1'
+                      ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 text-white shadow-sm'
                       : 'text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white'
                   }`}
                 >
@@ -102,7 +97,7 @@ export function InsightsPage() {
             title="Refresh Insights"
             onClick={handleRefresh}
             disabled={isRefetching}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-background-color-2/70 bg-background-color-1/90 text-font-color-dimmed shadow-sm backdrop-blur-md transition-all hover:text-font-color-black dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 dark:text-dark-font-color-dimmed dark:hover:text-font-color-white disabled:opacity-50"
+            className="border-background-color-2/70 bg-background-color-1/90 text-font-color-dimmed hover:text-font-color-black dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 dark:text-dark-font-color-dimmed dark:hover:text-font-color-white flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm backdrop-blur-md transition-all disabled:opacity-50"
           >
             <span className={`material-icons-round text-lg ${isRefetching ? 'animate-spin' : ''}`}>
               refresh
@@ -137,9 +132,7 @@ export function InsightsPage() {
 
         {/* Row 3: Circadian Rhythm (Span Full / 3) */}
         <div className="col-span-1 md:col-span-2 xl:col-span-3">
-          <CircadianRhythmCard
-            hourlyDistribution={listeningData.hourlyDistribution}
-          />
+          <CircadianRhythmCard hourlyDistribution={listeningData.hourlyDistribution} />
         </div>
       </div>
     </MainContainer>

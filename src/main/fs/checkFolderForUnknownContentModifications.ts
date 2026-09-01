@@ -4,9 +4,9 @@ import path from 'path';
 import { getFolderFromPath } from '@main/db/queries/folders';
 import { getSongsRelativeToFolder } from '@main/db/queries/songs';
 
+import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
-import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
 import { saveAbortController } from './controlAbortControllers';
 

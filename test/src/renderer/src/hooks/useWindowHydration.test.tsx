@@ -1,10 +1,10 @@
-// @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getSongListIdentity, songCacheKeys } from '@renderer/queries/songs';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
   let queryClient: QueryClient;
@@ -174,7 +174,7 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
     (window as any).api.audioLibraryControls.getSongInfo = vi.fn().mockResolvedValue([
       { id: 1, songId: 1, title: 'Song 1' },
       { id: 3, songId: 3, title: 'Song 3' },
-      { id: 4, songId: 4, title: 'Song 4' },
+      { id: 4, songId: 4, title: 'Song 4' }
     ]);
 
     const identity = getSongListIdentity({ sortType: 'aToZ' } as any);

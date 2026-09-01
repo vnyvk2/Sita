@@ -7,8 +7,12 @@ export function sleep(ms) {
 }
 
 export function killAllNora() {
-  try { execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' }); } catch (e) { }
-  try { execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' }); } catch (e) { }
+  try {
+    execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
+  } catch (e) {}
+  try {
+    execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
+  } catch (e) {}
 }
 
 export class CDPClient {
@@ -33,7 +37,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -47,14 +51,18 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -81,7 +89,7 @@ async function main() {
           break;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
 
@@ -99,8 +107,12 @@ async function main() {
   console.log(`DOM Nodes: ${perfMap.Nodes}`);
   console.log(`Documents: ${perfMap.Documents}`);
   console.log(`JS Event Listeners (CDP reported): ${perfMap.JSEventListeners}`);
-  console.log(`JS Heap Used: ${Math.round((perfMap.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB`);
-  console.log(`JS Heap Total: ${Math.round((perfMap.JSHeapTotalSize || 0) / 1024 / 1024 * 100) / 100} MB`);
+  console.log(
+    `JS Heap Used: ${Math.round(((perfMap.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB`
+  );
+  console.log(
+    `JS Heap Total: ${Math.round(((perfMap.JSHeapTotalSize || 0) / 1024 / 1024) * 100) / 100} MB`
+  );
 
   // Start playback and open lyrics
   console.log('\n--- PLAYBACK & LYRICS METRICS ---');
@@ -119,7 +131,9 @@ async function main() {
   console.log(`During Playback + Lyrics:`);
   console.log(`DOM Nodes: ${perfPlayMap.Nodes}`);
   console.log(`JS Event Listeners: ${perfPlayMap.JSEventListeners}`);
-  console.log(`JS Heap Used: ${Math.round((perfPlayMap.JSHeapUsedSize || 0) / 1024 / 1024 * 100) / 100} MB`);
+  console.log(
+    `JS Heap Used: ${Math.round(((perfPlayMap.JSHeapUsedSize || 0) / 1024 / 1024) * 100) / 100} MB`
+  );
 
   // Inspect what the listeners are attached to
   const listenerDetails = await cdp.evaluate(`(() => {

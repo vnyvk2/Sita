@@ -12,10 +12,9 @@ export interface BatchMembership {
   }[];
 }
 
-
 export interface MembershipSource {
   getCollectionsForSong(songId: number): Promise<readonly CollectionId[]>;
-  
+
   getCollectionsForSongs?(
     songIds: readonly number[]
   ): Promise<Map<number, readonly CollectionId[]>>;

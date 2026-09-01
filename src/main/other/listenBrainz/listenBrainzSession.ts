@@ -13,9 +13,12 @@ export function invalidateListenBrainzSession(): void {
     activeAbortController.abort();
     activeAbortController = null;
   }
-  logger.info('ListenBrainz session invalidated: bumped generation and aborted active HTTP requests', {
-    newGeneration: currentListenBrainzGeneration
-  });
+  logger.info(
+    'ListenBrainz session invalidated: bumped generation and aborted active HTTP requests',
+    {
+      newGeneration: currentListenBrainzGeneration
+    }
+  );
 }
 
 export function setActiveListenBrainzAbortController(controller: AbortController | null): void {

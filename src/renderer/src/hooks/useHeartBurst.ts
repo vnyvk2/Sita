@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export const HEART_BURST_DURATION_MS = 850;
 
 /**
- * Hook to manage the lifecycle of the heart burst animation.
- * Handles state, animation restart with requestAnimationFrame, and safe timer/rAF cleanup.
+ * Hook to manage the lifecycle of the heart burst animation. Handles state, animation restart with
+ * requestAnimationFrame, and safe timer/rAF cleanup.
  */
 export function useHeartBurst(durationMs = HEART_BURST_DURATION_MS) {
   const [isBursting, setIsBursting] = useState(false);

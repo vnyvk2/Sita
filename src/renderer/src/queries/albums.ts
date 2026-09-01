@@ -1,6 +1,7 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { keepPreviousData } from '@tanstack/react-query';
 import type { AlbumFilterTypes, AlbumSortTypes } from '@renderer/utils/albumFilters';
+import { keepPreviousData } from '@tanstack/react-query';
+
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const ALBUM_SUMMARY_PAGE_SIZE = 120;
@@ -43,9 +44,10 @@ export const fetchAlbumSummariesPage = async (
       limit: SEARCH_LIMITS.PAGE,
       updateSearchHistory: false
     });
-    const albums = params.filterType === 'favorites'
-      ? res.albums.filter((album) => album.isAFavorite)
-      : res.albums;
+    const albums =
+      params.filterType === 'favorites'
+        ? res.albums.filter((album) => album.isAFavorite)
+        : res.albums;
     return {
       data: albums.map(albumToSummary),
       total: albums.length,
@@ -140,7 +142,13 @@ export const albumQuery = createQueryKeys('albums', {
         `limit=${end - start}`
       ],
       queryFn: () =>
-        window.api.albumsData.getAlbumData(albumIds, sortType as AlbumSortTypes, undefined, start, end)
+        window.api.albumsData.getAlbumData(
+          albumIds,
+          sortType as AlbumSortTypes,
+          undefined,
+          start,
+          end
+        )
     };
   },
   single: (data: { albumId: number }) => ({

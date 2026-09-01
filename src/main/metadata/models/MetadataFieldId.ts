@@ -15,8 +15,7 @@ export const MetadataFields = {
   TrackNumber: 'trackNumber'
 } as const;
 
-export type BuiltInFieldId =
-  (typeof MetadataFields)[keyof typeof MetadataFields];
+export type BuiltInFieldId = (typeof MetadataFields)[keyof typeof MetadataFields];
 
 export type FieldId = BuiltInFieldId | string;
 

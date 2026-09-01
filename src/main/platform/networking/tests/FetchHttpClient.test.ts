@@ -32,11 +32,11 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
     const controller = new AbortController();
     controller.abort();
 
-    await expect(client.request({ url: 'https://api.example.com/x', signal: controller.signal })).rejects.toMatchObject(
-      {
-        name: 'AbortError'
-      }
-    );
+    await expect(
+      client.request({ url: 'https://api.example.com/x', signal: controller.signal })
+    ).rejects.toMatchObject({
+      name: 'AbortError'
+    });
   });
 
   it('preserves AbortError when the caller aborts mid-flight (never reports a timeout)', async () => {
@@ -54,9 +54,9 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
   it('reports a timeout error only when the internal timer fires', async () => {
     vi.stubGlobal('fetch', vi.fn(makeAbortRejectingFetch()) as unknown as typeof fetch);
 
-    await expect(client.request({ url: 'https://api.example.com/slow', timeoutMs: 25 })).rejects.toThrow(
-      /Request timed out after 25ms/
-    );
+    await expect(
+      client.request({ url: 'https://api.example.com/slow', timeoutMs: 25 })
+    ).rejects.toThrow(/Request timed out after 25ms/);
   });
 
   it('returns successful responses untouched', async () => {
@@ -90,7 +90,9 @@ describe('Platform Networking — FetchHttpClient cancellation identity', () => 
     } as unknown as Response;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse) as unknown as typeof fetch);
 
-    const err = await client.request({ url: 'https://api.example.com/limited' }).catch((e: Error) => e);
+    const err = await client
+      .request({ url: 'https://api.example.com/limited' })
+      .catch((e: Error) => e);
 
     expect(err).toBeInstanceOf(HttpError);
     const httpError = err as HttpError;

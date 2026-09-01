@@ -1,15 +1,16 @@
 import type { CollectionId, CollectionSource, CollectionType } from './types';
 
 /**
- * Parses a canonical collection URI into a structured CollectionId.
- * Expected format: source://type/key
- * Example: local://playlist/52
+ * Parses a canonical collection URI into a structured CollectionId. Expected format:
+ * source://type/key Example: local://playlist/52
  */
 export function parseCollectionUri(uri: string): CollectionId {
   const match = uri.match(/^([a-z]+):\/\/([a-zA-Z0-9_-]+)\/(.+)$/);
-  
+
   if (!match) {
-    throw new Error(`Invalid collection URI format: '${uri}'. Expected format: 'source://type/key'`);
+    throw new Error(
+      `Invalid collection URI format: '${uri}'. Expected format: 'source://type/key'`
+    );
   }
 
   const [, source, type, key] = match;
@@ -25,10 +26,7 @@ export function parseCollectionUri(uri: string): CollectionId {
   };
 }
 
-/**
- * Builds a canonical collection URI from its components.
- * Format: source://type/key
- */
+/** Builds a canonical collection URI from its components. Format: source://type/key */
 export function buildCollectionUri(
   source: CollectionSource,
   type: CollectionType,
@@ -38,8 +36,8 @@ export function buildCollectionUri(
 }
 
 /**
- * Creates a complete CollectionId object from its components,
- * automatically generating the canonical URI.
+ * Creates a complete CollectionId object from its components, automatically generating the
+ * canonical URI.
  */
 export function createCollectionId(
   source: CollectionSource,

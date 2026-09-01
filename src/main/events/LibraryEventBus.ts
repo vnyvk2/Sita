@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import type { SmartPlaylistField } from '../collections/query/ast';
 
 export type LibraryEvent =

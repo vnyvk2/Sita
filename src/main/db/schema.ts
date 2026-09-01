@@ -11,18 +11,18 @@ import {
   uniqueIndex
 } from 'drizzle-orm/sqlite-core';
 
+import {
+  DEFAULT_METADATA_PREFERENCES,
+  type MetadataProviderPreferences
+} from '../../common/metadata/preferences';
 import type { CollectionContextData } from '../collections/context/types';
 import type { OperationInverseInput, OperationType } from '../collections/operations/types';
-import type { MetadataHistorySnapshot } from '../metadata/history/MetadataHistoryService';
 import type {
   SmartPlaylistRuleAST,
   OrderDefinition,
   SmartPlaylistField
 } from '../collections/query/ast';
-import {
-  DEFAULT_METADATA_PREFERENCES,
-  type MetadataProviderPreferences
-} from '../../common/metadata/preferences';
+import type { MetadataHistorySnapshot } from '../metadata/history/MetadataHistoryService';
 import { NORM_STRIP_CHARS } from './sqlite/norm';
 
 // ============================================================================
@@ -55,7 +55,10 @@ function normExpr(columnGetter: () => AnySQLiteColumn): SQL {
 }
 
 const ts = (name: string) => integer(name, { mode: 'timestamp_ms' });
-const tsDefaultNow = (name: string) => ts(name).notNull().$defaultFn(() => new Date());
+const tsDefaultNow = (name: string) =>
+  ts(name)
+    .notNull()
+    .$defaultFn(() => new Date());
 const jsonText = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 
 // Enum mirrors (string unions; CHECK constraints live in the baseline DDL)
@@ -276,10 +279,7 @@ export const genres = sqliteTable(
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },
-  (t) => [
-    index('idx_genres_name').on(t.name),
-    uniqueIndex('idx_genres_name_ci').on(t.nameCI)
-  ]
+  (t) => [index('idx_genres_name').on(t.name), uniqueIndex('idx_genres_name_ci').on(t.nameCI)]
 );
 
 export const playlists = sqliteTable(
@@ -450,10 +450,10 @@ export const metadataOverrides = sqliteTable(
 );
 
 /**
- * Durable undo journal for AutoTag / metadata operations.
- * `seq` is assigned by a baseline-DDL trigger (AFTER INSERT, MAX(seq)+1) — SQLite
- * supports only one rowid-alias per table and the PK here is the varchar `id`.
- * The PGlite->SQLite migration inserts explicit `seq` values, which the trigger skips.
+ * Durable undo journal for AutoTag / metadata operations. `seq` is assigned by a baseline-DDL
+ * trigger (AFTER INSERT, MAX(seq)+1) — SQLite supports only one rowid-alias per table and the PK
+ * here is the varchar `id`. The PGlite->SQLite migration inserts explicit `seq` values, which the
+ * trigger skips.
  */
 export const metadataUndoSnapshots = sqliteTable(
   'metadata_undo_snapshots',
@@ -467,16 +467,18 @@ export const metadataUndoSnapshots = sqliteTable(
       updatedSongs: MetadataHistorySnapshot['updatedSongs'];
       songIds?: number[];
     }>('payload').notNull(),
-    createdAt: ts('created_at').notNull().$defaultFn(() => new Date())
+    createdAt: ts('created_at')
+      .notNull()
+      .$defaultFn(() => new Date())
   },
   (t) => [index('metadata_undo_snapshots_seq_idx').on(t.seq)]
 );
 
 /**
- * Durable deferred metadata file writes (2c P4): one self-contained, merged
- * TagData payload per song path, replayed on flush triggers and deleted on
- * success. Part of the DB-first correctness model - a crash between the DB
- * commit and the file write is recovered from here instead of drifting.
+ * Durable deferred metadata file writes (2c P4): one self-contained, merged TagData payload per
+ * song path, replayed on flush triggers and deleted on success. Part of the DB-first correctness
+ * model - a crash between the DB commit and the file write is recovered from here instead of
+ * drifting.
  */
 export const metadataPendingWrites = sqliteTable(
   'metadata_pending_writes',
@@ -485,8 +487,12 @@ export const metadataPendingWrites = sqliteTable(
     songPath: text('song_path').notNull().unique(),
     tags: jsonText<Record<string, unknown>>('tags').notNull(),
     isKnownSource: integer('is_known_source', { mode: 'boolean' }).notNull().default(true),
-    createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
-    updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
+    createdAt: ts('created_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: ts('updated_at')
+      .notNull()
+      .$defaultFn(() => new Date())
   },
   (t) => [index('metadata_pending_writes_song_path_idx').on(t.songPath)]
 );
@@ -513,7 +519,9 @@ export const userSettings = sqliteTable(
     isMusixmatchLyricsEnabled: integer('is_musixmatch_lyrics_enabled', { mode: 'boolean' })
       .notNull()
       .default(true),
-    hideWindowOnClose: integer('hide_window_on_close', { mode: 'boolean' }).notNull().default(false),
+    hideWindowOnClose: integer('hide_window_on_close', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     traySingleClickTogglesWindow: integer('tray_single_click_toggles_window', { mode: 'boolean' })
       .notNull()
       .default(false),
@@ -565,11 +573,9 @@ export const userSettings = sqliteTable(
     zoomFactor: real('zoom_factor').notNull().default(0.8),
     windowState: text('window_state').notNull().default('normal'),
     recentSearches: jsonText<string[]>('recent_searches').notNull().default([]),
-    miniPlayerPinnedControls: jsonText<string[]>('mini_player_pinned_controls').notNull().default([
-      'love',
-      'lyrics',
-      'volume'
-    ]),
+    miniPlayerPinnedControls: jsonText<string[]>('mini_player_pinned_controls')
+      .notNull()
+      .default(['love', 'lyrics', 'volume']),
     miniPlayerMode: text('mini_player_mode')
       .$type<'standard' | 'compact'>()
       .notNull()
@@ -925,15 +931,12 @@ export const ignoredFeaturingArtistsRelations = relations(ignoredFeaturingArtist
   })
 }));
 
-export const ignoredDuplicateMetadataRelations = relations(
-  ignoredDuplicateMetadata,
-  ({ one }) => ({
-    song: one(songs, {
-      fields: [ignoredDuplicateMetadata.songId],
-      references: [songs.id]
-    })
+export const ignoredDuplicateMetadataRelations = relations(ignoredDuplicateMetadata, ({ one }) => ({
+  song: one(songs, {
+    fields: [ignoredDuplicateMetadata.songId],
+    references: [songs.id]
   })
-);
+}));
 
 export const albumsRelations = relations(albums, ({ many }) => ({
   songs: many(albumsSongs),
@@ -1337,8 +1340,12 @@ export const spotifyIntegrations = sqliteTable('spotify_integrations', {
   encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
   tokenExpiresAt: ts('token_expires_at').notNull(),
   scopes: jsonText<string[]>('scopes').notNull().default([]),
-  createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
+  createdAt: ts('created_at')
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: ts('updated_at')
+    .notNull()
+    .$defaultFn(() => new Date())
 });
 
 export const spotifyPlaylistLinks = sqliteTable(
@@ -1369,8 +1376,12 @@ export const spotifyPlaylistLinks = sqliteTable(
     failedBatchIndex: integer('failed_batch_index'),
     lastError: text('last_error'),
     lastSyncedAt: ts('last_synced_at'),
-    createdAt: ts('created_at').notNull().$defaultFn(() => new Date()),
-    updatedAt: ts('updated_at').notNull().$defaultFn(() => new Date())
+    createdAt: ts('created_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: ts('updated_at')
+      .notNull()
+      .$defaultFn(() => new Date())
   },
   (t) => [
     index('idx_spotify_playlist_links_user_id').on(t.spotifyUserId),

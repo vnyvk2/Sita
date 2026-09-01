@@ -1,9 +1,12 @@
-import type { PlaylistPersistence, PlaylistEntryWriteModel } from '../interfaces/PlaylistPersistence';
+import logger from '../../logger';
+import type {
+  PlaylistPersistence,
+  PlaylistEntryWriteModel
+} from '../interfaces/PlaylistPersistence';
 import type { TransactionRunner } from '../interfaces/TransactionRunner';
-import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
 import type { PlaylistImportExecutionStatistics } from '../models/PlaylistImportExecutionStatistics';
-import logger from '../../logger';
+import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 
 export class PlaylistImportExecutor {
   constructor(
@@ -11,7 +14,10 @@ export class PlaylistImportExecutor {
     private transactionRunner: TransactionRunner
   ) {}
 
-  async execute(plan: PlaylistImportPlan, options?: { targetPlaylistId?: number; mode?: 'create' | 'merge' | 'replace' }): Promise<PlaylistImportExecutionResult> {
+  async execute(
+    plan: PlaylistImportPlan,
+    options?: { targetPlaylistId?: number; mode?: 'create' | 'merge' | 'replace' }
+  ): Promise<PlaylistImportExecutionResult> {
     const startTime = Date.now();
     logger.info(`PlaylistImportExecutor: starting execution for '${plan.playlistName}'...`);
 
@@ -49,19 +55,27 @@ export class PlaylistImportExecutor {
     // Execute playlist creation & song insertion via TransactionRunner
     await this.transactionRunner.runInTransaction(async () => {
       if (!playlistId) {
-        logger.info(`PlaylistImportExecutor: creating playlist '${plan.playlistName}' via persistence...`);
+        logger.info(
+          `PlaylistImportExecutor: creating playlist '${plan.playlistName}' via persistence...`
+        );
         playlistId = await this.persistence.createPlaylist(plan.playlistName, plan.description);
         logger.info(`PlaylistImportExecutor: playlist created with ID ${playlistId}.`);
       } else {
-        logger.info(`PlaylistImportExecutor: using existing target playlist ID ${playlistId} with mode ${mode}...`);
+        logger.info(
+          `PlaylistImportExecutor: using existing target playlist ID ${playlistId} with mode ${mode}...`
+        );
         if (mode === 'replace' && this.persistence.clearEntries) {
           await this.persistence.clearEntries(playlistId);
-          logger.info(`PlaylistImportExecutor: cleared existing entries for playlist ${playlistId}.`);
+          logger.info(
+            `PlaylistImportExecutor: cleared existing entries for playlist ${playlistId}.`
+          );
         }
       }
 
       if (entriesToImport.length > 0) {
-        logger.info(`PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${playlistId} in chunked batches...`);
+        logger.info(
+          `PlaylistImportExecutor: adding ${entriesToImport.length} entries to playlist ${playlistId} in chunked batches...`
+        );
         const CHUNK_SIZE = 500;
         for (let i = 0; i < entriesToImport.length; i += CHUNK_SIZE) {
           const chunk = entriesToImport.slice(i, i + CHUNK_SIZE);

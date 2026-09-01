@@ -50,15 +50,11 @@ const SeparateArtistsSuggestion = (props: Props) => {
       const artists = separatedArtistsNames.map((artist, i, arr) => {
         return (
           <Fragment key={`artist-${i}-${artist}`}>
-            <span
-              className="text-font-color-highlight dark:text-dark-font-color-highlight"
-            >
+            <span className="text-font-color-highlight dark:text-dark-font-color-highlight">
               {artist}
             </span>
             {i !== arr.length - 1 && (
-              <span key={`sep-${i}`}>
-                {i === arr.length - 2 ? ` ${t('common.and')} ` : ', '}
-              </span>
+              <span key={`sep-${i}`}>{i === arr.length - 2 ? ` ${t('common.and')} ` : ', '}</span>
             )}
           </Fragment>
         );

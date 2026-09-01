@@ -1,9 +1,9 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 import path from 'path';
 
 import * as schema from '@main/db/schema';
 import { musicFolders, songs } from '@main/db/schema';
+import { migrate } from 'drizzle-orm/pglite/migrator';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/db/db', async () => {
   const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
@@ -25,14 +25,17 @@ vi.mock('@main/main', () => ({
 
 vi.mock('@main/parseSong/parseSong', () => ({
   tryToParseSong: vi.fn(async (songPath: string, folderId?: number) => {
-    const [inserted] = await db.insert(songs).values({
-      title: path.basename(songPath),
-      duration: 180,
-      path: songPath,
-      folderId,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date()
-    }).returning();
+    const [inserted] = await db
+      .insert(songs)
+      .values({
+        title: path.basename(songPath),
+        duration: 180,
+        path: songPath,
+        folderId,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date()
+      })
+      .returning();
 
     return {
       songData: inserted,
@@ -48,24 +51,26 @@ vi.mock('@main/parseSong/parseSong', () => ({
   })
 }));
 
-import { db } from '@main/db/db';
 import { processSongsWithWorkerPool, type SongPoolInput } from '@main/core/songWorkerPool';
+import { db } from '@main/db/db';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 
 describe('Item 3/5 FORENSIC: Worker Backpressure Timeout & Durable Cursor Fallback', () => {
   let rootFolderId: number;
 
-  beforeAll(async () => {
-  });
+  beforeAll(async () => {});
 
   beforeEach(async () => {
     await db.delete(songs);
     await db.delete(musicFolders);
 
-    const [folder] = await db.insert(musicFolders).values({
-      name: 'TestMusic',
-      path: '/mock/music'
-    }).returning();
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'TestMusic',
+        path: '/mock/music'
+      })
+      .returning();
     rootFolderId = folder.id;
   });
 
@@ -82,40 +87,42 @@ describe('Item 3/5 FORENSIC: Worker Backpressure Timeout & Durable Cursor Fallba
 
     // Mock MediaWorkerBridge parseTrackBatchStream to simulate Batch 1 success + Batch 2 backpressure timeout
     vi.spyOn(mediaWorkerBridge, 'isReady').mockReturnValue(true);
-    vi.spyOn(mediaWorkerBridge, 'parseTrackBatchStream').mockImplementation(async (songsToParse, options) => {
-      // 1. Deliver Batch 1 (songs 0-49)
-      const batch1Tracks = songsToParse.slice(0, 50).map((s, idx) => ({
-        songPath: s.songPath,
-        title: `Song ${idx}`,
-        duration: 180,
-        artists: ['Artist 1'],
-        albumArtists: ['Artist 1'],
-        album: 'Album 1',
-        genres: ['Rock'],
-        year: 2024,
-        sampleRate: 44100,
-        bitRate: 320000,
-        noOfChannels: 2,
-        diskNumber: 1,
-        trackNumber: idx + 1,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date(),
-        folderId: s.folderId
-      }));
+    vi.spyOn(mediaWorkerBridge, 'parseTrackBatchStream').mockImplementation(
+      async (songsToParse, options) => {
+        // 1. Deliver Batch 1 (songs 0-49)
+        const batch1Tracks = songsToParse.slice(0, 50).map((s, idx) => ({
+          songPath: s.songPath,
+          title: `Song ${idx}`,
+          duration: 180,
+          artists: ['Artist 1'],
+          albumArtists: ['Artist 1'],
+          album: 'Album 1',
+          genres: ['Rock'],
+          year: 2024,
+          sampleRate: 44100,
+          bitRate: 320000,
+          noOfChannels: 2,
+          diskNumber: 1,
+          trackNumber: idx + 1,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date(),
+          folderId: s.folderId
+        }));
 
-      await options.onBatch({
-        batchId: 1,
-        isLastBatch: false,
-        tracks: batch1Tracks,
-        errors: []
-      });
+        await options.onBatch({
+          batchId: 1,
+          isLastBatch: false,
+          tracks: batch1Tracks,
+          errors: []
+        });
 
-      // 2. Simulate Worker Backpressure Timeout during Batch 2
-      // Per P1-3 fix: MediaWorkerBridge rejects with typed cancellation error
-      throw new Error(
-        '[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). Committed 50 tracks before cancellation.'
-      );
-    });
+        // 2. Simulate Worker Backpressure Timeout during Batch 2
+        // Per P1-3 fix: MediaWorkerBridge rejects with typed cancellation error
+        throw new Error(
+          '[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). Committed 50 tracks before cancellation.'
+        );
+      }
+    );
 
     // Run batch ingestion
     const result = await processSongsWithWorkerPool(songList, undefined, undefined, 50);
@@ -145,12 +152,19 @@ describe('Item 3/5 FORENSIC: Worker Backpressure Timeout & Durable Cursor Fallba
     const abortController = new AbortController();
 
     vi.spyOn(mediaWorkerBridge, 'isReady').mockReturnValue(true);
-    vi.spyOn(mediaWorkerBridge, 'parseTrackBatchStream').mockImplementation(async (songsToParse, options) => {
-      abortController.abort();
-      throw new Error('[MediaWorkerBridge] Aborted by user signal');
-    });
+    vi.spyOn(mediaWorkerBridge, 'parseTrackBatchStream').mockImplementation(
+      async (songsToParse, options) => {
+        abortController.abort();
+        throw new Error('[MediaWorkerBridge] Aborted by user signal');
+      }
+    );
 
-    const result = await processSongsWithWorkerPool(songList, abortController.signal, undefined, 25);
+    const result = await processSongsWithWorkerPool(
+      songList,
+      abortController.signal,
+      undefined,
+      25
+    );
 
     // When aborted by user, remaining songs are NOT processed by local fallback
     expect(result.successCount).toBe(0);

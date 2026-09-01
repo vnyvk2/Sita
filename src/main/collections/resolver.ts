@@ -11,7 +11,7 @@ export class CollectionResolver {
 
   public resolveProvider(id: CollectionId): CollectionProvider {
     const descriptor = this.registry.get(id.type);
-    
+
     if (!descriptor) {
       throw new Error(`No provider registered for collection type: '${id.type}'`);
     }

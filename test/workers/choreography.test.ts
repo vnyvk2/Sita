@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Job, JobState, JobPriority } from '../../src/main/workers/types';
@@ -38,7 +39,7 @@ class MockPaletteJob implements Job {
 describe('JobScheduler Choreography (Event Bus)', () => {
   it('should trigger both PaletteJob and DummyLoggingJob when ASSET_CREATED:ARTWORK is emitted', async () => {
     const eventBus = new EventEmitter();
-    
+
     const paletteJobExecuted = vi.fn();
     const dummyLoggingJobExecuted = vi.fn();
 
@@ -110,7 +111,7 @@ describe('JobScheduler Choreography (Event Bus)', () => {
     scheduler.enqueue(new TriggerJob());
 
     // Wait a short tick for execution chain
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(firstJobExecuted).toHaveBeenCalledTimes(1);
     expect(secondJobExecuted).toHaveBeenCalledTimes(1);

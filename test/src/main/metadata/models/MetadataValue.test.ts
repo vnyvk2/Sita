@@ -1,9 +1,8 @@
-import { describe, expect, it } from 'vitest';
-
 import { ValueStatuses } from '@main/metadata/common/types';
 import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataSource, MetadataSourceTypes } from '@main/metadata/models/MetadataSource';
 import { MetadataValue } from '@main/metadata/models/MetadataValue';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataValue', () => {
   it('should create MetadataValue with default source and confidence', () => {

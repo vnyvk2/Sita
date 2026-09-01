@@ -1,10 +1,10 @@
 import type { PlaylistImportHistoryRepository } from '../interfaces/PlaylistImportHistoryRepository';
 import type { SessionIdGenerator } from '../interfaces/SessionIdGenerator';
 import { DefaultSessionIdGenerator } from '../interfaces/SessionIdGenerator';
-import type { RepairSummaryBuilder } from './RepairSummaryBuilder';
-import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportExecutionResult } from '../models/PlaylistImportExecutionResult';
+import type { PlaylistImportPlan } from '../models/PlaylistImportPlan';
 import type { PlaylistImportSession } from '../models/PlaylistImportSession';
+import type { RepairSummaryBuilder } from './RepairSummaryBuilder';
 
 export class PlaylistImportSessionService {
   private idGenerator: SessionIdGenerator;
@@ -36,7 +36,10 @@ export class PlaylistImportSessionService {
     return session;
   }
 
-  async completeSession(sessionId: string, executionResult: PlaylistImportExecutionResult): Promise<void> {
+  async completeSession(
+    sessionId: string,
+    executionResult: PlaylistImportExecutionResult
+  ): Promise<void> {
     const session = await this.repository.getSession(sessionId);
     if (session) {
       await this.repository.updateSession({

@@ -16,8 +16,7 @@ export function renderLyricsLines(
     const syncedLyricsLines = parsedLyrics.map((lyric, index) => {
       const { originalText } = lyric;
       const start = (lyric?.start || 0) + offset;
-      const end =
-        (lyric.end === Number.POSITIVE_INFINITY ? songDuration : lyric.end || 0) + offset;
+      const end = (lyric.end === Number.POSITIVE_INFINITY ? songDuration : lyric.end || 0) + offset;
 
       return (
         <LyricLine

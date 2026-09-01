@@ -25,8 +25,8 @@ import {
 } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
-import { scrollRegistry } from '@renderer/utils/scrollStore';
 import storage from '@renderer/utils/localStorage';
+import { scrollRegistry } from '@renderer/utils/scrollStore';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -151,7 +151,15 @@ function SongsPage() {
       onlyFavoriteArtists,
       onlyFavoriteAlbums
     }),
-    [sortingOrder, filteringOrder, keyword, language, genre, onlyFavoriteArtists, onlyFavoriteAlbums]
+    [
+      sortingOrder,
+      filteringOrder,
+      keyword,
+      language,
+      genre,
+      onlyFavoriteArtists,
+      onlyFavoriteAlbums
+    ]
   );
 
   const idsQuery = useSuspenseQuery(songQuery.ids(songIdsParams));

@@ -356,7 +356,7 @@ export const Artist = (props: ArtistProp) => {
           <>
             <div className="absolute top-[5%] right-[5%] z-2 flex items-center justify-center">
               <Button
-                className={`m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
+                className={`bg-background-color-1/80 dark:bg-dark-background-color-1/80 m-0! rounded-full! border-0! p-1.5! shadow-md outline-offset-1 backdrop-blur-sm transition-opacity ${
                   isAFavorite
                     ? 'opacity-100'
                     : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
@@ -391,7 +391,7 @@ export const Artist = (props: ArtistProp) => {
             src={props?.onlineArtworkPaths?.picture_medium}
             fallbackSrc={props.artworkPaths.artworkPath}
             alt="Default song cover"
-            className="aspect-square h-full rounded-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04] group-focus-within:scale-[1.04]"
+            className="aspect-square h-full rounded-full object-cover transition-transform duration-300 ease-out group-focus-within:scale-[1.04] group-hover:scale-[1.04]"
             enableImgFadeIns={false}
           />
         </div>

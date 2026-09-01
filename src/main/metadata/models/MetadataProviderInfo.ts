@@ -1,6 +1,5 @@
 import type { MetadataCapability } from '../common/types';
 import type { ProviderState } from './ProviderState';
-
 import { ProviderStates } from './ProviderState';
 
 export interface MetadataProviderInfoOptions {

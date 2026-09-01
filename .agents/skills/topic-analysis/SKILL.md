@@ -40,6 +40,7 @@ If the capability depends on an external service, research the current official 
 Do not assume that the existing implementation represents the full capability of the external service.
 
 Distinguish:
+
 - What the service supports.
 - What Nora supports.
 - What Nora partially supports.
@@ -56,6 +57,7 @@ Do not automatically try to expose every external capability.
 Inspect the repository comprehensively for the target capability.
 
 Search for:
+
 - service names
 - API clients
 - endpoints
@@ -87,11 +89,13 @@ Search for:
 - dead/unused code
 
 Search by both:
+
 - the obvious feature/service name
 - concepts associated with the feature
 
 For example, a Last.fm audit should not only search for `lastfm`.
 Also investigate concepts such as:
+
 - scrobble
 - now playing
 - artist
@@ -120,6 +124,7 @@ The implementation may use abstractions that do not contain the service name.
 Classify every discovered component.
 
 Use statuses such as:
+
 - Fully implemented
 - Partially implemented
 - Implemented but unused
@@ -136,6 +141,7 @@ Do not call something "implemented" merely because a function exists.
 A capability is implemented only when the relevant end-to-end behavior actually exists.
 
 For example:
+
 ```text
 API client
 → service
@@ -153,6 +159,7 @@ If only the API client exists, classify the feature accordingly.
 # 4. Trace End-to-End Capability
 
 For every important feature, trace:
+
 ```text
 User intent
 → UI
@@ -165,11 +172,13 @@ User intent
 → state update
 → UI
 ```
+
 (Where applicable.)
 
 Determine exactly where the chain stops.
 
 Example:
+
 ```text
 Last.fm authentication
        ↓
@@ -190,13 +199,13 @@ Automatic scrobbling    ✗
 
 Create a matrix like:
 
-| Capability | External Service | Nora Code | User Accessible | Status | Notes |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Authentication | Yes | Yes | Yes | Complete | ... |
-| Scrobbling | Yes | Partial | Partial | Incomplete | ... |
-| Now Playing | Yes | Yes | No | Partial | ... |
-| Similar Artists | Yes | No | No | Missing | ... |
-| Tags | Yes | Partial | No | Partial | ... |
+| Capability      | External Service | Nora Code | User Accessible | Status     | Notes |
+| :-------------- | :--------------- | :-------- | :-------------- | :--------- | :---- |
+| Authentication  | Yes              | Yes       | Yes             | Complete   | ...   |
+| Scrobbling      | Yes              | Partial   | Partial         | Incomplete | ...   |
+| Now Playing     | Yes              | Yes       | No              | Partial    | ...   |
+| Similar Artists | Yes              | No        | No              | Missing    | ...   |
+| Tags            | Yes              | Partial   | No              | Partial    | ...   |
 
 Do not invent capabilities.
 Verify them through official documentation when external services are involved.
@@ -208,6 +217,7 @@ Verify them through official documentation when external services are involved.
 Determine how the existing capability fits into the application's architecture.
 
 Identify:
+
 - ownership
 - data flow
 - state ownership
@@ -223,9 +233,11 @@ Identify:
 - background execution
 
 Ask:
+
 > Is the current architecture appropriate?
 
 Look for:
+
 - duplicated logic
 - wrong ownership
 - bypassed abstractions
@@ -244,12 +256,14 @@ Perform a focused code review of the capability.
 Look for:
 
 ### Correctness
+
 - incorrect behavior
 - missing edge cases
 - stale state
 - incorrect API assumptions
 
 ### Reliability
+
 - failed requests
 - retry behavior
 - authentication expiry
@@ -257,6 +271,7 @@ Look for:
 - offline behavior
 
 ### Concurrency
+
 - overlapping requests
 - duplicate scrobbles
 - race conditions
@@ -264,6 +279,7 @@ Look for:
 - queue behavior
 
 ### Performance
+
 - excessive API requests
 - unnecessary polling
 - duplicate requests
@@ -271,6 +287,7 @@ Look for:
 - excessive DB writes
 
 ### Lifecycle
+
 - startup
 - shutdown
 - reconnect
@@ -278,12 +295,14 @@ Look for:
 - account switching
 
 ### Data integrity
+
 - duplicate records
 - incorrect mappings
 - stale metadata
 - lost state
 
 ### Security
+
 - credentials
 - tokens
 - secrets
@@ -296,6 +315,7 @@ Look for:
 This is critical.
 
 A capability can be:
+
 - **Technically implemented**: 80%
 - **Product capability**: 30%
 
@@ -308,6 +328,7 @@ Analyze both separately.
 # 9. Analyze the User Experience
 
 Determine:
+
 - What can the user actually do?
 - Where is the feature exposed?
 - Is it discoverable?
@@ -326,6 +347,7 @@ Don't evaluate only backend functionality.
 After understanding the current implementation, research what the external service can offer.
 
 For an external platform, investigate:
+
 - official APIs
 - supported endpoints
 - authentication
@@ -351,9 +373,11 @@ Do not treat third-party speculation as confirmed platform capability.
 # 11. Map External Capability to Nora
 
 Do not simply produce:
+
 > "Last.fm supports X, Y, Z."
 
 Instead classify:
+
 - **High-value for Nora**: Capabilities that strongly complement the existing product.
 - **Potentially useful**: Capabilities that could be valuable depending on UX/design.
 - **Low-value**: Capabilities that technically work but add little to Nora.
@@ -366,6 +390,7 @@ This is a product + engineering judgment, not merely an API inventory.
 # 12. Identify Missing Capabilities
 
 For each important missing feature, explain:
+
 - what it does
 - why it matters
 - dependencies
@@ -384,6 +409,7 @@ Do not turn every missing API endpoint into a feature request.
 This is especially important.
 
 Ask how the capability could interact with:
+
 - library
 - player
 - queue
@@ -404,6 +430,7 @@ Ask how the capability could interact with:
 Look for opportunities where one capability enables another.
 
 Example:
+
 ```text
 Last.fm scrobbling
       ↓
@@ -427,11 +454,13 @@ But do not assume the entire chain should be implemented. Evaluate each step.
 For meaningful future capabilities, consider multiple designs.
 
 For example:
+
 - **Option A**: Minimal integration.
 - **Option B**: Deep integration into existing architecture.
 - **Option C**: Unified abstraction that supports multiple music services.
 
 For each:
+
 - advantages
 - disadvantages
 - complexity
@@ -449,6 +478,7 @@ Then recommend one.
 Do not introduce a generic abstraction merely because another service might someday be supported.
 
 Ask:
+
 > Does abstraction solve a current architectural problem?
 
 If Spotify, Last.fm, MusicBrainz, ListenBrainz, etc. genuinely share a domain concept, investigate whether a common abstraction is appropriate.
@@ -462,6 +492,7 @@ just because multiple services exist.
 # 16. Determine the Best Future Architecture
 
 Based on:
+
 - current code
 - current product
 - external capabilities
@@ -472,6 +503,7 @@ Based on:
 Propose the best architecture for the capability.
 
 Describe:
+
 - components
 - responsibilities
 - data flow
@@ -493,12 +525,14 @@ The recommendation should fit Nora's existing architecture where possible.
 Create a prioritized roadmap.
 
 Example:
+
 - **Phase 1 — Complete existing foundation**: Fix incomplete/current functionality.
 - **Phase 2 — High-value user features**: Add the capabilities with the highest user value.
 - **Phase 3 — Deeper integration**: Connect the capability to existing Nora systems.
 - **Phase 4 — Advanced features**: Only after the foundation is stable.
 
 For each item estimate relative complexity:
+
 - Low
 - Medium
 - High
@@ -513,6 +547,7 @@ Do not pretend to know exact development time unless there is sufficient evidenc
 This is required.
 
 A good domain audit should identify:
+
 - low-value features
 - redundant features
 - expensive features with little benefit
@@ -528,6 +563,7 @@ The goal is to maximize useful capability.
 # 19. Identify Technical Debt
 
 Separate:
+
 - **Feature gaps**: Something doesn't exist.
 - **Implementation debt**: Something exists but is poorly implemented.
 - **Architectural debt**: The current structure makes future work unnecessarily difficult.
@@ -542,6 +578,7 @@ These should not be conflated.
 Explicitly document things that cannot be established.
 
 Examples:
+
 - undocumented API behavior
 - unclear external service limitations
 - runtime behavior not reproducible
@@ -554,6 +591,7 @@ Never fill unknowns with assumptions.
 # 21. Final Deliverable
 
 Produce:
+
 1. **Capability Overview**: What the capability is and why it matters.
 2. **Current Implementation Status**: What exists today.
 3. **Architecture**: How it currently works.
@@ -585,6 +623,7 @@ Evaluate independently:
 4. **What should Nora actually implement?**
 
 These are different questions:
+
 - A feature being supported by the external service does not mean Nora should implement it.
 - A feature existing in the code does not mean it is complete.
 - A feature being technically complete does not mean its UX is good.
@@ -595,7 +634,8 @@ These are different questions:
 ## Invocation & Scope Guidance
 
 You can invoke this skill with prompts such as:
-> *"Run a capability audit for Last.fm. I want to understand its current implementation, maturity, what is actually usable, everything we could potentially do with it, and what you recommend we build."*
+
+> _"Run a capability audit for Last.fm. I want to understand its current implementation, maturity, what is actually usable, everything we could potentially do with it, and what you recommend we build."_
 
 This skill moves sequentially through:
 `Code Archaeology` → `Current Status` → `Product Capability` → `External Research` → `Design` → `Roadmap`

@@ -1,23 +1,24 @@
 import { EventEmitter } from 'events';
-import type { Job, JobClass } from './types';
+
 import log from '../logger';
+import type { Job, JobClass } from './types';
 
 export class JobScheduler extends EventEmitter {
   private interactiveQueue: Job[] = [];
   private backgroundQueue: Job[] = [];
   private maintenanceQueue: Job[] = [];
-  
+
   private runningJobs = new Map<string, Job>();
   private inFlightJobPromises = new Map<string, Promise<void>>();
   private failedJobsList: Job[] = [];
-  
+
   // To protect against duplicates across all queues and running state
   private activeJobIds = new Set<string>();
   private deferredTimers = new Map<string, NodeJS.Timeout>();
 
   private isRunning = false;
   private isDraining = false;
-  
+
   private concurrencyLimits: Record<JobClass, number> = {
     interactive: 4,
     background: 2,
@@ -29,7 +30,7 @@ export class JobScheduler extends EventEmitter {
   private failedCount = 0;
   private totalExecutionTimeMs = 0;
   private readonly MAX_FAILED_JOBS = 100;
-  
+
   // Track whether we've already emitted QUEUE_EMPTY to prevent duplicate events
   private isQueueEmptyState = true;
   private pendingMaintenance = false;
@@ -42,22 +43,17 @@ export class JobScheduler extends EventEmitter {
     }
   }
 
-  /**
-   * Defines the maximum number of concurrent jobs per class.
-   */
+  /** Defines the maximum number of concurrent jobs per class. */
   public setConcurrency(limits: Partial<Record<JobClass, number>>) {
     this.concurrencyLimits = { ...this.concurrencyLimits, ...limits };
     this.processNext();
   }
 
-  /**
-   * Request maintenance (like Garbage Collection) to be scheduled 
-   * once the queue becomes empty.
-   */
+  /** Request maintenance (like Garbage Collection) to be scheduled once the queue becomes empty. */
   public requestMaintenance() {
     this.pendingMaintenance = true;
-    
-    // If the queue is already empty and no retry jobs are pending when maintenance is requested, 
+
+    // If the queue is already empty and no retry jobs are pending when maintenance is requested,
     // emit immediately so it can start without waiting for another job.
     if (this.isQueueEmptyState && this.runningJobs.size === 0 && this.pendingRetryJobs.size === 0) {
       this.pendingMaintenance = false;
@@ -65,9 +61,7 @@ export class JobScheduler extends EventEmitter {
     }
   }
 
-  /**
-   * Enqueues a job. Rejects if the job ID is already active (duplicate protection).
-   */
+  /** Enqueues a job. Rejects if the job ID is already active (duplicate protection). */
   public enqueue(job: Job): boolean {
     if (this.isDraining) {
       log.debug(`[JobScheduler] Rejected job ${job.id} because scheduler is shutting down.`);
@@ -97,16 +91,18 @@ export class JobScheduler extends EventEmitter {
   }
 
   /**
-   * Schedules a job to be enqueued after a delay. Useful when a job needs to
-   * re-check conditions (e.g., album completeness) after its current invocation
-   * finishes and its ID is cleared from activeJobIds.
+   * Schedules a job to be enqueued after a delay. Useful when a job needs to re-check conditions
+   * (e.g., album completeness) after its current invocation finishes and its ID is cleared from
+   * activeJobIds.
    *
-   * If a deferred timer already exists for this job ID, the new timer replaces it.
-   * Deferred timers are cancelled during stop() and dispose().
+   * If a deferred timer already exists for this job ID, the new timer replaces it. Deferred timers
+   * are cancelled during stop() and dispose().
    */
   public scheduleDeferred(job: Job, delayMs: number): void {
     if (this.isDraining) {
-      log.debug(`[JobScheduler] Rejected deferred job ${job.id} because scheduler is shutting down.`);
+      log.debug(
+        `[JobScheduler] Rejected deferred job ${job.id} because scheduler is shutting down.`
+      );
       return;
     }
 
@@ -126,11 +122,11 @@ export class JobScheduler extends EventEmitter {
   }
 
   /**
-   * Allows transitioning an already queued background/maintenance job to interactive.
-   * Commonly used for Demand-Driven Prioritization (e.g. user scrolled to album).
+   * Allows transitioning an already queued background/maintenance job to interactive. Commonly used
+   * for Demand-Driven Prioritization (e.g. user scrolled to album).
    */
   public promoteToInteractive(id: string): boolean {
-    let index = this.backgroundQueue.findIndex(j => j.id === id);
+    let index = this.backgroundQueue.findIndex((j) => j.id === id);
     if (index !== -1) {
       const [job] = this.backgroundQueue.splice(index, 1);
       job.jobClass = 'interactive';
@@ -140,7 +136,7 @@ export class JobScheduler extends EventEmitter {
       return true;
     }
 
-    index = this.maintenanceQueue.findIndex(j => j.id === id);
+    index = this.maintenanceQueue.findIndex((j) => j.id === id);
     if (index !== -1) {
       const [job] = this.maintenanceQueue.splice(index, 1);
       job.jobClass = 'interactive';
@@ -152,9 +148,7 @@ export class JobScheduler extends EventEmitter {
     return false;
   }
 
-  /**
-   * Cancels a specific job. If running, relies on the job's internal cancel() implementation.
-   */
+  /** Cancels a specific job. If running, relies on the job's internal cancel() implementation. */
   public cancelJob(id: string): boolean {
     // 1. Cancel if in retry backoff delay
     const pendingRetry = this.pendingRetryJobs.get(id);
@@ -184,20 +178,21 @@ export class JobScheduler extends EventEmitter {
       }
       return true;
     };
-    
+
     const initialIntLen = this.interactiveQueue.length;
     this.interactiveQueue = this.interactiveQueue.filter(filterFn);
-    
+
     const initialBgLen = this.backgroundQueue.length;
     this.backgroundQueue = this.backgroundQueue.filter(filterFn);
 
     const initialMaintLen = this.maintenanceQueue.length;
     this.maintenanceQueue = this.maintenanceQueue.filter(filterFn);
 
-    const wasQueued = (initialIntLen !== this.interactiveQueue.length) || 
-                      (initialBgLen !== this.backgroundQueue.length) ||
-                      (initialMaintLen !== this.maintenanceQueue.length);
-    
+    const wasQueued =
+      initialIntLen !== this.interactiveQueue.length ||
+      initialBgLen !== this.backgroundQueue.length ||
+      initialMaintLen !== this.maintenanceQueue.length;
+
     // 3. Cancel if running
     const runningJob = this.runningJobs.get(id);
     if (runningJob) {
@@ -216,9 +211,7 @@ export class JobScheduler extends EventEmitter {
     return false;
   }
 
-  /**
-   * Starts the scheduler processing loop.
-   */
+  /** Starts the scheduler processing loop. */
   public start() {
     this.isRunning = true;
     this.isDraining = false;
@@ -227,16 +220,15 @@ export class JobScheduler extends EventEmitter {
   }
 
   /**
-   * Shuts down the scheduler through a two-phase bounded drain:
-   * 1. Graceful Drain Phase (up to 15s): Prevents new jobs from starting while waiting
-   *    for running jobs to complete naturally.
-   * 2. Forced Abort & Grace Phase (up to 5s): If jobs survive the drain timeout, broadcasts
-   *    cancellation (job.state = 'cancelled', job.cancel()) and awaits up to 5 seconds
-   *    for in-flight promises to settle.
+   * Shuts down the scheduler through a two-phase bounded drain: 1. Graceful Drain Phase (up to
+   * 15s): Prevents new jobs from starting while waiting for running jobs to complete naturally. 2.
+   * Forced Abort & Grace Phase (up to 5s): If jobs survive the drain timeout, broadcasts
+   * cancellation (job.state = 'cancelled', job.cancel()) and awaits up to 5 seconds for in-flight
+   * promises to settle.
    *
-   * Returns surviving job promises that have NOT settled within the grace period.
-   * The caller MUST await these (or await a bounded timeout on them) before closing
-   * any shared resource (e.g., database) that jobs depend on.
+   * Returns surviving job promises that have NOT settled within the grace period. The caller MUST
+   * await these (or await a bounded timeout on them) before closing any shared resource (e.g.,
+   * database) that jobs depend on.
    */
   public async stop(): Promise<{ survivingJobPromises: Promise<void>[] }> {
     this.isRunning = false;
@@ -250,7 +242,9 @@ export class JobScheduler extends EventEmitter {
         try {
           job.cancel();
         } catch (e) {
-          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during stop:`, { error: e });
+          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during stop:`, {
+            error: e
+          });
         }
       }
       this.activeJobIds.delete(job.id);
@@ -297,13 +291,13 @@ export class JobScheduler extends EventEmitter {
       const GRACE_TIMEOUT_MS = 5000;
       const settleResult = await Promise.race([
         Promise.allSettled(survivingJobPromises).then(() => 'settled' as const),
-        new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), GRACE_TIMEOUT_MS))
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), GRACE_TIMEOUT_MS))
       ]);
 
       if (settleResult === 'timeout') {
         log.error(
           `[JobScheduler] ${this.inFlightJobPromises.size} job promises did not settle within ${GRACE_TIMEOUT_MS}ms after cancellation. ` +
-          `Returning unsettled promises to caller for write barrier.`
+            `Returning unsettled promises to caller for write barrier.`
         );
         // Re-snapshot: only return promises that are STILL in-flight
         survivingJobPromises = Array.from(this.inFlightJobPromises.values());
@@ -315,15 +309,13 @@ export class JobScheduler extends EventEmitter {
       this.activeJobIds.clear();
       this.inFlightJobPromises.clear();
     }
-    
+
     this.isDraining = false;
     log.info('[JobScheduler] Stopped cleanly');
     return { survivingJobPromises };
   }
 
-  /**
-   * Completely disposes of the scheduler, cancelling all jobs before unregistering events.
-   */
+  /** Completely disposes of the scheduler, cancelling all jobs before unregistering events. */
   public dispose() {
     this.isDraining = true;
     this.isRunning = false;
@@ -335,7 +327,9 @@ export class JobScheduler extends EventEmitter {
         try {
           job.cancel();
         } catch (e) {
-          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during dispose:`, { error: e });
+          log.warn(`[JobScheduler] Error cancelling retry job ${job.id} during dispose:`, {
+            error: e
+          });
         }
       }
       this.activeJobIds.delete(job.id);
@@ -347,12 +341,12 @@ export class JobScheduler extends EventEmitter {
       clearTimeout(timer);
     }
     this.deferredTimers.clear();
-    
+
     // Clear queues
     this.interactiveQueue = [];
     this.backgroundQueue = [];
     this.maintenanceQueue = [];
-    
+
     // Cancel running jobs
     for (const [id, job] of this.runningJobs.entries()) {
       job.state = 'cancelled';
@@ -364,15 +358,15 @@ export class JobScheduler extends EventEmitter {
         }
       }
     }
-    
+
     this.runningJobs.clear();
     this.activeJobIds.clear();
     this.inFlightJobPromises.clear();
     this.failedJobsList = [];
-    
+
     // Remove listeners last, so cancellation callbacks can still emit if needed
     this.removeAllListeners();
-    
+
     log.info('[JobScheduler] Disposed cleanly');
   }
 
@@ -390,14 +384,14 @@ export class JobScheduler extends EventEmitter {
     let startedNewJob = false;
     do {
       startedNewJob = false;
-      
+
       const intRunning = this.getRunningCountByClass('interactive');
       if (intRunning < this.concurrencyLimits.interactive && this.interactiveQueue.length > 0) {
         const job = this.interactiveQueue.shift()!;
         this.startJob(job);
         startedNewJob = true;
       }
-      
+
       const bgRunning = this.getRunningCountByClass('background');
       if (bgRunning < this.concurrencyLimits.background && this.backgroundQueue.length > 0) {
         const job = this.backgroundQueue.shift()!;
@@ -411,16 +405,16 @@ export class JobScheduler extends EventEmitter {
         this.startJob(job);
         startedNewJob = true;
       }
-
     } while (startedNewJob);
-    
+
     // Emit QUEUE_EMPTY if no jobs are running, queues are empty, and no retry jobs are pending
-    if (this.runningJobs.size === 0 && 
-        this.interactiveQueue.length === 0 && 
-        this.backgroundQueue.length === 0 && 
-        this.maintenanceQueue.length === 0 &&
-        this.pendingRetryJobs.size === 0) {
-      
+    if (
+      this.runningJobs.size === 0 &&
+      this.interactiveQueue.length === 0 &&
+      this.backgroundQueue.length === 0 &&
+      this.maintenanceQueue.length === 0 &&
+      this.pendingRetryJobs.size === 0
+    ) {
       if (!this.isQueueEmptyState) {
         this.isQueueEmptyState = true;
         this.emit('QUEUE_EMPTY');
@@ -439,7 +433,7 @@ export class JobScheduler extends EventEmitter {
     this.runningJobs.set(job.id, job);
     job.state = 'running';
     this.isQueueEmptyState = false;
-    
+
     const startTime = Date.now();
     this.emit('JOB_STARTED', job);
 
@@ -456,33 +450,34 @@ export class JobScheduler extends EventEmitter {
   private async executeJob(job: Job, startTime: number) {
     try {
       await job.execute();
-      
+
       const executionTime = Date.now() - startTime;
       this.totalExecutionTimeMs += executionTime;
       this.completedCount++;
-      
+
       // If the job was cancelled while it was executing, don't mark as completed
       if (job.state === 'cancelled') {
         return;
       }
-      
+
       job.state = 'completed';
       this.emit('JOB_COMPLETED', job, executionTime);
-
     } catch (error) {
       log.error(`[JobScheduler] Job failed: ${job.id}`, { error });
-      
+
       // If cancelled, don't retry or fail it.
       if (job.state === 'cancelled') {
         return;
       }
-      
+
       const maxRetries = job.maxRetries ?? 3;
       if (job.retries < maxRetries) {
         job.retries++;
         job.state = 'queued';
         const delayMs = Math.min(500 * Math.pow(2, job.retries - 1), 5000);
-        log.warn(`[JobScheduler] Scheduling retry ${job.retries}/${maxRetries} for job ${job.id} in ${delayMs}ms.`);
+        log.warn(
+          `[JobScheduler] Scheduling retry ${job.retries}/${maxRetries} for job ${job.id} in ${delayMs}ms.`
+        );
         const retryTimer = setTimeout(() => {
           this.pendingRetryJobs.delete(job.id);
           if (this.isDraining || !this.isRunning || job.state === 'cancelled') {
@@ -510,12 +505,12 @@ export class JobScheduler extends EventEmitter {
       }
     } finally {
       this.runningJobs.delete(job.id);
-      // We explicitly leave it in activeJobIds if it's running/queued, 
+      // We explicitly leave it in activeJobIds if it's running/queued,
       // but remove it once it reaches terminal state (completed/failed/cancelled)
       if (job.state === 'completed' || job.state === 'failed' || job.state === 'cancelled') {
         this.activeJobIds.delete(job.id);
       }
-      
+
       // Trigger the next job
       this.processNext();
     }
@@ -555,6 +550,6 @@ export class JobScheduler extends EventEmitter {
   }
 }
 
-// Instantiate a single JobScheduler (Singleton Pattern) 
+// Instantiate a single JobScheduler (Singleton Pattern)
 // to enforce the "single authority" architectural rule.
 export const libraryScheduler = new JobScheduler();

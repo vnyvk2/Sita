@@ -1,14 +1,15 @@
+import defaultArtistCover from '@renderer/assets/images/webp/artist_cover_default.webp';
+import HashTag from '@renderer/components/Biography/HashTag';
+import Img from '@renderer/components/Img';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { usePreviewAudio } from '@renderer/hooks/usePreviewAudio';
+import { artistQuery } from '@renderer/queries/artists';
+import { useQuery } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { artistQuery } from '@renderer/queries/artists';
-import { usePreviewAudio } from '@renderer/hooks/usePreviewAudio';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import defaultArtistCover from '@renderer/assets/images/webp/artist_cover_default.webp';
-import Img from '@renderer/components/Img';
-import HashTag from '@renderer/components/Biography/HashTag';
-import SimilarArtistsContainer from './SimilarArtistsContainer';
+
 import ArtistBioModal from './ArtistBioModal';
+import SimilarArtistsContainer from './SimilarArtistsContainer';
 
 export interface ArtistProfileTabProps {
   artistId: number;
@@ -29,9 +30,12 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   const { playPreview, isCurrentTrackPlaying } = usePreviewAudio();
   const [imgLoadError, setImgLoadError] = useState(false);
 
-  const { data: profile, isLoading, isError, refetch } = useQuery(
-    artistQuery.onlineProfile({ artistId, artistName })
-  );
+  const {
+    data: profile,
+    isLoading,
+    isError,
+    refetch
+  } = useQuery(artistQuery.onlineProfile({ artistId, artistName }));
 
   const handlePlayLocalSong = (songId: number) => {
     createQueue([songId], 'artist', false, artistId, false, artistName);
@@ -52,7 +56,11 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
       true,
       <ArtistBioModal
         artistName={artistName}
-        bioParagraphs={profile.bioParagraphs && profile.bioParagraphs.length > 0 ? profile.bioParagraphs : [profile.bioSummary || profile.bioFull || '']}
+        bioParagraphs={
+          profile.bioParagraphs && profile.bioParagraphs.length > 0
+            ? profile.bioParagraphs
+            : [profile.bioSummary || profile.bioFull || '']
+        }
         bioSource={profile.bioSource}
         bioUrl={profile.bioUrl}
         tags={profile.tags}
@@ -64,7 +72,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   if (isLoading) {
     return (
       <div className="flex min-h-[350px] flex-col items-center justify-center space-y-4 py-16 text-center">
-        <span className="material-icons-round animate-spin text-4xl text-font-color-highlight dark:text-dark-font-color-highlight">
+        <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight animate-spin text-4xl">
           progress_activity
         </span>
         <p className="text-sm font-medium opacity-70">
@@ -76,13 +84,13 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
 
   if (isError || !profile) {
     return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center space-y-4 rounded-2xl bg-background-color-2/30 p-8 text-center backdrop-blur-sm dark:bg-dark-background-color-2/30">
+      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 flex min-h-[320px] flex-col items-center justify-center space-y-4 rounded-2xl p-8 text-center backdrop-blur-sm">
         <span className="material-icons-round text-5xl opacity-40">person_off</span>
         <div className="max-w-md">
-          <h3 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
+          <h3 className="text-font-color-black dark:text-font-color-white text-lg font-semibold">
             {t('artistProfile.noProfileFound', 'Profile unavailable')}
           </h3>
-          <p className="mt-1 text-sm text-font-color-dimmed dark:text-font-color-white/60">
+          <p className="text-font-color-dimmed dark:text-font-color-white/60 mt-1 text-sm">
             {t(
               'artistProfile.offlineNotice',
               'Unable to fetch online artist information. Check your network connection and try again.'
@@ -92,7 +100,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
         <button
           type="button"
           onClick={() => refetch()}
-          className="flex items-center space-x-2 rounded-full bg-background-color-2 px-5 py-2 text-sm font-medium text-font-color-highlight shadow-sm transition-transform hover:scale-105 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight"
+          className="bg-background-color-2 text-font-color-highlight dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight flex items-center space-x-2 rounded-full px-5 py-2 text-sm font-medium shadow-sm transition-transform hover:scale-105"
         >
           <span className="material-icons-round text-lg">refresh</span>
           <span>{t('common.retry', 'Retry')}</span>
@@ -111,10 +119,10 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   return (
     <div className="space-y-8 pb-12">
       {/* 1. MusicBee-Style Hero / Biography Card */}
-      <section className="rounded-2xl border border-background-color-2/60 bg-background-color-2/40 p-6 shadow-lg backdrop-blur-md dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/40">
+      <section className="border-background-color-2/60 bg-background-color-2/40 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/40 rounded-2xl border p-6 shadow-lg backdrop-blur-md">
         <div className="flex flex-col gap-6 md:flex-row md:items-stretch">
           {/* Left: Featured Artist Artwork */}
-          <div className="group relative h-56 w-56 shrink-0 self-center overflow-hidden rounded-xl bg-background-color-1 shadow-md dark:bg-dark-background-color-1 md:self-start">
+          <div className="group bg-background-color-1 dark:bg-dark-background-color-1 relative h-56 w-56 shrink-0 self-center overflow-hidden rounded-xl shadow-md md:self-start">
             <Img
               src={featuredImgUrl}
               fallbackSrc={defaultArtistCover}
@@ -134,7 +142,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
           <div className="flex flex-1 flex-col justify-between space-y-4">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-3xl font-extrabold text-font-color-highlight dark:text-dark-font-color-highlight">
+                <h2 className="text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-extrabold">
                   {artistName}
                 </h2>
                 {profile.bioSource && (
@@ -163,7 +171,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
               )}
 
               {/* Bio Summary Snippet */}
-              <p className="line-clamp-4 text-sm leading-relaxed text-font-color-black/80 dark:text-font-color-white/80">
+              <p className="text-font-color-black/80 dark:text-font-color-white/80 line-clamp-4 text-sm leading-relaxed">
                 {profile.bioSummary || profile.bioFull || (
                   <span className="italic opacity-60">
                     {t('biography.noBioSummary', 'No detailed biography snippet available.')}
@@ -178,7 +186,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                 <button
                   type="button"
                   onClick={handleOpenBioModal}
-                  className="inline-flex items-center space-x-2 rounded-full bg-background-color-2 px-4 py-1.5 text-xs font-semibold text-font-color-highlight shadow-sm transition-all hover:bg-background-color-3 hover:scale-105 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3"
+                  className="bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3 inline-flex items-center space-x-2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm transition-all hover:scale-105"
                 >
                   <span className="material-icons-round text-sm">article</span>
                   <span>{t('biography.readMore', 'Read Full Biography →')}</span>
@@ -194,7 +202,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
         <section className="space-y-4 px-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <h3 className="text-xl font-bold text-font-color-black dark:text-font-color-white">
+              <h3 className="text-font-color-black dark:text-font-color-white text-xl font-bold">
                 {t('artistProfile.popularTracks', 'Top Tracks')}
               </h3>
               <span className="text-xs font-normal opacity-60">
@@ -203,24 +211,24 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-background-color-2/50 bg-background-color-2/20 backdrop-blur-sm dark:border-dark-background-color-2/50 dark:bg-dark-background-color-2/20">
-            <div className="divide-y divide-background-color-2/40 dark:divide-dark-background-color-2/40">
+          <div className="border-background-color-2/50 bg-background-color-2/20 dark:border-dark-background-color-2/50 dark:bg-dark-background-color-2/20 overflow-hidden rounded-xl border backdrop-blur-sm">
+            <div className="divide-background-color-2/40 dark:divide-dark-background-color-2/40 divide-y">
               {profile.topTracks.map((track) => {
                 const isPlayingThisPreview = isCurrentTrackPlaying(`top-${track.id}`);
 
                 return (
                   <div
                     key={track.id}
-                    className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/60"
+                    className="hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/60 flex items-center justify-between px-4 py-3 transition-colors"
                   >
                     {/* Rank & Title Info */}
                     <div className="flex min-w-0 flex-1 items-center space-x-4 pr-4">
-                      <span className="w-6 text-center text-sm font-bold text-font-color-highlight dark:text-dark-font-color-highlight opacity-80">
+                      <span className="text-font-color-highlight dark:text-dark-font-color-highlight w-6 text-center text-sm font-bold opacity-80">
                         #{track.globalRank}
                       </span>
 
                       {track.coverMedium && (
-                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-background-color-2 dark:bg-dark-background-color-2">
+                        <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-10 w-10 shrink-0 overflow-hidden rounded-md">
                           <img
                             src={track.coverMedium}
                             alt={track.title}
@@ -231,11 +239,11 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                       )}
 
                       <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-semibold text-font-color-black dark:text-font-color-white">
+                        <span className="text-font-color-black dark:text-font-color-white truncate text-sm font-semibold">
                           {track.title}
                         </span>
                         {track.albumTitle && (
-                          <span className="truncate text-xs text-font-color-dimmed dark:text-font-color-white/60">
+                          <span className="text-font-color-dimmed dark:text-font-color-white/60 truncate text-xs">
                             {track.albumTitle}
                           </span>
                         )}
@@ -244,7 +252,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
 
                     {/* Duration & Playback Actions */}
                     <div className="flex shrink-0 items-center space-x-3">
-                      <span className="text-xs text-font-color-dimmed dark:text-font-color-white/60 tabular-nums">
+                      <span className="text-font-color-dimmed dark:text-font-color-white/60 text-xs tabular-nums">
                         {formatTrackDuration(track.durationSec)}
                       </span>
 
@@ -257,7 +265,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                             type="button"
                             title={t('common.playLocalSong', 'Play from Library')}
                             onClick={() => handlePlayLocalSong(track.localSongId!)}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-font-color-highlight text-white shadow-sm transition-transform hover:scale-110 dark:bg-dark-font-color-highlight"
+                            className="bg-font-color-highlight dark:bg-dark-font-color-highlight flex h-8 w-8 items-center justify-center rounded-full text-white shadow-sm transition-transform hover:scale-110"
                           >
                             <span className="material-icons-round text-base">play_arrow</span>
                           </button>
@@ -273,7 +281,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                           onClick={() => playPreview(`top-${track.id}`, track.previewUrl)}
                           className={`flex items-center space-x-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
                             isPlayingThisPreview
-                              ? 'bg-font-color-highlight text-white shadow-md dark:bg-dark-font-color-highlight'
+                              ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-md'
                               : 'bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3'
                           }`}
                         >
@@ -302,7 +310,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
       {/* 4. External Discovery Links */}
       {profile.externalLinks.length > 0 && (
         <section className="space-y-3 px-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-font-color-dimmed dark:text-font-color-white/60">
+          <h4 className="text-font-color-dimmed dark:text-font-color-white/60 text-xs font-bold tracking-wider uppercase">
             {t('artistProfile.externalLinks', 'Explore On Web')}
           </h4>
           <div className="flex flex-wrap gap-2">
@@ -311,7 +319,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                 key={link.name}
                 type="button"
                 onClick={() => handleOpenExternalLink(link.url)}
-                className="flex items-center space-x-2 rounded-full bg-background-color-2/60 px-4 py-1.5 text-xs font-medium text-font-color-black transition-all hover:scale-105 hover:bg-background-color-2 dark:bg-dark-background-color-2/60 dark:text-font-color-white dark:hover:bg-dark-background-color-2"
+                className="bg-background-color-2/60 text-font-color-black hover:bg-background-color-2 dark:bg-dark-background-color-2/60 dark:text-font-color-white dark:hover:bg-dark-background-color-2 flex items-center space-x-2 rounded-full px-4 py-1.5 text-xs font-medium transition-all hover:scale-105"
               >
                 <span className="material-icons-round text-sm opacity-70">{link.icon}</span>
                 <span>{link.name}</span>

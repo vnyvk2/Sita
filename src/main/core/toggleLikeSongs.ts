@@ -23,10 +23,13 @@ const syncFavoritesToListenBrainz = async (
 ) => {
   try {
     if (accountGen !== getCurrentListenBrainzGeneration()) {
-      logger.info('Discarding favorites sync: ListenBrainz account generation changed before execution', {
-        actionGen: accountGen,
-        currentGen: getCurrentListenBrainzGeneration()
-      });
+      logger.info(
+        'Discarding favorites sync: ListenBrainz account generation changed before execution',
+        {
+          actionGen: accountGen,
+          currentGen: getCurrentListenBrainzGeneration()
+        }
+      );
       return;
     }
 
@@ -36,7 +39,9 @@ const syncFavoritesToListenBrainz = async (
     }
 
     if (accountGen !== getCurrentListenBrainzGeneration()) {
-      logger.info('Discarding favorites sync: ListenBrainz account generation changed after fetching settings');
+      logger.info(
+        'Discarding favorites sync: ListenBrainz account generation changed after fetching settings'
+      );
       return;
     }
 
@@ -46,7 +51,9 @@ const syncFavoritesToListenBrainz = async (
     ]);
 
     if (accountGen !== getCurrentListenBrainzGeneration()) {
-      logger.info('Discarding favorites sync: ListenBrainz account generation changed after querying songs');
+      logger.info(
+        'Discarding favorites sync: ListenBrainz account generation changed after querying songs'
+      );
       return;
     }
 
@@ -88,17 +95,16 @@ const syncFavoritesToListenBrainz = async (
   }
 };
 
-const syncFavoritesToLastFm = async (
-  likes: number[],
-  dislikes: number[],
-  accountGen: number
-) => {
+const syncFavoritesToLastFm = async (likes: number[], dislikes: number[], accountGen: number) => {
   try {
     if (accountGen !== getCurrentLastFmGeneration()) {
-      logger.info('Discarding favorites sync: Last.fm account generation changed before execution', {
-        actionGen: accountGen,
-        currentGen: getCurrentLastFmGeneration()
-      });
+      logger.info(
+        'Discarding favorites sync: Last.fm account generation changed before execution',
+        {
+          actionGen: accountGen,
+          currentGen: getCurrentLastFmGeneration()
+        }
+      );
       return;
     }
 
@@ -108,7 +114,9 @@ const syncFavoritesToLastFm = async (
     }
 
     if (accountGen !== getCurrentLastFmGeneration()) {
-      logger.info('Discarding favorites sync: Last.fm account generation changed after fetching settings');
+      logger.info(
+        'Discarding favorites sync: Last.fm account generation changed after fetching settings'
+      );
       return;
     }
 
@@ -118,7 +126,9 @@ const syncFavoritesToLastFm = async (
     ]);
 
     if (accountGen !== getCurrentLastFmGeneration()) {
-      logger.info('Discarding favorites sync: Last.fm account generation changed after querying songs');
+      logger.info(
+        'Discarding favorites sync: Last.fm account generation changed after querying songs'
+      );
       return;
     }
 

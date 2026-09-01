@@ -1,5 +1,5 @@
-import { queryClient } from '@renderer/queryClient';
 import { searchQuery } from '@renderer/queries/search';
+import { queryClient } from '@renderer/queryClient';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

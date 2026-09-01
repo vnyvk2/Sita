@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 
 import useSkipLyricsLines from '../../../hooks/useSkipLyricsLines';
 import { useLyricsQuery } from '../../../queries/lyrics';
+import LyricsMetadata from '../../LyricsPage/LyricsMetadata';
 import { renderLyricsLines } from '../../LyricsPage/lyricsUtils';
 import { useActiveLyricIndex } from '../../LyricsPage/useActiveLyricIndex';
-import LyricsMetadata from '../../LyricsPage/LyricsMetadata';
 
 type Props = { isLyricsVisible: boolean };
 

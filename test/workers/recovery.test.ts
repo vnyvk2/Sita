@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
+import { recoverLibraryAssets } from '../../src/main/core/recovery';
 import { getAlbumsWithoutArtwork } from '../../src/main/db/queries/recovery';
 import { libraryScheduler } from '../../src/main/workers/jobScheduler';
-import { recoverLibraryAssets } from '../../src/main/core/recovery';
 
 // Mock dependencies before importing
 vi.mock('../../src/main/db/queries/recovery', () => ({

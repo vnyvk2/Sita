@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_METADATA_PREFERENCES } from '../../../../common/metadata/preferences';
 import { getTrackPreviewKey } from '../../../../common/metadata/preview';
 import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
+import { MetadataApplyOrchestrator } from '../../apply/MetadataApplyOrchestrator';
 import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import type { AutoTagStage } from '../../models/AlbumTagPreview';
 import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
 import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
@@ -12,8 +14,6 @@ import { AlbumAutoTagService } from '../AlbumAutoTagService';
 import { AlbumMetadataService } from '../AlbumMetadataService';
 import { MetadataApplyService } from '../MetadataApplyService';
 import { TagWriterService } from '../TagWriterService';
-import { MetadataApplyOrchestrator } from '../../apply/MetadataApplyOrchestrator';
-import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 
 describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () => {
   it('executes search -> buildPreview -> user edits -> transactional apply -> complete undo flow', async () => {
@@ -27,7 +27,8 @@ describe('Phase 4 — AutoTag Workflow & Production-Grade Pipeline Suite', () =>
     const metadataService = new AlbumMetadataService(runtime);
     const tagWriter = new TagWriterService();
     vi.spyOn(tagWriter, 'writeBatch').mockImplementation(async (payloads) =>
-      payloads.map((p) => ({ filePath: p.filePath, success: true })));
+      payloads.map((p) => ({ filePath: p.filePath, success: true }))
+    );
     const dbUpdater = vi.fn().mockResolvedValue(undefined);
     const applyService = new MetadataApplyService({ tagWriter, dbUpdater });
     const autoTagService = new AlbumAutoTagService({

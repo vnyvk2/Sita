@@ -1,5 +1,6 @@
 import http from 'http';
 import type { AddressInfo } from 'net';
+
 import logger from '../../logger';
 
 export const DEFAULT_LOOPBACK_PORT = 43821;
@@ -20,8 +21,8 @@ export class SpotifyLoopbackServer {
   /**
    * Spawns an ephemeral HTTP loopback server listening strictly on 127.0.0.1.
    *
-   * Resilient to stray/malformed requests: invalid state or stray path probes
-   * return HTTP 400/404 without destroying the pending authorization listener.
+   * Resilient to stray/malformed requests: invalid state or stray path probes return HTTP 400/404
+   * without destroying the pending authorization listener.
    */
   public static async create(options: {
     expectedState: string;
@@ -186,7 +187,9 @@ export class SpotifyLoopbackServer {
 
     timeoutTimer = setTimeout(() => {
       void closeServer();
-      callbackPromiseReject(new Error(`Spotify authorization timed out after ${timeoutMs / 1000}s`));
+      callbackPromiseReject(
+        new Error(`Spotify authorization timed out after ${timeoutMs / 1000}s`)
+      );
     }, timeoutMs);
 
     const redirectUri = `http://127.0.0.1:${port}/callback`;

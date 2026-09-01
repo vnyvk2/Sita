@@ -1,13 +1,15 @@
 import { EventEmitter } from 'events';
-import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
+
 import { db } from '@main/db/db';
-import { ASSET_EVENTS } from '../libraryChoreography';
+import { getSongById } from '@main/db/queries/songs';
 import { lyrics } from '@main/db/schema';
 import logger from '@main/logger';
-import { getSongById } from '@main/db/queries/songs';
 import fetchLyricsFromLrclib from '@main/utils/fetchLyricsFromLrclib';
 import fetchLyricsFromMusixmatch from '@main/utils/fetchLyricsFromMusixmatch';
+import { eq } from 'drizzle-orm';
+
+import { ASSET_EVENTS } from '../libraryChoreography';
 import type { Job, JobClass, JobState } from '../types';
 
 export const CURRENT_LYRICS_GENERATOR_VERSION = 1;
@@ -99,39 +101,45 @@ export class LyricsJob implements Job {
       // 3. LRCLib
       if (!foundLyricsText) {
         try {
-          const lrclibRes = await fetchLyricsFromLrclib({
-            track_name: song.title,
-            artist_name: artistName,
-            album_name: albumName,
-            duration: durationSeconds.toString()
-          }, 'ANY');
+          const lrclibRes = await fetchLyricsFromLrclib(
+            {
+              track_name: song.title,
+              artist_name: artistName,
+              album_name: albumName,
+              duration: durationSeconds.toString()
+            },
+            'ANY'
+          );
           if (lrclibRes && lrclibRes.lyrics) {
             foundLyricsText = lrclibRes.lyrics;
             isSynced = lrclibRes.lyricsType === 'SYNCED';
             provider = 'LRCLIB';
           }
         } catch (e) {
-           logger.debug(`[LyricsJob] LRCLib failed for ${song.title}`);
+          logger.debug(`[LyricsJob] LRCLib failed for ${song.title}`);
         }
       }
 
       // 4. Musixmatch
       if (!foundLyricsText) {
         try {
-           const mxRes = await fetchLyricsFromMusixmatch({
-            q_track: song.title,
-            q_artist: artistName,
-            q_artists: artistName,
-            q_album: albumName,
-            q_duration: durationSeconds.toString()
-          }, 'ANY');
+          const mxRes = await fetchLyricsFromMusixmatch(
+            {
+              q_track: song.title,
+              q_artist: artistName,
+              q_artists: artistName,
+              q_album: albumName,
+              q_duration: durationSeconds.toString()
+            },
+            'ANY'
+          );
           if (mxRes && mxRes.lyrics) {
             foundLyricsText = mxRes.lyrics;
             isSynced = mxRes.lyricsType === 'SYNCED';
             provider = 'MUSIXMATCH';
           }
         } catch (e) {
-           logger.debug(`[LyricsJob] Musixmatch failed for ${song.title}`);
+          logger.debug(`[LyricsJob] Musixmatch failed for ${song.title}`);
         }
       }
 
@@ -144,7 +152,8 @@ export class LyricsJob implements Job {
 
       await db.transaction(async (trx) => {
         if (existing) {
-          await trx.update(lyrics)
+          await trx
+            .update(lyrics)
             .set({
               text: foundLyricsText,
               isSynced,

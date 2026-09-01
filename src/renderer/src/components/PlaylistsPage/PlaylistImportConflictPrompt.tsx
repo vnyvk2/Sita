@@ -1,8 +1,9 @@
+import { CollectionClient } from '@renderer/api/CollectionClient';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+
 import Button from '../Button';
-import { CollectionClient } from '@renderer/api/CollectionClient';
 
 interface PlaylistImportConflictPromptProps {
   filePath?: string;
@@ -44,12 +45,12 @@ const PlaylistImportConflictPrompt = (props: PlaylistImportConflictPromptProps) 
       </div>
 
       {totalEntries !== undefined && (
-        <div className="summary-box bg-background-color-dim/50 dark:bg-dark-background-color-dim/50 p-4 rounded-md mb-6 text-sm">
-          <div className="font-semibold mb-1 text-font-color-highlight dark:text-dark-font-color-highlight">
+        <div className="summary-box bg-background-color-dim/50 dark:bg-dark-background-color-dim/50 mb-6 rounded-md p-4 text-sm">
+          <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-1 font-semibold">
             {t('playlist.importSummary', 'Import Analysis')}
           </div>
           {importedPlaylistName && (
-            <div className="font-medium text-xs mb-1 opacity-80">
+            <div className="mb-1 text-xs font-medium opacity-80">
               Playlist: {importedPlaylistName}
             </div>
           )}
@@ -67,7 +68,7 @@ const PlaylistImportConflictPrompt = (props: PlaylistImportConflictPromptProps) 
         </div>
       )}
 
-      <div className="description mb-6 text-font-color-highlight/80 dark:text-dark-font-color-highlight/80 text-lg">
+      <div className="description text-font-color-highlight/80 dark:text-dark-font-color-highlight/80 mb-6 text-lg">
         {targetPlaylistId && playlistName
           ? t('playlist.importConflictDesc', {
               playlistName,
@@ -80,12 +81,13 @@ const PlaylistImportConflictPrompt = (props: PlaylistImportConflictPromptProps) 
       </div>
 
       {confirmingReplace ? (
-        <div className="replace-warning-box bg-font-color-error/10 border border-font-color-error/30 p-4 rounded-md mb-6">
-          <div className="text-font-color-error font-semibold mb-2">
+        <div className="replace-warning-box bg-font-color-error/10 border-font-color-error/30 mb-6 rounded-md border p-4">
+          <div className="text-font-color-error mb-2 font-semibold">
             ⚠️ Warning: Destructive Action
           </div>
-          <div className="text-sm mb-4">
-            Replacing will clear all existing tracks from &apos;{playlistName}&apos; and overwrite it with the imported tracks.
+          <div className="mb-4 text-sm">
+            Replacing will clear all existing tracks from &apos;{playlistName}&apos; and overwrite
+            it with the imported tracks.
           </div>
           <div className="flex justify-end gap-3">
             <Button
@@ -104,7 +106,7 @@ const PlaylistImportConflictPrompt = (props: PlaylistImportConflictPromptProps) 
           <Button
             label={t('playlist.createNewPlaylist', 'Create new playlist')}
             iconName="add"
-            className="w-full justify-start py-3 text-left font-medium cursor-pointer"
+            className="w-full cursor-pointer justify-start py-3 text-left font-medium"
             clickHandler={() => handleAction('create')}
           />
           {targetPlaylistId && (
@@ -112,13 +114,13 @@ const PlaylistImportConflictPrompt = (props: PlaylistImportConflictPromptProps) 
               <Button
                 label={t('playlist.mergeIntoCurrent', 'Merge into current playlist')}
                 iconName="merge_type"
-                className="w-full justify-start py-3 text-left font-medium cursor-pointer"
+                className="w-full cursor-pointer justify-start py-3 text-left font-medium"
                 clickHandler={() => handleAction('merge')}
               />
               <Button
                 label={t('playlist.replaceCurrent', 'Replace current playlist')}
                 iconName="sync"
-                className="danger-btn w-full justify-start py-3 text-left font-medium cursor-pointer"
+                className="danger-btn w-full cursor-pointer justify-start py-3 text-left font-medium"
                 clickHandler={() => setConfirmingReplace(true)}
               />
             </>

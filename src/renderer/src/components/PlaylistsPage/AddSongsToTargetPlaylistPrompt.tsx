@@ -1,6 +1,7 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAddSongsToCollection } from '../../hooks/collections/useCollectionMutations';
 import { useWindowHydration } from '../../hooks/useWindowHydration';
@@ -70,7 +71,14 @@ export const AddSongsToTargetPlaylistPrompt = ({
         onError: (err) => console.error(err)
       }
     );
-  }, [addSongsMutation, playlistId, selectedSongIdSet, changePromptMenuData, addNewNotifications, t]);
+  }, [
+    addSongsMutation,
+    playlistId,
+    selectedSongIdSet,
+    changePromptMenuData,
+    addNewNotifications,
+    t
+  ]);
 
   const toggleSelectAll = useCallback(() => {
     if (selectedSongIdSet.size === eligibleIds.length && eligibleIds.length > 0) {
@@ -99,10 +107,7 @@ export const AddSongsToTargetPlaylistPrompt = ({
 
       if (!song) {
         return (
-          <div
-            key={songId}
-            className="flex h-14 items-center justify-between rounded-lg px-2"
-          >
+          <div key={songId} className="flex h-14 items-center justify-between rounded-lg px-2">
             <div className="flex items-center gap-3 overflow-hidden pr-2">
               <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-10 w-10 min-w-10 animate-pulse rounded-md" />
               <div className="flex flex-col gap-1 overflow-hidden">

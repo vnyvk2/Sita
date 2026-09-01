@@ -1,5 +1,5 @@
-import { queryClient } from '@renderer/queryClient';
 import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
@@ -118,13 +118,13 @@ const LyricsSettings = () => {
       </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
         {/* 1. Lyrics Appearance (Default vs Artwork background) */}
-        <li className="lyrics-appearance-section mb-6 list-none -ml-6">
-          <div className="flex flex-col gap-4 rounded-lg bg-background-color-2/50 dark:bg-dark-background-color-2/50 p-4 border border-background-color-3/20 dark:border-dark-background-color-3/20">
+        <li className="lyrics-appearance-section mb-6 -ml-6 list-none">
+          <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-4 rounded-lg border p-4">
             <div className="flex flex-col gap-1">
-              <div className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+              <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
                 {t('settingsPage.lyricsAppearance', 'Lyrics Appearance')}
               </div>
-              <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed">
+              <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs">
                 {t(
                   'settingsPage.lyricsAppearanceDescription',
                   'Choose the background style for the lyrics view.'
@@ -137,7 +137,7 @@ const LyricsSettings = () => {
               <button
                 type="button"
                 aria-pressed={lyricsBackground === 'default'}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out cursor-pointer ${
+                className={`flex-1 cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
                   lyricsBackground === 'default'
                     ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
                     : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
@@ -149,7 +149,7 @@ const LyricsSettings = () => {
               <button
                 type="button"
                 aria-pressed={lyricsBackground === 'artwork'}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out cursor-pointer ${
+                className={`flex-1 cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
                   lyricsBackground === 'artwork'
                     ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
                     : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
@@ -162,23 +162,23 @@ const LyricsSettings = () => {
 
             {/* Nested Artwork Background Controls */}
             {lyricsBackground === 'artwork' && (
-              <div className="mt-2 pt-4 border-t border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-5">
+              <div className="border-background-color-3/20 dark:border-dark-background-color-3/20 mt-2 flex flex-col gap-5 border-t pt-4">
                 {/* Blur Intensity Slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
                       {t('settingsPage.blurIntensity', 'Blur Intensity')}: {lyricsArtworkBlur}px
                     </span>
                     <Button
                       label={t('settingsPage.resetBlur', 'Reset to 40px')}
                       iconName="restart_alt"
-                      className="text-xs py-1 px-2.5"
+                      className="px-2.5 py-1 text-xs"
                       isDisabled={lyricsArtworkBlur === 40}
                       clickHandler={() => handleBlurChange(40)}
                     />
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                  <div className="mt-1 flex items-center gap-3">
+                    <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
                       20px
                     </span>
                     <input
@@ -195,7 +195,7 @@ const LyricsSettings = () => {
                       style={blurSliderStyle}
                       title={`${lyricsArtworkBlur}px`}
                     />
-                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                    <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
                       80px
                     </span>
                   </div>
@@ -204,19 +204,20 @@ const LyricsSettings = () => {
                 {/* Background Darkness Slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
-                      {t('settingsPage.backgroundDarkness', 'Background Darkness')}: {lyricsArtworkDarkness}%
+                    <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
+                      {t('settingsPage.backgroundDarkness', 'Background Darkness')}:{' '}
+                      {lyricsArtworkDarkness}%
                     </span>
                     <Button
                       label={t('settingsPage.resetDarkness', 'Reset to 50%')}
                       iconName="restart_alt"
-                      className="text-xs py-1 px-2.5"
+                      className="px-2.5 py-1 text-xs"
                       isDisabled={lyricsArtworkDarkness === 50}
                       clickHandler={() => handleDarknessChange(50)}
                     />
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                  <div className="mt-1 flex items-center gap-3">
+                    <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
                       20%
                     </span>
                     <input
@@ -233,21 +234,21 @@ const LyricsSettings = () => {
                       style={darknessSliderStyle}
                       title={`${lyricsArtworkDarkness}%`}
                     />
-                    <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+                    <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
                       80%
                     </span>
                   </div>
                 </div>
 
                 {/* Subtle Animation Toggle */}
-                <div className="flex flex-col gap-1 mt-1">
+                <div className="mt-1 flex flex-col gap-1">
                   <Checkbox
                     id="lyricsArtworkAnimation"
                     isChecked={lyricsArtworkAnimation}
                     checkedStateUpdateFunction={(state) => handleAnimationChange(state)}
                     labelContent={t('settingsPage.subtleAnimation', 'Subtle animation')}
                   />
-                  <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed pl-7">
+                  <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed pl-7 text-xs">
                     {t(
                       'settingsPage.subtleAnimationDescription',
                       'Gentle ambient motion for artwork background.'

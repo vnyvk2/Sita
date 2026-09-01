@@ -51,7 +51,7 @@ const TheatreLyricsView = ({
   const isArtworkBackground = preferences?.lyricsBackground === 'artwork';
 
   return createPortal(
-    <div className="theatre-lyrics-view fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-background-color-1 text-font-color-black select-none dark:bg-dark-background-color-1 dark:text-font-color-white">
+    <div className="theatre-lyrics-view bg-background-color-1 text-font-color-black dark:bg-dark-background-color-1 dark:text-font-color-white fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden select-none">
       {/* Ambient Artwork Background */}
       {isArtworkBackground && (
         <LyricsAmbientBackground
@@ -124,7 +124,7 @@ const TheatreLyricsView = ({
       </div>
 
       {/* Main Lyrics Stream */}
-      <div className="lyrics-lines-container relative z-10 flex min-h-0 flex-1 w-full scrollbar-gutter-stable flex-col items-center overflow-y-auto px-8 py-[8vh] [overflow-anchor:none]!">
+      <div className="lyrics-lines-container relative z-10 flex min-h-0 w-full flex-1 scrollbar-gutter-stable flex-col items-center overflow-y-auto px-8 py-[8vh] [overflow-anchor:none]!">
         {lyricsComponents}
         {lyrics && (
           <LyricsMetadata

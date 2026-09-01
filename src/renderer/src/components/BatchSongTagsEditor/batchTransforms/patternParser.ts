@@ -27,7 +27,8 @@ export interface CompiledPattern {
 }
 
 /**
- * Compiles a user pattern string (e.g. "%track% - %artist% - %title%") into a RegExp with capture groups.
+ * Compiles a user pattern string (e.g. "%track% - %artist% - %title%") into a RegExp with capture
+ * groups.
  */
 export function compilePattern(pattern: string): CompiledPattern | null {
   if (!pattern || pattern.trim() === '') return null;
@@ -77,9 +78,7 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Extracts target string from path (basename without extension or normalized path).
- */
+/** Extracts target string from path (basename without extension or normalized path). */
 export function extractPathTarget(filePath: string, isPathPattern: boolean): string {
   if (!filePath) return '';
 
@@ -97,9 +96,7 @@ export function extractPathTarget(filePath: string, isPathPattern: boolean): str
   return filename.replace(/\.[a-zA-Z0-9]+$/, '');
 }
 
-/**
- * Parses raw captured token value into typed metadata value.
- */
+/** Parses raw captured token value into typed metadata value. */
 function parseTokenValue(field: EditableField, rawValue: string): unknown {
   const trimmed = rawValue.trim();
 
@@ -128,9 +125,7 @@ function parseTokenValue(field: EditableField, rawValue: string): unknown {
   return trimmed;
 }
 
-/**
- * Computes live match previews for pattern parser across target rows.
- */
+/** Computes live match previews for pattern parser across target rows. */
 export function previewPatternParser(
   context: BatchTransformContext,
   config: PatternParserConfig
@@ -182,9 +177,7 @@ export function previewPatternParser(
   return previews;
 }
 
-/**
- * Pure transformation that extracts metadata from file paths into row drafts.
- */
+/** Pure transformation that extracts metadata from file paths into row drafts. */
 export function parsePattern(
   context: BatchTransformContext,
   config: PatternParserConfig

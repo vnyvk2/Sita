@@ -1,4 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { albumQuery } from '@renderer/queries/albums';
+import { artistQuery } from '@renderer/queries/artists';
+import { genreQuery } from '@renderer/queries/genres';
+import { songQuery } from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
+import { useNavigate } from '@tanstack/react-router';
 import {
   type ColumnDef,
   flexRender,
@@ -7,31 +12,12 @@ import {
   type SortingState,
   useReactTable
 } from '@tanstack/react-table';
-import { TableVirtuoso } from 'react-virtuoso';
-import { useNavigate } from '@tanstack/react-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { queryClient } from '@renderer/queryClient';
-import { songQuery } from '@renderer/queries/songs';
-import { artistQuery } from '@renderer/queries/artists';
-import { albumQuery } from '@renderer/queries/albums';
-import { genreQuery } from '@renderer/queries/genres';
+import { TableVirtuoso } from 'react-virtuoso';
+
+import type { BatchSongItemResult, BatchTagUpdateProgressEvent } from '../../../../types/app';
 import Button from '../Button';
-import EditableCell from './EditableCell';
-import SaveProgressModal from './SaveProgressModal';
-import BulkOperationsBar from './BulkOperationsBar';
-import BulkSetValuesModal from './BulkSetValuesModal';
-import FindReplaceModal from './FindReplaceModal';
-import CaseConvertModal from './CaseConvertModal';
-import PatternParserModal from './PatternParserModal';
-import type { BatchEditStats, BatchTrackData, BatchTrackRow, EditableField } from './types';
-import {
-  buildCanonicalSongTags,
-  formatStringList,
-  formatTrackNumber,
-  isFieldDirty,
-  parseStringList,
-  validateField
-} from './utils';
 import {
   autoNumber,
   bulkApply,
@@ -45,7 +31,22 @@ import {
   type FindReplaceConfig,
   type PatternParserConfig
 } from './batchTransforms';
-import type { BatchSongItemResult, BatchTagUpdateProgressEvent } from '../../../../types/app';
+import BulkOperationsBar from './BulkOperationsBar';
+import BulkSetValuesModal from './BulkSetValuesModal';
+import CaseConvertModal from './CaseConvertModal';
+import EditableCell from './EditableCell';
+import FindReplaceModal from './FindReplaceModal';
+import PatternParserModal from './PatternParserModal';
+import SaveProgressModal from './SaveProgressModal';
+import type { BatchEditStats, BatchTrackData, BatchTrackRow, EditableField } from './types';
+import {
+  buildCanonicalSongTags,
+  formatStringList,
+  formatTrackNumber,
+  isFieldDirty,
+  parseStringList,
+  validateField
+} from './utils';
 
 export interface BatchSongTagsEditorProps {
   initialSongIds: number[];
@@ -89,8 +90,9 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
     async function loadMetadata() {
       setIsLoading(true);
-      const results: Array<{ id: number; tags?: SongTags; row?: BatchTrackRow } | null> =
-        new Array(sessionSongIds.length).fill(null);
+      const results: Array<{ id: number; tags?: SongTags; row?: BatchTrackRow } | null> = new Array(
+        sessionSongIds.length
+      ).fill(null);
 
       const CONCURRENCY = 8;
       let currentIndex = 0;
@@ -143,9 +145,8 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
         }
       };
 
-      const workers = Array.from(
-        { length: Math.min(CONCURRENCY, sessionSongIds.length) },
-        () => worker()
+      const workers = Array.from({ length: Math.min(CONCURRENCY, sessionSongIds.length) }, () =>
+        worker()
       );
       await Promise.all(workers);
 
@@ -250,7 +251,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
     setRows((prev) =>
       prev.map((r) => ({
         ...r,
-        draft: { ...r.original, artists: [...r.original.artists], albumArtists: [...r.original.albumArtists], genres: [...r.original.genres] },
+        draft: {
+          ...r.original,
+          artists: [...r.original.artists],
+          albumArtists: [...r.original.albumArtists],
+          genres: [...r.original.genres]
+        },
         dirtyFields: new Set<EditableField>(),
         validationErrors: new Map<EditableField, string>()
       }))
@@ -259,14 +265,18 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
   // Save coordinator execution
   const isMountedRef = useRef(true);
-  const activeProgressHandlerRef = useRef<((_: unknown, event: BatchTagUpdateProgressEvent) => void) | null>(null);
+  const activeProgressHandlerRef = useRef<
+    ((_: unknown, event: BatchTagUpdateProgressEvent) => void) | null
+  >(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (activeProgressHandlerRef.current) {
-        window.api.songUpdates.removeBatchTagUpdateProgressListener(activeProgressHandlerRef.current);
+        window.api.songUpdates.removeBatchTagUpdateProgressListener(
+          activeProgressHandlerRef.current
+        );
         activeProgressHandlerRef.current = null;
       }
     };
@@ -318,7 +328,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
             if (savedIds.has(r.songId)) {
               return {
                 ...r,
-                original: { ...r.draft, artists: [...r.draft.artists], albumArtists: [...r.draft.albumArtists], genres: [...r.draft.genres] },
+                original: {
+                  ...r.draft,
+                  artists: [...r.draft.artists],
+                  albumArtists: [...r.draft.albumArtists],
+                  genres: [...r.draft.genres]
+                },
                 dirtyFields: new Set<EditableField>(),
                 validationErrors: new Map<EditableField, string>(),
                 status: 'saved'
@@ -336,7 +351,9 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
       console.error('[BatchSongTagsEditor] Batch update failed:', err);
     } finally {
       if (activeProgressHandlerRef.current) {
-        window.api.songUpdates.removeBatchTagUpdateProgressListener(activeProgressHandlerRef.current);
+        window.api.songUpdates.removeBatchTagUpdateProgressListener(
+          activeProgressHandlerRef.current
+        );
         activeProgressHandlerRef.current = null;
       }
       if (isMountedRef.current) {
@@ -355,7 +372,7 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
             type="checkbox"
             checked={table.getIsAllPageRowsSelected()}
             onChange={table.getToggleAllPageRowsSelectedHandler()}
-            className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+            className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
             aria-label="Select all rows"
           />
         ),
@@ -364,7 +381,7 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
             type="checkbox"
             checked={row.getIsSelected()}
             onChange={row.getToggleSelectedHandler()}
-            className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+            className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
             aria-label={`Select track ${row.original.songId}`}
           />
         ),
@@ -652,10 +669,10 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
     return (
       <div className="flex h-full w-full items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <span className="material-icons-round animate-spin text-3xl text-font-color-highlight dark:text-dark-font-color-highlight">
+          <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight animate-spin text-3xl">
             sync
           </span>
-          <p className="text-sm font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed">
+          <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-sm font-medium">
             Loading metadata workspace...
           </p>
         </div>
@@ -666,44 +683,51 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
   if (sessionSongIds.length === 0 || rows.length === 0) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <span className="material-icons-round text-5xl text-font-color-dimmed dark:text-dark-font-color-dimmed">
+        <span className="material-icons-round text-font-color-dimmed dark:text-dark-font-color-dimmed text-5xl">
           edit_note
         </span>
-        <h2 className="text-xl font-semibold text-font-color-black dark:text-font-color-white">
+        <h2 className="text-font-color-black dark:text-font-color-white text-xl font-semibold">
           No Songs Selected for Batch Editing
         </h2>
-        <p className="max-w-md text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
-          Select multiple tracks in your song list or library, then choose &quot;Edit Tags&quot; to open the batch editor workspace.
+        <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed max-w-md text-xs">
+          Select multiple tracks in your song list or library, then choose &quot;Edit Tags&quot; to
+          open the batch editor workspace.
         </p>
         <Button
           label="Go to Songs"
           iconName="library_music"
           clickHandler={handleNavigateBack}
-          className="bg-font-color-highlight dark:bg-dark-font-color-highlight text-white font-medium text-xs px-4 py-2 rounded-lg"
+          className="bg-font-color-highlight dark:bg-dark-font-color-highlight rounded-lg px-4 py-2 text-xs font-medium text-white"
         />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-background-color-1 dark:bg-dark-background-color-1">
+    <div className="bg-background-color-1 dark:bg-dark-background-color-1 flex h-full w-full flex-col overflow-hidden">
       {/* Top Header Bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-background-color-2 px-6 dark:border-dark-background-color-2">
+      <header className="border-background-color-2 dark:border-dark-background-color-2 flex h-14 shrink-0 items-center justify-between border-b px-6">
         <div className="flex items-center gap-4">
           <button
             onClick={handleNavigateBack}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-font-color-dimmed hover:bg-background-color-2 hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white cursor-pointer transition-colors"
+            className="text-font-color-dimmed hover:bg-background-color-2 hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors"
             title="Back"
           >
             <span className="material-icons-round text-lg">arrow_back</span>
           </button>
           <div>
-            <h1 className="text-base font-bold text-font-color-black dark:text-font-color-white">
+            <h1 className="text-font-color-black dark:text-font-color-white text-base font-bold">
               Batch Metadata Editor
             </h1>
-            <p className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
               {stats.totalRows} tracks &middot; {stats.selectedCount} selected &middot;{' '}
-              <span className={stats.modifiedTrackCount > 0 ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-medium' : ''}>
+              <span
+                className={
+                  stats.modifiedTrackCount > 0
+                    ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-medium'
+                    : ''
+                }
+              >
                 {stats.modifiedTrackCount} modified
               </span>{' '}
               ({stats.totalFieldsChanged} fields changed)
@@ -717,17 +741,21 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
               label="Discard Changes"
               iconName="restart_alt"
               clickHandler={handleDiscardChanges}
-              className="border border-background-color-3/40 bg-transparent text-xs font-medium text-font-color-dimmed hover:text-font-color-black dark:border-dark-background-color-3/40 dark:text-dark-font-color-dimmed dark:hover:text-font-color-white px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="border-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:border-dark-background-color-3/40 dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer rounded-lg border bg-transparent px-3 py-1.5 text-xs font-medium transition-colors"
             />
           )}
           <Button
-            label={stats.modifiedTrackCount > 0 ? `Save ${stats.modifiedTrackCount} Tracks` : 'Save Tracks'}
+            label={
+              stats.modifiedTrackCount > 0
+                ? `Save ${stats.modifiedTrackCount} Tracks`
+                : 'Save Tracks'
+            }
             iconName="save"
             isDisabled={stats.modifiedTrackCount === 0 || stats.hasValidationErrors || isSaving}
             clickHandler={handleSave}
-            className={`text-xs font-medium px-4 py-1.5 rounded-lg transition-colors ${
+            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
               stats.modifiedTrackCount > 0 && !stats.hasValidationErrors
-                ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white cursor-pointer hover:opacity-90'
+                ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight cursor-pointer text-white hover:opacity-90'
                 : 'bg-background-color-2 text-font-color-dimmed dark:bg-dark-background-color-2 dark:text-dark-font-color-dimmed cursor-not-allowed opacity-50'
             }`}
           />
@@ -754,7 +782,7 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
 
       {/* Main Virtualized Data Table View */}
       <main className="flex-1 overflow-hidden p-4">
-        <div className="h-full w-full overflow-hidden rounded-xl border border-background-color-2 dark:border-dark-background-color-2 shadow-sm">
+        <div className="border-background-color-2 dark:border-dark-background-color-2 h-full w-full overflow-hidden rounded-xl border shadow-sm">
           <TableVirtuoso
             style={{ height: '100%', width: '100%' }}
             totalCount={tableRows.length}
@@ -767,17 +795,18 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
                   {tableProps.children}
                 </table>
               ),
-              TableHead: React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-                (headProps, ref) => (
-                  <thead
-                    {...headProps}
-                    ref={ref}
-                    className="sticky top-0 z-10 bg-background-color-2/80 backdrop-blur-sm dark:bg-dark-background-color-2/80 font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed border-b border-background-color-2 dark:border-dark-background-color-2"
-                  >
-                    {headProps.children}
-                  </thead>
-                )
-              ),
+              TableHead: React.forwardRef<
+                HTMLTableSectionElement,
+                React.HTMLAttributes<HTMLTableSectionElement>
+              >((headProps, ref) => (
+                <thead
+                  {...headProps}
+                  ref={ref}
+                  className="bg-background-color-2/80 dark:bg-dark-background-color-2/80 text-font-color-dimmed dark:text-dark-font-color-dimmed border-background-color-2 dark:border-dark-background-color-2 sticky top-0 z-10 border-b font-medium backdrop-blur-sm"
+                >
+                  {headProps.children}
+                </thead>
+              )),
               TableRow: (rowProps) => {
                 const index = rowProps['data-index'];
                 const row = tableRows[index];
@@ -787,7 +816,7 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
                 return (
                   <tr
                     {...rowProps}
-                    className={`border-b border-background-color-2/40 transition-colors dark:border-dark-background-color-2/40 ${
+                    className={`border-background-color-2/40 dark:border-dark-background-color-2/40 border-b transition-colors ${
                       isSelected
                         ? 'bg-font-color-highlight/10 dark:bg-dark-font-color-highlight/10'
                         : isDirty
@@ -808,9 +837,9 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
                       key={header.id}
                       style={{ width: header.getSize() }}
                       onClick={header.column.getToggleSortingHandler()}
-                      className={`px-3 py-2.5 select-none font-semibold transition-colors ${
+                      className={`px-3 py-2.5 font-semibold transition-colors select-none ${
                         header.column.getCanSort()
-                          ? 'cursor-pointer hover:bg-background-color-3/40 dark:hover:bg-dark-background-color-3/40'
+                          ? 'hover:bg-background-color-3/40 dark:hover:bg-dark-background-color-3/40 cursor-pointer'
                           : ''
                       }`}
                     >
@@ -820,12 +849,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
                           : flexRender(header.column.columnDef.header, header.getContext())}
                         {{
                           asc: (
-                            <span className="material-icons-round text-sm leading-none text-font-color-highlight dark:text-dark-font-color-highlight">
+                            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm leading-none">
                               arrow_drop_up
                             </span>
                           ),
                           desc: (
-                            <span className="material-icons-round text-sm leading-none text-font-color-highlight dark:text-dark-font-color-highlight">
+                            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm leading-none">
                               arrow_drop_down
                             </span>
                           )

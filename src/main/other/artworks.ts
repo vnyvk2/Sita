@@ -4,13 +4,9 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { db } from '@main/db/db';
-import {
-  deleteArtworks,
-  getUnusedArtworkIds
-} from '@main/db/queries/artworks';
-import { inArray } from 'drizzle-orm';
-
+import { deleteArtworks, getUnusedArtworkIds } from '@main/db/queries/artworks';
 import { artworks } from '@main/db/schema';
+import { inArray } from 'drizzle-orm';
 import { app } from 'electron';
 import sharp from 'sharp';
 
@@ -53,16 +49,11 @@ const createArtworks = async (
 
     try {
       const optimizedTmpPath = `${optimizedImgPath}.tmp`;
-      await sharp(artwork)
-        .webp({ quality: 50, effort: 0 })
-        .resize(50, 50)
-        .toFile(optimizedTmpPath);
+      await sharp(artwork).webp({ quality: 50, effort: 0 }).resize(50, 50).toFile(optimizedTmpPath);
       await fs.rename(optimizedTmpPath, optimizedImgPath);
 
       const imgTmpPath = `${imgPath}.tmp`;
-      const info = await sharp(artwork, { animated: true })
-        .webp()
-        .toFile(imgTmpPath);
+      const info = await sharp(artwork, { animated: true }).webp().toFile(imgTmpPath);
       await fs.rename(imgTmpPath, imgPath);
 
       return {
@@ -94,7 +85,10 @@ export const checkForDefaultArtworkSaveLocation = async () => {
     const code = (error as any)?.code;
     const isPermanent = code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
     if (isPermanent) {
-      logger.error('Artwork save location unwritable; falling back to default artwork.', { error, code });
+      logger.error('Artwork save location unwritable; falling back to default artwork.', {
+        error,
+        code
+      });
       isDefaultArtworkLocationCreated = true; // Avoid repeated failing syscalls on every song
     } else {
       logger.warn('Transient error creating artwork save location.', { error, code });
@@ -131,7 +125,10 @@ export const processArtworkFiles = async (
   const optHash = `${hashKey}-optimized`;
 
   // Lookup existing artwork by hash (non-transactional read)
-  const existing = await db.select().from(artworks).where(inArray(artworks.hash, [fullHash, optHash]));
+  const existing = await db
+    .select()
+    .from(artworks)
+    .where(inArray(artworks.hash, [fullHash, optHash]));
   if (existing.length > 0) {
     // If we found the artwork, return it directly to skip duplicate generation
     return { existing };
@@ -159,13 +156,25 @@ export const processArtworkFiles = async (
 
   return {
     payloads: [
-      { hash: fullHash, path: result.realArtworkPath, width: result.width, height: result.height, isOptimized: false, source: 'LOCAL' }, // Full resolution song artwork
-      { hash: optHash, path: result.realOptimizedArtworkPath, width: 50, height: 50, isOptimized: true, source: 'LOCAL' } // Optimized song artwork
+      {
+        hash: fullHash,
+        path: result.realArtworkPath,
+        width: result.width,
+        height: result.height,
+        isOptimized: false,
+        source: 'LOCAL'
+      }, // Full resolution song artwork
+      {
+        hash: optHash,
+        path: result.realOptimizedArtworkPath,
+        width: 50,
+        height: 50,
+        isOptimized: true,
+        source: 'LOCAL'
+      } // Optimized song artwork
     ]
   };
 };
-
-
 
 const manageArtworkRemovalErrors = (error: Error) => {
   if (isAnErrorWithCode(error) && error.code === 'ENOENT')
@@ -205,9 +214,9 @@ export const removeArtworks = async (artworkIds: number[], trx: DB | DBTransacti
 
     await Promise.allSettled(
       artworks.map((artwork) => {
-        return fs.unlink(removeDefaultAppProtocolFromFilePath(artwork.path)).catch(
-          manageArtworkRemovalErrors
-        );
+        return fs
+          .unlink(removeDefaultAppProtocolFromFilePath(artwork.path))
+          .catch(manageArtworkRemovalErrors);
       })
     );
   } catch (error) {
@@ -268,10 +277,10 @@ export const createTempArtwork = async (artwork: Uint8Array | Buffer | string) =
 
     const artworkPath = path.resolve(tempFolder, `${generateRandomId()}.webp`);
     const tmpArtworkPath = `${artworkPath}.tmp`;
-    
+
     await sharp(artwork).toFile(tmpArtworkPath);
     await fs.rename(tmpArtworkPath, artworkPath);
-    
+
     return artworkPath;
   } catch (error) {
     logger.error(`Failed to create a temporary artwork.`, { error });

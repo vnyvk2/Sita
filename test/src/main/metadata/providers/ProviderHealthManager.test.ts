@@ -1,20 +1,28 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderHealthManager } from '@main/metadata/providers/health/ProviderHealthManager';
+import { describe, expect, it } from 'vitest';
 
 describe('ProviderHealthManager', () => {
   it('should calculate health metrics and track request timestamps', () => {
     const eventBus = new MetadataEventBus();
     const manager = new ProviderHealthManager(eventBus);
-    const providerInfo = new MetadataProviderInfo({ id: 'musicbrainz', displayName: 'MusicBrainz', version: '1.0' });
+    const providerInfo = new MetadataProviderInfo({
+      id: 'musicbrainz',
+      displayName: 'MusicBrainz',
+      version: '1.0'
+    });
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 10 });
 
     eventBus.emit('ProviderStarted', { providerInfo, identity, latencyMs: 0 });
-    eventBus.emit('ProviderCompleted', { providerInfo, identity, status: 'success', latencyMs: 150 });
+    eventBus.emit('ProviderCompleted', {
+      providerInfo,
+      identity,
+      status: 'success',
+      latencyMs: 150
+    });
 
     const health = manager.getHealth('musicbrainz');
     expect(health).toBeDefined();
@@ -28,7 +36,11 @@ describe('ProviderHealthManager', () => {
   it('should emit ProviderDegraded when consecutive failures exceed threshold', () => {
     const eventBus = new MetadataEventBus();
     const manager = new ProviderHealthManager(eventBus);
-    const providerInfo = new MetadataProviderInfo({ id: 'spotify', displayName: 'Spotify', version: '1.0' });
+    const providerInfo = new MetadataProviderInfo({
+      id: 'spotify',
+      displayName: 'Spotify',
+      version: '1.0'
+    });
     const identity = new MetadataIdentity({ entityKind: MetadataKinds.Song, entityId: 20 });
 
     let degradedFired = false;
@@ -39,7 +51,13 @@ describe('ProviderHealthManager', () => {
 
     for (let i = 0; i < 3; i++) {
       eventBus.emit('ProviderStarted', { providerInfo, identity, latencyMs: 0 });
-      eventBus.emit('ProviderFailed', { providerInfo, identity, status: 'failed', latencyMs: 50, error: 'Network error' });
+      eventBus.emit('ProviderFailed', {
+        providerInfo,
+        identity,
+        status: 'failed',
+        latencyMs: 50,
+        error: 'Network error'
+      });
     }
 
     expect(degradedFired).toBe(true);

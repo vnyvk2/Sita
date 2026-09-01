@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto';
 import { MusicBrainzAdapter } from '@main/metadata/providers/musicbrainz/MusicBrainzAdapter';
 import type { MusicBrainzApiClient } from '@main/metadata/providers/musicbrainz/MusicBrainzApiClient';
-import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto';
 import { MetadataSearchRankingEngine } from '@main/metadata/search/MetadataSearchRankingEngine';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('MusicBrainzAdapter (Phase 1 Provider Fixes)', () => {
   describe('BUG-13: Multi-Disc Track Count Summation', () => {

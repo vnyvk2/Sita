@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { render, act, cleanup } from '@testing-library/react';
+import { dispatch } from '@renderer/store/store';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -7,8 +6,9 @@ import {
   createRouter,
   RouterProvider
 } from '@tanstack/react-router';
+// @vitest-environment jsdom
+import { render, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { dispatch } from '@renderer/store/store';
 
 import storage from '../../utils/localStorage';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
@@ -50,6 +50,7 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
 
   /**
    * Mounts the shortcut hook inside a REAL router backed by memory history. Module-mocking
+   *
    * @tanstack/react-router proved unreliable across vitest pools; a genuine router context keeps
    * these tests deterministic everywhere.
    */
@@ -94,9 +95,9 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
   };
 
   /**
-   * jsdom has no Web Audio API. The hook under test constructs the real AudioPlayer singleton,
-   * and module-mocking useAudioPlayer does not reliably intercept across vitest pools on Windows,
-   * so provide a permissive AudioContext stub instead.
+   * Jsdom has no Web Audio API. The hook under test constructs the real AudioPlayer singleton, and
+   * module-mocking useAudioPlayer does not reliably intercept across vitest pools on Windows, so
+   * provide a permissive AudioContext stub instead.
    */
   const makeStubNode = () => {
     const rampFns = {
@@ -244,10 +245,7 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
       defaultProps.toggleSongPlayback.mockClear();
       await setupShortcuts();
 
-      storage.keyboardShortcuts.setKeyboardShortcuts('appShortcutsPrompt.playPause', [
-        'Ctrl',
-        'P'
-      ]);
+      storage.keyboardShortcuts.setKeyboardShortcuts('appShortcutsPrompt.playPause', ['Ctrl', 'P']);
       fireKey('P', { ctrlKey: true });
 
       expect(defaultProps.toggleSongPlayback).toHaveBeenCalledTimes(1);

@@ -3,9 +3,8 @@ import { genres } from '@db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 import type { GenrePersistenceDTO } from '../../models/dtos';
-import type { IEntityLoader } from './IEntityLoader';
-
 import { MetadataKinds } from '../../models/MetadataKind';
+import type { IEntityLoader } from './IEntityLoader';
 
 const GENRE_RELATIONS = {
   songs: {

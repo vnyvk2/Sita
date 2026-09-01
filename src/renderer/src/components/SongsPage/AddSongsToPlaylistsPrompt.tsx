@@ -1,11 +1,12 @@
 /* eslint-disable promise/catch-or-return */
 
+import type { PlaylistDto } from '@common/collections/dtos';
 import { SpecialPlaylists } from '@common/playlists.enum';
 import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
-import type { PlaylistDto } from '@common/collections/dtos';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAddSongsToCollection } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
@@ -25,8 +26,7 @@ interface SelectablePlaylistProp extends PlaylistDto {
 const SelectablePlaylist = (props: SelectablePlaylistProp) => {
   const { t } = useTranslation();
 
-  const { id, artworkPath, name, itemCount, playlistCheckedStateUpdateFunc, isChecked } =
-    props;
+  const { id, artworkPath, name, itemCount, playlistCheckedStateUpdateFunc, isChecked } = props;
 
   return (
     <div
@@ -76,9 +76,7 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
   const { t } = useTranslation();
 
   const { songIds } = props;
-  const { data: playlists } = useSuspenseQuery(
-    rootCollectionsOptions('aToZ')
-  );
+  const { data: playlists } = useSuspenseQuery(rootCollectionsOptions('aToZ'));
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const addSongsMutation = useAddSongsToCollection();
@@ -93,7 +91,8 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
         return window.api.playerControls
           .toggleLikeSongs(songIds, true)
           .catch((err) => console.error(err));
-      return addSongsMutation.mutateAsync({ playlistId: playlist.id, songIds })
+      return addSongsMutation
+        .mutateAsync({ playlistId: playlist.id, songIds })
         .catch((err) => console.error(err));
     });
     Promise.all(promises)
@@ -115,7 +114,15 @@ const AddSongsToPlaylistsPrompt = (props: AddSongsToPlaylistProp) => {
       .finally(() => {
         changePromptMenuData(false);
       });
-  }, [playlists, songIds, selectedPlaylistIds, addNewNotifications, t, changePromptMenuData, addSongsMutation]);
+  }, [
+    playlists,
+    songIds,
+    selectedPlaylistIds,
+    addNewNotifications,
+    t,
+    changePromptMenuData,
+    addSongsMutation
+  ]);
 
   const playlistComponents = useMemo(
     () =>

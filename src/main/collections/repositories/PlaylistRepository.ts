@@ -1,6 +1,6 @@
 import { db } from '@db/db';
-import { rawRun } from '@db/sqlite/raw';
 import { playlists, playlistEntries, songs, artists, artistsSongs } from '@db/schema';
+import { rawRun } from '@db/sqlite/raw';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 
 import type { PlaylistViewMode } from '../../../common/collections/types';
@@ -209,7 +209,7 @@ export class PlaylistRepository {
 
   public async restorePlaylistWithId(data: PlaylistRow, trx: DB | DBTransaction = db) {
     const [inserted] = // SQLite (rowid tables) accepts explicit id values; pg needed overridingSystemValue for identity
-    await trx.insert(playlists).values(data).returning();
+      await trx.insert(playlists).values(data).returning();
 
     return inserted;
   }

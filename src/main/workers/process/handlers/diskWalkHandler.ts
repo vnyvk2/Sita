@@ -29,15 +29,12 @@ export interface DiskWalkHandlerResult {
 }
 
 /**
- * Worker-side asynchronous directory walker.
- * Runs inside the Electron utilityProcess.
+ * Worker-side asynchronous directory walker. Runs inside the Electron utilityProcess.
  *
- * CRITICAL ARCHITECTURAL INVARIANTS:
- * 1. Zero database dependencies, zero ORM imports.
- * 2. 100% read-only filesystem operations.
- * 3. Does NOT read ID3 tags (only directory entries and stat metadata).
- * 4. Error isolation: records failedSubtrees and failedPaths without throwing,
- *    preventing false deletion cascades in the Main diffEngine.
+ * CRITICAL ARCHITECTURAL INVARIANTS: 1. Zero database dependencies, zero ORM imports. 2. 100%
+ * read-only filesystem operations. 3. Does NOT read ID3 tags (only directory entries and stat
+ * metadata). 4. Error isolation: records failedSubtrees and failedPaths without throwing,
+ * preventing false deletion cascades in the Main diffEngine.
  */
 export async function executeDiskWalk(
   roots: DiskWalkRoot[],

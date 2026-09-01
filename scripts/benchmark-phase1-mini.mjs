@@ -13,10 +13,10 @@ export function sleep(ms) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 export function sampleProcessMetrics(sampleDurationSeconds = 5) {
@@ -69,7 +69,10 @@ export function sampleProcessMetrics(sampleDurationSeconds = 5) {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 20000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 20000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === 'null') return null;
 
@@ -145,7 +148,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -159,7 +162,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -175,7 +182,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -190,7 +197,7 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
           return page;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -210,10 +217,18 @@ async function runPhase1MiniPlayerBenchmark() {
     NORA_DEVTOOLS_CLOSED: '1'
   };
 
-  console.log('[Runner] Launching Nora (Nora-oexxx) in dev mode with --remoteDebuggingPort 9876...');
+  console.log(
+    '[Runner] Launching Nora (Nora-oexxx) in dev mode with --remoteDebuggingPort 9876...'
+  );
   spawn(
     process.execPath,
-    [path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'dev', '--watch=false', '--remoteDebuggingPort', '9876'],
+    [
+      path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'),
+      'dev',
+      '--watch=false',
+      '--remoteDebuggingPort',
+      '9876'
+    ],
     {
       cwd: rootDir,
       env,
@@ -262,9 +277,15 @@ async function runPhase1MiniPlayerBenchmark() {
     const idleMetrics = await cdp.getPerformanceMetrics();
     const idleProc = sampleProcessMetrics(5);
 
-    console.log(`  [Idle] Total WS: ${idleProc.totalWS} MB | Renderer WS: ${idleProc.rendererWS} MB | GPU: ${idleProc.gpuWS} MB | Main: ${idleProc.mainWS} MB`);
-    console.log(`  [Idle] CPU Total: ${idleProc.totalCPU}% (Renderer: ${idleProc.renderer.cpu}%, Main: ${idleProc.main.cpu}%, GPU: ${idleProc.gpu.cpu}%)`);
-    console.log(`  [Idle] Listeners: ${idleMetrics.JSEventListeners} | DOM Nodes: ${idleMetrics.Nodes} | JS Heap: ${Math.round(idleMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100} MB`);
+    console.log(
+      `  [Idle] Total WS: ${idleProc.totalWS} MB | Renderer WS: ${idleProc.rendererWS} MB | GPU: ${idleProc.gpuWS} MB | Main: ${idleProc.mainWS} MB`
+    );
+    console.log(
+      `  [Idle] CPU Total: ${idleProc.totalCPU}% (Renderer: ${idleProc.renderer.cpu}%, Main: ${idleProc.main.cpu}%, GPU: ${idleProc.gpu.cpu}%)`
+    );
+    console.log(
+      `  [Idle] Listeners: ${idleMetrics.JSEventListeners} | DOM Nodes: ${idleMetrics.Nodes} | JS Heap: ${Math.round((idleMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100} MB`
+    );
 
     phase1Results.idle = {
       totalWS: idleProc.totalWS,
@@ -275,7 +296,7 @@ async function runPhase1MiniPlayerBenchmark() {
       cpuRenderer: idleProc.renderer.cpu,
       cpuMain: idleProc.main.cpu,
       cpuGPU: idleProc.gpu.cpu,
-      jsHeapUsedMB: Math.round(idleMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100,
+      jsHeapUsedMB: Math.round((idleMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100,
       listeners: idleMetrics.JSEventListeners,
       domNodes: idleMetrics.Nodes,
       taskDuration: idleMetrics.TaskDuration ?? 0,
@@ -297,9 +318,15 @@ async function runPhase1MiniPlayerBenchmark() {
     const playingMetrics = await cdp.getPerformanceMetrics();
     const playingProc = sampleProcessMetrics(5);
 
-    console.log(`  [Playing] Total WS: ${playingProc.totalWS} MB | Renderer WS: ${playingProc.rendererWS} MB | GPU: ${playingProc.gpuWS} MB | Main: ${playingProc.mainWS} MB`);
-    console.log(`  [Playing] CPU Total: ${playingProc.totalCPU}% (Renderer: ${playingProc.renderer.cpu}%, Main: ${playingProc.main.cpu}%, GPU: ${playingProc.gpu.cpu}%)`);
-    console.log(`  [Playing] Listeners: ${playingMetrics.JSEventListeners} | DOM Nodes: ${playingMetrics.Nodes} | JS Heap: ${Math.round(playingMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100} MB`);
+    console.log(
+      `  [Playing] Total WS: ${playingProc.totalWS} MB | Renderer WS: ${playingProc.rendererWS} MB | GPU: ${playingProc.gpuWS} MB | Main: ${playingProc.mainWS} MB`
+    );
+    console.log(
+      `  [Playing] CPU Total: ${playingProc.totalCPU}% (Renderer: ${playingProc.renderer.cpu}%, Main: ${playingProc.main.cpu}%, GPU: ${playingProc.gpu.cpu}%)`
+    );
+    console.log(
+      `  [Playing] Listeners: ${playingMetrics.JSEventListeners} | DOM Nodes: ${playingMetrics.Nodes} | JS Heap: ${Math.round((playingMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100} MB`
+    );
 
     phase1Results.playing = {
       totalWS: playingProc.totalWS,
@@ -310,7 +337,7 @@ async function runPhase1MiniPlayerBenchmark() {
       cpuRenderer: playingProc.renderer.cpu,
       cpuMain: playingProc.main.cpu,
       cpuGPU: playingProc.gpu.cpu,
-      jsHeapUsedMB: Math.round(playingMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100,
+      jsHeapUsedMB: Math.round((playingMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100,
       listeners: playingMetrics.JSEventListeners,
       domNodes: playingMetrics.Nodes,
       taskDuration: playingMetrics.TaskDuration ?? 0,
@@ -331,9 +358,15 @@ async function runPhase1MiniPlayerBenchmark() {
     const compactMetrics = await cdp.getPerformanceMetrics();
     const compactProc = sampleProcessMetrics(5);
 
-    console.log(`  [Compact Playing] Total WS: ${compactProc.totalWS} MB | Renderer WS: ${compactProc.rendererWS} MB | GPU: ${compactProc.gpuWS} MB | Main: ${compactProc.mainWS} MB`);
-    console.log(`  [Compact Playing] CPU Total: ${compactProc.totalCPU}% (Renderer: ${compactProc.renderer.cpu}%, Main: ${compactProc.main.cpu}%, GPU: ${compactProc.gpu.cpu}%)`);
-    console.log(`  [Compact Playing] Listeners: ${compactMetrics.JSEventListeners} | DOM Nodes: ${compactMetrics.Nodes} | JS Heap: ${Math.round(compactMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100} MB`);
+    console.log(
+      `  [Compact Playing] Total WS: ${compactProc.totalWS} MB | Renderer WS: ${compactProc.rendererWS} MB | GPU: ${compactProc.gpuWS} MB | Main: ${compactProc.mainWS} MB`
+    );
+    console.log(
+      `  [Compact Playing] CPU Total: ${compactProc.totalCPU}% (Renderer: ${compactProc.renderer.cpu}%, Main: ${compactProc.main.cpu}%, GPU: ${compactProc.gpu.cpu}%)`
+    );
+    console.log(
+      `  [Compact Playing] Listeners: ${compactMetrics.JSEventListeners} | DOM Nodes: ${compactMetrics.Nodes} | JS Heap: ${Math.round((compactMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100} MB`
+    );
 
     phase1Results.compactPlaying = {
       totalWS: compactProc.totalWS,
@@ -344,7 +377,7 @@ async function runPhase1MiniPlayerBenchmark() {
       cpuRenderer: compactProc.renderer.cpu,
       cpuMain: compactProc.main.cpu,
       cpuGPU: compactProc.gpu.cpu,
-      jsHeapUsedMB: Math.round(compactMetrics.JSHeapUsedSize / 1024 / 1024 * 100) / 100,
+      jsHeapUsedMB: Math.round((compactMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100,
       listeners: compactMetrics.JSEventListeners,
       domNodes: compactMetrics.Nodes,
       taskDuration: compactMetrics.TaskDuration ?? 0,

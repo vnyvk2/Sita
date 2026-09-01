@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+
 import type { PlaylistAutomationEngine } from '../engine/PlaylistAutomationEngine';
 
 export function setupPlaylistAutomationIpc(engine: PlaylistAutomationEngine): void {

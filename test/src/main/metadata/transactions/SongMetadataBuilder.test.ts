@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { SongMetadataBuilder } from '@main/metadata/transactions/SongMetadataBuilder';
 import * as songsDb from '@main/db/queries/songs';
+import { SongMetadataBuilder } from '@main/metadata/transactions/SongMetadataBuilder';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/db/queries/songs', () => ({
   getSongById: vi.fn()

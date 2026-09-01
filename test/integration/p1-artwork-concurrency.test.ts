@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { atomicPublishFile } from '@main/workers/process/handlers/assetJobHandler';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('Item 5 FORENSIC: Artwork Concurrency & Shared Hash-Addressed File Invariant', () => {
   let tempDir: string;

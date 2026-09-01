@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-import { SnapshotBuilder, type DraftSnapshot } from '@main/metadata/transactions/SnapshotBuilder';
-import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
 import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
+import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import { SnapshotBuilder, type DraftSnapshot } from '@main/metadata/transactions/SnapshotBuilder';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('SnapshotBuilder', () => {
   it('captures all metadata fields including MBID and ISRC in both previousSongs and updatedSongs', () => {
@@ -106,10 +106,14 @@ describe('SnapshotBuilder', () => {
 describe('MetadataTransactionManager Rollback', () => {
   it('restores trackNumber, discNumber, genre, MBID, and ISRC along with standard tags on rollback', async () => {
     let lastPassedTags: Record<string, string | number | undefined> | null = null;
-    const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
-      lastPassedTags = tags;
-      return true;
-    });
+    const mockDbUpdater = vi
+      .fn()
+      .mockImplementation(
+        async (_songId: number, tags: Record<string, string | number | undefined>) => {
+          lastPassedTags = tags;
+          return true;
+        }
+      );
 
     const txManager = new MetadataTransactionManager({
       dbUpdater: mockDbUpdater
@@ -157,10 +161,14 @@ describe('MetadataTransactionManager Rollback', () => {
 
   it('explicitly clears MBID/ISRC on rollback if previously absent (absent -> new -> rollback -> empty)', async () => {
     let lastPassedTags: Record<string, string | number | undefined> | null = null;
-    const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
-      lastPassedTags = tags;
-      return true;
-    });
+    const mockDbUpdater = vi
+      .fn()
+      .mockImplementation(
+        async (_songId: number, tags: Record<string, string | number | undefined>) => {
+          lastPassedTags = tags;
+          return true;
+        }
+      );
 
     const txManager = new MetadataTransactionManager({
       dbUpdater: mockDbUpdater

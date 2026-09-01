@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-In Nora v4.0.0+, database durability and zero-corruption shutdowns are guaranteed through a single-pass, idempotent lifecycle architecture. 
+In Nora v4.0.0+, database durability and zero-corruption shutdowns are guaranteed through a single-pass, idempotent lifecycle architecture.
 
 During application shutdown or window exit, all teardown steps (stopping schedulers, persisting unwritten metadata/lyrics, aborting ongoing background tasks, flushing and closing the PGlite WASM database) are orchestrated sequentially by `ShutdownCoordinator`.
 
@@ -16,15 +16,15 @@ During application shutdown or window exit, all teardown steps (stopping schedul
 
 To avoid race conditions, duplicate logging, or premature process exits, lifecycle responsibilities are strictly partitioned:
 
-| Component | Responsibility | Emits State Machine Logs? |
-| :--- | :--- | :---: |
-| **`ShutdownCoordinator`** | Orchestrates the entire shutdown sequence, single-flight locking, and state machine transitions. | ✅ **Yes** |
-| **`ShutdownLogger`** | Formats, timestamps, and outputs session-scoped diagnostic logs (`[Boot #N]`, `[Shutdown #N]`). | ✅ **Yes** |
-| **`closeDatabaseInstance()`** | Low-level helper that closes the PGlite database instance. | ❌ **No** *(Debug diagnostics only)* |
-| **`libraryScheduler.stop()`** | Stops the library background job scheduler. | ❌ **No** |
-| **`adaptivePolicyEngine.stop()`** | Stops the CPU/resource policy engine. | ❌ **No** |
-| **`main.ts`** | Single owner of Electron event registration (`before-quit`, `will-quit`, `window-all-closed`). Delegates to `ShutdownCoordinator`. | ❌ **Observational Event Logs Only** |
-| **`ipc.ts`** | Defines IPC handlers only. Does **not** own lifecycle events or call `app.exit()`. | ❌ **No** |
+| Component                         | Responsibility                                                                                                                     |      Emits State Machine Logs?       |
+| :-------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------: |
+| **`ShutdownCoordinator`**         | Orchestrates the entire shutdown sequence, single-flight locking, and state machine transitions.                                   |              ✅ **Yes**              |
+| **`ShutdownLogger`**              | Formats, timestamps, and outputs session-scoped diagnostic logs (`[Boot #N]`, `[Shutdown #N]`).                                    |              ✅ **Yes**              |
+| **`closeDatabaseInstance()`**     | Low-level helper that closes the PGlite database instance.                                                                         | ❌ **No** _(Debug diagnostics only)_ |
+| **`libraryScheduler.stop()`**     | Stops the library background job scheduler.                                                                                        |              ❌ **No**               |
+| **`adaptivePolicyEngine.stop()`** | Stops the CPU/resource policy engine.                                                                                              |              ❌ **No**               |
+| **`main.ts`**                     | Single owner of Electron event registration (`before-quit`, `will-quit`, `window-all-closed`). Delegates to `ShutdownCoordinator`. | ❌ **Observational Event Logs Only** |
+| **`ipc.ts`**                      | Defines IPC handlers only. Does **not** own lifecycle events or call `app.exit()`.                                                 |              ❌ **No**               |
 
 ---
 

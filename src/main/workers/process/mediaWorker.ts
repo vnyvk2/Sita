@@ -3,9 +3,8 @@
  *
  * Runs off the main process event loop.
  *
- * CRITICAL ARCHITECTURAL INVARIANT:
- * This process MUST NEVER import database modules, Drizzle ORM, or PGlite instances.
- * Database ownership belongs strictly to the Main process.
+ * CRITICAL ARCHITECTURAL INVARIANT: This process MUST NEVER import database modules, Drizzle ORM,
+ * or PGlite instances. Database ownership belongs strictly to the Main process.
  */
 
 import { executeAssetJob } from './handlers/assetJobHandler';
@@ -21,7 +20,9 @@ import {
 const parentPort = process.parentPort;
 
 if (!parentPort) {
-  console.error('[MediaWorker] Fatal: process.parentPort is not available. Must be spawned as utilityProcess.');
+  console.error(
+    '[MediaWorker] Fatal: process.parentPort is not available. Must be spawned as utilityProcess.'
+  );
   process.exit(1);
 }
 
@@ -373,7 +374,8 @@ parentPort.on('message', (event: Electron.MessageEvent) => {
     postToMain({
       protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
       type: 'EVT_PROTOCOL_ERROR',
-      error: 'Message does not conform to MediaWorker protocol envelope (missing or invalid protocolVersion/type).'
+      error:
+        'Message does not conform to MediaWorker protocol envelope (missing or invalid protocolVersion/type).'
     });
     return;
   }

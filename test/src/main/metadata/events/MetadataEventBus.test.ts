@@ -1,8 +1,7 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataEventBus', () => {
   it('should emit and receive typed metadata events', () => {

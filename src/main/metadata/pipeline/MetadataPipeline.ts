@@ -6,7 +6,6 @@ import type { DefaultConflictPolicy } from '../policies/DefaultConflictPolicy';
 import type { DefaultValidationPolicy } from '../policies/DefaultValidationPolicy';
 import type { MetadataFieldRegistry } from '../registries/MetadataFieldRegistry';
 import type { IPipelineStage } from './IPipelineStage';
-
 import { PipelineContext } from './PipelineContext';
 import { ConflictStage } from './stages/ConflictStage';
 import { MapperStage } from './stages/MapperStage';

@@ -1,18 +1,22 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getCurrentSongPath } from '@main/main';
+import {
+  isMetadataUpdatesPending,
+  clearPendingMetadataUpdates
+} from '@main/updateSong/updateSongId3Tags';
 import sharp from 'sharp';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '../../../db/db';
 import { songs } from '../../../db/schema';
+import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
+import { MetadataPendingWritesRepository } from '../../history/MetadataPendingWritesRepository';
 import type { TagWritePayload, TagWriterService } from '../../services/TagWriterService';
 import { MetadataApplyOrchestrator } from '../MetadataApplyOrchestrator';
-import { MetadataHistoryService } from '../../history/MetadataHistoryService';
-import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
-import { MetadataPendingWritesRepository } from '../../history/MetadataPendingWritesRepository';
-import { isMetadataUpdatesPending, clearPendingMetadataUpdates } from '@main/updateSong/updateSongId3Tags';
-import { getCurrentSongPath } from '@main/main';
 
 vi.mock('@main/main', () => ({
   getCurrentSongPath: vi.fn(() => undefined),
@@ -25,7 +29,7 @@ const seedSong = async (title: string, filePath: string): Promise<number> => {
     .insert(songs)
     .values({
       title,
-      duration: 180.000,
+      duration: 180.0,
       path: filePath,
       fileCreatedAt: new Date(),
       fileModifiedAt: new Date()
@@ -35,7 +39,10 @@ const seedSong = async (title: string, filePath: string): Promise<number> => {
 };
 
 const makeFixture = (): string => {
-  const p = path.join(os.tmpdir(), `durability_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`);
+  const p = path.join(
+    os.tmpdir(),
+    `durability_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`
+  );
   fs.copyFileSync(path.join(process.cwd(), 'test', 'assets', 'test_song.mp3'), p);
   return p;
 };
@@ -294,7 +301,8 @@ describe('Durability regressions (P0 #1/#2/#3/#4 - single-transaction design)', 
     const songId = await seedSong('Album Link Test', fixture);
 
     // Pre-create album and link song to it
-    const { createAlbum, linkSongToAlbum, getAlbumWithTitle } = await import('@main/db/queries/albums');
+    const { createAlbum, linkSongToAlbum, getAlbumWithTitle } =
+      await import('@main/db/queries/albums');
     const existing = await createAlbum({ title: 'Thriller Album' });
     await linkSongToAlbum(existing.id, songId);
 

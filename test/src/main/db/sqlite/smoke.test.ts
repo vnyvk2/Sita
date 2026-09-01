@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Real-fixture smoke for the SQLite build: PRODUCTION PATH end-to-end.
@@ -22,18 +23,14 @@ vi.mock('@main/other/artworks', () => ({
   sweepUnusedArtworks: vi.fn().mockResolvedValue(undefined)
 }));
 
-import { getEngine, closeDatabaseInstance, db } from '@main/db/db';
-import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
-import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
-import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
-import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
-import toggleLikeSongs from '@main/core/toggleLikeSongs';
 import { PlaylistEngine } from '@main/collections/engine/PlaylistEngine';
-import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
-import { OperationJournalWriter } from '@main/collections/operations/OperationJournalWriter';
-import { OperationExecutor } from '@main/collections/operations/OperationExecutor';
-import { MembershipService } from '@main/collections/membership/MembershipService';
 import { MembershipCache } from '@main/collections/membership/MembershipCache';
+import { MembershipService } from '@main/collections/membership/MembershipService';
+import { OperationExecutor } from '@main/collections/operations/OperationExecutor';
+import { OperationJournalWriter } from '@main/collections/operations/OperationJournalWriter';
+import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
+import toggleLikeSongs from '@main/core/toggleLikeSongs';
+import { getEngine, closeDatabaseInstance, db } from '@main/db/db';
 import {
   musicFolders,
   songs,
@@ -42,12 +39,34 @@ import {
   playlistEntries,
   playHistory
 } from '@main/db/schema';
+import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
+import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
+import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
+import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
 import { eq, sql } from 'drizzle-orm';
 
 const FIXTURE_TRACKS = [
-  { title: 'Midnight City', artist: 'M83', album: 'Hurry Up, Were Dreaming', genre: 'Synthwave', duration: '243.2' },
-  { title: 'Midnight Surround', artist: 'M83', album: 'Hurry Up, Were Dreaming', genre: 'Synthwave', duration: '201.0' },
-  { title: 'Golden Hour', artist: 'JVKE', album: 'This Is What ___ Feels Like', genre: 'Pop', duration: '209.5' }
+  {
+    title: 'Midnight City',
+    artist: 'M83',
+    album: 'Hurry Up, Were Dreaming',
+    genre: 'Synthwave',
+    duration: '243.2'
+  },
+  {
+    title: 'Midnight Surround',
+    artist: 'M83',
+    album: 'Hurry Up, Were Dreaming',
+    genre: 'Synthwave',
+    duration: '201.0'
+  },
+  {
+    title: 'Golden Hour',
+    artist: 'JVKE',
+    album: 'This Is What ___ Feels Like',
+    genre: 'Pop',
+    duration: '209.5'
+  }
 ];
 
 const smokeFixture = {
@@ -61,25 +80,29 @@ const ingestFixture = async () => {
   for (let i = 0; i < FIXTURE_TRACKS.length; i++) {
     const t = FIXTURE_TRACKS[i];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await ingestTrackDTO({
-      songPath: `C:\\Smoke\\track_${i}.mp3`,
-      title: t.title,
-      duration: t.duration,
-      artists: [t.artist],
-      albumArtists: [t.artist],
-      album: t.album,
-      genres: [t.genre],
-      year: 2022,
-      sampleRate: 44100,
-      bitRate: 320000,
-      noOfChannels: 2,
-      diskNumber: 1,
-      trackNumber: i + 1,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date(),
-      folderId: 1
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any, db, undefined);
+    const res = await ingestTrackDTO(
+      {
+        songPath: `C:\\Smoke\\track_${i}.mp3`,
+        title: t.title,
+        duration: t.duration,
+        artists: [t.artist],
+        albumArtists: [t.artist],
+        album: t.album,
+        genres: [t.genre],
+        year: 2022,
+        sampleRate: 44100,
+        bitRate: 320000,
+        noOfChannels: 2,
+        diskNumber: 1,
+        trackNumber: i + 1,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date(),
+        folderId: 1
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      db,
+      undefined
+    );
     smokeFixture.songIds.push(res.songData.id);
   }
 };
@@ -93,7 +116,12 @@ describe('SQLite migration — real-fixture smoke (production path)', () => {
   afterAll(async () => {
     await closeDatabaseInstance();
     try {
-      fs.rmSync(smokeFixture.tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+      fs.rmSync(smokeFixture.tmpDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: 300
+      });
     } catch {
       /* Windows transient locks; OS cleans temp */
     }
@@ -126,7 +154,9 @@ describe('SQLite migration — real-fixture smoke (production path)', () => {
 
   it('favorite toggle persists and inverts atomically', async () => {
     await toggleLikeSongs([smokeFixture.songIds[0]], undefined);
-    let row = getEngine()!.get(`SELECT is_favorite FROM songs WHERE id = ${smokeFixture.songIds[0]}`);
+    let row = getEngine()!.get(
+      `SELECT is_favorite FROM songs WHERE id = ${smokeFixture.songIds[0]}`
+    );
     expect(row.is_favorite).toBe(1);
     await toggleLikeSongs([smokeFixture.songIds[0]], undefined);
     row = getEngine()!.get(`SELECT is_favorite FROM songs WHERE id = ${smokeFixture.songIds[0]}`);
@@ -160,7 +190,8 @@ describe('SQLite migration — real-fixture smoke (production path)', () => {
       dependencies: []
     });
     expect(
-      (await db.select().from(smartPlaylistRules).where(eq(smartPlaylistRules.playlistId, pl.id))).length
+      (await db.select().from(smartPlaylistRules).where(eq(smartPlaylistRules.playlistId, pl.id)))
+        .length
     ).toBe(1);
 
     await db.insert(playHistory).values({ songId: smokeFixture.songIds[0] });
@@ -177,13 +208,13 @@ describe('SQLite migration — real-fixture smoke (production path)', () => {
     const engine = reopened.getEngine()!;
 
     expect(Number((engine.get('SELECT COUNT(*) c FROM songs') as { c: number }).c)).toBe(3);
-    expect(engine.get(`SELECT is_favorite FROM songs WHERE id = ${songIds[0]}`).is_favorite).toBe(1);
-    expect(
-      Number((engine.get('SELECT COUNT(*) c FROM playlist_entries') as { c: number }).c)
-    ).toBe(3);
-    expect(
-      Number((engine.get('SELECT COUNT(*) c FROM fts_songs') as { c: number }).c)
-    ).toBe(3);
+    expect(engine.get(`SELECT is_favorite FROM songs WHERE id = ${songIds[0]}`).is_favorite).toBe(
+      1
+    );
+    expect(Number((engine.get('SELECT COUNT(*) c FROM playlist_entries') as { c: number }).c)).toBe(
+      3
+    );
+    expect(Number((engine.get('SELECT COUNT(*) c FROM fts_songs') as { c: number }).c)).toBe(3);
     expect(
       (engine.get('PRAGMA integrity_check') as { integrity_check: string }).integrity_check
     ).toBe('ok');
@@ -191,7 +222,8 @@ describe('SQLite migration — real-fixture smoke (production path)', () => {
     // search still works against the reopened file — import fresh module instances
     // (vi.resetModules() re-binds; static imports in this file still hold the closed one,
     // mirroring how a real process restart re-binds every module)
-    const { SongSearchEngine: FreshSongSearch } = await import('@main/search/engines/SongSearchEngine');
+    const { SongSearchEngine: FreshSongSearch } =
+      await import('@main/search/engines/SongSearchEngine');
     const results = await FreshSongSearch.search(normalizeQuery('Golden Hour'));
     expect(results.some((m) => m.kind === 'song' && m.id === songIds[2])).toBe(true);
 

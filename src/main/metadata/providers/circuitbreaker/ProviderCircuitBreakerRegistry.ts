@@ -1,6 +1,5 @@
 import type { MetadataEventBus } from '../../events/MetadataEventBus';
 import type { MetadataProviderConfig } from '../config/MetadataProviderConfig';
-
 import { ProviderCircuitBreaker } from './ProviderCircuitBreaker';
 
 export class ProviderCircuitBreakerRegistry {

@@ -1,16 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { app } from 'electron';
-import { and, eq, inArray } from 'drizzle-orm';
+
 import { db } from '@main/db/db';
 import { replayGain } from '@main/db/schema';
 import logger from '@main/logger';
+import { and, eq, inArray } from 'drizzle-orm';
+import { app } from 'electron';
+
+import { JobScheduler } from '../jobScheduler';
+import { ASSET_EVENTS } from '../libraryChoreography';
 import {
   AlbumLoudnessAggregator,
   type TrackLoudnessData
 } from '../process/audio/AlbumLoudnessAggregator';
-import { ASSET_EVENTS } from '../libraryChoreography';
-import { JobScheduler } from '../jobScheduler';
 import type { Job, JobClass, JobState } from '../types';
 import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from './replayGainJob';
 
@@ -20,16 +22,20 @@ import { CURRENT_REPLAYGAIN_GENERATOR_VERSION } from './replayGainJob';
  * Orchestrates album-level loudness aggregation across all tracks belonging to an album.
  *
  * Architectural & Invalidation Invariants:
- * 1. Generator Version: Both track DSP analysis and album aggregation share CURRENT_REPLAYGAIN_GENERATOR_VERSION (1).
- *    Whenever a track is analyzed or re-analyzed by ReplayGainJob, its albumGain and albumPeak are set to null,
- *    which immediately invalidates the album's cached metrics and triggers fresh aggregation.
- * 2. Block Cache Contract: Block caches on disk (loudness_blocks/${songId}_v1.bin) are intermediate 64-bit
- *    DSP artifacts used exclusively during album aggregation. When an album is already synchronized in DB
- *    (isUpToDate === true), the DB rows are authoritative. When aggregation is needed, block files must be
- *    valid and divisible by 8 bytes. Missing or corrupt caches defer aggregation until tracks are re-analyzed.
- * 3. True Optimistic Concurrency: Within the DB transaction, the row count is strictly verified against
- *    album songs, and every row is updated with a conditional `WHERE song_id = ? AND updated_at = ?` check.
- *    If any concurrent transaction updated a track between validation and commit, the transaction aborts and rolls back.
+ *
+ * 1. Generator Version: Both track DSP analysis and album aggregation share
+ *    CURRENT_REPLAYGAIN_GENERATOR_VERSION (1). Whenever a track is analyzed or re-analyzed by
+ *    ReplayGainJob, its albumGain and albumPeak are set to null, which immediately invalidates the
+ *    album's cached metrics and triggers fresh aggregation.
+ * 2. Block Cache Contract: Block caches on disk (loudness_blocks/${songId}_v1.bin) are intermediate
+ *    64-bit DSP artifacts used exclusively during album aggregation. When an album is already
+ *    synchronized in DB (isUpToDate === true), the DB rows are authoritative. When aggregation is
+ *    needed, block files must be valid and divisible by 8 bytes. Missing or corrupt caches defer
+ *    aggregation until tracks are re-analyzed.
+ * 3. True Optimistic Concurrency: Within the DB transaction, the row count is strictly verified
+ *    against album songs, and every row is updated with a conditional `WHERE song_id = ? AND
+ *    updated_at = ?` check. If any concurrent transaction updated a track between validation and
+ *    commit, the transaction aborts and rolls back.
  */
 export class AlbumReplayGainJob implements Job {
   id: string;
@@ -43,11 +49,7 @@ export class AlbumReplayGainJob implements Job {
   public albumId: number;
   private scheduler: JobScheduler;
 
-  constructor(
-    albumId: number,
-    scheduler: JobScheduler,
-    jobClass: JobClass = 'background'
-  ) {
+  constructor(albumId: number, scheduler: JobScheduler, jobClass: JobClass = 'background') {
     this.albumId = albumId;
     this.scheduler = scheduler;
     this.id = `album_replaygain_${albumId}`;
@@ -129,7 +131,9 @@ export class AlbumReplayGainJob implements Job {
         );
 
       if (isUpToDate) {
-        logger.debug(`[AlbumReplayGainJob] Album ${this.albumId} ReplayGain is already up to date.`);
+        logger.debug(
+          `[AlbumReplayGainJob] Album ${this.albumId} ReplayGain is already up to date.`
+        );
         return;
       }
 
@@ -228,10 +232,7 @@ export class AlbumReplayGainJob implements Job {
                 updatedAt: now
               })
               .where(
-                and(
-                  eq(replayGain.songId, rg.songId),
-                  eq(replayGain.updatedAt, expectedUpdatedAt)
-                )
+                and(eq(replayGain.songId, rg.songId), eq(replayGain.updatedAt, expectedUpdatedAt))
               )
               .returning({ id: replayGain.id });
 
@@ -246,7 +247,9 @@ export class AlbumReplayGainJob implements Job {
           committed = true;
         });
       } catch (trxErr) {
-        logger.warn(`[AlbumReplayGainJob] Transaction rolled back for album ${this.albumId}:`, { trxErr });
+        logger.warn(`[AlbumReplayGainJob] Transaction rolled back for album ${this.albumId}:`, {
+          trxErr
+        });
         // Re-throw so the outer catch propagates to JobScheduler for backoff/retry.
         // Previously this was swallowed (committed = false; return;), silently marking
         // the job as completed and preventing retry on SQLITE_BUSY or concurrency conflicts.

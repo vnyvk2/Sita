@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+
 import { and, eq } from 'drizzle-orm';
 import { safeStorage } from 'electron';
 
@@ -13,9 +14,7 @@ export class SpotifyTokenStore {
   // Concurrency guard keyed by user ID to prevent parallel token refresh requests from racing
   private static refreshPromises = new Map<string, Promise<string | null>>();
 
-  /**
-   * Derives a 32-byte encryption key from the environment secret without hardcoded production keys.
-   */
+  /** Derives a 32-byte encryption key from the environment secret without hardcoded production keys. */
   private static getDerivedKey(): Buffer {
     const secret =
       (typeof import.meta !== 'undefined' && import.meta.env?.MAIN_VITE_ENCRYPTION_SECRET) ||
@@ -28,8 +27,8 @@ export class SpotifyTokenStore {
   }
 
   /**
-   * Encrypts sensitive token text using OS-level safeStorage if available,
-   * falling back to authenticated AES-256-GCM with tamper verification.
+   * Encrypts sensitive token text using OS-level safeStorage if available, falling back to
+   * authenticated AES-256-GCM with tamper verification.
    */
   public static encryptToken(token: string): string {
     try {
@@ -38,7 +37,9 @@ export class SpotifyTokenStore {
         return `os:${encrypted.toString('hex')}`;
       }
     } catch (err) {
-      logger.debug('OS safeStorage unavailable for encryption, using authenticated AES-GCM', { err });
+      logger.debug('OS safeStorage unavailable for encryption, using authenticated AES-GCM', {
+        err
+      });
     }
 
     // Authenticated AES-256-GCM Fallback
@@ -54,7 +55,8 @@ export class SpotifyTokenStore {
   }
 
   /**
-   * Decrypts token text with authenticated integrity verification and legacy AES-CBC migration support.
+   * Decrypts token text with authenticated integrity verification and legacy AES-CBC migration
+   * support.
    */
   public static decryptToken(encryptedString: string): string {
     if (encryptedString.startsWith('os:')) {
@@ -92,7 +94,8 @@ export class SpotifyTokenStore {
   }
 
   /**
-   * Persists or updates the single active Spotify integration record inside an atomic database transaction.
+   * Persists or updates the single active Spotify integration record inside an atomic database
+   * transaction.
    */
   public static async saveTokens(options: {
     user: {
@@ -140,9 +143,7 @@ export class SpotifyTokenStore {
     });
   }
 
-  /**
-   * Retrieves the currently active Spotify integration record.
-   */
+  /** Retrieves the currently active Spotify integration record. */
   public static async getActiveIntegration(): Promise<SpotifyTokenRecord | null> {
     const rows = await db.select().from(spotifyIntegrations).limit(1);
     if (rows.length === 0) return null;
@@ -219,8 +220,8 @@ export class SpotifyTokenStore {
   }
 
   /**
-   * Gets a valid, non-expired access token, transparently refreshing if needed.
-   * Concurrency-safe: multiple parallel callers for the same account share the in-flight refresh promise.
+   * Gets a valid, non-expired access token, transparently refreshing if needed. Concurrency-safe:
+   * multiple parallel callers for the same account share the in-flight refresh promise.
    */
   public static async getValidAccessToken(clientId: string): Promise<string | null> {
     const integration = await this.getActiveIntegration();
@@ -275,9 +276,7 @@ export class SpotifyTokenStore {
     return await refreshPromise;
   }
 
-  /**
-   * Checks if the active Spotify integration has been granted the required OAuth scopes.
-   */
+  /** Checks if the active Spotify integration has been granted the required OAuth scopes. */
   public static async hasRequiredScopes(requiredScopes: string[]): Promise<boolean> {
     const integration = await this.getActiveIntegration();
     if (!integration || !Array.isArray(integration.scopes)) {
@@ -288,9 +287,7 @@ export class SpotifyTokenStore {
     return requiredScopes.every((scope) => grantedSet.has(scope));
   }
 
-  /**
-   * Clears the stored Spotify integration upon user disconnect.
-   */
+  /** Clears the stored Spotify integration upon user disconnect. */
   public static async clearIntegration(): Promise<void> {
     await db.transaction(async (tx) => {
       await tx.delete(spotifyIntegrations);

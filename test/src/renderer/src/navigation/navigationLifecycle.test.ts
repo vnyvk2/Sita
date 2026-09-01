@@ -1,4 +1,9 @@
-import { createMemoryHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter
+} from '@tanstack/react-router';
 import { Store } from '@tanstack/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

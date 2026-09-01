@@ -115,8 +115,8 @@ export class RetryPolicy {
   }
 
   /**
-   * Parses a numeric-seconds `Retry-After` header into milliseconds.
-   * HTTP-date form is intentionally not supported (rare for rate limiting).
+   * Parses a numeric-seconds `Retry-After` header into milliseconds. HTTP-date form is
+   * intentionally not supported (rare for rate limiting).
    */
   private parseRetryAfterMs(err: HttpError): number | undefined {
     const raw = err.responseHeaders?.['retry-after'];

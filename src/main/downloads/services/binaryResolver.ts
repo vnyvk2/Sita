@@ -11,12 +11,13 @@ const EXT = process.platform === 'win32' ? '.exe' : '';
  * Resolves the absolute path of an external binary used by the downloads feature.
  *
  * Resolution order:
- * 1. `<userData>/bin/` — user-updated binaries. This override location lets the
- *    download engine be refreshed (e.g. a newer yt-dlp after a YouTube change)
- *    without reinstalling or releasing a new app version.
+ *
+ * 1. `<userData>/bin/` — user-updated binaries. This override location lets the download engine be
+ *    refreshed (e.g. a newer yt-dlp after a YouTube change) without reinstalling or releasing a new
+ *    app version.
  * 2. Development: resources/bin relative to the app path.
- * 3. Packaged: inside the unpacked asar (a real file on disk, required for
- *    spawning), mirrored from `asarUnpack: resources/**` in electron-builder.yml.
+ * 3. Packaged: inside the unpacked asar (a real file on disk, required for spawning), mirrored from
+ *    `asarUnpack: resources/**` in electron-builder.yml.
  */
 export function resolveBinaryPath(name: BinaryName): string {
   const fileName = `${name}${EXT}`;

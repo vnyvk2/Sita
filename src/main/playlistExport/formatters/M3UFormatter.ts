@@ -25,4 +25,3 @@ export class M3UFormatter implements PlaylistFormatter {
     return lines.join('\n') + '\n';
   }
 }
-

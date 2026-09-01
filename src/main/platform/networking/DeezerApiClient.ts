@@ -1,5 +1,3 @@
-import { HttpError } from './FetchHttpClient';
-import { RequestPipeline } from './RequestPipeline';
 import type {
   DeezerAlbum,
   DeezerArtistInfo,
@@ -7,6 +5,8 @@ import type {
   DeezerTrackResults
 } from '../../../types/deezer_api';
 import logger from '../../logger';
+import { HttpError } from './FetchHttpClient';
+import { RequestPipeline } from './RequestPipeline';
 
 export const DEEZER_BASE_URL = 'https://api.deezer.com';
 
@@ -42,10 +42,11 @@ export class DeezerApiClient {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
-  /**
-   * Search for an artist by name.
-   */
-  public async searchArtist(artistName: string, signal?: AbortSignal): Promise<DeezerArtistInfo | null> {
+  /** Search for an artist by name. */
+  public async searchArtist(
+    artistName: string,
+    signal?: AbortSignal
+  ): Promise<DeezerArtistInfo | null> {
     const trimmed = artistName.trim();
     if (!trimmed) return null;
 
@@ -78,8 +79,8 @@ export class DeezerApiClient {
   }
 
   /**
-   * Get all albums, singles, EPs, and compilations for a Deezer artist ID,
-   * paginating through results up to maxReleases (default 300).
+   * Get all albums, singles, EPs, and compilations for a Deezer artist ID, paginating through
+   * results up to maxReleases (default 300).
    */
   public async getArtistAlbums(
     deezerArtistId: number,
@@ -132,9 +133,7 @@ export class DeezerApiClient {
     }
   }
 
-  /**
-   * Get tracklist with 30s previews for a specific Deezer album.
-   */
+  /** Get tracklist with 30s previews for a specific Deezer album. */
   public async getAlbumTracks(
     deezerAlbumId: number,
     signal?: AbortSignal
@@ -162,9 +161,7 @@ export class DeezerApiClient {
     }
   }
 
-  /**
-   * Get top / popular tracks for an artist.
-   */
+  /** Get top / popular tracks for an artist. */
   public async getArtistTopTracks(
     deezerArtistId: number,
     limit = 10,
@@ -188,14 +185,14 @@ export class DeezerApiClient {
       if (err instanceof HttpError && err.status === 404) {
         return [];
       }
-      logger.warn(`Failed to fetch top tracks for Deezer artist ID ${deezerArtistId}`, { error: err });
+      logger.warn(`Failed to fetch top tracks for Deezer artist ID ${deezerArtistId}`, {
+        error: err
+      });
       return [];
     }
   }
 
-  /**
-   * Get related artists for a Deezer artist ID.
-   */
+  /** Get related artists for a Deezer artist ID. */
   public async getRelatedArtists(
     deezerArtistId: number,
     limit = 10,
@@ -219,7 +216,9 @@ export class DeezerApiClient {
       if (err instanceof HttpError && err.status === 404) {
         return [];
       }
-      logger.warn(`Failed to fetch related artists for Deezer artist ID ${deezerArtistId}`, { error: err });
+      logger.warn(`Failed to fetch related artists for Deezer artist ID ${deezerArtistId}`, {
+        error: err
+      });
       return [];
     }
   }

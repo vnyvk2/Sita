@@ -1,4 +1,5 @@
 import { playlistEngine, playlistRepository } from '../collections/setup';
+import { PlaylistImportExecutor } from './executor/PlaylistImportExecutor';
 import { M3UImporter } from './importers/M3UImporter';
 import { PlaylistImportPipeline } from './pipeline/PlaylistImportPipeline';
 import { PlaylistImportPlanner } from './planner/PlaylistImportPlanner';
@@ -7,9 +8,6 @@ import { RepairStrategyRegistry } from './registry/RepairStrategyRegistry';
 import { PlaylistRepairEngine } from './repair/PlaylistRepairEngine';
 import { LibraryResolver } from './resolver/LibraryResolver';
 import { PlaylistPathResolver } from './resolver/PlaylistPathResolver';
-import { ExactFilenameStrategy } from './strategies/ExactFilenameStrategy';
-import { NormalizedFilenameStrategy } from './strategies/NormalizedFilenameStrategy';
-import { TitleMatchStrategy } from './strategies/TitleMatchStrategy';
 import { DrizzleLibraryLookup } from './services/DrizzleLibraryLookup';
 import { DrizzleTransactionRunner } from './services/DrizzleTransactionRunner';
 import { EnginePlaylistPersistence } from './services/EnginePlaylistPersistence';
@@ -19,9 +17,11 @@ import { PlaylistImportHistoryService } from './services/PlaylistImportHistorySe
 import { PlaylistImportService } from './services/PlaylistImportService';
 import { PlaylistImportSessionService } from './services/PlaylistImportSessionService';
 import { RepairSummaryBuilder } from './services/RepairSummaryBuilder';
+import { ExactFilenameStrategy } from './strategies/ExactFilenameStrategy';
+import { NormalizedFilenameStrategy } from './strategies/NormalizedFilenameStrategy';
+import { TitleMatchStrategy } from './strategies/TitleMatchStrategy';
 import { FilesystemVerifier } from './verifier/FilesystemVerifier';
 import { PlaylistImportWorkflow } from './workflow/PlaylistImportWorkflow';
-import { PlaylistImportExecutor } from './executor/PlaylistImportExecutor';
 
 // 1. Importer Registry & Service
 export const importerRegistry = new PlaylistImporterRegistry();
@@ -63,8 +63,14 @@ export const importExecutor = new PlaylistImportExecutor(enginePersistence, tran
 // 7. Session & History Subsystem
 export const historyRepository = new InMemoryPlaylistImportHistoryRepository();
 export const summaryBuilder = new RepairSummaryBuilder();
-export const importSessionService = new PlaylistImportSessionService(historyRepository, summaryBuilder);
-export const importHistoryService = new PlaylistImportHistoryService(historyRepository, enginePersistence);
+export const importSessionService = new PlaylistImportSessionService(
+  historyRepository,
+  summaryBuilder
+);
+export const importHistoryService = new PlaylistImportHistoryService(
+  historyRepository,
+  enginePersistence
+);
 
 // 8. Canonical Playlist Import Workflow Orchestrator
 export const playlistImportWorkflow = new PlaylistImportWorkflow(

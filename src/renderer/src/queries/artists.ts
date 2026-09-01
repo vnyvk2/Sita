@@ -1,4 +1,5 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
+
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const artistQuery = createQueryKeys('artists', {
@@ -10,7 +11,13 @@ export const artistQuery = createQueryKeys('artists', {
     limit?: number;
     keyword?: string;
   }) => {
-    const { sortType = 'aToZ', filterType = 'notSelected', start = 0, end = 0, keyword = '' } = data;
+    const {
+      sortType = 'aToZ',
+      filterType = 'notSelected',
+      start = 0,
+      end = 0,
+      keyword = ''
+    } = data;
 
     return {
       queryKey: [
@@ -56,19 +63,22 @@ export const artistQuery = createQueryKeys('artists', {
   discography: (data: { artistId: number; artistName: string }) => {
     return {
       queryKey: [data.artistId, data.artistName, 'discography'],
-      queryFn: async () => window.api.artistsData.getArtistDiscography(data.artistId, data.artistName)
+      queryFn: async () =>
+        window.api.artistsData.getArtistDiscography(data.artistId, data.artistName)
     };
   },
   onlineAlbumTracks: (data: { onlineAlbumId: number; artistId: number }) => {
     return {
       queryKey: [data.artistId, data.onlineAlbumId, 'tracks'],
-      queryFn: async () => window.api.artistsData.getAlbumOnlineTracks(data.onlineAlbumId, data.artistId)
+      queryFn: async () =>
+        window.api.artistsData.getAlbumOnlineTracks(data.onlineAlbumId, data.artistId)
     };
   },
   onlineProfile: (data: { artistId: number; artistName: string }) => {
     return {
       queryKey: [data.artistId, data.artistName, 'profile'],
-      queryFn: async () => window.api.artistsData.getArtistOnlineProfile(data.artistId, data.artistName)
+      queryFn: async () =>
+        window.api.artistsData.getArtistOnlineProfile(data.artistId, data.artistName)
     };
   }
 });

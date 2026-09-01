@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
+import fs from 'fs/promises';
+
+import { eq } from 'drizzle-orm';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { collectGarbageArtworks } from '../../src/main/core/garbageCollector';
 import { db } from '../../src/main/db/db';
+import { saveArtworks } from '../../src/main/db/queries/artworks';
 import { albums, artworks, albumsArtworks, songs, artworksSongs } from '../../src/main/db/schema';
 import { processArtworkFiles } from '../../src/main/other/artworks';
-import { saveArtworks } from '../../src/main/db/queries/artworks';
-import { collectGarbageArtworks } from '../../src/main/core/garbageCollector';
-import { eq } from 'drizzle-orm';
-import fs from 'fs/promises';
 import { GarbageCollectionJob } from '../../src/main/workers/jobs/garbageCollectionJob';
 
 vi.mock('fs/promises');
@@ -48,7 +50,7 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       expect(resultB.length).toBe(2);
       expect(resultA[0].hash).toBe(hash);
       expect(resultB[0].hash).toBe(hash);
-      
+
       // Since it's exactly the same hash, the ON CONFLICT should ensure they return the SAME db rows
       expect(resultA[0].id).toBe(resultB[0].id);
 
@@ -100,15 +102,15 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       // 3. Verify it was deleted from db
       dbRows = await db.select().from(artworks).where(eq(artworks.id, artworkId));
       expect(dbRows.length).toBe(0);
-      
+
       // Verify file unlinking was attempted
       expect(fs.unlink).toHaveBeenCalled();
     });
-    
+
     it('should be safe to run GC multiple times (idempotent)', async () => {
       // Run once
       await collectGarbageArtworks();
-      
+
       // Run again
       const count = await collectGarbageArtworks();
       expect(count).toBe(0); // Should safely do nothing
@@ -122,10 +124,19 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       const processedA = await processArtworkFiles('songs', bufferA);
       const resultA = await saveArtworks(processedA.payloads || [], db);
       const artworkA_Id = resultA[0].id;
-      
-      const song = await db.insert(songs).values({ title: 'test song', path: `/test-reparse-${crypto.randomUUID()}.mp3`, duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+
+      const song = await db
+        .insert(songs)
+        .values({
+          title: 'test song',
+          path: `/test-reparse-${crypto.randomUUID()}.mp3`,
+          duration: 200,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
       await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkA_Id });
-      
+
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Simulate Reparse: create Artwork B and use syncSongArtworks
@@ -133,17 +144,17 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       const processedB = await processArtworkFiles('songs', bufferB);
       const resultB = await saveArtworks(processedB.payloads || [], db);
       const artworkB_Id = resultB[0].id;
-      
+
       const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');
       await syncSongArtworks(song[0].id, [artworkB_Id], db);
-      
+
       // 3. Run GC
       await collectGarbageArtworks();
-      
+
       // 4. Verify Artwork A is deleted from DB but Artwork B remains
       const dbRowsA = await db.select().from(artworks).where(eq(artworks.id, artworkA_Id));
       expect(dbRowsA.length).toBe(0);
-      
+
       const dbRowsB = await db.select().from(artworks).where(eq(artworks.id, artworkB_Id));
       expect(dbRowsB.length).toBe(1);
     });
@@ -154,10 +165,19 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       const processedX = await processArtworkFiles('songs', bufferX);
       const resultX = await saveArtworks(processedX.payloads || [], db);
       const artworkX_Id = resultX[0].id;
-      
-      const song = await db.insert(songs).values({ title: 'test song 2', path: `/test-metadata-${crypto.randomUUID()}.mp3`, duration: 200, fileCreatedAt: new Date(), fileModifiedAt: new Date() }).returning();
+
+      const song = await db
+        .insert(songs)
+        .values({
+          title: 'test song 2',
+          path: `/test-metadata-${crypto.randomUUID()}.mp3`,
+          duration: 200,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
       await db.insert(artworksSongs).values({ songId: song[0].id, artworkId: artworkX_Id });
-      
+
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       // 2. Simulate Metadata Update: create Artwork Y and use syncSongArtworks
@@ -165,17 +185,17 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
       const processedY = await processArtworkFiles('songs', bufferY);
       const resultY = await saveArtworks(processedY.payloads || [], db);
       const artworkY_Id = resultY[0].id;
-      
+
       const { syncSongArtworks } = await import('../../src/main/db/queries/artworks');
       await syncSongArtworks(song[0].id, [artworkY_Id], db);
-      
+
       // 3. Run GC
       await collectGarbageArtworks();
-      
+
       // 4. Verify Artwork X is deleted from DB but Artwork Y remains
       const dbRowsX = await db.select().from(artworks).where(eq(artworks.id, artworkX_Id));
       expect(dbRowsX.length).toBe(0);
-      
+
       const dbRowsY = await db.select().from(artworks).where(eq(artworks.id, artworkY_Id));
       expect(dbRowsY.length).toBe(1);
     });
@@ -185,23 +205,29 @@ describe('Phase 6: Asset Lifecycle (Content Addressing & GC)', () => {
     it('promotes the newest stale temp file deterministically when multiple stale temp files exist', async () => {
       const { waveforms } = await import('../../src/main/db/schema');
       const songPath = `/test-waveform-${crypto.randomUUID()}.wav`;
-      const song = await db.insert(songs).values({
-        title: 'Waveform song',
-        path: songPath,
-        duration: 120,
-        fileCreatedAt: new Date(),
-        fileModifiedAt: new Date()
-      }).returning();
+      const song = await db
+        .insert(songs)
+        .values({
+          title: 'Waveform song',
+          path: songPath,
+          duration: 120,
+          fileCreatedAt: new Date(),
+          fileModifiedAt: new Date()
+        })
+        .returning();
 
       const waveformPath = 'C:/mock/userData/waveforms/999_v1.bin';
-      const insertedWaveform = await db.insert(waveforms).values({
-        songId: song[0].id,
-        path: waveformPath,
-        resolution: 200,
-        generatorVersion: 1,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).returning();
+      const insertedWaveform = await db
+        .insert(waveforms)
+        .values({
+          songId: song[0].id,
+          path: waveformPath,
+          resolution: 200,
+          generatorVersion: 1,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
 
       const now = Date.now();
       vi.mocked(fs.readdir).mockResolvedValue([

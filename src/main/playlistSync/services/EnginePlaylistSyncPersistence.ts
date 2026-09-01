@@ -1,7 +1,7 @@
 import type { PlaylistEngine } from '../../collections/engine/PlaylistEngine';
 import type { PlaylistRepository } from '../../collections/repositories/PlaylistRepository';
-import type { PlaylistSyncPersistence } from '../interfaces/PlaylistSyncPersistence';
 import type { PlaylistEntryWriteModel } from '../../playlistImport/interfaces/PlaylistPersistence';
+import type { PlaylistSyncPersistence } from '../interfaces/PlaylistSyncPersistence';
 
 export class EnginePlaylistSyncPersistence implements PlaylistSyncPersistence {
   constructor(

@@ -1,18 +1,19 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it, vi } from 'vitest';
-import { File } from 'node-taglib-sharp';
+
+import { updateSongBasicFields } from '@main/db/queries/songs';
+import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
+import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
+import type { MusicBrainzRecordingDto } from '@main/metadata/providers/musicbrainz/dto/RecordingDto';
 import { MusicBrainzRecordingMapper } from '@main/metadata/providers/musicbrainz/mappers/RecordingMapper';
 import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
-import { MetadataDiffBuilder } from '@main/metadata/diff/MetadataDiffBuilder';
-import { SongMetadataBuilder } from '@main/metadata/transactions/SongMetadataBuilder';
-import { SnapshotBuilder } from '@main/metadata/transactions/SnapshotBuilder';
-import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
 import { TagWriterService } from '@main/metadata/services/TagWriterService';
-import { updateSongBasicFields } from '@main/db/queries/songs';
-import type { MusicBrainzRecordingDto } from '@main/metadata/providers/musicbrainz/dto/RecordingDto';
-import type { ResourceMutationPayload } from '@main/metadata/domain/MetadataTransaction';
+import { MetadataTransactionManager } from '@main/metadata/transactions/MetadataTransactionManager';
+import { SnapshotBuilder } from '@main/metadata/transactions/SnapshotBuilder';
+import { SongMetadataBuilder } from '@main/metadata/transactions/SongMetadataBuilder';
+import { File } from 'node-taglib-sharp';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('AutoTag Identity Pipeline (Phase 4 Integration Gate)', () => {
   describe('1. End-to-End Identity Mapping & Building (Phase 4-A, 4-C)', () => {
@@ -149,10 +150,14 @@ describe('AutoTag Identity Pipeline (Phase 4 Integration Gate)', () => {
     it('restores previous DB and ID3 identity states across all 4 rollback permutations', async () => {
       const rollbackHistory: Array<Record<string, string | number | undefined>> = [];
 
-      const mockDbUpdater = vi.fn().mockImplementation(async (_songId: number, tags: Record<string, string | number | undefined>) => {
-        rollbackHistory.push(tags);
-        return true;
-      });
+      const mockDbUpdater = vi
+        .fn()
+        .mockImplementation(
+          async (_songId: number, tags: Record<string, string | number | undefined>) => {
+            rollbackHistory.push(tags);
+            return true;
+          }
+        );
 
       const txManager = new MetadataTransactionManager({
         dbUpdater: mockDbUpdater
@@ -173,7 +178,9 @@ describe('AutoTag Identity Pipeline (Phase 4 Integration Gate)', () => {
       await txManager.executeTransaction('op-perm-1', mutations1);
       await txManager.rollbackLastTransaction();
 
-      expect(rollbackHistory[rollbackHistory.length - 1].musicBrainzRecordingId).toBe('rec-old-aaa');
+      expect(rollbackHistory[rollbackHistory.length - 1].musicBrainzRecordingId).toBe(
+        'rec-old-aaa'
+      );
       expect(rollbackHistory[rollbackHistory.length - 1].isrc).toBe('ISRC-OLD-111');
 
       // Permutation 2: Absent MBID/ISRC -> New MBID/ISRC -> Rollback -> Cleared/Absent ('')
@@ -322,7 +329,11 @@ describe('AutoTag Identity Pipeline (Phase 4 Integration Gate)', () => {
             filePath: tempTestFile,
             fieldMutations: [
               { fieldId: 'title', oldValue: 'Initial Title', newValue: 'Mutated Title' },
-              { fieldId: 'musicBrainzRecordingId', oldValue: 'rec-initial-state', newValue: 'rec-mutated-state' },
+              {
+                fieldId: 'musicBrainzRecordingId',
+                oldValue: 'rec-initial-state',
+                newValue: 'rec-mutated-state'
+              },
               { fieldId: 'isrc', oldValue: 'ISRC-INITIAL', newValue: 'ISRC-MUTATED' }
             ]
           }

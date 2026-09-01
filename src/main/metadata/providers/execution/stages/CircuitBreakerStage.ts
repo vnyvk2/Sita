@@ -1,11 +1,10 @@
+import { MetadataConfidence } from '../../../models/MetadataConfidence';
 import type { ProviderResult } from '../../../models/ProviderResult';
+import { ProviderResult as ConcreteProviderResult } from '../../../models/ProviderResult';
+import { ProviderCircuitBreaker } from '../../circuitbreaker/ProviderCircuitBreaker';
 import type { ProviderCircuitBreakerRegistry } from '../../circuitbreaker/ProviderCircuitBreakerRegistry';
 import type { IProviderExecutionStage } from '../IProviderExecutionStage';
 import type { ProviderExecutionStageContext } from '../ProviderExecutionStageContext';
-
-import { MetadataConfidence } from '../../../models/MetadataConfidence';
-import { ProviderResult as ConcreteProviderResult } from '../../../models/ProviderResult';
-import { ProviderCircuitBreaker } from '../../circuitbreaker/ProviderCircuitBreaker';
 
 export class CircuitBreakerStage implements IProviderExecutionStage {
   public readonly name = 'CircuitBreakerStage';
@@ -16,7 +15,10 @@ export class CircuitBreakerStage implements IProviderExecutionStage {
     this.registry = registry;
   }
 
-  public getCircuitBreaker(providerId: string, context: ProviderExecutionStageContext): ProviderCircuitBreaker {
+  public getCircuitBreaker(
+    providerId: string,
+    context: ProviderExecutionStageContext
+  ): ProviderCircuitBreaker {
     if (this.registry) {
       return this.registry.getOrCreate(providerId, context.config);
     }
@@ -35,7 +37,10 @@ export class CircuitBreakerStage implements IProviderExecutionStage {
     context: ProviderExecutionStageContext<TDTO>,
     next: () => Promise<ProviderResult<TDTO>>
   ): Promise<ProviderResult<TDTO>> {
-    const breaker = this.getCircuitBreaker(context.provider.info.id, context as unknown as ProviderExecutionStageContext);
+    const breaker = this.getCircuitBreaker(
+      context.provider.info.id,
+      context as unknown as ProviderExecutionStageContext
+    );
 
     if (!breaker.isCallAllowed()) {
       context.eventBus.emit('ProviderSkipped', {

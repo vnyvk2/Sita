@@ -74,7 +74,7 @@ describe('Delete + Restore Integration', () => {
       .values(
         ['A', 'B'].map((title) => ({
           title,
-          duration: 120.000,
+          duration: 120.0,
           path: `C:\\music\\delrestore-${title}-${Date.now()}.mp3`,
           fileCreatedAt: new Date(),
           fileModifiedAt: new Date()

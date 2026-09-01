@@ -1,32 +1,32 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
-import { libraryScheduler } from '@main/workers/jobScheduler';
-import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
-import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
-import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { closeDatabaseInstance, db } from '@main/db/db';
+import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
+import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
+import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
+import { libraryScheduler } from '@main/workers/jobScheduler';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/workers/jobScheduler', () => ({
   libraryScheduler: {
-    stop: vi.fn(),
+    stop: vi.fn()
   }
 }));
 
 vi.mock('@main/workers/adaptivePolicyEngine', () => ({
   adaptivePolicyEngine: {
-    stop: vi.fn(),
+    stop: vi.fn()
   }
 }));
 
 vi.mock('@main/library/LibraryLifecycleController', () => ({
   libraryLifecycleController: {
-    shutdown: vi.fn(),
+    shutdown: vi.fn()
   }
 }));
 
 vi.mock('@main/workers/process/MediaWorkerBridge', () => ({
   mediaWorkerBridge: {
-    terminate: vi.fn(),
+    terminate: vi.fn()
   }
 }));
 
@@ -45,28 +45,28 @@ vi.mock('@main/logger', () => ({
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
-    debug: vi.fn(),
+    debug: vi.fn()
   }
 }));
 
 vi.mock('@main/fs/controlAbortControllers', () => ({
-  closeAllAbortControllers: vi.fn(),
+  closeAllAbortControllers: vi.fn()
 }));
 
 vi.mock('@main/other/artworks', () => ({
-  clearTempArtworkFolder: vi.fn(),
+  clearTempArtworkFolder: vi.fn()
 }));
 
 vi.mock('@main/other/discordRPC', () => ({
-  clearDiscordRpcActivity: vi.fn(),
+  clearDiscordRpcActivity: vi.fn()
 }));
 
 vi.mock('@main/saveLyricsToSong', () => ({
-  savePendingSongLyrics: vi.fn(),
+  savePendingSongLyrics: vi.fn()
 }));
 
 vi.mock('@main/updateSong/updateSongId3Tags', () => ({
-  savePendingMetadataUpdates: vi.fn(),
+  savePendingMetadataUpdates: vi.fn()
 }));
 
 describe('Item 4 FORENSIC: Adversarial Shutdown & Resource Lifetime Invariant', () => {
@@ -88,9 +88,18 @@ describe('Item 4 FORENSIC: Adversarial Shutdown & Resource Lifetime Invariant', 
         dbWritesAfterCloseCount++;
       }
     };
-    vi.mocked(db.insert).mockImplementation((...args: any[]) => { recordDbWrite(); return {} as any; });
-    vi.mocked(db.update).mockImplementation((...args: any[]) => { recordDbWrite(); return {} as any; });
-    vi.mocked(db.delete).mockImplementation((...args: any[]) => { recordDbWrite(); return {} as any; });
+    vi.mocked(db.insert).mockImplementation((...args: any[]) => {
+      recordDbWrite();
+      return {} as any;
+    });
+    vi.mocked(db.update).mockImplementation((...args: any[]) => {
+      recordDbWrite();
+      return {} as any;
+    });
+    vi.mocked(db.delete).mockImplementation((...args: any[]) => {
+      recordDbWrite();
+      return {} as any;
+    });
   });
 
   it('Case 1: Cooperative job finishes naturally during scheduler drain -> DB closes after job settles', async () => {
@@ -170,9 +179,15 @@ describe('Item 4 FORENSIC: Adversarial Shutdown & Resource Lifetime Invariant', 
 
   it('Case 4 to 8: Multi-subsystem failures during shutdown -> All subsystems attempted and DB teardown executes', async () => {
     vi.mocked(libraryScheduler.stop).mockRejectedValueOnce(new Error('Scheduler stop crashed'));
-    vi.mocked(adaptivePolicyEngine.stop).mockImplementationOnce(() => { throw new Error('Adaptive policy stop crashed'); });
-    vi.mocked(libraryLifecycleController.shutdown).mockRejectedValueOnce(new Error('Library lifecycle shutdown crashed'));
-    vi.mocked(mediaWorkerBridge.terminate).mockRejectedValueOnce(new Error('MediaWorkerBridge terminate crashed'));
+    vi.mocked(adaptivePolicyEngine.stop).mockImplementationOnce(() => {
+      throw new Error('Adaptive policy stop crashed');
+    });
+    vi.mocked(libraryLifecycleController.shutdown).mockRejectedValueOnce(
+      new Error('Library lifecycle shutdown crashed')
+    );
+    vi.mocked(mediaWorkerBridge.terminate).mockRejectedValueOnce(
+      new Error('MediaWorkerBridge terminate crashed')
+    );
 
     await ShutdownCoordinator.shutdown('test-multi-crash');
 

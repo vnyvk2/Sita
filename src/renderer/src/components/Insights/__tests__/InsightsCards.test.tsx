@@ -1,7 +1,9 @@
+import { render, screen, fireEvent } from '@testing-library/react';
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+
+import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';
 import {
   HeroListeningTimeCard,
   TopTracksLeaderboardCard,
@@ -11,7 +13,6 @@ import {
   CircadianRhythmCard,
   InsightsSkeleton
 } from '../index';
-import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';
 
 describe('Insights Bento Cards Component Suite', () => {
   it('HeroListeningTimeCard renders formatted hours, completion rate, and daily bars', () => {

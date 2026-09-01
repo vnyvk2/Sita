@@ -1,7 +1,8 @@
+import { render, screen } from '@testing-library/react';
+import React from 'react';
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+
 import HighlightedText from '../../../../../src/renderer/src/components/SearchPage/HighlightedText';
 
 describe('HighlightedText', () => {
@@ -21,7 +22,7 @@ describe('HighlightedText', () => {
     const { container } = render(<HighlightedText text="ab ab c ab" highlight="AB" />);
     const marks = container.querySelectorAll('mark');
     expect(marks.length).toBe(3);
-    marks.forEach(mark => {
+    marks.forEach((mark) => {
       expect(mark.textContent).toBe('ab');
     });
   });

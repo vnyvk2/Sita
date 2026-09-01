@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+
 import type { QueueEntry, QueueEntrySource, QueueState } from './types';
 
 export class QueueEngine {
@@ -14,7 +15,7 @@ export class QueueEngine {
       shuffleMode: false,
       shufflePermutation: [],
       currentEntryId: undefined,
-      ...options?.initialState,
+      ...options?.initialState
     };
   }
 
@@ -22,36 +23,30 @@ export class QueueEngine {
     return structuredClone(this.state);
   }
 
-  /**
-   * Helper: Get the natural index of an entry by ID.
-   */
+  /** Helper: Get the natural index of an entry by ID. */
   private getNaturalIndex(id: string): number {
-    return this.state.entries.findIndex(e => e.id === id);
+    return this.state.entries.findIndex((e) => e.id === id);
   }
 
-  /**
-   * Helper: Get the playback index for a given natural index.
-   */
+  /** Helper: Get the playback index for a given natural index. */
   private getPlaybackIndex(naturalIndex: number): number {
     return this.state.shufflePermutation.indexOf(naturalIndex);
   }
 
-  /**
-   * Replace the entire queue with new songs.
-   */
+  /** Replace the entire queue with new songs. */
   public replaceQueue(songIds: number[], source: QueueEntrySource, startingIndex = 0): void {
-    const newEntries: QueueEntry[] = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map((songId) => ({
       id: randomUUID(),
       songId,
-      source,
+      source
     }));
 
     this.state.entries = newEntries;
     this.state.history = []; // Clear history on full replacement
-    
+
     // By default, natural order matches playback order
     this.state.shufflePermutation = newEntries.map((_, i) => i);
-    
+
     const safeIndex = Math.max(0, Math.min(startingIndex, newEntries.length - 1));
     this.state.currentEntryId = newEntries.length > 0 ? newEntries[safeIndex].id : undefined;
 
@@ -60,16 +55,14 @@ export class QueueEngine {
     }
   }
 
-  /**
-   * Add songs immediately after the current track.
-   */
+  /** Add songs immediately after the current track. */
   public addNext(songIds: number[], source: QueueEntrySource): void {
     if (songIds.length === 0) return;
 
-    const newEntries: QueueEntry[] = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map((songId) => ({
       id: randomUUID(),
       songId,
-      source,
+      source
     }));
 
     if (this.state.entries.length === 0) {
@@ -77,7 +70,9 @@ export class QueueEngine {
       return;
     }
 
-    const currentNatural = this.state.currentEntryId ? this.getNaturalIndex(this.state.currentEntryId) : -1;
+    const currentNatural = this.state.currentEntryId
+      ? this.getNaturalIndex(this.state.currentEntryId)
+      : -1;
     let insertNaturalIndex = this.state.entries.length;
     let insertPlaybackIndex = this.state.entries.length;
 
@@ -90,7 +85,7 @@ export class QueueEngine {
     this.state.entries.splice(insertNaturalIndex, 0, ...newEntries);
 
     // Adjust existing permutation indices for values >= insertNaturalIndex
-    this.state.shufflePermutation = this.state.shufflePermutation.map(idx => 
+    this.state.shufflePermutation = this.state.shufflePermutation.map((idx) =>
       idx >= insertNaturalIndex ? idx + newEntries.length : idx
     );
 
@@ -99,9 +94,7 @@ export class QueueEngine {
     this.state.shufflePermutation.splice(insertPlaybackIndex, 0, ...newIndices);
   }
 
-  /**
-   * Add songs to the end of the queue.
-   */
+  /** Add songs to the end of the queue. */
   public addToEnd(songIds: number[], source: QueueEntrySource): void {
     if (songIds.length === 0) return;
 
@@ -111,18 +104,18 @@ export class QueueEngine {
     }
 
     const startNaturalIdx = this.state.entries.length;
-    const newEntries: QueueEntry[] = songIds.map(songId => ({
+    const newEntries: QueueEntry[] = songIds.map((songId) => ({
       id: randomUUID(),
       songId,
-      source,
+      source
     }));
 
     this.state.entries.push(...newEntries);
     const newIndices = newEntries.map((_, i) => startNaturalIdx + i);
 
     if (this.state.shuffleMode) {
-      // In shuffle mode, adding to end means we can just shuffle the new items 
-      // and append them, or just append them directly (so they play last). 
+      // In shuffle mode, adding to end means we can just shuffle the new items
+      // and append them, or just append them directly (so they play last).
       // We'll just append them to the end of the permutation array.
       this.state.shufflePermutation.push(...newIndices);
     } else {
@@ -130,9 +123,7 @@ export class QueueEngine {
     }
   }
 
-  /**
-   * Remove an entry by its unique ID.
-   */
+  /** Remove an entry by its unique ID. */
   public removeEntry(id: string): void {
     const naturalIndex = this.getNaturalIndex(id);
     if (naturalIndex === -1) return;
@@ -142,12 +133,19 @@ export class QueueEngine {
     // If we're removing the current track, advance to the next track first
     if (this.state.currentEntryId === id) {
       // Temporarily mark the current track as something else so advance doesn't try to push the removed track to history yet.
-      // Actually, advancing pushes current to history. If the user removes the current track, 
+      // Actually, advancing pushes current to history. If the user removes the current track,
       // does it go to history? Usually no, but let's just advance and NOT put it in history.
-      const nextPlayback = playbackIndex + 1 < this.state.entries.length ? playbackIndex + 1 : 
-                           (this.state.repeatMode === 'all' ? 0 : -1);
-      
-      this.state.currentEntryId = nextPlayback !== -1 ? this.state.entries[this.state.shufflePermutation[nextPlayback]].id : undefined;
+      const nextPlayback =
+        playbackIndex + 1 < this.state.entries.length
+          ? playbackIndex + 1
+          : this.state.repeatMode === 'all'
+            ? 0
+            : -1;
+
+      this.state.currentEntryId =
+        nextPlayback !== -1
+          ? this.state.entries[this.state.shufflePermutation[nextPlayback]].id
+          : undefined;
     }
 
     // Remove from natural array
@@ -155,15 +153,14 @@ export class QueueEngine {
 
     // Remove from permutation and adjust remaining indices
     this.state.shufflePermutation.splice(playbackIndex, 1);
-    this.state.shufflePermutation = this.state.shufflePermutation.map(idx => 
+    this.state.shufflePermutation = this.state.shufflePermutation.map((idx) =>
       idx > naturalIndex ? idx - 1 : idx
     );
   }
 
   /**
-   * Reorder an entry to a new physical (UI) position.
-   * If shuffle is off, this alters the natural order.
-   * If shuffle is on, this only alters the playback order permutation.
+   * Reorder an entry to a new physical (UI) position. If shuffle is off, this alters the natural
+   * order. If shuffle is on, this only alters the playback order permutation.
    */
   public reorder(id: string, newPlaybackPosition: number): void {
     const naturalIndex = this.getNaturalIndex(id);
@@ -186,9 +183,7 @@ export class QueueEngine {
     }
   }
 
-  /**
-   * Clear the entire queue (except current track usually, but let's clear all).
-   */
+  /** Clear the entire queue (except current track usually, but let's clear all). */
   public clear(): void {
     this.state.entries = [];
     this.state.shufflePermutation = [];
@@ -196,9 +191,7 @@ export class QueueEngine {
     // history remains intact
   }
 
-  /**
-   * Jump to a specific track in the queue.
-   */
+  /** Jump to a specific track in the queue. */
   public jumpTo(id: string): void {
     const naturalIndex = this.getNaturalIndex(id);
     if (naturalIndex === -1) return;
@@ -211,9 +204,7 @@ export class QueueEngine {
     this.state.currentEntryId = id;
   }
 
-  /**
-   * Advance to the next track.
-   */
+  /** Advance to the next track. */
   public advance(): void {
     if (this.state.entries.length === 0) return;
 
@@ -224,7 +215,9 @@ export class QueueEngine {
       return;
     }
 
-    const currentNatural = this.state.currentEntryId ? this.getNaturalIndex(this.state.currentEntryId) : -1;
+    const currentNatural = this.state.currentEntryId
+      ? this.getNaturalIndex(this.state.currentEntryId)
+      : -1;
     let nextPlayback = 0;
 
     if (currentNatural !== -1 && this.state.currentEntryId) {
@@ -247,9 +240,7 @@ export class QueueEngine {
     this.state.currentEntryId = this.state.entries[nextNatural].id;
   }
 
-  /**
-   * Go back to the previous track (from history).
-   */
+  /** Go back to the previous track (from history). */
   public goBack(): void {
     if (this.state.history.length === 0) {
       // If no history, maybe just restart current? We'll just no-op.
@@ -263,7 +254,7 @@ export class QueueEngine {
         return;
       }
     }
-    
+
     // If we exhausted history, do nothing
   }
 
@@ -272,33 +263,33 @@ export class QueueEngine {
   }
 
   /**
-   * Toggles shuffle mode.
-   * Note: Disabling and immediately enabling shuffle generates a brand-new order intentionally.
+   * Toggles shuffle mode. Note: Disabling and immediately enabling shuffle generates a brand-new
+   * order intentionally.
    */
   public toggleShuffle(): void {
     this.state.shuffleMode = !this.state.shuffleMode;
-    
+
     if (this.state.shuffleMode) {
       this.recomputeShuffle();
     } else {
       // Restore natural order
       this.state.shufflePermutation = this.state.entries.map((_, i) => i);
-      
+
       // If we are playing something, maybe we want to keep it playing.
       // Since natural order is restored, the playback index of current naturally jumps to its natural index.
       // This is expected.
     }
   }
 
-  /**
-   * Generates a random permutation for shuffle.
-   */
+  /** Generates a random permutation for shuffle. */
   private recomputeShuffle(): void {
     const len = this.state.entries.length;
     if (len === 0) return;
 
-    const currentNatural = this.state.currentEntryId ? this.getNaturalIndex(this.state.currentEntryId) : -1;
-    
+    const currentNatural = this.state.currentEntryId
+      ? this.getNaturalIndex(this.state.currentEntryId)
+      : -1;
+
     let indicesToShuffle: number[] = [];
     for (let i = 0; i < len; i++) {
       if (i !== currentNatural) indicesToShuffle.push(i);

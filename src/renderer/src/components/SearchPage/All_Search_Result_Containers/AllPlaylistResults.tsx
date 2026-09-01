@@ -2,8 +2,8 @@ import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 
 import useSelectAllHandler from '../../../hooks/useSelectAllHandler';
-import { Playlist } from '../../PlaylistsPage/Playlist';
 import { mapLegacyPlaylistToDto } from '../../../utils/playlistAdapter';
+import { Playlist } from '../../PlaylistsPage/Playlist';
 import SecondaryContainer from '../../SecondaryContainer';
 import VirtualizedGrid from '../../VirtualizedGrid';
 
@@ -35,7 +35,13 @@ const AllPlaylistResults = (prop: Props) => {
           fixedItemHeight={MIN_ITEM_HEIGHT}
           scrollTopOffset={currentlyActivePage.data?.scrollTopOffset}
           itemContent={(index, playlist) => {
-            return <Playlist index={index} selectAllHandler={selectAllHandler} {...mapLegacyPlaylistToDto(playlist)} />;
+            return (
+              <Playlist
+                index={index}
+                selectAllHandler={selectAllHandler}
+                {...mapLegacyPlaylistToDto(playlist)}
+              />
+            );
           }}
         />
       )}

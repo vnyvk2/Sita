@@ -7,13 +7,11 @@ description: Process for creating repository-grounded, technically sound impleme
 
 ## The most important rule
 
-
 > **Do not create an implementation plan merely by translating the user's request into a list of files. First understand the existing system, identify the actual problem and constraints, evaluate the available approaches, then produce a repository-grounded plan that explains the architecture, change surface, invariants, risks, testing, and verification.**
 
 And one more:
 
 > **A plan is allowed to conclude that the requested implementation approach is not the best approach. If investigation reveals a simpler, safer, or more architecturally consistent solution, explain the difference and recommend it rather than blindly planning the requested approach.**
-
 
 ## 1. Purpose
 
@@ -708,12 +706,12 @@ Every non-trivial plan should include a short risk assessment.
 
 Example:
 
-| Risk | Why | Mitigation |
-|---|---|---|
-| DB contention | Multiple background writers | Serialize writes |
-| Event flooding | Watchers can emit bursts | Debounce/batch |
-| Memory growth | Large pending queue | Bounded queue |
-| Stale UI | Async state updates | Explicit invalidation |
+| Risk           | Why                         | Mitigation            |
+| -------------- | --------------------------- | --------------------- |
+| DB contention  | Multiple background writers | Serialize writes      |
+| Event flooding | Watchers can emit bursts    | Debounce/batch        |
+| Memory growth  | Large pending queue         | Bounded queue         |
+| Stale UI       | Async state updates         | Explicit invalidation |
 
 Don't invent risks simply to fill a table.
 
@@ -902,5 +900,3 @@ Before presenting a non-trivial plan:
 ```
 
 ---
-
-

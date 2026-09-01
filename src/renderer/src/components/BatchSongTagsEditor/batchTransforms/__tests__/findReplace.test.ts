@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
+
+import type { BatchTrackRow } from '../../types';
 import { findReplace, previewFindReplace, validateFindReplaceRegex } from '../findReplace';
 import type { BatchTransformContext } from '../types';
-import type { BatchTrackRow } from '../../types';
 
-function createMockRow(songId: number, title: string, artists: string[], album: string): BatchTrackRow {
+function createMockRow(
+  songId: number,
+  title: string,
+  artists: string[],
+  album: string
+): BatchTrackRow {
   const data = {
     songId,
     path: `C:/Music/song${songId}.mp3`,
@@ -19,7 +25,12 @@ function createMockRow(songId: number, title: string, artists: string[], album: 
     path: data.path,
     duration: data.duration,
     original: data,
-    draft: { ...data, artists: [...data.artists], albumArtists: [...data.albumArtists], genres: [...data.genres] },
+    draft: {
+      ...data,
+      artists: [...data.artists],
+      albumArtists: [...data.albumArtists],
+      genres: [...data.genres]
+    },
     dirtyFields: new Set(),
     validationErrors: new Map()
   };
@@ -34,7 +45,12 @@ describe('batchTransforms — findReplace', () => {
 
   it('generates accurate previews for plain text and regex substitutions', () => {
     const rows = [
-      createMockRow(1, 'Song 1 (Remastered 2024)', ['Artist feat. Guest'], 'Greatest Hits [Deluxe]'),
+      createMockRow(
+        1,
+        'Song 1 (Remastered 2024)',
+        ['Artist feat. Guest'],
+        'Greatest Hits [Deluxe]'
+      ),
       createMockRow(2, 'Song 2', ['Artist'], 'Greatest Hits')
     ];
     const context: BatchTransformContext = {
@@ -88,9 +104,7 @@ describe('batchTransforms — findReplace', () => {
   });
 
   it('removes matching array items when replaced with empty string, preserving remaining non-empty elements', () => {
-    const rows = [
-      createMockRow(1, 'Song 1', ['Queen', 'David Bowie'], 'Greatest Hits')
-    ];
+    const rows = [createMockRow(1, 'Song 1', ['Queen', 'David Bowie'], 'Greatest Hits')];
     const context: BatchTransformContext = {
       rows,
       selectedSongIds: new Set([1]),
@@ -112,9 +126,7 @@ describe('batchTransforms — findReplace', () => {
   });
 
   it('preserves literal dollar signs without treating them as capture group backreferences in plain-text mode', () => {
-    const rows = [
-      createMockRow(1, 'Price 100', ['Artist'], 'Album')
-    ];
+    const rows = [createMockRow(1, 'Price 100', ['Artist'], 'Album')];
     const context: BatchTransformContext = {
       rows,
       selectedSongIds: new Set([1]),

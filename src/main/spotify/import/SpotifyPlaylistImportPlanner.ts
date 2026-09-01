@@ -1,6 +1,9 @@
-import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
-import { HARD_VARIANT_CONFLICT_PENALTY, TrackIdentityMatcher } from '../../metadata/identity/TrackIdentityMatcher';
 import { toCanonicalFromSpotifyTrack } from '../../metadata/identity/adapters/SpotifyToCanonicalIdentity';
+import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
+import {
+  HARD_VARIANT_CONFLICT_PENALTY,
+  TrackIdentityMatcher
+} from '../../metadata/identity/TrackIdentityMatcher';
 import { MetadataNormalizer } from '../../metadata/matching/MetadataNormalizer';
 import type { ImportStatistics } from '../../playlistImport/models/ImportStatistics';
 import type { LibraryMatch } from '../../playlistImport/models/LibraryMatch';
@@ -20,7 +23,8 @@ export interface RemotePlaylistMetadata {
 export class SpotifyPlaylistImportPlanner {
   /**
    * Pure, deterministic planner that evaluates Spotify playlist items against local canonical songs
-   * and produces a standard Nora PlaylistImportPlan with full item accounting, exact ordering, and duplicate preservation.
+   * and produces a standard Nora PlaylistImportPlan with full item accounting, exact ordering, and
+   * duplicate preservation.
    */
   public static generatePlan(
     remoteMetadata: RemotePlaylistMetadata,
@@ -54,7 +58,9 @@ export class SpotifyPlaylistImportPlanner {
       const rawNormTitle = MetadataNormalizer.normalizeTitle(song.title);
       if (rawNormTitle) titlesToIndex.add(rawNormTitle);
 
-      const primaryArtist = song.artists[0] ? MetadataNormalizer.normalizeArtist(song.artists[0]) : '';
+      const primaryArtist = song.artists[0]
+        ? MetadataNormalizer.normalizeArtist(song.artists[0])
+        : '';
 
       for (const normTitle of titlesToIndex) {
         if (primaryArtist) {
@@ -138,7 +144,11 @@ export class SpotifyPlaylistImportPlanner {
           const libraryMatch: LibraryMatch = {
             status: 'INVALID_URI',
             confidence: 0,
-            diagnostics: [itemType === 'episode' ? 'PODCAST_EPISODE' : `UNSUPPORTED_TYPE_${itemType.toUpperCase()}`]
+            diagnostics: [
+              itemType === 'episode'
+                ? 'PODCAST_EPISODE'
+                : `UNSUPPORTED_TYPE_${itemType.toUpperCase()}`
+            ]
           };
 
           const resolvedTrack: ResolvedTrackReference = {
@@ -218,7 +228,11 @@ export class SpotifyPlaylistImportPlanner {
         const libraryMatch: LibraryMatch = {
           status: 'INVALID_URI',
           confidence: 0,
-          diagnostics: [spotifyTrack.type === 'episode' ? 'PODCAST_EPISODE' : `UNSUPPORTED_TYPE_${spotifyTrack.type.toUpperCase()}`]
+          diagnostics: [
+            spotifyTrack.type === 'episode'
+              ? 'PODCAST_EPISODE'
+              : `UNSUPPORTED_TYPE_${spotifyTrack.type.toUpperCase()}`
+          ]
         };
 
         const resolvedTrack: ResolvedTrackReference = {
@@ -264,7 +278,10 @@ export class SpotifyPlaylistImportPlanner {
         if (isrcList) isrcList.forEach((c) => candidateSet.add(c));
       }
 
-      if (canonicalSpotify.musicBrainzRecordingId && canonicalSpotify.musicBrainzRecordingId.trim()) {
+      if (
+        canonicalSpotify.musicBrainzRecordingId &&
+        canonicalSpotify.musicBrainzRecordingId.trim()
+      ) {
         const mbidList = mbidMap.get(canonicalSpotify.musicBrainzRecordingId.trim().toLowerCase());
         if (mbidList) mbidList.forEach((c) => candidateSet.add(c));
       }
@@ -305,12 +322,17 @@ export class SpotifyPlaylistImportPlanner {
 
         // Check if candidate matched artist+title identity but suffered hard variant conflict penalty >= 30
         const candNormTitle = MetadataNormalizer.getEffectiveTitle(candidate);
-        const candArtist = candidate.artists[0] ? MetadataNormalizer.normalizeArtist(candidate.artists[0]) : '';
+        const candArtist = candidate.artists[0]
+          ? MetadataNormalizer.normalizeArtist(candidate.artists[0])
+          : '';
         const isTitleArtistCompatible =
           effectiveSpotifyTitle === candNormTitle &&
           (!primaryArtist || !candArtist || primaryArtist === candArtist);
 
-        if (isTitleArtistCompatible && matchResult.breakdown.variantPenalty >= HARD_VARIANT_CONFLICT_PENALTY) {
+        if (
+          isTitleArtistCompatible &&
+          matchResult.breakdown.variantPenalty >= HARD_VARIANT_CONFLICT_PENALTY
+        ) {
           hadVariantConflict = true;
         }
       }
@@ -339,7 +361,8 @@ export class SpotifyPlaylistImportPlanner {
             duration: bestCandidate.durationSecs ?? 0
           },
           resolution: {
-            originalReference: canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
+            originalReference:
+              canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
             resolvedPath: bestCandidate.pathOrUri,
             resolutionStatus: 'RESOLVED',
             verificationStatus: 'FOUND'
@@ -378,7 +401,8 @@ export class SpotifyPlaylistImportPlanner {
             duration: canonicalSpotify.durationSecs ?? 0
           },
           resolution: {
-            originalReference: canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
+            originalReference:
+              canonicalSpotify.pathOrUri || `spotify:track:${spotifyTrack.id || ''}`,
             resolutionStatus: 'UNRESOLVED',
             verificationStatus: 'MISSING'
           }

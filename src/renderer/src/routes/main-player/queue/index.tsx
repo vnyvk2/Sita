@@ -114,10 +114,14 @@ function RouteComponent() {
   const membershipVersion = viewingQueue?.membershipVersion ?? 0;
 
   const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
-  const { getItem, onRangeChange } = useWindowHydration(currentQueue, `${queueId}:${membershipVersion}`, {
-    keyPrefix: 'queue',
-    initialIndex: savedPosition?.index ?? 0
-  });
+  const { getItem, onRangeChange } = useWindowHydration(
+    currentQueue,
+    `${queueId}:${membershipVersion}`,
+    {
+      keyPrefix: 'queue',
+      initialIndex: savedPosition?.index ?? 0
+    }
+  );
 
   const durationsQuery = useQuery({
     queryKey: ['queue', 'durations', queueId, membershipVersion],
@@ -206,10 +210,7 @@ function RouteComponent() {
   //   };
   // }, [fetchAllSongsData]);
 
-  const selectAllStubs = useMemo(
-    () => currentQueue.map((id) => ({ songId: id })),
-    [currentQueue]
-  );
+  const selectAllStubs = useMemo(() => currentQueue.map((id) => ({ songId: id })), [currentQueue]);
   const selectAllHandler = useSelectAllHandler(selectAllStubs, 'songs', 'songId');
 
   const handleDragEnd = (result: DropResult) => {
@@ -295,8 +296,11 @@ function RouteComponent() {
 
   const handleRemoveSong = useCallback(
     (songId: number) => {
-      const { multipleSelections: selectedSongIds, selectionType, isEnabled } =
-        multipleSelectionsDataRef.current;
+      const {
+        multipleSelections: selectedSongIds,
+        selectionType,
+        isEnabled
+      } = multipleSelectionsDataRef.current;
       const isMultipleSelectionsEnabled =
         isEnabled && selectionType === 'songs' && selectedSongIds.length !== 1;
 
@@ -500,72 +504,72 @@ function RouteComponent() {
             className={`songs-container overflow-auto ${currentQueue.length > 0 ? 'h-full' : 'h-0'}`}
           >
             {currentQueue.length > 0 && (
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable
-                    droppableId="droppable"
-                    mode="virtual"
-                    renderClone={(provided, _, rubric) => {
-                      const data = getItem(rubric.source.index);
-                      if (!data) return null;
-                      return (
-                        <Song
-                          provided={provided}
-                          key={data.songId}
-                          isDraggable
-                          index={rubric.source.index}
-                          ref={provided.innerRef}
-                          isIndexingSongs={preferences?.isSongIndexingEnabled}
-                          title={data.title}
-                          songId={data.songId}
-                          artists={data.artists}
-                          album={data.album}
-                          artworkPaths={data.artworkPaths}
-                          duration={data.duration}
-                          path={data.path}
-                          isAFavorite={data.isAFavorite}
-                          year={data.year}
-                          isBlacklisted={data.isBlacklisted}
-                        />
-                      );
-                    }}
-                  >
-                    {(droppableProvided) => (
-                      <VirtualizedList
-                        data={currentQueue}
-                        fixedItemHeight={60}
-                        ref={ListRef}
-                        scrollerRef={droppableProvided.innerRef}
-                        scrollKey={scrollKey}
-                        onChange={onRangeChange}
-                        components={{
-                          Item: ({ children, ...props }: { children?: ReactNode }) => (
-                            <div {...props} className="height-preserving-container">
-                              {children}
-                            </div>
-                          )
-                        }}
-                        itemContent={(index, songId) => {
-                          const song = getItem(index);
-                          if (!song) return null;
-
-                          return (
-                            <QueueRow
-                              key={`${song.songId}-${index}`}
-                              index={index}
-                              songId={songId}
-                              song={song}
-                              isIndexingSongs={Boolean(preferences?.isSongIndexingEnabled)}
-                              selectAllHandler={selectAllHandler}
-                              onPlaySong={handlePlaySong}
-                              onRemoveSong={handleRemoveSong}
-                            />
-                          );
-                        }}
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable
+                  droppableId="droppable"
+                  mode="virtual"
+                  renderClone={(provided, _, rubric) => {
+                    const data = getItem(rubric.source.index);
+                    if (!data) return null;
+                    return (
+                      <Song
+                        provided={provided}
+                        key={data.songId}
+                        isDraggable
+                        index={rubric.source.index}
+                        ref={provided.innerRef}
+                        isIndexingSongs={preferences?.isSongIndexingEnabled}
+                        title={data.title}
+                        songId={data.songId}
+                        artists={data.artists}
+                        album={data.album}
+                        artworkPaths={data.artworkPaths}
+                        duration={data.duration}
+                        path={data.path}
+                        isAFavorite={data.isAFavorite}
+                        year={data.year}
+                        isBlacklisted={data.isBlacklisted}
                       />
-                    )}
-                  </Droppable>
-                </DragDropContext>
-              )}
+                    );
+                  }}
+                >
+                  {(droppableProvided) => (
+                    <VirtualizedList
+                      data={currentQueue}
+                      fixedItemHeight={60}
+                      ref={ListRef}
+                      scrollerRef={droppableProvided.innerRef}
+                      scrollKey={scrollKey}
+                      onChange={onRangeChange}
+                      components={{
+                        Item: ({ children, ...props }: { children?: ReactNode }) => (
+                          <div {...props} className="height-preserving-container">
+                            {children}
+                          </div>
+                        )
+                      }}
+                      itemContent={(index, songId) => {
+                        const song = getItem(index);
+                        if (!song) return null;
+
+                        return (
+                          <QueueRow
+                            key={`${song.songId}-${index}`}
+                            index={index}
+                            songId={songId}
+                            song={song}
+                            isIndexingSongs={Boolean(preferences?.isSongIndexingEnabled)}
+                            selectAllHandler={selectAllHandler}
+                            onPlaySong={handlePlaySong}
+                            onRemoveSong={handleRemoveSong}
+                          />
+                        );
+                      }}
+                    />
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
           </div>
           {currentQueue.length === 0 && (
             <div className="no-songs-container text-font-color-dimmed flex h-full w-full flex-col items-center justify-center text-center text-2xl">

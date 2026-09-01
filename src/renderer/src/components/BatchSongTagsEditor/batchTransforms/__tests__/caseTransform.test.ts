@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
+
+import type { BatchTrackRow } from '../../types';
 import { caseTransform, previewCaseTransform, toSentenceCase, toTitleCase } from '../caseTransform';
 import type { BatchTransformContext } from '../types';
-import type { BatchTrackRow } from '../../types';
 
 describe('batchTransforms — caseTransform', () => {
   it('converts strings to proper Title Case with minor-word and hyphen preservation', () => {
     expect(toTitleCase('the dark side of the moon')).toBe('The Dark Side of the Moon');
-    expect(toTitleCase('don\'t stop believin\'')).toBe('Don\'t Stop Believin\'');
-    expect(toTitleCase('spider-man: into the spider-verse')).toBe('Spider-Man: Into the Spider-Verse');
-    expect(toTitleCase('A HARD DAY\'S NIGHT')).toBe('A Hard Day\'s Night');
+    expect(toTitleCase("don't stop believin'")).toBe("Don't Stop Believin'");
+    expect(toTitleCase('spider-man: into the spider-verse')).toBe(
+      'Spider-Man: Into the Spider-Verse'
+    );
+    expect(toTitleCase("A HARD DAY'S NIGHT")).toBe("A Hard Day's Night");
     expect(toTitleCase('(live at wembley stadium)')).toBe('(Live at Wembley Stadium)');
     expect(toTitleCase('"heroes" (2017 remaster)')).toBe('"Heroes" (2017 Remaster)');
   });
@@ -34,7 +37,12 @@ describe('batchTransforms — caseTransform', () => {
       path: data.path,
       duration: data.duration,
       original: data,
-      draft: { ...data, artists: [...data.artists], albumArtists: [...data.albumArtists], genres: [...data.genres] },
+      draft: {
+        ...data,
+        artists: [...data.artists],
+        albumArtists: [...data.albumArtists],
+        genres: [...data.genres]
+      },
       dirtyFields: new Set(),
       validationErrors: new Map()
     };

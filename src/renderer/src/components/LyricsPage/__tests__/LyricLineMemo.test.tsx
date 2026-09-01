@@ -1,10 +1,11 @@
-﻿// @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+﻿import { render, screen, act } from '@testing-library/react';
 import React, { useState } from 'react';
-import { render, screen, act } from '@testing-library/react';
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from 'vitest';
+
+import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';
 import LyricLine from '../LyricLine';
 import { renderLyricsLines } from '../lyricsUtils';
-import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';
 
 const translationCallsByLine: Record<number, number> = {};
 
@@ -54,9 +55,9 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
 
   it('directly proves exported memo(LyricLine) bails out of component function execution', () => {
     // Reset tracker
-    translationCallsByLine[0] = 0;   // Line 0 (start: 0)
-    translationCallsByLine[5] = 0;   // Line 1 (start: 5)
-    translationCallsByLine[10] = 0;  // Line 2 (start: 10)
+    translationCallsByLine[0] = 0; // Line 0 (start: 0)
+    translationCallsByLine[5] = 0; // Line 1 (start: 5)
+    translationCallsByLine[10] = 0; // Line 2 (start: 10)
 
     function TestLyricsContainer() {
       const [activeIndex, setActiveIndex] = useState(0);

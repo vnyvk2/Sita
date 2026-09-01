@@ -33,9 +33,7 @@ export class MetadataProviderRegistry {
   }
 
   public getByCapability(capability: ProviderCapability): MetadataProviderRuntime[] {
-    return this.getAvailable().filter((runtime) =>
-      runtime.adapterInstance.supports(capability)
-    );
+    return this.getAvailable().filter((runtime) => runtime.adapterInstance.supports(capability));
   }
 
   public clear(): void {

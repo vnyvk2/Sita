@@ -1,7 +1,13 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { compilePattern, extractPathTarget, parsePattern, previewPatternParser } from '../patternParser';
-import type { BatchTransformContext } from '../types';
+
 import type { BatchTrackRow } from '../../types';
+import {
+  compilePattern,
+  extractPathTarget,
+  parsePattern,
+  previewPatternParser
+} from '../patternParser';
+import type { BatchTransformContext } from '../types';
 
 function createMockRow(songId: number, path: string): BatchTrackRow {
   const data = {
@@ -19,7 +25,12 @@ function createMockRow(songId: number, path: string): BatchTrackRow {
     path,
     duration: data.duration,
     original: data,
-    draft: { ...data, artists: [...data.artists], albumArtists: [...data.albumArtists], genres: [...data.genres] },
+    draft: {
+      ...data,
+      artists: [...data.artists],
+      albumArtists: [...data.albumArtists],
+      genres: [...data.genres]
+    },
     dirtyFields: new Set(),
     validationErrors: new Map()
   };
@@ -27,7 +38,9 @@ function createMockRow(songId: number, path: string): BatchTrackRow {
 
 describe('batchTransforms — patternParser', () => {
   it('extracts filename target stripping diverse audio extensions', () => {
-    expect(extractPathTarget('C:/Music/01 - Queen - Bohemian Rhapsody.mp3', false)).toBe('01 - Queen - Bohemian Rhapsody');
+    expect(extractPathTarget('C:/Music/01 - Queen - Bohemian Rhapsody.mp3', false)).toBe(
+      '01 - Queen - Bohemian Rhapsody'
+    );
     expect(extractPathTarget('D:/Audio/Track.flac', false)).toBe('Track');
     expect(extractPathTarget('C:/Music/Album/01 Title.m4a', true)).toBe('C:/Music/Album/01 Title');
   });

@@ -41,7 +41,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -112,7 +115,7 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) { }
+        } catch (e) {}
       };
     });
   }
@@ -126,7 +129,11 @@ export class CDPClient {
   }
 
   async evaluate(expression) {
-    const res = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
     return res?.result?.value;
   }
 
@@ -142,7 +149,7 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) { }
+    } catch (e) {}
   }
 }
 
@@ -157,7 +164,7 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
           return page;
         }
       }
-    } catch (e) { }
+    } catch (e) {}
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -166,17 +173,19 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 async function runMultiCycleAttributionTest() {
   console.log(`\n=================================================================`);
   console.log(` RENDERER MEMORY ATTRIBUTION & MULTI-CYCLE TRANSITION TEST`);
   console.log(` Testing Lifecycle: Main -> Standard Mini -> Compact Mini (3 Consecutive Cycles)`);
-  console.log(` Measuring: OS Working Set, V8 JS Heap, DOM Nodes, LayoutObjects, Documents, Listeners`);
+  console.log(
+    ` Measuring: OS Working Set, V8 JS Heap, DOM Nodes, LayoutObjects, Documents, Listeners`
+  );
   console.log(`=================================================================\n`);
 
   killAllNora();
@@ -190,7 +199,13 @@ async function runMultiCycleAttributionTest() {
   console.log('[Runner] Launching Nora in dev mode with --remoteDebuggingPort 9876...');
   spawn(
     process.execPath,
-    [path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'dev', '--watch=false', '--remoteDebuggingPort', '9876'],
+    [
+      path.join(rootDir, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'),
+      'dev',
+      '--watch=false',
+      '--remoteDebuggingPort',
+      '9876'
+    ],
     {
       cwd: rootDir,
       env,
@@ -217,7 +232,7 @@ async function runMultiCycleAttributionTest() {
       let metrics = {};
       try {
         metrics = await cdp.getPerformanceMetrics();
-      } catch (e) { }
+      } catch (e) {}
 
       const record = {
         phase: phaseLabel,
@@ -226,8 +241,12 @@ async function runMultiCycleAttributionTest() {
         rendererPM: proc?.renderer?.pm ?? 0,
         gpuWS: proc?.gpu?.ws ?? 0,
         mainWS: proc?.main?.ws ?? 0,
-        jsHeapUsedMB: metrics.JSHeapUsedSize ? Math.round((metrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100 : null,
-        jsHeapTotalMB: metrics.JSHeapTotalSize ? Math.round((metrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100 : null,
+        jsHeapUsedMB: metrics.JSHeapUsedSize
+          ? Math.round((metrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100
+          : null,
+        jsHeapTotalMB: metrics.JSHeapTotalSize
+          ? Math.round((metrics.JSHeapTotalSize / 1024 / 1024) * 100) / 100
+          : null,
         domNodes: metrics.Nodes ?? null,
         documents: metrics.Documents ?? null,
         layoutObjects: metrics.LayoutObjects ?? null,
@@ -235,7 +254,9 @@ async function runMultiCycleAttributionTest() {
       };
 
       telemetryLog.push(record);
-      console.log(`  [${record.phase}] Total: ${record.totalWS} MB | Renderer WS: ${record.rendererWS} MB | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB} MB | Nodes: ${record.domNodes} | Listeners: ${record.listeners}`);
+      console.log(
+        `  [${record.phase}] Total: ${record.totalWS} MB | Renderer WS: ${record.rendererWS} MB | GPU: ${record.gpuWS} MB | Main: ${record.mainWS} MB | Heap: ${record.jsHeapUsedMB} MB | Nodes: ${record.domNodes} | Listeners: ${record.listeners}`
+      );
       return record;
     }
 

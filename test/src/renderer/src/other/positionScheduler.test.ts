@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -17,7 +18,11 @@ class MockAudioPlayer extends EventEmitter {
 describe('PositionTimerScheduler', () => {
   let player: MockAudioPlayer;
   let dispatchedEvents: number[];
-  let fakeDoc: { visibilityState: DocumentVisibilityState; addEventListener: any; removeEventListener: any };
+  let fakeDoc: {
+    visibilityState: DocumentVisibilityState;
+    addEventListener: any;
+    removeEventListener: any;
+  };
   let visibilityListener: (() => void) | null = null;
 
   beforeEach(() => {

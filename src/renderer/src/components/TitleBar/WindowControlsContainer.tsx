@@ -28,12 +28,12 @@ const WindowControlsContainer = () => {
 
   return (
     <div
-      className="window-controls-container flex h-full items-center justify-end bg-background-color-2/70 dark:bg-dark-background-color-2/80 [-webkit-app-region:no-drag]"
+      className="window-controls-container bg-background-color-2/70 dark:bg-dark-background-color-2/80 flex h-full items-center justify-end [-webkit-app-region:no-drag]"
       id="window-controls-container"
     >
       <button
         type="button"
-        className={`minimize-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-background-color-3/60 hover:text-font-color-black focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white ${
+        className={`minimize-btn text-font-color-black/80 hover:bg-background-color-3/60 hover:text-font-color-black dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out focus-visible:outline-hidden ${
           bodyBackgroundImage && 'text-font-color-white!'
         }`}
         onClick={minimize}
@@ -43,7 +43,7 @@ const WindowControlsContainer = () => {
       </button>
       <button
         type="button"
-        className={`maximize-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-background-color-3/60 hover:text-font-color-black focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white ${
+        className={`maximize-btn text-font-color-black/80 hover:bg-background-color-3/60 hover:text-font-color-black dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out focus-visible:outline-hidden ${
           bodyBackgroundImage && 'text-font-color-white!'
         }`}
         onClick={maximize}
@@ -53,7 +53,7 @@ const WindowControlsContainer = () => {
       </button>
       <button
         type="button"
-        className={`close-btn m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent text-font-color-black/80 transition-colors ease-in-out hover:bg-[#e81123] hover:text-white focus-visible:outline-hidden dark:text-font-color-white/80 dark:hover:bg-[#e81123] dark:hover:text-white ${
+        className={`close-btn text-font-color-black/80 dark:text-font-color-white/80 m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out hover:bg-[#e81123] hover:text-white focus-visible:outline-hidden dark:hover:bg-[#e81123] dark:hover:text-white ${
           bodyBackgroundImage && 'text-font-color-white!'
         }`}
         onClick={close}

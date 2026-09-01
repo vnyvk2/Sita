@@ -2,6 +2,7 @@
 // --remote-debugging-port, evaluates a JS expression, prints JSON result.
 // Usage: node scripts/cdp-eval.mjs "<expression>" [port]
 import http from 'node:http';
+
 import WebSocket from 'ws';
 
 const expression = process.argv[2];
@@ -25,13 +26,14 @@ const listTargets = () =>
 const targets = await listTargets();
 const page = targets.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
 if (!page) {
-  console.error(JSON.stringify({ ok: false, error: 'no page target', targets: targets.map((t) => t.type) }));
+  console.error(
+    JSON.stringify({ ok: false, error: 'no page target', targets: targets.map((t) => t.type) })
+  );
   process.exit(2);
 }
 
 const ws = new WebSocket(page.webSocketDebuggerUrl, { maxPayload: 64 * 1024 * 1024 });
-const send = (id, method, params) =>
-  ws.send(JSON.stringify({ id, method, params }));
+const send = (id, method, params) => ws.send(JSON.stringify({ id, method, params }));
 
 const result = await new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('CDP timeout after 30s')), 30000);
@@ -42,7 +44,11 @@ const result = await new Promise((resolve, reject) => {
       clearTimeout(timer);
       if (process.env.CDP_DEBUG) console.error('RAW:', raw.toString().slice(0, 500));
       if (msg.result?.exceptionDetails) {
-        resolve({ ok: false, error: msg.result.exceptionDetails.exception?.description ?? msg.result.exceptionDetails.text });
+        resolve({
+          ok: false,
+          error:
+            msg.result.exceptionDetails.exception?.description ?? msg.result.exceptionDetails.text
+        });
       } else {
         resolve({ ok: true, value: msg.result?.result?.value });
       }
@@ -50,9 +56,7 @@ const result = await new Promise((resolve, reject) => {
     }
   });
   ws.on('open', () => {
-    const body = expression.includes('return ')
-      ? expression
-      : `return (${expression});`;
+    const body = expression.includes('return ') ? expression : `return (${expression});`;
     send(2, 'Runtime.evaluate', {
       expression: `(async () => {\n${body}\n})()`,
       awaitPromise: true,

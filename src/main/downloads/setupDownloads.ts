@@ -1,12 +1,11 @@
 import { mkdirSync, readdirSync, rmSync } from 'fs';
 import path from 'path';
 
-import { app, ipcMain } from 'electron';
-
 import addMusicFromFolderStructures from '@main/core/addMusicFolder';
 import { getUserSettings } from '@main/db/queries/settings';
 import libraryChangeTracker from '@main/library/LibraryChangeTracker';
 import logger from '@main/logger';
+import { app, ipcMain } from 'electron';
 
 import { DownloadManager, type DownloadSettings } from './DownloadManager';
 import type {
@@ -27,9 +26,8 @@ function stagingRoot(): string {
 }
 
 /**
- * Removes leftovers from previous sessions. Jobs live in memory only, so ANY
- * directory inside the staging root at startup belongs to a dead download
- * (crash / power loss) and is safe to delete.
+ * Removes leftovers from previous sessions. Jobs live in memory only, so ANY directory inside the
+ * staging root at startup belongs to a dead download (crash / power loss) and is safe to delete.
  */
 function purgeStaleStaging(root: string): void {
   try {
@@ -50,8 +48,8 @@ async function resolveDownloadSettings(): Promise<DownloadSettings> {
 }
 
 /**
- * Registers the downloads folder with the library scanner when the user opted in.
- * Safe to call repeatedly: the ingestion pipeline ignores already-linked folders.
+ * Registers the downloads folder with the library scanner when the user opted in. Safe to call
+ * repeatedly: the ingestion pipeline ignores already-linked folders.
  */
 export async function ensureDownloadsFolderInLibrary(): Promise<void> {
   const settings = await getUserSettings();
@@ -94,10 +92,13 @@ export function setupDownloadsIpc(publish: (snapshot: DownloadsSnapshot) => void
     }
   });
 
-  ipcMain.handle('downloads/search', (_, query: string, limit?: number): Promise<OnlineTrackResult[]> => {
-    if (!query.trim()) return Promise.resolve([]);
-    return extractorInstance!.search(query, { limit });
-  });
+  ipcMain.handle(
+    'downloads/search',
+    (_, query: string, limit?: number): Promise<OnlineTrackResult[]> => {
+      if (!query.trim()) return Promise.resolve([]);
+      return extractorInstance!.search(query, { limit });
+    }
+  );
 
   ipcMain.handle(
     'downloads/resolvePlaylist',
@@ -142,10 +143,10 @@ export function setupDownloadsIpc(publish: (snapshot: DownloadsSnapshot) => void
 }
 
 /**
- * Nudges the library change tracker for scan modes without filesystem watchers
- * (startup/manual). In automatic mode watchers already handle ingestion; in
- * manual mode this only marks the library dirty so the UI indicates that a scan
- * will pick the file up — it never forces a scan against the user's choice.
+ * Nudges the library change tracker for scan modes without filesystem watchers (startup/manual). In
+ * automatic mode watchers already handle ingestion; in manual mode this only marks the library
+ * dirty so the UI indicates that a scan will pick the file up — it never forces a scan against the
+ * user's choice.
  */
 async function markDownloadedFileDirty(finalPath: string): Promise<void> {
   const settings = await getUserSettings();

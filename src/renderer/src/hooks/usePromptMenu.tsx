@@ -1,8 +1,7 @@
 import { useCallback, type ReactNode } from 'react';
 
-import { dispatch, store } from '../store/store';
-
 import type { PromptMenuDataOptions } from '../components/PromptMenu/types';
+import { dispatch, store } from '../store/store';
 
 /** Return type for the usePromptMenu hook */
 export interface UsePromptMenuReturn {
@@ -100,7 +99,12 @@ export interface UsePromptMenuReturn {
  */
 export function usePromptMenu(): UsePromptMenuReturn {
   const changePromptMenuData = useCallback(
-    (isVisible = false, prompt?: ReactNode | null, className = '', options?: PromptMenuDataOptions) => {
+    (
+      isVisible = false,
+      prompt?: ReactNode | null,
+      className = '',
+      options?: PromptMenuDataOptions
+    ) => {
       const promptData: PromptMenuData = {
         prompt,
         className,

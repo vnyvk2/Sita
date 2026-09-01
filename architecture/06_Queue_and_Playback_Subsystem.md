@@ -7,6 +7,7 @@ This document specifies the architecture, data models, permutation algorithms, a
 ## 1. Subsystem Architectural Philosophy
 
 The playback queue is intentionally decoupled from persistent database collections:
+
 - **Ephemeral & In-Memory**: Current playback state, shuffle permutations, cursor positions, and history stacks live in fast memory rather than disk databases.
 - **Non-Destructive Shuffling**: Shuffling does not scramble the original track order. It maintains a **Shuffled Permutation Vector** (`shufflePermutation`) that maps logical playback positions to natural indices.
 - **Separation of Structure vs. Membership**: Reordering or shuffling a queue does NOT invalidate React Query caches or trigger database refetches; only adding or removing distinct songs increments `membershipVersion`.
@@ -55,6 +56,7 @@ graph TD
 ## 2. Detailed Process Breakdown
 
 ### Process 1: Queue Initialization & State Model
+
 Represents the queue as an immutable state structure containing unique entry UUIDs, sources, and mode flags.
 
 ```ts
@@ -92,9 +94,11 @@ flowchart TD
 ---
 
 ### Process 2: Permutation-Based Shuffle Algorithm
+
 When shuffle mode is toggled, Nora never mutates the underlying `entries` array. Instead, it recomputes `shufflePermutation`.
 
 **Fisher-Yates Algorithm with Active Track Anchoring**:
+
 1. Identifies the currently playing track's natural index ($N_{\text{current}}$).
 2. Collects all remaining indices ($i \neq N_{\text{current}}$).
 3. Executes a Fisher-Yates shuffle on the remaining indices.
@@ -121,13 +125,16 @@ flowchart TD
 ---
 
 ### Process 3: Bi-Directional Index Translation Mathematics
+
 Translates between the natural order (the original list) and the playback order (the UI list in shuffle mode).
 
-$$\begin{aligned}
+$$
+\begin{aligned}
 \text{playbackIndex}(n) &= \text{shufflePermutation}.\text{indexOf}(n) \\
 \text{naturalIndex}(p) &= \text{shufflePermutation}[p] \\
 \text{songToPlay}(p) &= \text{entries}[\text{shufflePermutation}[p]].\text{songId}
-\end{aligned}$$
+\end{aligned}
+$$
 
 ```mermaid
 graph LR
@@ -165,9 +172,11 @@ graph LR
 ---
 
 ### Process 4: Dynamic Queue Insertion (`addNext` & `addToEnd`)
+
 Dynamically inserts new tracks without invalidating existing shuffle indices.
 
 **Insertion Math for `addNext`**:
+
 1. Computes `insertNaturalIndex = currentNatural + 1`.
 2. Computes `insertPlaybackIndex = getPlaybackIndex(currentNatural) + 1`.
 3. Slices new entries into `state.entries`.
@@ -191,9 +200,11 @@ flowchart TD
 ---
 
 ### Process 5: Atomic $O(N)$ `playNext` with Duplicate Removal & Versioning
+
 When a user clicks "Play Next" on an album or track, Nora atomically strips existing duplicate instances of those tracks from the queue and inserts the incoming batch in a single $O(N)$ operation.
 
 **Version Optimization Guarantee**:
+
 - **`structureVersion`** increments on every order or position change (triggers local UI animation).
 - **`membershipVersion`** increments ONLY IF new distinct song IDs are added or duplicate counts change. If `playNext` merely shifts existing tracks, `membershipVersion` stays unchanged (0 DB refetches, 0 IPC roundtrips).
 
@@ -227,6 +238,7 @@ flowchart TD
 ---
 
 ### Process 6: Playback Navigation & History Stack (`advance` & `goBack`)
+
 Coordinates cursor progression, repeat constraints, and back-button navigation.
 
 ```mermaid
@@ -251,6 +263,7 @@ flowchart TD
 ---
 
 ### Process 7: Multi-Queue Workspace Management (`QueuesManager.ts`)
+
 Users can maintain multiple independent queue workspaces simultaneously (e.g. "Work Queue", "Chill Queue", "Workout").
 
 ```mermaid
@@ -279,6 +292,7 @@ flowchart TD
 ---
 
 ### Process 8: Zustand Store & LocalStorage Synchronization
+
 Ensures zero state divergence between the in-memory queue, React component trees, and persistent local storage.
 
 ```mermaid

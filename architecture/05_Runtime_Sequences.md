@@ -26,7 +26,7 @@ sequenceDiagram
     Scanner->>Scanner: setState('DISCOVERING')
     Scanner->>Walker: fastDiskWalk(accessibleRoots)
     Walker-->>Scanner: { diskSnapshots, failedSubtrees, failedPaths }
-    
+
     Scanner->>Scanner: setState('DIFFING')
     Scanner->>DB: fetch flat dbSongs snapshot
     DB-->>Scanner: dbSnapshots
@@ -34,7 +34,7 @@ sequenceDiagram
     Diff-->>Scanner: DiffResult { added, modified, removed, unchanged }
 
     Scanner->>Scanner: setState('RECONCILING')
-    
+
     alt Removed Tracks Exist
         Scanner->>Reconciler: reconcileRemoved(removed)
         Reconciler->>DB: batch DELETE FROM songs
@@ -88,7 +88,7 @@ sequenceDiagram
     AutoTag->>ResMgr: resolve(operationId, context)
     ResMgr->>Lookup: searchCandidates(context)
     Lookup->>Exec: executeConcurrent(query)
-    
+
     par Federated Provider Queries
         Exec->>MB: searchReleases(query)
         Exec->>Discogs: searchReleases(query)

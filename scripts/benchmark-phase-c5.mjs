@@ -1,8 +1,8 @@
 import { spawn, spawnSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { performance } from 'perf_hooks';
+import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -49,7 +49,10 @@ export function getProcessMemoryMetrics() {
       $list | ConvertTo-Json -Compress
     `;
 
-    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], { encoding: 'utf8', timeout: 6000 });
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      encoding: 'utf8',
+      timeout: 6000
+    });
     const raw = res.stdout?.trim();
     if (!raw || raw === '[]') return null;
 
@@ -100,9 +103,7 @@ export function getProcessMemoryMetrics() {
   }
 }
 
-/**
- * Event Loop Latency Monitor (measures Main event loop blockage/starvation).
- */
+/** Event Loop Latency Monitor (measures Main event loop blockage/starvation). */
 export class EventLoopMonitor {
   constructor(sampleIntervalMs = 10) {
     this.sampleIntervalMs = sampleIntervalMs;
@@ -175,7 +176,9 @@ async function runBenchmark() {
   const batchSize = 100;
   const totalBatches = totalTracks / batchSize;
 
-  console.log(`[Config] Total tracks: ${totalTracks.toLocaleString()} | Batch size: ${batchSize} | Total batches: ${totalBatches}`);
+  console.log(
+    `[Config] Total tracks: ${totalTracks.toLocaleString()} | Batch size: ${batchSize} | Total batches: ${totalBatches}`
+  );
 
   // Create virtual batch definitions
   const tracks = [];
@@ -214,7 +217,9 @@ async function runBenchmark() {
     if (batchesReceived % 50 === 0 || batchesReceived === totalBatches) {
       const elapsedSec = (performance.now() - startTime) / 1000;
       const rate = Math.round(totalTracksProcessed / elapsedSec);
-      console.log(`  [Progress] Processed ${totalTracksProcessed.toLocaleString()} / ${totalTracks.toLocaleString()} tracks (${batchesReceived}/${totalBatches} batches) | Rate: ${rate.toLocaleString()} tracks/sec | Elapsed: ${elapsedSec.toFixed(2)}s`);
+      console.log(
+        `  [Progress] Processed ${totalTracksProcessed.toLocaleString()} / ${totalTracks.toLocaleString()} tracks (${batchesReceived}/${totalBatches} batches) | Rate: ${rate.toLocaleString()} tracks/sec | Elapsed: ${elapsedSec.toFixed(2)}s`
+      );
     }
   }
 
@@ -225,7 +230,8 @@ async function runBenchmark() {
   const avgThroughput = Math.round(totalTracks / totalElapsedSec);
   const loopStats = loopMonitor.getStats();
 
-  const avgBatchLatency = Math.round((batchLatencies.reduce((a, b) => a + b, 0) / batchLatencies.length) * 100) / 100;
+  const avgBatchLatency =
+    Math.round((batchLatencies.reduce((a, b) => a + b, 0) / batchLatencies.length) * 100) / 100;
   const maxBatchLatency = Math.round(Math.max(...batchLatencies) * 100) / 100;
 
   console.log('\n================================================================================');

@@ -35,7 +35,13 @@ vi.mock('../../../../../../src/renderer/src/components/Img', () => ({
 
 vi.mock('../../../../../../src/renderer/src/components/NavLink', () => ({
   default: ({ children, className, onClick, onContextMenu, ...rest }: any) => (
-    <div data-testid="nav-link" className={className} onClick={onClick} onContextMenu={onContextMenu} {...rest}>
+    <div
+      data-testid="nav-link"
+      className={className}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      {...rest}
+    >
       {children}
     </div>
   )

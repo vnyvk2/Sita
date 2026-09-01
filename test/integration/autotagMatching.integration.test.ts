@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
+import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
 import { normalizeForMatching } from '@main/metadata/matching/normalizeForMatching';
 import { TrackMatcher, MIN_MATCH_SCORE } from '@main/metadata/matching/TrackMatcher';
-import { MetadataNormalizer } from '@main/metadata/matching/MetadataNormalizer';
-import { MetadataMatcher } from '@main/metadata/matching/MetadataMatcher';
-import { MetadataQueryNormalizer } from '@main/metadata/search/MetadataQueryNormalizer';
 import type { LocalSongInput, OfficialTrackInput } from '@main/metadata/matching/TrackMatcher';
+import { MetadataQueryNormalizer } from '@main/metadata/search/MetadataQueryNormalizer';
+import { describe, expect, it } from 'vitest';
 
 describe('AutoTag Matching Subsystem (Phase 1 Integration Gate)', () => {
   const trackMatcher = new TrackMatcher();
@@ -32,9 +32,15 @@ describe('AutoTag Matching Subsystem (Phase 1 Integration Gate)', () => {
       expect(normalizeForMatching(cjkComposed)).toBe(normalizeForMatching(cjkDecomposed));
 
       // Domain-specific normalizer transformations
-      expect(MetadataNormalizer.normalizeTitle('Кино - Группа крови [Live]')).toBe('кино группа крови');
-      expect(MetadataNormalizer.normalizeTitle('YOASOBI - 夜に駆ける (Official Music Video)')).toBe('yoasobi 夜に駆ける');
-      expect(MetadataNormalizer.normalizeArtist('A.R. Rahman with Sid Sriram')).toBe('ar rahman sid sriram');
+      expect(MetadataNormalizer.normalizeTitle('Кино - Группа крови [Live]')).toBe(
+        'кино группа крови'
+      );
+      expect(MetadataNormalizer.normalizeTitle('YOASOBI - 夜に駆ける (Official Music Video)')).toBe(
+        'yoasobi 夜に駆ける'
+      );
+      expect(MetadataNormalizer.normalizeArtist('A.R. Rahman with Sid Sriram')).toBe(
+        'ar rahman sid sriram'
+      );
       expect(MetadataNormalizer.normalizeArtist('YOASOBI feat. 初音ミク')).toBe('yoasobi 初音ミク');
     });
 
@@ -125,7 +131,9 @@ describe('AutoTag Matching Subsystem (Phase 1 Integration Gate)', () => {
       expect(score.score).toBeLessThanOrEqual(49);
       expect(score.reasons).toContain('conflicting_variants_ceiling_applied');
 
-      const matchedPairs = trackMatcher.matchTracks([localSong], 'rel-radiohead-01', [officialTrack]);
+      const matchedPairs = trackMatcher.matchTracks([localSong], 'rel-radiohead-01', [
+        officialTrack
+      ]);
       expect(matchedPairs).toHaveLength(0);
     });
 
@@ -153,7 +161,9 @@ describe('AutoTag Matching Subsystem (Phase 1 Integration Gate)', () => {
       expect(score.score).toBeGreaterThanOrEqual(MIN_MATCH_SCORE);
       expect(score.reasons).not.toContain('conflicting_variants_ceiling_applied');
 
-      const matchedPairs = trackMatcher.matchTracks([localSong], 'rel-radiohead-01', [officialTrack]);
+      const matchedPairs = trackMatcher.matchTracks([localSong], 'rel-radiohead-01', [
+        officialTrack
+      ]);
       expect(matchedPairs).toHaveLength(1);
       expect(matchedPairs[0].localSong.songId).toBe(202);
     });

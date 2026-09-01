@@ -24,9 +24,7 @@ const fetchAlbumData = async (
     filterType
   });
 
-  const numericIds = albumTitlesOrIds
-    .map((x) => Number(x))
-    .filter((x) => !isNaN(x));
+  const numericIds = albumTitlesOrIds.map((x) => Number(x)).filter((x) => !isNaN(x));
 
   if (albumTitlesOrIds.length > 0 && numericIds.length === 0) {
     return result;

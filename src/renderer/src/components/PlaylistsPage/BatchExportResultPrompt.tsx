@@ -1,7 +1,8 @@
+import type { BatchExportResult } from '@common/collections/types';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import type { BatchExportResult } from '@common/collections/types';
+
 import Button from '../Button';
 
 interface BatchExportResultPromptProps {
@@ -29,26 +30,31 @@ const BatchExportResultPrompt = (props: BatchExportResultPromptProps) => {
       </div>
 
       <div className="summary-banner mb-6 text-sm">
-        <span className="font-semibold text-font-color-highlight dark:text-dark-font-color-highlight">
+        <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-semibold">
           {successfulItems.length} of {result.totalCount} playlists exported successfully.
         </span>
       </div>
 
-      <div className="results-list max-h-60 overflow-y-auto mb-6 bg-background-color-dim/40 dark:bg-dark-background-color-dim/40 p-4 rounded-md flex flex-col gap-2">
+      <div className="results-list bg-background-color-dim/40 dark:bg-dark-background-color-dim/40 mb-6 flex max-h-60 flex-col gap-2 overflow-y-auto rounded-md p-4">
         {successfulItems.map((item) => (
-          <div key={item.playlistId} className="flex items-center text-sm gap-2">
-            <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold">✓</span>
-            <span className="font-medium truncate flex-1">{item.playlistName}</span>
+          <div key={item.playlistId} className="flex items-center gap-2 text-sm">
+            <span className="text-font-color-highlight dark:text-dark-font-color-highlight font-bold">
+              ✓
+            </span>
+            <span className="flex-1 truncate font-medium">{item.playlistName}</span>
           </div>
         ))}
 
         {failedItems.map((item) => (
-          <div key={item.playlistId} className="flex flex-col text-sm text-font-color-error dark:text-dark-font-color-error">
+          <div
+            key={item.playlistId}
+            className="text-font-color-error dark:text-dark-font-color-error flex flex-col text-sm"
+          >
             <div className="flex items-center gap-2">
               <span className="font-bold">✗</span>
-              <span className="font-medium truncate flex-1">{item.playlistName}</span>
+              <span className="flex-1 truncate font-medium">{item.playlistName}</span>
             </div>
-            {item.error && <div className="text-xs ml-5 opacity-80">{item.error}</div>}
+            {item.error && <div className="ml-5 text-xs opacity-80">{item.error}</div>}
           </div>
         ))}
       </div>

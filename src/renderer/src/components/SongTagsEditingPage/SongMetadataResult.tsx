@@ -32,12 +32,14 @@ function SongMetadataResult(props: SongMetadataResultProp) {
       const albumData = album?.trim()
         ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
         : [];
-      const artistData = Array.isArray(artists) && artists.length > 0
-        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
-        : [];
-      const genreData = Array.isArray(genres) && genres.length > 0
-        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
-        : [];
+      const artistData =
+        Array.isArray(artists) && artists.length > 0
+          ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+          : [];
+      const genreData =
+        Array.isArray(genres) && genres.length > 0
+          ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+          : [];
 
       updateSongInfo((prevData): SongTags => {
         changePromptMenuData(false, undefined, '');

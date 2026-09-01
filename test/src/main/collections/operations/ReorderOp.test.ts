@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
 import { ReorderOp } from '@main/collections/operations/ReorderOp';
-import type { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
 import type { OperationContext } from '@main/collections/operations/types';
+import type { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/collections/repositories/PlaylistRepository', () => ({
   PlaylistRepository: class MockPlaylistRepository {}
@@ -10,7 +10,8 @@ vi.mock('@main/collections/repositories/PlaylistRepository', () => ({
 type EntryRow = { entryId: number; position: number };
 
 /** Builds ordered rows from a plain visual order (rank == position). */
-const contiguous = (ids: number[]): EntryRow[] => ids.map((entryId, position) => ({ entryId, position }));
+const contiguous = (ids: number[]): EntryRow[] =>
+  ids.map((entryId, position) => ({ entryId, position }));
 
 const makeRepo = (rows: EntryRow[]) => ({
   // Repository contract: rows arrive sorted by visual order (position, id)

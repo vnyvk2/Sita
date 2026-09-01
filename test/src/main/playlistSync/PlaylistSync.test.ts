@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PlaylistSourceTracker } from '@main/playlistSync/services/PlaylistSourceTracker';
-import { PlaylistSyncPlanner } from '@main/playlistSync/planner/PlaylistSyncPlanner';
-import { PlaylistSyncExecutor } from '@main/playlistSync/executor/PlaylistSyncExecutor';
-import type { PlaylistLink } from '@main/playlistSync/models/PlaylistLink';
-import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
 import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
-import type { PlaylistSyncPersistence } from '@main/playlistSync/interfaces/PlaylistSyncPersistence';
 import type { TransactionRunner } from '@main/playlistImport/interfaces/TransactionRunner';
+import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
+import { PlaylistSyncExecutor } from '@main/playlistSync/executor/PlaylistSyncExecutor';
+import type { PlaylistSyncPersistence } from '@main/playlistSync/interfaces/PlaylistSyncPersistence';
+import type { PlaylistLink } from '@main/playlistSync/models/PlaylistLink';
+import { PlaylistSyncPlanner } from '@main/playlistSync/planner/PlaylistSyncPlanner';
+import { PlaylistSourceTracker } from '@main/playlistSync/services/PlaylistSourceTracker';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Playlist Synchronization Framework Refinements', () => {
   it('should detect source file modifications using PlaylistSourceTracker', async () => {
@@ -62,7 +62,14 @@ describe('Playlist Synchronization Framework Refinements', () => {
           source: {
             position: 1,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'song1.mp3' }, resolution: { originalReference: 'song1.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'song1.mp3' },
+                resolution: {
+                  originalReference: 'song1.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 101 }
             }
           }
@@ -72,7 +79,14 @@ describe('Playlist Synchronization Framework Refinements', () => {
           source: {
             position: 2,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'song2.mp3' }, resolution: { originalReference: 'song2.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'song2.mp3' },
+                resolution: {
+                  originalReference: 'song2.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 102 }
             }
           }
@@ -116,7 +130,11 @@ describe('Playlist Synchronization Framework Refinements', () => {
       additionsCount: 1,
       removalsCount: 1,
       operations: [
-        { type: 'ADD_SONG' as const, songId: 102, reason: 'Song present in updated source playlist' },
+        {
+          type: 'ADD_SONG' as const,
+          songId: 102,
+          reason: 'Song present in updated source playlist'
+        },
         { type: 'REMOVE_SONG' as const, songId: 999, reason: 'Song removed from source playlist' }
       ]
     };

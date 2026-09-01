@@ -6,9 +6,7 @@ import type {
   FindReplaceConfig
 } from './types';
 
-/**
- * Validates a regex pattern, returning compiled RegExp or syntax error message.
- */
+/** Validates a regex pattern, returning compiled RegExp or syntax error message. */
 export function validateFindReplaceRegex(
   query: string,
   matchCase: boolean
@@ -29,14 +27,8 @@ export function validateFindReplaceRegex(
   }
 }
 
-/**
- * Compiles a search string into a RegExp instance (escaping literals if not isRegex).
- */
-function compileSearchPattern(
-  query: string,
-  isRegex: boolean,
-  matchCase: boolean
-): RegExp | null {
+/** Compiles a search string into a RegExp instance (escaping literals if not isRegex). */
+function compileSearchPattern(query: string, isRegex: boolean, matchCase: boolean): RegExp | null {
   if (!query) return null;
 
   try {
@@ -48,9 +40,7 @@ function compileSearchPattern(
   }
 }
 
-/**
- * Transforms a single text value or array of strings with search-and-replace.
- */
+/** Transforms a single text value or array of strings with search-and-replace. */
 function replaceValue(
   val: unknown,
   regex: RegExp,
@@ -88,9 +78,7 @@ function replaceValue(
   return { changed: false, value: val };
 }
 
-/**
- * Computes a live before -> after preview of all affected fields for Find & Replace.
- */
+/** Computes a live before -> after preview of all affected fields for Find & Replace. */
 export function previewFindReplace(
   context: BatchTransformContext,
   config: FindReplaceConfig
@@ -112,7 +100,12 @@ export function previewFindReplace(
 
     for (const field of config.targetFields) {
       const currentVal = row.draft[field];
-      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement, isRegex);
+      const { changed, value: nextVal } = replaceValue(
+        currentVal,
+        regex,
+        config.replacement,
+        isRegex
+      );
 
       if (changed) {
         previews.push({
@@ -128,9 +121,7 @@ export function previewFindReplace(
   return previews;
 }
 
-/**
- * Pure transformation to execute Find & Replace across target columns and rows.
- */
+/** Pure transformation to execute Find & Replace across target columns and rows. */
 export function findReplace(
   context: BatchTransformContext,
   config: FindReplaceConfig
@@ -156,7 +147,12 @@ export function findReplace(
 
     for (const field of config.targetFields) {
       const currentVal = cloned.draft[field];
-      const { changed, value: nextVal } = replaceValue(currentVal, regex, config.replacement, isRegex);
+      const { changed, value: nextVal } = replaceValue(
+        currentVal,
+        regex,
+        config.replacement,
+        isRegex
+      );
 
       if (changed && applyFieldChange(cloned, field, nextVal)) {
         rowChanged = true;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { LocalSongNormalizer } from '../LocalSongNormalizer';
 
 describe('LocalSongNormalizer', () => {
@@ -26,9 +27,15 @@ describe('LocalSongNormalizer', () => {
     const songData = {
       songId: 202,
       title: 'traitor',
-      artists: [{ artistId: 1, name: 'Olivia Rodrigo' }, { artistId: 2, name: 'Dan Nigro' }],
+      artists: [
+        { artistId: 1, name: 'Olivia Rodrigo' },
+        { artistId: 2, name: 'Dan Nigro' }
+      ],
       album: { albumId: 5, name: 'SOUR', isAFavorite: true },
-      genres: [{ genreId: 10, name: 'Pop' }, { genreId: 11, name: 'Indie Pop' }],
+      genres: [
+        { genreId: 10, name: 'Pop' },
+        { genreId: 11, name: 'Indie Pop' }
+      ],
       trackNo: 2,
       discNo: 1,
       duration: 229,
@@ -53,7 +60,7 @@ describe('LocalSongNormalizer', () => {
       id: 303,
       title: 'drivers license',
       path: '/music/03-drivers-license.mp3',
-      duration: 242.000,
+      duration: 242.0,
       year: 2021,
       trackNumber: 3,
       diskNumber: 1,

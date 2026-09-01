@@ -1,15 +1,10 @@
 import React, { memo, useMemo, useState } from 'react';
+
 import Button from '../Button';
+import { previewFindReplace, validateFindReplaceRegex } from './batchTransforms/findReplace';
+import type { BatchTransformContext, FindReplaceConfig } from './batchTransforms/types';
 import type { EditableField } from './types';
 import { formatStringList } from './utils';
-import {
-  previewFindReplace,
-  validateFindReplaceRegex
-} from './batchTransforms/findReplace';
-import type {
-  BatchTransformContext,
-  FindReplaceConfig
-} from './batchTransforms/types';
 
 export interface FindReplaceModalProps {
   isOpen: boolean;
@@ -94,15 +89,15 @@ export const FindReplaceModal = memo(function FindReplaceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-background-color-1 p-6 shadow-2xl dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 w-full max-w-2xl rounded-2xl border p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
+            <h2 className="text-font-color-black dark:text-font-color-white text-lg font-semibold">
               Find & Replace
             </h2>
-            <p className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
               Search and replace text across selected tracks with live before & after preview.
             </p>
           </div>
@@ -115,9 +110,9 @@ export const FindReplaceModal = memo(function FindReplaceModal({
         </div>
 
         {/* Inputs */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-font-color-black dark:text-font-color-white mb-1">
+            <label className="text-font-color-black dark:text-font-color-white mb-1 block text-xs font-semibold">
               Find
             </label>
             <input
@@ -125,11 +120,11 @@ export const FindReplaceModal = memo(function FindReplaceModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search text or pattern..."
-              className="w-full rounded-lg border border-background-color-2 bg-background-color-1 px-3 py-2 text-xs text-font-color-black focus:border-font-color-highlight focus:outline-none dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight"
+              className="border-background-color-2 bg-background-color-1 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-font-color-black dark:text-font-color-white mb-1">
+            <label className="text-font-color-black dark:text-font-color-white mb-1 block text-xs font-semibold">
               Replace With
             </label>
             <input
@@ -137,57 +132,57 @@ export const FindReplaceModal = memo(function FindReplaceModal({
               value={replacement}
               onChange={(e) => setReplacement(e.target.value)}
               placeholder="Replacement (e.g. $1, text)..."
-              className="w-full rounded-lg border border-background-color-2 bg-background-color-1 px-3 py-2 text-xs text-font-color-black focus:border-font-color-highlight focus:outline-none dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight"
+              className="border-background-color-2 bg-background-color-1 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
             />
           </div>
         </div>
 
         {/* Options & Regex Error */}
-        <div className="flex items-center justify-between mb-3 text-xs">
+        <div className="mb-3 flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 cursor-pointer text-font-color-black dark:text-font-color-white">
+            <label className="text-font-color-black dark:text-font-color-white flex cursor-pointer items-center gap-1.5">
               <input
                 type="checkbox"
                 checked={matchCase}
                 onChange={(e) => setMatchCase(e.target.checked)}
-                className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+                className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
               />
               <span>Match Case</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-font-color-black dark:text-font-color-white">
+            <label className="text-font-color-black dark:text-font-color-white flex cursor-pointer items-center gap-1.5">
               <input
                 type="checkbox"
                 checked={isRegex}
                 onChange={(e) => setIsRegex(e.target.checked)}
-                className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+                className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
               />
               <span>Regular Expression (Regex)</span>
             </label>
           </div>
 
           {isRegex && !regexValidation.valid && (
-            <span className="text-red-500 font-medium truncate max-w-[250px]">
+            <span className="max-w-[250px] truncate font-medium text-red-500">
               {regexValidation.error}
             </span>
           )}
         </div>
 
         {/* Target Columns */}
-        <div className="mb-4 rounded-xl border border-background-color-2/60 bg-background-color-2/20 p-2.5 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20">
-          <p className="text-xs font-semibold text-font-color-black dark:text-font-color-white mb-1.5">
+        <div className="border-background-color-2/60 bg-background-color-2/20 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20 mb-4 rounded-xl border p-2.5">
+          <p className="text-font-color-black dark:text-font-color-white mb-1.5 text-xs font-semibold">
             Target Columns:
           </p>
           <div className="flex flex-wrap gap-3">
             {AVAILABLE_FIELDS.map(({ field, label }) => (
               <label
                 key={field}
-                className="flex items-center gap-1.5 text-xs text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer select-none"
+                className="text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white flex cursor-pointer items-center gap-1.5 text-xs select-none"
               >
                 <input
                   type="checkbox"
                   checked={targetFields.includes(field)}
                   onChange={() => toggleField(field)}
-                  className="cursor-pointer accent-font-color-highlight dark:accent-dark-font-color-highlight"
+                  className="accent-font-color-highlight dark:accent-dark-font-color-highlight cursor-pointer"
                 />
                 <span>{label}</span>
               </label>
@@ -197,40 +192,45 @@ export const FindReplaceModal = memo(function FindReplaceModal({
 
         {/* Live Preview Section */}
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-font-color-black dark:text-font-color-white">
-              Preview Matches ({affectedTracksCount} tracks affected &middot; {previews.length} fields changed)
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-font-color-black dark:text-font-color-white text-xs font-semibold">
+              Preview Matches ({affectedTracksCount} tracks affected &middot; {previews.length}{' '}
+              fields changed)
             </span>
           </div>
 
-          <div className="max-h-48 overflow-y-auto rounded-xl border border-background-color-2 bg-background-color-2/10 p-2 text-xs dark:border-dark-background-color-2 dark:bg-dark-background-color-2/10">
+          <div className="border-background-color-2 bg-background-color-2/10 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/10 max-h-48 overflow-y-auto rounded-xl border p-2 text-xs">
             {previews.length === 0 ? (
-              <p className="text-center py-6 text-font-color-dimmed dark:text-dark-font-color-dimmed italic">
-                {query ? 'No matching text found in target columns.' : 'Enter search text to preview matches.'}
+              <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed py-6 text-center italic">
+                {query
+                  ? 'No matching text found in target columns.'
+                  : 'Enter search text to preview matches.'}
               </p>
             ) : (
               <div className="space-y-1.5">
                 {previews.slice(0, 50).map((p, idx) => (
                   <div
                     key={`${p.songId}-${p.field}-${idx}`}
-                    className="flex items-center justify-between rounded-lg bg-background-color-1 p-2 dark:bg-dark-background-color-1 border border-background-color-2/40 dark:border-dark-background-color-2/40"
+                    className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2/40 dark:border-dark-background-color-2/40 flex items-center justify-between rounded-lg border p-2"
                   >
-                    <span className="font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed w-24 truncate">
+                    <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed w-24 truncate font-medium">
                       {p.field}:
                     </span>
-                    <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                      <span className="text-red-400 line-through truncate max-w-[200px]">
+                    <div className="flex flex-1 items-center justify-end gap-2 truncate">
+                      <span className="max-w-[200px] truncate text-red-400 line-through">
                         {formatDisplay(p.before)}
                       </span>
-                      <span className="material-icons-round text-xs text-font-color-dimmed">arrow_forward</span>
-                      <span className="text-emerald-400 font-medium truncate max-w-[200px]">
+                      <span className="material-icons-round text-font-color-dimmed text-xs">
+                        arrow_forward
+                      </span>
+                      <span className="max-w-[200px] truncate font-medium text-emerald-400">
                         {formatDisplay(p.after)}
                       </span>
                     </div>
                   </div>
                 ))}
                 {previews.length > 50 && (
-                  <p className="text-center text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed pt-1">
+                  <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed pt-1 text-center text-xs">
                     ...and {previews.length - 50} more changes.
                   </p>
                 )}
@@ -244,13 +244,13 @@ export const FindReplaceModal = memo(function FindReplaceModal({
           <Button
             label="Cancel"
             clickHandler={onClose}
-            className="bg-transparent hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 text-font-color-black dark:text-font-color-white text-xs px-4 py-2 rounded-lg font-medium cursor-pointer"
+            className="hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 text-font-color-black dark:text-font-color-white cursor-pointer rounded-lg bg-transparent px-4 py-2 text-xs font-medium"
           />
           <Button
             label={`Replace (${previews.length} Changes)`}
             clickHandler={handleApply}
             isDisabled={previews.length === 0}
-            className="bg-font-color-highlight dark:bg-dark-font-color-highlight text-white text-xs px-4 py-2 rounded-lg font-medium cursor-pointer disabled:opacity-40"
+            className="bg-font-color-highlight dark:bg-dark-font-color-highlight cursor-pointer rounded-lg px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
           />
         </div>
       </div>

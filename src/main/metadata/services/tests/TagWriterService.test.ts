@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TagWriterService } from '../TagWriterService';
+
 import * as atomicModule from '../../../utils/withAtomicFileWrite';
+import { TagWriterService } from '../TagWriterService';
 
 describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
   it('preserves strict separation between albumArtist and track artist (performers)', async () => {
@@ -26,7 +27,9 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      const __result = await fn(mockFile as any); mockFile.save(); return __result;
+      const __result = await fn(mockFile as any);
+      mockFile.save();
+      return __result;
     });
 
     const payload = {
@@ -67,7 +70,9 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      const __result = await fn(mockFile as any); mockFile.save(); return __result;
+      const __result = await fn(mockFile as any);
+      mockFile.save();
+      return __result;
     });
 
     const payload = {
@@ -106,7 +111,9 @@ describe('TagWriterService — Album Artist & Physical Tag Integrity', () => {
           savedFileTag = { ...mockFile.tag };
         }
       };
-      const __result = await fn(mockFile as any); mockFile.save(); return __result;
+      const __result = await fn(mockFile as any);
+      mockFile.save();
+      return __result;
     });
 
     const payload = {

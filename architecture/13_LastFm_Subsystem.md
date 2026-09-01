@@ -146,13 +146,13 @@ stateDiagram-v2
     state "failed (quarantined)" as failed
 
     pending --> sending : claimPendingBatch(limit=5)
-    
+
     sending --> sent : HTTP 200 + accepted >= 1 (track.scrobble)<br/>HTTP 200 + no error (track.love/unlove)<br/>14-day expired scrobble (local prune)<br/>Ignored codes 1,2,3,4 (API filtered)
-    
+
     sending --> pending : Auth Error (4, 9, 14, 15) reset<br/>Session Invalidation (bump generation)<br/>Startup recovery (resetStuckSending)
-    
+
     sending --> pending : Transient Error (8, 11, 16, 29, HTTP 429, HTTP 5xx, Ignored code 5)<br/>[retry_count incremented]
-    
+
     sending --> failed : Permanent Error (2, 3, 6, 7, 10, 13, 26)<br/>Missing song in DB (deleted)<br/>Malformed response / Unknown code
 
     sent --> [*] : Deleted on completion
@@ -189,14 +189,14 @@ sequenceDiagram
 
 The Last.fm 2.0 REST API uses a hybrid error reporting model (HTTP Status Codes + XML/JSON Response Payloads). Nora enforces the following strict taxonomy:
 
-| Category | Triggers / Error Codes | Action Taken | Outbox Row State |
-| :--- | :--- | :--- | :--- |
-| **Auth Errors** | Code `4` (Invalid Key), Code `9` (Invalid Session), Code `14` (Unauthorized), Code `15` (Expired Token) | Halts current flush cycle immediately; resets claimed items to `pending` without burning retry attempts. | `pending` (`retry_count` untouched) |
-| **Transient Errors** | Code `8` (Operation Failed), Code `11` (Service Offline), Code `16` (Temporarily Unavailable), Code `29` (Rate Limit Exceeded), HTTP `429`, HTTP `5xx`, Network Timeouts, Ignored Code `5` (Daily Limit) | Records error message, increments `retry_count`, and schedules backoff retry on subsequent flush. | `pending` (`retry_count++`) |
-| **Permanent Errors** | Code `2` (Invalid Service), Code `3` (Invalid Method), Code `6` (Invalid Parameters), Code `7` (Invalid Resource), Code `10` (Invalid API Key), Code `13` (Invalid Signature), Code `26` (Suspended Key), Malformed response without `@attr.accepted`, Unknown codes | Quarantines item to prevent infinite retry loops; logs error diagnostics. | `failed` (`markPermanentlyFailed`) |
-| **Permanent Ignored / Filtered** | Scrobble ignored code `1` (Artist Filtered), Code `2` (Track Filtered), Code `3` (Timestamp Too Old), Code `4` (Timestamp Too New) | Last.fm permanently rejected the track. Logs info and marks sent. | Deleted (`markSent`) |
-| **14-Day Expiration Rule** | Local check: `track.scrobble` where `startTimeSecs < now - 14 days` | Discards stale scrobbles locally without sending wasteful network requests. | Deleted (`markSent`) |
-| **30-Day Outbox Retention** | Local query: `createdAt <= now - 30 days` and `status IN ('pending', 'failed')` | Automatic pruning query executed during flush to keep SQLite compact. | Pruned from DB |
+| Category                         | Triggers / Error Codes                                                                                                                                                                                                                                               | Action Taken                                                                                             | Outbox Row State                    |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------- | :---------------------------------- |
+| **Auth Errors**                  | Code `4` (Invalid Key), Code `9` (Invalid Session), Code `14` (Unauthorized), Code `15` (Expired Token)                                                                                                                                                              | Halts current flush cycle immediately; resets claimed items to `pending` without burning retry attempts. | `pending` (`retry_count` untouched) |
+| **Transient Errors**             | Code `8` (Operation Failed), Code `11` (Service Offline), Code `16` (Temporarily Unavailable), Code `29` (Rate Limit Exceeded), HTTP `429`, HTTP `5xx`, Network Timeouts, Ignored Code `5` (Daily Limit)                                                             | Records error message, increments `retry_count`, and schedules backoff retry on subsequent flush.        | `pending` (`retry_count++`)         |
+| **Permanent Errors**             | Code `2` (Invalid Service), Code `3` (Invalid Method), Code `6` (Invalid Parameters), Code `7` (Invalid Resource), Code `10` (Invalid API Key), Code `13` (Invalid Signature), Code `26` (Suspended Key), Malformed response without `@attr.accepted`, Unknown codes | Quarantines item to prevent infinite retry loops; logs error diagnostics.                                | `failed` (`markPermanentlyFailed`)  |
+| **Permanent Ignored / Filtered** | Scrobble ignored code `1` (Artist Filtered), Code `2` (Track Filtered), Code `3` (Timestamp Too Old), Code `4` (Timestamp Too New)                                                                                                                                   | Last.fm permanently rejected the track. Logs info and marks sent.                                        | Deleted (`markSent`)                |
+| **14-Day Expiration Rule**       | Local check: `track.scrobble` where `startTimeSecs < now - 14 days`                                                                                                                                                                                                  | Discards stale scrobbles locally without sending wasteful network requests.                              | Deleted (`markSent`)                |
+| **30-Day Outbox Retention**      | Local query: `createdAt <= now - 30 days` and `status IN ('pending', 'failed')`                                                                                                                                                                                      | Automatic pruning query executed during flush to keep SQLite compact.                                    | Pruned from DB                      |
 
 ---
 
@@ -236,10 +236,7 @@ export async function claimPendingBatch(batchSize: number = 5, trx: DB | DBTrans
     if (items.length === 0) return [];
 
     const ids = items.map((i) => i.id);
-    await tx
-      .update(scrobbleQueue)
-      .set({ status: 'sending' })
-      .where(inArray(scrobbleQueue.id, ids));
+    await tx.update(scrobbleQueue).set({ status: 'sending' }).where(inArray(scrobbleQueue.id, ids));
 
     return items;
   });
@@ -252,11 +249,11 @@ export async function claimPendingBatch(batchSize: number = 5, trx: DB | DBTrans
 
 The Last.fm subsystem is continuously tested across 3 specialized test suites:
 
-| Test Suite File | Tests | Core Invariants Verified |
-| :--- | :---: | :--- |
-| [`flushScrobbleQueue.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/other/lastFm/__tests__/flushScrobbleQueue.test.ts) | 22 | Offline skip, stuck sending recovery, valid scrobble markSent, `track.love` success, 14-day pre-check, ignored codes 1/3, daily limit code 5, error 13 permanent fail, malformed response, unknown code 999, DB failure retry, auth errors 9/15, transient error 8, HTTP 429, HTTP 500, network timeouts, flush coalescing, session aborts, 30-day prune. |
-| [`toggleLikeSongs.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/__tests__/toggleLikeSongs.test.ts) | 11 | Explicit true/false, toggle inversion, sequential double invert, concurrent inverted requests, duplicate IDs, empty input, **Last.fm outbox sync, rapid like/unlike FIFO serialization, and deterministic promise-gated account switch isolation**. |
-| [`manageLastFmAuth.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/auth/__tests__/manageLastFmAuth.test.ts) | 3 | Account switch queue wipe and session invalidation, same-account re-auth queue preservation, same-account credential rotation. |
+| Test Suite File                                                                                                                            | Tests | Core Invariants Verified                                                                                                                                                                                                                                                                                                                                  |
+| :----------------------------------------------------------------------------------------------------------------------------------------- | :---: | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`flushScrobbleQueue.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/other/lastFm/__tests__/flushScrobbleQueue.test.ts) |  22   | Offline skip, stuck sending recovery, valid scrobble markSent, `track.love` success, 14-day pre-check, ignored codes 1/3, daily limit code 5, error 13 permanent fail, malformed response, unknown code 999, DB failure retry, auth errors 9/15, transient error 8, HTTP 429, HTTP 500, network timeouts, flush coalescing, session aborts, 30-day prune. |
+| [`toggleLikeSongs.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/__tests__/toggleLikeSongs.test.ts)               |  11   | Explicit true/false, toggle inversion, sequential double invert, concurrent inverted requests, duplicate IDs, empty input, **Last.fm outbox sync, rapid like/unlike FIFO serialization, and deterministic promise-gated account switch isolation**.                                                                                                       |
+| [`manageLastFmAuth.test.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/auth/__tests__/manageLastFmAuth.test.ts)             |   3   | Account switch queue wipe and session invalidation, same-account re-auth queue preservation, same-account credential rotation.                                                                                                                                                                                                                            |
 
 ---
 
@@ -264,8 +261,8 @@ The Last.fm subsystem is continuously tested across 3 specialized test suites:
 
 The following non-blocking optimizations are prioritized for future subsystem iterations:
 
-| Priority | Feature / Enhancement | Complexity | Description |
-| :--- | :--- | :--- | :--- |
-| **P2** | **In-Memory Favorite Coalescing** | Low | If an offline user rapidly toggles a song multiple times (*Like `->` Unlike `->` Like*), coalesce to the final state in the outbox rather than logging multiple rows. |
-| **P2** | **Outbox Queue Inspector UI** | Low | Expose pending queue count in Settings > Developer / Diagnostics. |
-| **P3** | **Dynamic Exponential Backoff** | Low | Implement custom backoff jitter per outbox row based on individual `retry_count` rather than fixed dispatcher intervals. |
+| Priority | Feature / Enhancement             | Complexity | Description                                                                                                                                                           |
+| :------- | :-------------------------------- | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P2**   | **In-Memory Favorite Coalescing** | Low        | If an offline user rapidly toggles a song multiple times (_Like `->` Unlike `->` Like_), coalesce to the final state in the outbox rather than logging multiple rows. |
+| **P2**   | **Outbox Queue Inspector UI**     | Low        | Expose pending queue count in Settings > Developer / Diagnostics.                                                                                                     |
+| **P3**   | **Dynamic Exponential Backoff**   | Low        | Implement custom backoff jitter per outbox row based on individual `retry_count` rather than fixed dispatcher intervals.                                              |

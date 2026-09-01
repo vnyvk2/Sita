@@ -1,10 +1,10 @@
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { usePreviewAudio } from '@renderer/hooks/usePreviewAudio';
+import { artistQuery } from '@renderer/queries/artists';
+import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
+import { useQuery } from '@tanstack/react-query';
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { artistQuery } from '@renderer/queries/artists';
-import { usePreviewAudio } from '@renderer/hooks/usePreviewAudio';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
 
 export interface OnlineTracklistProps {
   onlineAlbumId: number;
@@ -17,9 +17,11 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
   const { createQueue, updateQueueData } = useContext(AppUpdateContext);
   const { playPreview, isCurrentTrackPlaying } = usePreviewAudio();
 
-  const { data: tracks = [], isLoading, isError } = useQuery(
-    artistQuery.onlineAlbumTracks({ onlineAlbumId, artistId })
-  );
+  const {
+    data: tracks = [],
+    isLoading,
+    isError
+  } = useQuery(artistQuery.onlineAlbumTracks({ onlineAlbumId, artistId }));
 
   const handlePlayLocalSong = (songId: number) => {
     createQueue([songId], 'artist', false, artistId, false, artistName);
@@ -29,7 +31,7 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-6 text-sm opacity-60">
-        <span className="material-icons-round animate-spin mr-2 text-lg">sync</span>
+        <span className="material-icons-round mr-2 animate-spin text-lg">sync</span>
         {t('common.loading')}
       </div>
     );
@@ -44,7 +46,7 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
   }
 
   return (
-    <div className="mt-3 border-t border-font-color-dimmed/10 pt-2 dark:border-font-color-dimmed/20">
+    <div className="border-font-color-dimmed/10 dark:border-font-color-dimmed/20 mt-3 border-t pt-2">
       <div className="flex flex-col space-y-1">
         {tracks.map((track, idx) => {
           const isPlayingThisPreview = isCurrentTrackPlaying(`track-${track.id}`);
@@ -53,18 +55,18 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
           return (
             <div
               key={track.id || idx}
-              className="flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors hover:bg-background-color-1/40 dark:hover:bg-dark-background-color-1/40"
+              className="hover:bg-background-color-1/40 dark:hover:bg-dark-background-color-1/40 flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors"
             >
               <div className="flex items-center space-x-3 overflow-hidden">
                 <span className="w-5 text-right font-mono text-xs opacity-50">
                   {track.trackPosition || idx + 1}
                 </span>
-                <span className="truncate font-medium text-font-color-black dark:text-font-color-white">
+                <span className="text-font-color-black dark:text-font-color-white truncate font-medium">
                   {track.title}
                 </span>
               </div>
 
-              <div className="flex items-center space-x-3 shrink-0">
+              <div className="flex shrink-0 items-center space-x-3">
                 <span className="text-xs opacity-60">{durationStr}</span>
 
                 {track.isInLibrary && track.localSongId ? (
@@ -77,7 +79,7 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
                       type="button"
                       title={t('common.play')}
                       onClick={() => handlePlayLocalSong(track.localSongId!)}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3 transition-transform hover:scale-105"
+                      className="bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3 flex h-7 w-7 items-center justify-center rounded-full transition-transform hover:scale-105"
                     >
                       <span className="material-icons-round text-base">play_arrow</span>
                     </button>
@@ -85,11 +87,15 @@ export function OnlineTracklist({ onlineAlbumId, artistId, artistName }: OnlineT
                 ) : track.previewUrl ? (
                   <button
                     type="button"
-                    title={isPlayingThisPreview ? t('common.pause') : t('common.play30sPreview', '30s Preview')}
+                    title={
+                      isPlayingThisPreview
+                        ? t('common.pause')
+                        : t('common.play30sPreview', '30s Preview')
+                    }
                     onClick={() => playPreview(`track-${track.id}`, track.previewUrl)}
                     className={`flex items-center space-x-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
                       isPlayingThisPreview
-                        ? 'bg-font-color-highlight text-white dark:bg-dark-font-color-highlight'
+                        ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white'
                         : 'bg-background-color-2/80 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2/80 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3'
                     }`}
                   >

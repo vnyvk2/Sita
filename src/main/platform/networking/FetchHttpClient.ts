@@ -99,7 +99,13 @@ export class FetchHttpClient implements IHttpClient {
       }
 
       if (!response.ok) {
-        throw new HttpError(response.status, response.statusText, fullUrl, responseData, responseHeaders);
+        throw new HttpError(
+          response.status,
+          response.statusText,
+          fullUrl,
+          responseData,
+          responseHeaders
+        );
       }
 
       return {
@@ -145,7 +151,10 @@ export class FetchHttpClient implements IHttpClient {
     return this.request<T>({ ...options, url, method: 'POST', body });
   }
 
-  private buildUrl(url: string, params?: Record<string, string | number | boolean | undefined>): string {
+  private buildUrl(
+    url: string,
+    params?: Record<string, string | number | boolean | undefined>
+  ): string {
     if (!params || Object.keys(params).length === 0) {
       return url;
     }

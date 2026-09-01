@@ -17,7 +17,8 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
 
   const dynamicThemeMode = useStore(
     store,
-    (state) => (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
+    (state) =>
+      (state.localStorage.preferences?.dynamicThemeMode ?? 'dynamic-accent') as DynamicThemeMode
   );
 
   const dynamicThemeIntensity = useStore(
@@ -40,10 +41,10 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
   };
 
   return (
-    <div className="mt-4 flex flex-col gap-6 rounded-lg bg-background-color-2/50 dark:bg-dark-background-color-2/50 p-4 border border-background-color-3/20 dark:border-dark-background-color-3/20">
+    <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 mt-4 flex flex-col gap-6 rounded-lg border p-4">
       {/* 1. Dynamic Mode Selection */}
       <div className="flex flex-col gap-2">
-        <div className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
+        <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
           {t('settingsPage.dynamicThemeMode', 'Dynamic Theme Mode')}
         </div>
         <div className="flex gap-2">
@@ -72,11 +73,11 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
             {t('settingsPage.dynamicThemeModeFull', 'Full Atmosphere')}
           </button>
         </div>
-        <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed mt-1">
+        <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed mt-1 text-xs">
           {dynamicThemeMode === 'dynamic-accent'
             ? t(
                 'settingsPage.dynamicThemeModeAccentDesc',
-                "Preserves active preset backgrounds and surfaces while dynamically coloring accents, highlights, and seekbars from the album artwork."
+                'Preserves active preset backgrounds and surfaces while dynamically coloring accents, highlights, and seekbars from the album artwork.'
               )
             : t(
                 'settingsPage.dynamicThemeModeFullDesc',
@@ -88,25 +89,26 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
       {/* 2. Theme Intensity Slider */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-font-color-highlight dark:text-dark-font-color-highlight">
-            {t('settingsPage.dynamicThemeIntensity', 'Dynamic Theme Intensity')}: {dynamicThemeIntensity}%
+          <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
+            {t('settingsPage.dynamicThemeIntensity', 'Dynamic Theme Intensity')}:{' '}
+            {dynamicThemeIntensity}%
           </span>
           <Button
             label={t('settingsPage.resetIntensity', 'Reset to 100%')}
             iconName="restart_alt"
-            className="text-xs py-1 px-2.5"
+            className="px-2.5 py-1 text-xs"
             isDisabled={dynamicThemeIntensity === 100}
             clickHandler={() => handleIntensityChange(100)}
           />
         </div>
-        <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed">
+        <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs">
           {t(
             'settingsPage.dynamicThemeIntensityDesc',
             'Controls how strongly album artwork influences the theme.'
           )}
         </div>
-        <div className="flex items-center gap-3 mt-2">
-          <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+        <div className="mt-2 flex items-center gap-3">
+          <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
             {t('settingsPage.dynamicThemeIntensityPreset', 'Preset (0%)')}
           </span>
           <input
@@ -123,7 +125,7 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
             style={intensitySliderStyle}
             title={`${dynamicThemeIntensity}%`}
           />
-          <span className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed whitespace-nowrap">
+          <span className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs whitespace-nowrap">
             {t('settingsPage.dynamicThemeIntensityArtwork', 'Artwork (100%)')}
           </span>
         </div>
@@ -131,44 +133,48 @@ const DynamicThemeSettings = ({ palette }: DynamicThemeSettingsProps) => {
 
       {/* 3. Live Palette & Semantic Role Preview */}
       {semanticPalette && (
-        <div className="mt-2 pt-4 border-t border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-3">
-          <div className="text-xs font-semibold text-text-color-dimmed dark:text-dark-text-color-dimmed uppercase tracking-wider">
+        <div className="border-background-color-3/20 dark:border-dark-background-color-3/20 mt-2 flex flex-col gap-3 border-t pt-4">
+          <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs font-semibold tracking-wider uppercase">
             {t('settingsPage.resolvedTones', 'Derived Semantic Tones')}
           </div>
           <div className="grid grid-cols-4 gap-2.5">
-            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+            <div className="bg-background-color-1/40 dark:bg-dark-background-color-1/40 flex flex-col items-center gap-1.5 rounded-md p-2 text-center">
               <span
                 className="h-7 w-full rounded-md shadow-2xs"
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.primaryAccent)})` }}
               />
-              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+              <span className="text-text-color dark:text-dark-text-color text-[11px] font-medium">
                 {t('settingsPage.primaryAccent', 'Primary Accent')}
               </span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+            <div className="bg-background-color-1/40 dark:bg-dark-background-color-1/40 flex flex-col items-center gap-1.5 rounded-md p-2 text-center">
               <span
                 className="h-7 w-full rounded-md shadow-2xs"
                 style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.secondaryAccent)})` }}
               />
-              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+              <span className="text-text-color dark:text-dark-text-color text-[11px] font-medium">
                 {t('settingsPage.secondaryAccent', 'Secondary Accent')}
               </span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+            <div className="bg-background-color-1/40 dark:bg-dark-background-color-1/40 flex flex-col items-center gap-1.5 rounded-md p-2 text-center">
               <span
                 className="h-7 w-full rounded-md shadow-2xs"
-                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.dark.backgroundBase)})` }}
+                style={{
+                  backgroundColor: `hsl(${formatHsl(semanticPalette.dark.backgroundBase)})`
+                }}
               />
-              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+              <span className="text-text-color dark:text-dark-text-color text-[11px] font-medium">
                 {t('settingsPage.darkCanvas', 'Dark Canvas')}
               </span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 p-2 rounded-md bg-background-color-1/40 dark:bg-dark-background-color-1/40 text-center">
+            <div className="bg-background-color-1/40 dark:bg-dark-background-color-1/40 flex flex-col items-center gap-1.5 rounded-md p-2 text-center">
               <span
                 className="h-7 w-full rounded-md shadow-2xs"
-                style={{ backgroundColor: `hsl(${formatHsl(semanticPalette.light.backgroundBase)})` }}
+                style={{
+                  backgroundColor: `hsl(${formatHsl(semanticPalette.light.backgroundBase)})`
+                }}
               />
-              <span className="text-[11px] font-medium text-text-color dark:text-dark-text-color">
+              <span className="text-text-color dark:text-dark-text-color text-[11px] font-medium">
                 {t('settingsPage.lightCanvas', 'Light Canvas')}
               </span>
             </div>

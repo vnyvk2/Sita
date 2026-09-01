@@ -1,8 +1,8 @@
 import type { ConflictResolutionStrategy } from '../interfaces/ConflictResolutionStrategy';
-import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
 import type { ConflictAnalysis } from '../models/ConflictAnalysis';
-import type { ConflictSummary } from '../models/ConflictSummary';
 import type { ConflictResolution } from '../models/ConflictResolution';
+import type { ConflictSummary } from '../models/ConflictSummary';
+import type { PlaylistSyncPlan } from '../models/PlaylistSyncPlan';
 
 export interface ResolvedSyncPlanResult {
   resolvedPlan: PlaylistSyncPlan;

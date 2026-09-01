@@ -1,10 +1,8 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-
-import logger from '../../logger';
-
 import type { DeleteInput } from '../../../common/collections/operationInputs';
+import logger from '../../logger';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class DeleteOp implements CollectionOperation<DeleteInput, void> {
   private readonly repository: PlaylistRepository;
@@ -13,10 +11,7 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
     this.repository = repository;
   }
 
-  public async execute(
-    input: DeleteInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<void>> {
+  public async execute(input: DeleteInput, ctx: OperationContext): Promise<OperationResult<void>> {
     const { playlistId } = input;
 
     const playlist = await this.repository.getById(playlistId, ctx.trx);
@@ -33,9 +28,12 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
     // Delete playlist (cascade deletes entries if DB is set up, but let's be explicit or rely on repo)
     await this.repository.deletePlaylist(playlistId, ctx.trx);
 
-    const affectedSongIds = Array.from(new Set(entries.map(e => e.entry.songId)));
+    const affectedSongIds = Array.from(new Set(entries.map((e) => e.entry.songId)));
 
-    const duration = typeof playlist.totalDuration === 'string' ? parseFloat(playlist.totalDuration) : (playlist.totalDuration || 0);
+    const duration =
+      typeof playlist.totalDuration === 'string'
+        ? parseFloat(playlist.totalDuration)
+        : playlist.totalDuration || 0;
 
     return {
       data: undefined,
@@ -44,15 +42,17 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
       operationInput: { playlistId },
       inverseInput: {
         operationType: 'playlist.restore',
-        input: { playlist, entries: entries.map(e => e.entry) }
+        input: { playlist, entries: entries.map((e) => e.entry) }
       },
       version: 1,
       affectedSongIds,
-      statsDelta: playlist.parentId ? {
-        targetPlaylistId: playlist.parentId,
-        itemCountDelta: -(playlist.itemCount || 0),
-        durationDelta: -duration
-      } : undefined
+      statsDelta: playlist.parentId
+        ? {
+            targetPlaylistId: playlist.parentId,
+            itemCountDelta: -(playlist.itemCount || 0),
+            durationDelta: -duration
+          }
+        : undefined
     };
   }
 }

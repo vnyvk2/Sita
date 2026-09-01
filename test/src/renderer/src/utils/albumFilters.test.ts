@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { albumFilterTypes, albumSortTypes } from '@renderer/utils/albumFilters';
+import { describe, expect, it } from 'vitest';
 
 describe('albumFilters', () => {
   it('should export expected albumFilterTypes', () => {
@@ -7,11 +7,6 @@ describe('albumFilters', () => {
   });
 
   it('should export expected albumSortTypes', () => {
-    expect(albumSortTypes).toEqual([
-      'aToZ',
-      'zToA',
-      'noOfSongsAscending',
-      'noOfSongsDescending'
-    ]);
+    expect(albumSortTypes).toEqual(['aToZ', 'zToA', 'noOfSongsAscending', 'noOfSongsDescending']);
   });
 });

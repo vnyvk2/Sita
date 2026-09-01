@@ -1,5 +1,5 @@
-import type { ResolvedTrackReference } from './ResolvedTrackReference';
 import type { LibraryMatch } from './LibraryMatch';
+import type { ResolvedTrackReference } from './ResolvedTrackReference';
 
 export interface LibraryResolvedTrackReference {
   resolvedTrack: ResolvedTrackReference;

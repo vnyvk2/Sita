@@ -924,5 +924,3 @@ If there are no real findings, say:
 Do **not** manufacture P3 findings just to make the review look thorough.
 
 ---
-
-

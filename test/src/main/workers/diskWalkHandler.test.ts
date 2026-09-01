@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeDiskWalk } from '@main/workers/process/handlers/diskWalkHandler';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('fs/promises', () => ({
   default: {

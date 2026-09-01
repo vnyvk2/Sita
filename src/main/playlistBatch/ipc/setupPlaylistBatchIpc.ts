@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron';
+
+import type { BatchExecutionPlan } from '../models/BatchExecutionPlan';
+import type { BatchExecutionPolicy } from '../models/BatchExecutionPolicy';
+import type { BatchItem } from '../models/BatchItem';
 import type { PlaylistBatchOrchestrator } from '../orchestrator/PlaylistBatchOrchestrator';
 import type { PlaylistBatchPlanner } from '../planner/PlaylistBatchPlanner';
-import type { BatchItem } from '../models/BatchItem';
-import type { BatchExecutionPolicy } from '../models/BatchExecutionPolicy';
-import type { BatchExecutionPlan } from '../models/BatchExecutionPlan';
 
 export function setupPlaylistBatchIpc(
   planner: PlaylistBatchPlanner,

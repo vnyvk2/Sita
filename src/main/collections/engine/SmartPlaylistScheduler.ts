@@ -1,9 +1,9 @@
 import { db } from '../../db/db';
 import { smartPlaylistRules } from '../../db/schema';
 import { libraryEventBus } from '../../events/LibraryEventBus';
-import { DependencyAnalyzer } from './DependencyAnalyzer';
-import { libraryScheduler } from '../../workers/jobScheduler';
 import { SmartPlaylistJob } from '../../workers/jobs/smartPlaylistJob';
+import { libraryScheduler } from '../../workers/jobScheduler';
+import { DependencyAnalyzer } from './DependencyAnalyzer';
 
 export class SmartPlaylistScheduler {
   private dirtyPlaylists = new Set<number>();
@@ -78,7 +78,10 @@ export class SmartPlaylistScheduler {
 
       this.scheduleFlush();
     } catch (error) {
-      console.error(`Failed to handle library event ${eventName} in SmartPlaylistScheduler:`, error);
+      console.error(
+        `Failed to handle library event ${eventName} in SmartPlaylistScheduler:`,
+        error
+      );
     }
   }
 

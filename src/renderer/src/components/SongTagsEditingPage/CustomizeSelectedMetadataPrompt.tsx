@@ -76,23 +76,22 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
     try {
       changePromptMenuData(false, undefined, '');
 
-      const {
-        isAlbumSelected,
-        isArtistsSelected,
-        isGenresSelected
-      } = selectedMetadata;
+      const { isAlbumSelected, isArtistsSelected, isGenresSelected } = selectedMetadata;
 
-      const albumData = isAlbumSelected && album?.trim()
-        ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
-        : undefined;
+      const albumData =
+        isAlbumSelected && album?.trim()
+          ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
+          : undefined;
 
-      const artistData = isArtistsSelected && Array.isArray(artists) && artists.length > 0
-        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
-        : undefined;
+      const artistData =
+        isArtistsSelected && Array.isArray(artists) && artists.length > 0
+          ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+          : undefined;
 
-      const genreData = isGenresSelected && Array.isArray(genres) && genres.length > 0
-        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
-        : undefined;
+      const genreData =
+        isGenresSelected && Array.isArray(genres) && genres.length > 0
+          ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+          : undefined;
 
       updateSongInfo((prevData): SongTags => {
         return mergeSongMetadata(
@@ -126,12 +125,14 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
       const albumData = album?.trim()
         ? await window.api.albumsData.getAlbumData([album]).then((res) => res.data)
         : [];
-      const artistData = Array.isArray(artists) && artists.length > 0
-        ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
-        : [];
-      const genreData = Array.isArray(genres) && genres.length > 0
-        ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
-        : [];
+      const artistData =
+        Array.isArray(artists) && artists.length > 0
+          ? await window.api.artistsData.getArtistData(artists).then((res) => res.data)
+          : [];
+      const genreData =
+        Array.isArray(genres) && genres.length > 0
+          ? await window.api.genresData.getGenresData(genres).then((res) => res.data)
+          : [];
 
       updateSongInfo((prevData) => {
         return mergeSongMetadata(
@@ -369,7 +370,9 @@ const CustomizeSelectedMetadataPrompt = (props: SongMetadataResultProp) => {
                     )}{' '}
                     {t(
                       `customizeSelectedMetadataPrompt.${
-                        isLyricsSynced(lyrics || '') ? 'syncedLyricsAvailable' : 'unsyncedLyricsAvailable'
+                        isLyricsSynced(lyrics || '')
+                          ? 'syncedLyricsAvailable'
+                          : 'unsyncedLyricsAvailable'
                       }`
                     )}
                     <Button

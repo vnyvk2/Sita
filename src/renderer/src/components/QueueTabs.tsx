@@ -225,8 +225,7 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
                                 {
                                   label: t('currentQueuePage.deleteQueue', 'Delete Queue'),
                                   iconName: 'delete',
-                                  isDisabled:
-                                    queueTabsData.length <= 1 || !!q.isLocked,
+                                  isDisabled: queueTabsData.length <= 1 || !!q.isLocked,
                                   handlerFunction: () => handleDeleteQueue(q.id, index)
                                 }
                               ],
@@ -287,7 +286,7 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
           clickHandler={handleCreateNewQueue}
         />
         <Button
-          className="bg-background-color-3 dark:bg-dark-background-color-3 !m-0 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105 hover:!bg-font-color-crimson hover:!text-font-color-white"
+          className="bg-background-color-3 dark:bg-dark-background-color-3 hover:!bg-font-color-crimson hover:!text-font-color-white !m-0 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
           iconName="delete_sweep"
           iconClassName="text-xl"
           tooltipLabel={t('currentQueuePage.removeAllQueues', 'Remove All Queues')}

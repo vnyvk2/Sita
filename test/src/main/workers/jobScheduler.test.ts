@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { JobScheduler } from '../../../../src/main/workers/jobScheduler';
 import type { Job } from '../../../../src/main/workers/types';
 
@@ -36,7 +37,7 @@ describe('JobScheduler', () => {
     scheduler.start();
 
     // Wait for the job to complete
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       scheduler.on('QUEUE_EMPTY', resolve);
     });
 
@@ -46,7 +47,7 @@ describe('JobScheduler', () => {
 
   it('should not re-enqueue a job if it is cancelled while executing', async () => {
     let rejectJob: (err: Error) => void;
-    
+
     const mockJob: Job = {
       id: 'test_cancel',
       type: 'test',
@@ -67,16 +68,16 @@ describe('JobScheduler', () => {
 
     // Give it a moment to start running
     await new Promise((resolve) => setTimeout(resolve, 10));
-    
+
     // Job is now running, so we cancel it
     scheduler.cancelJob('test_cancel');
 
     // The job's promise rejects
     rejectJob!(new Error('Aborted'));
-    
+
     // Give it a moment to hit the catch block
     await new Promise((resolve) => setTimeout(resolve, 10));
-    
+
     const metrics = scheduler.getRawMetrics();
     expect(metrics.queuedJobs).toBe(0);
     expect(metrics.runningJobs).toBe(0);

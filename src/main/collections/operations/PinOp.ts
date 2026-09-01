@@ -1,22 +1,16 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { createCollectionId } from '../../../common/collections/id';
-import { playlists } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
+import { createCollectionId } from '../../../common/collections/id';
 import type { PinInput, UnpinInput } from '../../../common/collections/operationInputs';
+import { playlists } from '../../db/schema';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export class PinOp implements CollectionOperation<PinInput, void> {
-  public async execute(
-    input: PinInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<void>> {
+  public async execute(input: PinInput, ctx: OperationContext): Promise<OperationResult<void>> {
     const { playlistId } = input;
     const now = new Date();
 
-    await ctx.trx
-      .update(playlists)
-      .set({ pinnedAt: now })
-      .where(eq(playlists.id, playlistId));
+    await ctx.trx.update(playlists).set({ pinnedAt: now }).where(eq(playlists.id, playlistId));
 
     return {
       data: undefined,
@@ -33,19 +27,11 @@ export class PinOp implements CollectionOperation<PinInput, void> {
   }
 }
 
-
-
 export class UnpinOp implements CollectionOperation<UnpinInput, void> {
-  public async execute(
-    input: UnpinInput,
-    ctx: OperationContext
-  ): Promise<OperationResult<void>> {
+  public async execute(input: UnpinInput, ctx: OperationContext): Promise<OperationResult<void>> {
     const { playlistId } = input;
 
-    await ctx.trx
-      .update(playlists)
-      .set({ pinnedAt: null })
-      .where(eq(playlists.id, playlistId));
+    await ctx.trx.update(playlists).set({ pinnedAt: null }).where(eq(playlists.id, playlistId));
 
     return {
       data: undefined,

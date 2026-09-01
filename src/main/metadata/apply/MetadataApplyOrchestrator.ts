@@ -1,21 +1,22 @@
 import { randomUUID } from 'crypto';
+
 import type { DBTransaction } from '@main/db/db';
 import { db } from '@main/db/db';
-import { getSongById, updateSongBasicFields } from '@main/db/queries/songs';
 import { getAlbumWithTitle, linkSongToAlbum } from '@main/db/queries/albums';
+import { getSongById, updateSongBasicFields } from '@main/db/queries/songs';
+import logger from '@main/logger';
 import { processArtworkFiles } from '@main/other/artworks';
 import generatePalette from '@main/other/generatePalette';
 import manageAlbumArtistOfParsedSong from '@main/parseSong/manageAlbumArtistOfParsedSong';
 import { syncSongRelationalData } from '@main/parseSong/syncSongRelationalData';
-import logger from '@main/logger';
+import type { TagData } from '@main/updateSong/updateSongId3Tags';
 
-import type { ArtworkDownloaderService } from '../transactions/ArtworkDownloaderService';
-import type { TagWritePayload, TagWriterService } from '../services/TagWriterService';
+import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
 import type { SongMetadataSnapshot } from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
+import type { TagWritePayload, TagWriterService } from '../services/TagWriterService';
+import type { ArtworkDownloaderService } from '../transactions/ArtworkDownloaderService';
 import type { NormalizedMutation, OrchestratorResult } from './contract';
-import { runExclusiveMetadataApply } from '../../utils/metadataApplyMutex';
-import type { TagData } from '@main/updateSong/updateSongId3Tags';
 
 export interface MetadataApplyOrchestratorOptions {
   tagWriter: TagWriterService;
@@ -26,23 +27,20 @@ export interface MetadataApplyOrchestratorOptions {
 }
 
 /**
- * ─── MetadataApplyOrchestrator (2c) ────────────────────────────────────────
- * Single authoritative owner of a metadata state transition and its recovery
- * protocol across DB, filesystem, artwork and the undo journal.
+ * ─── MetadataApplyOrchestrator (2c) ──────────────────────────────────────── Single authoritative
+ * owner of a metadata state transition and its recovery protocol across DB, filesystem, artwork and
+ * the undo journal.
  *
- * Phase order per mutation:
- *   0. pre-state capture + artwork acquisition (size-capped download,
- *      palette, artwork file processing)
- *   1. ONE DB transaction: scalars (incl. isrc/mbid) + relational sync +
- *      durable undo journal + (when deferred) the COMPLETE pending-write
- *      intent incl. albumArtist/artwork. Journal and deferral commit or
- *      roll back atomically WITH the mutation (audit P0 #1/#2/#3).
- *   2. memory-stack adoption of the committed journal entry
- *   3. file phase - atomic write; deferred when the song is playing
+ * Phase order per mutation: 0. pre-state capture + artwork acquisition (size-capped download,
+ * palette, artwork file processing) 1. ONE DB transaction: scalars (incl. isrc/mbid) + relational
+ * sync + durable undo journal + (when deferred) the COMPLETE pending-write intent incl.
+ * albumArtist/artwork. Journal and deferral commit or roll back atomically WITH the mutation (audit
+ * P0 #1/#2/#3). 2. memory-stack adoption of the committed journal entry 3. file phase - atomic
+ * write; deferred when the song is playing
  *
- * Compensation: a hard (non-deferred) file-phase failure reverts DB scalars
- * from the captured snapshot. Relational compensation is logged-only until
- * P4 finishes fan-out removal (documented limitation).
+ * Compensation: a hard (non-deferred) file-phase failure reverts DB scalars from the captured
+ * snapshot. Relational compensation is logged-only until P4 finishes fan-out removal (documented
+ * limitation).
  */
 export class MetadataApplyOrchestrator {
   private readonly tagWriter: TagWriterService;
@@ -80,9 +78,7 @@ export class MetadataApplyOrchestrator {
     const groupUpdated: SongMetadataSnapshot[] = [];
     const opId = mutations[0]?.operationId;
     const groupId =
-      opId && opId !== 'default'
-        ? `orch-group-${opId}`
-        : `orch-group-${randomUUID()}`;
+      opId && opId !== 'default' ? `orch-group-${opId}` : `orch-group-${randomUUID()}`;
     for (const mutation of mutations) {
       try {
         const outcome = await this.executeSingle(mutation, {
@@ -135,16 +131,35 @@ export class MetadataApplyOrchestrator {
     const payload: TagWritePayload = { filePath: m.filePath };
     for (const f of m.fields) {
       switch (f.fieldId) {
-        case 'title': payload.title = String(f.newValue); break;
-        case 'artist': payload.artist = String(f.newValue); break;
-        case 'album': payload.album = String(f.newValue); break;
-        case 'genre': payload.genre = String(f.newValue); break;
-        case 'year': payload.year = Number(f.newValue); break;
-        case 'trackNumber': payload.trackNumber = Number(f.newValue); break;
-        case 'discNumber': payload.discNumber = Number(f.newValue); break;
-        case 'isrc': payload.isrc = String(f.newValue); break;
-        case 'musicBrainzRecordingId': payload.musicBrainzRecordingId = String(f.newValue); break;
-        case 'style': break; // style has no physical frame mapping today
+        case 'title':
+          payload.title = String(f.newValue);
+          break;
+        case 'artist':
+          payload.artist = String(f.newValue);
+          break;
+        case 'album':
+          payload.album = String(f.newValue);
+          break;
+        case 'genre':
+          payload.genre = String(f.newValue);
+          break;
+        case 'year':
+          payload.year = Number(f.newValue);
+          break;
+        case 'trackNumber':
+          payload.trackNumber = Number(f.newValue);
+          break;
+        case 'discNumber':
+          payload.discNumber = Number(f.newValue);
+          break;
+        case 'isrc':
+          payload.isrc = String(f.newValue);
+          break;
+        case 'musicBrainzRecordingId':
+          payload.musicBrainzRecordingId = String(f.newValue);
+          break;
+        case 'style':
+          break; // style has no physical frame mapping today
       }
     }
     if (m.albumArtistNewValue !== undefined) payload.albumArtist = m.albumArtistNewValue;
@@ -214,7 +229,8 @@ export class MetadataApplyOrchestrator {
     if (!artworkBuffer) {
       const legacyUrl = (m as unknown as { artworkUrl?: string }).artworkUrl;
       if (legacyUrl && this.artworkDownloader) {
-        artworkBuffer = (await this.artworkDownloader.fetchAndValidateArtwork(legacyUrl)) ?? undefined;
+        artworkBuffer =
+          (await this.artworkDownloader.fetchAndValidateArtwork(legacyUrl)) ?? undefined;
       }
     }
 
@@ -235,14 +251,23 @@ export class MetadataApplyOrchestrator {
     const normalizedPlaying = playingPath ? this.stripProtocol(playingPath) : undefined;
     const normalizedTarget = this.stripProtocol(m.filePath);
     const deferToPlaying =
-      m.fileWrite.deferredIfPlaying && normalizedPlaying !== undefined && normalizedPlaying === normalizedTarget;
+      m.fileWrite.deferredIfPlaying &&
+      normalizedPlaying !== undefined &&
+      normalizedPlaying === normalizedTarget;
 
     const payload = this.buildTagPayload(m, artworkBuffer);
 
     // Post-state snapshot for the undo journal (built ahead of the transaction
     // so the journal row can be staged INSIDE it - audit P0 #2/#3).
-    const updatedSnapshot: SongMetadataSnapshot = { songId: m.songId, path: m.filePath, title: currentRow.title };
-    const setIf = <K extends keyof SongMetadataSnapshot>(key: K, value: SongMetadataSnapshot[K] | undefined): void => {
+    const updatedSnapshot: SongMetadataSnapshot = {
+      songId: m.songId,
+      path: m.filePath,
+      title: currentRow.title
+    };
+    const setIf = <K extends keyof SongMetadataSnapshot>(
+      key: K,
+      value: SongMetadataSnapshot[K] | undefined
+    ): void => {
       if (value !== undefined) updatedSnapshot[key] = value;
     };
     setIf('title', this.fieldNew(m, 'title') as string | undefined);
@@ -254,7 +279,10 @@ export class MetadataApplyOrchestrator {
     setIf('discNumber', this.fieldNew(m, 'discNumber') as number | undefined);
     setIf('genre', this.fieldNew(m, 'genre') as string | undefined);
     setIf('isrc', this.fieldNew(m, 'isrc') as string | undefined);
-    setIf('musicBrainzRecordingId', this.fieldNew(m, 'musicBrainzRecordingId') as string | undefined);
+    setIf(
+      'musicBrainzRecordingId',
+      this.fieldNew(m, 'musicBrainzRecordingId') as string | undefined
+    );
 
     let deferredTagData: TagData | undefined;
 
@@ -284,9 +312,15 @@ export class MetadataApplyOrchestrator {
           tags: {
             title: '',
             duration: 0,
-            ...(this.fieldNew(m, 'artist') !== undefined && { artists: [{ name: String(this.fieldNew(m, 'artist')) }] }),
-            ...(this.fieldNew(m, 'album') !== undefined && { albums: [{ title: String(this.fieldNew(m, 'album')) }] }),
-            ...(this.fieldNew(m, 'genre') !== undefined && { genres: [{ name: String(this.fieldNew(m, 'genre')) }] })
+            ...(this.fieldNew(m, 'artist') !== undefined && {
+              artists: [{ name: String(this.fieldNew(m, 'artist')) }]
+            }),
+            ...(this.fieldNew(m, 'album') !== undefined && {
+              albums: [{ title: String(this.fieldNew(m, 'album')) }]
+            }),
+            ...(this.fieldNew(m, 'genre') !== undefined && {
+              genres: [{ name: String(this.fieldNew(m, 'genre')) }]
+            })
           } as unknown as Parameters<typeof syncSongRelationalData>[0]['tags'],
           processedArtwork,
           trx
@@ -308,14 +342,20 @@ export class MetadataApplyOrchestrator {
               await linkSongToAlbum(existingAlbum.id, m.songId, trx);
             } else {
               const created = await import('@main/db/queries/albums').then((mod) =>
-                mod.createAlbum({ title: albumTitleStr, year: Number(this.fieldNew(m, 'year') ?? NaN) }, trx)
+                mod.createAlbum(
+                  { title: albumTitleStr, year: Number(this.fieldNew(m, 'year') ?? NaN) },
+                  trx
+                )
               );
               albumId = created.id;
               await linkSongToAlbum(created.id, m.songId, trx);
             }
           }
           if (albumId !== undefined) {
-            await manageAlbumArtistOfParsedSong({ albumArtists: [m.albumArtistNewValue], albumId }, trx);
+            await manageAlbumArtistOfParsedSong(
+              { albumArtists: [m.albumArtistNewValue], albumId },
+              trx
+            );
           }
         }
 
@@ -412,10 +452,15 @@ export class MetadataApplyOrchestrator {
           );
         });
       } catch (compErr: unknown) {
-        logger.error('[Orchestrator] scalar compensation failed after file-write failure', { compErr });
+        logger.error('[Orchestrator] scalar compensation failed after file-write failure', {
+          compErr
+        });
       }
       await this.historyService.confirmUndo(`orch-${m.mutationId}`).catch(() => undefined);
-      return { success: false, error: `File write failed for ${writeRes.filePath}: ${writeRes.error}` };
+      return {
+        success: false,
+        error: `File write failed for ${writeRes.filePath}: ${writeRes.error}`
+      };
     }
 
     return { success: true };

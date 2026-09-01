@@ -1,11 +1,13 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { createCollectionId } from '../../../common/collections/id';
-import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
-
 import type { RemoveSongsInput } from '../../../common/collections/operationInputs';
+import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
+import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
-export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { removedCount: number; deltaCount: number; deltaDuration: number }> {
+export class RemoveSongsOp implements CollectionOperation<
+  RemoveSongsInput,
+  { removedCount: number; deltaCount: number; deltaDuration: number }
+> {
   private readonly repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository) {
@@ -21,23 +23,23 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
       throw new Error('No entries provided to RemoveSongsOp');
     }
 
-    const removedEntries = await this.repository.deleteEntries(
-      [...entryIds], 
-      ctx.trx
-    );
+    const removedEntries = await this.repository.deleteEntries([...entryIds], ctx.trx);
 
-    // If we removed entries, we might need to shift positions down to close gaps, 
+    // If we removed entries, we might need to shift positions down to close gaps,
     // but the original plan says "Deletes specific entries and invokes shiftPositions".
     // Wait, to close gaps properly, we'd need a more complex shift if multiple non-contiguous entries were removed.
     // For now, let's keep it simple: the UI doesn't strictly need gapless positions.
     // Reorder can fix gaps if needed. But let's leave shiftPositions out unless it's a single contiguous block.
     // Actually, skipping shift for now is safest.
 
-    const affectedSongIds = Array.from(new Set(removedEntries.map(e => e.songId)));
+    const affectedSongIds = Array.from(new Set(removedEntries.map((e) => e.songId)));
 
     // Compute delta using repository
-    const removedSongIds = removedEntries.map(e => e.songId);
-    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(removedSongIds, ctx.trx);
+    const removedSongIds = removedEntries.map((e) => e.songId);
+    const { itemCountDelta, durationDelta } = await this.repository.computeStatisticsDelta(
+      removedSongIds,
+      ctx.trx
+    );
 
     const container = await MembershipBootstrap.getInstance();
     container.service.notifyMembershipChanged({
@@ -48,7 +50,7 @@ export class RemoveSongsOp implements CollectionOperation<RemoveSongsInput, { re
     });
 
     return {
-      data: { 
+      data: {
         removedCount: removedEntries.length,
         deltaCount: -itemCountDelta,
         deltaDuration: -durationDelta

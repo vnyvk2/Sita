@@ -1,11 +1,11 @@
-import { queryClient } from '@renderer/queryClient';
 import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import Dropdown, { type DropdownOption } from '../../Dropdown';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
+import Dropdown, { type DropdownOption } from '../../Dropdown';
 
 const duplicatePolicyOptions: DropdownOption<DuplicatePolicy>[] = [
   { label: 'Skip duplicates', value: 'SKIP' },
@@ -94,7 +94,7 @@ const DownloadsSettings = () => {
               'Add download folder to the library'
             )}
           />
-          <div className="text-xs text-text-color-dimmed dark:text-dark-text-color-dimmed pl-7">
+          <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed pl-7 text-xs">
             {t(
               'settingsPage.downloads.addToLibraryDescription',
               'Downloaded songs appear in your library automatically once this folder is linked.'
@@ -106,7 +106,7 @@ const DownloadsSettings = () => {
           <div className="description">
             {t(
               'settingsPage.downloads.duplicatePolicyDescription',
-              "What to do when a song with the same source id already exists in the download folder. Duplicates are detected by the video id embedded in the filename, not by title."
+              'What to do when a song with the same source id already exists in the download folder. Duplicates are detected by the video id embedded in the filename, not by title.'
             )}
           </div>
           <div className="mt-4 flex flex-row items-center">

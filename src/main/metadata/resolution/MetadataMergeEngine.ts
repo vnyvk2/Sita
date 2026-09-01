@@ -1,5 +1,5 @@
-import type { ProviderCandidate } from '../domain/MetadataResolution';
 import type { MetadataPolicy } from '../domain/MetadataPolicy';
+import type { ProviderCandidate } from '../domain/MetadataResolution';
 import type { ProviderAttribution } from '../domain/ProviderAttribution';
 import type { ProviderRegistry } from './ProviderRegistry';
 
@@ -31,7 +31,8 @@ export class MetadataMergeEngine {
   }
 
   /**
-   * Merges candidate objects by extracting field contributions and evaluating MergePolicy priorities.
+   * Merges candidate objects by extracting field contributions and evaluating MergePolicy
+   * priorities.
    */
   public mergeCandidates(
     candidates: ProviderCandidate[],
@@ -62,7 +63,8 @@ export class MetadataMergeEngine {
   }
 
   /**
-   * Directly merges independent field contributions across multiple providers according to MergePolicy priorities.
+   * Directly merges independent field contributions across multiple providers according to
+   * MergePolicy priorities.
    */
   public mergeFieldContributions(
     contributions: FieldContribution[],
@@ -99,7 +101,9 @@ export class MetadataMergeEngine {
       let winning: FieldContribution | undefined;
 
       if (fieldPolicy?.preferredProviderId) {
-        winning = contribs.find((c) => c.providerId.toLowerCase() === fieldPolicy.preferredProviderId?.toLowerCase());
+        winning = contribs.find(
+          (c) => c.providerId.toLowerCase() === fieldPolicy.preferredProviderId?.toLowerCase()
+        );
       }
 
       if (!winning) {
@@ -142,7 +146,8 @@ export class MetadataMergeEngine {
   }
 
   /**
-   * Recomputes a merged result when the user explicitly selects an alternate provider for a specific field.
+   * Recomputes a merged result when the user explicitly selects an alternate provider for a
+   * specific field.
    */
   public selectFieldProvider(
     merged: MergedCandidateResult,

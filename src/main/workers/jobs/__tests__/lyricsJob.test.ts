@@ -1,10 +1,11 @@
 import { EventEmitter } from 'events';
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@main/db/db';
 import { getSongById } from '@main/db/queries/songs';
 import fetchLyricsFromLrclib from '@main/utils/fetchLyricsFromLrclib';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ASSET_EVENTS } from '../../libraryChoreography';
 import { CURRENT_LYRICS_GENERATOR_VERSION, LyricsJob } from '../lyricsJob';
 

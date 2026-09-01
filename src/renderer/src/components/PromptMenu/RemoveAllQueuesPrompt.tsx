@@ -44,7 +44,7 @@ const RemoveAllQueuesPrompt = () => {
       <span className="mb-4 text-center text-2xl font-medium">
         {t('currentQueuePage.removeAllQueues', 'Remove All Queues')}
       </span>
-      <div className="mb-6 text-center text-lg text-font-color-black/80 dark:text-font-color-white/80">
+      <div className="text-font-color-black/80 dark:text-font-color-white/80 mb-6 text-center text-lg">
         <p>
           {t('currentQueuePage.unlockedQueuesRemoved', {
             count: unlockedQueues,

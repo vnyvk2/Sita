@@ -1,7 +1,7 @@
-﻿// @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+﻿import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
 import { renderHook, act } from '@testing-library/react';
-import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
+// @vitest-environment jsdom
+import { describe, it, expect } from 'vitest';
 
 describe('useActiveLyricIndex Monotonic & Binary Search Resolution (Phase L3)', () => {
   const mockSyncedLyrics: SongLyrics = {

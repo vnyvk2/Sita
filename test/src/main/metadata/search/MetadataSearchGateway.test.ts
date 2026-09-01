@@ -12,27 +12,28 @@ vi.mock('@db/db', () => ({
   }
 }));
 
-import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { SongMapper } from '@main/metadata/mappers/SongMapper';
+import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
-import { MetadataSearchGateway } from '@main/metadata/search/MetadataSearchGateway';
 import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
+import { MetadataSearchGateway } from '@main/metadata/search/MetadataSearchGateway';
 import { MetadataBootstrap } from '@main/metadata/setup';
 
 describe('MetadataSearchGateway', () => {
   it('should hydrate search results via IMetadataGateway and MetadataEngine batch loading', async () => {
     const mockLoader: IEntityLoader<SongPersistenceDTO> = {
       kind: MetadataKinds.Song,
-      load: async (id) => ({
-        id: Number(id),
-        title: `Gateway Song ${id}`,
-        duration: 180,
-        path: '/test.mp3',
-        artworks: [],
-        artists: [],
-        albums: [],
-        genres: []
-      } as any),
+      load: async (id) =>
+        ({
+          id: Number(id),
+          title: `Gateway Song ${id}`,
+          duration: 180,
+          path: '/test.mp3',
+          artworks: [],
+          artists: [],
+          albums: [],
+          genres: []
+        }) as any,
       loadMany: async (ids) =>
         ids.map(
           (id) =>

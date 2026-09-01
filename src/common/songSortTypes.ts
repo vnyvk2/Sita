@@ -1,6 +1,6 @@
 /**
- * Song sort type constants shared between main and renderer.
- * Extracted from renderer/SongOptions.tsx to avoid cross-project boundary issues.
+ * Song sort type constants shared between main and renderer. Extracted from
+ * renderer/SongOptions.tsx to avoid cross-project boundary issues.
  */
 export const songSortTypes = [
   'addedOrder',

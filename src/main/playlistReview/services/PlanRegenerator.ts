@@ -1,6 +1,6 @@
-import type { OverrideApplier } from './OverrideApplier';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import type { UserOverride } from '../models/UserOverride';
+import type { OverrideApplier } from './OverrideApplier';
 
 export class PlanRegenerator {
   constructor(private overrideApplier: OverrideApplier) {}
@@ -18,7 +18,9 @@ export class PlanRegenerator {
         ...originalPlan.statistics,
         importedEntries,
         skippedEntries,
-        plannedImportPercentage: Math.round((importedEntries / originalPlan.statistics.totalEntries) * 100)
+        plannedImportPercentage: Math.round(
+          (importedEntries / originalPlan.statistics.totalEntries) * 100
+        )
       }
     };
   }

@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
-import { render, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CollectionEventProvider } from '@renderer/components/providers/CollectionEventProvider';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
 import { collectionKeys } from '@renderer/api/collectionKeys';
 import type { CollectionEvent } from '@renderer/api/CollectionTypes';
+import { CollectionEventProvider } from '@renderer/components/providers/CollectionEventProvider';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// @vitest-environment jsdom
+import { render, act } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // We need to capture the registered callback to trigger it
 let registeredCallback: ((e: unknown, event: CollectionEvent) => void) | null = null;
@@ -109,6 +109,8 @@ describe('CollectionEventProvider', () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.tree() });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: collectionKeys.children('new-parent-id') });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: collectionKeys.children('new-parent-id')
+    });
   });
 });

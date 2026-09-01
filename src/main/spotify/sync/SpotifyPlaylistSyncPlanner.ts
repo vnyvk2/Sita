@@ -11,8 +11,8 @@ import type {
 
 export class SpotifyPlaylistSyncPlanner {
   /**
-   * Derives a stable canonical identity key for a track.
-   * Priority: ISRC -> MusicBrainz ID -> Normalized Title + Artist.
+   * Derives a stable canonical identity key for a track. Priority: ISRC -> MusicBrainz ID ->
+   * Normalized Title + Artist.
    */
   public static getIdentityKey(track: CanonicalTrackIdentity): string {
     if (track.isrc && track.isrc.trim()) {
@@ -22,13 +22,15 @@ export class SpotifyPlaylistSyncPlanner {
       return `mbid:${track.musicBrainzRecordingId.trim().toLowerCase()}`;
     }
     const cleanTitle = MetadataNormalizer.normalizeTitle(track.title || '');
-    const cleanArtist = track.artists[0] ? MetadataNormalizer.normalizeArtist(track.artists[0]) : '';
+    const cleanArtist = track.artists[0]
+      ? MetadataNormalizer.normalizeArtist(track.artists[0])
+      : '';
     return `meta:${cleanTitle}::${cleanArtist}`;
   }
 
   /**
-   * Converts an ordered sequence of tracks into distinct position-aware PlaylistOccurrences.
-   * Allows duplicate tracks [A, B, A] to be represented as distinct occurrences (A#0, B#0, A#1).
+   * Converts an ordered sequence of tracks into distinct position-aware PlaylistOccurrences. Allows
+   * duplicate tracks [A, B, A] to be represented as distinct occurrences (A#0, B#0, A#1).
    */
   public static toOccurrences(
     tracks: CanonicalTrackIdentity[],
@@ -47,7 +49,8 @@ export class SpotifyPlaylistSyncPlanner {
 
       const occurrenceId = `${identityKey}#${occurrenceIndex}`;
       const spotifyUri = spotifyUriMap?.get(i + 1) || track.pathOrUri;
-      const localSongId = localSongMap?.get(i + 1) ?? (typeof track.id === 'number' ? track.id : undefined);
+      const localSongId =
+        localSongMap?.get(i + 1) ?? (typeof track.id === 'number' ? track.id : undefined);
 
       occurrences.push({
         occurrenceId,

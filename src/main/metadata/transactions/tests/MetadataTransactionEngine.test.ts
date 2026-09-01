@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MetadataTransactionManager } from '../MetadataTransactionManager';
+
 import type { ResourceMutationPayload } from '../../domain/MetadataTransaction';
+import { MetadataTransactionManager } from '../MetadataTransactionManager';
 
 describe('Metadata Transaction Manager Blueprint Test Suite', () => {
   it('executes atomic mutations via MetadataTransactionManager and records UndoToken snapshots', async () => {
@@ -15,7 +16,13 @@ describe('Metadata Transaction Manager Blueprint Test Suite', () => {
         resourceId: 101,
         filePath: 'song.mp3',
         fieldMutations: [
-          { fieldId: 'title', oldValue: 'brutal (audio)', newValue: 'brutal', providerId: 'musicbrainz', confidenceScore: 0.98 }
+          {
+            fieldId: 'title',
+            oldValue: 'brutal (audio)',
+            newValue: 'brutal',
+            providerId: 'musicbrainz',
+            confidenceScore: 0.98
+          }
         ]
       }
     ];
@@ -75,7 +82,13 @@ describe('Metadata Transaction Manager Blueprint Test Suite', () => {
         resourceId: 103,
         filePath: 'song-with-art.mp3',
         fieldMutations: [
-          { fieldId: 'title', oldValue: 'old', newValue: 'with art', providerId: 'musicbrainz', confidenceScore: 0.95 }
+          {
+            fieldId: 'title',
+            oldValue: 'old',
+            newValue: 'with art',
+            providerId: 'musicbrainz',
+            confidenceScore: 0.95
+          }
         ]
       }
     ];
@@ -108,7 +121,13 @@ describe('Metadata Transaction Manager Blueprint Test Suite', () => {
         resourceId: 104,
         filePath: 'plain-song.mp3',
         fieldMutations: [
-          { fieldId: 'title', oldValue: 'a', newValue: 'b', providerId: 'musicbrainz', confidenceScore: 0.9 }
+          {
+            fieldId: 'title',
+            oldValue: 'a',
+            newValue: 'b',
+            providerId: 'musicbrainz',
+            confidenceScore: 0.9
+          }
         ]
       }
     ];

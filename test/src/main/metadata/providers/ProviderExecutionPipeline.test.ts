@@ -16,14 +16,14 @@ import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
-import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
+import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
+import { ProviderExecutionStageContext } from '@main/metadata/providers/execution/ProviderExecutionStageContext';
 import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
 import { RetryStage } from '@main/metadata/providers/execution/stages/RetryStage';
 import { TimeoutStage } from '@main/metadata/providers/execution/stages/TimeoutStage';
-import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
-import { ProviderExecutionStageContext } from '@main/metadata/providers/execution/ProviderExecutionStageContext';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
+import { LocalMetadataProvider } from '@main/metadata/providers/LocalMetadataProvider';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('ProviderExecutionPipeline', () => {
   it('should process provider execution through pipeline stages', async () => {

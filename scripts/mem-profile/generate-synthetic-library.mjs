@@ -20,7 +20,9 @@ const dbPath = `${profileDir}/nora.pglite.db`;
 console.log(`[gen] opening ${dbPath}`);
 const db = await PGlite.create(dbPath, { extensions: { pg_trgm, citext } });
 
-const existing = await db.query("SELECT COUNT(*)::int AS n FROM songs WHERE path LIKE 'X:/synthetic/%'");
+const existing = await db.query(
+  "SELECT COUNT(*)::int AS n FROM songs WHERE path LIKE 'X:/synthetic/%'"
+);
 console.log(`[gen] synthetic songs before cleanup: ${existing.rows[0].n}; target total: ${count}`);
 
 await db.exec(`DELETE FROM songs WHERE path LIKE 'X:/synthetic/%';`);
@@ -41,7 +43,9 @@ await db.exec(
   `INSERT INTO genres (name) SELECT g FROM unnest(ARRAY['Rock','Pop','Jazz','Electronic','Hip Hop','Classical','Metal','Ambient']) g WHERE NOT EXISTS (SELECT 1 FROM genres ge WHERE ge.name = g);`
 );
 
-const existingAfterDelete = await db.query("SELECT COUNT(*)::int AS n FROM songs WHERE path LIKE 'X:/synthetic/%'");
+const existingAfterDelete = await db.query(
+  "SELECT COUNT(*)::int AS n FROM songs WHERE path LIKE 'X:/synthetic/%'"
+);
 let seq = Number(existingAfterDelete.rows[0].n);
 console.log(`[gen] songs to insert: ${count - seq}`);
 

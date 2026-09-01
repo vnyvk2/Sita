@@ -1,7 +1,7 @@
 ﻿// @vitest-environment jsdom
 import { store } from '@renderer/store/store';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -103,10 +103,7 @@ describe('CompactLyricsPanel (Scrollable Focused Synced Lyrics Panel)', () => {
     mockGetSongLyrics.mockResolvedValue({
       lyrics: {
         isSynced: false,
-        parsedLyrics: [
-          { originalText: 'Unsynced verse 1' },
-          { originalText: 'Unsynced verse 2' }
-        ]
+        parsedLyrics: [{ originalText: 'Unsynced verse 1' }, { originalText: 'Unsynced verse 2' }]
       },
       source: 'Musixmatch'
     });

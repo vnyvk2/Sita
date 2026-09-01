@@ -4,8 +4,8 @@ import { db } from '../../db/db';
 import { getAllSongs } from '../../db/queries/songs';
 import { playlistEntries, playlists } from '../../db/schema';
 import logger from '../../logger';
-import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
 import { toCanonicalFromSong } from '../../metadata/identity/adapters/SongToCanonicalIdentity';
+import type { CanonicalTrackIdentity } from '../../metadata/identity/CanonicalTrackIdentity';
 import { SpotifyApiClient } from '../api/SpotifyApiClient';
 import type {
   CatalogResolution,
@@ -32,9 +32,7 @@ export class SpotifyPlaylistExportService {
     this.catalogSearcher = new SpotifyTrackCatalogSearcher(this.apiClient);
   }
 
-  /**
-   * Generates a cache key for memoizing catalog search results across duplicate playlist entries.
-   */
+  /** Generates a cache key for memoizing catalog search results across duplicate playlist entries. */
   private getTrackResolutionKey(track: CanonicalTrackIdentity, songId: number): string {
     if (track.isrc && track.isrc.trim()) {
       return `isrc:${track.isrc.trim().toUpperCase()}`;
@@ -42,9 +40,7 @@ export class SpotifyPlaylistExportService {
     return `song:${songId}:${track.title}::${track.artists.join(',')}`;
   }
 
-  /**
-   * Runs an array of async task functions with bounded concurrency (e.g. max 5 in flight).
-   */
+  /** Runs an array of async task functions with bounded concurrency (e.g. max 5 in flight). */
   private async runWithConcurrencyLimit<T>(
     tasks: Array<() => Promise<T>>,
     limit = 5
@@ -68,8 +64,8 @@ export class SpotifyPlaylistExportService {
 
   /**
    * Generates a preview export plan by loading the local Nora playlist, resolving its tracks
-   * against the Spotify catalog with bounded concurrency and revision-aware memoization.
-   * Strictly preserves 1..N positions even if individual local song records are missing.
+   * against the Spotify catalog with bounded concurrency and revision-aware memoization. Strictly
+   * preserves 1..N positions even if individual local song records are missing.
    */
   public async generateExportPlan(
     playlistId: number,
@@ -176,7 +172,10 @@ export class SpotifyPlaylistExportService {
     }
 
     // Identify distinct tracks needing network resolution
-    const keysToResolve = new Map<string, { canonicalTrack: CanonicalTrackIdentity; entryId: number }>();
+    const keysToResolve = new Map<
+      string,
+      { canonicalTrack: CanonicalTrackIdentity; entryId: number }
+    >();
     for (const item of entryItems) {
       if (!item.isMissing && item.cacheKey && !resolutionMap.has(item.cacheKey)) {
         if (!keysToResolve.has(item.cacheKey)) {
@@ -234,9 +233,9 @@ export class SpotifyPlaylistExportService {
   }
 
   /**
-   * Executes remote Spotify playlist creation and batched sequential item additions.
-   * Performs server-side re-resolution to prevent renderer tampering, guards against
-   * revision races, and captures snapshots sequentially.
+   * Executes remote Spotify playlist creation and batched sequential item additions. Performs
+   * server-side re-resolution to prevent renderer tampering, guards against revision races, and
+   * captures snapshots sequentially.
    */
   public async executeExport(
     validated: ValidatedExportRequest,

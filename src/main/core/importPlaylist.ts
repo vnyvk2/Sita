@@ -1,9 +1,14 @@
 import path from 'path';
+
 import type { OpenDialogOptions } from 'electron';
+
+import type {
+  PlaylistImportIpcOptions,
+  PlaylistImportAnalysis
+} from '../../common/collections/types';
 import logger from '../logger';
 import { sendMessageToRenderer, showOpenDialog } from '../main';
 import type { PlaylistImportWorkflow } from '../playlistImport/workflow/PlaylistImportWorkflow';
-import type { PlaylistImportIpcOptions, PlaylistImportAnalysis } from '../../common/collections/types';
 
 const DEFAULT_IMPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   title: 'Select a Playlist file to import',
@@ -57,8 +62,8 @@ export const analyzePlaylistImport = async (
 };
 
 /**
- * Lightweight compatibility wrapper delegating playlist import execution
- * exclusively to the canonical PlaylistImportWorkflow framework via Dependency Injection.
+ * Lightweight compatibility wrapper delegating playlist import execution exclusively to the
+ * canonical PlaylistImportWorkflow framework via Dependency Injection.
  */
 const importPlaylist = async (
   workflow: PlaylistImportWorkflow,

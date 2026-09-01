@@ -1,10 +1,11 @@
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
-import type { PlaylistImporterRegistry } from '../registry/PlaylistImporterRegistry';
-import type { PlaylistImportResult } from '../models/PlaylistImportResult';
-import type { PlaylistImportContext } from '../interfaces/PlaylistImportContext';
-import type { FileSystemAccess } from '../interfaces/FileSystemAccess';
+
 import { UnsupportedFormatError, CorruptedPlaylistError } from '../errors/PlaylistImportError';
+import type { FileSystemAccess } from '../interfaces/FileSystemAccess';
+import type { PlaylistImportContext } from '../interfaces/PlaylistImportContext';
+import type { PlaylistImportResult } from '../models/PlaylistImportResult';
+import type { PlaylistImporterRegistry } from '../registry/PlaylistImporterRegistry';
 
 export class PlaylistImportService {
   constructor(
@@ -12,7 +13,10 @@ export class PlaylistImportService {
     private fileSystem?: FileSystemAccess
   ) {}
 
-  async importPlaylist(filePath: string, options?: Record<string, unknown>): Promise<PlaylistImportResult> {
+  async importPlaylist(
+    filePath: string,
+    options?: Record<string, unknown>
+  ): Promise<PlaylistImportResult> {
     const ext = extname(filePath);
     const importer = this.registry.resolveByExtension(ext);
 

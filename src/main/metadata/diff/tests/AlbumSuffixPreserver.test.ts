@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { AlbumSuffixPreserver } from '../AlbumSuffixPreserver';
 
 describe('AlbumSuffixPreserver Unit Test Suite', () => {
@@ -8,7 +9,10 @@ describe('AlbumSuffixPreserver Unit Test Suite', () => {
   });
 
   it('preserves "(Gracie\'s Version)" when base album titles match', () => {
-    const res = AlbumSuffixPreserver.preserveAlbumSuffix("The Secret (Gracie's Version)", 'The Secret');
+    const res = AlbumSuffixPreserver.preserveAlbumSuffix(
+      "The Secret (Gracie's Version)",
+      'The Secret'
+    );
     expect(res).toBe("The Secret (Gracie's Version)");
   });
 
@@ -23,7 +27,10 @@ describe('AlbumSuffixPreserver Unit Test Suite', () => {
   });
 
   it('does NOT preserve suffix if base album titles differ completely', () => {
-    const res = AlbumSuffixPreserver.preserveAlbumSuffix('Greatest Hits (Deluxe)', 'The Eminem Show');
+    const res = AlbumSuffixPreserver.preserveAlbumSuffix(
+      'Greatest Hits (Deluxe)',
+      'The Eminem Show'
+    );
     expect(res).toBe('The Eminem Show');
   });
 

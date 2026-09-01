@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { RequestPipeline } from '../../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../../cache/IdentityResolutionCache';
 import { ProviderRegistry } from '../../../resolution/ProviderRegistry';
@@ -21,7 +22,8 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
         images: [
           {
             id: '123',
-            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
+            image:
+              'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
             front: true,
             back: false,
             thumbnails: {
@@ -30,7 +32,8 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
           },
           {
             id: '456',
-            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg',
+            image:
+              'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg',
             front: false,
             back: true
           }
@@ -46,10 +49,18 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
     expect(contribution?.contributions).toHaveLength(4);
 
     const fieldMap = new Map(contribution?.contributions.map((c) => [c.fieldId, c.value]));
-    expect(fieldMap.get('artworkUrl')).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg');
-    expect(fieldMap.get('front')).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg');
-    expect(fieldMap.get('back')).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg');
-    expect(fieldMap.get('thumbnail')).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123-500.jpg');
+    expect(fieldMap.get('artworkUrl')).toBe(
+      'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg'
+    );
+    expect(fieldMap.get('front')).toBe(
+      'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg'
+    );
+    expect(fieldMap.get('back')).toBe(
+      'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/456.jpg'
+    );
+    expect(fieldMap.get('thumbnail')).toBe(
+      'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123-500.jpg'
+    );
   });
 
   it('fetchContribution() returns null for empty or invalid MBIDs', async () => {
@@ -73,7 +84,8 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
         images: [
           {
             id: '123',
-            image: 'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
+            image:
+              'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg',
             front: true,
             back: false
           }
@@ -84,6 +96,8 @@ describe('Phase 14G — Cover Art Archive Contribution Adapter Suite', () => {
 
     const result = await adapter.lookup({ entityId: mbid } as any);
     expect(result.confidence.score).toBe(0.95);
-    expect((result.payload as any).coverArtUrl).toBe('https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg');
+    expect((result.payload as any).coverArtUrl).toBe(
+      'https://coverartarchive.org/release/76df3287-6cda-33eb-8e9a-044b5e15ffdd/123.jpg'
+    );
   });
 });

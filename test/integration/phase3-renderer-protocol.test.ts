@@ -1,11 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'events';
+
 import { GarbageCollectionJob } from '@main/workers/jobs/garbageCollectionJob';
 import { WAVEFORM_RESOLUTION } from '@main/workers/jobs/waveformJob';
+import { isAssetTempFileFor } from '@main/workers/process/handlers/assetJobHandler';
 import { MediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { MEDIA_WORKER_PROTOCOL_VERSION } from '@main/workers/process/workerProtocol';
-import { isAssetTempFileFor } from '@main/workers/process/handlers/assetJobHandler';
 import type { SongData } from '@renderer/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 class MockUtilityProcess extends EventEmitter {
   public pid = 1234;
@@ -26,12 +27,11 @@ vi.mock('@main/logger', () => ({
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
-    debug: vi.fn(),
+    debug: vi.fn()
   }
 }));
 
 describe('Phase 3 FORENSIC: Format Audits, UI Hydration & Protocol Matrix', () => {
-
   // -------------------------------------------------------------------------
   // Item 10: Waveform 800-byte Format & GC Promotion Validation
   // -------------------------------------------------------------------------
@@ -95,7 +95,7 @@ describe('Phase 3 FORENSIC: Format Audits, UI Hydration & Protocol Matrix', () =
         responseById.set(item.songId!, item);
       }
 
-      for (let k = 0; k < (win.endIndex - win.startIndex); k += 1) {
+      for (let k = 0; k < win.endIndex - win.startIndex; k += 1) {
         const requestedId = ids[win.startIndex + k];
         if (requestedId !== undefined) {
           const item = responseById.get(requestedId);

@@ -1,8 +1,8 @@
-import type { PluginCapability } from '../models/PluginCapability';
 import type { PlaylistPlugin } from '../interfaces/PlaylistPlugin';
+import type { PluginCapability } from '../models/PluginCapability';
 import type { ImportProvider } from '../providers/ImportProvider';
-import type { SyncProvider } from '../providers/SyncProvider';
 import type { MatchProvider } from '../providers/MatchProvider';
+import type { SyncProvider } from '../providers/SyncProvider';
 
 export class PluginRegistry {
   private providers = new Map<PluginCapability, Set<PlaylistPlugin>>();

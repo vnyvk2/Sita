@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { TrackMatcher, MIN_MATCH_SCORE } from '@main/metadata/matching/TrackMatcher';
 import type { LocalSongInput, OfficialTrackInput } from '@main/metadata/matching/TrackMatcher';
+import { describe, expect, it } from 'vitest';
 
 describe('TrackMatcher (Phase 1 Matching Invariants)', () => {
   const matcher = new TrackMatcher();

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PluginRegistry } from '@main/playlistPlugin/registry/PluginRegistry';
-import { PluginManager } from '@main/playlistPlugin/manager/PluginManager';
 import { PlaylistEventBus } from '@main/playlistAutomation/events/PlaylistEventBus';
-import type { PlaylistPlugin } from '@main/playlistPlugin/interfaces/PlaylistPlugin';
 import type { PluginContext } from '@main/playlistPlugin/context/PluginContext';
+import type { PlaylistPlugin } from '@main/playlistPlugin/interfaces/PlaylistPlugin';
+import { PluginManager } from '@main/playlistPlugin/manager/PluginManager';
 import type { ImportProvider } from '@main/playlistPlugin/providers/ImportProvider';
+import { PluginRegistry } from '@main/playlistPlugin/registry/PluginRegistry';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Phase 16 — Plugin & Extension Framework Refinements', () => {
   it('should register, activate, and route typed providers for a versioned external plugin', async () => {
@@ -16,7 +16,7 @@ describe('Phase 16 — Plugin & Extension Framework Refinements', () => {
 
     const mockImportProvider: ImportProvider = {
       format: 'spotify',
-      parseAndPlan: vi.fn(async () => ({} as any))
+      parseAndPlan: vi.fn(async () => ({}) as any)
     };
 
     const mockSpotifyPlugin: PlaylistPlugin = {

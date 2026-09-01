@@ -21,12 +21,12 @@ const LayoutSelector = ({ selectedLayout, onChange }: Props) => {
               type="button"
               disabled={!isEnabled}
               onClick={() => isEnabled && onChange(def.id)}
-              className={`group relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 ${
+              className={`group relative flex items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ${
                 isSelected && isEnabled
-                  ? 'border-neutral-500 bg-neutral-800/90 text-white ring-2 ring-neutral-500/50 shadow-md cursor-pointer'
+                  ? 'cursor-pointer border-neutral-500 bg-neutral-800/90 text-white shadow-md ring-2 ring-neutral-500/50'
                   : isEnabled
-                    ? 'border-neutral-800 bg-neutral-900/50 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200 cursor-pointer'
-                    : 'border-neutral-900 bg-neutral-950/40 text-neutral-600 opacity-50 cursor-not-allowed'
+                    ? 'cursor-pointer border-neutral-800 bg-neutral-900/50 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200'
+                    : 'cursor-not-allowed border-neutral-900 bg-neutral-950/40 text-neutral-600 opacity-50'
               }`}
             >
               {/* Visual Mini-Diagram Icon Box */}
@@ -43,16 +43,18 @@ const LayoutSelector = ({ selectedLayout, onChange }: Props) => {
               </div>
 
               {/* Layout Info & Status Badge */}
-              <div className="flex flex-1 flex-col min-w-0">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-sm font-medium truncate">{def.title}</span>
+                  <span className="truncate text-sm font-medium">{def.title}</span>
                   {!isEnabled && (
-                    <span className="shrink-0 rounded-full bg-neutral-800/90 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase text-neutral-400 border border-neutral-700/50">
+                    <span className="shrink-0 rounded-full border border-neutral-700/50 bg-neutral-800/90 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-neutral-400 uppercase">
                       Coming Soon
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-neutral-500 line-clamp-1 mt-0.5">{def.description}</span>
+                <span className="mt-0.5 line-clamp-1 text-xs text-neutral-500">
+                  {def.description}
+                </span>
               </div>
             </button>
           );

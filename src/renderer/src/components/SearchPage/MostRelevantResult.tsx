@@ -104,11 +104,7 @@ export const MostRelevantResult = (props: MostRelevantResultProp) => {
       </div>
       <div className="result-info-container text-font-color-black group-hover:text-font-color-black dark:text-font-color-white dark:group-hover:text-font-color-black max-w-[50%]">
         <div className="title overflow-hidden text-2xl text-ellipsis whitespace-nowrap">
-          {highlightText ? (
-            <HighlightedText text={title} highlight={highlightText} />
-          ) : (
-            title
-          )}
+          {highlightText ? <HighlightedText text={title} highlight={highlightText} /> : title}
         </div>
         {infoType1 && (
           <div className="info-type-1 overflow-hidden text-base text-ellipsis whitespace-nowrap">

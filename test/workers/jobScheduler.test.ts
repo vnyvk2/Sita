@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { JobScheduler } from '../../src/main/workers/jobScheduler';
 import type { Job } from '../../src/main/workers/types';
 
@@ -25,7 +26,7 @@ describe('JobScheduler', () => {
       jobClass: 'interactive',
       state: 'queued',
       retries: 0,
-      execute: executeMock,
+      execute: executeMock
     };
 
     const promise = new Promise<void>((resolve) => {
@@ -55,7 +56,7 @@ describe('JobScheduler', () => {
       jobClass: 'interactive',
       state: 'queued',
       retries: 0,
-      execute: executeMock,
+      execute: executeMock
     };
 
     const job2: Job = {
@@ -64,7 +65,7 @@ describe('JobScheduler', () => {
       jobClass: 'interactive',
       state: 'queued',
       retries: 0,
-      execute: executeMock,
+      execute: executeMock
     };
 
     const enqueued1 = scheduler.enqueue(job1);
@@ -91,7 +92,7 @@ describe('JobScheduler', () => {
       retries: 0,
       execute: async () => {
         executionOrder.push(id);
-      },
+      }
     });
 
     scheduler.enqueue(createJob('normal_1', 'normal'));
@@ -127,7 +128,7 @@ describe('JobScheduler', () => {
         jobClass: 'interactive',
         state: 'queued',
         retries: 0,
-        execute: executeMock,
+        execute: executeMock
       });
     }
 
@@ -155,7 +156,7 @@ describe('JobScheduler', () => {
   it('should strictly respect maxConcurrency limit', async () => {
     // We expect exactly 2 jobs running simultaneously
     const maxAllowedConcurrency = 2;
-    
+
     // Stop the running scheduler from beforeEach
     await scheduler.stop();
     // Restart with a strict limit
@@ -186,7 +187,7 @@ describe('JobScheduler', () => {
         jobClass: 'interactive',
         state: 'queued',
         retries: 0,
-        execute: executeMock,
+        execute: executeMock
       });
     }
 

@@ -2,25 +2,24 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { TagWriterService } from '@main/metadata/services/TagWriterService';
 import { File } from 'node-taglib-sharp';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { TagWriterService } from '@main/metadata/services/TagWriterService';
-
 /**
  * Round-trip gate for the download-song feature.
  *
- * Verifies that node-taglib-sharp (via TagWriterService) can write tags AND embedded
- * artwork to the exact container formats yt-dlp produces for audio-only downloads:
- *   - M4A  (AAC in MP4 container, yt-dlp `-f bestaudio[ext=m4a]`)
- *   - OPUS (Opus in Ogg container, yt-dlp `-f bestaudio[ext=opus]`)
+ * Verifies that node-taglib-sharp (via TagWriterService) can write tags AND embedded artwork to the
+ * exact container formats yt-dlp produces for audio-only downloads:
  *
- * This is a FORMAT-CAPABILITY gate: if a container listed in the extractor's
- * SUPPORTED_EXTENSIONS cannot hold tags/artwork, the whitelist must be corrected
- * so the pipeline never advertises a format it cannot tag. A transient runtime
- * tagging failure on an otherwise supported file is tolerated by design — the
- * audio is kept and library parsing falls back to the filename.
+ * - M4A (AAC in MP4 container, yt-dlp `-f bestaudio[ext=m4a]`)
+ * - OPUS (Opus in Ogg container, yt-dlp `-f bestaudio[ext=opus]`)
+ *
+ * This is a FORMAT-CAPABILITY gate: if a container listed in the extractor's SUPPORTED_EXTENSIONS
+ * cannot hold tags/artwork, the whitelist must be corrected so the pipeline never advertises a
+ * format it cannot tag. A transient runtime tagging failure on an otherwise supported file is
+ * tolerated by design — the audio is kept and library parsing falls back to the filename.
  */
 
 const FIXTURES_DIR = path.resolve(__dirname, '../../../../../test/fixtures/downloads');

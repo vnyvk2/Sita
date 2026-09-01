@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import { MetadataProviderDiscovery } from '../MetadataProviderDiscovery';
 import { MetadataProviderRegistry } from '../MetadataProviderRegistry';
 
-const createAdapter = (id: string, capabilities: ProviderCapability[]): IMetadataProviderAdapter => ({
+const createAdapter = (
+  id: string,
+  capabilities: ProviderCapability[]
+): IMetadataProviderAdapter => ({
   identity: {
     id,
     name: `Adapter ${id}`,

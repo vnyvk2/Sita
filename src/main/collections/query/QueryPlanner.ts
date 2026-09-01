@@ -1,4 +1,9 @@
-import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, RuleCondition, OrderDefinition } from './ast';
+import type {
+  SmartPlaylistDefinition,
+  SmartPlaylistRuleAST,
+  RuleCondition,
+  OrderDefinition
+} from './ast';
 
 export type JoinRelation = 'artist' | 'album' | 'genre';
 
@@ -34,7 +39,10 @@ export class QueryPlanner {
     };
   }
 
-  private traverse(node: SmartPlaylistRuleAST | RuleCondition, requiredRelations: Set<JoinRelation>) {
+  private traverse(
+    node: SmartPlaylistRuleAST | RuleCondition,
+    requiredRelations: Set<JoinRelation>
+  ) {
     if (node.type === 'group') {
       for (const child of node.rules) {
         this.traverse(child, requiredRelations);

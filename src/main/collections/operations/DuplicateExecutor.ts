@@ -1,5 +1,6 @@
-import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
 import { inArray } from 'drizzle-orm';
+
+import { playlists, playlistEntries, smartPlaylistRules } from '../../db/schema';
 import type { PlannedNode } from './DuplicatePlanner';
 
 export class DuplicateExecutor {
@@ -8,8 +9,8 @@ export class DuplicateExecutor {
     plannedNodes: PlannedNode[],
     rootNodeId: number
   ): Promise<{ rootNewId: number; affectedSongIds: number[] }> {
-    const nodeIds = plannedNodes.map(p => p.node.id);
-    
+    const nodeIds = plannedNodes.map((p) => p.node.id);
+
     // 1. Fetch extra data
     const allEntries = await trx
       .select()
@@ -21,10 +22,7 @@ export class DuplicateExecutor {
       .from(smartPlaylistRules)
       .where(inArray(smartPlaylistRules.playlistId, nodeIds));
 
-    const fullNodes = await trx
-      .select()
-      .from(playlists)
-      .where(inArray(playlists.id, nodeIds));
+    const fullNodes = await trx.select().from(playlists).where(inArray(playlists.id, nodeIds));
 
     // Map oldId -> fullNode
     const fullNodeMap = new Map<number, (typeof fullNodes)[number]>(
@@ -44,15 +42,21 @@ export class DuplicateExecutor {
 
       // Determine parentId: if it's the root being duplicated, keep original parent.
       // If it's a child, point to the newly inserted parent.
-      const parentId = plan.node.id === rootNodeId 
-        ? plan.node.parentId 
-        : (plan.node.parentId !== null ? idMap.get(plan.node.parentId) ?? null : null);
+      const parentId =
+        plan.node.id === rootNodeId
+          ? plan.node.parentId
+          : plan.node.parentId !== null
+            ? (idMap.get(plan.node.parentId) ?? null)
+            : null;
 
-      const [inserted] = await trx.insert(playlists).values({
-        ...rest,
-        name: plan.newName,
-        parentId
-      }).returning({ id: playlists.id });
+      const [inserted] = await trx
+        .insert(playlists)
+        .values({
+          ...rest,
+          name: plan.newName,
+          parentId
+        })
+        .returning({ id: playlists.id });
 
       idMap.set(plan.node.id, inserted.id);
 

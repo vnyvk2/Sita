@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock DB
 vi.mock('../../../../src/main/db/db', async () => {
@@ -7,43 +7,51 @@ vi.mock('../../../../src/main/db/db', async () => {
   return createSqliteMockDb();
 });
 
-import { db, client } from '../../../../src/main/db/db';
-import { PlaylistEngine } from '../../../../src/main/collections/engine/PlaylistEngine';
 import { HierarchyService } from '../../../../src/main/collections/engine/HierarchyService';
-import { PlaylistRepository } from '../../../../src/main/collections/repositories/PlaylistRepository';
+import { PlaylistEngine } from '../../../../src/main/collections/engine/PlaylistEngine';
+import { MembershipService } from '../../../../src/main/collections/membership/MembershipService';
 import { OperationExecutor } from '../../../../src/main/collections/operations/OperationExecutor';
 import { OperationJournalWriter } from '../../../../src/main/collections/operations/OperationJournalWriter';
-import { MembershipService } from '../../../../src/main/collections/membership/MembershipService';
-import { playlists, playlistEntries, operationJournal, songs } from '../../../../src/main/db/schema';
+import { PlaylistRepository } from '../../../../src/main/collections/repositories/PlaylistRepository';
+import { db, client } from '../../../../src/main/db/db';
+import {
+  playlists,
+  playlistEntries,
+  operationJournal,
+  songs
+} from '../../../../src/main/db/schema';
 
 describe('PlaylistEngine', () => {
   let engine: PlaylistEngine;
   let repository: PlaylistRepository;
   let membershipService: MembershipService;
-  
+
   beforeEach(async () => {
     // Baseline SQLite schema is applied by the engine on first open (:memory:)
 
     // Insert some mock songs so we don't hit foreign key constraints
     const now = new Date();
-    const insertedSongs = await db.insert(songs).values([
-      { title: 'Song A', path: '/a.mp3', duration: 100, fileCreatedAt: now, fileModifiedAt: now },
-      { title: 'Song B', path: '/b.mp3', duration: 120, fileCreatedAt: now, fileModifiedAt: now },
-      { title: 'Song C', path: '/c.mp3', duration: 140, fileCreatedAt: now, fileModifiedAt: now },
-      { title: 'Song D', path: '/d.mp3', duration: 160, fileCreatedAt: now, fileModifiedAt: now },
-    ]).returning({ id: songs.id });
-    
+    const insertedSongs = await db
+      .insert(songs)
+      .values([
+        { title: 'Song A', path: '/a.mp3', duration: 100, fileCreatedAt: now, fileModifiedAt: now },
+        { title: 'Song B', path: '/b.mp3', duration: 120, fileCreatedAt: now, fileModifiedAt: now },
+        { title: 'Song C', path: '/c.mp3', duration: 140, fileCreatedAt: now, fileModifiedAt: now },
+        { title: 'Song D', path: '/d.mp3', duration: 160, fileCreatedAt: now, fileModifiedAt: now }
+      ])
+      .returning({ id: songs.id });
+
     // Setup references to the generated song IDs for tests
-    (globalThis as any).songIds = insertedSongs.map(s => s.id);
+    (globalThis as any).songIds = insertedSongs.map((s) => s.id);
 
     repository = new PlaylistRepository();
     const journalWriter = new OperationJournalWriter();
     const executor = new OperationExecutor(journalWriter);
-    
+
     // Mock membership service
     membershipService = {
       invalidateSongs: vi.fn(),
-      getCollectionsForSong: vi.fn(),
+      getCollectionsForSong: vi.fn()
     } as unknown as MembershipService;
 
     engine = new PlaylistEngine(repository, membershipService, executor, new HierarchyService());
@@ -62,7 +70,7 @@ describe('PlaylistEngine', () => {
     // 1. Setup a playlist
     const [playlist] = await db.insert(playlists).values({ name: 'My Playlist' }).returning();
     const songId = (globalThis as any).songIds[0];
-    
+
     // 2. Add song
     await engine.addSongs({
       playlistId: playlist.id,
@@ -78,7 +86,15 @@ describe('PlaylistEngine', () => {
     expect(membershipService.invalidateSongs).toHaveBeenCalledWith([songId]);
 
     // 5. Verify journal contents
-    const journal = await db.select().from(operationJournal).where(and(eq(operationJournal.collectionType, 'playlist'), eq(operationJournal.collectionId, playlist.id)));
+    const journal = await db
+      .select()
+      .from(operationJournal)
+      .where(
+        and(
+          eq(operationJournal.collectionType, 'playlist'),
+          eq(operationJournal.collectionId, playlist.id)
+        )
+      );
     expect(journal.length).toBe(1);
     expect(journal[0].operationType).toBe('playlist.addSongs');
     expect(journal[0].sequenceNumber).toBe(1);
@@ -86,16 +102,20 @@ describe('PlaylistEngine', () => {
 
   it('should add 100 songs', async () => {
     const [playlist] = await db.insert(playlists).values({ name: 'Big Playlist' }).returning();
-    
+
     // Mock 100 songs
     const now = new Date();
     const manySongs = Array.from({ length: 100 }, (_, i) => ({
-      title: `Song ${i}`, path: `/path${i}.mp3`, duration: 10, fileCreatedAt: now, fileModifiedAt: now
+      title: `Song ${i}`,
+      path: `/path${i}.mp3`,
+      duration: 10,
+      fileCreatedAt: now,
+      fileModifiedAt: now
     }));
     const insertedSongs = await db.insert(songs).values(manySongs).returning({ id: songs.id });
 
-    const songIds = insertedSongs.map(s => s.id);
-    
+    const songIds = insertedSongs.map((s) => s.id);
+
     await engine.addSongs({
       playlistId: playlist.id,
       songIds

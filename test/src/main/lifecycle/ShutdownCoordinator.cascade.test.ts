@@ -1,32 +1,32 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
-import { libraryScheduler } from '@main/workers/jobScheduler';
-import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
-import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
-import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { closeDatabaseInstance } from '@main/db/db';
+import { libraryLifecycleController } from '@main/library/LibraryLifecycleController';
+import { ShutdownCoordinator } from '@main/lifecycle/ShutdownCoordinator';
+import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
+import { libraryScheduler } from '@main/workers/jobScheduler';
+import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@main/workers/jobScheduler', () => ({
   libraryScheduler: {
-    stop: vi.fn(),
+    stop: vi.fn()
   }
 }));
 
 vi.mock('@main/workers/adaptivePolicyEngine', () => ({
   adaptivePolicyEngine: {
-    stop: vi.fn(),
+    stop: vi.fn()
   }
 }));
 
 vi.mock('@main/library/LibraryLifecycleController', () => ({
   libraryLifecycleController: {
-    shutdown: vi.fn(),
+    shutdown: vi.fn()
   }
 }));
 
 vi.mock('@main/workers/process/MediaWorkerBridge', () => ({
   mediaWorkerBridge: {
-    terminate: vi.fn(),
+    terminate: vi.fn()
   }
 }));
 
@@ -40,28 +40,28 @@ vi.mock('@main/logger', () => ({
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
-    debug: vi.fn(),
+    debug: vi.fn()
   }
 }));
 
 vi.mock('@main/fs/controlAbortControllers', () => ({
-  closeAllAbortControllers: vi.fn(),
+  closeAllAbortControllers: vi.fn()
 }));
 
 vi.mock('@main/other/artworks', () => ({
-  clearTempArtworkFolder: vi.fn(),
+  clearTempArtworkFolder: vi.fn()
 }));
 
 vi.mock('@main/other/discordRPC', () => ({
-  clearDiscordRpcActivity: vi.fn(),
+  clearDiscordRpcActivity: vi.fn()
 }));
 
 vi.mock('@main/saveLyricsToSong', () => ({
-  savePendingSongLyrics: vi.fn(),
+  savePendingSongLyrics: vi.fn()
 }));
 
 vi.mock('@main/updateSong/updateSongId3Tags', () => ({
-  savePendingMetadataUpdates: vi.fn(),
+  savePendingMetadataUpdates: vi.fn()
 }));
 
 describe('ShutdownCoordinator cascade', () => {

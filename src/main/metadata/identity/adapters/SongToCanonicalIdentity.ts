@@ -82,10 +82,15 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
     if (typeof first === 'string') {
       genre = first.trim() || undefined;
     } else if (first && typeof first === 'object') {
-      if ('genre' in first && first.genre && typeof first.genre === 'object' && typeof (first.genre as { name?: unknown }).name === 'string') {
-        genre = ((first.genre as { name: string }).name).trim() || undefined;
+      if (
+        'genre' in first &&
+        first.genre &&
+        typeof first.genre === 'object' &&
+        typeof (first.genre as { name?: unknown }).name === 'string'
+      ) {
+        genre = (first.genre as { name: string }).name.trim() || undefined;
       } else if ('name' in first && typeof (first as { name?: unknown }).name === 'string') {
-        genre = ((first as { name: string }).name).trim() || undefined;
+        genre = (first as { name: string }).name.trim() || undefined;
       }
     }
   }
@@ -96,9 +101,10 @@ export function toCanonicalFromSong(song: MinimalSongRecord): CanonicalTrackIden
     artists,
     album,
     albumArtist: song.albumArtist?.trim() || undefined,
-    durationSecs: song.duration !== undefined && song.duration !== null ? Number(song.duration) : undefined,
+    durationSecs:
+      song.duration !== undefined && song.duration !== null ? Number(song.duration) : undefined,
     releaseYear: song.year || undefined,
-    trackNumber: (song.trackNumber ?? song.trackNo) ?? undefined,
+    trackNumber: song.trackNumber ?? song.trackNo ?? undefined,
     discNumber: song.discNumber ?? undefined,
     isrc: song.isrc?.trim() || undefined,
     musicBrainzRecordingId: song.musicBrainzRecordingId?.trim() || undefined,

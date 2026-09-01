@@ -1,9 +1,10 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+import sharp from 'sharp';
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import sharp from 'sharp';
 
 // Mock Web Audio API for jsdom environment
 class MockAudioContext {
@@ -85,10 +86,18 @@ describe('Playback Pipeline Rigorous Engineering Audit', () => {
       const t3 = performance.now();
       const pathDuration = t3 - t2;
 
-      console.log(`[Sharp Real Benchmark] 2000x2000 JPEG file size: ${(fileSize / 1024).toFixed(1)} KB`);
-      console.log(`[Sharp Real Benchmark] sharp(path).toBuffer() execution time: ${sharpDuration.toFixed(2)} ms`);
-      console.log(`[Sharp Real Benchmark] path-only resolution time: ${pathDuration.toFixed(4)} ms`);
-      console.log(`[Sharp Real Benchmark] Sharp Buffer allocated in RAM: ${(sharpBuffer.length / 1024).toFixed(1)} KB`);
+      console.log(
+        `[Sharp Real Benchmark] 2000x2000 JPEG file size: ${(fileSize / 1024).toFixed(1)} KB`
+      );
+      console.log(
+        `[Sharp Real Benchmark] sharp(path).toBuffer() execution time: ${sharpDuration.toFixed(2)} ms`
+      );
+      console.log(
+        `[Sharp Real Benchmark] path-only resolution time: ${pathDuration.toFixed(4)} ms`
+      );
+      console.log(
+        `[Sharp Real Benchmark] Sharp Buffer allocated in RAM: ${(sharpBuffer.length / 1024).toFixed(1)} KB`
+      );
 
       expect(sharpBuffer.length).toBeGreaterThan(0);
       expect(sharpDuration).toBeGreaterThan(pathDuration);
@@ -191,8 +200,12 @@ describe('Playback Pipeline Rigorous Engineering Audit', () => {
       await Promise.all([p1, p2, p3]);
 
       console.log(`[AudioPlayer Class Integration] Final player.audio.src: ${player.audio.src}`);
-      console.log(`[AudioPlayer Class Integration] Final store.state.currentSongData.songId: ${store.state.currentSongData?.songId}`);
-      console.log(`[AudioPlayer Class Integration] Record listening events emitted: ${JSON.stringify(recordListeningEvents)}`);
+      console.log(
+        `[AudioPlayer Class Integration] Final store.state.currentSongData.songId: ${store.state.currentSongData?.songId}`
+      );
+      console.log(
+        `[AudioPlayer Class Integration] Record listening events emitted: ${JSON.stringify(recordListeningEvents)}`
+      );
 
       // 1. Final audio source is strictly Track 3
       expect(player.audio.src).toBe('nora://music/song_3.flac');
@@ -275,8 +288,12 @@ describe('Playback Pipeline Rigorous Engineering Audit', () => {
 
       // Give event loop 30ms to verify disk stream did NOT dump all 80 chunks
       await new Promise((r) => setTimeout(r, 30));
-      console.log(`[Stream Backpressure Real File] Chunks enqueued after reading 1 chunk: ${chunksEnqueued} / ${totalChunks}`);
-      console.log(`[Stream Backpressure Real File] Stream pause calls: ${pauseCalls}, resume calls: ${resumeCalls}`);
+      console.log(
+        `[Stream Backpressure Real File] Chunks enqueued after reading 1 chunk: ${chunksEnqueued} / ${totalChunks}`
+      );
+      console.log(
+        `[Stream Backpressure Real File] Stream pause calls: ${pauseCalls}, resume calls: ${resumeCalls}`
+      );
 
       // With backpressure, the fileStream paused after initial buffer filled (<= 3 chunks enqueued)
       expect(chunksEnqueued).toBeLessThan(5);
@@ -294,7 +311,9 @@ describe('Playback Pipeline Rigorous Engineering Audit', () => {
       await reader.cancel();
       fileStream.destroy();
 
-      console.log(`[Stream Backpressure Real File] Successfully bounded producer memory to ${chunksEnqueued * 64} KB instead of full 5.12 MB!`);
+      console.log(
+        `[Stream Backpressure Real File] Successfully bounded producer memory to ${chunksEnqueued * 64} KB instead of full 5.12 MB!`
+      );
     });
   });
 });

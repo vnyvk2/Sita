@@ -1,13 +1,14 @@
+import { playlists, playlistEntries, songs } from '@db/schema';
+
+import { createCollectionId, getNumericKey } from '../../../common/collections/id';
 import type {
   Collection,
   CollectionEntry,
   CollectionId,
   CollectionCapabilities
 } from '../../../common/collections/types';
-import type { CollectionProvider, CollectionQueryOptions, EntryQueryOptions } from './types';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { createCollectionId, getNumericKey } from '../../../common/collections/id';
-import { playlists, playlistEntries, songs } from '@db/schema';
+import type { CollectionProvider, CollectionQueryOptions, EntryQueryOptions } from './types';
 
 type PlaylistRow = typeof playlists.$inferSelect;
 type EntryRow = {
@@ -50,15 +51,16 @@ export class PlaylistProvider implements CollectionProvider {
   public async getAllCollections(
     options: CollectionQueryOptions
   ): Promise<PaginatedResult<Collection, string>> {
-    const limit = options.end !== undefined && options.start !== undefined 
-      ? options.end - options.start 
-      : undefined;
-    
+    const limit =
+      options.end !== undefined && options.start !== undefined
+        ? options.end - options.start
+        : undefined;
+
     const rows = await this.repository.getAll({
       limit,
       offset: options.start
     });
-    
+
     const total = await this.repository.countAll();
 
     return {
@@ -84,7 +86,7 @@ export class PlaylistProvider implements CollectionProvider {
       offset: options.start,
       sortType: options.sortType
     });
-    
+
     const total = await this.repository.countEntries(playlistId);
 
     // Provider preserves natural repository ordering and purely translates data types.
@@ -109,7 +111,7 @@ export class PlaylistProvider implements CollectionProvider {
       stats: {
         totalEntries: row.itemCount,
         totalDuration: Number(row.totalDuration ?? 0),
-        uniqueArtists: 0, 
+        uniqueArtists: 0,
         uniqueAlbums: 0
       },
       createdAt: row.createdAt,

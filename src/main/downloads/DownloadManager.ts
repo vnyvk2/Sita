@@ -1,5 +1,5 @@
-import { mkdirSync, readdirSync, renameSync, rmSync, copyFileSync, statSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { mkdirSync, readdirSync, renameSync, rmSync, copyFileSync, statSync } from 'fs';
 import path from 'path';
 
 import logger from '@main/logger';
@@ -32,8 +32,8 @@ export interface DownloadManagerOptions {
   /** Pushes a snapshot to the renderer (wired to webContents.send by IPC setup). */
   publish?: (snapshot: DownloadsSnapshot) => void;
   /**
-   * Called after a file reached its final destination. Lets the host app nudge
-   * library change tracking for scan modes without filesystem watchers.
+   * Called after a file reached its final destination. Lets the host app nudge library change
+   * tracking for scan modes without filesystem watchers.
    */
   onFileFinalized?: (finalPath: string) => void;
 }
@@ -46,16 +46,16 @@ type JobRecord = DownloadJobState & {
   /** Internal: set right before moving so cancellation cannot race the move. */
   isFinalizing?: boolean;
   /**
-   * Internal: set when cancellation arrives before the job pipeline created its
-   * AbortController (e.g. while suspended on settings resolution).
+   * Internal: set when cancellation arrives before the job pipeline created its AbortController
+   * (e.g. while suspended on settings resolution).
    */
   cancelRequested?: boolean;
 };
 
 /**
- * Orchestrates online downloads: queue -> extract into staging -> verify ->
- * tag -> atomic move into the user's music folder. The filesystem remains the
- * source of truth; ingestion happens exclusively through the normal scanner.
+ * Orchestrates online downloads: queue -> extract into staging -> verify -> tag -> atomic move into
+ * the user's music folder. The filesystem remains the source of truth; ingestion happens
+ * exclusively through the normal scanner.
  *
  * A playlist download is simply many jobs enqueued with the same playlistId.
  */
@@ -77,8 +77,8 @@ export class DownloadManager {
   }
 
   /**
-   * Enqueues one track. Returns the affected job id. Deduping happens against
-   * tracked jobs (by videoId) and existing files in the destination folder.
+   * Enqueues one track. Returns the affected job id. Deduping happens against tracked jobs (by
+   * videoId) and existing files in the destination folder.
    */
   async enqueue(
     input: EnqueueDownloadInput
@@ -110,7 +110,9 @@ export class DownloadManager {
   }
 
   /** Convenience wrapper used by the playlist flow. */
-  async enqueueMany(inputs: EnqueueDownloadInput[]): Promise<{ queued: number; duplicates: number }> {
+  async enqueueMany(
+    inputs: EnqueueDownloadInput[]
+  ): Promise<{ queued: number; duplicates: number }> {
     let queued = 0;
     let duplicates = 0;
     for (const input of inputs) {
@@ -133,7 +135,10 @@ export class DownloadManager {
       return true;
     }
 
-    if (record.isFinalizing || ['COMPLETED', 'SKIPPED_DUPLICATE', 'CANCELLED', 'FAILED'].includes(record.status)) {
+    if (
+      record.isFinalizing ||
+      ['COMPLETED', 'SKIPPED_DUPLICATE', 'CANCELLED', 'FAILED'].includes(record.status)
+    ) {
       return false;
     }
     record.cancelRequested = true;
@@ -149,15 +154,20 @@ export class DownloadManager {
     return cancelled;
   }
 
-  /** Cancels every queued and active job. Used on app shutdown so spawned
-   *  yt-dlp processes never outlive the app. */
+  /**
+   * Cancels every queued and active job. Used on app shutdown so spawned yt-dlp processes never
+   * outlive the app.
+   */
   cancelAll(): number {
     let cancelled = 0;
     for (const jobId of [...this.queue]) {
       if (this.cancel(jobId)) cancelled += 1;
     }
     for (const record of this.jobs.values()) {
-      if (record.isFinalizing || ['COMPLETED', 'SKIPPED_DUPLICATE', 'CANCELLED', 'FAILED'].includes(record.status)) {
+      if (
+        record.isFinalizing ||
+        ['COMPLETED', 'SKIPPED_DUPLICATE', 'CANCELLED', 'FAILED'].includes(record.status)
+      ) {
         continue;
       }
       if (!record.cancelRequested) cancelled += 1;
@@ -209,7 +219,12 @@ export class DownloadManager {
 
   private trimTrackedJobs() {
     if (this.jobs.size <= MAX_TRACKED_JOBS) return;
-    const terminalOrder: DownloadJobState['status'][] = ['FAILED', 'CANCELLED', 'SKIPPED_DUPLICATE', 'COMPLETED'];
+    const terminalOrder: DownloadJobState['status'][] = [
+      'FAILED',
+      'CANCELLED',
+      'SKIPPED_DUPLICATE',
+      'COMPLETED'
+    ];
     for (const status of terminalOrder) {
       for (const [jobId, record] of this.jobs) {
         if (this.jobs.size <= MAX_TRACKED_JOBS) return;
@@ -223,17 +238,17 @@ export class DownloadManager {
       const jobId = this.queue.shift()!;
       const record = this.jobs.get(jobId);
       if (!record) continue;
-          this.activeCount += 1;
-          void this.processJob(record)
-            .catch((error) => {
-              // Defensive: processJob handles its own errors, but a throw from its
-              // finally block must never become an unhandled rejection.
-              logger.error('[DownloadManager] Unexpected job pipeline error.', { error });
-            })
-            .finally(() => {
-              this.activeCount -= 1;
-              this.pump();
-            });
+      this.activeCount += 1;
+      void this.processJob(record)
+        .catch((error) => {
+          // Defensive: processJob handles its own errors, but a throw from its
+          // finally block must never become an unhandled rejection.
+          logger.error('[DownloadManager] Unexpected job pipeline error.', { error });
+        })
+        .finally(() => {
+          this.activeCount -= 1;
+          this.pump();
+        });
     }
   }
 
@@ -351,9 +366,9 @@ export class DownloadManager {
   }
 
   /**
-   * Moves the staged file into the destination folder. renameSync keeps the move
-   * atomic on the same volume; across volumes we copy next to the destination and
-   * rename locally so the scanner never sees a partial file.
+   * Moves the staged file into the destination folder. renameSync keeps the move atomic on the same
+   * volume; across volumes we copy next to the destination and rename locally so the scanner never
+   * sees a partial file.
    */
   private moveToDestination(
     stagedFilePath: string,
@@ -466,78 +481,78 @@ const MAX_ARTWORK_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
- * Performs the fetch with every redirect hop validated before it is requested:
- * scheme allowlist plus DNS/IP checks against loopback, private, link-local
- * (cloud metadata), and other non-routable destinations. A compromised renderer
- * must not be able to make the main process fetch internal resources.
+ * Performs the fetch with every redirect hop validated before it is requested: scheme allowlist
+ * plus DNS/IP checks against loopback, private, link-local (cloud metadata), and other non-routable
+ * destinations. A compromised renderer must not be able to make the main process fetch internal
+ * resources.
  */
 async function fetchArtworkResponse(url: string): Promise<Response> {
-    let currentUrl = url;
-    for (let hop = 0; ; hop += 1) {
-        await assertUrlResolvesToPublicHost(currentUrl);
-        const response = await fetch(currentUrl, { redirect: 'manual' });
+  let currentUrl = url;
+  for (let hop = 0; ; hop += 1) {
+    await assertUrlResolvesToPublicHost(currentUrl);
+    const response = await fetch(currentUrl, { redirect: 'manual' });
 
-        if (!REDIRECT_STATUSES.has(response.status)) return response;
-        try {
-            await response.body?.cancel();
-        } catch {
-            // Drain failures are irrelevant for discarded redirect bodies.
-        }
-
-        if (hop >= MAX_ARTWORK_REDIRECTS) {
-            throw new UnsafeUrlError(`Too many redirects fetching artwork from ${url}`);
-        }
-        const location = response.headers.get('location');
-        if (!location) {
-            throw new UnsafeUrlError(`Redirect without Location header from ${currentUrl}`);
-        }
-        currentUrl = new URL(location, currentUrl).toString();
+    if (!REDIRECT_STATUSES.has(response.status)) return response;
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Drain failures are irrelevant for discarded redirect bodies.
     }
+
+    if (hop >= MAX_ARTWORK_REDIRECTS) {
+      throw new UnsafeUrlError(`Too many redirects fetching artwork from ${url}`);
+    }
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new UnsafeUrlError(`Redirect without Location header from ${currentUrl}`);
+    }
+    currentUrl = new URL(location, currentUrl).toString();
+  }
 }
 
 async function fetchArtwork(url?: string): Promise<Buffer | null> {
-    if (!url) return null;
-    try {
-        const response = await fetchArtworkResponse(url);
-        if (!response.ok) return null;
+  if (!url) return null;
+  try {
+    const response = await fetchArtworkResponse(url);
+    if (!response.ok) return null;
 
-        // Reject responses that are obviously not images.
-        const contentType = response.headers.get('content-type') ?? '';
-        if (contentType && !contentType.startsWith('image/')) {
-            logger.warn('[DownloadManager] Rejected artwork response with non-image content-type.', {
-                contentType
-            });
-            return null;
-        }
-
-        // Stream with a size cap to prevent OOM from unbounded payloads.
-        const chunks: Uint8Array[] = [];
-        let totalBytes = 0;
-        const reader = response.body?.getReader();
-        if (!reader) return null;
-
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            totalBytes += value.byteLength;
-            if (totalBytes > MAX_ARTWORK_BYTES) {
-                await reader.cancel();
-                logger.warn('[DownloadManager] Artwork response exceeded size limit; discarding.', {
-                    totalBytes,
-                    limit: MAX_ARTWORK_BYTES
-                });
-                return null;
-            }
-            chunks.push(value);
-        }
-
-        const buffer = Buffer.concat(chunks);
-        return buffer.length > 0 ? buffer : null;
-    } catch (error) {
-        logger.warn('[DownloadManager] Artwork fetch failed; continuing without cover art.', { error });
-        return null;
+    // Reject responses that are obviously not images.
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType && !contentType.startsWith('image/')) {
+      logger.warn('[DownloadManager] Rejected artwork response with non-image content-type.', {
+        contentType
+      });
+      return null;
     }
+
+    // Stream with a size cap to prevent OOM from unbounded payloads.
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    const reader = response.body?.getReader();
+    if (!reader) return null;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_ARTWORK_BYTES) {
+        await reader.cancel();
+        logger.warn('[DownloadManager] Artwork response exceeded size limit; discarding.', {
+          totalBytes,
+          limit: MAX_ARTWORK_BYTES
+        });
+        return null;
+      }
+      chunks.push(value);
+    }
+
+    const buffer = Buffer.concat(chunks);
+    return buffer.length > 0 ? buffer : null;
+  } catch (error) {
+    logger.warn('[DownloadManager] Artwork fetch failed; continuing without cover art.', { error });
+    return null;
+  }
 }
 
 function exists(filePath: string): boolean {
@@ -550,11 +565,10 @@ function exists(filePath: string): boolean {
 }
 
 /**
- * Verifies the finished file against the duration contract:
- * - hard limit: longer-than-max files (e.g. full sets uploaded as "songs")
- *   are rejected even when they bypassed search/playlist filtering;
- * - soft check: a mismatch against the expected duration is logged only,
- *   since YouTube upload durations frequently differ slightly from releases.
+ * Verifies the finished file against the duration contract: - hard limit: longer-than-max files
+ * (e.g. full sets uploaded as "songs") are rejected even when they bypassed search/playlist
+ * filtering; - soft check: a mismatch against the expected duration is logged only, since YouTube
+ * upload durations frequently differ slightly from releases.
  */
 async function enforceDurationContract(
   filePath: string,

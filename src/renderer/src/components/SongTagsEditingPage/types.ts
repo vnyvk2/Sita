@@ -1,7 +1,6 @@
 /**
- * Extended SongTags type that includes user-override fields managed by the
- * metadata override platform. These fields are stored locally in Nora and
- * do NOT modify the original audio files.
+ * Extended SongTags type that includes user-override fields managed by the metadata override
+ * platform. These fields are stored locally in Nora and do NOT modify the original audio files.
  */
 export type EditableSongTags = SongTags & {
   language?: string;
@@ -12,12 +11,11 @@ export type EditableSongTags = SongTags & {
 };
 
 /**
- * The set of field IDs that can be written as user overrides via the
- * metadata.override IPC channel. Mirrors the BuiltInFieldId values that
- * actually have corresponding UI controls.
+ * The set of field IDs that can be written as user overrides via the metadata.override IPC channel.
+ * Mirrors the BuiltInFieldId values that actually have corresponding UI controls.
  *
- * NOTE: 'trackNumber' is intentionally omitted because the track-number input
- * writes directly to the ID3 tag (not through the override platform).
+ * NOTE: 'trackNumber' is intentionally omitted because the track-number input writes directly to
+ * the ID3 tag (not through the override platform).
  */
 export type OverridableFieldId =
   | 'title'

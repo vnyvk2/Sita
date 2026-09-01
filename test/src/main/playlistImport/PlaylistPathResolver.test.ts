@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { normalize, resolve } from 'path';
+
+import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
+import type { ImportedPlaylist } from '@main/playlistImport/models/ImportedPlaylist';
 import { PlaylistPathResolver } from '@main/playlistImport/resolver/PlaylistPathResolver';
 import { FilesystemVerifier } from '@main/playlistImport/verifier/FilesystemVerifier';
-import type { FileSystemAccess } from '@main/playlistImport/interfaces/FileSystemAccess';
-import { normalize, resolve } from 'path';
-import type { ImportedPlaylist } from '@main/playlistImport/models/ImportedPlaylist';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('PlaylistPathResolver & FilesystemVerifier', () => {
   let resolver: PlaylistPathResolver;

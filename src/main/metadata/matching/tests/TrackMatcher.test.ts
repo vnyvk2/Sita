@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { TrackMatcher } from '../TrackMatcher';
 
 describe('TrackMatcher — Object Album Input Support', () => {

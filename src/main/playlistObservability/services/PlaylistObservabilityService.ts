@@ -1,13 +1,13 @@
 import type { PlaylistEventBus } from '../../playlistAutomation/events/PlaylistEventBus';
-import type { TimelineBuilder } from '../engine/TimelineBuilder';
+import type { PlaylistAutomationEvent } from '../../playlistAutomation/models/PlaylistAutomationEvent';
 import type { DiagnosticEvaluator } from '../engine/DiagnosticEvaluator';
 import type { HealthEvaluator } from '../engine/HealthEvaluator';
 import type { RecommendationEngine } from '../engine/RecommendationEngine';
-import type { PlaylistAutomationEvent } from '../../playlistAutomation/models/PlaylistAutomationEvent';
+import type { TimelineBuilder } from '../engine/TimelineBuilder';
+import type { DiagnosticIssue } from '../models/DiagnosticIssue';
+import type { ExecutionTimeline } from '../models/ExecutionTimeline';
 import type { ObservabilityMetrics } from '../models/ObservabilityMetrics';
 import type { ObservabilitySnapshot } from '../models/ObservabilitySnapshot';
-import type { ExecutionTimeline } from '../models/ExecutionTimeline';
-import type { DiagnosticIssue } from '../models/DiagnosticIssue';
 import type { PlaylistHealth } from '../models/PlaylistHealth';
 
 export class PlaylistObservabilityService {

@@ -28,11 +28,7 @@ export interface LibraryTabProps {
   onSortingOrderChange: (order: SongSortTypes) => void;
 }
 
-export function LibraryTab({
-  artistData,
-  sortingOrder,
-  onSortingOrderChange
-}: LibraryTabProps) {
+export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: LibraryTabProps) {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
   const isMultipleSelectionEnabled = useStore(
     store,
@@ -242,7 +238,9 @@ export function LibraryTab({
             </div>
           )}
           {songs.length > 0 && (
-            <div className="artist-total-songs-duration text-sm opacity-80">{artistSongsDuration}</div>
+            <div className="artist-total-songs-duration text-sm opacity-80">
+              {artistSongsDuration}
+            </div>
           )}
           <div className="artist-actions-container mt-4 flex items-center">
             <Button

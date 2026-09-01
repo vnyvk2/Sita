@@ -1,11 +1,23 @@
 import { randomUUID } from 'crypto';
-import type { AlbumTagPreview, ApplyPreviewOptions, GlobalAlbumMutations, TrackMatchPreview } from '../../../common/metadata/types';
-import type { MetadataHistorySnapshot, SongMetadataSnapshot } from '../history/MetadataHistoryService';
+
+import type {
+  AlbumTagPreview,
+  ApplyPreviewOptions,
+  GlobalAlbumMutations,
+  TrackMatchPreview
+} from '../../../common/metadata/types';
+import type {
+  MetadataHistorySnapshot,
+  SongMetadataSnapshot
+} from '../history/MetadataHistoryService';
 import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { TagWriterService, type TagWritePayload } from './TagWriterService';
 
 export class MetadataError extends Error {
-  constructor(message: string, public readonly code: string) {
+  constructor(
+    message: string,
+    public readonly code: string
+  ) {
     super(message);
     this.name = 'MetadataError';
   }
@@ -98,8 +110,9 @@ export class MetadataApplyService {
   }
 
   /**
-   * Applies metadata changes from AlbumTagPreview using chunked batched transactions with AbortSignal cancellation support:
-   * Chunking (default 50 items/batch) -> Check Cancellation -> Validate -> Snapshot -> Disk Write -> DB Transaction & ReParse -> Revert Disk on Error
+   * Applies metadata changes from AlbumTagPreview using chunked batched transactions with
+   * AbortSignal cancellation support: Chunking (default 50 items/batch) -> Check Cancellation ->
+   * Validate -> Snapshot -> Disk Write -> DB Transaction & ReParse -> Revert Disk on Error
    */
   public async applyPreview(
     preview: AlbumTagPreview,
@@ -123,12 +136,11 @@ export class MetadataApplyService {
     const globalMutations = options?.globalMutations;
 
     const hasGlobalMetadataChanges = Boolean(
-      globalMutations && (
-        globalMutations.applyAlbumTitle ||
+      globalMutations &&
+      (globalMutations.applyAlbumTitle ||
         globalMutations.applyAlbumArtist ||
         globalMutations.applyYear ||
-        globalMutations.applyGenre
-      )
+        globalMutations.applyGenre)
     );
     const hasArtworkChange = Boolean(options?.replaceArtwork);
     const hasAlbumLevelChanges = hasGlobalMetadataChanges || hasArtworkChange;
@@ -140,7 +152,10 @@ export class MetadataApplyService {
     // Step 0: Download and validate artwork buffer ONCE if replaceArtwork is requested
     let artworkBuffer: Buffer | undefined;
     if (options?.replaceArtwork) {
-      const artUrl = options.artworkUrl || preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0];
+      const artUrl =
+        options.artworkUrl ||
+        preview.album.artwork?.primaryPath ||
+        preview.album.artwork?.onlineUrls?.[0];
       if (artUrl) {
         artworkBuffer = await this.fetchAndValidateArtwork(artUrl, signal);
       }
@@ -163,9 +178,19 @@ export class MetadataApplyService {
         // Contract whitelist: unknown ids (e.g. artworkUrl) are excluded -
         // artwork travels through its own normalized channel.
         const KNOWN_APPLY_FIELDS: ReadonlySet<string> = new Set([
-          'title', 'artist', 'album', 'year', 'trackNumber', 'discNumber', 'genre', 'isrc', 'musicBrainzRecordingId'
+          'title',
+          'artist',
+          'album',
+          'year',
+          'trackNumber',
+          'discNumber',
+          'genre',
+          'isrc',
+          'musicBrainzRecordingId'
         ]);
-        const fields: import('../apply/contract').NormalizedFieldMutation[] = (match.fieldDiffs ?? [])
+        const fields: import('../apply/contract').NormalizedFieldMutation[] = (
+          match.fieldDiffs ?? []
+        )
           .filter((d) => d.applyField && KNOWN_APPLY_FIELDS.has(d.fieldId))
           .map((d) => {
             const val = d.userValue !== undefined ? d.userValue : d.suggestedValue;
@@ -178,13 +203,25 @@ export class MetadataApplyService {
           .filter((f) => f.newValue !== undefined && String(f.newValue).trim() !== '');
 
         if (globalMutations?.applyAlbumTitle && globalMutations.albumTitle) {
-          fields.push({ fieldId: 'album', oldValue: match.oldAlbum ?? null, newValue: globalMutations.albumTitle });
+          fields.push({
+            fieldId: 'album',
+            oldValue: match.oldAlbum ?? null,
+            newValue: globalMutations.albumTitle
+          });
         }
         if (globalMutations?.applyYear && globalMutations.year !== undefined) {
-          fields.push({ fieldId: 'year', oldValue: match.oldYear ?? null, newValue: globalMutations.year });
+          fields.push({
+            fieldId: 'year',
+            oldValue: match.oldYear ?? null,
+            newValue: globalMutations.year
+          });
         }
         if (globalMutations?.applyGenre && globalMutations.genre) {
-          fields.push({ fieldId: 'genre', oldValue: match.oldGenre ?? null, newValue: globalMutations.genre });
+          fields.push({
+            fieldId: 'genre',
+            oldValue: match.oldGenre ?? null,
+            newValue: globalMutations.genre
+          });
         }
 
         return {
@@ -218,8 +255,7 @@ export class MetadataApplyService {
                 musicBrainzRecordingId: match.oldMbid
               }
             ]
-          },
-
+          }
         };
       });
 
@@ -290,7 +326,10 @@ export class MetadataApplyService {
     };
   }
 
-  private async fetchAndValidateArtwork(urlOrPath: string, signal?: AbortSignal): Promise<Buffer | undefined> {
+  private async fetchAndValidateArtwork(
+    urlOrPath: string,
+    signal?: AbortSignal
+  ): Promise<Buffer | undefined> {
     try {
       if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
         const controller = new AbortController();
@@ -304,7 +343,7 @@ export class MetadataApplyService {
         const res = await fetch(urlOrPath, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        const contentType = res.headers?.get ? (res.headers.get('content-type') || '') : '';
+        const contentType = res.headers?.get ? res.headers.get('content-type') || '' : '';
         if (res.ok && (!contentType || contentType.includes('image/'))) {
           const arr = await res.arrayBuffer();
           const buf = Buffer.from(arr);
@@ -474,11 +513,15 @@ export class MetadataApplyService {
 
     if (failedWriteIndex !== -1) {
       // Roll back all files that were successfully written during the batch
-      const successfulRollbacks = rollbackPayloads.filter((_, idx) => tagWriteResults[idx]?.success === true);
+      const successfulRollbacks = rollbackPayloads.filter(
+        (_, idx) => tagWriteResults[idx]?.success === true
+      );
       if (successfulRollbacks.length > 0) {
         const rollbackResults = await this.tagWriter.writeBatch(successfulRollbacks);
         const failedRollbacks = rollbackResults.filter((r) => !r.success);
-        const rollbackErrors = failedRollbacks.map((f) => `Rollback failed for ${f.filePath}: ${f.error}`);
+        const rollbackErrors = failedRollbacks.map(
+          (f) => `Rollback failed for ${f.filePath}: ${f.error}`
+        );
         if (rollbackErrors.length > 0) {
           return {
             success: false,
@@ -496,7 +539,9 @@ export class MetadataApplyService {
         success: false,
         updatedCount: 0,
         failedCount: chunkMatches.length,
-        errors: [`Physical file tag write failed for ${tagWriteResults[failedWriteIndex].filePath}: ${tagWriteResults[failedWriteIndex].error}`]
+        errors: [
+          `Physical file tag write failed for ${tagWriteResults[failedWriteIndex].filePath}: ${tagWriteResults[failedWriteIndex].error}`
+        ]
       };
     }
 
@@ -539,10 +584,16 @@ export class MetadataApplyService {
           removeDeletedGenreDataOfSong
         } = await import('../../removeSongsFromLibrary');
 
-        const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
-        const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
-        const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
-        const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
+        const manageArtistsOfParsedSong = (
+          await import('../../parseSong/manageArtistsOfParsedSong')
+        ).default;
+        const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong'))
+          .default;
+        const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong'))
+          .default;
+        const manageAlbumArtistOfParsedSong = (
+          await import('../../parseSong/manageAlbumArtistOfParsedSong')
+        ).default;
 
         await db.transaction(async (trx) => {
           for (const snap of updatedSongs) {
@@ -573,7 +624,10 @@ export class MetadataApplyService {
 
             // 2. Update relational metadata
             if (snap.artist) {
-              await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
+              await manageArtistsOfParsedSong(
+                { songId: snap.songId, songArtists: [snap.artist] },
+                trx
+              );
             }
             if (snap.album) {
               const { relevantAlbum } = await manageAlbumsOfParsedSong(
@@ -596,7 +650,10 @@ export class MetadataApplyService {
               }
             }
             if (snap.genre) {
-              await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
+              await manageGenresOfParsedSong(
+                { songId: snap.songId, songGenres: [snap.genre] },
+                trx
+              );
             }
           }
         });
@@ -639,7 +696,11 @@ export class MetadataApplyService {
     };
   }
 
-  public async undoLastAutoTag(): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> {
+  public async undoLastAutoTag(): Promise<{
+    success: boolean;
+    restoredCount: number;
+    errors?: string[];
+  }> {
     // Peek without consuming: the snapshot stays in the durable journal until
     // the restore fully succeeded, so a failed undo remains retryable.
     const snapshot = await this.historyService.peekUndo();
@@ -676,7 +737,8 @@ export class MetadataApplyService {
       const snap = snapshot.previousSongs[i];
       if (!snap) return;
       if (r.success) succeededSnaps.push(snap);
-      else restoreFailures.push(`Undo physical file tag restore failed for ${r.filePath}: ${r.error}`);
+      else
+        restoreFailures.push(`Undo physical file tag restore failed for ${r.filePath}: ${r.error}`);
     });
 
     if (succeededSnaps.length === 0) {
@@ -728,10 +790,18 @@ export class MetadataApplyService {
             removeDeletedGenreDataOfSong
           } = await import('../../removeSongsFromLibrary');
 
-          const manageArtistsOfParsedSong = (await import('../../parseSong/manageArtistsOfParsedSong')).default;
-          const manageAlbumsOfParsedSong = (await import('../../parseSong/manageAlbumsOfParsedSong')).default;
-          const manageGenresOfParsedSong = (await import('../../parseSong/manageGenresOfParsedSong')).default;
-          const manageAlbumArtistOfParsedSong = (await import('../../parseSong/manageAlbumArtistOfParsedSong')).default;
+          const manageArtistsOfParsedSong = (
+            await import('../../parseSong/manageArtistsOfParsedSong')
+          ).default;
+          const manageAlbumsOfParsedSong = (
+            await import('../../parseSong/manageAlbumsOfParsedSong')
+          ).default;
+          const manageGenresOfParsedSong = (
+            await import('../../parseSong/manageGenresOfParsedSong')
+          ).default;
+          const manageAlbumArtistOfParsedSong = (
+            await import('../../parseSong/manageAlbumArtistOfParsedSong')
+          ).default;
 
           await db.transaction(async (trx) => {
             for (const snap of succeededSnaps) {
@@ -757,7 +827,10 @@ export class MetadataApplyService {
                 .where(eq(songs.id, snap.songId));
 
               if (snap.artist) {
-                await manageArtistsOfParsedSong({ songId: snap.songId, songArtists: [snap.artist] }, trx);
+                await manageArtistsOfParsedSong(
+                  { songId: snap.songId, songArtists: [snap.artist] },
+                  trx
+                );
               }
               if (snap.album) {
                 const { relevantAlbum } = await manageAlbumsOfParsedSong(
@@ -781,7 +854,10 @@ export class MetadataApplyService {
                 }
               }
               if (snap.genre) {
-                await manageGenresOfParsedSong({ songId: snap.songId, songGenres: [snap.genre] }, trx);
+                await manageGenresOfParsedSong(
+                  { songId: snap.songId, songGenres: [snap.genre] },
+                  trx
+                );
               }
             }
           });
@@ -795,7 +871,10 @@ export class MetadataApplyService {
         return {
           success: false,
           restoredCount: succeededSnaps.length,
-          errors: [...restoreFailures, 'Partial undo applied - retry to restore the remaining tracks.']
+          errors: [
+            ...restoreFailures,
+            'Partial undo applied - retry to restore the remaining tracks.'
+          ]
         };
       }
 

@@ -42,7 +42,7 @@ const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
 const DefaultScrollSeekPlaceholder = (props: ScrollSeekPlaceholderProps) => (
   <div
     style={{ height: `${props.height}px` }}
-    className="relative w-full select-none items-center overflow-hidden opacity-40"
+    className="relative w-full items-center overflow-hidden opacity-40 select-none"
     aria-hidden="true"
   />
 );
@@ -275,4 +275,3 @@ const VirtualizedList = forwardRef(List) as <T>(
 ) => ReturnType<typeof List>;
 
 export default VirtualizedList;
-

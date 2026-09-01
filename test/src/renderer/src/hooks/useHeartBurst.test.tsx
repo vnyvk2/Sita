@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import useHeartBurst, { HEART_BURST_DURATION_MS } from '../../../../../src/renderer/src/hooks/useHeartBurst';
+
+import useHeartBurst, {
+  HEART_BURST_DURATION_MS
+} from '../../../../../src/renderer/src/hooks/useHeartBurst';
 
 describe('useHeartBurst hook lifecycle and animation restart', () => {
   beforeEach(() => {
@@ -13,8 +16,8 @@ describe('useHeartBurst hook lifecycle and animation restart', () => {
   });
 
   /**
-   * Explicitly flushes the double requestAnimationFrame sequence without relying on
-   * fixed magic-number time assumptions (e.g. 32ms).
+   * Explicitly flushes the double requestAnimationFrame sequence without relying on fixed
+   * magic-number time assumptions (e.g. 32ms).
    */
   const flushDoubleRaf = () => {
     act(() => {

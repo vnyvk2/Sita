@@ -178,9 +178,9 @@ export class LibraryReconciler {
   }
 
   /**
-   * Reconciles modified tracks by re-parsing updated ID3 tags with bounded concurrency.
-   * Explicitly tracks and returns errors if any track fails to re-parse.
-   * Guarantees monotonic progress emission.
+   * Reconciles modified tracks by re-parsing updated ID3 tags with bounded concurrency. Explicitly
+   * tracks and returns errors if any track fails to re-parse. Guarantees monotonic progress
+   * emission.
    */
   async reconcileModified(
     modified: DiskSongSnapshot[],

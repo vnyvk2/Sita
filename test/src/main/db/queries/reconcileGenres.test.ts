@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { reconcileExistingMultiGenres } from '@main/db/queries/genres';
 import { db } from '@main/db/db';
+import { reconcileExistingMultiGenres } from '@main/db/queries/genres';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/db/db', () => ({
   db: {
@@ -21,6 +21,7 @@ interface MockGenre {
 
 /**
  * Creates a stateful mock DB transaction that realistically enforces:
+ *
  * 1. Name-based lookup in genres (nameCI)
  * 2. Primary key constraint / ON CONFLICT DO NOTHING on genres_songs (genre_id, song_id)
  * 3. Primary key constraint / ON CONFLICT DO NOTHING on artworks_genres (artwork_id, genre_id)

@@ -1,7 +1,7 @@
 # Nora Metadata Platform Architecture Specification
 
 > **Core System Invariant**:  
-> *Every metadata change in Nora is a Domain-Driven Metadata Operation executed on Metadata Resources by the Metadata Engine, regardless of where it originated.*
+> _Every metadata change in Nora is a Domain-Driven Metadata Operation executed on Metadata Resources by the Metadata Engine, regardless of where it originated._
 
 ---
 
@@ -78,15 +78,17 @@ Completed ─────────────► Publish Event Signals (Meta
 ## 4. Provider Federation & Attribution Badges
 
 Every resolved field diff carries structured provider attribution resolved by `MetadataMergeEngine` using container descriptors in `ProviderRegistry`:
-* **MusicBrainz**: `MusicBrainz` badge attached to title, artist, album, track number, MBID.
-* **Discogs**: `Discogs` badge attached to master releases, genres, styles, catalog numbers.
-* **Cover Art Archive**: `Cover Art Archive` badge attached to high-resolution front/back artwork.
-* **Spotify / Apple Music**: `Spotify` / `Apple Music` badges attached to popular genre tags & release dates.
+
+- **MusicBrainz**: `MusicBrainz` badge attached to title, artist, album, track number, MBID.
+- **Discogs**: `Discogs` badge attached to master releases, genres, styles, catalog numbers.
+- **Cover Art Archive**: `Cover Art Archive` badge attached to high-resolution front/back artwork.
+- **Spotify / Apple Music**: `Spotify` / `Apple Music` badges attached to popular genre tags & release dates.
 
 ---
 
 ## 5. Background Enrichment Platform & Health Assessment
 
 Background tasks execute asynchronously without blocking the UI main loop:
-* **Background Enqueuing**: `BackgroundEnrichmentQueue` enqueues background jobs with `ExecutionMode.Background`.
-* **Library Quality Health Scoring**: Evaluates individual song health and library-wide health reports (`totalSongs`, `overallScore`, `rating`, `missingTitles`, `missingArtists`, `missingAlbums`, `missingArtworks`, `missingGenres`).
+
+- **Background Enqueuing**: `BackgroundEnrichmentQueue` enqueues background jobs with `ExecutionMode.Background`.
+- **Library Quality Health Scoring**: Evaluates individual song health and library-wide health reports (`totalSongs`, `overallScore`, `rating`, `missingTitles`, `missingArtists`, `missingAlbums`, `missingArtworks`, `missingGenres`).

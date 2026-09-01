@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { GENRE_SEPARATOR_REGEX, parseGenreList } from '../../../src/common/genreUtils';
 
 describe('genreUtils - parseGenreList', () => {
@@ -37,7 +38,10 @@ describe('genreUtils - parseGenreList', () => {
     expect(parseGenreList('Rock & Roll')).toEqual(['Rock & Roll']);
     expect(parseGenreList('R&B')).toEqual(['R&B']);
     expect(parseGenreList('R&B, Soul')).toEqual(['R&B', 'Soul']);
-    expect(parseGenreList('Noise & Industrial / Ambient')).toEqual(['Noise & Industrial', 'Ambient']);
+    expect(parseGenreList('Noise & Industrial / Ambient')).toEqual([
+      'Noise & Industrial',
+      'Ambient'
+    ]);
   });
 
   it('deduplicates case-insensitively while preserving first spelling/casing', () => {

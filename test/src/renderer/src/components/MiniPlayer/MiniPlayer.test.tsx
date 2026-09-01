@@ -33,31 +33,26 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn()
 }));
 
-vi.mock(
-  '../../../../../../src/renderer/src/queries/settings',
-  async (importOriginal) => {
-    const actual =
-      await importOriginal<
-        typeof import('../../../../../../src/renderer/src/queries/settings')
-      >();
-    return {
-      ...actual,
-      settingsQuery: {
-        all: {
-          queryKey: ['settings'],
-          queryFn: () => ({
-            isMiniPlayerAlwaysOnTop: false
-          })
-        }
-      },
-      settingsMutation: {
-        toggleMiniPlayerAlwaysOnTop: {
-          mutationKey: ['toggleMiniPlayerAlwaysOnTop']
-        }
+vi.mock('../../../../../../src/renderer/src/queries/settings', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../../../src/renderer/src/queries/settings')>();
+  return {
+    ...actual,
+    settingsQuery: {
+      all: {
+        queryKey: ['settings'],
+        queryFn: () => ({
+          isMiniPlayerAlwaysOnTop: false
+        })
       }
-    };
-  }
-);
+    },
+    settingsMutation: {
+      toggleMiniPlayerAlwaysOnTop: {
+        mutationKey: ['toggleMiniPlayerAlwaysOnTop']
+      }
+    }
+  };
+});
 
 vi.mock('../../../../../../src/renderer/src/components/Img', () => ({
   default: ({ fallbackSrc, ...props }: any) => <img {...props} alt="Song Cover" />
@@ -82,18 +77,8 @@ vi.mock(
 vi.mock(
   '../../../../../../src/renderer/src/components/MiniPlayer/containers/SearchContainer',
   () => ({
-    default: ({
-      isSearchVisible,
-      onClose
-    }: {
-      isSearchVisible: boolean;
-      onClose: () => void;
-    }) => (
-      <div
-        data-testid="search-container"
-        data-visible={String(isSearchVisible)}
-        onClick={onClose}
-      >
+    default: ({ isSearchVisible, onClose }: { isSearchVisible: boolean; onClose: () => void }) => (
+      <div data-testid="search-container" data-visible={String(isSearchVisible)} onClick={onClose}>
         Search (Visible: {String(isSearchVisible)})
       </div>
     )
@@ -248,7 +233,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       resolveToggle = resolve;
     });
 
-    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(() => pendingPromise);
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(
+      () => pendingPromise
+    );
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -318,7 +305,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       resolveFirstToggle = resolve;
     });
 
-    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(() => pendingPromise);
+    (window.api.miniPlayer.toggleMiniPlayerQueue as any).mockImplementationOnce(
+      () => pendingPromise
+    );
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -385,7 +374,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       expect(restingControlsWidth).toBe(180);
 
       expect(window.api.miniPlayer.setDynamicMinimumBounds).toHaveBeenCalled();
-      const initialCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      const initialCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(
+        -1
+      )[0];
       const restingMinWidth = initialCall.minWidth;
 
       // Hover over volume button
@@ -409,7 +400,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       const unhoverControlsWidth = controlsDeck.getBoundingClientRect().width;
       expect(unhoverControlsWidth).toBe(restingControlsWidth);
 
-      const unhoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      const unhoverCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(
+        -1
+      )[0];
       expect(unhoverCall.minWidth).toBe(restingMinWidth);
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
@@ -421,7 +414,14 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function () {
       if (this.classList.contains('mini-deck-controls')) {
-        return { width: mockControlsWidth, height: 40, top: 0, left: 0, right: mockControlsWidth, bottom: 40 } as DOMRect;
+        return {
+          width: mockControlsWidth,
+          height: 40,
+          top: 0,
+          left: 0,
+          right: mockControlsWidth,
+          bottom: 40
+        } as DOMRect;
       }
       return originalGetBoundingClientRect.apply(this);
     };
@@ -462,7 +462,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
 
       await new Promise((r) => setTimeout(r, 50));
 
-      const updatedCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+      const updatedCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(
+        -1
+      )[0];
       expect(updatedCall.minWidth).toBeGreaterThan(baseMinWidth);
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
@@ -489,7 +491,9 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
     expect(container.querySelector('.compact-mini-player')).not.toBeNull();
     expect(container.querySelector('.mini-player-deck')).toBeNull();
 
-    const compactBoundsCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(-1)[0];
+    const compactBoundsCall = (window.api.miniPlayer.setDynamicMinimumBounds as any).mock.calls.at(
+      -1
+    )[0];
     expect(compactBoundsCall.minHeight).toBe(64);
     expect(compactBoundsCall.minWidth).toBe(200);
   });
@@ -688,7 +692,8 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       miniPlayerMode: 'standard'
     });
 
-    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+    const { AppUpdateContext } =
+      await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -729,7 +734,8 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       miniPlayerMode: 'standard'
     });
 
-    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+    const { AppUpdateContext } =
+      await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -815,7 +821,8 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
       miniPlayerMode: 'standard'
     });
 
-    const { AppUpdateContext } = await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
+    const { AppUpdateContext } =
+      await import('../../../../../../src/renderer/src/contexts/AppUpdateContext');
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>

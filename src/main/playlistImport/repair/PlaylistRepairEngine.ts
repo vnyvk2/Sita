@@ -1,11 +1,12 @@
 import { basename } from 'path';
+
 import type { LibraryCandidateProvider } from '../interfaces/LibraryCandidateProvider';
 import type { LibrarySongRecord } from '../interfaces/LibraryLookup';
-import type { RepairStrategyRegistry } from '../registry/RepairStrategyRegistry';
 import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
 import type { RepairCandidate } from '../models/RepairCandidate';
 import type { RepairDiagnostic } from '../models/RepairDiagnostic';
+import type { RepairStrategyRegistry } from '../registry/RepairStrategyRegistry';
 
 export class PlaylistRepairEngine {
   constructor(

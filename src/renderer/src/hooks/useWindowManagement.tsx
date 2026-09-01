@@ -1,8 +1,8 @@
 import { type DragEvent, type RefObject, useCallback, useEffect, Suspense, lazy } from 'react';
 
 import { appPreferences } from '../../../../package.json';
-import { store } from '../store/store';
 import { CollectionClient } from '../api/CollectionClient';
+import { store } from '../store/store';
 
 // Lazy load prompts
 const UnsupportedFileMessagePrompt = lazy(
@@ -136,7 +136,8 @@ export function useWindowManagement(
           const isASupportedAudioFormat = appPreferences.supportedMusicExtensions.some((type) =>
             file?.webkitRelativePath.endsWith(type)
           );
-          const isPlaylistFile = file.name.toLowerCase().endsWith('.m3u') || file.name.toLowerCase().endsWith('.m3u8');
+          const isPlaylistFile =
+            file.name.toLowerCase().endsWith('.m3u') || file.name.toLowerCase().endsWith('.m3u8');
 
           if (isPlaylistFile) {
             CollectionClient.analyze(filePath).then((analysis) => {

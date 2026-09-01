@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import logger, { logFilePath } from '@main/logger';
+import { describe, expect, it } from 'vitest';
 
 describe('logger terminal output filtering', () => {
   it('should export logger and logFilePath', () => {

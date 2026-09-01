@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { albumQuery } from '@renderer/queries/albums';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('albumQuery', () => {
   beforeEach(() => {

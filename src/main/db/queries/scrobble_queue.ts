@@ -62,10 +62,7 @@ export async function claimPendingBatch(
       .select()
       .from(scrobbleQueue)
       .where(
-        and(
-          eq(scrobbleQueue.status, 'pending'),
-          lte(scrobbleQueue.retryCount, MAX_RETRY_COUNT - 1)
-        )
+        and(eq(scrobbleQueue.status, 'pending'), lte(scrobbleQueue.retryCount, MAX_RETRY_COUNT - 1))
       )
       .orderBy(asc(scrobbleQueue.createdAt), asc(scrobbleQueue.id))
       .limit(batchSize);
@@ -105,7 +102,10 @@ export async function markFailed(id: number, trx: DB | DBTransaction = db): Prom
     .where(and(eq(scrobbleQueue.id, id), eq(scrobbleQueue.status, 'sending')));
 }
 
-export async function markPermanentlyFailed(id: number, trx: DB | DBTransaction = db): Promise<void> {
+export async function markPermanentlyFailed(
+  id: number,
+  trx: DB | DBTransaction = db
+): Promise<void> {
   await trx
     .update(scrobbleQueue)
     .set({
@@ -140,7 +140,10 @@ export async function clearScrobbleQueue(
   await trx.delete(scrobbleQueue);
 }
 
-export async function resetSendingToPending(ids: number[], trx: DB | DBTransaction = db): Promise<void> {
+export async function resetSendingToPending(
+  ids: number[],
+  trx: DB | DBTransaction = db
+): Promise<void> {
   if (ids.length === 0) return;
   await trx
     .update(scrobbleQueue)

@@ -1,14 +1,13 @@
+import type { PlaylistDto } from '@common/collections/dtos';
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import PlaylistDefaultCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { CollectionClient } from '../../api/CollectionClient';
+import PlaylistDefaultCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useCreatePlaylist } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
 import Img from '../Img';
-
-import type { PlaylistDto } from '@common/collections/dtos';
 
 interface NewPlaylistPromptProp {
   updatePlaylists?: (_updatedPlaylist: PlaylistDto[]) => void;
@@ -34,7 +33,9 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
           onSuccess: async (data: any) => {
             const playlistId = typeof data === 'number' ? data : data?.id;
             if (artworkPath && playlistId) {
-              await window.api.collections.write.setArtwork(playlistId, artworkPath).catch(console.error);
+              await window.api.collections.write
+                .setArtwork(playlistId, artworkPath)
+                .catch(console.error);
             }
             if (songIds && songIds.length > 0 && playlistId) {
               await CollectionClient.addSongs({ playlistId, songIds }).catch(console.error);

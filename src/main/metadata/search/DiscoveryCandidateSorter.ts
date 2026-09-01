@@ -39,12 +39,11 @@ export class DiscoveryCandidateSorter {
     const ranked: RankedDiscoveryCandidate[] = candidates.map(({ album, scored }) => {
       const qualityBand = classifyQualityBand(scored);
       const providerId = (album.provider ?? 'musicbrainz').toLowerCase();
-      const sourcePriorityRank = priorityMap.has(providerId)
-        ? priorityMap.get(providerId)!
-        : 999;
+      const sourcePriorityRank = priorityMap.has(providerId) ? priorityMap.get(providerId)! : 999;
 
       const isExactTrackCount = scored.breakdown.trackCountBonus > 0;
-      const isExactTitleArtist = scored.breakdown.artistScore >= 27 && scored.breakdown.titleScore >= 27;
+      const isExactTitleArtist =
+        scored.breakdown.artistScore >= 27 && scored.breakdown.titleScore >= 27;
       const isOfficial = scored.breakdown.statusScore > 0;
       const isPreferredSource = sourcePriorityRank === 0;
 

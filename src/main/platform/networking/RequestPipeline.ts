@@ -61,9 +61,7 @@ export class RequestPipeline {
     options?: Omit<HttpRequestOptions, 'url'>
   ): Promise<HttpResponse<T>> {
     const opts: HttpRequestOptions =
-      typeof urlOrOptions === 'string'
-        ? { url: urlOrOptions, ...options }
-        : urlOrOptions;
+      typeof urlOrOptions === 'string' ? { url: urlOrOptions, ...options } : urlOrOptions;
 
     return this.retryPolicy.execute(
       async () => {

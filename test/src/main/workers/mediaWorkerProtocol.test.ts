@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MEDIA_WORKER_PROTOCOL_VERSION } from '../../../../src/main/workers/process/workerProtocol';

@@ -1,5 +1,3 @@
-import { net } from 'electron';
-
 import {
   claimPendingBatch,
   deleteOldPending,
@@ -12,6 +10,7 @@ import {
 import { getSongById } from '@main/db/queries/songs';
 import type { scrobbleQueue } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
+import { net } from 'electron';
 
 import type { AuthData, LoveParams, ScrobbleParams } from '../../../types/last_fm_api';
 import type { ListenBrainzSubmitListensPayload } from '../../../types/listen_brainz_api';
@@ -112,9 +111,12 @@ export function invalidateLastFmSession(): void {
     activeAbortController.abort();
     activeAbortController = null;
   }
-  logger.info('Last.fm session invalidated: bumped flush generation and aborted active HTTP requests', {
-    newGeneration: currentFlushGeneration
-  });
+  logger.info(
+    'Last.fm session invalidated: bumped flush generation and aborted active HTTP requests',
+    {
+      newGeneration: currentFlushGeneration
+    }
+  );
 }
 
 export function _resetFlushStateForTesting(): void {
@@ -251,7 +253,9 @@ async function runFlushCycle(): Promise<void> {
             lbGen !== getCurrentListenBrainzGeneration() ||
             abortController.signal.aborted
           ) {
-            logger.warn('Flush aborted during network request, halting without mutating queue item');
+            logger.warn(
+              'Flush aborted during network request, halting without mutating queue item'
+            );
             return;
           }
 
@@ -368,7 +372,9 @@ async function processItem(
       const songData = item.songId != null ? await getSongById(item.songId) : null;
       if (!songData) {
         if (!item.trackTitle || !item.artistNames) {
-          logger.warn('Song not found and no fallback metadata available, dropping', { id: item.id });
+          logger.warn('Song not found and no fallback metadata available, dropping', {
+            id: item.id
+          });
           return 'DISCARDED_STALE';
         }
         const params: ScrobbleParams = {
@@ -511,7 +517,8 @@ async function processItem(
         return 'DISCARDED_STALE';
       }
 
-      const songData = item.songId != null ? await getSongById(item.songId).catch(() => null) : null;
+      const songData =
+        item.songId != null ? await getSongById(item.songId).catch(() => null) : null;
       let mbid = songData ? convertToSongData(songData).musicBrainzId : undefined;
       if (!mbid) {
         mbid =
@@ -638,7 +645,8 @@ async function postToLastFm<T extends LastFMApi['method']>(
   }
 
   const errorCode = typeof json.error === 'number' ? json.error : undefined;
-  const message = typeof json.message === 'string' ? json.message : `API returned HTTP ${res.status}`;
+  const message =
+    typeof json.message === 'string' ? json.message : `API returned HTTP ${res.status}`;
 
   // Error 4: Authentication Failed, 9: Invalid session key, 14: Token not authorized, 15: Token expired
   if (errorCode !== undefined && [4, 9, 14, 15].includes(errorCode)) {

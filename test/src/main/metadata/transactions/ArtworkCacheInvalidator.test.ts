@@ -1,9 +1,10 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it } from 'vitest';
-import { ArtworkCacheInvalidator } from '@main/metadata/transactions/ArtworkCacheInvalidator';
+
 import { getSongArtworkPath } from '@main/fs/resolveFilePaths';
+import { ArtworkCacheInvalidator } from '@main/metadata/transactions/ArtworkCacheInvalidator';
+import { describe, expect, it } from 'vitest';
 
 describe('ArtworkCacheInvalidator (Phase 5-D Lifecycle)', () => {
   it('does NOT delete or unlink physical artwork files on disk during invalidation', () => {

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { PlaylistAutomationEngine } from '@main/playlistAutomation/engine/PlaylistAutomationEngine';
 import { PlaylistEventBus } from '@main/playlistAutomation/events/PlaylistEventBus';
 import { AutomationScheduler } from '@main/playlistAutomation/scheduler/AutomationScheduler';
-import { PlaylistAutomationEngine } from '@main/playlistAutomation/engine/PlaylistAutomationEngine';
-import type { PlaylistSyncWorkflow } from '@main/playlistSync/workflow/PlaylistSyncWorkflow';
 import type { PlaylistLink } from '@main/playlistSync/models/PlaylistLink';
+import type { PlaylistSyncWorkflow } from '@main/playlistSync/workflow/PlaylistSyncWorkflow';
 import type { SyncPreviewResult } from '@main/playlistSync/workflow/PlaylistSyncWorkflow';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('Phase 12 — Event-Driven Automation & Background Synchronization', () => {
   beforeEach(() => {
@@ -89,12 +89,24 @@ describe('Phase 12 — Event-Driven Automation & Background Synchronization', ()
         operations: [{ type: 'ADD_SONG', songId: 101, reason: 'Source addition' }]
       },
       analysis: { conflicts: [], hasConflicts: false, hasManualConflicts: false },
-      conflictSummary: { totalConflicts: 0, resolvedAutomatically: 0, manualConflicts: 0, ignoredConflicts: 0 }
+      conflictSummary: {
+        totalConflicts: 0,
+        resolvedAutomatically: 0,
+        manualConflicts: 0,
+        ignoredConflicts: 0
+      }
     };
 
     const mockWorkflow = {
       previewSync: vi.fn(async () => mockPreview),
-      executeSyncPlan: vi.fn(async () => ({ playlistId: 10, success: true, appliedAdditionsCount: 1, appliedRemovalsCount: 0, appliedMovesCount: 0, durationMs: 10 }))
+      executeSyncPlan: vi.fn(async () => ({
+        playlistId: 10,
+        success: true,
+        appliedAdditionsCount: 1,
+        appliedRemovalsCount: 0,
+        appliedMovesCount: 0,
+        durationMs: 10
+      }))
     } as unknown as PlaylistSyncWorkflow;
 
     const engine = new PlaylistAutomationEngine(bus, scheduler, mockWorkflow, async () => [200]);

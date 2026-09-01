@@ -1,8 +1,9 @@
+import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
+import * as songQueries from '@main/db/queries/songs';
 import { net } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
-import * as songQueries from '@main/db/queries/songs';
+import getListenBrainzAuthData from '../../listenBrainz/getListenBrainzAuthData';
 import {
   _resetFlushStateForTesting,
   flushScrobbleQueue,
@@ -10,7 +11,6 @@ import {
 } from '../flushScrobbleQueue';
 import getLastFmAuthData from '../getLastFMAuthData';
 import * as lastFmUtils from '../lastFmUtils';
-import getListenBrainzAuthData from '../../listenBrainz/getListenBrainzAuthData';
 
 vi.mock('@main/db/db', () => ({
   db: {}
@@ -149,7 +149,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
   });
 
   it('recovers stuck sending items on startup flush', async () => {
-    const resetStuckSpy = vi.spyOn(scrobbleQueueQueries, 'resetStuckSending').mockResolvedValue(undefined);
+    const resetStuckSpy = vi
+      .spyOn(scrobbleQueueQueries, 'resetStuckSending')
+      .mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([]);
 
@@ -416,13 +418,14 @@ describe('flushScrobbleQueue Durable Outbox', () => {
       .mockResolvedValueOnce([]);
 
     const markSentSpy = vi.spyOn(scrobbleQueueQueries, 'markSent');
-    const markPermFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markPermanentlyFailed').mockResolvedValue(undefined);
+    const markPermFailedSpy = vi
+      .spyOn(scrobbleQueueQueries, 'markPermanentlyFailed')
+      .mockResolvedValue(undefined);
 
     vi.spyOn(lastFmUtils, 'fetchWithTimeout').mockResolvedValue(
-      new Response(
-        JSON.stringify({ error: 13, message: 'Invalid method signature supplied' }),
-        { status: 200 }
-      )
+      new Response(JSON.stringify({ error: 13, message: 'Invalid method signature supplied' }), {
+        status: 200
+      })
     );
 
     await flushScrobbleQueue();
@@ -453,7 +456,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
       .mockResolvedValueOnce([]);
 
     const markSentSpy = vi.spyOn(scrobbleQueueQueries, 'markSent');
-    const markPermFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markPermanentlyFailed').mockResolvedValue(undefined);
+    const markPermFailedSpy = vi
+      .spyOn(scrobbleQueueQueries, 'markPermanentlyFailed')
+      .mockResolvedValue(undefined);
 
     // Malformed: has scrobbles but missing @attr.accepted
     vi.spyOn(lastFmUtils, 'fetchWithTimeout').mockResolvedValue(
@@ -495,7 +500,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
       .mockResolvedValueOnce([]);
 
     const markSentSpy = vi.spyOn(scrobbleQueueQueries, 'markSent');
-    const markPermFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markPermanentlyFailed').mockResolvedValue(undefined);
+    const markPermFailedSpy = vi
+      .spyOn(scrobbleQueueQueries, 'markPermanentlyFailed')
+      .mockResolvedValue(undefined);
 
     vi.spyOn(lastFmUtils, 'fetchWithTimeout').mockResolvedValue(
       new Response(
@@ -583,7 +590,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([item1, item2]);
 
-    const resetSendingSpy = vi.spyOn(scrobbleQueueQueries, 'resetSendingToPending').mockResolvedValue(undefined);
+    const resetSendingSpy = vi
+      .spyOn(scrobbleQueueQueries, 'resetSendingToPending')
+      .mockResolvedValue(undefined);
     const markFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markFailed');
 
     // Return Auth Error 9
@@ -617,12 +626,16 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([item1]);
 
-    const resetSendingSpy = vi.spyOn(scrobbleQueueQueries, 'resetSendingToPending').mockResolvedValue(undefined);
+    const resetSendingSpy = vi
+      .spyOn(scrobbleQueueQueries, 'resetSendingToPending')
+      .mockResolvedValue(undefined);
     const markFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markFailed');
 
     // Return Auth Error 15
     vi.spyOn(lastFmUtils, 'fetchWithTimeout').mockResolvedValue(
-      new Response(JSON.stringify({ error: 15, message: 'This token has expired' }), { status: 200 })
+      new Response(JSON.stringify({ error: 15, message: 'This token has expired' }), {
+        status: 200
+      })
     );
 
     await flushScrobbleQueue();
@@ -656,7 +669,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     const markFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markFailed').mockResolvedValue(undefined);
 
     vi.spyOn(lastFmUtils, 'fetchWithTimeout').mockResolvedValue(
-      new Response(JSON.stringify({ error: 8, message: 'Operation failed. Try again.' }), { status: 200 })
+      new Response(JSON.stringify({ error: 8, message: 'Operation failed. Try again.' }), {
+        status: 200
+      })
     );
 
     await flushScrobbleQueue();
@@ -710,7 +725,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
 
   it('invokes deleteOldPending on flush to prune 30-day old pending and failed items', async () => {
     vi.spyOn(scrobbleQueueQueries, 'resetStuckSending').mockResolvedValue(undefined);
-    const deleteOldSpy = vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
+    const deleteOldSpy = vi
+      .spyOn(scrobbleQueueQueries, 'deleteOldPending')
+      .mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([]);
 
     await flushScrobbleQueue();
@@ -852,7 +869,8 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
 
     // First cycle claims batch 1, then ends. Second cycle (coalesced) claims batch 2.
-    const claimSpy = vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch')
+    const claimSpy = vi
+      .spyOn(scrobbleQueueQueries, 'claimPendingBatch')
       .mockResolvedValueOnce([itemBatch1])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([itemBatch2])
@@ -910,7 +928,9 @@ describe('flushScrobbleQueue Durable Outbox', () => {
 
     const markSentSpy = vi.spyOn(scrobbleQueueQueries, 'markSent').mockResolvedValue(undefined);
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }));
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }));
     globalThis.fetch = mockFetch;
 
     await flushScrobbleQueue();
@@ -959,10 +979,14 @@ describe('flushScrobbleQueue Durable Outbox', () => {
     vi.spyOn(scrobbleQueueQueries, 'deleteOldPending').mockResolvedValue(undefined);
     vi.spyOn(scrobbleQueueQueries, 'claimPendingBatch').mockResolvedValueOnce([item1, item2]);
 
-    const resetSpy = vi.spyOn(scrobbleQueueQueries, 'resetSendingToPending').mockResolvedValue(undefined);
+    const resetSpy = vi
+      .spyOn(scrobbleQueueQueries, 'resetSendingToPending')
+      .mockResolvedValue(undefined);
     const markFailedSpy = vi.spyOn(scrobbleQueueQueries, 'markFailed').mockResolvedValue(undefined);
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
     globalThis.fetch = mockFetch;
 
     await flushScrobbleQueue();

@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+
 import type { BatchSongItemResult } from '../../../../types/app';
 import Button from '../Button';
 
@@ -27,11 +28,11 @@ export const SaveProgressModal = memo(function SaveProgressModal({
   const isComplete = !isSaving;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-background-color-1 p-6 shadow-2xl dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 w-full max-w-lg rounded-2xl border p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-font-color-black dark:text-font-color-white">
+          <h2 className="text-font-color-black dark:text-font-color-white text-lg font-semibold">
             {isSaving ? 'Saving Metadata Changes' : 'Batch Save Complete'}
           </h2>
           {isComplete && (
@@ -47,13 +48,15 @@ export const SaveProgressModal = memo(function SaveProgressModal({
         {/* Progress bar */}
         {isSaving ? (
           <div className="space-y-3 py-2">
-            <div className="flex justify-between text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
-              <span>Saving track {current} of {total}...</span>
+            <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex justify-between text-xs">
+              <span>
+                Saving track {current} of {total}...
+              </span>
               <span>{percentage}%</span>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-background-color-2 dark:bg-dark-background-color-2">
+            <div className="bg-background-color-2 dark:bg-dark-background-color-2 h-2.5 w-full overflow-hidden rounded-full">
               <div
-                className="h-full rounded-full bg-font-color-highlight transition-all duration-200 dark:bg-dark-font-color-highlight"
+                className="bg-font-color-highlight dark:bg-dark-font-color-highlight h-full rounded-full transition-all duration-200"
                 style={{ width: `${percentage}%` }}
               />
             </div>
@@ -61,18 +64,20 @@ export const SaveProgressModal = memo(function SaveProgressModal({
         ) : (
           <div className="space-y-4 py-2">
             {/* Status overview */}
-            <div className="flex items-center gap-3 rounded-lg bg-background-color-2/40 p-3 text-sm dark:bg-dark-background-color-2/40">
-              <span className={`material-icons-round text-2xl ${failedItems.length > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+            <div className="bg-background-color-2/40 dark:bg-dark-background-color-2/40 flex items-center gap-3 rounded-lg p-3 text-sm">
+              <span
+                className={`material-icons-round text-2xl ${failedItems.length > 0 ? 'text-amber-500' : 'text-emerald-500'}`}
+              >
                 {failedItems.length > 0 ? 'warning' : 'check_circle'}
               </span>
               <div>
-                <p className="font-medium text-font-color-black dark:text-font-color-white">
+                <p className="text-font-color-black dark:text-font-color-white font-medium">
                   {failedItems.length === 0
                     ? `Successfully updated all ${savedCount} tracks.`
                     : `${savedCount} tracks saved, ${failedItems.length} failed.`}
                 </p>
                 {failedItems.length > 0 && (
-                  <p className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                  <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                     Some audio files could not be updated or written to disk.
                   </p>
                 )}
@@ -81,12 +86,19 @@ export const SaveProgressModal = memo(function SaveProgressModal({
 
             {/* Error List if any failures */}
             {failedItems.length > 0 && (
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs space-y-2">
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs">
                 <p className="font-semibold text-red-500">Failed Items:</p>
                 {failedItems.map((item) => (
-                  <div key={item.songId} className="flex justify-between text-font-color-dimmed dark:text-dark-font-color-dimmed">
-                    <span>Song ID: {item.songId} ({item.status})</span>
-                    <span className="truncate max-w-[200px] text-red-400">{item.message || 'Write error'}</span>
+                  <div
+                    key={item.songId}
+                    className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex justify-between"
+                  >
+                    <span>
+                      Song ID: {item.songId} ({item.status})
+                    </span>
+                    <span className="max-w-[200px] truncate text-red-400">
+                      {item.message || 'Write error'}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -100,7 +112,7 @@ export const SaveProgressModal = memo(function SaveProgressModal({
             <Button
               label="Done"
               clickHandler={onClose}
-              className="bg-font-color-highlight dark:bg-dark-font-color-highlight text-white font-medium text-xs px-4 py-2 rounded-lg"
+              className="bg-font-color-highlight dark:bg-dark-font-color-highlight rounded-lg px-4 py-2 text-xs font-medium text-white"
             />
           )}
         </div>

@@ -1,7 +1,7 @@
 import type { PlaylistExportFormat } from '../../../common/collections/types';
-import type { PlaylistFormatter } from './PlaylistFormatter';
-import { M3UFormatter } from './M3UFormatter';
 import { M3U8Formatter } from './M3U8Formatter';
+import { M3UFormatter } from './M3UFormatter';
+import type { PlaylistFormatter } from './PlaylistFormatter';
 
 export class FormatterRegistry {
   private formatters = new Map<PlaylistExportFormat, PlaylistFormatter>();

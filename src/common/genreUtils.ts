@@ -2,6 +2,7 @@
  * Canonical delimiter regex for splitting multi-genre metadata strings.
  *
  * Rules:
+ *
  * - Commas (,) and Semicolons (;) are unconditional delimiters
  * - Newlines (\n, \r) and Null bytes (\0) are delimiters
  * - Slashes surrounded by whitespace ( e.g. " / ", " \ ", " | " ) are delimiters
@@ -13,14 +14,12 @@
 export const GENRE_SEPARATOR_REGEX = /[,;\u0000\n\r]+|\s+[/\\|]\s+|\/{2,}/;
 
 /**
- * Tokenizes, trims, deduplicates (case-insensitively, preserving first encountered spelling/casing),
- * and normalizes genre inputs.
+ * Tokenizes, trims, deduplicates (case-insensitively, preserving first encountered
+ * spelling/casing), and normalizes genre inputs.
  *
- * Handles:
- * - string input: "Rock,pop" -> ["Rock", "pop"]
- * - string array: ["Rock, Pop", "Indie"] -> ["Rock", "Pop", "Indie"]
- * - mixed/empty/null/undefined inputs -> []
- * - deduplication: ["Rock", "rock", "ROCK; Pop"] -> ["Rock", "Pop"]
+ * Handles: - string input: "Rock,pop" -> ["Rock", "pop"] - string array: ["Rock, Pop", "Indie"] ->
+ * ["Rock", "Pop", "Indie"] - mixed/empty/null/undefined inputs -> [] - deduplication: ["Rock",
+ * "rock", "ROCK; Pop"] -> ["Rock", "Pop"]
  */
 export function parseGenreList(genres?: string[] | string | null): string[] {
   if (!genres) return [];

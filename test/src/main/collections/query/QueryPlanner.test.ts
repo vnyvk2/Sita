@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { QueryPlanner } from '../../../../../src/main/collections/query/QueryPlanner';
+
 import type { SmartPlaylistDefinition } from '../../../../../src/main/collections/query/ast';
+import { QueryPlanner } from '../../../../../src/main/collections/query/QueryPlanner';
 
 describe('QueryPlanner', () => {
   it('should not add joins for fields present in songs table', () => {
@@ -29,9 +30,7 @@ describe('QueryPlanner', () => {
       rule: {
         type: 'group',
         logicalOperator: 'and',
-        rules: [
-          { type: 'condition', field: 'artist', operator: 'eq', value: 'The Beatles' }
-        ]
+        rules: [{ type: 'condition', field: 'artist', operator: 'eq', value: 'The Beatles' }]
       },
       orderBy: []
     };

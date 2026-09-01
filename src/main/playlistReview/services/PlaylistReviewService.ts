@@ -1,8 +1,8 @@
-import type { ReviewValidator } from '../validator/ReviewValidator';
-import type { PlanRegenerator } from './PlanRegenerator';
 import type { PlaylistImportPlan } from '../../playlistImport/models/PlaylistImportPlan';
 import type { ReviewSession } from '../models/ReviewSession';
 import type { UserOverride } from '../models/UserOverride';
+import type { ReviewValidator } from '../validator/ReviewValidator';
+import type { PlanRegenerator } from './PlanRegenerator';
 
 export class PlaylistReviewService {
   private sessions = new Map<string, ReviewSession>();
@@ -48,7 +48,10 @@ export class PlaylistReviewService {
     }
 
     session.userOverrides.push(override);
-    session.effectivePlan = this.planRegenerator.regeneratePlan(session.originalPlan, session.userOverrides);
+    session.effectivePlan = this.planRegenerator.regeneratePlan(
+      session.originalPlan,
+      session.userOverrides
+    );
     session.isValid = true;
     session.validationErrors = [];
 

@@ -1,9 +1,11 @@
-﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fs from 'fs';
-import path from 'path';
+﻿import fs from 'fs';
 import os from 'os';
-import { handleFileProtocol } from '../../../src/main/handleFileProtocol';
+import path from 'path';
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { addDefaultAppProtocolToFilePath } from '../../../src/main/fs/resolveFilePaths';
+import { handleFileProtocol } from '../../../src/main/handleFileProtocol';
 
 describe('Production handleFileProtocol Deterministic Tests', () => {
   let tempDir: string;

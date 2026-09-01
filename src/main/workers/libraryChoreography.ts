@@ -1,8 +1,9 @@
-import { libraryScheduler } from './jobScheduler';
-import { PaletteJob } from './jobs/paletteJob';
-import { GarbageCollectionJob } from './jobs/garbageCollectionJob';
-import { AlbumReplayGainJob } from './jobs/albumReplayGainJob';
 import log from '@main/logger';
+
+import { AlbumReplayGainJob } from './jobs/albumReplayGainJob';
+import { GarbageCollectionJob } from './jobs/garbageCollectionJob';
+import { PaletteJob } from './jobs/paletteJob';
+import { libraryScheduler } from './jobScheduler';
 
 export const ASSET_EVENTS = {
   ARTWORK_CREATED: 'ASSET_CREATED:ARTWORK',
@@ -12,12 +13,22 @@ export const ASSET_EVENTS = {
   LYRICS_CREATED: 'ASSET_CREATED:LYRICS'
 } as const;
 
-const handleArtworkCreated = (payload: { artworkId: number; path: string; albumId: number; albumTitle: string }) => {
+const handleArtworkCreated = (payload: {
+  artworkId: number;
+  path: string;
+  albumId: number;
+  albumTitle: string;
+}) => {
   libraryScheduler.enqueue(new PaletteJob(payload.artworkId, payload.path, payload.albumTitle));
   libraryScheduler.requestMaintenance();
 };
 
-const handleReplayGainCreated = (payload: { songId: number; albumId?: number; trackGain: number; trackPeak: number }) => {
+const handleReplayGainCreated = (payload: {
+  songId: number;
+  albumId?: number;
+  trackGain: number;
+  trackPeak: number;
+}) => {
   if (payload.albumId !== undefined && payload.albumId !== null) {
     libraryScheduler.enqueue(new AlbumReplayGainJob(payload.albumId, libraryScheduler));
   }

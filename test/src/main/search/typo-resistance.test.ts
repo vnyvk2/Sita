@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/db/db', async () => {
   const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
@@ -11,11 +11,11 @@ vi.mock('@main/other/artworks', () => ({
 }));
 
 import { db } from '@main/db/db';
-import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
-import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
-import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
-import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
 import { musicFolders, songs } from '@main/db/schema';
+import { ingestTrackDTO } from '@main/parseSong/ingestTrackDTO';
+import { ArtistSearchEngine } from '@main/search/engines/ArtistSearchEngine';
+import { SongSearchEngine } from '@main/search/engines/SongSearchEngine';
+import { normalizeQuery } from '@main/search/normalize/normalizeQuery';
 
 const FIXTURE = [
   { title: 'Midnight City', artist: 'M83', album: 'Hurry Up, Were Dreaming', genre: 'Synthwave' },
@@ -29,25 +29,29 @@ const seed = async () => {
   for (let i = 0; i < FIXTURE.length; i++) {
     const t = FIXTURE[i];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await ingestTrackDTO({
-      songPath: `C:\\T\\track_${i}.mp3`,
-      title: t.title,
-      duration: '200',
-      artists: [t.artist],
-      albumArtists: [t.artist],
-      album: t.album,
-      genres: [t.genre],
-      year: 2022,
-      sampleRate: 44100,
-      bitRate: 320000,
-      noOfChannels: 2,
-      diskNumber: 1,
-      trackNumber: 1,
-      fileCreatedAt: new Date(),
-      fileModifiedAt: new Date(),
-      folderId: 1
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any, db, undefined);
+    await ingestTrackDTO(
+      {
+        songPath: `C:\\T\\track_${i}.mp3`,
+        title: t.title,
+        duration: '200',
+        artists: [t.artist],
+        albumArtists: [t.artist],
+        album: t.album,
+        genres: [t.genre],
+        year: 2022,
+        sampleRate: 44100,
+        bitRate: 320000,
+        noOfChannels: 2,
+        diskNumber: 1,
+        trackNumber: 1,
+        fileCreatedAt: new Date(),
+        fileModifiedAt: new Date(),
+        folderId: 1
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      db,
+      undefined
+    );
   }
 };
 

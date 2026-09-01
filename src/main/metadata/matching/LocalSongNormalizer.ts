@@ -2,13 +2,11 @@ import type { LocalSongInput } from '../services/AlbumMetadataService';
 import { extractStringValue } from './TrackMatcher';
 
 /**
- * Normalizes diverse song representations (renderer SongData, database rows, ad-hoc inputs)
- * into a canonical, flat LocalSongInput baseline for the AutoTag diff and matching engines.
+ * Normalizes diverse song representations (renderer SongData, database rows, ad-hoc inputs) into a
+ * canonical, flat LocalSongInput baseline for the AutoTag diff and matching engines.
  */
 export class LocalSongNormalizer {
-  /**
-   * Normalizes any loose or heterogeneous song object into a canonical LocalSongInput.
-   */
+  /** Normalizes any loose or heterogeneous song object into a canonical LocalSongInput. */
   public static normalize(input: unknown): LocalSongInput {
     if (!input || typeof input !== 'object') {
       return {
@@ -21,20 +19,18 @@ export class LocalSongNormalizer {
     const obj = input as Record<string, unknown>;
 
     // 1. Resolve songId
-    const songId = typeof obj.songId === 'number'
-      ? obj.songId
-      : typeof obj.id === 'number'
-        ? obj.id
-        : typeof obj.songId === 'string'
-          ? parseInt(obj.songId, 10) || 0
-          : 0;
+    const songId =
+      typeof obj.songId === 'number'
+        ? obj.songId
+        : typeof obj.id === 'number'
+          ? obj.id
+          : typeof obj.songId === 'string'
+            ? parseInt(obj.songId, 10) || 0
+            : 0;
 
     // 2. Resolve title
-    const title = typeof obj.title === 'string'
-      ? obj.title
-      : typeof obj.name === 'string'
-        ? obj.name
-        : '';
+    const title =
+      typeof obj.title === 'string' ? obj.title : typeof obj.name === 'string' ? obj.name : '';
 
     // 3. Resolve path
     const path = typeof obj.path === 'string' ? obj.path : '';
@@ -50,7 +46,10 @@ export class LocalSongNormalizer {
           if (typeof a === 'object' && a !== null) {
             const artObj = a as Record<string, unknown>;
             if (typeof artObj.name === 'string') return artObj.name;
-            if (artObj.artist && typeof (artObj.artist as Record<string, unknown>).name === 'string') {
+            if (
+              artObj.artist &&
+              typeof (artObj.artist as Record<string, unknown>).name === 'string'
+            ) {
               return (artObj.artist as Record<string, unknown>).name as string;
             }
           }
@@ -73,7 +72,12 @@ export class LocalSongNormalizer {
       if (typeof first === 'object' && first !== null) {
         const albObj = first as Record<string, unknown>;
         const innerAlb = (albObj.album ?? albObj) as Record<string, unknown>;
-        album = typeof innerAlb.title === 'string' ? innerAlb.title : typeof innerAlb.name === 'string' ? innerAlb.name : undefined;
+        album =
+          typeof innerAlb.title === 'string'
+            ? innerAlb.title
+            : typeof innerAlb.name === 'string'
+              ? innerAlb.name
+              : undefined;
       }
     } else {
       album = extractStringValue(obj.album);
@@ -90,7 +94,10 @@ export class LocalSongNormalizer {
           if (typeof g === 'object' && g !== null) {
             const genObj = g as Record<string, unknown>;
             if (typeof genObj.name === 'string') return genObj.name;
-            if (genObj.genre && typeof (genObj.genre as Record<string, unknown>).name === 'string') {
+            if (
+              genObj.genre &&
+              typeof (genObj.genre as Record<string, unknown>).name === 'string'
+            ) {
               return (genObj.genre as Record<string, unknown>).name as string;
             }
           }
@@ -144,9 +151,10 @@ export class LocalSongNormalizer {
 
     // 11. Resolve ISRC and MBID
     const isrc = typeof obj.isrc === 'string' && obj.isrc.trim() ? obj.isrc.trim() : undefined;
-    const musicBrainzRecordingId = typeof obj.musicBrainzRecordingId === 'string' && obj.musicBrainzRecordingId.trim()
-      ? obj.musicBrainzRecordingId.trim()
-      : undefined;
+    const musicBrainzRecordingId =
+      typeof obj.musicBrainzRecordingId === 'string' && obj.musicBrainzRecordingId.trim()
+        ? obj.musicBrainzRecordingId.trim()
+        : undefined;
 
     return {
       songId,
@@ -164,33 +172,44 @@ export class LocalSongNormalizer {
     };
   }
 
-  /**
-   * Maps a relational SQLite song row (returned from getSongById) into canonical LocalSongInput.
-   */
+  /** Maps a relational SQLite song row (returned from getSongById) into canonical LocalSongInput. */
   public static fromDbSong(dbSong: any): LocalSongInput {
     if (!dbSong) {
       return { songId: 0, title: '', path: '' };
     }
 
     const artists = Array.isArray(dbSong.artists)
-      ? dbSong.artists.map((a: any) => a?.artist?.name ?? a?.name).filter(Boolean).join(', ')
+      ? dbSong.artists
+          .map((a: any) => a?.artist?.name ?? a?.name)
+          .filter(Boolean)
+          .join(', ')
       : undefined;
 
-    const album = Array.isArray(dbSong.albums) && dbSong.albums.length > 0
-      ? dbSong.albums[0]?.album?.title ?? dbSong.albums[0]?.album?.name ?? dbSong.albums[0]?.title
-      : dbSong.album?.title ?? dbSong.album?.name ?? undefined;
+    const album =
+      Array.isArray(dbSong.albums) && dbSong.albums.length > 0
+        ? (dbSong.albums[0]?.album?.title ??
+          dbSong.albums[0]?.album?.name ??
+          dbSong.albums[0]?.title)
+        : (dbSong.album?.title ?? dbSong.album?.name ?? undefined);
 
     // Release-level artist from the albums_artists junction - distinct from
     // the per-track artists above.
-    const albumArtists = Array.isArray(dbSong.albums) && dbSong.albums.length > 0
-      ? dbSong.albums[0]?.album?.artists
-      : undefined;
+    const albumArtists =
+      Array.isArray(dbSong.albums) && dbSong.albums.length > 0
+        ? dbSong.albums[0]?.album?.artists
+        : undefined;
     const albumArtist = Array.isArray(albumArtists)
-      ? albumArtists.map((a: any) => a?.artist?.name ?? a?.name).filter(Boolean).join(', ') || undefined
+      ? albumArtists
+          .map((a: any) => a?.artist?.name ?? a?.name)
+          .filter(Boolean)
+          .join(', ') || undefined
       : undefined;
 
     const genres = Array.isArray(dbSong.genres)
-      ? dbSong.genres.map((g: any) => g?.genre?.name ?? g?.name).filter(Boolean).join(', ')
+      ? dbSong.genres
+          .map((g: any) => g?.genre?.name ?? g?.name)
+          .filter(Boolean)
+          .join(', ')
       : undefined;
 
     return {

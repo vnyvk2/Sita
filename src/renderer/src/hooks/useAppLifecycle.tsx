@@ -66,7 +66,10 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
       .then((startUpSongData) => {
         if (startUpSongData) {
           playSongFromUnknownSource(startUpSongData, true);
-        } else if (playback?.currentSong.songId && typeof playback.currentSong.songId === 'number') {
+        } else if (
+          playback?.currentSong.songId &&
+          typeof playback.currentSong.songId === 'number'
+        ) {
           playSong(playback.currentSong.songId, false);
 
           const currSongPosition = Number(playback.currentSong.stoppedPosition);

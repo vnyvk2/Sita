@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SmartPlaylistJob } from '../../../../../src/main/workers/jobs/smartPlaylistJob';
+
 import { SmartPlaylistEngine } from '../../../../../src/main/collections/engine/SmartPlaylistEngine';
+import { SmartPlaylistJob } from '../../../../../src/main/workers/jobs/smartPlaylistJob';
 
 describe('SmartPlaylistJob', () => {
   beforeEach(() => {
@@ -9,7 +10,9 @@ describe('SmartPlaylistJob', () => {
 
   it('should regenerate the playlist', async () => {
     const job = new SmartPlaylistJob('test_id', 123);
-    const regenerateSpy = vi.spyOn(SmartPlaylistEngine.prototype, 'regenerate').mockResolvedValue(true);
+    const regenerateSpy = vi
+      .spyOn(SmartPlaylistEngine.prototype, 'regenerate')
+      .mockResolvedValue(true);
 
     await job.execute();
 

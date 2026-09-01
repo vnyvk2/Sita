@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import { libraryScheduler } from './jobScheduler';
 import type { Job, RunningJobInfo, SchedulerMetrics, EventTimelineEntry } from './types';
 
@@ -7,12 +8,12 @@ export class LibraryObservabilityService extends EventEmitter {
   private totalRuntimeMs = 0;
   private totalCompleted = 0;
   private timeline: EventTimelineEntry[] = [];
-  
+
   // External subsystems can report these
   private gcRunCount = 0;
   private recoveries = 0;
   private peakQueueSize = 0;
-  
+
   private batchStartTime = 0;
   private batchJobsProcessed = 0;
   private isBatchActive = false;
@@ -69,9 +70,9 @@ export class LibraryObservabilityService extends EventEmitter {
       if (this.isBatchActive) {
         const durationSeconds = Math.round((Date.now() - this.batchStartTime) / 1000);
         this.addTimelineEvent(`Library operation completed in ${durationSeconds}s`);
-        
-        this.emit('BATCH_COMPLETE', { 
-          jobsProcessed: this.batchJobsProcessed, 
+
+        this.emit('BATCH_COMPLETE', {
+          jobsProcessed: this.batchJobsProcessed,
           durationSeconds
         });
 
@@ -87,9 +88,12 @@ export class LibraryObservabilityService extends EventEmitter {
     if (now - this.lastMetricsUpdate >= 250) {
       this.emitMetricsImmediate();
     } else if (!this.metricsUpdateTimeout) {
-      this.metricsUpdateTimeout = setTimeout(() => {
-        this.emitMetricsImmediate();
-      }, 250 - (now - this.lastMetricsUpdate));
+      this.metricsUpdateTimeout = setTimeout(
+        () => {
+          this.emitMetricsImmediate();
+        },
+        250 - (now - this.lastMetricsUpdate)
+      );
     }
   }
 
@@ -136,12 +140,12 @@ export class LibraryObservabilityService extends EventEmitter {
 
   private pruneTimestamps() {
     const oneMinuteAgo = Date.now() - 60000;
-    this.completedTimestamps = this.completedTimestamps.filter(t => t > oneMinuteAgo);
+    this.completedTimestamps = this.completedTimestamps.filter((t) => t > oneMinuteAgo);
   }
 
   public getMetrics(): SchedulerMetrics {
     const raw = libraryScheduler.getRawMetrics();
-    const runningJobsList: RunningJobInfo[] = libraryScheduler.getRunningJobs().map(job => ({
+    const runningJobsList: RunningJobInfo[] = libraryScheduler.getRunningJobs().map((job) => ({
       id: job.id,
       type: job.type,
       description: job.description
@@ -149,9 +153,8 @@ export class LibraryObservabilityService extends EventEmitter {
 
     this.pruneTimestamps();
 
-    const averageRuntime = this.totalCompleted > 0 
-      ? Math.round(this.totalRuntimeMs / this.totalCompleted) 
-      : 0;
+    const averageRuntime =
+      this.totalCompleted > 0 ? Math.round(this.totalRuntimeMs / this.totalCompleted) : 0;
 
     return {
       runningJobs: raw.runningJobs,

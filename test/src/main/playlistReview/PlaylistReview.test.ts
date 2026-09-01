@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
+import { OverrideApplier } from '@main/playlistReview/services/OverrideApplier';
+import { PlanRegenerator } from '@main/playlistReview/services/PlanRegenerator';
 import { PlaylistReviewService } from '@main/playlistReview/services/PlaylistReviewService';
 import { ReviewValidator } from '@main/playlistReview/validator/ReviewValidator';
-import { PlanRegenerator } from '@main/playlistReview/services/PlanRegenerator';
-import { OverrideApplier } from '@main/playlistReview/services/OverrideApplier';
-import type { PlaylistImportPlan } from '@main/playlistImport/models/PlaylistImportPlan';
+import { describe, it, expect } from 'vitest';
 
 describe('Phase 13 — Interactive Review & Decision Framework Refinements', () => {
   it('should create a review session and derive effective plan via OverrideApplier & PlanRegenerator', () => {
@@ -31,7 +31,14 @@ describe('Phase 13 — Interactive Review & Decision Framework Refinements', () 
           source: {
             position: 1,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'bohemian.mp3' }, resolution: { originalReference: 'bohemian.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'bohemian.mp3' },
+                resolution: {
+                  originalReference: 'bohemian.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 101 }
             }
           }
@@ -41,7 +48,14 @@ describe('Phase 13 — Interactive Review & Decision Framework Refinements', () 
           source: {
             position: 2,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'stairway.mp3' }, resolution: { originalReference: 'stairway.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'stairway.mp3' },
+                resolution: {
+                  originalReference: 'stairway.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'NOT_IN_LIBRARY', confidence: 0 }
             }
           }
@@ -64,7 +78,9 @@ describe('Phase 13 — Interactive Review & Decision Framework Refinements', () 
     expect(updatedSession.isValid).toBe(true);
     expect(updatedSession.effectivePlan.statistics.importedEntries).toBe(2);
     expect(updatedSession.effectivePlan.entries[1].decision).toBe('IMPORT');
-    expect(updatedSession.effectivePlan.entries[1].source.trackReference.libraryMatch.matchedSongId).toBe(999);
+    expect(
+      updatedSession.effectivePlan.entries[1].source.trackReference.libraryMatch.matchedSongId
+    ).toBe(999);
   });
 
   it('should support FORCE_SKIP user overrides and derive effective plan', () => {
@@ -92,7 +108,14 @@ describe('Phase 13 — Interactive Review & Decision Framework Refinements', () 
           source: {
             position: 1,
             trackReference: {
-              resolvedTrack: { track: { originalLocation: 'bohemian.mp3' }, resolution: { originalReference: 'bohemian.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' } },
+              resolvedTrack: {
+                track: { originalLocation: 'bohemian.mp3' },
+                resolution: {
+                  originalReference: 'bohemian.mp3',
+                  resolutionStatus: 'RESOLVED',
+                  verificationStatus: 'FOUND'
+                }
+              },
               libraryMatch: { status: 'MATCHED', confidence: 100, matchedSongId: 101 }
             }
           }

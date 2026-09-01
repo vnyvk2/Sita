@@ -1,10 +1,9 @@
-import type { ProviderResult } from '../../../models/ProviderResult';
-import type { IProviderExecutionStage } from '../IProviderExecutionStage';
-import type { ProviderExecutionStageContext } from '../ProviderExecutionStageContext';
-
 import { MetadataConfidence } from '../../../models/MetadataConfidence';
+import type { ProviderResult } from '../../../models/ProviderResult';
 import { ProviderResult as ConcreteProviderResult } from '../../../models/ProviderResult';
 import { ProviderTimeoutPolicy } from '../../timeout/ProviderTimeoutPolicy';
+import type { IProviderExecutionStage } from '../IProviderExecutionStage';
+import type { ProviderExecutionStageContext } from '../ProviderExecutionStageContext';
 
 export class TimeoutStage implements IProviderExecutionStage {
   public readonly name = 'TimeoutStage';

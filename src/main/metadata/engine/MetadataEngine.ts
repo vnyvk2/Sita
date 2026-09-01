@@ -1,7 +1,8 @@
+import type { MetadataCache } from '../cache/MetadataCache';
+import { MetadataCapabilities } from '../common/types';
 import type { MetadataEventBus } from '../events/MetadataEventBus';
 import type { IMetadataGateway } from '../interfaces/IMetadataGateway';
 import type { IMetadataProviderExecutor } from '../interfaces/IMetadataProviderExecutor';
-import type { MetadataCache } from '../cache/MetadataCache';
 import type { MetadataContext } from '../models/MetadataContext';
 import type { MetadataEntity } from '../models/MetadataEntity';
 import type { MetadataIdentity } from '../models/MetadataIdentity';
@@ -10,10 +11,8 @@ import type { ProviderExecutionContext } from '../models/ProviderExecutionContex
 import type { ProviderResult } from '../models/ProviderResult';
 import type { MetadataPipeline } from '../pipeline/MetadataPipeline';
 import type { MetadataQueryPlanner } from '../planner/MetadataQueryPlanner';
-import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergePolicy';
-
 import { DefaultMetadataMergePolicy } from '../providers/policies/DefaultMetadataMergePolicy';
-import { MetadataCapabilities } from '../common/types';
+import type { IMetadataMergePolicy } from '../providers/policies/IMetadataMergePolicy';
 
 export interface MetadataEngineOptions {
   executor: IMetadataProviderExecutor;
@@ -71,11 +70,7 @@ export class MetadataEngine implements IMetadataGateway {
       return null;
     }
 
-    const entity = await this.pipeline.processDTO(
-      identity.entityKind,
-      mergedPayload,
-      null
-    );
+    const entity = await this.pipeline.processDTO(identity.entityKind, mergedPayload, null);
 
     if (entity) {
       this.cache.set(entity);
@@ -118,11 +113,7 @@ export class MetadataEngine implements IMetadataGateway {
 
         const mergedPayload = this.mergePolicy.merge(singleProviderResults);
         if (mergedPayload) {
-          const entity = await this.pipeline.processDTO(
-            identity.entityKind,
-            mergedPayload,
-            null
-          );
+          const entity = await this.pipeline.processDTO(identity.entityKind, mergedPayload, null);
           if (entity) {
             this.cache.set(entity);
             this.publishEntity(entity, 'MetadataLoaded');
@@ -159,11 +150,7 @@ export class MetadataEngine implements IMetadataGateway {
       return null;
     }
 
-    const entity = await this.pipeline.processDTO(
-      identity.entityKind,
-      mergedPayload,
-      null
-    );
+    const entity = await this.pipeline.processDTO(identity.entityKind, mergedPayload, null);
 
     if (entity) {
       this.cache.set(entity);
@@ -192,10 +179,7 @@ export class MetadataEngine implements IMetadataGateway {
     return this.refresh(identity, execContext);
   }
 
-  public preload(
-    identities: MetadataIdentity[],
-    execContext?: ProviderExecutionContext
-  ): void {
+  public preload(identities: MetadataIdentity[], execContext?: ProviderExecutionContext): void {
     if (identities.length === 0) return;
     // Non-blocking background cache warming
     this.loadMany(identities, execContext).catch((err) => {

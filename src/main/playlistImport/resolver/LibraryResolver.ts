@@ -1,9 +1,9 @@
 import type { LibraryLookup, LibrarySongRecord } from '../interfaces/LibraryLookup';
-import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
-import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
+import type { LibraryMatch } from '../models/LibraryMatch';
 import type { LibraryResolvedPlaylist } from '../models/LibraryResolvedPlaylist';
 import type { LibraryResolvedPlaylistEntry } from '../models/LibraryResolvedPlaylistEntry';
-import type { LibraryMatch } from '../models/LibraryMatch';
+import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
+import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
 
 export class LibraryResolver {
   constructor(private libraryLookup: LibraryLookup) {}
@@ -15,7 +15,10 @@ export class LibraryResolver {
       const targetPaths: string[] = [];
       for (const entry of playlist.entries) {
         const { resolution } = entry.resolvedTrack;
-        if (resolution.resolutionStatus !== 'UNRESOLVED' && resolution.resolutionStatus !== 'INVALID_URI') {
+        if (
+          resolution.resolutionStatus !== 'UNRESOLVED' &&
+          resolution.resolutionStatus !== 'INVALID_URI'
+        ) {
           const targetPath = resolution.resolvedPath ?? entry.resolvedTrack.track.originalLocation;
           if (targetPath) {
             targetPaths.push(targetPath);
@@ -92,7 +95,9 @@ export class LibraryResolver {
       if (matchedSong) {
         const diagnostics: string[] = [];
         if (resolution.verificationStatus === 'MISSING') {
-          diagnostics.push('File missing from original playlist filesystem location, but matched in Nora library');
+          diagnostics.push(
+            'File missing from original playlist filesystem location, but matched in Nora library'
+          );
         }
 
         const match: LibraryMatch = {
@@ -184,7 +189,9 @@ export class LibraryResolver {
       if (matchedSong) {
         const diagnostics: string[] = [];
         if (resolution.verificationStatus === 'MISSING') {
-          diagnostics.push('File missing from original playlist filesystem location, but matched in Nora library');
+          diagnostics.push(
+            'File missing from original playlist filesystem location, but matched in Nora library'
+          );
         }
 
         const match: LibraryMatch = {

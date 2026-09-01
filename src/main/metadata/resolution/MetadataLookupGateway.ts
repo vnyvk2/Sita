@@ -1,9 +1,13 @@
-import type { MetadataProviderExecutor } from '../providers/MetadataProviderExecutor';
-import type { ProviderCandidate } from '../domain/MetadataResolution';
-import type { MetadataContext, AlbumLookupQuery, TrackLookupQuery } from '../domain/MetadataContext';
-import { ProviderRegistry } from './ProviderRegistry';
-import type { FieldContribution } from './MetadataMergeEngine';
 import type { IMetadataProviderAdapter } from '../contracts/IMetadataProviderAdapter';
+import type {
+  MetadataContext,
+  AlbumLookupQuery,
+  TrackLookupQuery
+} from '../domain/MetadataContext';
+import type { ProviderCandidate } from '../domain/MetadataResolution';
+import type { MetadataProviderExecutor } from '../providers/MetadataProviderExecutor';
+import type { FieldContribution } from './MetadataMergeEngine';
+import { ProviderRegistry } from './ProviderRegistry';
 
 export interface ProviderResolutionResult {
   contributions: FieldContribution[];
@@ -26,9 +30,10 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
   }
 
   /**
-   * Single-pass parallel provider resolution executing fetchContribution across all active providers concurrently (Promise.allSettled).
-   * Derives both specialized FieldContribution[] and ProviderCandidate[] in a single network pass.
-   * Includes in-flight memoization to prevent duplicate federation passes.
+   * Single-pass parallel provider resolution executing fetchContribution across all active
+   * providers concurrently (Promise.allSettled). Derives both specialized FieldContribution[] and
+   * ProviderCandidate[] in a single network pass. Includes in-flight memoization to prevent
+   * duplicate federation passes.
    */
   public async resolveFederated(context: MetadataContext): Promise<ProviderResolutionResult> {
     const requestQuery = context.request?.query;
@@ -105,7 +110,9 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
             const artistContrib = contrib.contributions.find((c) => c.fieldId === 'artist')?.value;
             const albumContrib = contrib.contributions.find((c) => c.fieldId === 'album')?.value;
             const genreContrib = contrib.contributions.find((c) => c.fieldId === 'genre')?.value;
-            const artworkUrlContrib = contrib.contributions.find((c) => c.fieldId === 'artworkUrl')?.value;
+            const artworkUrlContrib = contrib.contributions.find(
+              (c) => c.fieldId === 'artworkUrl'
+            )?.value;
             const mbidContrib = contrib.contributions.find((c) => c.fieldId === 'mbid')?.value;
 
             candidates.push({

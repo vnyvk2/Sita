@@ -1,8 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ArtistProfileService } from '@main/services/ArtistProfileService';
-import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import type { DeezerApiClient } from '@main/platform/networking/DeezerApiClient';
+import type { ITunesApiClient } from '@main/platform/networking/ITunesApiClient';
 import type { WikipediaApiClient } from '@main/platform/networking/WikipediaApiClient';
+import { ArtistProfileService } from '@main/services/ArtistProfileService';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('@main/logger', () => ({
   default: {
@@ -20,9 +20,7 @@ vi.mock('@main/db/queries/artists', () => ({
     artistId: 1,
     name: 'Gracie Abrams',
     artworks: [],
-    songs: [
-      { song: { id: 10, title: 'I Love You, I\'m Sorry', duration: 157 } }
-    ],
+    songs: [{ song: { id: 10, title: "I Love You, I'm Sorry", duration: 157 } }],
     onlineArtworkPaths: {
       picture_xl: 'https://local-art/gracie-xl.jpg'
     }
@@ -64,7 +62,7 @@ describe('ArtistProfileService', () => {
       getArtistTopTracks: vi.fn().mockResolvedValue([
         {
           trackId: 1001,
-          trackName: 'I Love You, I\'m Sorry',
+          trackName: "I Love You, I'm Sorry",
           collectionName: 'The Secret of Us',
           previewUrl: 'https://audio-ssl.itunes.apple.com/preview.m4a',
           artworkUrl600: 'https://itunes.com/art600.jpg',
@@ -95,7 +93,8 @@ describe('ArtistProfileService', () => {
       getArtistBiography: vi.fn().mockResolvedValue({
         title: 'Gracie Abrams',
         summary: 'Gracie Madigan Abrams is an American singer-songwriter.',
-        fullExtract: 'Gracie Madigan Abrams (born September 7, 1999) is an American singer-songwriter.\n\nShe released her debut studio album, Good Riddance, in 2023.\n\nHer second album, The Secret of Us, followed in 2024.',
+        fullExtract:
+          'Gracie Madigan Abrams (born September 7, 1999) is an American singer-songwriter.\n\nShe released her debut studio album, Good Riddance, in 2023.\n\nHer second album, The Secret of Us, followed in 2024.',
         originalImage: 'https://upload.wikimedia.org/wikipedia/commons/gracie.jpg',
         pageUrl: 'https://en.wikipedia.org/wiki/Gracie_Abrams'
       })
@@ -114,7 +113,8 @@ describe('ArtistProfileService', () => {
         name: 'Gracie Abrams',
         url: 'https://www.last.fm/music/Gracie+Abrams',
         bio: {
-          content: 'Gracie Abrams (born September 7, 1999) is an American pop singer-songwriter from Los Angeles, California.\n\nAfter having only three tracks publicly available on her Soundcloud, Gracie released her debut single and critically acclaimed EP minor in 2020 followed by her sophomore record.\n\n<a href="https://www.last.fm">Read more on Last.fm</a>'
+          content:
+            'Gracie Abrams (born September 7, 1999) is an American pop singer-songwriter from Los Angeles, California.\n\nAfter having only three tracks publicly available on her Soundcloud, Gracie released her debut single and critically acclaimed EP minor in 2020 followed by her sophomore record.\n\n<a href="https://www.last.fm">Read more on Last.fm</a>'
         },
         tags: { tag: [{ name: 'indie pop', url: 'https://last.fm/tag/indie+pop' }] },
         similar: {
@@ -127,9 +127,24 @@ describe('ArtistProfileService', () => {
     });
 
     (getArtistTopTracksFromLastFM as any).mockResolvedValue([
-      { name: 'I Love You, I\'m Sorry', playcount: '50000', listeners: '25000', url: 'https://last.fm/track1' },
-      { name: 'I Love You, I\'m Sorry (Live)', playcount: '5000', listeners: '2000', url: 'https://last.fm/track1-live' }, // should be deduplicated!
-      { name: 'Close To You', playcount: '40000', listeners: '20000', url: 'https://last.fm/track2' }
+      {
+        name: "I Love You, I'm Sorry",
+        playcount: '50000',
+        listeners: '25000',
+        url: 'https://last.fm/track1'
+      },
+      {
+        name: "I Love You, I'm Sorry (Live)",
+        playcount: '5000',
+        listeners: '2000',
+        url: 'https://last.fm/track1-live'
+      }, // should be deduplicated!
+      {
+        name: 'Close To You',
+        playcount: '40000',
+        listeners: '20000',
+        url: 'https://last.fm/track2'
+      }
     ]);
 
     const profile = await service.getProfile(1, 'Gracie Abrams');
@@ -143,7 +158,7 @@ describe('ArtistProfileService', () => {
     // Deduplication check: live version should be merged, resulting in 2 unique tracks
     expect(profile.topTracks).toHaveLength(2);
     expect(profile.topTracks[0].globalRank).toBe(1);
-    expect(profile.topTracks[0].title).toBe('I Love You, I\'m Sorry');
+    expect(profile.topTracks[0].title).toBe("I Love You, I'm Sorry");
     expect(profile.topTracks[0].isInLibrary).toBe(true);
     expect(profile.topTracks[0].localSongId).toBe(10);
     expect(profile.topTracks[0].previewUrl).toBe('https://audio-ssl.itunes.apple.com/preview.m4a');

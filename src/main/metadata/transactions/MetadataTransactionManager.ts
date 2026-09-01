@@ -1,10 +1,10 @@
+import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
 import type { UndoToken } from '../domain/UndoToken';
-import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
+import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { ArtworkCacheInvalidator } from './ArtworkCacheInvalidator';
 import { ArtworkDownloaderService } from './ArtworkDownloaderService';
 import { LibraryRelationalSyncService, type SongDbUpdater } from './LibraryRelationalSyncService';
-import { MetadataHistoryService } from '../history/MetadataHistoryService';
 import { MutationExecutor } from './MutationExecutor';
 import { SnapshotBuilder, type DraftSnapshot } from './SnapshotBuilder';
 
@@ -41,16 +41,13 @@ export class MetadataTransactionManager {
   }) {
     this.relationalSync = new LibraryRelationalSyncService(options?.dbUpdater);
     this.artworkDownloader =
-      options?.artworkDownloader ??
-      new ArtworkDownloaderService(options?.requestPipeline);
+      options?.artworkDownloader ?? new ArtworkDownloaderService(options?.requestPipeline);
     this.cacheInvalidator = new ArtworkCacheInvalidator();
     this.historyService = options?.historyService ?? new MetadataHistoryService();
     this.mutationExecutor = new MutationExecutor(this.relationalSync);
   }
 
-  /**
-   * Reverts all applied draft snapshots in reverse chronological order.
-   */
+  /** Reverts all applied draft snapshots in reverse chronological order. */
   private async rollbackDraftSnapshots(draftSnapshots: DraftSnapshot[]): Promise<void> {
     if (draftSnapshots.length === 0) return;
     for (const draft of [...draftSnapshots].reverse()) {
@@ -69,13 +66,13 @@ export class MetadataTransactionManager {
   }
 
   /**
-   * Executes a batch of metadata mutations as a single atomic transaction (Option A — Entire Transaction Atomic).
+   * Executes a batch of metadata mutations as a single atomic transaction (Option A — Entire
+   * Transaction Atomic).
    *
-   * Transaction Semantics:
-   * - Mutations are processed in chunks (default 50 files per chunk).
-   * - If ANY mutation fails or an AbortSignal cancellation occurs mid-transaction,
-   *   all previously applied mutations in the transaction are automatically reverted
-   *   back to their pre-transaction disk and database states.
+   * Transaction Semantics: - Mutations are processed in chunks (default 50 files per chunk). - If
+   * ANY mutation fails or an AbortSignal cancellation occurs mid-transaction, all previously
+   * applied mutations in the transaction are automatically reverted back to their pre-transaction
+   * disk and database states.
    */
   public async executeTransaction(
     operationId: string,
@@ -135,7 +132,10 @@ export class MetadataTransactionManager {
         const tagPayload: Record<string, string | number | Buffer> = {};
         const fieldMap: Record<string, string | number> = {};
         const previousState: Record<string, string | number | undefined> = {};
-        const providerAttributions: Record<string, { providerId: string; confidenceScore?: number }> = {};
+        const providerAttributions: Record<
+          string,
+          { providerId: string; confidenceScore?: number }
+        > = {};
 
         for (const fm of mut.fieldMutations) {
           if (fm.newValue !== undefined) {
@@ -198,7 +198,11 @@ export class MetadataTransactionManager {
     }
 
     if (draftSnapshots.length > 0) {
-      const historySnapshot = SnapshotBuilder.buildHistorySnapshot(operationId, undoToken, draftSnapshots);
+      const historySnapshot = SnapshotBuilder.buildHistorySnapshot(
+        operationId,
+        undoToken,
+        draftSnapshots
+      );
       await this.historyService.pushSnapshot(historySnapshot);
     }
 
@@ -214,12 +218,13 @@ export class MetadataTransactionManager {
   }
 
   /**
-   * Executes a rollback operation using the history snapshot stack.
-   * The snapshot is only consumed after a fully successful revert; reverts are
-   * idempotent (same target values rewritten), so a partially-failed rollback
-   * can simply be retried.
+   * Executes a rollback operation using the history snapshot stack. The snapshot is only consumed
+   * after a fully successful revert; reverts are idempotent (same target values rewritten), so a
+   * partially-failed rollback can simply be retried.
    */
-  public async rollbackLastTransaction(targetSongId?: number): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
+  public async rollbackLastTransaction(
+    targetSongId?: number
+  ): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
     const lastSnapshot = await this.historyService.peekUndo(targetSongId);
     if (!lastSnapshot) {
       return { success: true, revertedCount: 0, errors: [] };

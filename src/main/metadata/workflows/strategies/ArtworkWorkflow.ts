@@ -1,3 +1,9 @@
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { MetadataProviderId } from '../../models/RecordingMetadata';
+import type { CoverArtArchiveAdapter } from '../../providers/coverartarchive/CoverArtArchiveAdapter';
+import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
+import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
+import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type {
   WorkflowCandidate,
   WorkflowMatch,
@@ -6,12 +12,6 @@ import type {
   WorkflowType
 } from '../MetadataWorkflow';
 import { BaseMetadataWorkflow } from '../MetadataWorkflow';
-import type { CoverArtArchiveAdapter } from '../../providers/coverartarchive/CoverArtArchiveAdapter';
-import type { DiscogsAdapter } from '../../providers/discogs/DiscogsAdapter';
-import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
-import type { LocalSongInput } from '../../services/AlbumMetadataService';
-import type { MetadataProviderId } from '../../models/RecordingMetadata';
-import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class ArtworkWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'artwork';
@@ -50,7 +50,11 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
     // Search MusicBrainz releases to obtain release MBID and releaseGroupId for CoverArtArchive
     if (this.musicBrainzAdapter) {
       try {
-        const mbReleases = await this.musicBrainzAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
+        const mbReleases = await this.musicBrainzAdapter.searchAlbums(
+          qStr,
+          query.artist,
+          query.limit ?? 5
+        );
         for (const rel of mbReleases) {
           if (rel.releaseId) {
             candidates.push({
@@ -71,7 +75,11 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
 
     // Search Discogs for artwork candidates (skipped when provider is not configured)
     if (this.discogsAdapter) {
-      const discogsReleases = await this.discogsAdapter.searchAlbums(qStr, query.artist, query.limit ?? 5);
+      const discogsReleases = await this.discogsAdapter.searchAlbums(
+        qStr,
+        query.artist,
+        query.limit ?? 5
+      );
       for (const rel of discogsReleases) {
         const artUrl = rel.artwork?.primaryPath || rel.artwork?.onlineUrls?.[0];
         if (artUrl) {
@@ -114,7 +122,9 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
         mbid: candidateId,
         releaseGroupId
       });
-      coverArtUrl = contrib?.contributions.find((c) => c.fieldId === 'artworkUrl' || c.fieldId === 'artworkPath')?.value as string;
+      coverArtUrl = contrib?.contributions.find(
+        (c) => c.fieldId === 'artworkUrl' || c.fieldId === 'artworkPath'
+      )?.value as string;
     } else {
       if (!this.discogsAdapter) {
         throw new Error('Discogs provider is not configured (missing personal access token).');

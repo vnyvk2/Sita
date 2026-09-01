@@ -1,26 +1,27 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
 import { File } from 'node-taglib-sharp';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 // Measured: ~2.3s of test time standalone, but these real-file + real-DB
 // tests exceed the 5s default when the full suite runs in parallel on
 // slower machines. Scoped here instead of raising the global timeout.
 vi.setConfig({ testTimeout: 30_000 });
+import { db } from '@main/db/db';
+import * as albumsDb from '@main/db/queries/albums';
+import * as artistsDb from '@main/db/queries/artists';
+import * as artworksDb from '@main/db/queries/artworks';
+import * as genresDb from '@main/db/queries/genres';
+import * as songsDb from '@main/db/queries/songs';
+import * as mainModule from '@main/main';
 import updateSongId3Tags, {
   clearPendingMetadataUpdates,
   enqueueDeferredMetadataInMemory,
   isMetadataUpdatesPending,
   savePendingMetadataUpdates
 } from '@main/updateSong/updateSongId3Tags';
-import * as mainModule from '@main/main';
-import * as songsDb from '@main/db/queries/songs';
-import * as artistsDb from '@main/db/queries/artists';
-import * as albumsDb from '@main/db/queries/albums';
-import * as genresDb from '@main/db/queries/genres';
-import * as artworksDb from '@main/db/queries/artworks';
-import { db } from '@main/db/db';
 
 vi.mock('@main/main', () => ({
   getCurrentSongPath: vi.fn(),
@@ -42,7 +43,10 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
 
   beforeEach(() => {
     clearPendingMetadataUpdates();
-    tempSongPath = path.join(os.tmpdir(), `update_id3_test_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
+    tempSongPath = path.join(
+      os.tmpdir(),
+      `update_id3_test_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`
+    );
     fs.copyFileSync(fixtureSource, tempSongPath);
   });
 
@@ -74,7 +78,10 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       } as any);
       vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
       vi.spyOn(artistsDb, 'getArtistWithName').mockResolvedValue(undefined);
-      vi.spyOn(artistsDb, 'createArtist').mockResolvedValue({ id: 10, name: 'Artist Mutation 1' } as any);
+      vi.spyOn(artistsDb, 'createArtist').mockResolvedValue({
+        id: 10,
+        name: 'Artist Mutation 1'
+      } as any);
       vi.spyOn(artistsDb, 'linkSongToArtist').mockResolvedValue(true as any);
 
       // 1. First mutation on playing track: updates title and artist
@@ -217,16 +224,27 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
 
   describe('5-G: Durable pending-write journal (2c P4 + audit P0 #2)', () => {
     it('persists deferred write, hydrates WITHOUT premature deletion, cleans up on successful flush', async () => {
-      const { MetadataPendingWritesRepository } = await import('@main/metadata/history/MetadataPendingWritesRepository');
+      const { MetadataPendingWritesRepository } =
+        await import('@main/metadata/history/MetadataPendingWritesRepository');
       const { restorePersistedPendingWrites } = await import('@main/updateSong/updateSongId3Tags');
       const repo = new (MetadataPendingWritesRepository as new () => {
-        upsert: (i: { id: string; songPath: string; tags: Record<string, unknown>; isKnownSource: boolean }) => Promise<void>;
+        upsert: (i: {
+          id: string;
+          songPath: string;
+          tags: Record<string, unknown>;
+          isKnownSource: boolean;
+        }) => Promise<void>;
         listAll: () => Promise<Array<{ songPath: string }>>;
         clearAll: () => Promise<void>;
       })();
 
       await repo.clearAll();
-      await repo.upsert({ id: 'pw-test', songPath: tempSongPath, tags: { title: 'Persisted Title' }, isKnownSource: true });
+      await repo.upsert({
+        id: 'pw-test',
+        songPath: tempSongPath,
+        tags: { title: 'Persisted Title' },
+        isKnownSource: true
+      });
 
       // Boot recovery with a FAILING disk write: the durable row must survive
       // (audit P0 #2 - hydration must not delete before the write lands)
@@ -291,7 +309,10 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
         50,
         {
           title: 'Full Projection Title',
-          artists: [{ artistId: 101, name: 'Primary Artist' }, { artistId: 102, name: 'Featured Artist' }],
+          artists: [
+            { artistId: 101, name: 'Primary Artist' },
+            { artistId: 102, name: 'Featured Artist' }
+          ],
           albums: [{ albumId: 201, title: 'Projection Album' }],
           genres: [{ genreId: 301, name: 'Electronic' }],
           releasedYear: 2024,
@@ -420,7 +441,10 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       } as any);
       vi.spyOn(songsDb, 'updateSongBasicFields').mockResolvedValue(true as any);
       vi.spyOn(artistsDb, 'getArtistWithName').mockResolvedValue(undefined);
-      vi.spyOn(artistsDb, 'createArtist').mockResolvedValue({ id: 20, name: 'Concurrent Band' } as any);
+      vi.spyOn(artistsDb, 'createArtist').mockResolvedValue({
+        id: 20,
+        name: 'Concurrent Band'
+      } as any);
       vi.spyOn(artistsDb, 'linkSongToArtist').mockResolvedValue(true as any);
 
       // Concurrent overlapping mutations via Promise.all
@@ -470,7 +494,12 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
       ]);
       const createFromPathSpy = vi.spyOn(File, 'createFromPath');
 
-      const result = await updateSongId3Tags(tempSongPath, { title: 'Unknown Source Awaited' }, false, false);
+      const result = await updateSongId3Tags(
+        tempSongPath,
+        { title: 'Unknown Source Awaited' },
+        false,
+        false
+      );
 
       expect(result?.success).toBe(true);
       // The awaited flush must have completed before the call resolved
@@ -488,7 +517,12 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
         { songId: 57, path: tempSongPath, isKnownSource: false } as any
       ]);
 
-      const result = await updateSongId3Tags(tempSongPath, { title: 'Deferred While Playing' }, false, false);
+      const result = await updateSongId3Tags(
+        tempSongPath,
+        { title: 'Deferred While Playing' },
+        false,
+        false
+      );
 
       expect(result?.success).toBe(true);
       // Deferred: queued but NOT written yet
@@ -512,7 +546,9 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
   describe('G2-05: Pending-write flusher fixes', () => {
     it('does not advance DB modifiedAt if physical file write throws an error', async () => {
       vi.mocked(mainModule.getCurrentSongPath).mockReturnValue('/other.mp3');
-      const updateModifiedAtSpy = vi.spyOn(songsDb, 'updateSongModifiedAtByPath').mockResolvedValue(undefined as any);
+      const updateModifiedAtSpy = vi
+        .spyOn(songsDb, 'updateSongModifiedAtByPath')
+        .mockResolvedValue(undefined as any);
 
       vi.spyOn(songsDb, 'getSongById').mockResolvedValue({
         id: 201,
@@ -570,8 +606,12 @@ describe('updateSongId3Tags Lifecycle & Concurrency (Phase 5)', () => {
         expect(f3.tag.title).toBe('New Song 3 Title');
         f3.dispose();
       } finally {
-        try { fs.unlinkSync(tempSong2); } catch {}
-        try { fs.unlinkSync(tempSong3); } catch {}
+        try {
+          fs.unlinkSync(tempSong2);
+        } catch {}
+        try {
+          fs.unlinkSync(tempSong3);
+        } catch {}
       }
     });
 

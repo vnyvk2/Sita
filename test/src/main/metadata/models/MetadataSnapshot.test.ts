@@ -1,9 +1,8 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataSnapshot } from '@main/metadata/models/MetadataSnapshot';
 import { MetadataValue } from '@main/metadata/models/MetadataValue';
+import { describe, expect, it } from 'vitest';
 
 describe('MetadataSnapshot', () => {
   it('should freeze and clone snapshot correctly', () => {

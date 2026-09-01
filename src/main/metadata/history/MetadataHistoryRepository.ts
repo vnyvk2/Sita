@@ -14,8 +14,8 @@ interface StoredSnapshotPayload {
 /**
  * Durable storage for metadata undo snapshots.
  *
- * Rows are ordered by an identity `seq`; the service layer keeps at most
- * `maxStackSize` newest snapshots, so no pruning happens here.
+ * Rows are ordered by an identity `seq`; the service layer keeps at most `maxStackSize` newest
+ * snapshots, so no pruning happens here.
  */
 export class MetadataHistoryRepository {
   private readonly database: typeof db;
@@ -25,9 +25,9 @@ export class MetadataHistoryRepository {
   }
 
   /**
-   * Inserts a snapshot. When `trx` is provided the row joins the caller's
-   * transaction, so an undo journal entry is committed atomically with the
-   * mutation it covers (P0 #3) - a crash can never leave DB=new / undo=missing.
+   * Inserts a snapshot. When `trx` is provided the row joins the caller's transaction, so an undo
+   * journal entry is committed atomically with the mutation it covers (P0 #3) - a crash can never
+   * leave DB=new / undo=missing.
    */
   public async insert(
     snapshot: MetadataHistorySnapshot,
@@ -51,10 +51,9 @@ export class MetadataHistoryRepository {
   }
 
   /**
-   * Grouped mode: appends one song's pre/post snapshots to a single journal
-   * row, creating the row on first sight. Called inside each per-song
-   * transaction so partial group failures still leave durable undo coverage
-   * for every song that actually committed (P0 #2).
+   * Grouped mode: appends one song's pre/post snapshots to a single journal row, creating the row
+   * on first sight. Called inside each per-song transaction so partial group failures still leave
+   * durable undo coverage for every song that actually committed (P0 #2).
    */
   public async appendToSnapshot(
     args: {
@@ -66,7 +65,10 @@ export class MetadataHistoryRepository {
     },
     trx: DB | DBTransaction = this.database
   ): Promise<void> {
-    const [row] = await trx.select().from(metadataUndoSnapshots).where(eq(metadataUndoSnapshots.id, args.id));
+    const [row] = await trx
+      .select()
+      .from(metadataUndoSnapshots)
+      .where(eq(metadataUndoSnapshots.id, args.id));
 
     if (!row) {
       const payload: StoredSnapshotPayload = {

@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
-import type { LibraryLookup, LibrarySongRecord } from '@main/playlistImport/interfaces/LibraryLookup';
+import type {
+  LibraryLookup,
+  LibrarySongRecord
+} from '@main/playlistImport/interfaces/LibraryLookup';
 import type { ResolvedPlaylist } from '@main/playlistImport/models/ResolvedPlaylist';
+import { LibraryResolver } from '@main/playlistImport/resolver/LibraryResolver';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('LibraryResolver', () => {
   it('should match song with 100 confidence when exact canonical path exists in library', async () => {

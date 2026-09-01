@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
+
+import type { MetadataHealth } from '../MetadataHealth';
 import type { MetadataOperation } from '../MetadataOperation';
 import type { MetadataPolicy } from '../MetadataPolicy';
 import type { MetadataPreview } from '../MetadataPreview';
-import type { MetadataTransaction } from '../MetadataTransaction';
-import type { UndoToken } from '../UndoToken';
-import type { ProviderAttribution } from '../ProviderAttribution';
-import type { MetadataHealth } from '../MetadataHealth';
 import type { MetadataResolution } from '../MetadataResolution';
+import type { MetadataTransaction } from '../MetadataTransaction';
+import type { ProviderAttribution } from '../ProviderAttribution';
+import type { UndoToken } from '../UndoToken';
 
 describe('Metadata Domain Model Specification Blueprint Test Suite', () => {
   it('instantiates pure MetadataOperation domain entity contracts with targetResourceIds', () => {

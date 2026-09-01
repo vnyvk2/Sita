@@ -1,15 +1,19 @@
-import type { CollectionOperation, OperationContext, OperationResult } from './types';
+import { eq } from 'drizzle-orm';
+
 import { createCollectionId } from '../../../common/collections/id';
 import { playlists, playlistEntries } from '../../db/schema';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
-import { eq } from 'drizzle-orm';
+import type { CollectionOperation, OperationContext, OperationResult } from './types';
 
 export interface SnapshotSmartPlaylistInput {
   smartPlaylistId: number;
   snapshotName: string;
 }
 
-export class SnapshotSmartPlaylistOp implements CollectionOperation<SnapshotSmartPlaylistInput, number> {
+export class SnapshotSmartPlaylistOp implements CollectionOperation<
+  SnapshotSmartPlaylistInput,
+  number
+> {
   public readonly repository: PlaylistRepository;
 
   constructor(repository: PlaylistRepository = new PlaylistRepository()) {
@@ -55,7 +59,7 @@ export class SnapshotSmartPlaylistOp implements CollectionOperation<SnapshotSmar
 
     // 4. Copy entries
     if (currentEntries.length > 0) {
-      const entriesToInsert = currentEntries.map(e => ({
+      const entriesToInsert = currentEntries.map((e) => ({
         playlistId: inserted.id,
         songId: e.songId,
         position: e.position,

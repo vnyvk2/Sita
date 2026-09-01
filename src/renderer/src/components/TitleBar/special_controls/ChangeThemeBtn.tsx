@@ -2,8 +2,8 @@ import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import { useTranslation } from 'react-i18next';
 
-import Button from '../../Button';
 import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
+import Button from '../../Button';
 
 const ChangeThemeBtn = () => {
   const { isDark: isDarkMode } = useEffectiveAppearance();

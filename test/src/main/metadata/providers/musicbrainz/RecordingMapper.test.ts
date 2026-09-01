@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { MusicBrainzRecordingMapper } from '@main/metadata/providers/musicbrainz/mappers/RecordingMapper';
-import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
 import type { MusicBrainzRecordingDto } from '@main/metadata/providers/musicbrainz/dto/RecordingDto';
 import type { MusicBrainzReleaseDto } from '@main/metadata/providers/musicbrainz/dto/ReleaseDto';
+import { MusicBrainzRecordingMapper } from '@main/metadata/providers/musicbrainz/mappers/RecordingMapper';
+import { MusicBrainzReleaseMapper } from '@main/metadata/providers/musicbrainz/mappers/ReleaseMapper';
+import { describe, expect, it } from 'vitest';
 
 describe('MusicBrainz Recording & Release Mappers (Phase 4 Identity)', () => {
   it('MusicBrainzRecordingMapper maps recording.id to providerRecordingId/musicBrainzRecordingId and isrcs[0] to isrc', () => {

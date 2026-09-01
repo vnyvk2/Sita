@@ -8,11 +8,9 @@ import { generateLocalArtworkBuffer } from '../filesystem/artworkBuffers';
 export { generateLocalArtworkBuffer };
 
 import { appPreferences } from '../../../package.json';
-import parseLyrics from '../../common/parseLyrics';
 import { parseGenreList } from '../../common/genreUtils';
+import parseLyrics from '../../common/parseLyrics';
 import { updateCachedLyrics } from '../core/getSongLyrics';
-import { syncSongRelationalData } from '../parseSong/syncSongRelationalData';
-import { MetadataPendingWritesRepository } from '../metadata/history/MetadataPendingWritesRepository';
 import saveLyricsToLRCFile from '../core/saveLyricsToLrcFile';
 import sendSongMetadata from '../core/sendSongMetadata';
 import { db } from '../db/db';
@@ -26,6 +24,7 @@ import {
 } from '../db/queries/songs';
 import { DEFAULT_FILE_URL } from '../filesystem';
 import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
+import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import {
   dataUpdateEvent,
@@ -34,14 +33,14 @@ import {
   sendMessageToRenderer,
   updateSongsOutsideLibraryData
 } from '../main';
+import { MetadataPendingWritesRepository } from '../metadata/history/MetadataPendingWritesRepository';
 import { createTempArtwork, processArtworkFiles } from '../other/artworks';
 import generatePalette from '../other/generatePalette';
+import { syncSongRelationalData } from '../parseSong/syncSongRelationalData';
 import { isSongBlacklisted } from '../utils/isBlacklisted';
-import { libraryScheduler } from '../workers/jobScheduler';
-
-import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
 import isPathAWebURL from '../utils/isPathAWebUrl';
 import { withAtomicFileWrite } from '../utils/withAtomicFileWrite';
+import { libraryScheduler } from '../workers/jobScheduler';
 
 const { metadataEditingSupportedExtensions } = appPreferences;
 
@@ -58,10 +57,10 @@ export type TagData = {
   year?: number;
   artwork?: Picture;
   /**
-   * Base64-encoded artwork for DEFERRED writes. The durable pending table is
-   * jsonb - a taglib `Picture` instance cannot survive serialization there,
-   * so deferred intent travels as base64 and is embedded at flush time
-   * (P0 #4: deferred writes must carry the complete physical file intent).
+   * Base64-encoded artwork for DEFERRED writes. The durable pending table is jsonb - a taglib
+   * `Picture` instance cannot survive serialization there, so deferred intent travels as base64 and
+   * is embedded at flush time (P0 #4: deferred writes must carry the complete physical file
+   * intent).
    */
   artworkBase64?: string;
   lyrics?: string;
@@ -84,7 +83,8 @@ export const clearPendingMetadataUpdates = () => pendingMetadataUpdates.clear();
 export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave = false) => {
   const { saveLyricsInLrcFilesForSupportedSongs } = await getUserSettings();
 
-  if (pendingMetadataUpdates.size === 0) return logger.verbose('No pending metadata updates found.');
+  if (pendingMetadataUpdates.size === 0)
+    return logger.verbose('No pending metadata updates found.');
 
   logger.verbose(`Started saving pending metadata updates.`, {
     pendingSongs: pendingMetadataUpdates.keys
@@ -146,7 +146,9 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
                 .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
                 .jpeg({ quality: 85 })
                 .toBuffer();
-              const picture = Picture.fromData(ByteVector.fromByteArray(new Uint8Array(jpegBuffer)));
+              const picture = Picture.fromData(
+                ByteVector.fromByteArray(new Uint8Array(jpegBuffer))
+              );
               picture.mimeType = 'image/jpeg';
               picture.type = PictureType.FrontCover;
               picture.description = 'artwork';
@@ -233,7 +235,8 @@ const mergeTagData = (base: TagData, incoming: TagData): TagData => {
   if (incoming.artwork !== undefined) merged.artwork = incoming.artwork;
   if (incoming.artworkBase64 !== undefined) merged.artworkBase64 = incoming.artworkBase64;
   if (incoming.lyrics !== undefined) merged.lyrics = incoming.lyrics;
-  if (incoming.musicBrainzRecordingId !== undefined) merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
+  if (incoming.musicBrainzRecordingId !== undefined)
+    merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
   if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
   return merged;
 };
@@ -259,16 +262,16 @@ const addMetadataToPendingQueue = (data: PendingMetadataUpdates) => {
   return { deferred: true };
 };
 /**
- * Durable-pending storage for deferred metadata writes (2c P4 + P0 #1/#4).
- * Split into two halves so the orchestrator can commit the durable row inside
- * its own DB transaction and hydrate the coalescing queue only afterwards.
+ * Durable-pending storage for deferred metadata writes (2c P4 + P0 #1/#4). Split into two halves so
+ * the orchestrator can commit the durable row inside its own DB transaction and hydrate the
+ * coalescing queue only afterwards.
  */
 const pendingWritesRepo = new MetadataPendingWritesRepository();
 
 /**
- * P0 #1/#4: merges the incoming deferred intent with any already-durable row
- * for this path and upserts the FULL merged payload (optionally within a
- * caller-owned transaction so it commits atomically WITH the DB mutation).
+ * P0 #1/#4: merges the incoming deferred intent with any already-durable row for this path and
+ * upserts the FULL merged payload (optionally within a caller-owned transaction so it commits
+ * atomically WITH the DB mutation).
  */
 export const persistDeferredMetadataWrite = async (
   songPath: string,
@@ -277,7 +280,9 @@ export const persistDeferredMetadataWrite = async (
 ): Promise<void> => {
   const rows = await pendingWritesRepo.listAll(trx);
   const existing = rows.find((r) => r.songPath === songPath);
-  const mergedTags = existing ? mergeTagData(existing.tags as unknown as TagData, incomingTags) : incomingTags;
+  const mergedTags = existing
+    ? mergeTagData(existing.tags as unknown as TagData, incomingTags)
+    : incomingTags;
   await pendingWritesRepo.upsert(
     {
       id: existing?.id ?? `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -311,9 +316,8 @@ export const enqueueDeferredMetadataInMemory = (songPath: string, tags: TagData)
 };
 
 /**
- * Boot-time recovery: replays any deferred writes persisted by a previous
- * session. Called after DB bootstrap; nothing is playing yet, so every item
- * can be flushed immediately.
+ * Boot-time recovery: replays any deferred writes persisted by a previous session. Called after DB
+ * bootstrap; nothing is playing yet, so every item can be flushed immediately.
  */
 export const restorePersistedPendingWrites = async (): Promise<void> => {
   const items = await pendingWritesRepo.listAll();
@@ -349,7 +353,6 @@ export const fetchArtworkBufferFromURL = async (url: string) => {
     return undefined;
   }
 };
-
 
 const generateArtworkBuffer = async (artworkPath?: string) => {
   if (artworkPath) {
@@ -1002,7 +1005,10 @@ const updateSongId3Tags = async (
       : await getSongByPath(String(songIdOrPath));
 
     if (!song && isNumericId) {
-      console.log('[updateSongId3Tags] getSongById yielded no result, attempting getSongByPath fallback for:', songIdOrPath);
+      console.log(
+        '[updateSongId3Tags] getSongById yielded no result, attempting getSongByPath fallback for:',
+        songIdOrPath
+      );
       song = await getSongByPath(String(songIdOrPath));
     }
 
@@ -1030,9 +1036,11 @@ const updateSongId3Tags = async (
       ? removeDefaultAppProtocolFromFilePath(tags.artworkPath)
       : undefined;
 
-    let processedArtwork: { existing?: any, payloads?: any } | undefined;
+    let processedArtwork: { existing?: any; payloads?: any } | undefined;
     if (newArtworkPath || tags.artworkBuffer) {
-      const buffer = (tags.artworkBuffer as Buffer | undefined) || (newArtworkPath ? await generateArtworkBuffer(newArtworkPath) : undefined);
+      const buffer =
+        (tags.artworkBuffer as Buffer | undefined) ||
+        (newArtworkPath ? await generateArtworkBuffer(newArtworkPath) : undefined);
       artworkBuffer = buffer || undefined;
 
       if (artworkBuffer) {

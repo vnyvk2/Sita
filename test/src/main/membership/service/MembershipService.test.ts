@@ -1,15 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import { MembershipCache } from '@main/membership/cache/MembershipCache';
 import { MembershipEventBus } from '@main/membership/events/MembershipEventBus';
 import type { MembershipEntry } from '@main/membership/models/MembershipEntry';
 import type { IMembershipRepository } from '@main/membership/repository/IMembershipRepository';
 import { MembershipService } from '@main/membership/service/MembershipService';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('MembershipService', () => {
   it('should handle cache misses by querying repository and caching results', async () => {
     const mockEntries: MembershipEntry[] = [
-      { collectionKind: 'playlist', collectionId: 5, memberKind: 'song', memberId: 100, position: 1 }
+      {
+        collectionKind: 'playlist',
+        collectionId: 5,
+        memberKind: 'song',
+        memberId: 100,
+        position: 1
+      }
     ];
 
     const mockRepo: IMembershipRepository = {

@@ -1,31 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MetadataApplyService } from '../MetadataApplyService';
-import { TagWriterService, type TagWritePayload, type TagWriteResult } from '../TagWriterService';
-import { MetadataHistoryService } from '../../history/MetadataHistoryService';
+
 import type { TrackMatchPreview } from '../../../../common/metadata/types';
 import { db } from '../../../db/db';
 import { getSongById } from '../../../db/queries/songs';
-import manageArtistsOfParsedSong from '../../../parseSong/manageArtistsOfParsedSong';
 import manageAlbumArtistOfParsedSongModule from '../../../parseSong/manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSongModule from '../../../parseSong/manageAlbumsOfParsedSong';
+import manageArtistsOfParsedSong from '../../../parseSong/manageArtistsOfParsedSong';
 import manageGenresOfParsedSongModule from '../../../parseSong/manageGenresOfParsedSong';
+import { MetadataHistoryService } from '../../history/MetadataHistoryService';
+import { MetadataApplyService } from '../MetadataApplyService';
+import { TagWriterService, type TagWritePayload, type TagWriteResult } from '../TagWriterService';
 
 /**
- * Earlier tests embed trx-identity assertions inside shared mock
- * implementations, which leak across tests (only .calls are cleared).
- * New tests reset them so stale expectations cannot fail unrelated paths.
+ * Earlier tests embed trx-identity assertions inside shared mock implementations, which leak across
+ * tests (only .calls are cleared). New tests reset them so stale expectations cannot fail unrelated
+ * paths.
  */
 const resetSharedDbMocks = () => {
   vi.mocked(getSongById).mockReset();
   (db.transaction as any).mockReset();
-  vi.mocked(manageArtistsOfParsedSong).mockReset().mockResolvedValue({ newArtists: [], relevantArtists: [] });
-  vi.mocked(manageAlbumArtistOfParsedSongModule).mockReset().mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] });
+  vi.mocked(manageArtistsOfParsedSong)
+    .mockReset()
+    .mockResolvedValue({ newArtists: [], relevantArtists: [] });
+  vi.mocked(manageAlbumArtistOfParsedSongModule)
+    .mockReset()
+    .mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] });
   vi.mocked(manageAlbumsOfParsedSongModule).mockReset().mockResolvedValue({
     relevantAlbum: undefined,
     newAlbum: undefined,
     relevantAlbumArtists: []
   });
-  vi.mocked(manageGenresOfParsedSongModule).mockReset().mockResolvedValue({ newGenres: [], relevantGenres: [] });
+  vi.mocked(manageGenresOfParsedSongModule)
+    .mockReset()
+    .mockResolvedValue({ newGenres: [], relevantGenres: [] });
 };
 
 vi.mock('../../../db/db', () => ({
@@ -54,8 +61,12 @@ vi.mock('../../../parseSong/manageArtistsOfParsedSong', () => ({
 
 const { manageAlbumArtistOfParsedSong, manageAlbumsOfParsedSong } = vi.hoisted(() => ({
   // Default: album resolved but no id - keeps legacy tests on the no-link path
-  manageAlbumsOfParsedSong: vi.fn().mockResolvedValue({ relevantAlbum: undefined, newAlbum: undefined }),
-  manageAlbumArtistOfParsedSong: vi.fn().mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] })
+  manageAlbumsOfParsedSong: vi
+    .fn()
+    .mockResolvedValue({ relevantAlbum: undefined, newAlbum: undefined }),
+  manageAlbumArtistOfParsedSong: vi
+    .fn()
+    .mockResolvedValue({ newAlbumArtists: [], relevantAlbumArtists: [] })
 }));
 
 vi.mock('../../../parseSong/manageAlbumArtistOfParsedSong', () => ({
@@ -85,19 +96,23 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     const mockWriteBatch = vi.fn();
 
     // First call: writing new tags for 4 files (index 1 fails, indices 0, 2, 3 succeed)
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return [
-        { filePath: payloads[0].filePath, success: true },
-        { filePath: payloads[1].filePath, success: false, error: 'EACCES: permission denied' },
-        { filePath: payloads[2].filePath, success: true },
-        { filePath: payloads[3].filePath, success: true }
-      ];
-    });
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return [
+          { filePath: payloads[0].filePath, success: true },
+          { filePath: payloads[1].filePath, success: false, error: 'EACCES: permission denied' },
+          { filePath: payloads[2].filePath, success: true },
+          { filePath: payloads[3].filePath, success: true }
+        ];
+      }
+    );
 
     // Second call: rollback batch for the 3 files that succeeded
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      }
+    );
 
     const mockTagWriter = {
       writeBatch: mockWriteBatch
@@ -122,7 +137,16 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         applyTrack: true,
         oldTitle: 'Old Title 1',
         remoteTitle: 'New Title 1',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 1',
+            suggestedValue: 'New Title 1',
+            status: 'changed',
+            applyField: true
+          }
+        ]
       },
       {
         localSongId: 2,
@@ -136,7 +160,16 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         applyTrack: true,
         oldTitle: 'Old Title 2',
         remoteTitle: 'New Title 2',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 2',
+            suggestedValue: 'New Title 2',
+            status: 'changed',
+            applyField: true
+          }
+        ]
       },
       {
         localSongId: 3,
@@ -150,7 +183,16 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         applyTrack: true,
         oldTitle: 'Old Title 3',
         remoteTitle: 'New Title 3',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 3', suggestedValue: 'New Title 3', status: 'changed', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 3',
+            suggestedValue: 'New Title 3',
+            status: 'changed',
+            applyField: true
+          }
+        ]
       },
       {
         localSongId: 4,
@@ -164,7 +206,16 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         applyTrack: true,
         oldTitle: 'Old Title 4',
         remoteTitle: 'New Title 4',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 4', suggestedValue: 'New Title 4', status: 'changed', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 4',
+            suggestedValue: 'New Title 4',
+            status: 'changed',
+            applyField: true
+          }
+        ]
       }
     ];
 
@@ -206,14 +257,18 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     const mockWriteBatch = vi.fn();
 
     // First call: all physical writes succeed for 2 tracks
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      }
+    );
 
     // Second call: rollback batch for all physical writes
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      }
+    );
 
     const mockTagWriter = {
       writeBatch: mockWriteBatch
@@ -272,8 +327,22 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         oldTitle: 'Old Title 1',
         remoteTitle: 'New Title 1',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 1', suggestedValue: 'New Title 1', status: 'changed', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 1', suggestedValue: 'New Artist 1', status: 'changed', applyField: true }
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 1',
+            suggestedValue: 'New Title 1',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'artist',
+            fieldName: 'Artist',
+            oldValue: 'Old Artist 1',
+            suggestedValue: 'New Artist 1',
+            status: 'changed',
+            applyField: true
+          }
         ]
       },
       {
@@ -289,8 +358,22 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         oldTitle: 'Old Title 2',
         remoteTitle: 'New Title 2',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Old Title 2', suggestedValue: 'New Title 2', status: 'changed', applyField: true },
-          { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Old Artist 2', suggestedValue: 'New Artist 2', status: 'changed', applyField: true }
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Old Title 2',
+            suggestedValue: 'New Title 2',
+            status: 'changed',
+            applyField: true
+          },
+          {
+            fieldId: 'artist',
+            fieldName: 'Artist',
+            oldValue: 'Old Artist 2',
+            suggestedValue: 'New Artist 2',
+            status: 'changed',
+            applyField: true
+          }
         ]
       }
     ];
@@ -328,15 +411,19 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
     const mockWriteBatch = vi.fn();
 
     // First call: track 1 fails, track 2 succeeds -> rollback only track 2
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return [
-        { filePath: payloads[0].filePath, success: false, error: 'EPERM' },
-        { filePath: payloads[1].filePath, success: true }
-      ];
-    });
-    mockWriteBatch.mockImplementationOnce(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return [
+          { filePath: payloads[0].filePath, success: false, error: 'EPERM' },
+          { filePath: payloads[1].filePath, success: true }
+        ];
+      }
+    );
+    mockWriteBatch.mockImplementationOnce(
+      async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      }
+    );
 
     const service = new MetadataApplyService({
       tagWriter: { writeBatch: mockWriteBatch } as unknown as TagWriterService,
@@ -360,11 +447,24 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         applyTrack: true,
         oldTitle: 'Was Empty',
         suggestedTitle: 'Now Tagged',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'Was Empty', suggestedValue: 'Now Tagged', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Was Empty',
+            suggestedValue: 'Now Tagged',
+            applyField: true
+          }
+        ]
       }
     ];
 
-    const preview: any = { album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] };
+    const preview: any = {
+      album: { title: 'X' },
+      matches,
+      globalMutations: {},
+      unmatchedFiles: []
+    };
     await service.applyPreview(preview);
 
     expect(mockWriteBatch).toHaveBeenCalledTimes(2);
@@ -475,9 +575,11 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
   });
 
   it('writes isrc and musicBrainzRecordingId to BOTH file payloads and DB scalar columns', async () => {
-    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    const mockWriteBatch = vi
+      .fn()
+      .mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      });
 
     const setCalls: Array<Record<string, unknown>> = [];
     const mockTrx = {
@@ -505,12 +607,29 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         oldTitle: 'Old',
         suggestedTitle: 'New',
         fieldDiffs: [
-          { fieldId: 'isrc', fieldName: 'ISRC', oldValue: undefined, suggestedValue: 'USUM71700001', applyField: true },
-          { fieldId: 'musicBrainzRecordingId', fieldName: 'MBID', oldValue: undefined, suggestedValue: 'mbid-new', applyField: true }
+          {
+            fieldId: 'isrc',
+            fieldName: 'ISRC',
+            oldValue: undefined,
+            suggestedValue: 'USUM71700001',
+            applyField: true
+          },
+          {
+            fieldId: 'musicBrainzRecordingId',
+            fieldName: 'MBID',
+            oldValue: undefined,
+            suggestedValue: 'mbid-new',
+            applyField: true
+          }
         ]
       }
     ];
-    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+    await service.applyPreview({
+      album: { title: 'X' },
+      matches,
+      globalMutations: {},
+      unmatchedFiles: []
+    } as any);
 
     // File side: TagLib frames receive the recording identities
     expect(mockWriteBatch.mock.calls[0][0][0]).toMatchObject({
@@ -526,9 +645,11 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
   });
 
   it('never touches identity fields when diffs are absent or effectively empty', async () => {
-    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    const mockWriteBatch = vi
+      .fn()
+      .mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      });
 
     const setCalls: Array<Record<string, unknown>> = [];
     const mockTrx = {
@@ -555,7 +676,15 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         matchConfidence: 0.9,
         applyTrack: true,
         oldTitle: 'A',
-        fieldDiffs: [{ fieldId: 'title', fieldName: 'Title', oldValue: 'A', suggestedValue: 'B', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'A',
+            suggestedValue: 'B',
+            applyField: true
+          }
+        ]
       },
       {
         // Whitespace-only diff value -> guarded as intentionally-empty, not written
@@ -564,10 +693,23 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         matchConfidence: 0.9,
         applyTrack: true,
         oldTitle: 'B',
-        fieldDiffs: [{ fieldId: 'isrc', fieldName: 'ISRC', oldValue: 'OLD', suggestedValue: '   ', applyField: true }]
+        fieldDiffs: [
+          {
+            fieldId: 'isrc',
+            fieldName: 'ISRC',
+            oldValue: 'OLD',
+            suggestedValue: '   ',
+            applyField: true
+          }
+        ]
       }
     ];
-    await service.applyPreview({ album: { title: 'X' }, matches, globalMutations: {}, unmatchedFiles: [] } as any);
+    await service.applyPreview({
+      album: { title: 'X' },
+      matches,
+      globalMutations: {},
+      unmatchedFiles: []
+    } as any);
 
     const payloads = mockWriteBatch.mock.calls[0][0] as TagWritePayload[];
     expect(payloads[0].isrc).toBeUndefined();
@@ -579,9 +721,11 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
   });
 
   it('links albums_artists from the release-level albumArtist, never the track artist', async () => {
-    const mockWriteBatch = vi.fn().mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
-      return payloads.map((p) => ({ filePath: p.filePath, success: true }));
-    });
+    const mockWriteBatch = vi
+      .fn()
+      .mockImplementation(async (payloads: TagWritePayload[]): Promise<TagWriteResult[]> => {
+        return payloads.map((p) => ({ filePath: p.filePath, success: true }));
+      });
     const setCalls: Array<Record<string, unknown>> = [];
     const mockTrx = {
       update: vi.fn().mockReturnValue({
@@ -614,7 +758,13 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
         oldAlbumArtist: 'Various Artists',
         oldAlbum: 'Compilation',
         fieldDiffs: [
-          { fieldId: 'title', fieldName: 'Title', oldValue: 'Track', suggestedValue: 'Track (Remastered)', applyField: true }
+          {
+            fieldId: 'title',
+            fieldName: 'Title',
+            oldValue: 'Track',
+            suggestedValue: 'Track (Remastered)',
+            applyField: true
+          }
         ]
       }
     ];
@@ -722,7 +872,15 @@ describe('MetadataApplyService — Production Drizzle Transaction & Rollback Inv
       id: 'snap-legacy',
       timestamp: Date.now(),
       description: 'AutoTag apply (pre-albumArtist capture)',
-      previousSongs: [{ songId: 1, path: '/m/a.mp3', title: 'Original Title', artist: 'Some Artist', album: 'Album' }],
+      previousSongs: [
+        {
+          songId: 1,
+          path: '/m/a.mp3',
+          title: 'Original Title',
+          artist: 'Some Artist',
+          album: 'Album'
+        }
+      ],
       updatedSongs: []
     });
 

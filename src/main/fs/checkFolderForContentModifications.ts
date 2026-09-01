@@ -4,10 +4,10 @@ import path from 'path';
 import { getFolderFromPath } from '@main/db/queries/folders';
 import { isSongWithPathAvailable } from '@main/db/queries/songs';
 
+import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import { supportedMusicExtensions } from '../filesystem';
 import logger from '../logger';
 import { sendMessageToRenderer } from '../main';
-import { processSongsWithWorkerPool } from '../core/songWorkerPool';
 import removeSongsFromLibrary from '../removeSongsFromLibrary';
 
 const getFolderDirs = async (folderPath: string) => {

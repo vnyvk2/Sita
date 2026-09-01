@@ -1,21 +1,20 @@
-import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-
-import { drizzle as drizzleProxy } from 'drizzle-orm/sqlite-proxy';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import * as schema from '@db/schema';
 import logger from '@main/logger';
+import { drizzle as drizzleProxy } from 'drizzle-orm/sqlite-proxy';
 
 import { BASELINE_DDL, SCHEMA_VERSION } from './ddl';
 
 /**
  * SQLite engine (node:sqlite) for Nora's main process.
  *
- * Durability posture (sqlite-poc RESULTS.md §3b / b14): WAL + synchronous=NORMAL —
- * commits survive power loss (at worst the last uncommitted WAL frame is lost; no
- * corruption). busy_timeout covers straggler writers during close windows.
+ * Durability posture (sqlite-poc RESULTS.md §3b / b14): WAL + synchronous=NORMAL — commits survive
+ * power loss (at worst the last uncommitted WAL frame is lost; no corruption). busy_timeout covers
+ * straggler writers during close windows.
  */
 export const SQLITE_PRAGMAS = [
   'PRAGMA journal_mode = WAL;',
@@ -35,7 +34,10 @@ export interface SqliteEngine {
   orm: NoraDrizzle;
   initMs: { open: number; pragma: number; ddl: number };
   exec: (sql: string) => void;
-  run: (sql: string, params?: unknown[]) => { changes: number | bigint; lastInsertRowid: number | bigint };
+  run: (
+    sql: string,
+    params?: unknown[]
+  ) => { changes: number | bigint; lastInsertRowid: number | bigint };
   all: (sql: string, params?: unknown[]) => Record<string, unknown>[];
   get: (sql: string, params?: unknown[]) => Record<string, unknown> | undefined;
   close: () => Promise<number>;
@@ -68,17 +70,17 @@ function buildDrizzle(db: DatabaseSync) {
 
   type AsyncRemoteCallback = Parameters<typeof drizzleProxy>[0];
   const callback = (async (sqlText: string, params: unknown[], method: string) => {
-      const stmt = prepared(sqlText);
-      if (method === 'run') {
-        stmt.run(...(params as never[]));
-        return { rows: [] };
-      }
-      if (method === 'get') {
-        const row = stmt.get(...(params as never[]));
-        return { rows: row ?? undefined };
-      }
-      return { rows: stmt.all(...(params as never[])) };
-    }) as unknown as AsyncRemoteCallback;
+    const stmt = prepared(sqlText);
+    if (method === 'run') {
+      stmt.run(...(params as never[]));
+      return { rows: [] };
+    }
+    if (method === 'get') {
+      const row = stmt.get(...(params as never[]));
+      return { rows: row ?? undefined };
+    }
+    return { rows: stmt.all(...(params as never[])) };
+  }) as unknown as AsyncRemoteCallback;
 
   // NOTE: sqlite-proxy's signature is (callback, batchCallbackOrConfig, config?) —
   // with no batch callback, the config object is the SECOND argument.
@@ -118,7 +120,8 @@ function buildDrizzle(db: DatabaseSync) {
 
   const originalTransaction = orm.transaction.bind(orm);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (orm as any).transaction = (fn: any, config: any) => withTxLock(() => originalTransaction(fn, config));
+  (orm as any).transaction = (fn: any, config: any) =>
+    withTxLock(() => originalTransaction(fn, config));
 
   const guardBareStatement = (builder: any): any => {
     if (!builder || (typeof builder !== 'object' && typeof builder !== 'function')) return builder;
@@ -189,9 +192,14 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
 
   // Baseline schema & migrations: stamped via user_version.
   let ddlMs = 0;
-  const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+  const version = (db.prepare('PRAGMA user_version').get() as { user_version: number })
+    .user_version;
   const tablesCount = (
-    db.prepare("SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='user_settings'").get() as { cnt: number }
+    db
+      .prepare(
+        "SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='user_settings'"
+      )
+      .get() as { cnt: number }
   ).cnt;
   const isFreshDb = tablesCount === 0;
 
@@ -218,12 +226,16 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
         COMMIT;
       `);
       currentVersion = 2;
-      logger.info(`SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`);
+      logger.info(
+        `SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`
+      );
     }
 
     // Defensive check: ensure all required v2 columns exist on user_settings
     const userSettingsCols = new Set(
-      (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map((c) => c.name)
+      (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+        (c) => c.name
+      )
     );
     if (!userSettingsCols.has('send_song_scrobbling_data_to_listenbrainz')) {
       logger.warn('Detected missing ListenBrainz columns on user_settings; applying schema repair');
@@ -251,12 +263,15 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     orm,
     initMs: { open: openMs, pragma: pragmaMs, ddl: ddlMs },
     exec: (sql) => db.exec(sql),
-    run: (sql, params = []) => preparedObj(sql).run(...(params as never[])) as {
-      changes: number | bigint;
-      lastInsertRowid: number | bigint;
-    },
-    all: (sql, params = []) => preparedObj(sql).all(...(params as never[])) as Record<string, unknown>[],
-    get: (sql, params = []) => preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
+    run: (sql, params = []) =>
+      preparedObj(sql).run(...(params as never[])) as {
+        changes: number | bigint;
+        lastInsertRowid: number | bigint;
+      },
+    all: (sql, params = []) =>
+      preparedObj(sql).all(...(params as never[])) as Record<string, unknown>[],
+    get: (sql, params = []) =>
+      preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
     close: async () => {
       const t = performance.now();
       try {

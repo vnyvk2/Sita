@@ -15,8 +15,8 @@ vi.mock('@db/db', () => ({
 import type { SongPersistenceDTO } from '@main/metadata/models/dtos';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
-import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 import { DatabaseMetadataRepository } from '@main/metadata/repository/DatabaseMetadataRepository';
+import type { IEntityLoader } from '@main/metadata/repository/strategies/IEntityLoader';
 
 describe('DatabaseMetadataRepository', () => {
   it('should find DTO using registered strategy loaders', async () => {

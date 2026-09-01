@@ -33,7 +33,10 @@ export class MetadataSnapshot {
 
   public diff(
     other: MetadataSnapshot
-  ): Record<string, { current: MetadataValue<unknown> | null; other: MetadataValue<unknown> | null }> {
+  ): Record<
+    string,
+    { current: MetadataValue<unknown> | null; other: MetadataValue<unknown> | null }
+  > {
     const diffs: Record<
       string,
       { current: MetadataValue<unknown> | null; other: MetadataValue<unknown> | null }

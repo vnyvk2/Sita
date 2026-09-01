@@ -1,6 +1,7 @@
 import { linkArtworksToGenre } from '@main/db/queries/artworks';
 import { createGenre, getGenreWithTitle, linkSongToGenre } from '@main/db/queries/genres';
 import type { genres } from '@main/db/schema';
+
 import { parseGenreList } from '../../common/genreUtils';
 
 const manageGenresOfParsedSong = async (

@@ -135,8 +135,9 @@ export function detectLanguageFromScript(
 
 /**
  * Executes the language detection pipeline with strict priority:
+ *
  * 1. Embedded audio file tags (ID3 TLAN, Vorbis LANGUAGE)
- * 2. Folder path check (/Telugu/, \Hindi\, etc.)
+ * 2. Folder path check (/Telugu/, \Hindi, etc.)
  * 3. Unicode script range check (Telugu, Tamil, Hindi, Korean, Japanese, etc.)
  * 4. Fallback: undefined (Unspecified)
  */

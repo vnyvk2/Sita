@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import { ProviderRetryPolicy } from '@main/metadata/providers/retry/ProviderRetryPolicy';
+import { describe, expect, it } from 'vitest';
 
 describe('ProviderRetryPolicy', () => {
   it('should retry failed calls up to maxAttempts', async () => {

@@ -1,7 +1,10 @@
-import { collectionEventBus } from '../../collections/events/CollectionEventBus';
 import type { PlaylistEngine } from '../../collections/engine/PlaylistEngine';
+import { collectionEventBus } from '../../collections/events/CollectionEventBus';
 import type { PlaylistRepository } from '../../collections/repositories/PlaylistRepository';
-import type { PlaylistPersistence, PlaylistEntryWriteModel } from '../interfaces/PlaylistPersistence';
+import type {
+  PlaylistPersistence,
+  PlaylistEntryWriteModel
+} from '../interfaces/PlaylistPersistence';
 import type { PlaylistUndoPersistence } from '../interfaces/PlaylistUndoPersistence';
 
 export class EnginePlaylistPersistence implements PlaylistPersistence, PlaylistUndoPersistence {

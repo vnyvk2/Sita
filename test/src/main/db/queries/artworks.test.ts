@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
 import { syncAlbumArtworks } from '@main/db/queries/artworks';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('syncAlbumArtworks (BUG-08 Preservation of LOCAL artwork)', () => {
-  const createMockDb = (existingLinks: Array<{ artworkId: number; source: 'LOCAL' | 'REMOTE' }>) => {
+  const createMockDb = (
+    existingLinks: Array<{ artworkId: number; source: 'LOCAL' | 'REMOTE' }>
+  ) => {
     const deletedArtworkIds: number[] = [];
     const insertedRecords: Array<{ albumId: number; artworkId: number }> = [];
 

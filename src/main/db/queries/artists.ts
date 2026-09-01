@@ -151,7 +151,12 @@ export const getAllArtists = async (
 
       // Filter by artist names (case-insensitive)
       if (artistNames && artistNames.length > 0) {
-        filters.push(inArray(s.nameCI, artistNames.map((n) => n.toLowerCase())));
+        filters.push(
+          inArray(
+            s.nameCI,
+            artistNames.map((n) => n.toLowerCase())
+          )
+        );
       }
 
       // Apply additional filters based on filterType

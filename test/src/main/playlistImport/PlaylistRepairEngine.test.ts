@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PlaylistRepairEngine } from '@main/playlistImport/repair/PlaylistRepairEngine';
-import { RepairStrategyRegistry } from '@main/playlistImport/registry/RepairStrategyRegistry';
-import { ExactFilenameStrategy } from '@main/playlistImport/strategies/ExactFilenameStrategy';
-import { NormalizedFilenameStrategy } from '@main/playlistImport/strategies/NormalizedFilenameStrategy';
 import type { LibraryCandidateProvider } from '@main/playlistImport/interfaces/LibraryCandidateProvider';
 import type { LibrarySongRecord } from '@main/playlistImport/interfaces/LibraryLookup';
 import type { LibraryResolvedPlaylist } from '@main/playlistImport/models/LibraryResolvedPlaylist';
+import { RepairStrategyRegistry } from '@main/playlistImport/registry/RepairStrategyRegistry';
+import { PlaylistRepairEngine } from '@main/playlistImport/repair/PlaylistRepairEngine';
+import { ExactFilenameStrategy } from '@main/playlistImport/strategies/ExactFilenameStrategy';
+import { NormalizedFilenameStrategy } from '@main/playlistImport/strategies/NormalizedFilenameStrategy';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('PlaylistRepairEngine', () => {
   it('should repair unresolved entries using ExactFilenameStrategy (confidence 95 & matchType REPAIRED)', async () => {
@@ -32,7 +32,11 @@ describe('PlaylistRepairEngine', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'old/location/Bohemian Rhapsody.mp3' },
-              resolution: { originalReference: 'old/location/Bohemian Rhapsody.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
+              resolution: {
+                originalReference: 'old/location/Bohemian Rhapsody.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'FOUND'
+              }
             },
             libraryMatch: { status: 'NOT_IN_LIBRARY', confidence: 0 }
           }
@@ -83,7 +87,11 @@ describe('PlaylistRepairEngine', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'Bohemian-Rhapsody.mp3' },
-              resolution: { originalReference: 'Bohemian-Rhapsody.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
+              resolution: {
+                originalReference: 'Bohemian-Rhapsody.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'FOUND'
+              }
             },
             libraryMatch: { status: 'NOT_IN_LIBRARY', confidence: 0 }
           }
@@ -117,9 +125,18 @@ describe('PlaylistRepairEngine', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'song.mp3' },
-              resolution: { originalReference: 'song.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'FOUND' }
+              resolution: {
+                originalReference: 'song.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'FOUND'
+              }
             },
-            libraryMatch: { status: 'MATCHED', matchType: 'EXACT', confidence: 100, matchedSongId: 10 }
+            libraryMatch: {
+              status: 'MATCHED',
+              matchType: 'EXACT',
+              confidence: 100,
+              matchedSongId: 10
+            }
           }
         },
         {
@@ -127,7 +144,11 @@ describe('PlaylistRepairEngine', () => {
           trackReference: {
             resolvedTrack: {
               track: { originalLocation: 'missing.mp3' },
-              resolution: { originalReference: 'missing.mp3', resolutionStatus: 'RESOLVED', verificationStatus: 'MISSING' }
+              resolution: {
+                originalReference: 'missing.mp3',
+                resolutionStatus: 'RESOLVED',
+                verificationStatus: 'MISSING'
+              }
             },
             libraryMatch: { status: 'MISSING', confidence: 0 }
           }

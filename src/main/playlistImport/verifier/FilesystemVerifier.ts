@@ -1,7 +1,7 @@
 import type { FileSystemAccess } from '../interfaces/FileSystemAccess';
+import type { PathResolutionResult } from '../models/PathResolutionResult';
 import type { ResolvedPlaylist } from '../models/ResolvedPlaylist';
 import type { ResolvedPlaylistEntry } from '../models/ResolvedPlaylistEntry';
-import type { PathResolutionResult } from '../models/PathResolutionResult';
 
 export class FilesystemVerifier {
   constructor(private fileSystem: FileSystemAccess) {}

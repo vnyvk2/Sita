@@ -5,6 +5,8 @@ import { analyticsQuery } from '@renderer/queries/analytics';
 import { artistQuery } from '@renderer/queries/artists';
 import { genreQuery } from '@renderer/queries/genres';
 import { homeQuery } from '@renderer/queries/home';
+import { searchQuery } from '@renderer/queries/search';
+import { settingsQuery } from '@renderer/queries/settings';
 import {
   SONG_WINDOW_SIZE,
   getSongListIdentity,
@@ -12,8 +14,6 @@ import {
   songQuery,
   type SongIdsResult
 } from '@renderer/queries/songs';
-import { searchQuery } from '@renderer/queries/search';
-import { settingsQuery } from '@renderer/queries/settings';
 import { queryClient } from '@renderer/queryClient';
 import { useEffect, useRef } from 'react';
 
@@ -52,11 +52,11 @@ export type InvalidationTargetKey =
  * - Bulk hydration keys are gone: ID lists live under songQuery.ids; row objects live under
  *   ['songs','window',version,start]. 'songs:all' is kept only as a transition-safety net for
  *   consumers not yet converted.
- * - 'songs:windows' requires changed song ids from eventData; the batcher resolves them to the
- *   exact containing window keys of every active ID list (surgical row refresh, no version bump,
- *   no scroll disturbance).
- * - Structural song changes (add/delete/blacklist/tag edits affecting order or filters) bump the
- *   ID lists instead; new versions orphan old windows which gc naturally.
+ * - 'songs:windows' requires changed song ids from eventData; the batcher resolves them to the exact
+ *   containing window keys of every active ID list (surgical row refresh, no version bump, no
+ *   scroll disturbance).
+ * - Structural song changes (add/delete/blacklist/tag edits affecting order or filters) bump the ID
+ *   lists instead; new versions orphan old windows which gc naturally.
  */
 export function getInvalidationTargetsForEvent(
   dataType: DataUpdateEventTypes
@@ -96,7 +96,14 @@ export function getInvalidationTargetsForEvent(
       return ['songs:favorites', 'home:mostLovedSongs', 'songs:singleInfo', 'songs:windows'];
 
     case 'songs/artworks':
-      return ['songs:all', 'songs:allInfo', 'songs:singleInfo', 'songs:windows', 'albums:all', 'albums:single'];
+      return [
+        'songs:all',
+        'songs:allInfo',
+        'songs:singleInfo',
+        'songs:windows',
+        'albums:all',
+        'albums:single'
+      ];
 
     case 'songs/palette':
       return [];
@@ -250,9 +257,9 @@ export const defaultRafScheduler: SchedulerFn = (callback) => {
 };
 
 /**
- * Invalidates exactly the hydration windows that contain the changed song ids, across every
- * cached ID list version. Rows refetch in place (~40KB per window) without bumping the ID list
- * version, so scroll position and list ordering are untouched.
+ * Invalidates exactly the hydration windows that contain the changed song ids, across every cached
+ * ID list version. Rows refetch in place (~40KB per window) without bumping the ID list version, so
+ * scroll position and list ordering are untouched.
  */
 export function invalidateWindowsContainingIds(
   client: typeof queryClient,
@@ -279,7 +286,9 @@ export function invalidateWindowsContainingIds(
       const index = indexById.get(id);
       if (index === undefined) continue;
       const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
-      client.invalidateQueries({ queryKey: songCacheKeys.window(listIdentity, version, windowStart) });
+      client.invalidateQueries({
+        queryKey: songCacheKeys.window(listIdentity, version, windowStart)
+      });
     }
   }
 }
@@ -311,7 +320,10 @@ export class DataSyncBatcher {
       }
     }
 
-    if ((this.pendingTargets.size > 0 || this.pendingChangedIds.size > 0) && !this.cancelScheduledFlush) {
+    if (
+      (this.pendingTargets.size > 0 || this.pendingChangedIds.size > 0) &&
+      !this.cancelScheduledFlush
+    ) {
       this.cancelScheduledFlush = this.scheduler(() => {
         this.flush();
       });

@@ -24,10 +24,7 @@ const CoverImageTile = ({
   };
 
   return (
-    <div
-      className={`h-full w-full overflow-hidden ${className}`}
-      style={combinedStyle}
-    >
+    <div className={`h-full w-full overflow-hidden ${className}`} style={combinedStyle}>
       <Img
         src={src || DefaultImgCover}
         fallbackSrc={DefaultImgCover}

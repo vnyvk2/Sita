@@ -554,8 +554,6 @@ describe('parseSong', () => {
     });
   });
 
-
-
   describe('Eligibility Checks', () => {
     test('should not parse if song already exists', async () => {
       const songPath = '/test/existing-song.mp3';

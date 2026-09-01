@@ -1,21 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-import { and, eq } from 'drizzle-orm';
 import { db } from '@main/db/db';
 import { saveArtworks, syncSongArtworks } from '@main/db/queries/artworks';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import { metadataOverrides, type songs } from '@main/db/schema';
 import { convertToSongData } from '@main/utils/convert';
+import { and, eq } from 'drizzle-orm';
 import { File } from 'node-taglib-sharp';
 
 import { removeDefaultAppProtocolFromFilePath, resetArtworkCache } from '../fs/resolveFilePaths';
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
-import { detectSongLanguage } from './detectLanguage';
-import { libraryScheduler } from '../workers/jobScheduler';
-import { PaletteJob } from '../workers/jobs/paletteJob';
 // (GC job will be dispatched by Maintenance orchestrator)
 import {
   removeDeletedAlbumDataOfSong,
@@ -23,6 +20,9 @@ import {
   removeDeletedGenreDataOfSong
 } from '../removeSongsFromLibrary';
 import { extractFrontCover } from '../utils/extractFrontCover';
+import { PaletteJob } from '../workers/jobs/paletteJob';
+import { libraryScheduler } from '../workers/jobScheduler';
+import { detectSongLanguage } from './detectLanguage';
 import manageAlbumArtistOfParsedSong from './manageAlbumArtistOfParsedSong';
 import manageAlbumsOfParsedSong from './manageAlbumsOfParsedSong';
 import manageArtistsOfParsedSong from './manageArtistsOfParsedSong';
@@ -67,7 +67,9 @@ const reParseSong = async (filePath: string) => {
 
           updatedSong = {
             title: songTitle,
-            duration: Number(getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)),
+            duration: Number(
+              getSongDurationFromSong(file.properties.durationMilliseconds / 1000).toFixed(2)
+            ),
             year: metadata.year || undefined,
             path: songPath,
             sampleRate: file.properties.audioSampleRate,
@@ -77,7 +79,8 @@ const reParseSong = async (filePath: string) => {
             noOfChannels: file.properties.audioChannels,
             diskNumber: metadata.disc ?? undefined,
             trackNumber: metadata.track ?? undefined,
-            musicBrainzRecordingId: metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || null,
+            musicBrainzRecordingId:
+              metadata.musicBrainzTrackId || (metadata as any).musicBrainzRecordingId || null,
             isrc: metadata.isrc || null,
             fileCreatedAt: stats ? stats.birthtime : new Date(),
             fileModifiedAt: stats ? stats.mtime : new Date()
@@ -152,7 +155,11 @@ const reParseSong = async (filePath: string) => {
           );
 
           const { newGenres, relevantGenres } = await manageGenresOfParsedSong(
-            { artworkId: artworkData ? artworkData[0].id : undefined, songId: songData.id, songGenres: genresData },
+            {
+              artworkId: artworkData ? artworkData[0].id : undefined,
+              songId: songData.id,
+              songGenres: genresData
+            },
             trx
           );
 
@@ -170,7 +177,7 @@ const reParseSong = async (filePath: string) => {
             newAlbumArtists
           };
         });
-        
+
         libraryScheduler.requestMaintenance();
 
         if (reparseResult.savedArtworkData && reparseResult.savedArtworkData.length > 0) {

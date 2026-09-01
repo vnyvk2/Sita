@@ -1,9 +1,9 @@
-import { SpecialPlaylists } from '@common/playlists.enum';
 import type { PlaylistDto as CollectionDto } from '@common/collections/dtos';
-import { CollectionClient } from '../../api/CollectionClient';
+import { SpecialPlaylists } from '@common/playlists.enum';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CollectionClient } from '../../api/CollectionClient';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useBulkDeleteCollections } from '../../hooks/collections/useCollectionMutations';
 import Button from '../Button';
@@ -14,7 +14,8 @@ interface ConfirmDeletePlaylistProp {
 }
 
 const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
-  const { addNewNotifications, changePromptMenuData, toggleMultipleSelections } = useContext(AppUpdateContext);
+  const { addNewNotifications, changePromptMenuData, toggleMultipleSelections } =
+    useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const { playlistIds, playlistName } = props;
@@ -45,7 +46,10 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
   const arePlaylistsRemovable = useMemo(() => {
     return (
       numericPlaylistIds.length > 0 &&
-      !playlistIds.some((playlistId) => typeof playlistId === 'number' && SpecialPlaylists.isSpecialPlaylistId(playlistId))
+      !playlistIds.some(
+        (playlistId) =>
+          typeof playlistId === 'number' && SpecialPlaylists.isSpecialPlaylistId(playlistId)
+      )
     );
   }, [playlistIds, numericPlaylistIds]);
 
@@ -71,7 +75,14 @@ const ConfirmDeletePlaylistsPrompt = (props: ConfirmDeletePlaylistProp) => {
         onError: (err) => console.error('Failed to bulk delete playlists:', err)
       }
     );
-  }, [addNewNotifications, changePromptMenuData, toggleMultipleSelections, numericPlaylistIds, t, bulkDelete]);
+  }, [
+    addNewNotifications,
+    changePromptMenuData,
+    toggleMultipleSelections,
+    numericPlaylistIds,
+    t,
+    bulkDelete
+  ]);
 
   return (
     <>

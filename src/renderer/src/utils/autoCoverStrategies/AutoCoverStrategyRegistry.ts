@@ -2,8 +2,8 @@ import type { AutoCoverStrategyId } from '../../types/playlistCover';
 import type { AutoCoverStrategy } from './AutoCoverStrategy';
 import { FirstNStrategy } from './FirstNStrategy';
 import { MostPlayedStrategy } from './MostPlayedStrategy';
-import { RecentlyAddedStrategy } from './RecentlyAddedStrategy';
 import { RandomStrategy } from './RandomStrategy';
+import { RecentlyAddedStrategy } from './RecentlyAddedStrategy';
 
 export const AUTO_COVER_STRATEGIES: readonly AutoCoverStrategy[] = [
   FirstNStrategy,

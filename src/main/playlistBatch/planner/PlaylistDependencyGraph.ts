@@ -51,7 +51,9 @@ export class PlaylistDependencyGraph {
       );
 
       if (currentLevel.length === 0) {
-        throw new Error('Circular dependency or unsatisfied requirement detected in execution levels calculation');
+        throw new Error(
+          'Circular dependency or unsatisfied requirement detected in execution levels calculation'
+        );
       }
 
       const levelIds = currentLevel.map((i) => i.id);

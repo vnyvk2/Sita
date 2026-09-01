@@ -27,7 +27,10 @@ const getLyricPlainText = (text?: string | SyncedLyricsLineWord[]): string => {
     if (match?.groups?.lyric) return match.groups.lyric.trim();
     return text;
   }
-  return text.map((word) => word.text).join(' ').trim();
+  return text
+    .map((word) => word.text)
+    .join(' ')
+    .trim();
 };
 
 const CompactLyricsPanel = (props: Props) => {
@@ -102,15 +105,15 @@ const CompactLyricsPanel = (props: Props) => {
   return (
     <div
       data-testid="compact-lyrics-panel"
-      className="compact-lyrics-panel relative flex h-[160px] min-h-[160px] w-full flex-col justify-between overflow-hidden bg-black/75 select-none border-t border-white/10 [-webkit-app-region:no-drag]"
+      className="compact-lyrics-panel relative flex h-[160px] min-h-[160px] w-full flex-col justify-between overflow-hidden border-t border-white/10 bg-black/75 select-none [-webkit-app-region:no-drag]"
     >
       {/* ── Layer 1: Ambient Blurred Artwork Background (z-0) ── */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Img
           src={currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath}
           fallbackSrc={DefaultSongCover}
           alt="Album Art Ambient Background"
-          className="h-full w-full object-cover blur-2xl brightness-[0.35] scale-125 transition-[filter,transform] duration-500"
+          className="h-full w-full scale-125 object-cover blur-2xl brightness-[0.35] transition-[filter,transform] duration-500"
         />
         <div className="absolute inset-0 bg-black/60" />
       </div>
@@ -118,7 +121,7 @@ const CompactLyricsPanel = (props: Props) => {
       {/* ── Layer 2: Floating Close Button (z-30) ── */}
       <button
         type="button"
-        className="absolute top-2 right-2 z-30 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 text-font-color-white/70 transition-colors hover:bg-[#e81123] hover:text-white"
+        className="text-font-color-white/70 absolute top-2 right-2 z-30 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
         onClick={onClose}
         title={t('common.close', 'Close')}
       >
@@ -130,7 +133,7 @@ const CompactLyricsPanel = (props: Props) => {
         ref={scrollContainerRef}
         onWheel={handleUserInteraction}
         onTouchMove={handleUserInteraction}
-        className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto px-4 py-6 scrollbar-none text-center select-none"
+        className="relative z-10 min-h-0 w-full flex-1 scrollbar-none overflow-y-auto px-4 py-6 text-center select-none"
       >
         {/* ── Synced Lyrics List ── */}
         {lyrics && isSynced && parsedLyrics.length > 0 && (
@@ -149,8 +152,8 @@ const CompactLyricsPanel = (props: Props) => {
                   onClick={() => handleLineClick(line.start)}
                   className={`max-w-full cursor-pointer px-2 transition-all duration-200 ${
                     isActive
-                      ? 'text-sm font-semibold text-font-color-highlight scale-105 drop-shadow-sm py-1'
-                      : 'text-[11px] font-normal text-font-color-white/50 hover:text-font-color-white/90 py-0.5'
+                      ? 'text-font-color-highlight scale-105 py-1 text-sm font-semibold drop-shadow-sm'
+                      : 'text-font-color-white/50 hover:text-font-color-white/90 py-0.5 text-[11px] font-normal'
                   }`}
                 >
                   {text}
@@ -166,7 +169,7 @@ const CompactLyricsPanel = (props: Props) => {
             {parsedLyrics.map((line, idx) => (
               <div
                 key={idx}
-                className="max-w-full py-0.5 text-xs text-font-color-white/80 leading-relaxed"
+                className="text-font-color-white/80 max-w-full py-0.5 text-xs leading-relaxed"
               >
                 {getLyricPlainText(line.originalText)}
               </div>
@@ -176,13 +179,13 @@ const CompactLyricsPanel = (props: Props) => {
 
         {/* ── Loading / Empty States ── */}
         {lyrics === null && (
-          <div className="flex h-full min-h-[90px] items-center justify-center text-xs text-font-color-white/60">
+          <div className="text-font-color-white/60 flex h-full min-h-[90px] items-center justify-center text-xs">
             {t('lyricsPage.loadingLyrics', 'Loading lyrics...')}
           </div>
         )}
 
         {lyrics !== null && parsedLyrics.length === 0 && (
-          <div className="flex h-full min-h-[90px] items-center justify-center text-xs text-font-color-white/60">
+          <div className="text-font-color-white/60 flex h-full min-h-[90px] items-center justify-center text-xs">
             {t('lyricsPage.noLyrics', 'No lyrics available')}
           </div>
         )}
@@ -190,7 +193,7 @@ const CompactLyricsPanel = (props: Props) => {
 
       {/* ── Layer 4: Pinned Attribution Footer (z-10 outside scrolling viewport) ── */}
       {lyrics?.source && (
-        <div className="relative z-10 text-[9px] text-font-color-white/40 text-center select-none truncate py-1 border-t border-white/5 bg-black/20">
+        <div className="text-font-color-white/40 relative z-10 truncate border-t border-white/5 bg-black/20 py-1 text-center text-[9px] select-none">
           {lyrics.source}
         </div>
       )}
@@ -199,4 +202,3 @@ const CompactLyricsPanel = (props: Props) => {
 };
 
 export default CompactLyricsPanel;
-

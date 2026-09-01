@@ -1,34 +1,26 @@
 /**
  * Fetches the external binaries required by the online download feature:
- *   - yt-dlp  (search/stream extraction backend)
- *   - ffmpeg + ffprobe (reserved for edge cases; not used in the normal download path)
  *
- * Binaries are placed in resources/bin/ which is gitignored and included in packaged
- * builds through the existing `asarUnpack: resources/**` rule.
+ * - Yt-dlp (search/stream extraction backend)
+ * - Ffmpeg + ffprobe (reserved for edge cases; not used in the normal download path)
  *
- * Usage:
- *   node scripts/fetch-binaries.mjs            # skips anything already present
- *   node scripts/fetch-binaries.mjs --force    # re-downloads even if present
+ * Binaries are placed in resources/bin/ which is gitignored and included in packaged builds through
+ * the existing `asarUnpack: resources/**` rule.
  *
- * Optional pin (falls back to latest release when unset):
- *   NORA_YTDLP_VERSION=2025.06.30   (a release tag of yt-dlp/yt-dlp)
+ * Usage: node scripts/fetch-binaries.mjs # skips anything already present node
+ * scripts/fetch-binaries.mjs --force # re-downloads even if present
+ *
+ * Optional pin (falls back to latest release when unset): NORA_YTDLP_VERSION=2025.06.30 (a release
+ * tag of yt-dlp/yt-dlp)
  */
 
 import { spawnSync } from 'child_process';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync
-} from 'fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'fs';
+import { createWriteStream } from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
-import { fileURLToPath } from 'url';
-import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
+import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN_DIR = path.resolve(__dirname, '..', 'resources', 'bin');

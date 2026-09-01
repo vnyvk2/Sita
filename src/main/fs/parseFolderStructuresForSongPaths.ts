@@ -161,14 +161,20 @@ const parseFolderStructuresForSongPaths = async (folderStructures: FolderStructu
       getAllFilePathsFromFolder(folder.path).map((songPath) => ({ songPath, folder }))
     )
     .flat();
-    
-  logger.info(`All files found in relevant folders`, { count: allFilesData.length, sample: allFilesData.slice(0, 5).map(x => x.songPath) });
+
+  logger.info(`All files found in relevant folders`, {
+    count: allFilesData.length,
+    sample: allFilesData.slice(0, 5).map((x) => x.songPath)
+  });
 
   const allSongPaths = allFilesData.filter((file) => {
     const fileExtension = path.extname(file.songPath).toLowerCase();
     const isSupported = supportedMusicExtensions.includes(fileExtension);
     if (!isSupported) {
-      logger.info(`Skipped file due to unsupported extension`, { fileExtension, songPath: file.songPath });
+      logger.info(`Skipped file due to unsupported extension`, {
+        fileExtension,
+        songPath: file.songPath
+      });
     }
     return isSupported;
   });

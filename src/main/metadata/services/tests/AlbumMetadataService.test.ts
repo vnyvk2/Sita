@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TrackMatcher } from '../../matching/TrackMatcher';
-import { AlbumMetadataService, getConfidenceLevel } from '../AlbumMetadataService';
-import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
-import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
-import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
+
 import { RequestPipeline } from '../../../platform/networking/RequestPipeline';
 import { IdentityResolutionCache } from '../../cache/IdentityResolutionCache';
 import type { IMetadataProviderAdapter } from '../../contracts/IMetadataProviderAdapter';
 import { ProviderCapabilities, ProviderCapability } from '../../contracts/ProviderCapabilities';
 import { ProviderState } from '../../contracts/ProviderStatus';
+import { TrackMatcher } from '../../matching/TrackMatcher';
+import { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
+import { MusicBrainzApiClient } from '../../providers/musicbrainz/MusicBrainzApiClient';
+import { MetadataProviderRuntime } from '../../runtime/MetadataProviderRuntime';
+import { AlbumMetadataService, getConfidenceLevel } from '../AlbumMetadataService';
 
 describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider Runtime Suite', () => {
   it('maps confidence scores to confidence levels cleanly via getConfidenceLevel helper', () => {
@@ -17,7 +18,7 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
     expect(getConfidenceLevel(0.92)).toBe('Very Good');
     expect(getConfidenceLevel(0.85)).toBe('Good');
     expect(getConfidenceLevel(0.72)).toBe('Review');
-    expect(getConfidenceLevel(0.50)).toBe('Poor');
+    expect(getConfidenceLevel(0.5)).toBe('Poor');
   });
 
   it('generates presentation-agnostic clean why match explanation strings without symbols', () => {
@@ -56,7 +57,12 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
   it('tracks health status per provider independently in getProviderStatus', async () => {
     const failingAdapter: IMetadataProviderAdapter = {
       priority: 200,
-      identity: { id: 'discogs', name: 'Discogs Provider', version: '1.0.0', providerType: 'online' },
+      identity: {
+        id: 'discogs',
+        name: 'Discogs Provider',
+        version: '1.0.0',
+        providerType: 'online'
+      },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
@@ -66,14 +72,27 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
 
     const successfulAdapter: IMetadataProviderAdapter = {
       priority: 100,
-      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      identity: {
+        id: 'musicbrainz',
+        name: 'MusicBrainz Provider',
+        version: '1.0.0',
+        providerType: 'online'
+      },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
       search: vi.fn(),
-      searchAlbums: vi.fn().mockResolvedValue([
-        { title: 'SOUR', artist: 'Olivia Rodrigo', releaseId: 'mb-sour', provider: 'musicbrainz', year: 2021 }
-      ])
+      searchAlbums: vi
+        .fn()
+        .mockResolvedValue([
+          {
+            title: 'SOUR',
+            artist: 'Olivia Rodrigo',
+            releaseId: 'mb-sour',
+            provider: 'musicbrainz',
+            year: 2021
+          }
+        ])
     };
 
     const runtime = new MetadataProviderRuntime([failingAdapter, successfulAdapter]);
@@ -92,7 +111,12 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
 
   it('prevents accidental duplicate provider registrations unless overwrite=true', () => {
     const adapter: IMetadataProviderAdapter = {
-      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      identity: {
+        id: 'musicbrainz',
+        name: 'MusicBrainz Provider',
+        version: '1.0.0',
+        providerType: 'online'
+      },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
@@ -106,7 +130,12 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
 
   it('preserves distinct release years during deduplication (title::artist::year)', async () => {
     const adapter: IMetadataProviderAdapter = {
-      identity: { id: 'musicbrainz', name: 'MusicBrainz Provider', version: '1.0.0', providerType: 'online' },
+      identity: {
+        id: 'musicbrainz',
+        name: 'MusicBrainz Provider',
+        version: '1.0.0',
+        providerType: 'online'
+      },
       capabilities: new ProviderCapabilities([ProviderCapability.Search]),
       supports: () => true,
       lookup: vi.fn(),
@@ -163,7 +192,13 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
           tracks: [
             { id: 't1', title: 'brutal', length: 203000, position: 1, recording: { id: 'rec-1' } },
             { id: 't2', title: 'traitor', length: 229000, position: 2, recording: { id: 'rec-2' } },
-            { id: 't3', title: 'drivers license', length: 242000, position: 3, recording: { id: 'rec-3' } }
+            {
+              id: 't3',
+              title: 'drivers license',
+              length: 242000,
+              position: 3,
+              recording: { id: 'rec-3' }
+            }
           ]
         }
       ]
@@ -176,7 +211,10 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
     expect(searchResults[0].provider).toBe('musicbrainz');
 
     // 2. Resolve Release Details
-    const resolvedRelease = await service.resolveRelease(searchResults[0].releaseId!, searchResults[0].provider);
+    const resolvedRelease = await service.resolveRelease(
+      searchResults[0].releaseId!,
+      searchResults[0].provider
+    );
     expect(resolvedRelease).not.toBeNull();
     expect(resolvedRelease?.tracks).toHaveLength(3);
     expect(resolvedRelease?.providerReleaseId).toBe('mb-rel-sour');
@@ -191,10 +229,20 @@ describe('Phase 3 Complete — Production-Grade Metadata Engine & Multi-Provider
     const localSongs = [
       { songId: 101, title: 'brutal', artist: 'Olivia Rodrigo', path: '01.mp3', duration: 203 },
       { songId: 102, title: 'traitor', artist: 'Olivia Rodrigo', path: '02.mp3', duration: 229 },
-      { songId: 103, title: 'drivers license', artist: 'Olivia Rodrigo', path: '03.mp3', duration: 242 }
+      {
+        songId: 103,
+        title: 'drivers license',
+        artist: 'Olivia Rodrigo',
+        path: '03.mp3',
+        duration: 242
+      }
     ];
 
-    const preview = await service.buildAlbumMatch(localSongs, resolvedRelease!.album, resolvedRelease!.tracks);
+    const preview = await service.buildAlbumMatch(
+      localSongs,
+      resolvedRelease!.album,
+      resolvedRelease!.tracks
+    );
     expect(preview.trackList).toHaveLength(3);
     expect(preview.confidence).toBeGreaterThanOrEqual(0.95);
     expect(preview.trackList[0].confidenceLevel).toBe('Excellent');

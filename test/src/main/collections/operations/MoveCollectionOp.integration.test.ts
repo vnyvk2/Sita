@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { db } from '../../../../../src/main/db/db';
-import { playlists } from '../../../../../src/main/db/schema';
 import { eq } from 'drizzle-orm';
-import { MoveCollectionOp } from '../../../../../src/main/collections/operations/MoveCollectionOp';
-import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
+import { MoveCollectionOp } from '../../../../../src/main/collections/operations/MoveCollectionOp';
 import { OperationExecutor } from '../../../../../src/main/collections/operations/OperationExecutor';
 import { OperationJournalWriter } from '../../../../../src/main/collections/operations/OperationJournalWriter';
+import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
+import { db } from '../../../../../src/main/db/db';
+import { playlists } from '../../../../../src/main/db/schema';
 
 describe('MoveCollectionOp Integration', () => {
   let repository: PlaylistRepository;
@@ -17,7 +18,7 @@ describe('MoveCollectionOp Integration', () => {
   beforeEach(async () => {
     // Clean up
     await db.delete(playlists);
-    
+
     repository = new PlaylistRepository();
     hierarchyService = new HierarchyService();
     const journalWriter = new OperationJournalWriter();
@@ -31,18 +32,24 @@ describe('MoveCollectionOp Integration', () => {
 
   it('prevents cyclic moves (moving A under B when B is in A)', async () => {
     // Create Folder A
-    const [folderA] = await db.insert(playlists).values({
-      name: 'Folder A',
-      playlistType: 'folder',
-      parentId: null
-    }).returning();
+    const [folderA] = await db
+      .insert(playlists)
+      .values({
+        name: 'Folder A',
+        playlistType: 'folder',
+        parentId: null
+      })
+      .returning();
 
     // Create Folder B under A
-    const [folderB] = await db.insert(playlists).values({
-      name: 'Folder B',
-      playlistType: 'folder',
-      parentId: folderA.id
-    }).returning();
+    const [folderB] = await db
+      .insert(playlists)
+      .values({
+        name: 'Folder B',
+        playlistType: 'folder',
+        parentId: folderA.id
+      })
+      .returning();
 
     // Attempt to move A under B
     await expect(async () => {

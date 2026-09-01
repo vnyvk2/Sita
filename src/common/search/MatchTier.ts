@@ -1,8 +1,8 @@
 /**
  * Match tier constants for Nora's search ranking system.
  *
- * Every search engine uses the same tiers. Results are sorted by tier (highest first),
- * then by pg_trgm similarity score within the same tier.
+ * Every search engine uses the same tiers. Results are sorted by tier (highest first), then by
+ * pg_trgm similarity score within the same tier.
  *
  * Tier values are intentionally spaced to allow future tiers between them.
  */
@@ -63,8 +63,8 @@ export interface SearchEngineOptions {
   /** Max results to return. Default: SEARCH_LIMITS.GLOBAL */
   limit?: number;
   /**
-   * Song-engine only: also search by related entity names.
-   * Pass an object to control which fields, or undefined to disable.
+   * Song-engine only: also search by related entity names. Pass an object to control which fields,
+   * or undefined to disable.
    */
   metadata?: MetadataSearchOptions;
 }

@@ -95,7 +95,10 @@ function QueueTestHarness({
   onPlaySong,
   onRemoveSong
 }: {
-  externalQueueState: { queues: { songIds: number[]; position: number }[]; currentQueueIndex: number };
+  externalQueueState: {
+    queues: { songIds: number[]; position: number }[];
+    currentQueueIndex: number;
+  };
   onPlaySong: (index: number, songId: number) => void;
   onRemoveSong: (songId: number) => void;
 }) {

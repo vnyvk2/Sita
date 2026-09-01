@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest';
-
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
 import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
+import { describe, expect, it } from 'vitest';
 
 describe('ProviderCircuitBreaker', () => {
   it('should trip open on failure threshold, block calls, and transition to half-open after cooldown', () => {

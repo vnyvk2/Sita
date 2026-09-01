@@ -1,8 +1,7 @@
 import type { ProviderResult } from '../../../models/ProviderResult';
+import { ProviderRetryPolicy } from '../../retry/ProviderRetryPolicy';
 import type { IProviderExecutionStage } from '../IProviderExecutionStage';
 import type { ProviderExecutionStageContext } from '../ProviderExecutionStageContext';
-
-import { ProviderRetryPolicy } from '../../retry/ProviderRetryPolicy';
 
 export class RetryStage implements IProviderExecutionStage {
   public readonly name = 'RetryStage';
@@ -27,8 +26,7 @@ export class RetryStage implements IProviderExecutionStage {
         async () => {
           lastResult = await next();
           const isCancelled =
-            context.execContext?.cancellationToken?.isCancelled ||
-            lastResult.status === 'skipped';
+            context.execContext?.cancellationToken?.isCancelled || lastResult.status === 'skipped';
           if (!isCancelled && (lastResult.status === 'failed' || lastResult.status === 'timeout')) {
             throw new Error(lastResult.error ?? `Provider result status: ${lastResult.status}`);
           }

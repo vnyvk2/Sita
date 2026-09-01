@@ -1,7 +1,8 @@
+import type { PlaylistExportFormat } from '@common/collections/types';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import type { PlaylistExportFormat } from '@common/collections/types';
+
 import Button from '../Button';
 import Dropdown from '../Dropdown';
 import { SpotifyPlaylistExportModal } from './SpotifyPlaylistExportModal';
@@ -92,8 +93,9 @@ const PlaylistExportSettingsPrompt = (props: PlaylistExportSettingsPromptProps) 
         )}
 
         {format === 'spotify' && (
-          <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs">
-            Export directly to your connected Spotify account. Nora will search Spotify&apos;s catalog, match your tracks, and create a remote playlist.
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+            Export directly to your connected Spotify account. Nora will search Spotify&apos;s
+            catalog, match your tracks, and create a remote playlist.
           </div>
         )}
       </div>

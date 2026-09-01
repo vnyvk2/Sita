@@ -1,5 +1,6 @@
 import http from 'http';
 import https from 'https';
+
 import type { RequestPipeline } from '../../platform/networking/RequestPipeline';
 
 /** Hard ceiling for downloaded artwork before it enters the write pipeline. */

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
 import { store } from '@renderer/store/store';
+import { useCallback, useEffect, useState } from 'react';
 
 // Singleton Audio Element for all track preview auditions
 let previewAudio: HTMLAudioElement | null = null;

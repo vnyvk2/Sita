@@ -4,6 +4,7 @@ import { getSongByIdForSongMetadata } from '@main/db/queries/songs';
 import { File } from 'node-taglib-sharp';
 
 import { appPreferences } from '../../../package.json';
+import { parseGenreList } from '../../common/genreUtils';
 // import { parseSyncedLyricsFromAudioDataSource } from '../../common/parseLyrics';
 import {
   parseAlbumArtworks,
@@ -13,7 +14,6 @@ import {
   parseSongArtworks,
   removeDefaultAppProtocolFromFilePath
 } from '../fs/resolveFilePaths';
-import { parseGenreList } from '../../common/genreUtils';
 import logger from '../logger';
 import { getSongsOutsideLibraryData } from '../main';
 import { isLyricsSavePending } from '../saveLyricsToSong';

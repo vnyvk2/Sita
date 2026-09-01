@@ -1,5 +1,5 @@
-import path from 'path';
 import { existsSync } from 'fs';
+import path from 'path';
 
 import ShutdownLogger from '@main/lifecycle/ShutdownLogger';
 import { ShutdownState } from '@main/lifecycle/ShutdownState';
@@ -7,18 +7,14 @@ import logger from '@main/logger';
 import { app } from 'electron';
 
 import { seedDatabase } from './seed';
-import {
-  deleteSqliteFiles,
-  openSqliteEngine,
-  type SqliteEngine
-} from './sqlite/engine';
+import { deleteSqliteFiles, openSqliteEngine, type SqliteEngine } from './sqlite/engine';
 
 /**
  * Nora database — node:sqlite (SQLite) engine.
  *
- * Migrated from PGlite (see sqlite-poc/RESULTS.md). The database is a single
- * WAL file under userData; a legacy PGlite data dir (`nora.pglite.db/`) found
- * next to it is migrated automatically on first launch (migrateFromPglite).
+ * Migrated from PGlite (see sqlite-poc/RESULTS.md). The database is a single WAL file under
+ * userData; a legacy PGlite data dir (`nora.pglite.db/`) found next to it is migrated automatically
+ * on first launch (migrateFromPglite).
  */
 
 const DB_NAME = 'nora.sqlite.db';
@@ -27,7 +23,9 @@ const isTest = typeof process.env.VITEST !== 'undefined' || process.env.NODE_ENV
 export const isDatabaseStubbed = !isTest && process.env.NORA_NO_PGLITE === '1';
 // NORA_DB_FILE lets integration tests drive the PRODUCTION path (real file DB,
 // real singleton) instead of the default in-memory test database.
-const useMemoryDb = !process.env.NORA_DB_FILE && (isTest || (!isDatabaseStubbed && process.env.NORA_PGLITE_MEMORY === '1'));
+const useMemoryDb =
+  !process.env.NORA_DB_FILE &&
+  (isTest || (!isDatabaseStubbed && process.env.NORA_PGLITE_MEMORY === '1'));
 
 const resolveUserDataDir = () => {
   // Isolation override resolved AT THE CONSUMPTION POINT (bundlers may reorder
@@ -46,8 +44,7 @@ const resolveUserDataDir = () => {
 };
 
 export const DB_PATH =
-    process.env.NORA_DB_FILE ??
-    (useMemoryDb ? ':memory:' : path.join(resolveUserDataDir(), DB_NAME));
+  process.env.NORA_DB_FILE ?? (useMemoryDb ? ':memory:' : path.join(resolveUserDataDir(), DB_NAME));
 
 if (process.env.NORA_USE_PGLITE === '1') {
   // PGlite was removed in the SQLite migration. Master retains the PGlite
@@ -77,7 +74,6 @@ if (isDatabaseStubbed) {
     pragmaMs: Math.round(engine.initMs.pragma),
     ddlMs: Math.round(engine.initMs.ddl)
   });
-
 }
 
 type DrizzleSqlite = NonNullable<ReturnType<typeof openSqliteEngine>>['orm'];
@@ -137,8 +133,8 @@ export const nukeDatabase = async () => {
 };
 
 /**
- * Exports the database as a portable SQL dump (plain text, like the pgDump
- * export it replaces). Consumed by core/exportAppData.ts.
+ * Exports the database as a portable SQL dump (plain text, like the pgDump export it replaces).
+ * Consumed by core/exportAppData.ts.
  */
 export const exportDatabase = async (): Promise<string> => {
   if (isDatabaseStubbed || !engine) {
@@ -197,8 +193,8 @@ const dumpToSql = (engine: SqliteEngine): string => {
 };
 
 /**
- * Imports a database from a SQL dump (see exportDatabase). Existing rows are
- * replaced by the dump's DELETE+INSERT pairs inside its transaction.
+ * Imports a database from a SQL dump (see exportDatabase). Existing rows are replaced by the dump's
+ * DELETE+INSERT pairs inside its transaction.
  */
 export const importDatabase = async (sqlDump: string) => {
   if (!engine) {

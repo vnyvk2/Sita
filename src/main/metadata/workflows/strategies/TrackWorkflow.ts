@@ -1,3 +1,7 @@
+import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
+import type { MetadataProviderId } from '../../models/RecordingMetadata';
+import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
+import type { LocalSongInput } from '../../services/AlbumMetadataService';
 import type {
   WorkflowCandidate,
   WorkflowMatch,
@@ -6,10 +10,6 @@ import type {
   WorkflowType
 } from '../MetadataWorkflow';
 import { BaseMetadataWorkflow } from '../MetadataWorkflow';
-import type { MusicBrainzAdapter } from '../../providers/musicbrainz/MusicBrainzAdapter';
-import type { LocalSongInput } from '../../services/AlbumMetadataService';
-import type { MetadataProviderId } from '../../models/RecordingMetadata';
-import { MetadataDiffBuilder } from '../../diff/MetadataDiffBuilder';
 
 export class TrackWorkflow extends BaseMetadataWorkflow {
   public readonly type: WorkflowType = 'track';
@@ -37,7 +37,11 @@ export class TrackWorkflow extends BaseMetadataWorkflow {
     const title = query.title || '';
     if (!title) return [];
 
-    const recordings = await this.mbAdapter.searchRecordings(title, query.artist, query.limit ?? 10);
+    const recordings = await this.mbAdapter.searchRecordings(
+      title,
+      query.artist,
+      query.limit ?? 10
+    );
 
     return recordings.map((rec) => ({
       id: rec.id,
@@ -74,8 +78,20 @@ export class TrackWorkflow extends BaseMetadataWorkflow {
         },
         confidence: 0.9,
         fieldDiffs: [
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'title', oldVal: local.title, newVal: suggestedTitle, providerId, confidenceScore: 0.9 }),
-          MetadataDiffBuilder.createFieldDiff({ fieldId: 'artist', oldVal: local.artist, newVal: suggestedArtist, providerId, confidenceScore: 0.9 })
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'title',
+            oldVal: local.title,
+            newVal: suggestedTitle,
+            providerId,
+            confidenceScore: 0.9
+          }),
+          MetadataDiffBuilder.createFieldDiff({
+            fieldId: 'artist',
+            oldVal: local.artist,
+            newVal: suggestedArtist,
+            providerId,
+            confidenceScore: 0.9
+          })
         ]
       };
     });

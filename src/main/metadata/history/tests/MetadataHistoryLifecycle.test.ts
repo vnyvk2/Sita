@@ -1,23 +1,22 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Three full PGlite boots + real migration chains: observed 7-33s on this
 // machine depending on thermal/load state, hence the generous local ceiling
 vi.setConfig({ testTimeout: 120_000 });
 import { openSqliteEngine } from '../../../db/sqlite/engine';
-
+import { MetadataHistoryRepository } from '../MetadataHistoryRepository';
 import type { MetadataHistorySnapshot } from '../MetadataHistoryService';
 import { MetadataHistoryService } from '../MetadataHistoryService';
-import { MetadataHistoryRepository } from '../MetadataHistoryRepository';
 
 /**
- * Real-file-database lifecycle proof for the persistent undo journal:
- * boots PGlite against an actual on-disk database file, applies ALL real
- * migrations (including 0022_add_metadata_undo_snapshots), writes snapshots,
- * closes the process-side instance, reopens the SAME file fresh - mirroring
- * what an app restart exercises - and verifies full recovery.
+ * Real-file-database lifecycle proof for the persistent undo journal: boots PGlite against an
+ * actual on-disk database file, applies ALL real migrations (including
+ * 0022_add_metadata_undo_snapshots), writes snapshots, closes the process-side instance, reopens
+ * the SAME file fresh - mirroring what an app restart exercises - and verifies full recovery.
  */
 describe('MetadataHistoryService — real-file DB restart lifecycle', () => {
   let dbDir: string;
@@ -30,7 +29,13 @@ describe('MetadataHistoryService — real-file DB restart lifecycle', () => {
     albumTitle: title,
     songIds: [1],
     previousSongs: [
-      { songId: 1, path: `/music/${id}.mp3`, title: `Old ${title}`, isrc: 'ISRC-X', musicBrainzRecordingId: 'mbid-x' }
+      {
+        songId: 1,
+        path: `/music/${id}.mp3`,
+        title: `Old ${title}`,
+        isrc: 'ISRC-X',
+        musicBrainzRecordingId: 'mbid-x'
+      }
     ],
     updatedSongs: [{ songId: 1, path: `/music/${id}.mp3`, title }]
   });
@@ -73,7 +78,7 @@ describe('MetadataHistoryService — real-file DB restart lifecycle', () => {
     // Session 3: confirmed consumption was durably recorded
     const third = await bootFresh();
     expect((await third.service.peekUndo())?.id).toBe('life-1');
-    expect((await third.service.peekUndo('nope' as unknown as number))).toBeUndefined();
+    expect(await third.service.peekUndo('nope' as unknown as number)).toBeUndefined();
     await third.close();
   });
 });

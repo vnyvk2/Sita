@@ -1,11 +1,11 @@
 import { db } from '@main/db/db';
+import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
+import * as settingsQueries from '@main/db/queries/settings';
 import { songs } from '@main/db/schema';
+import * as flushModule from '@main/other/lastFm/flushScrobbleQueue';
 import { inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as scrobbleQueueQueries from '@main/db/queries/scrobble_queue';
-import * as settingsQueries from '@main/db/queries/settings';
-import * as flushModule from '@main/other/lastFm/flushScrobbleQueue';
 import { dataUpdateEvent } from '../../main';
 import toggleLikeSongs from '../toggleLikeSongs';
 
@@ -52,7 +52,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 1',
           path: 'C:\\test\\song1.mp3',
-          duration: 180.00,
+          duration: 180.0,
           isFavorite: true,
           isBlacklisted: false,
           fileCreatedAt: now,
@@ -61,7 +61,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 2',
           path: 'C:\\test\\song2.mp3',
-          duration: 200.00,
+          duration: 200.0,
           isFavorite: false,
           isBlacklisted: false,
           fileCreatedAt: now,
@@ -70,7 +70,7 @@ describe('toggleLikeSongs Core Functionality & Contracts', () => {
         {
           title: 'Test Song 3',
           path: 'C:\\test\\song3.mp3',
-          duration: 220.00,
+          duration: 220.0,
           isFavorite: true,
           isBlacklisted: false,
           fileCreatedAt: now,

@@ -31,7 +31,8 @@ export const fetchWithTimeout = async (
   }
 
   try {
-    const fetchImpl = typeof net !== 'undefined' && typeof net.fetch === 'function' ? net.fetch : fetch;
+    const fetchImpl =
+      typeof net !== 'undefined' && typeof net.fetch === 'function' ? net.fetch : fetch;
     const response = await fetchImpl(url.toString(), {
       ...options,
       signal: controller.signal

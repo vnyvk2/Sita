@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LibraryScanner } from '../LibraryScanner';
-import { getLibraryScanRoots } from '../getLibraryScanRoots';
 import { fastDiskWalk } from '../fastDiskWalk';
+import { getLibraryScanRoots } from '../getLibraryScanRoots';
+import { LibraryScanner } from '../LibraryScanner';
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -84,12 +84,14 @@ describe('Scanner Cancellation Lifecycle (B-7)', () => {
       failedPaths: []
     });
 
-    mockReconciler.reconcileAdded.mockImplementation(async (_added: any, _roots: any, options: any) => {
-      // User cancels during additions reconciliation
-      scanner.cancelScan();
-      expect(options?.abortSignal?.aborted).toBe(true);
-      return { successCount: 1, errorCount: 0, errors: [], cancelled: true };
-    });
+    mockReconciler.reconcileAdded.mockImplementation(
+      async (_added: any, _roots: any, options: any) => {
+        // User cancels during additions reconciliation
+        scanner.cancelScan();
+        expect(options?.abortSignal?.aborted).toBe(true);
+        return { successCount: 1, errorCount: 0, errors: [], cancelled: true };
+      }
+    );
 
     const summary = await scanner.scan();
 

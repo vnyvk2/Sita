@@ -1,10 +1,15 @@
+import type {
+  PlaylistExportFormat,
+  PlaylistBatchExportOptions,
+  BatchExportResult
+} from '@common/collections/types';
+import { CollectionClient } from '@renderer/api/CollectionClient';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useContext, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import type { PlaylistExportFormat, PlaylistBatchExportOptions, BatchExportResult } from '@common/collections/types';
+
 import Button from '../Button';
 import Dropdown from '../Dropdown';
-import { CollectionClient } from '@renderer/api/CollectionClient';
 import BatchExportResultPrompt from './BatchExportResultPrompt';
 
 interface PlaylistBatchExportSettingsPromptProps {
@@ -21,7 +26,11 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
   const [pathType, setPathType] = useState<'absolute' | 'relative'>('absolute');
   const [destinationDir, setDestinationDir] = useState<string>('');
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [progress, setProgress] = useState<{ current: number; total: number; playlistName: string } | null>(null);
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+    playlistName: string;
+  } | null>(null);
 
   useEffect(() => {
     const handleProgress = (_event: any, messageCode: string, data: any) => {
@@ -65,10 +74,7 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
       setIsExporting(false);
 
       if (result && result.items.length > 0) {
-        changePromptMenuData(
-          true,
-          <BatchExportResultPrompt result={result} />
-        );
+        changePromptMenuData(true, <BatchExportResultPrompt result={result} />);
       } else {
         changePromptMenuData(false);
       }
@@ -88,14 +94,15 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
       </div>
 
       {isExporting && progress ? (
-        <div className="export-progress-box bg-background-color-dim/50 dark:bg-dark-background-color-dim/50 p-6 rounded-md mb-6">
-          <div className="font-semibold text-lg mb-2 text-font-color-highlight dark:text-dark-font-color-highlight">
+        <div className="export-progress-box bg-background-color-dim/50 dark:bg-dark-background-color-dim/50 mb-6 rounded-md p-6">
+          <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 text-lg font-semibold">
             {t('playlist.exportingProgress', 'Exporting playlists...')}
           </div>
-          <div className="text-sm opacity-80 mb-3">
-            {progress.current} / {progress.total} — <span className="font-medium">{progress.playlistName}</span>
+          <div className="mb-3 text-sm opacity-80">
+            {progress.current} / {progress.total} —{' '}
+            <span className="font-medium">{progress.playlistName}</span>
           </div>
-          <div className="w-full bg-background-color-dim dark:bg-dark-background-color-dim rounded-full h-2.5 overflow-hidden">
+          <div className="bg-background-color-dim dark:bg-dark-background-color-dim h-2.5 w-full overflow-hidden rounded-full">
             <div
               className="bg-font-color-highlight dark:bg-dark-font-color-highlight h-2.5 transition-all duration-200"
               style={{ width: `${(progress.current / progress.total) * 100}%` }}
@@ -153,18 +160,15 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
             <label className="text-font-color-highlight dark:text-dark-font-color-highlight mb-2 block font-medium">
               Destination Folder
             </label>
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
                 placeholder={t('playlist.noFolderSelected', 'No folder selected')}
                 value={destinationDir}
-                className="w-full bg-background-color-dim dark:bg-dark-background-color-dim px-3 py-2 rounded-md text-sm truncate"
+                className="bg-background-color-dim dark:bg-dark-background-color-dim w-full truncate rounded-md px-3 py-2 text-sm"
               />
-              <Button
-                label={t('common.browse', 'Browse')}
-                clickHandler={handleBrowseDirectory}
-              />
+              <Button label={t('common.browse', 'Browse')} clickHandler={handleBrowseDirectory} />
             </div>
           </div>
         </div>

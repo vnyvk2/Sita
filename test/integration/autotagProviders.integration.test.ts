@@ -1,22 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
 import { MetadataCapabilities } from '@main/metadata/common/types';
-import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataEventBus } from '@main/metadata/events/MetadataEventBus';
+import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import { MetadataConfidence } from '@main/metadata/models/MetadataConfidence';
 import { MetadataIdentity } from '@main/metadata/models/MetadataIdentity';
 import { MetadataKinds } from '@main/metadata/models/MetadataKind';
 import { MetadataProviderInfo } from '@main/metadata/models/MetadataProviderInfo';
 import { ProviderExecutionContext } from '@main/metadata/models/ProviderExecutionContext';
 import { ProviderResult } from '@main/metadata/models/ProviderResult';
+import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
+import { ProviderCircuitBreakerRegistry } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreakerRegistry';
+import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
 import { CircuitBreakerStage } from '@main/metadata/providers/execution/stages/CircuitBreakerStage';
 import { RetryStage } from '@main/metadata/providers/execution/stages/RetryStage';
 import { TimeoutStage } from '@main/metadata/providers/execution/stages/TimeoutStage';
-import { ProviderExecutionPipeline } from '@main/metadata/providers/execution/ProviderExecutionPipeline';
-import { DefaultProviderExecutionStrategy } from '@main/metadata/providers/strategies/DefaultProviderExecutionStrategy';
 import { MetadataProviderExecutor } from '@main/metadata/providers/MetadataProviderExecutor';
+import { DefaultProviderExecutionStrategy } from '@main/metadata/providers/strategies/DefaultProviderExecutionStrategy';
 import { MetadataProviderRegistry } from '@main/metadata/registries/MetadataProviderRegistry';
-import { ProviderCircuitBreaker } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreaker';
-import { ProviderCircuitBreakerRegistry } from '@main/metadata/providers/circuitbreaker/ProviderCircuitBreakerRegistry';
-import type { IMetadataProvider } from '@main/metadata/interfaces/IMetadataProvider';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => {
   it('executes providers strictly in descending priority order and respects capability filtering', async () => {
@@ -25,8 +25,14 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     const executionLog: string[] = [];
 
     const pLow: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'prov-low', displayName: 'Low Priority Provider', priority: 20 }),
-      initialize: async () => { pLow.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'prov-low',
+        displayName: 'Low Priority Provider',
+        priority: 20
+      }),
+      initialize: async () => {
+        pLow.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {
@@ -43,8 +49,14 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     };
 
     const pHigh: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'prov-high', displayName: 'High Priority Provider', priority: 90 }),
-      initialize: async () => { pHigh.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'prov-high',
+        displayName: 'High Priority Provider',
+        priority: 90
+      }),
+      initialize: async () => {
+        pHigh.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {
@@ -86,8 +98,14 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     const executedProviders: string[] = [];
 
     const pA: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'prov-abort-a', displayName: 'Provider A', priority: 100 }),
-      initialize: async () => { pA.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'prov-abort-a',
+        displayName: 'Provider A',
+        priority: 100
+      }),
+      initialize: async () => {
+        pA.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {
@@ -102,8 +120,14 @@ describe('AutoTag Provider Runtime Subsystem (Phase 2 Integration Gate)', () => 
     };
 
     const pB: IMetadataProvider = {
-      info: new MetadataProviderInfo({ id: 'prov-abort-b', displayName: 'Provider B', priority: 50 }),
-      initialize: async () => { pB.info.setReady(); },
+      info: new MetadataProviderInfo({
+        id: 'prov-abort-b',
+        displayName: 'Provider B',
+        priority: 50
+      }),
+      initialize: async () => {
+        pB.info.setReady();
+      },
       supports: (c) => c === MetadataCapabilities.Tags,
       getCapabilities: () => new Set([MetadataCapabilities.Tags]),
       fetch: async () => {

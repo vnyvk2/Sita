@@ -1,6 +1,6 @@
+import type { MetadataFieldDiff } from './diff';
 import type { ConfidenceLevel, MetadataProviderId } from './provider';
 import type { AlbumMetadata, ResolvedAlbumRelease } from './release';
-import type { MetadataFieldDiff } from './diff';
 
 export type AutoTagStage =
   | 'idle'
@@ -57,7 +57,8 @@ export interface TrackMatchPreview {
 }
 
 /**
- * Returns a stable, collision-free React key for a TrackMatchPreview item across multi-disc releases.
+ * Returns a stable, collision-free React key for a TrackMatchPreview item across multi-disc
+ * releases.
  */
 export function getTrackPreviewKey(match: TrackMatchPreview, idx?: number): string {
   if (match.isMissingLocally || match.localSongId <= 0) {

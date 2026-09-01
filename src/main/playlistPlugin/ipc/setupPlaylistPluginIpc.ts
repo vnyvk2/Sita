@@ -1,12 +1,10 @@
 import { ipcMain } from 'electron';
-import type { PluginManager } from '../manager/PluginManager';
-import type { PluginRegistry } from '../registry/PluginRegistry';
-import type { PluginCapability } from '../models/PluginCapability';
 
-export function setupPlaylistPluginIpc(
-  manager: PluginManager,
-  registry: PluginRegistry
-): void {
+import type { PluginManager } from '../manager/PluginManager';
+import type { PluginCapability } from '../models/PluginCapability';
+import type { PluginRegistry } from '../registry/PluginRegistry';
+
+export function setupPlaylistPluginIpc(manager: PluginManager, registry: PluginRegistry): void {
   ipcMain.handle('plugin:list', async () => {
     return manager.listPlugins();
   });

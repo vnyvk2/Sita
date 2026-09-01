@@ -1,5 +1,5 @@
-import type { MetadataPolicy } from './MetadataPolicy';
 import type { MetadataContext } from './MetadataContext';
+import type { MetadataPolicy } from './MetadataPolicy';
 
 export type OperationType =
   | 'ManualEdit'

@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { defaultAudioDecoderRegistry } from '@main/workers/process/audio/AudioDecoderRegistry';
 import {
   atomicPublishFile,
   CURRENT_REPLAYGAIN_GENERATOR_VERSION,
@@ -10,7 +10,7 @@ import {
   isAssetTempFileFor,
   WAVEFORM_RESOLUTION
 } from '@main/workers/process/handlers/assetJobHandler';
-import { defaultAudioDecoderRegistry } from '@main/workers/process/audio/AudioDecoderRegistry';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('fs/promises');
 vi.mock('sharp');
@@ -273,9 +273,7 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
 
       expect(result.success).toBe(false);
       // PROVE: the newly published optimized file is NOT unlinked
-      expect(fs.unlink).not.toHaveBeenCalledWith(
-        expect.stringMatching(/-optimized\.webp$/)
-      );
+      expect(fs.unlink).not.toHaveBeenCalledWith(expect.stringMatching(/-optimized\.webp$/));
     });
 
     it('preserves pre-existing optimized webp when collision occurs and full webp publish fails', async () => {
@@ -564,7 +562,9 @@ describe('assetJobHandler (Phase C4 Worker Asset Generation)', () => {
       vi.mocked(fs.stat).mockRejectedValueOnce(eaccesError);
       vi.mocked(fs.unlink).mockResolvedValueOnce(undefined);
 
-      await expect(atomicPublishFile('C:/Cache/temp.tmp', 'C:/Cache/dest.bin')).rejects.toThrow('EACCES');
+      await expect(atomicPublishFile('C:/Cache/temp.tmp', 'C:/Cache/dest.bin')).rejects.toThrow(
+        'EACCES'
+      );
       expect(fs.unlink).toHaveBeenCalledWith('C:/Cache/temp.tmp');
       expect(fs.link).not.toHaveBeenCalled();
     });

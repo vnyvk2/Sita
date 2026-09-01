@@ -1,11 +1,11 @@
 import type { CollectionId } from '../../../common/collections/types';
-import type { BatchMembership, CollectionMembership, MembershipSource } from './types';
 import type { MembershipCache } from './MembershipCache';
+import type { BatchMembership, CollectionMembership, MembershipSource } from './types';
 
 /**
- * MembershipService resolves reverse-lookups (song -> collections).
- * It merges results from all provided MembershipSources by union,
- * removes duplicates, and returns them in a deterministic order (by URI).
+ * MembershipService resolves reverse-lookups (song -> collections). It merges results from all
+ * provided MembershipSources by union, removes duplicates, and returns them in a deterministic
+ * order (by URI).
  */
 export class MembershipService {
   private readonly cache: MembershipCache;
@@ -19,13 +19,13 @@ export class MembershipService {
   public async getCollectionsForSong(songId: number): Promise<readonly CollectionMembership[]> {
     const cached = this.cache.get(songId);
     if (cached) {
-      return cached.map(collectionId => ({ collectionId, songId }));
+      return cached.map((collectionId) => ({ collectionId, songId }));
     }
 
     const collections = await this.fetchCollectionsForSong(songId);
     this.cache.set(songId, collections);
 
-    return collections.map(collectionId => ({ collectionId, songId }));
+    return collections.map((collectionId) => ({ collectionId, songId }));
   }
 
   public async getCollectionsForSongs(songIds: readonly number[]): Promise<BatchMembership> {
@@ -78,9 +78,7 @@ export class MembershipService {
     }
 
     // Sort deterministically
-    batch.collections.sort((a, b) => 
-      a.collectionId.uri.localeCompare(b.collectionId.uri)
-    );
+    batch.collections.sort((a, b) => a.collectionId.uri.localeCompare(b.collectionId.uri));
 
     return batch;
   }
@@ -100,7 +98,9 @@ export class MembershipService {
     return this.mergeAndSortCollections(allCollections);
   }
 
-  private async fetchCollectionsForSongsBulk(songIds: readonly number[]): Promise<Map<number, readonly CollectionId[]>> {
+  private async fetchCollectionsForSongsBulk(
+    songIds: readonly number[]
+  ): Promise<Map<number, readonly CollectionId[]>> {
     const allResults = new Map<number, CollectionId[]>();
     for (const songId of songIds) {
       allResults.set(songId, []);
@@ -131,14 +131,14 @@ export class MembershipService {
 
   private mergeAndSortCollections(collections: CollectionId[]): readonly CollectionId[] {
     const unique = new Map<string, CollectionId>();
-    
+
     for (const col of collections) {
       unique.set(col.uri, col);
     }
 
     const merged = Array.from(unique.values());
     merged.sort((a, b) => a.uri.localeCompare(b.uri));
-    
+
     Object.freeze(merged);
     return merged;
   }

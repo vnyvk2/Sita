@@ -12,8 +12,7 @@ export const MetadataCapabilities = {
   Key: 'Key'
 } as const;
 
-export type MetadataCapability =
-  (typeof MetadataCapabilities)[keyof typeof MetadataCapabilities];
+export type MetadataCapability = (typeof MetadataCapabilities)[keyof typeof MetadataCapabilities];
 
 export const ValueStatuses = {
   Verified: 'Verified',

@@ -31,6 +31,7 @@ export class MetadataContext {
     this.locale = options.locale ?? 'en-US';
     this.cancellationToken = options.cancellationToken;
     this.transaction = options.transaction;
-    this.traceId = options.traceId ?? `trace-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    this.traceId =
+      options.traceId ?? `trace-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   }
 }

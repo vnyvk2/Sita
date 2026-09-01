@@ -13,21 +13,20 @@ export interface IngestedTrackResult {
   songData: typeof songs.$inferSelect;
   relevantAlbum: typeof albums.$inferSelect | undefined;
   newAlbum: typeof albums.$inferSelect | undefined;
-  newArtists: typeof artists.$inferSelect[];
-  relevantArtists: typeof artists.$inferSelect[];
-  newGenres: typeof genres.$inferSelect[];
-  relevantGenres: typeof genres.$inferSelect[];
-  relevantAlbumArtists: typeof artists.$inferSelect[];
-  newAlbumArtists: typeof artists.$inferSelect[];
+  newArtists: (typeof artists.$inferSelect)[];
+  relevantArtists: (typeof artists.$inferSelect)[];
+  newGenres: (typeof genres.$inferSelect)[];
+  relevantGenres: (typeof genres.$inferSelect)[];
+  relevantAlbumArtists: (typeof artists.$inferSelect)[];
+  newAlbumArtists: (typeof artists.$inferSelect)[];
 }
 
 /**
  * Ingests a single ParsedTrackDTO into the database within an existing Drizzle transaction.
  *
- * CRITICAL ARCHITECTURAL INVARIANTS:
- * 1. Runs strictly in the Main process using the provided transaction handle (trx).
- * 2. If preprocessedArtwork is provided, NO filesystem/image decoding work occurs inside trx.
- * 3. Never instantiates a new database connection.
+ * CRITICAL ARCHITECTURAL INVARIANTS: 1. Runs strictly in the Main process using the provided
+ * transaction handle (trx). 2. If preprocessedArtwork is provided, NO filesystem/image decoding
+ * work occurs inside trx. 3. Never instantiates a new database connection.
  */
 export async function ingestTrackDTO(
   track: ParsedTrackDTO,
@@ -55,8 +54,10 @@ export async function ingestTrackDTO(
     musicBrainzRecordingId: track.musicBrainzRecordingId,
     isrc: track.isrc,
     language: track.language,
-    fileCreatedAt: track.fileCreatedAt instanceof Date ? track.fileCreatedAt : new Date(track.fileCreatedAt),
-    fileModifiedAt: track.fileModifiedAt instanceof Date ? track.fileModifiedAt : new Date(track.fileModifiedAt),
+    fileCreatedAt:
+      track.fileCreatedAt instanceof Date ? track.fileCreatedAt : new Date(track.fileCreatedAt),
+    fileModifiedAt:
+      track.fileModifiedAt instanceof Date ? track.fileModifiedAt : new Date(track.fileModifiedAt),
     folderId: track.folderId
   };
 

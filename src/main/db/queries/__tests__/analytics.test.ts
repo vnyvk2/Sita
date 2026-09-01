@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { getCutoffDate, type HistoryPeriod } from '../analytics';
 
 describe('Analytics Database Queries - Logic & Period Validation', () => {
