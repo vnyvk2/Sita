@@ -1,4 +1,6 @@
 import { normalizedKeys } from '@renderer/other/appShortcuts';
+import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { dispatch, store } from '@renderer/store/store';
 import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { lazy, useCallback, useEffect, type ReactNode } from 'react';
@@ -69,8 +71,8 @@ export interface KeyboardShortcutDependencies {
   /** Add new notifications */
   addNewNotifications: (notifications: AppNotification[]) => void;
 
-  /** Update player type (mini/normal) */
-  updatePlayerType: (type: PlayerTypes) => void;
+  /** Update player type (mini/normal) and optional mode (standard/compact) */
+  updatePlayerType: (type: PlayerTypes, mode?: 'standard' | 'compact') => void;
 
   /** Toggle multiple selections mode */
   toggleMultipleSelections: (isEnabled?: boolean) => void;
@@ -325,14 +327,31 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             history.forward();
             break;
           case 'appShortcutsPrompt.openMiniPlayer':
-            updatePlayerType(store.state.playerType === 'mini' ? 'normal' : 'mini');
+            if (store.state.playerType === 'mini') {
+              const currentMode =
+                queryClient.getQueryData<UserSettings>(settingsQuery.all.queryKey)
+                  ?.miniPlayerMode || 'standard';
+              if (currentMode === 'compact') {
+                updatePlayerType('mini', 'standard');
+              } else {
+                updatePlayerType('normal');
+              }
+            } else {
+              updatePlayerType('mini', 'standard');
+            }
             break;
           case 'appShortcutsPrompt.openCompactPlayer':
             if (store.state.playerType === 'mini') {
-              updatePlayerType('normal');
+              const currentMode =
+                queryClient.getQueryData<UserSettings>(settingsQuery.all.queryKey)
+                  ?.miniPlayerMode || 'standard';
+              if (currentMode === 'standard') {
+                updatePlayerType('mini', 'compact');
+              } else {
+                updatePlayerType('normal');
+              }
             } else {
-              void window.api.miniPlayer.setMiniPlayerMode('compact');
-              updatePlayerType('mini');
+              updatePlayerType('mini', 'compact');
             }
             break;
           case 'appShortcutsPrompt.selectMultipleItems':

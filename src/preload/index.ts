@@ -59,8 +59,8 @@ const windowControls = {
   closeApp: (): void => ipcRenderer.send('app/close'),
   hideApp: (): void => ipcRenderer.send('app/hide'),
   showApp: (): void => ipcRenderer.send('app/show'),
-  changePlayerType: (type: PlayerTypes): Promise<void> =>
-    ipcRenderer.invoke('app/changePlayerType', type),
+  changePlayerType: (type: PlayerTypes, mode?: 'standard' | 'compact'): Promise<void> =>
+    ipcRenderer.invoke('app/changePlayerType', type, mode),
   onWindowFocus: (callback: (e: unknown) => void) => ipcRenderer.on('app/focused', callback),
   onWindowBlur: (callback: (e: unknown) => void) => ipcRenderer.on('app/blurred', callback)
 };

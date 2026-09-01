@@ -1241,9 +1241,12 @@ export function setMiniPlayerMode(
   mode: 'standard' | 'compact'
 ): Promise<{ mode: 'standard' | 'compact' }> {
   const runTransition = async () => {
-    if (!mainWindow || playerType !== 'mini') return { mode };
-    logger.debug('Switching mini player mode', { mode, currentMiniPlayerMode });
+    if (!mainWindow) return { mode };
     currentMiniPlayerMode = mode;
+    await saveUserSettings({ miniPlayerMode: mode });
+    if (playerType !== 'mini') return { mode };
+
+    logger.debug('Switching mini player mode', { mode, currentMiniPlayerMode });
 
     const [currentX, currentY] = mainWindow.getPosition();
     const [currentW, currentH] = mainWindow.getSize();
@@ -1407,12 +1410,15 @@ export async function resetMiniPlayerToDefault() {
   }
 }
 
-export async function changePlayerType(type: PlayerTypes): Promise<void> {
+export async function changePlayerType(
+  type: PlayerTypes,
+  targetMode?: 'standard' | 'compact'
+): Promise<void> {
   const runTransition = async () => {
     if (!mainWindow) return;
-    if (playerType === type) return;
+    if (playerType === type && (!targetMode || currentMiniPlayerMode === targetMode)) return;
 
-    logger.debug(`Changed player type.`, { type });
+    logger.debug(`Changed player type.`, { type, targetMode });
     isChangingPlayerType = true;
 
     try {
@@ -1433,7 +1439,10 @@ export async function changePlayerType(type: PlayerTypes): Promise<void> {
         if (mainWindow.fullScreen) mainWindow.setFullScreen(false);
         if (mainWindow.isMaximized()) mainWindow.unmaximize();
 
-        currentMiniPlayerMode = miniPlayerMode || 'standard';
+        currentMiniPlayerMode = targetMode || miniPlayerMode || 'standard';
+        if (targetMode && targetMode !== miniPlayerMode) {
+          await saveUserSettings({ miniPlayerMode: targetMode });
+        }
         savedStandardHeight = miniPlayerHeight || MINI_PLAYER_DEFAULT_SIZE_Y;
 
         mainWindow.setMaximizable(false);

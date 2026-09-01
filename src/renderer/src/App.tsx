@@ -54,6 +54,8 @@ const DevAgentation = import.meta.env.DEV
 import { Outlet } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 
+import { settingsQuery } from './queries/settings';
+import { queryClient } from './queryClient';
 // ? UTILS
 import { dispatch, store } from './store/store';
 
@@ -241,9 +243,19 @@ export default function App() {
 
   const transitionTokenRef = useRef(0);
 
-  const updatePlayerType = useCallback(async (type: PlayerTypes) => {
+  const updatePlayerType = useCallback(async (type: PlayerTypes, mode?: 'standard' | 'compact') => {
     if (store.state.playerType !== type) {
       const currentToken = ++transitionTokenRef.current;
+
+      if (mode) {
+        const prev = queryClient.getQueryData<UserSettings>(settingsQuery.all.queryKey);
+        if (prev) {
+          queryClient.setQueryData(settingsQuery.all.queryKey, {
+            ...prev,
+            miniPlayerMode: mode
+          });
+        }
+      }
 
       if (type === 'normal') {
         await window.api.windowControls.changePlayerType(type);
@@ -257,7 +269,10 @@ export default function App() {
           requestAnimationFrame(() => resolve());
         });
         if (currentToken === transitionTokenRef.current) {
-          await window.api.windowControls.changePlayerType(type);
+          await window.api.windowControls.changePlayerType(type, mode);
+          if (mode) {
+            queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
+          }
         }
       } else {
         dispatch({ type: 'UPDATE_PLAYER_TYPE', data: type });
@@ -265,6 +280,16 @@ export default function App() {
           await window.api.windowControls.changePlayerType(type);
         }
       }
+    } else if (type === 'mini' && mode) {
+      const prev = queryClient.getQueryData<UserSettings>(settingsQuery.all.queryKey);
+      if (prev) {
+        queryClient.setQueryData(settingsQuery.all.queryKey, {
+          ...prev,
+          miniPlayerMode: mode
+        });
+      }
+      await window.api.miniPlayer.setMiniPlayerMode(mode);
+      queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
     }
   }, []);
 

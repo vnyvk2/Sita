@@ -69,7 +69,13 @@ const OtherSongControlsContainer = () => {
             label: t('player.showMiniPlayer'),
             iconName: 'pip',
             iconClassName: 'material-icons-round-outlined mr-2',
-            handlerFunction: () => updatePlayerType('mini')
+            handlerFunction: () => updatePlayerType('mini', 'standard')
+          },
+          {
+            label: t('player.showCompactPlayer', 'Show Compact Player'),
+            iconName: 'compress',
+            iconClassName: 'material-icons-round-outlined mr-2',
+            handlerFunction: () => updatePlayerType('mini', 'compact')
           },
           {
             label: t('player.openInFullScreen'),

@@ -944,7 +944,9 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       removeMusicFolder(absolutePath)
     );
 
-    ipcMain.handle('app/changePlayerType', (_, type: PlayerTypes) => changePlayerType(type));
+    ipcMain.handle('app/changePlayerType', (_, type: PlayerTypes, mode?: 'standard' | 'compact') =>
+      changePlayerType(type, mode)
+    );
 
     ipcMain.handle('app/toggleMiniPlayerQueue', (_, isExpanded: boolean, queueItemCount?: number) =>
       expandMiniPlayer(isExpanded, queueItemCount)

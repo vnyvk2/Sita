@@ -71,7 +71,8 @@ const CompactMiniPlayer = (props: Props) => {
     toggleIsFavorite,
     toggleMutedState,
     toggleRepeat,
-    toggleShuffling
+    toggleShuffling,
+    updatePlayerType
   } = useContext(AppUpdateContext);
 
   const { t } = useTranslation();
@@ -440,6 +441,14 @@ const CompactMiniPlayer = (props: Props) => {
 
         {/* ── Hover Window Controls (Overlay - non-layout participating) ── */}
         <div className="compact-window-controls absolute top-0 right-0 z-30 flex items-center gap-1 opacity-0 transition-opacity duration-150 [-webkit-app-region:no-drag] group-focus-within/compact:opacity-100 group-hover/compact:opacity-100">
+          <button
+            type="button"
+            className="text-font-color-white/80 m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-black/80 hover:text-white"
+            onClick={() => updatePlayerType('normal')}
+            title={t('player.goToMainPlayer')}
+          >
+            <span className="material-icons-round-outlined text-xs leading-none">pip_exit</span>
+          </button>
           <button
             type="button"
             className="text-font-color-white/80 m-0! flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-black/80 hover:text-white"

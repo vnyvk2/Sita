@@ -1,3 +1,5 @@
+import { settingsQuery } from '@renderer/queries/settings';
+import { queryClient } from '@renderer/queryClient';
 import { dispatch } from '@renderer/store/store';
 import {
   createMemoryHistory,
@@ -261,8 +263,64 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
       expect(backSpy).not.toHaveBeenCalled();
     });
 
-    it('still allows exiting mini player mode via the openMiniPlayer shortcut', async () => {
+    it('opens standard mini player via openMiniPlayer shortcut from normal mode', async () => {
+      setPlayerType('normal');
+      defaultProps.updatePlayerType.mockClear();
+      await setupShortcuts();
+
+      // openMiniPlayer default binding is Ctrl+N
+      fireKey('N', { ctrlKey: true });
+
+      expect(defaultProps.updatePlayerType).toHaveBeenCalledWith('mini', 'standard');
+    });
+
+    it('opens compact mini player via openCompactPlayer shortcut from normal mode', async () => {
+      setPlayerType('normal');
+      defaultProps.updatePlayerType.mockClear();
+      await setupShortcuts();
+
+      // openCompactPlayer default binding is Ctrl+Shift+N
+      fireKey('N', { ctrlKey: true, shiftKey: true });
+
+      expect(defaultProps.updatePlayerType).toHaveBeenCalledWith('mini', 'compact');
+    });
+
+    it('switches to compact mode via openCompactPlayer shortcut when in standard mini mode', async () => {
       setPlayerType('mini');
+      queryClient.setQueryData(settingsQuery.all.queryKey, { miniPlayerMode: 'standard' });
+      defaultProps.updatePlayerType.mockClear();
+      await setupShortcuts();
+
+      fireKey('N', { ctrlKey: true, shiftKey: true });
+
+      expect(defaultProps.updatePlayerType).toHaveBeenCalledWith('mini', 'compact');
+    });
+
+    it('exits to normal mode via openCompactPlayer shortcut when already in compact mode', async () => {
+      setPlayerType('mini');
+      queryClient.setQueryData(settingsQuery.all.queryKey, { miniPlayerMode: 'compact' });
+      defaultProps.updatePlayerType.mockClear();
+      await setupShortcuts();
+
+      fireKey('N', { ctrlKey: true, shiftKey: true });
+
+      expect(defaultProps.updatePlayerType).toHaveBeenCalledWith('normal');
+    });
+
+    it('switches to standard mode via openMiniPlayer shortcut when in compact mode', async () => {
+      setPlayerType('mini');
+      queryClient.setQueryData(settingsQuery.all.queryKey, { miniPlayerMode: 'compact' });
+      defaultProps.updatePlayerType.mockClear();
+      await setupShortcuts();
+
+      fireKey('N', { ctrlKey: true });
+
+      expect(defaultProps.updatePlayerType).toHaveBeenCalledWith('mini', 'standard');
+    });
+
+    it('exits to normal mode via openMiniPlayer shortcut when in standard mini mode', async () => {
+      setPlayerType('mini');
+      queryClient.setQueryData(settingsQuery.all.queryKey, { miniPlayerMode: 'standard' });
       defaultProps.updatePlayerType.mockClear();
       await setupShortcuts();
 

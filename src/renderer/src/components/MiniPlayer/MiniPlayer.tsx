@@ -90,7 +90,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     toggleIsFavorite,
     toggleMutedState,
     toggleRepeat,
-    toggleShuffling
+    toggleShuffling,
+    updatePlayerType
   } = useContext(AppUpdateContext);
 
   const { className } = props;
@@ -430,6 +431,10 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               : t('miniPlayer.switchToCompactMode', 'Switch to Compact Mode')
         },
         {
+          id: 'goToMainPlayer',
+          label: t('player.goToMainPlayer', 'Go to Main Player')
+        },
+        {
           id: 'toggleQueue',
           label: t('player.currentQueue', 'Queue')
         },
@@ -541,6 +546,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           queryClient.invalidateQueries({ queryKey: settingsQuery.all.queryKey });
           break;
         }
+        case 'goToMainPlayer':
+          updatePlayerType('normal');
+          break;
         case 'toggleQueue':
           handleToggleQueue();
           break;
@@ -616,7 +624,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       handleToggleQueue,
       handleToggleLyrics,
       handleToggleSearch,
-      miniPlayerMode
+      miniPlayerMode,
+      updatePlayerType
     ]
   );
 
