@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { WaveformAccumulator, WAVEFORM_NUM_BINS } from '../../../../../src/main/workers/process/audio/WaveformAccumulator';
+
+import {
+  WaveformAccumulator,
+  WAVEFORM_NUM_BINS
+} from '../../../../../src/main/workers/process/audio/WaveformAccumulator';
 
 describe('Gate D1 Hardening: WaveformAccumulator (Mathematical Accuracy & Determinism)', () => {
   it('extracts known step quarter waveform envelope with mathematical accuracy across 200 bins', () => {
@@ -8,14 +12,34 @@ describe('Gate D1 Hardening: WaveformAccumulator (Mathematical Accuracy & Determ
 
     // Create 4 quarters: [0..4999] = 0.25, [5000..9999] = 0.50, [10000..14999] = 0.75, [15000..19999] = 1.00
     const q1 = new Float32Array(5000).fill(0.25);
-    const q2 = new Float32Array(5000).fill(0.50);
+    const q2 = new Float32Array(5000).fill(0.5);
     const q3 = new Float32Array(5000).fill(0.75);
-    const q4 = new Float32Array(5000).fill(1.00);
+    const q4 = new Float32Array(5000).fill(1.0);
 
-    accumulator.processChunk({ channelData: [q1], sampleOffset: 0, frameCount: 5000, totalSamples });
-    accumulator.processChunk({ channelData: [q2], sampleOffset: 5000, frameCount: 5000, totalSamples });
-    accumulator.processChunk({ channelData: [q3], sampleOffset: 10000, frameCount: 5000, totalSamples });
-    accumulator.processChunk({ channelData: [q4], sampleOffset: 15000, frameCount: 5000, totalSamples });
+    accumulator.processChunk({
+      channelData: [q1],
+      sampleOffset: 0,
+      frameCount: 5000,
+      totalSamples
+    });
+    accumulator.processChunk({
+      channelData: [q2],
+      sampleOffset: 5000,
+      frameCount: 5000,
+      totalSamples
+    });
+    accumulator.processChunk({
+      channelData: [q3],
+      sampleOffset: 10000,
+      frameCount: 5000,
+      totalSamples
+    });
+    accumulator.processChunk({
+      channelData: [q4],
+      sampleOffset: 15000,
+      frameCount: 5000,
+      totalSamples
+    });
 
     const peaks = accumulator.finish();
     expect(peaks.length).toBe(200);
@@ -26,7 +50,7 @@ describe('Gate D1 Hardening: WaveformAccumulator (Mathematical Accuracy & Determ
     }
     // Bins 50..99 should be 0.50
     for (let b = 50; b < 100; b++) {
-      expect(peaks[b]).toBeCloseTo(0.50, 2);
+      expect(peaks[b]).toBeCloseTo(0.5, 2);
     }
     // Bins 100..149 should be 0.75
     for (let b = 100; b < 150; b++) {
@@ -34,7 +58,7 @@ describe('Gate D1 Hardening: WaveformAccumulator (Mathematical Accuracy & Determ
     }
     // Bins 150..199 should be 1.00
     for (let b = 150; b < 200; b++) {
-      expect(peaks[b]).toBeCloseTo(1.00, 2);
+      expect(peaks[b]).toBeCloseTo(1.0, 2);
     }
   });
 
@@ -120,11 +144,21 @@ describe('Gate D1 Hardening: WaveformAccumulator (Mathematical Accuracy & Determ
     const inputLeft = new Float32Array(8000).map((_, i) => Math.sin(i * 0.05) * 0.85);
 
     const acc1 = new WaveformAccumulator(totalSamples);
-    acc1.processChunk({ channelData: [inputLeft], sampleOffset: 0, frameCount: 8000, totalSamples });
+    acc1.processChunk({
+      channelData: [inputLeft],
+      sampleOffset: 0,
+      frameCount: 8000,
+      totalSamples
+    });
     const peaks1 = acc1.finish();
 
     const acc2 = new WaveformAccumulator(totalSamples);
-    acc2.processChunk({ channelData: [inputLeft], sampleOffset: 0, frameCount: 8000, totalSamples });
+    acc2.processChunk({
+      channelData: [inputLeft],
+      sampleOffset: 0,
+      frameCount: 8000,
+      totalSamples
+    });
     const peaks2 = acc2.finish();
 
     expect(peaks1).toEqual(peaks2);

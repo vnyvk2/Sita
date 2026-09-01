@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+
 import { executeAssetJob } from '../../../../../src/main/workers/process/handlers/assetJobHandler';
 import { createWavBuffer } from './wavHelper';
 
@@ -60,9 +62,9 @@ describe('Gate D1 Hardening: End-to-End Streaming Waveform Integration', () => {
 
     // Verify mathematical accuracy of quarters: 0.25, 0.50, 0.75, 1.00
     expect(floatArray[25]).toBeCloseTo(0.25, 2);
-    expect(floatArray[75]).toBeCloseTo(0.50, 2);
+    expect(floatArray[75]).toBeCloseTo(0.5, 2);
     expect(floatArray[125]).toBeCloseTo(0.75, 2);
-    expect(floatArray[175]).toBeCloseTo(1.00, 2);
+    expect(floatArray[175]).toBeCloseTo(1.0, 2);
   });
 
   it('re-surfaces error when supported audio file is corrupt without generating fake synthetic waveform', async () => {
@@ -88,7 +90,10 @@ describe('Gate D1 Hardening: End-to-End Streaming Waveform Integration', () => {
     }
 
     // Ensure no destination cache file was published
-    const fileExists = await fs.access(destPath).then(() => true).catch(() => false);
+    const fileExists = await fs
+      .access(destPath)
+      .then(() => true)
+      .catch(() => false);
     expect(fileExists).toBe(false);
   });
 
@@ -137,7 +142,10 @@ describe('Gate D1 Hardening: End-to-End Streaming Waveform Integration', () => {
     expect(result.success).toBe(false);
     expect(result.cancelled).toBe(true);
 
-    const exists = await fs.access(destPath).then(() => true).catch(() => false);
+    const exists = await fs
+      .access(destPath)
+      .then(() => true)
+      .catch(() => false);
     expect(exists).toBe(false);
   });
 });

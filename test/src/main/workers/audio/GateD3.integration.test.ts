@@ -1,9 +1,11 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { executeAssetJob } from '../../../../../src/main/workers/process/handlers/assetJobHandler';
+
 import { AlbumLoudnessAggregator } from '../../../../../src/main/workers/process/audio/AlbumLoudnessAggregator';
+import { executeAssetJob } from '../../../../../src/main/workers/process/handlers/assetJobHandler';
 import { computeEffectiveReplayGain } from '../../../../../src/renderer/src/other/replayGainCalculator';
 
 function createWavBuffer(options: {
@@ -47,7 +49,10 @@ function createWavBuffer(options: {
         buffer.writeInt16LE(intSample, offset);
         offset += 2;
       } else {
-        const intSample = Math.max(-2147483648, Math.min(2147483647, Math.floor(sample * 2147483647)));
+        const intSample = Math.max(
+          -2147483648,
+          Math.min(2147483647, Math.floor(sample * 2147483647))
+        );
         buffer.writeInt32LE(intSample, offset);
         offset += 4;
       }

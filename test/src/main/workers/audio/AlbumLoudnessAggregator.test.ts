@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { AlbumLoudnessAggregator } from '../../../../../src/main/workers/process/audio/AlbumLoudnessAggregator';
 import { BS1770LoudnessEngine } from '../../../../../src/main/workers/process/audio/BS1770LoudnessEngine';
 
@@ -16,7 +17,12 @@ describe('Gate D3: AlbumLoudnessAggregator (ITU-R BS.1770-4 Multi-Track Pooled G
       left1[i] = s;
       right1[i] = s;
     }
-    engine1.processChunk({ channelData: [left1, right1], sampleOffset: 0, frameCount: frames1, totalSamples: frames1 });
+    engine1.processChunk({
+      channelData: [left1, right1],
+      sampleOffset: 0,
+      frameCount: frames1,
+      totalSamples: frames1
+    });
     const res1 = engine1.finish();
     const blocks1 = engine1.getBlockEnergies();
 
@@ -30,7 +36,12 @@ describe('Gate D3: AlbumLoudnessAggregator (ITU-R BS.1770-4 Multi-Track Pooled G
       left2[i] = s;
       right2[i] = s;
     }
-    engine2.processChunk({ channelData: [left2, right2], sampleOffset: 0, frameCount: frames2, totalSamples: frames2 });
+    engine2.processChunk({
+      channelData: [left2, right2],
+      sampleOffset: 0,
+      frameCount: frames2,
+      totalSamples: frames2
+    });
     const res2 = engine2.finish();
     const blocks2 = engine2.getBlockEnergies();
 
@@ -63,16 +74,30 @@ describe('Gate D3: AlbumLoudnessAggregator (ITU-R BS.1770-4 Multi-Track Pooled G
 
     // Generate two tracks
     const frames = sampleRate * 2;
-    const track1Audio = new Float32Array(frames).map((_, i) => 0.1 * Math.sin(2 * Math.PI * 440 * (i / sampleRate)));
-    const track2Audio = new Float32Array(frames).map((_, i) => 0.08 * Math.cos(2 * Math.PI * 880 * (i / sampleRate)));
+    const track1Audio = new Float32Array(frames).map(
+      (_, i) => 0.1 * Math.sin(2 * Math.PI * 440 * (i / sampleRate))
+    );
+    const track2Audio = new Float32Array(frames).map(
+      (_, i) => 0.08 * Math.cos(2 * Math.PI * 880 * (i / sampleRate))
+    );
 
     // Run separately
     const eng1 = new BS1770LoudnessEngine(sampleRate, 2);
-    eng1.processChunk({ channelData: [track1Audio, track1Audio], sampleOffset: 0, frameCount: frames, totalSamples: frames });
+    eng1.processChunk({
+      channelData: [track1Audio, track1Audio],
+      sampleOffset: 0,
+      frameCount: frames,
+      totalSamples: frames
+    });
     const r1 = eng1.finish();
 
     const eng2 = new BS1770LoudnessEngine(sampleRate, 2);
-    eng2.processChunk({ channelData: [track2Audio, track2Audio], sampleOffset: 0, frameCount: frames, totalSamples: frames });
+    eng2.processChunk({
+      channelData: [track2Audio, track2Audio],
+      sampleOffset: 0,
+      frameCount: frames,
+      totalSamples: frames
+    });
     const r2 = eng2.finish();
 
     // Aggregate
@@ -84,7 +109,9 @@ describe('Gate D3: AlbumLoudnessAggregator (ITU-R BS.1770-4 Multi-Track Pooled G
     // Invariant: albumPeak is discrete max
     expect(albumRes.albumPeak).toBe(Math.max(r1.samplePeak, r2.samplePeak));
     expect(Number.isFinite(albumRes.albumLoudness)).toBe(true);
-    expect(albumRes.totalBlocksProcessed).toBe(eng1.getBlockEnergies().length + eng2.getBlockEnergies().length);
+    expect(albumRes.totalBlocksProcessed).toBe(
+      eng1.getBlockEnergies().length + eng2.getBlockEnergies().length
+    );
   });
 
   it('handles empty track lists and all-silent albums gracefully', () => {

@@ -1,8 +1,13 @@
 import fs from 'fs/promises';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { WavAudioDecoder, deriveChannelLayout } from '../../../../../src/main/workers/process/audio/decoders/WavAudioDecoder';
+
+import {
+  WavAudioDecoder,
+  deriveChannelLayout
+} from '../../../../../src/main/workers/process/audio/decoders/WavAudioDecoder';
 import { createWavBuffer } from './wavHelper';
 
 describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validation)', () => {
@@ -45,7 +50,13 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
   it('distinguishes 32-bit PCM integer from 32-bit IEEE Float', async () => {
     // 32-bit Integer PCM
     const intFile = path.join(tempDir, 'int32.wav');
-    const intBuf = createWavBuffer({ sampleRate: 44100, channels: 2, bitDepth: 32, isFloat: false, amplitude: 0.5 });
+    const intBuf = createWavBuffer({
+      sampleRate: 44100,
+      channels: 2,
+      bitDepth: 32,
+      isFloat: false,
+      amplitude: 0.5
+    });
     await fs.writeFile(intFile, intBuf);
 
     const intInfo = await decoder.probe(intFile);
@@ -61,7 +72,13 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
 
     // 32-bit Float PCM
     const floatFile = path.join(tempDir, 'float32.wav');
-    const floatBuf = createWavBuffer({ sampleRate: 44100, channels: 2, bitDepth: 32, isFloat: true, amplitude: 0.75 });
+    const floatBuf = createWavBuffer({
+      sampleRate: 44100,
+      channels: 2,
+      bitDepth: 32,
+      isFloat: true,
+      amplitude: 0.75
+    });
     await fs.writeFile(floatFile, floatBuf);
 
     const floatInfo = await decoder.probe(floatFile);
@@ -78,7 +95,13 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
 
   it('decodes 8-bit unsigned PCM audio correctly', async () => {
     const filePath = path.join(tempDir, 'pcm8.wav');
-    const wavBuf = createWavBuffer({ sampleRate: 22050, channels: 1, bitDepth: 8, durationSeconds: 0.5, amplitude: 0.6 });
+    const wavBuf = createWavBuffer({
+      sampleRate: 22050,
+      channels: 1,
+      bitDepth: 8,
+      durationSeconds: 0.5,
+      amplitude: 0.6
+    });
     await fs.writeFile(filePath, wavBuf);
 
     const info = await decoder.probe(filePath);
@@ -97,7 +120,13 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
 
   it('decodes 24-bit PCM integer audio correctly', async () => {
     const filePath = path.join(tempDir, 'pcm24.wav');
-    const wavBuf = createWavBuffer({ sampleRate: 48000, channels: 2, bitDepth: 24, durationSeconds: 0.5, amplitude: 0.9 });
+    const wavBuf = createWavBuffer({
+      sampleRate: 48000,
+      channels: 2,
+      bitDepth: 24,
+      durationSeconds: 0.5,
+      amplitude: 0.9
+    });
     await fs.writeFile(filePath, wavBuf);
 
     const info = await decoder.probe(filePath);
@@ -145,7 +174,9 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
       wavBuf[49] = 0xee;
       await fs.writeFile(filePath, wavBuf);
 
-      await expect(decoder.probe(filePath)).rejects.toThrow(/Unsupported WAVE_FORMAT_EXTENSIBLE SubFormat GUID/i);
+      await expect(decoder.probe(filePath)).rejects.toThrow(
+        /Unsupported WAVE_FORMAT_EXTENSIBLE SubFormat GUID/i
+      );
     });
 
     it('throws when WAVE_FORMAT_EXTENSIBLE header is truncated (< 40 bytes)', async () => {
@@ -155,7 +186,9 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
       wavBuf.writeUInt16LE(0xfffe, 20);
       await fs.writeFile(filePath, wavBuf);
 
-      await expect(decoder.probe(filePath)).rejects.toThrow(/Invalid WAVE_FORMAT_EXTENSIBLE header size/i);
+      await expect(decoder.probe(filePath)).rejects.toThrow(
+        /Invalid WAVE_FORMAT_EXTENSIBLE header size/i
+      );
     });
 
     it('assigns Unknown to multichannel audio (>2ch) lacking an explicit channel mask', () => {
@@ -170,7 +203,14 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
       // 6 channels with only 2 mask bits set (0x3) -> inconsistent, must return 6 Unknowns
       const layoutInconsistent = deriveChannelLayout(6, 0x3);
       expect(layoutInconsistent).toHaveLength(6);
-      expect(layoutInconsistent).toEqual(['Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown']);
+      expect(layoutInconsistent).toEqual([
+        'Unknown',
+        'Unknown',
+        'Unknown',
+        'Unknown',
+        'Unknown',
+        'Unknown'
+      ]);
 
       // 2 channels with only 1 mask bit set (0x1) -> inconsistent, must return 2 Unknowns
       const layoutInconsistentStereo = deriveChannelLayout(2, 0x1);
@@ -189,7 +229,12 @@ describe('Gate D2-R2: WavAudioDecoder (RIFF Scanning & Extensible GUID Validatio
 
   it('halts streaming decode immediately on AbortSignal cancellation', async () => {
     const filePath = path.join(tempDir, 'long_cancel.wav');
-    const wavBuf = createWavBuffer({ sampleRate: 44100, channels: 2, bitDepth: 16, durationSeconds: 10 });
+    const wavBuf = createWavBuffer({
+      sampleRate: 44100,
+      channels: 2,
+      bitDepth: 16,
+      durationSeconds: 10
+    });
     await fs.writeFile(filePath, wavBuf);
 
     const abortController = new AbortController();

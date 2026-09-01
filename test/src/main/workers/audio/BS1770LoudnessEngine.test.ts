@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   BS1770LoudnessEngine,
   getChannelWeighting,
@@ -33,8 +34,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       const totalFrames = 100000;
 
       for (let offset = 0; offset < totalFrames; offset += frameCount) {
-        const left = new Float32Array(frameCount).map((_, i) => Math.sin((offset + i) * 0.05) * 0.8);
-        const right = new Float32Array(frameCount).map((_, i) => Math.cos((offset + i) * 0.05) * 0.8);
+        const left = new Float32Array(frameCount).map(
+          (_, i) => Math.sin((offset + i) * 0.05) * 0.8
+        );
+        const right = new Float32Array(frameCount).map(
+          (_, i) => Math.cos((offset + i) * 0.05) * 0.8
+        );
 
         engine.processChunk({
           channelData: [left, right],
@@ -66,7 +71,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
 
       // 1. Single chunk execution
       const engineSingle = new BS1770LoudnessEngine(sampleRate, 2);
-      engineSingle.processChunk({ channelData: [left, right], sampleOffset: 0, frameCount: totalFrames, totalSamples: totalFrames });
+      engineSingle.processChunk({
+        channelData: [left, right],
+        sampleOffset: 0,
+        frameCount: totalFrames,
+        totalSamples: totalFrames
+      });
       const resultSingle = engineSingle.finish();
 
       // 2. Fragmented execution across arbitrary chunk sizes (e.g. 512 frames, 16384 frames, 73 frames)
@@ -107,7 +117,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       // Test 1: Exactly 400ms (19,200 frames) -> 1 block
       const engine400 = new BS1770LoudnessEngine(sampleRate, 2);
       const audio400 = new Float32Array(blockSize).fill(0.1);
-      engine400.processChunk({ channelData: [audio400, audio400], sampleOffset: 0, frameCount: blockSize, totalSamples: blockSize });
+      engine400.processChunk({
+        channelData: [audio400, audio400],
+        sampleOffset: 0,
+        frameCount: blockSize,
+        totalSamples: blockSize
+      });
       const res400 = engine400.finish();
       expect(res400.blocksProcessed).toBe(1);
       expect(res400.blocksSurvivingGate).toBe(1);
@@ -115,7 +130,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       // Test 2: Exactly 400ms + 1 frame (19,201 frames) -> 1 block
       const engine400Plus1 = new BS1770LoudnessEngine(sampleRate, 2);
       const audio400Plus1 = new Float32Array(blockSize + 1).fill(0.1);
-      engine400Plus1.processChunk({ channelData: [audio400Plus1, audio400Plus1], sampleOffset: 0, frameCount: blockSize + 1, totalSamples: blockSize + 1 });
+      engine400Plus1.processChunk({
+        channelData: [audio400Plus1, audio400Plus1],
+        sampleOffset: 0,
+        frameCount: blockSize + 1,
+        totalSamples: blockSize + 1
+      });
       const res400Plus1 = engine400Plus1.finish();
       expect(res400Plus1.blocksProcessed).toBe(1);
 
@@ -123,7 +143,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       const frames499 = Math.floor(0.499 * sampleRate);
       const engine499 = new BS1770LoudnessEngine(sampleRate, 2);
       const audio499 = new Float32Array(frames499).fill(0.1);
-      engine499.processChunk({ channelData: [audio499, audio499], sampleOffset: 0, frameCount: frames499, totalSamples: frames499 });
+      engine499.processChunk({
+        channelData: [audio499, audio499],
+        sampleOffset: 0,
+        frameCount: frames499,
+        totalSamples: frames499
+      });
       const res499 = engine499.finish();
       expect(res499.blocksProcessed).toBe(1);
 
@@ -134,7 +159,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       for (let i = 0; i < frames500; i++) {
         audio500[i] = 0.1 * Math.sin(2 * Math.PI * 1000 * (i / sampleRate));
       }
-      engine500.processChunk({ channelData: [audio500, audio500], sampleOffset: 0, frameCount: frames500, totalSamples: frames500 });
+      engine500.processChunk({
+        channelData: [audio500, audio500],
+        sampleOffset: 0,
+        frameCount: frames500,
+        totalSamples: frames500
+      });
       const res500 = engine500.finish();
       expect(res500.blocksProcessed).toBe(2);
       expect(res500.blocksSurvivingGate).toBe(2);
@@ -147,9 +177,19 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
 
       const engine = new BS1770LoudnessEngine(sampleRate, 2);
       // Chunk 1: 200ms
-      engine.processChunk({ channelData: [audio200, audio200], sampleOffset: 0, frameCount: frames200ms, totalSamples: frames200ms * 2 });
+      engine.processChunk({
+        channelData: [audio200, audio200],
+        sampleOffset: 0,
+        frameCount: frames200ms,
+        totalSamples: frames200ms * 2
+      });
       // Chunk 2: 200ms (completes 400ms block)
-      engine.processChunk({ channelData: [audio200, audio200], sampleOffset: frames200ms, frameCount: frames200ms, totalSamples: frames200ms * 2 });
+      engine.processChunk({
+        channelData: [audio200, audio200],
+        sampleOffset: frames200ms,
+        frameCount: frames200ms,
+        totalSamples: frames200ms * 2
+      });
 
       const res = engine.finish();
       expect(res.blocksProcessed).toBe(1);
@@ -184,7 +224,7 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
       });
 
       const result = engine.finish();
-      expect(result.integratedLoudness).toBeCloseTo(-23.00, 1);
+      expect(result.integratedLoudness).toBeCloseTo(-23.0, 1);
       expect(result.samplePeak).toBeCloseTo(targetAmp, 3);
     });
 
@@ -313,8 +353,18 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
         dataB[i] = 0.015 * Math.sin(2 * Math.PI * 1000 * (i / sampleRate));
       }
 
-      engine.processChunk({ channelData: [dataA], sampleOffset: 0, frameCount: framesA, totalSamples: framesA + framesB });
-      engine.processChunk({ channelData: [dataB], sampleOffset: framesA, frameCount: framesB, totalSamples: framesA + framesB });
+      engine.processChunk({
+        channelData: [dataA],
+        sampleOffset: 0,
+        frameCount: framesA,
+        totalSamples: framesA + framesB
+      });
+      engine.processChunk({
+        channelData: [dataB],
+        sampleOffset: framesA,
+        frameCount: framesB,
+        totalSamples: framesA + framesB
+      });
 
       const result = engine.finish();
       expect(result.integratedLoudness).toBeCloseTo(-15.3, 1);
@@ -350,7 +400,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
 
       const frames = sampleRate * 1;
       const audio = new Float32Array(frames).fill(0.1);
-      engine.processChunk({ channelData: [audio, audio], sampleOffset: 0, frameCount: frames, totalSamples: frames });
+      engine.processChunk({
+        channelData: [audio, audio],
+        sampleOffset: 0,
+        frameCount: frames,
+        totalSamples: frames
+      });
 
       const res1 = engine.finish();
       const res2 = engine.finish();
@@ -358,7 +413,12 @@ describe('Gate D2-R2: BS1770LoudnessEngine (ITU-R BS.1770-4 Gating, Chunk Bounda
 
       // Processing chunks after finish throws
       expect(() => {
-        engine.processChunk({ channelData: [audio, audio], sampleOffset: frames, frameCount: frames, totalSamples: frames * 2 });
+        engine.processChunk({
+          channelData: [audio, audio],
+          sampleOffset: frames,
+          frameCount: frames,
+          totalSamples: frames * 2
+        });
       }).toThrow(/already been finalized/i);
     });
 

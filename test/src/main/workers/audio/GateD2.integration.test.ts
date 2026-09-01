@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+
 import { executeAssetJob } from '../../../../../src/main/workers/process/handlers/assetJobHandler';
 import { createWavBuffer } from './wavHelper';
 

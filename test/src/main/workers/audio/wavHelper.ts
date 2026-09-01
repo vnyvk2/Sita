@@ -1,6 +1,6 @@
 /**
- * Generates a valid RIFF/WAVE PCM buffer for testing with arbitrary bit depths,
- * channel counts, formats (PCM integer vs IEEE Float vs EXTENSIBLE), and metadata chunks.
+ * Generates a valid RIFF/WAVE PCM buffer for testing with arbitrary bit depths, channel counts,
+ * formats (PCM integer vs IEEE Float vs EXTENSIBLE), and metadata chunks.
  */
 export function createWavBuffer(options: {
   sampleRate?: number;
@@ -113,7 +113,10 @@ export function createWavBuffer(options: {
         buffer.writeFloatLE(sampleValue, offset);
         offset += 4;
       } else if (!isFloat && bitDepth === 32) {
-        const int32 = Math.max(-2147483648, Math.min(2147483647, Math.floor(sampleValue * 2147483647)));
+        const int32 = Math.max(
+          -2147483648,
+          Math.min(2147483647, Math.floor(sampleValue * 2147483647))
+        );
         buffer.writeInt32LE(int32, offset);
         offset += 4;
       } else if (bitDepth === 24) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { calculateReplayGainMetrics } from '../../../../../src/main/workers/process/audio/ReplayGainPolicy';
+
 import type { LoudnessResult } from '../../../../../src/main/workers/process/audio/BS1770LoudnessEngine';
+import { calculateReplayGainMetrics } from '../../../../../src/main/workers/process/audio/ReplayGainPolicy';
 
 describe('Gate D2-R1: ReplayGainPolicy (Decoupled Nora Gain Policy)', () => {
   it('calculates trackGain relative to Nora default -18.0 LUFS target', () => {
