@@ -1,4 +1,4 @@
-import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
+import { songClientCache, useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getSongListIdentity, songCacheKeys } from '@renderer/queries/songs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -10,6 +10,7 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    songClientCache.clear();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {

@@ -289,7 +289,7 @@ const Song = memo(
             }
           ]);
         });
-    }, [addNewNotifications, isAFavorite, isCurrentSong, songId, t, toggleIsFavorite]);
+    }, [addNewNotifications, isAFavorite, isCurrentSong, songId, t, toggleIsFavorite, triggerBurst]);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => {
@@ -854,7 +854,8 @@ const Song = memo(
             </div>
             <Img
               src={artworkPaths?.optimizedArtworkPath || DefaultSongCover}
-              loading="eager"
+              loading="lazy"
+              decoding="async"
               alt="Song cover"
               className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
                 isSongPlaying && !showEqualizerOnTracklist ? 'brightness-50' : ''

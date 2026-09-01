@@ -1,4 +1,4 @@
-import { db } from '@db/db';
+import { db, getEngine } from '@db/db';
 import {
   albums,
   albumsSongs,
@@ -10,9 +10,246 @@ import {
   musicFolders,
   songs
 } from '@db/schema';
+import type { SqliteEngine } from '@db/sqlite/engine';
 import { rawAll } from '@db/sqlite/raw';
+import songMetadataCache from '@main/core/songMetadataCache';
+import { parseSongArtworks } from '@main/fs/resolveFilePaths';
+import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+
+export interface RawFlatSongRow {
+  id: number;
+  title: string;
+  duration: number | string;
+  path: string;
+  year: number | null;
+  trackNo: number | null;
+  discNo: number | null;
+  bitrate: number | null;
+  sampleRate: number | null;
+  noOfChannels: number | null;
+  language: string | null;
+  musicBrainzId: string | null;
+  isAFavorite: number;
+  isBlacklisted: number;
+  createdAt: number | string | null;
+  updatedAt: number | string | null;
+  fileCreatedAt: number | string | null;
+  fileModifiedAt: number | string | null;
+  album_json: string | null;
+  artists_json: string | null;
+  artworks_json: string | null;
+  language_override: string | null;
+}
+
+export const mapRawFlatRowToSongData = (row: RawFlatSongRow): SongData => {
+  const created = row.createdAt
+    ? typeof row.createdAt === 'number'
+      ? row.createdAt
+      : new Date(row.createdAt).getTime()
+    : 0;
+
+  const modified = row.updatedAt
+    ? typeof row.updatedAt === 'number'
+      ? row.updatedAt
+      : new Date(row.updatedAt).getTime()
+    : undefined;
+
+  let artists: { artistId: number; name: string }[] = [];
+  if (typeof row.artists_json === 'string' && row.artists_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.artists_json);
+      if (Array.isArray(parsed)) {
+        artists = parsed.filter(
+          (a) => a && typeof a.artistId === 'number' && typeof a.name === 'string'
+        );
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let album: { albumId: number; name: string; isAFavorite?: boolean } | undefined = undefined;
+  if (typeof row.album_json === 'string' && row.album_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.album_json);
+      if (parsed && typeof parsed.albumId === 'number' && typeof parsed.name === 'string') {
+        album = {
+          albumId: parsed.albumId,
+          name: parsed.name,
+          isAFavorite: Boolean(parsed.isAFavorite)
+        };
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let artworkList: { path: string; isOptimized?: boolean }[] = [];
+  if (typeof row.artworks_json === 'string' && row.artworks_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.artworks_json);
+      if (Array.isArray(parsed)) {
+        artworkList = parsed
+          .filter((a) => a && typeof a.path === 'string')
+          .map((a) => ({
+            path: a.path,
+            isOptimized: Boolean(a.isOptimized)
+          }));
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  const artworkPaths = parseSongArtworks(artworkList);
+  const isArtworkAvailable = artworkList.length > 0;
+
+  const language =
+    typeof row.language_override === 'string' && row.language_override.trim() !== ''
+      ? row.language_override.trim()
+      : typeof row.language === 'string' && row.language.trim() !== ''
+        ? row.language.trim()
+        : undefined;
+
+  const musicBrainzId =
+    typeof row.musicBrainzId === 'string' && row.musicBrainzId.trim() !== ''
+      ? row.musicBrainzId.trim()
+      : undefined;
+
+  return {
+    songId: Number(row.id),
+    title: String(row.title ?? ''),
+    duration: Number(row.duration ?? 0),
+    path: String(row.path ?? ''),
+    artists,
+    album,
+    albumArtists: [],
+    genres: [],
+    artworkPaths,
+    isArtworkAvailable,
+    isAFavorite: Boolean(row.isAFavorite),
+    isBlacklisted: Boolean(row.isBlacklisted),
+    addedDate: created,
+    createdDate: created,
+    modifiedDate: modified,
+    year: row.year != null ? Number(row.year) : undefined,
+    trackNo: row.trackNo != null ? Number(row.trackNo) : undefined,
+    discNo: row.discNo != null ? Number(row.discNo) : undefined,
+    bitrate: row.bitrate != null ? Number(row.bitrate) : undefined,
+    sampleRate: row.sampleRate != null ? Number(row.sampleRate) : undefined,
+    noOfChannels: row.noOfChannels != null ? Number(row.noOfChannels) : undefined,
+    language,
+    musicBrainzId,
+    paletteData: undefined
+  };
+};
+
+export const getFlatSongsByIds = async (
+  songIds: number[],
+  preserveIdOrder = false,
+  trx?: DB | DBTransaction
+): Promise<SongData[]> => {
+  if (!songIds || songIds.length === 0) return [];
+
+  const engine = (trx as { _engine?: SqliteEngine } | undefined)?._engine ?? getEngine();
+  if (!engine) {
+    logger.warn('[getFlatSongsByIds] No SQLite engine available, returning empty list');
+    return [];
+  }
+
+  const CHUNK_SIZE = 500;
+  const uniqueIds = Array.from(new Set(songIds));
+  const rawRows: RawFlatSongRow[] = [];
+
+  for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+    const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => '?').join(',');
+    const sqlText = `
+      SELECT
+        s.id,
+        s.title,
+        s.duration,
+        s.path,
+        s.year,
+        s.track_number AS trackNo,
+        s.disk_number AS discNo,
+        s.bit_rate AS bitrate,
+        s.sample_rate AS sampleRate,
+        s.no_of_channels AS noOfChannels,
+        s.language,
+        s.music_brainz_recording_id AS musicBrainzId,
+        s.is_favorite AS isAFavorite,
+        s.is_blacklisted AS isBlacklisted,
+        s.created_at AS createdAt,
+        s.updated_at AS updatedAt,
+        s.file_created_at AS fileCreatedAt,
+        s.file_modified_at AS fileModifiedAt,
+        (
+          SELECT json_object(
+            'albumId', al.id,
+            'name', al.title,
+            'isAFavorite', CAST(al.is_favorite AS INTEGER)
+          )
+          FROM album_songs als
+          JOIN albums al ON al.id = als.album_id
+          WHERE als.song_id = s.id
+          LIMIT 1
+        ) AS album_json,
+        (
+          SELECT json_group_array(
+            json_object('artistId', ar.id, 'name', ar.name)
+          )
+          FROM artists_songs asg
+          JOIN artists ar ON ar.id = asg.artist_id
+          WHERE asg.song_id = s.id
+        ) AS artists_json,
+        (
+          SELECT json_group_array(
+            json_object('id', art.id, 'path', art.path, 'isOptimized', art.is_optimized)
+          )
+          FROM artworks_songs arts
+          JOIN artworks art ON art.id = arts.artwork_id
+          WHERE arts.song_id = s.id
+        ) AS artworks_json,
+        (
+          SELECT mo.string_value
+          FROM metadata_overrides mo
+          WHERE mo.entity_kind = 'song'
+            AND mo.field_id = 'language'
+            AND mo.entity_id = CAST(s.id AS TEXT)
+            AND mo.string_value IS NOT NULL
+            AND trim(mo.string_value) <> ''
+          LIMIT 1
+        ) AS language_override
+      FROM songs s
+      WHERE s.id IN (${placeholders});
+    `;
+
+    const rows = engine.all(sqlText, chunk) as unknown as RawFlatSongRow[];
+    if (rows && rows.length > 0) {
+      rawRows.push(...rows);
+    }
+  }
+
+  const convertedSongs = rawRows.map(mapRawFlatRowToSongData);
+
+  if (preserveIdOrder) {
+    const songsById = new Map<number, SongData>();
+    for (let i = 0; i < convertedSongs.length; i += 1) {
+      songsById.set(convertedSongs[i].songId, convertedSongs[i]);
+    }
+    const orderedSongs: SongData[] = [];
+    for (let i = 0; i < songIds.length; i += 1) {
+      const s = songsById.get(songIds[i]);
+      if (s) orderedSongs.push(s);
+    }
+    return orderedSongs;
+  }
+
+  return convertedSongs;
+};
 
 export const isSongWithPathAvailable = async (path: string, trx: DB | DBTransaction = db) => {
   const count = await trx.$count(songs, eq(songs.path, path));
@@ -69,6 +306,7 @@ export const updateSongBasicFields = async (
   }
 
   const res = await trx.update(songs).set(updatePayload).where(eq(songs.id, songId)).returning();
+  songMetadataCache.invalidate(songId);
 
   return res[0];
 };
@@ -587,7 +825,9 @@ export const getFilteredSongLibraryIds = async (
         orderClauses: orderClauses.length,
         options
       });
-    } catch {}
+    } catch {
+      // Debug preview failure
+    }
   }
 
   const results = await query;
@@ -599,7 +839,9 @@ export const getFilteredSongLibraryIds = async (
         firstIds: results.slice(0, 3).map((r) => r.id),
         options
       });
-    } catch {}
+    } catch {
+      // Debug preview failure
+    }
   }
   const ids: number[] = [];
   const blacklistedIds: number[] = [];
@@ -851,6 +1093,9 @@ export const updateSongByPath = async (
   trx: DB | DBTransaction = db
 ) => {
   const updatedSong = await trx.update(songs).set(song).where(eq(songs.path, path)).returning();
+  if (updatedSong?.[0]?.id) {
+    songMetadataCache.invalidate(updatedSong[0].id);
+  }
   return updatedSong;
 };
 
@@ -993,6 +1238,7 @@ export const updateSongFavoriteStatuses = async (
     .update(songs)
     .set({ isFavorite, isFavoriteUpdatedAt: new Date() })
     .where(inArray(songs.id, songIds));
+  songMetadataCache.updateFavoriteMany(songIds, isFavorite);
   return data;
 };
 
@@ -1009,6 +1255,9 @@ export const invertSongFavoriteStatuses = async (
     })
     .where(inArray(songs.id, songIds))
     .returning({ id: songs.id, isFavorite: songs.isFavorite });
+  for (let i = 0; i < data.length; i += 1) {
+    songMetadataCache.updateFavorite(data[i].id, Boolean(data[i].isFavorite));
+  }
   return data;
 };
 
@@ -1278,6 +1527,7 @@ export const getSongByIdForSongMetadata = async (songId: number, trx: DB | DBTra
 
 export const removeSongById = async (songId: number, trx: DB | DBTransaction = db) => {
   await trx.delete(songs).where(eq(songs.id, songId));
+  songMetadataCache.invalidate(songId);
 };
 
 export const updateSongModifiedAtByPath = async (
@@ -1285,5 +1535,12 @@ export const updateSongModifiedAtByPath = async (
   modifiedAt: Date,
   trx: DB | DBTransaction = db
 ) => {
-  await trx.update(songs).set({ fileModifiedAt: modifiedAt }).where(eq(songs.path, songPath));
+  const updated = await trx
+    .update(songs)
+    .set({ fileModifiedAt: modifiedAt })
+    .where(eq(songs.path, songPath))
+    .returning({ id: songs.id });
+  if (updated?.[0]?.id) {
+    songMetadataCache.invalidate(updated[0].id);
+  }
 };
