@@ -15,20 +15,26 @@ interface SongRowSkeletonProps {
  * in on the real row via its existing appear animation.
  */
 const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
-  ({ index, height, style, className = '' }, ref) => {
+  ({ index, height: _height, style, className = '' }, ref) => {
+    const isOdd = typeof index === 'number' && (index + 1) % 2 === 1;
+
     return (
       <div
         ref={ref}
         data-skeleton-index={index}
-        style={{ ...(height ? { height: `${height}px` } : {}), ...style }}
-        className={`song-item-animation relative h-[3.75rem] w-full animate-pulse select-none items-center overflow-hidden pr-2 ${className}`}
+        style={style}
+        className={`song-item list-row [contain:layout] relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 select-none items-center overflow-hidden ${
+          isOdd
+            ? 'bg-background-color-2/70! dark:bg-dark-background-color-2/50!'
+            : 'bg-background-color-1! dark:bg-dark-background-color-1!'
+        } ${className}`}
         aria-hidden="true"
       >
-        <div className="flex h-full w-full items-center gap-2">
+        <div className="flex h-full w-full items-center gap-2 animate-pulse">
           <div className="ml-1 w-[0.625rem] shrink-0">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! aspect-square rounded-sm opacity-60" />
           </div>
-          <div className="relative aspect-square h-[85%] shrink-0 overflow-hidden">
+          <div className="relative aspect-square h-[85%] shrink-0 overflow-hidden rounded-md">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60" />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-[45%_1fr_minmax(4.5rem,6rem)] items-center gap-2 sm:grid-cols-[35%_2fr_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] sm:gap-3 lg:grid-cols-[40%_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] lg:gap-0!">

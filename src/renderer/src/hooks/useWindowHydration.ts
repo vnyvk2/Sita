@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 
 import { SONG_WINDOW_GC_TIME, SONG_WINDOW_SIZE, SONG_WINDOW_STALE_TIME } from '../queries/songs';
@@ -32,12 +32,14 @@ export function useWindowHydration(
 ) {
   const {
     enabled = true,
-    extraRowsBefore = 50,
-    extraRowsAfter = 100,
+    extraRowsBefore = 75,
+    extraRowsAfter = 150,
     keyPrefix = 'songs',
     listIdentity = 'default',
     initialIndex = 0
   } = options ?? {};
+
+  const queryClient = useQueryClient();
 
   const [visibleRange, setVisibleRange] = useState<WindowRange>(() => ({
     startIndex: Math.max(0, initialIndex),
@@ -122,7 +124,39 @@ export function useWindowHydration(
     return map;
   }, [queries, windows, ids]);
 
-  const getItem = useCallback((index: number) => itemsByIndex.get(index), [itemsByIndex]);
+  const getItem = useCallback(
+    (index: number) => {
+      // 1. Fast path: check current itemsByIndex map
+      const direct = itemsByIndex.get(index);
+      if (direct) return direct;
+
+      // 2. Direct synchronous queryClient cache fallback!
+      // Bypasses the 1-frame React state update lag when Virtuoso renders
+      // before setVisibleRange has flushed the new window into `queries`.
+      const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
+      const cachedData = queryClient.getQueryData<SongData[]>([
+        keyPrefix,
+        'window',
+        listIdentity,
+        idsVersion,
+        windowStart
+      ]);
+
+      if (cachedData && cachedData.length > 0) {
+        const targetId = ids[index];
+        if (targetId !== undefined) {
+          const offset = index - windowStart;
+          if (cachedData[offset]?.songId === targetId) {
+            return cachedData[offset];
+          }
+          return cachedData.find((s) => s.songId === targetId);
+        }
+      }
+
+      return undefined;
+    },
+    [itemsByIndex, queryClient, keyPrefix, listIdentity, idsVersion, ids]
+  );
 
   return { getItem, onRangeChange: handleRangeChange };
 }
