@@ -68,7 +68,7 @@ export const Album = (props: AlbumProp) => {
   const resolveSongTitles = useCallback(async (): Promise<{ songId: number; title: string }[]> => {
     if (props.songs) return props.songs;
     const albums = await window.api.albumsData.getAlbumData([props.albumId]);
-    return albums?.[0]?.songs ?? [];
+    return albums?.data?.[0]?.songs ?? [];
   }, [props.albumId, props.songs]);
 
   const playAlbumSongs = useCallback(
@@ -106,8 +106,8 @@ export const Album = (props: AlbumProp) => {
       window.api.albumsData
         .getAlbumData(albumIds)
         .then((albums) => {
-          if (Array.isArray(albums) && albums.length > 0) {
-            const albumSongIds = albums
+          if (Array.isArray(albums.data) && albums.data.length > 0) {
+            const albumSongIds = albums.data
               .map((album) => album.songs.map((song) => song.songId))
               .flat();
 
@@ -135,16 +135,18 @@ export const Album = (props: AlbumProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData]
+    [createQueue, multipleSelectionsData, t]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
     const { multipleSelections: albumIds } = multipleSelectionsData;
-    window.api.genresData
-      .getGenresData(albumIds)
+    window.api.albumsData
+      .getAlbumData(albumIds)
       .then((albums) => {
-        if (Array.isArray(albums) && albums.length > 0) {
-          const albumSongIds = albums.map((album) => album.songs.map((song) => song.songId)).flat();
+        if (Array.isArray(albums.data) && albums.data.length > 0) {
+          const albumSongIds = albums.data
+            .map((album) => album.songs.map((song) => song.songId))
+            .flat();
 
           return window.api.audioLibraryControls.getSongInfo(
             albumSongIds,
@@ -173,11 +175,7 @@ export const Album = (props: AlbumProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [
-    addNewNotifications,
-    multipleSelectionsData,
-    t
-  ]);
+  }, [addNewNotifications, multipleSelectionsData, t]);
 
   const showAlbumInfoPage = useCallback(
     () =>
@@ -430,7 +428,7 @@ export const Album = (props: AlbumProp) => {
           <>
             <div className="absolute top-[5%] right-[5%] z-2 flex items-center justify-center">
               <Button
-                className={`m-0! rounded-full! border-0! bg-background-color-1/80 p-1.5! shadow-md backdrop-blur-sm outline-offset-1 transition-opacity dark:bg-dark-background-color-1/80 ${
+                className={`bg-background-color-1/80 dark:bg-dark-background-color-1/80 m-0! rounded-full! border-0! p-1.5! shadow-md outline-offset-1 backdrop-blur-sm transition-opacity ${
                   isFavorite
                     ? 'opacity-100'
                     : 'opacity-0 group-focus-within:opacity-75 group-hover:opacity-75 hover:opacity-100! focus-visible:opacity-100!'
@@ -466,7 +464,7 @@ export const Album = (props: AlbumProp) => {
             fallbackSrc={DefaultAlbumCover}
             loading="lazy"
             alt="Album Cover"
-            className="aspect-square h-full max-h-full w-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.04] group-focus-within:scale-[1.04]"
+            className="aspect-square h-full max-h-full w-full object-cover object-center transition-transform duration-300 ease-out group-focus-within:scale-[1.04] group-hover:scale-[1.04]"
             enableImgFadeIns={!isMultipleSelectionEnabled}
           />
         </div>

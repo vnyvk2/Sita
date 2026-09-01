@@ -1,4 +1,8 @@
-import type { AlbumTagPreview, MetadataFieldDiff, TrackMatchPreview } from '../../../../common/metadata/types';
+import type {
+  AlbumTagPreview,
+  MetadataFieldDiff,
+  TrackMatchPreview
+} from '../../../../common/metadata/types';
 
 export interface ProviderContribution {
   providerId: string;
@@ -12,23 +16,17 @@ export interface FederationSummaryData {
   artworkProvider?: string;
 }
 
-/**
- * Returns true if a field diff represents an actual semantic change (new or modified value).
- */
+/** Returns true if a field diff represents an actual semantic change (new or modified value). */
 export function isFieldChanged(diff: MetadataFieldDiff): boolean {
   return diff.status === 'changed' || diff.status === 'new';
 }
 
-/**
- * Filters a track's field diffs down to only those that represent actual changes.
- */
+/** Filters a track's field diffs down to only those that represent actual changes. */
 export function getChangedFieldDiffs(track: TrackMatchPreview): MetadataFieldDiff[] {
   return track.fieldDiffs.filter(isFieldChanged);
 }
 
-/**
- * Calculates the total number of changed/new fields for a single track.
- */
+/** Calculates the total number of changed/new fields for a single track. */
 export function getTrackChangeCount(track: TrackMatchPreview): number {
   return getChangedFieldDiffs(track).length;
 }
@@ -50,7 +48,9 @@ export function computeFederationSummary(
       if (isFieldChanged(diff)) {
         totalChangedFields++;
         const pId = diff.providerId || preview.provider || 'unknown';
-        const pName = diff.providerName || (pId === 'musicbrainz' ? 'MusicBrainz' : pId === 'discogs' ? 'Discogs' : pId);
+        const pName =
+          diff.providerName ||
+          (pId === 'musicbrainz' ? 'MusicBrainz' : pId === 'discogs' ? 'Discogs' : pId);
 
         const current = providerMap.get(pId) || { name: pName, count: 0 };
         current.count++;
@@ -78,8 +78,8 @@ export function computeFederationSummary(
 }
 
 /**
- * Determines whether the active HTML element is an interactive input control
- * where global keybindings (like Space or Enter) should NOT trigger dialog actions.
+ * Determines whether the active HTML element is an interactive input control where global
+ * keybindings (like Space or Enter) should NOT trigger dialog actions.
  */
 export function isInteractiveElement(element: Element | null): boolean {
   if (!element || !(element instanceof HTMLElement)) {

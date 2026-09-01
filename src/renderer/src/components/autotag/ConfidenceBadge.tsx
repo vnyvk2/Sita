@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { ConfidenceLevel } from '../../../../common/metadata/types';
 
 export interface ConfidenceBadgeProps {
@@ -41,12 +42,11 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({ level, confide
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border tracking-wide ${getBadgeClass()}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold tracking-wide ${getBadgeClass()}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${getDotClass()}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${getDotClass()}`} />
       {level}
       {percentText}
     </span>
   );
 };
-

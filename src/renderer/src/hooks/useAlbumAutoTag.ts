@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import type {
   AlbumMetadata,
   AlbumTagPreview,
@@ -13,11 +14,11 @@ import type {
   ProgressEventPayload,
   TrackMatchPreview
 } from '../../../common/metadata/types';
-import { metadataApi } from '../services/metadataApi';
 import { albumQuery } from '../queries/albums';
 import { artistQuery } from '../queries/artists';
 import { genreQuery } from '../queries/genres';
 import { songQuery } from '../queries/songs';
+import { metadataApi } from '../services/metadataApi';
 
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
 export type PreviewFilterOption = 'all' | 'changed' | 'matched' | 'low_confidence' | 'warnings';
@@ -95,7 +96,11 @@ export interface UseAlbumAutoTagActions {
 
   searchReleases: (album?: string, artist?: string) => Promise<void>;
   selectCandidate: (localSongs: AutoTagSongInput[], candidate: AlbumMetadata) => Promise<void>;
-  buildPreview: (localSongs: AutoTagSongInput[], releaseId: string, providerId?: MetadataProviderId) => Promise<void>;
+  buildPreview: (
+    localSongs: AutoTagSongInput[],
+    releaseId: string,
+    providerId?: MetadataProviderId
+  ) => Promise<void>;
 
   toggleGlobalField: (fieldId: string) => void;
   selectAllGlobalFields: () => void;
@@ -129,10 +134,15 @@ const generateSessionOperationId = (): string => {
     : `op_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 };
 
-export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoTagSongInput[] = []) {
+export function useAlbumAutoTag(
+  initialOperationId?: string,
+  initialSongs: AutoTagSongInput[] = []
+) {
   const queryClient = useQueryClient();
 
-  const [operationId, setOperationId] = useState(() => initialOperationId ?? generateSessionOperationId());
+  const [operationId, setOperationId] = useState(
+    () => initialOperationId ?? generateSessionOperationId()
+  );
   const [step, setStep] = useState<AutoTagStep>('search');
   const [stage, setStage] = useState<AutoTagStage>('idle');
   const [progressMessage, setProgressMessage] = useState('');
@@ -149,11 +159,14 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   ]);
 
   useEffect(() => {
-    metadataApi.getAvailableSearchProviders().then((providers) => {
-      if (providers && providers.length > 0) {
-        setAvailableProviders(providers);
-      }
-    }).catch(() => {});
+    metadataApi
+      .getAvailableSearchProviders()
+      .then((providers) => {
+        if (providers && providers.length > 0) {
+          setAvailableProviders(providers);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Candidate Matches & Selection
@@ -306,8 +319,11 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       setStep('search');
 
       try {
-        const parsedTracks = searchTotalTracks.trim() ? parseInt(searchTotalTracks.trim(), 10) : undefined;
-        const targetTrackCount = Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
+        const parsedTracks = searchTotalTracks.trim()
+          ? parseInt(searchTotalTracks.trim(), 10)
+          : undefined;
+        const targetTrackCount =
+          Number.isInteger(parsedTracks) && (parsedTracks as number) > 0 ? parsedTracks : undefined;
         const source = activeSource === 'auto' ? undefined : (activeSource as MetadataProviderId);
 
         const results = await metadataApi.searchAlbums(albumQuery, artistQuery || undefined, {
@@ -335,7 +351,15 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
         setLoadingCandidates(false);
       }
     },
-    [searchAlbum, searchArtist, searchTotalTracks, selectedSource, operationId, initialSongs, buildPreview]
+    [
+      searchAlbum,
+      searchArtist,
+      searchTotalTracks,
+      selectedSource,
+      operationId,
+      initialSongs,
+      buildPreview
+    ]
   );
 
   // Select a candidate from the table and trigger preview
@@ -395,15 +419,18 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     });
   }, []);
 
-  const setFieldValue = useCallback((songId: number, fieldId: MetadataFieldId, value: string | number) => {
-    if (songId <= 0) return;
-    const key = `${songId}::${fieldId}`;
-    setUserEditedValues((prev) => {
-      const next = new Map(prev);
-      next.set(key, value);
-      return next;
-    });
-  }, []);
+  const setFieldValue = useCallback(
+    (songId: number, fieldId: MetadataFieldId, value: string | number) => {
+      if (songId <= 0) return;
+      const key = `${songId}::${fieldId}`;
+      setUserEditedValues((prev) => {
+        const next = new Map(prev);
+        next.set(key, value);
+        return next;
+      });
+    },
+    []
+  );
 
   const resetFieldValue = useCallback(
     (songId: number, fieldId: MetadataFieldId) => {
@@ -427,7 +454,11 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const selectAllTracks = useCallback(() => {
     if (!preview) return;
     setSelectedTrackIds(
-      new Set(preview.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).map((m) => m.localSongId))
+      new Set(
+        preview.matches
+          .filter((m) => !m.isMissingLocally && m.localSongId > 0)
+          .map((m) => m.localSongId)
+      )
     );
   }, [preview]);
 
@@ -435,7 +466,12 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     if (!preview) return;
     const changed = new Set(
       preview.matches
-        .filter((m) => !m.isMissingLocally && m.localSongId > 0 && m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new'))
+        .filter(
+          (m) =>
+            !m.isMissingLocally &&
+            m.localSongId > 0 &&
+            m.fieldDiffs.some((d) => d.status === 'changed' || d.status === 'new')
+        )
         .map((m) => m.localSongId)
     );
     setSelectedTrackIds(changed);
@@ -453,7 +489,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     setError(null);
 
     try {
-      const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
+      const isGlobalField = (fieldId: string) =>
+        ['album', 'artist', 'year', 'genre'].includes(fieldId);
 
       const effectiveMatches: TrackMatchPreview[] = preview.matches
         .filter((m) => !m.isMissingLocally && m.localSongId > 0)
@@ -463,36 +500,47 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
             const key = `${m.localSongId}::${d.fieldId}`;
             let applyField: boolean;
 
-          if (isGlobalField(d.fieldId)) {
-            // Global fields are governed by selectedGlobalFields, with granular override if explicitly set in selectedFieldMap
-            applyField = selectedFieldMap.has(key)
-              ? (selectedFieldMap.get(key) ?? false)
-              : selectedGlobalFields.has(d.fieldId);
-          } else {
-            applyField = selectedFieldMap.get(key) ?? d.applyField;
-          }
+            if (isGlobalField(d.fieldId)) {
+              // Global fields are governed by selectedGlobalFields, with granular override if explicitly set in selectedFieldMap
+              applyField = selectedFieldMap.has(key)
+                ? (selectedFieldMap.get(key) ?? false)
+                : selectedGlobalFields.has(d.fieldId);
+            } else {
+              applyField = selectedFieldMap.get(key) ?? d.applyField;
+            }
 
-          const userVal = userEditedValues.get(key) ?? d.userValue;
-          return { ...d, applyField, userValue: userVal };
+            const userVal = userEditedValues.get(key) ?? d.userValue;
+            return { ...d, applyField, userValue: userVal };
+          });
+
+          return { ...m, applyTrack, fieldDiffs: updatedDiffs };
         });
-
-        return { ...m, applyTrack, fieldDiffs: updatedDiffs };
-      });
 
       const payloadAlbum = {
         ...preview.album,
-        title: selectedGlobalFields.has('album') ? preview.album.title : (preview.matches[0]?.oldAlbum || preview.album.title),
-        artist: selectedGlobalFields.has('artist') ? preview.album.artist : (preview.matches[0]?.oldArtist || preview.album.artist),
-        year: selectedGlobalFields.has('year') ? preview.album.year : (preview.matches[0]?.oldYear || preview.album.year)
+        title: selectedGlobalFields.has('album')
+          ? preview.album.title
+          : preview.matches[0]?.oldAlbum || preview.album.title,
+        artist: selectedGlobalFields.has('artist')
+          ? preview.album.artist
+          : preview.matches[0]?.oldArtist || preview.album.artist,
+        year: selectedGlobalFields.has('year')
+          ? preview.album.year
+          : preview.matches[0]?.oldYear || preview.album.year
       };
 
-      const payload: AlbumTagPreview = { ...preview, album: payloadAlbum, matches: effectiveMatches };
+      const payload: AlbumTagPreview = {
+        ...preview,
+        album: payloadAlbum,
+        matches: effectiveMatches
+      };
       const effectiveReplaceArtwork = replaceArtwork && selectedGlobalFields.has('artwork');
       const suggestedGenre =
         preview.album.genre ||
         preview.matches
           .map((m) => m.fieldDiffs.find((d) => d.fieldId === 'genre')?.suggestedValue)
-          .find((g) => g !== undefined && g !== null && String(g).trim() !== '')?.toString() ||
+          .find((g) => g !== undefined && g !== null && String(g).trim() !== '')
+          ?.toString() ||
         undefined;
 
       const globalMutations: GlobalAlbumMutations = {
@@ -651,7 +699,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const globalFieldDiffs = useMemo((): GlobalFieldDiff[] => {
     if (!preview) return [];
 
-    const firstLocalMatch = preview.matches.find((m) => !m.isMissingLocally && m.localSongId > 0) ?? preview.matches[0];
+    const firstLocalMatch =
+      preview.matches.find((m) => !m.isMissingLocally && m.localSongId > 0) ?? preview.matches[0];
     const localArtist = firstLocalMatch?.oldArtist ?? '—';
     const localAlbum = firstLocalMatch?.oldAlbum ?? '—';
     const localYear = firstLocalMatch?.oldYear ? String(firstLocalMatch.oldYear) : '—';
@@ -664,15 +713,28 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       preview.album.genre ||
       preview.matches
         .map((m) => m.fieldDiffs.find((d) => d.fieldId === 'genre')?.suggestedValue)
-        .find((g) => g !== undefined && g !== null && String(g).trim() !== '')?.toString() ||
+        .find((g) => g !== undefined && g !== null && String(g).trim() !== '')
+        ?.toString() ||
       '';
     const remoteGenre = suggestedGenre || '—';
     const remoteArtwork = preview.album.artwork ? 'Cover Art' : 'None';
 
-    const makeDiff = (id: string, name: string, oldVal: string, newVal: string): GlobalFieldDiff => {
+    const makeDiff = (
+      id: string,
+      name: string,
+      oldVal: string,
+      newVal: string
+    ): GlobalFieldDiff => {
       const isChanged = oldVal.toLowerCase() !== newVal.toLowerCase() && newVal !== '—';
       const status = isChanged ? (oldVal === '—' ? 'new' : 'changed') : 'same';
-      return { fieldId: id, fieldName: name, oldValue: oldVal, suggestedValue: newVal, status, isChanged };
+      return {
+        fieldId: id,
+        fieldName: name,
+        oldValue: oldVal,
+        suggestedValue: newVal,
+        status,
+        isChanged
+      };
     };
 
     return [
@@ -689,11 +751,19 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
   const totalChanges = useMemo(() => {
     if (!preview) return 0;
 
-    const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
-    const globalCount = globalFieldDiffs.filter((g) => selectedGlobalFields.has(g.fieldId) && g.isChanged).length;
+    const isGlobalField = (fieldId: string) =>
+      ['album', 'artist', 'year', 'genre'].includes(fieldId);
+    const globalCount = globalFieldDiffs.filter(
+      (g) => selectedGlobalFields.has(g.fieldId) && g.isChanged
+    ).length;
 
     const trackChangesCount = filteredMatches.reduce((acc, match) => {
-      if (match.isMissingLocally || match.localSongId <= 0 || !selectedTrackIds.has(match.localSongId)) return acc;
+      if (
+        match.isMissingLocally ||
+        match.localSongId <= 0 ||
+        !selectedTrackIds.has(match.localSongId)
+      )
+        return acc;
 
       const changedTrackFields = match.fieldDiffs.filter((d) => {
         const key = `${match.localSongId}::${d.fieldId}`;
@@ -709,7 +779,14 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
     }, 0);
 
     return globalCount + trackChangesCount;
-  }, [preview, globalFieldDiffs, selectedGlobalFields, filteredMatches, selectedTrackIds, selectedFieldMap]);
+  }, [
+    preview,
+    globalFieldDiffs,
+    selectedGlobalFields,
+    filteredMatches,
+    selectedTrackIds,
+    selectedFieldMap
+  ]);
 
   return {
     state: {
@@ -738,7 +815,8 @@ export function useAlbumAutoTag(initialOperationId?: string, initialSongs: AutoT
       artworkSource,
       replaceArtwork,
       selectedTracksCount: selectedTrackIds.size,
-      totalTracksCount: preview?.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ?? 0,
+      totalTracksCount:
+        preview?.matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ?? 0,
       albumTracksCount: preview?.matches.length ?? 0,
       activeFieldsCount: selectedGlobalFields.size,
       totalChanges,

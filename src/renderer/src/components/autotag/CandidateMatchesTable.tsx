@@ -1,6 +1,7 @@
 import React from 'react';
-import type { AlbumMetadata, MatchQualityBandName } from '../../../../common/metadata/types';
+
 import { getProviderDisplayName } from '../../../../common/metadata/displayNames';
+import type { AlbumMetadata, MatchQualityBandName } from '../../../../common/metadata/types';
 
 const QUALITY_BAND_CHIP_CLASS: Record<MatchQualityBandName, string> = {
   Definitive: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
@@ -51,7 +52,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
 }) => {
   if (candidates.length === 0 && !loading) {
     return (
-      <div className="p-6 text-center bg-background-color-2/20 dark:bg-dark-background-color-2/30 rounded-xl border border-dashed border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed text-sm">
+      <div className="bg-background-color-2/20 dark:bg-dark-background-color-2/30 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed dark:text-dark-font-color-dimmed rounded-xl border border-dashed p-6 text-center text-sm">
         No candidate releases found. Enter album and artist above and click Search.
       </div>
     );
@@ -60,46 +61,49 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
   return (
     <div className="flex flex-col gap-2">
       {/* Section Header */}
-      <div className="flex justify-between items-center px-1">
-        <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-semibold tracking-wider uppercase">
           Candidate Releases ({candidates.length})
         </span>
       </div>
 
       {/* Table Container (Scrollable up to max 4-5 compact rows) */}
-      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-y-auto max-h-[250px] bg-background-color-2/20 dark:bg-dark-background-color-2/30">
+      <div className="border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/20 dark:bg-dark-background-color-2/30 max-h-[250px] overflow-y-auto rounded-xl border">
         <table className="w-full border-collapse text-left text-sm">
-          <thead className="sticky top-0 z-[2] bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
+          <thead className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed sticky top-0 z-[2] border-b text-xs tracking-wider uppercase">
             <tr>
               <th className="w-9 px-2.5 py-2 text-center"></th>
               <th className="px-3 py-2">RELEASE</th>
               <th className="px-3 py-2">ARTIST</th>
-              <th className="px-3 py-2 w-20">YEAR</th>
-              <th className="px-3 py-2 w-40">MATCH</th>
+              <th className="w-20 px-3 py-2">YEAR</th>
+              <th className="w-40 px-3 py-2">MATCH</th>
             </tr>
           </thead>
           <tbody>
             {candidates.map((cand, idx) => {
               const candidateKey = cand.releaseId ?? cand.title;
               const isSelected = selectedCandidateId === candidateKey;
-              const isLoadingThis = loadingCandidateId === candidateKey || loadingCandidateId === cand.releaseId;
+              const isLoadingThis =
+                loadingCandidateId === candidateKey || loadingCandidateId === cand.releaseId;
               const providerLabel = getProviderDisplayName(cand.provider);
 
               return (
                 <tr
                   key={candidateKey}
                   onClick={() => onSelectCandidate(cand)}
-                  className={`border-b border-background-color-2/50 dark:border-dark-background-color-2/50 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-background-color-3/20 dark:bg-dark-background-color-3/20' : 'hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/60'
+                  className={`border-background-color-2/50 dark:border-dark-background-color-2/50 cursor-pointer border-b transition-colors ${
+                    isSelected
+                      ? 'bg-background-color-3/20 dark:bg-dark-background-color-3/20'
+                      : 'hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/60'
                   }`}
                 >
                   {/* Radio / Loading Indicator */}
                   <td className="px-2.5 py-2 text-center">
                     {isLoadingThis ? (
-                      <div className="w-3 h-3 rounded-full border-2 border-font-color-highlight dark:border-dark-font-color-highlight border-t-transparent animate-spin mx-auto" />
+                      <div className="border-font-color-highlight dark:border-dark-font-color-highlight mx-auto h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
                     ) : (
                       <div
-                        className={`w-3.5 h-3.5 rounded-full border-2 mx-auto transition-all ${
+                        className={`mx-auto h-3.5 w-3.5 rounded-full border-2 transition-all ${
                           isSelected
                             ? 'border-font-color-highlight dark:border-dark-font-color-highlight bg-font-color-highlight dark:bg-dark-font-color-highlight'
                             : 'border-font-color-dimmed/60 dark:border-dark-font-color-dimmed/60 bg-transparent'
@@ -110,21 +114,24 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
 
                   {/* Release Title & Subtitle */}
                   <td className="px-3 py-2">
-                    <div className={`text-sm ${isSelected ? 'font-bold text-font-color-highlight dark:text-dark-font-color-highlight' : 'font-semibold text-font-color-black dark:text-font-color-white'}`}>
+                    <div
+                      className={`text-sm ${isSelected ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold' : 'text-font-color-black dark:text-font-color-white font-semibold'}`}
+                    >
                       {cand.title}
                     </div>
-                    <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5">
-                      {cand.trackCount ? `${cand.trackCount} tracks` : 'Official Release'} {cand.releaseType ? `· ${cand.releaseType}` : ''}
+                    <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 text-xs">
+                      {cand.trackCount ? `${cand.trackCount} tracks` : 'Official Release'}{' '}
+                      {cand.releaseType ? `· ${cand.releaseType}` : ''}
                     </div>
                   </td>
 
                   {/* Artist */}
-                  <td className="px-3 py-2 text-font-color-black dark:text-font-color-white text-xs font-medium">
+                  <td className="text-font-color-black dark:text-font-color-white px-3 py-2 text-xs font-medium">
                     {cand.artist || '—'}
                   </td>
 
                   {/* Year */}
-                  <td className="px-3 py-2 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
+                  <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-3 py-2 text-xs">
                     {cand.year ?? '—'}
                   </td>
 
@@ -132,15 +139,15 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
                       {isLoadingThis ? (
-                        <span className="text-[0.7rem] font-semibold px-1.5 py-0.5 rounded bg-background-color-3/30 dark:bg-dark-background-color-3/30 text-font-color-highlight dark:text-dark-font-color-highlight border border-background-color-3/50 dark:border-dark-background-color-3/50">
+                        <span className="bg-background-color-3/30 dark:bg-dark-background-color-3/30 text-font-color-highlight dark:text-dark-font-color-highlight border-background-color-3/50 dark:border-dark-background-color-3/50 rounded border px-1.5 py-0.5 text-[0.7rem] font-semibold">
                           Resolving...
                         </span>
                       ) : (
                         <>
                           <span
-                            className={`text-[0.7rem] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide border ${
+                            className={`rounded border px-1.5 py-0.5 text-[0.7rem] font-semibold tracking-wide uppercase ${
                               idx === 0
-                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed'
                             }`}
                           >
@@ -148,7 +155,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                           </span>
                           {cand.qualityBand && (
                             <span
-                              className={`text-[0.65rem] font-semibold px-1.5 py-0.5 rounded border ${QUALITY_BAND_CHIP_CLASS[cand.qualityBand]}`}
+                              className={`rounded border px-1.5 py-0.5 text-[0.65rem] font-semibold ${QUALITY_BAND_CHIP_CLASS[cand.qualityBand]}`}
                               title={`Match quality: ${cand.qualityBand}`}
                             >
                               {cand.qualityBand}
@@ -156,7 +163,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                           )}
                           {cand.rankingScore !== undefined && (
                             <span
-                              className="text-[0.72rem] font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed cursor-help"
+                              className="text-font-color-dimmed dark:text-dark-font-color-dimmed cursor-help text-[0.72rem] font-medium"
                               title={formatScoreTooltip(cand)}
                             >
                               Score {cand.rankingScore}
@@ -165,7 +172,7 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
                         </>
                       )}
                     </div>
-                    <div className="text-[0.7rem] text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 font-medium">
+                    <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 text-[0.7rem] font-medium">
                       {providerLabel}
                     </div>
                   </td>
@@ -178,4 +185,3 @@ export const CandidateMatchesTable: React.FC<CandidateMatchesTableProps> = ({
     </div>
   );
 };
-

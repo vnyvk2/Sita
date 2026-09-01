@@ -1,4 +1,5 @@
 import React from 'react';
+
 import styles from './MetadataCenter.module.css';
 
 export interface SearchAndProviderPanelProps {
@@ -30,7 +31,10 @@ export const SearchAndProviderPanel: React.FC<SearchAndProviderPanelProps> = ({
 
   return (
     <div className={styles.searchBar}>
-      <span className="material-symbols-rounded" style={{ color: 'var(--text-color-dimmed)', fontSize: '20px' }}>
+      <span
+        className="material-symbols-rounded"
+        style={{ color: 'var(--text-color-dimmed)', fontSize: '20px' }}
+      >
         search
       </span>
       <input
@@ -64,11 +68,7 @@ export const SearchAndProviderPanel: React.FC<SearchAndProviderPanelProps> = ({
         })}
       </div>
 
-      <button
-        onClick={onSearch}
-        disabled={loading}
-        className={styles.searchButton}
-      >
+      <button onClick={onSearch} disabled={loading} className={styles.searchButton}>
         <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>
           {loading ? 'sync' : 'auto_fix_high'}
         </span>

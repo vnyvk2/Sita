@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { GlobalFieldDiff } from '../../hooks/useAlbumAutoTag';
 
 export interface GlobalFieldDiffTableProps {
@@ -21,8 +22,8 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
   return (
     <div className="flex flex-col gap-2">
       {/* Section Header & Bulk Buttons */}
-      <div className="flex justify-between items-center px-1">
-        <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-semibold tracking-wider uppercase">
           Global / Album Metadata Changes
         </span>
 
@@ -30,21 +31,21 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
           <button
             type="button"
             onClick={onSelectAll}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+            className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
           >
             Select All
           </button>
           <button
             type="button"
             onClick={onSelectChanged}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+            className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
           >
             Select Changed
           </button>
           <button
             type="button"
             onClick={onClear}
-            className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+            className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
           >
             Deselect All
           </button>
@@ -52,10 +53,10 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
       </div>
 
       {/* Diff Table */}
-      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20 dark:bg-dark-background-color-2/30">
+      <div className="border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/20 dark:bg-dark-background-color-2/30 overflow-hidden rounded-xl border">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
+            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed border-b text-xs tracking-wider uppercase">
               <th className="w-9 px-3 py-2.5 text-center"></th>
               <th className="w-36 px-3 py-2.5">FIELD</th>
               <th className="px-3 py-2.5">CURRENT (LOCAL)</th>
@@ -71,15 +72,17 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
                 diff.status === 'changed'
                   ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
                   : diff.status === 'new'
-                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed';
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed';
 
               return (
                 <tr
                   key={diff.fieldId}
                   onClick={() => onToggleField(diff.fieldId)}
-                  className={`border-b border-background-color-2/40 dark:border-dark-background-color-2/40 cursor-pointer transition-colors text-font-color-black dark:text-font-color-white ${
-                    isSelected ? 'bg-background-color-3/15 dark:bg-dark-background-color-3/20' : 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50'
+                  className={`border-background-color-2/40 dark:border-dark-background-color-2/40 text-font-color-black dark:text-font-color-white cursor-pointer border-b transition-colors ${
+                    isSelected
+                      ? 'bg-background-color-3/15 dark:bg-dark-background-color-3/20'
+                      : 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50'
                   }`}
                 >
                   {/* Checkbox */}
@@ -96,28 +99,32 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
                   </td>
 
                   {/* Field Name */}
-                  <td className="px-3 py-2.5 font-bold text-font-color-black dark:text-font-color-white">
+                  <td className="text-font-color-black dark:text-font-color-white px-3 py-2.5 font-bold">
                     {diff.fieldName}
                   </td>
 
                   {/* Current Local Value */}
-                  <td className="px-3 py-2.5 text-font-color-dimmed dark:text-dark-font-color-dimmed font-medium">
+                  <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-3 py-2.5 font-medium">
                     {diff.oldValue}
                   </td>
 
                   {/* Arrow */}
-                  <td className="px-0 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-bold">
+                  <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-0 py-2.5 text-center font-bold">
                     →
                   </td>
 
                   {/* Suggested Remote Value */}
-                  <td className={`px-3 py-2.5 ${diff.isChanged ? 'font-bold text-font-color-highlight dark:text-dark-font-color-highlight' : 'font-medium text-font-color-black dark:text-font-color-white'}`}>
+                  <td
+                    className={`px-3 py-2.5 ${diff.isChanged ? 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold' : 'text-font-color-black dark:text-font-color-white font-medium'}`}
+                  >
                     {diff.suggestedValue}
                   </td>
 
                   {/* Status Badge */}
                   <td className="px-3 py-2.5 text-right">
-                    <span className={`px-2.5 py-0.5 rounded text-[0.72rem] font-bold uppercase tracking-wide border ${statusClass}`}>
+                    <span
+                      className={`rounded border px-2.5 py-0.5 text-[0.72rem] font-bold tracking-wide uppercase ${statusClass}`}
+                    >
                       {diff.status}
                     </span>
                   </td>
@@ -130,4 +137,3 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
     </div>
   );
 };
-

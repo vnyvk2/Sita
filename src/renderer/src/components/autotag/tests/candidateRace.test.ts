@@ -20,11 +20,13 @@ describe('Candidate Switching Race Condition & State Protection', () => {
       resolveCandidateB = resolve;
     });
 
-    const mockBuildPreviewApi = vi.fn().mockImplementation(async (_songs: any, releaseId: string) => {
-      if (releaseId === 'rel-A') return promiseA;
-      if (releaseId === 'rel-B') return promiseB;
-      return null;
-    });
+    const mockBuildPreviewApi = vi
+      .fn()
+      .mockImplementation(async (_songs: any, releaseId: string) => {
+        if (releaseId === 'rel-A') return promiseA;
+        if (releaseId === 'rel-B') return promiseB;
+        return null;
+      });
 
     // Simulates useAlbumAutoTag buildPreview logic
     const buildPreview = async (releaseId: string) => {
@@ -97,11 +99,13 @@ describe('Candidate Switching Race Condition & State Protection', () => {
       resolveCandidateB = resolve;
     });
 
-    const mockBuildPreviewApi = vi.fn().mockImplementation(async (_songs: any, releaseId: string) => {
-      if (releaseId === 'rel-A') return promiseA;
-      if (releaseId === 'rel-B') return promiseB;
-      return null;
-    });
+    const mockBuildPreviewApi = vi
+      .fn()
+      .mockImplementation(async (_songs: any, releaseId: string) => {
+        if (releaseId === 'rel-A') return promiseA;
+        if (releaseId === 'rel-B') return promiseB;
+        return null;
+      });
 
     const buildPreview = async (releaseId: string) => {
       const requestId = ++previewRequestId;

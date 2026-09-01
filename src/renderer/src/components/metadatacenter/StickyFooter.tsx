@@ -40,13 +40,23 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
         borderBottomRightRadius: '16px'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: 'var(--text-color-dimmed)' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          fontSize: '13px',
+          color: 'var(--text-color-dimmed)'
+        }}
+      >
         <span>
-          <strong style={{ color: 'var(--text-color)' }}>{selectedTrackCount}</strong> / {matchCount} tracks selected
+          <strong style={{ color: 'var(--text-color)' }}>{selectedTrackCount}</strong> /{' '}
+          {matchCount} tracks selected
         </span>
         <span>•</span>
         <span>
-          <strong style={{ color: 'var(--text-color-highlight)' }}>{selectedFieldCount}</strong> fields active
+          <strong style={{ color: 'var(--text-color-highlight)' }}>{selectedFieldCount}</strong>{' '}
+          fields active
         </span>
 
         {canUndo && (
@@ -104,7 +114,9 @@ export const StickyFooter: React.FC<StickyFooterProps> = ({
             fontSize: '13px',
             fontWeight: 600,
             color: 'var(--text-color-white)',
-            background: loading ? 'rgba(59, 130, 246, 0.4)' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+            background: loading
+              ? 'rgba(59, 130, 246, 0.4)'
+              : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
             border: 'none',
             borderRadius: '8px',
             cursor: loading ? 'not-allowed' : 'pointer',

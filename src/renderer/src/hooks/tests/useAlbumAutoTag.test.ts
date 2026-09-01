@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+
 import type { AlbumTagPreview, TrackMatchPreview } from '../../../../common/metadata/types';
 import { albumQuery } from '../../queries/albums';
 import { artistQuery } from '../../queries/artists';
@@ -29,8 +30,22 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
       api: {
         metadataAutoTag: {
           searchAlbums: vi.fn().mockResolvedValue([
-            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2021, releaseId: 'mb-sour-2021', provider: 'musicbrainz', rankingScore: 185 },
-            { title: 'SOUR', artist: 'Olivia Rodrigo', year: 2022, releaseId: 'mb-sour-2022', provider: 'musicbrainz', rankingScore: 163 }
+            {
+              title: 'SOUR',
+              artist: 'Olivia Rodrigo',
+              year: 2021,
+              releaseId: 'mb-sour-2021',
+              provider: 'musicbrainz',
+              rankingScore: 185
+            },
+            {
+              title: 'SOUR',
+              artist: 'Olivia Rodrigo',
+              year: 2022,
+              releaseId: 'mb-sour-2022',
+              provider: 'musicbrainz',
+              rankingScore: 163
+            }
           ]),
           buildPreview: vi.fn().mockImplementation(async (_songs, releaseId) => {
             if (releaseId === 'mb-sour-2021') {
@@ -56,11 +71,46 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     why: 'Exact title and duration match',
                     reasons: [],
                     fieldDiffs: [
-                      { fieldId: 'title', fieldName: 'Title', oldValue: 'brutal', suggestedValue: 'brutal', status: 'unchanged', applyField: true },
-                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia Rodrigo', suggestedValue: 'Olivia Rodrigo', status: 'unchanged', applyField: true },
-                      { fieldId: 'album', fieldName: 'Album', oldValue: 'SOUR Demo', suggestedValue: 'SOUR', status: 'changed', applyField: true },
-                      { fieldId: 'year', fieldName: 'Year', oldValue: 2020, suggestedValue: 2021, status: 'changed', applyField: true },
-                      { fieldId: 'genre', fieldName: 'Genre', oldValue: 'Rock', suggestedValue: 'Pop', status: 'changed', applyField: true }
+                      {
+                        fieldId: 'title',
+                        fieldName: 'Title',
+                        oldValue: 'brutal',
+                        suggestedValue: 'brutal',
+                        status: 'unchanged',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'artist',
+                        fieldName: 'Artist',
+                        oldValue: 'Olivia Rodrigo',
+                        suggestedValue: 'Olivia Rodrigo',
+                        status: 'unchanged',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'album',
+                        fieldName: 'Album',
+                        oldValue: 'SOUR Demo',
+                        suggestedValue: 'SOUR',
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'year',
+                        fieldName: 'Year',
+                        oldValue: 2020,
+                        suggestedValue: 2021,
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'genre',
+                        fieldName: 'Genre',
+                        oldValue: 'Rock',
+                        suggestedValue: 'Pop',
+                        status: 'changed',
+                        applyField: true
+                      }
                     ]
                   },
                   {
@@ -78,11 +128,46 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     why: 'Fuzzy match',
                     reasons: [],
                     fieldDiffs: [
-                      { fieldId: 'title', fieldName: 'Title', oldValue: 'traitor (demo)', suggestedValue: 'traitor', status: 'changed', applyField: true },
-                      { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia', suggestedValue: 'Olivia Rodrigo', status: 'changed', applyField: true },
-                      { fieldId: 'album', fieldName: 'Album', oldValue: 'SOUR Demo', suggestedValue: 'SOUR', status: 'changed', applyField: true },
-                      { fieldId: 'year', fieldName: 'Year', oldValue: 2020, suggestedValue: 2021, status: 'changed', applyField: true },
-                      { fieldId: 'genre', fieldName: 'Genre', oldValue: 'Rock', suggestedValue: 'Pop', status: 'changed', applyField: true }
+                      {
+                        fieldId: 'title',
+                        fieldName: 'Title',
+                        oldValue: 'traitor (demo)',
+                        suggestedValue: 'traitor',
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'artist',
+                        fieldName: 'Artist',
+                        oldValue: 'Olivia',
+                        suggestedValue: 'Olivia Rodrigo',
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'album',
+                        fieldName: 'Album',
+                        oldValue: 'SOUR Demo',
+                        suggestedValue: 'SOUR',
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'year',
+                        fieldName: 'Year',
+                        oldValue: 2020,
+                        suggestedValue: 2021,
+                        status: 'changed',
+                        applyField: true
+                      },
+                      {
+                        fieldId: 'genre',
+                        fieldName: 'Genre',
+                        oldValue: 'Rock',
+                        suggestedValue: 'Pop',
+                        status: 'changed',
+                        applyField: true
+                      }
                     ]
                   }
                 ]
@@ -107,14 +192,23 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
                     why: 'Match',
                     reasons: [],
                     fieldDiffs: [
-                      { fieldId: 'title', fieldName: 'Title', oldValue: 'brutal', suggestedValue: 'brutal (deluxe)', status: 'changed', applyField: true }
+                      {
+                        fieldId: 'title',
+                        fieldName: 'Title',
+                        oldValue: 'brutal',
+                        suggestedValue: 'brutal (deluxe)',
+                        status: 'changed',
+                        applyField: true
+                      }
                     ]
                   }
                 ]
               } as unknown as AlbumTagPreview;
             }
           }),
-          applyPreview: vi.fn().mockResolvedValue({ success: true, updatedCount: 2, failedCount: 0, errors: [] }),
+          applyPreview: vi
+            .fn()
+            .mockResolvedValue({ success: true, updatedCount: 2, failedCount: 0, errors: [] }),
           undoLastAutoTag: vi.fn().mockResolvedValue({ success: true, restoredCount: 2 }),
           cancelAutoTag: vi.fn(),
           onProgress: vi.fn((cb) => {
@@ -129,12 +223,21 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
   it('provides metadataAutoTag API integration methods and supports single listener count safety', async () => {
     const api = (window as any).api.metadataAutoTag;
-    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', { limit: 10, targetTrackCount: 11, operationId: 'op-1' });
+    const candidates = await api.searchAlbums('SOUR', 'Olivia Rodrigo', {
+      limit: 10,
+      targetTrackCount: 11,
+      operationId: 'op-1'
+    });
     expect(candidates).toHaveLength(2);
     expect(candidates[0].title).toBe('SOUR');
     expect(candidates[0].rankingScore).toBe(185);
 
-    const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
+    const preview = await api.buildPreview(
+      [{ songId: 101 }],
+      'mb-sour-2021',
+      'musicbrainz',
+      'op-1'
+    );
     expect(preview.overallConfidence).toBe(0.94);
 
     const applyRes = await api.applyPreview(preview, 'op-1');
@@ -167,9 +270,15 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
   it('calculates exact change count distinguishing global fields from per-track fields', async () => {
     const api = (window as any).api.metadataAutoTag;
-    const preview: AlbumTagPreview = await api.buildPreview([{ songId: 101 }, { songId: 102 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
+    const preview: AlbumTagPreview = await api.buildPreview(
+      [{ songId: 101 }, { songId: 102 }],
+      'mb-sour-2021',
+      'musicbrainz',
+      'op-1'
+    );
 
-    const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
+    const isGlobalField = (fieldId: string) =>
+      ['album', 'artist', 'year', 'genre'].includes(fieldId);
     const selectedGlobalFields = new Set(['artist']); // Only artist is selected globally
     const selectedGlobalChangedCount = 1; // 'Olivia' -> 'Olivia Rodrigo'
     const selectedTrackIds = new Set([101, 102]);
@@ -202,7 +311,12 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
 
   it('correctly maps canonical global field selections to effective track diffs on apply', async () => {
     const api = (window as any).api.metadataAutoTag;
-    const preview: AlbumTagPreview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
+    const preview: AlbumTagPreview = await api.buildPreview(
+      [{ songId: 101 }],
+      'mb-sour-2021',
+      'musicbrainz',
+      'op-1'
+    );
 
     // User selected only 'album' and 'year', while 'artist' and 'genre' are deselected
     const selectedGlobalFields = new Set(['album', 'year']);
@@ -210,7 +324,8 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
     const selectedFieldMap = new Map<string, boolean>();
     const userEditedValues = new Map<string, string | number>();
 
-    const isGlobalField = (fieldId: string) => ['album', 'artist', 'year', 'genre'].includes(fieldId);
+    const isGlobalField = (fieldId: string) =>
+      ['album', 'artist', 'year', 'genre'].includes(fieldId);
 
     const effectiveMatches: TrackMatchPreview[] = preview.matches.map((m) => {
       const applyTrack = selectedTrackIds.has(m.localSongId);
@@ -259,7 +374,12 @@ describe('Unified Single-Page AutoTag — useAlbumAutoTag & State Machine Tests'
     };
 
     // Simulated apply success
-    const preview = await api.buildPreview([{ songId: 101 }], 'mb-sour-2021', 'musicbrainz', 'op-1');
+    const preview = await api.buildPreview(
+      [{ songId: 101 }],
+      'mb-sour-2021',
+      'musicbrainz',
+      'op-1'
+    );
     const applyRes = await api.applyPreview(preview, 'op-1');
     if (applyRes.success) {
       invalidateQueryCache();

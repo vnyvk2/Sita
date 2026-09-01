@@ -43,19 +43,36 @@ export const metadataApi = {
     return api.getAvailableSearchProviders();
   },
 
-  buildPreview: async (localSongs: unknown[], releaseId: string, providerId?: MetadataProviderId, operationId?: string): Promise<AlbumTagPreview | null> => {
+  buildPreview: async (
+    localSongs: unknown[],
+    releaseId: string,
+    providerId?: MetadataProviderId,
+    operationId?: string
+  ): Promise<AlbumTagPreview | null> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api) return null;
     return api.buildPreview(localSongs, releaseId, providerId, operationId);
   },
 
-  applyPreview: async (preview: AlbumTagPreview, options?: ApplyPreviewOptions, operationId?: string): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
+  applyPreview: async (
+    preview: AlbumTagPreview,
+    options?: ApplyPreviewOptions,
+    operationId?: string
+  ): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
-    if (!api) return { success: false, updatedCount: 0, failedCount: 0, errors: ['Metadata API unavailable'] };
+    if (!api)
+      return {
+        success: false,
+        updatedCount: 0,
+        failedCount: 0,
+        errors: ['Metadata API unavailable']
+      };
     return api.applyPreview(preview, options, operationId);
   },
 
-  undoLastAutoTag: async (operationId?: string): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> => {
+  undoLastAutoTag: async (
+    operationId?: string
+  ): Promise<{ success: boolean; restoredCount: number; errors?: string[] }> => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api) return { success: false, restoredCount: 0 };
     return api.undoLastAutoTag(operationId);
@@ -73,25 +90,49 @@ export const metadataApi = {
   },
 
   // --- Phase 14 Unified Metadata Workflow API ---
-  workflowSearch: async (workflowType: string, query: { title?: string; artist?: string; album?: string; limit?: number }, operationId?: string): Promise<any[]> => {
+  workflowSearch: async (
+    workflowType: string,
+    query: { title?: string; artist?: string; album?: string; limit?: number },
+    operationId?: string
+  ): Promise<any[]> => {
     const api = window.api?.metadataWorkflow;
     if (!api) return [];
     return api.search(workflowType, query, operationId);
   },
 
-  workflowBuildPreview: async (workflowType: string, localSongs: unknown[], candidateId: string, providerId?: string, operationId?: string): Promise<any | null> => {
+  workflowBuildPreview: async (
+    workflowType: string,
+    localSongs: unknown[],
+    candidateId: string,
+    providerId?: string,
+    operationId?: string
+  ): Promise<any | null> => {
     const api = window.api?.metadataWorkflow;
     if (!api) return null;
     return api.buildPreview(workflowType, localSongs, candidateId, providerId, operationId);
   },
 
-  workflowApplyPreview: async (workflowType: string, preview: unknown, selectedFieldIds?: string[], options?: unknown, operationId?: string): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
+  workflowApplyPreview: async (
+    workflowType: string,
+    preview: unknown,
+    selectedFieldIds?: string[],
+    options?: unknown,
+    operationId?: string
+  ): Promise<{ success: boolean; updatedCount: number; failedCount: number; errors: string[] }> => {
     const api = window.api?.metadataWorkflow;
-    if (!api) return { success: false, updatedCount: 0, failedCount: 0, errors: ['Metadata API unavailable'] };
+    if (!api)
+      return {
+        success: false,
+        updatedCount: 0,
+        failedCount: 0,
+        errors: ['Metadata API unavailable']
+      };
     return api.applyPreview(workflowType, preview, selectedFieldIds, options, operationId);
   },
 
-  workflowUndo: async (operationId?: string): Promise<{ success: boolean; revertedCount: number; errors: string[] }> => {
+  workflowUndo: async (
+    operationId?: string
+  ): Promise<{ success: boolean; revertedCount: number; errors: string[] }> => {
     const api = window.api?.metadataWorkflow;
     if (!api) return { success: false, revertedCount: 0, errors: ['Metadata API unavailable'] };
     return api.undo(operationId);

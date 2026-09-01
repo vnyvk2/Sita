@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import type { AlbumTagPreview, MetadataFieldDiff, TrackMatchPreview } from '../../../../common/metadata/types';
+
+import type {
+  AlbumTagPreview,
+  MetadataFieldDiff,
+  TrackMatchPreview
+} from '../../../../common/metadata/types';
 import {
   computeFederationSummary,
   getChangedFieldDiffs,

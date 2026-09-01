@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
 import { useAlbumAutoTag } from '../../hooks/useAlbumAutoTag';
 import { useEffectiveAppearance } from '../../hooks/useEffectiveAppearance';
 import { AutoTagActionBar } from './AutoTagActionBar';
@@ -134,7 +135,15 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, state.preview, state.filteredMatches, focusedTrackIndex, state.selectedTrackIds?.size, state.loading, viewMode]);
+  }, [
+    isOpen,
+    state.preview,
+    state.filteredMatches,
+    focusedTrackIndex,
+    state.selectedTrackIds?.size,
+    state.loading,
+    viewMode
+  ]);
 
   if (!isOpen) return null;
 
@@ -145,35 +154,38 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[95%] max-w-[1080px] max-h-[92vh] bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-font-color-black dark:text-font-color-white"
+        className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 text-font-color-black dark:text-font-color-white flex max-h-[92vh] w-[95%] max-w-[1080px] flex-col overflow-hidden rounded-2xl border shadow-2xl"
       >
         {/* Header Bar */}
-        <div className="flex justify-between items-center px-5 py-2.5 border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/50 dark:bg-dark-background-color-2/50">
+        <div className="border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/50 dark:bg-dark-background-color-2/50 flex items-center justify-between border-b px-5 py-2.5">
           <div className="flex items-center gap-2.5">
-            <span className="material-symbols-rounded material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-xl select-none leading-none">
+            <span className="material-symbols-rounded material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-xl leading-none select-none">
               auto_awesome
             </span>
             <div>
-              <div className="text-sm font-bold text-font-color-highlight dark:text-dark-font-color-highlight leading-snug">
+              <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm leading-snug font-bold">
                 Metadata Center / AutoTag
               </div>
-              <div className="text-[11px] text-font-color-dimmed dark:text-dark-font-color-dimmed">
+              <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[11px]">
                 Search, compare and apply verified metadata
               </div>
             </div>
             {state.preview && (
-              <ConfidenceBadge level={state.preview.confidenceLevel} confidence={state.preview.overallConfidence} />
+              <ConfidenceBadge
+                level={state.preview.confidenceLevel}
+                confidence={state.preview.overallConfidence}
+              />
             )}
           </div>
 
           <div className="flex items-center gap-2.5">
             {/* View Mode Toggle Pill (Compact vs Detailed) */}
             {state.preview && (
-              <div className="flex bg-background-color-2 dark:bg-dark-background-color-2 rounded-lg p-0.5 border border-background-color-3/40 dark:border-dark-background-color-3/40">
+              <div className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 flex rounded-lg border p-0.5">
                 <button
                   type="button"
                   onClick={() => setViewMode('compact')}
-                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                  className={`flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                     viewMode === 'compact'
                       ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
                       : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
@@ -185,7 +197,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => setViewMode('detailed')}
-                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                  className={`flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                     viewMode === 'detailed'
                       ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
                       : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
@@ -200,7 +212,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 rounded-lg text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-sm cursor-pointer px-2 py-0.5 flex items-center justify-center transition-colors"
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white flex cursor-pointer items-center justify-center rounded-lg border px-2 py-0.5 text-sm transition-colors"
             >
               ✕
             </button>
@@ -208,7 +220,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
         </div>
 
         {/* Scrollable Single-Page Workspace */}
-        <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
           {/* Progress Overlay during active apply operations */}
           {state.loading && state.step === 'applying' && (
             <AutoTagProgressOverlay
@@ -221,20 +233,22 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Expandable Error UX Drawer */}
           {state.error && (
-            <div className="p-3.5 rounded-xl bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson text-sm flex flex-col gap-1.5">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-font-color-crimson">Couldn't update metadata.</span>
+            <div className="bg-font-color-crimson/15 border-font-color-crimson/30 text-font-color-crimson flex flex-col gap-1.5 rounded-xl border p-3.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-font-color-crimson font-semibold">
+                  Couldn't update metadata.
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowErrorDetails((prev) => !prev)}
-                  className="bg-transparent border-0 text-font-color-highlight dark:text-dark-font-color-highlight text-xs cursor-pointer font-semibold"
+                  className="text-font-color-highlight dark:text-dark-font-color-highlight cursor-pointer border-0 bg-transparent text-xs font-semibold"
                 >
                   {showErrorDetails ? '▲ Hide Details' : '▼ Details'}
                 </button>
               </div>
 
               {showErrorDetails && (
-                <div className="font-mono text-xs bg-background-color-1 dark:bg-dark-background-color-1 p-2.5 rounded-lg overflow-x-auto text-font-color-crimson border border-font-color-crimson/20">
+                <div className="bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-crimson border-font-color-crimson/20 overflow-x-auto rounded-lg border p-2.5 font-mono text-xs">
                   {state.error}
                 </div>
               )}
@@ -243,21 +257,21 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
 
           {/* Success Banner */}
           {state.step === 'complete' && (
-            <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex justify-between items-center">
+            <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/15 p-4">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">🎉</span>
                 <div>
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                     Metadata Applied Successfully!
                   </div>
-                  <div className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                  <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                     Updated {state.selectedTrackIds.size} songs with verified tags and artwork.
                   </div>
                 </div>
               </div>
 
               {state.lastRestoredCount > 0 && (
-                <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
                   Restored {state.lastRestoredCount} songs.
                 </span>
               )}
@@ -294,7 +308,9 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           {state.preview && (
             <div
               className={`transition-opacity duration-200 ${
-                state.loadingPreview ? 'opacity-60 pointer-events-none' : 'opacity-100 pointer-events-auto'
+                state.loadingPreview
+                  ? 'pointer-events-none opacity-60'
+                  : 'pointer-events-auto opacity-100'
               }`}
             >
               <SelectedReleasePanel
@@ -320,8 +336,8 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
           )}
 
           {/* 5. Track Review: Compact View or Detailed Table */}
-          {state.preview && (
-            viewMode === 'compact' ? (
+          {state.preview &&
+            (viewMode === 'compact' ? (
               <CompactReviewView
                 matches={state.filteredMatches}
                 selectedTrackIds={state.selectedTrackIds}
@@ -361,8 +377,7 @@ export const MetadataCenterDialog: React.FC<MetadataCenterDialogProps> = ({
                 onFilterChange={actions.setFilter}
                 onSortChange={actions.setSort}
               />
-            )
-          )}
+            ))}
         </div>
 
         {/* 6. Sticky Action Bar */}

@@ -1,7 +1,8 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+
 import type { TrackMatchPreview } from '../../../../common/metadata/types';
 import { TrackComparisonTable } from '../TrackComparisonTable';
 

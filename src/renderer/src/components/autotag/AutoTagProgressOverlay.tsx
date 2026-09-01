@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { AutoTagStage } from '../../../../common/metadata/types';
 
 export interface AutoTagProgressOverlayProps {
@@ -38,28 +39,34 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
   };
 
   return (
-    <div className="p-5 rounded-xl bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-2 dark:border-dark-background-color-2 text-font-color-black dark:text-font-color-white flex flex-col gap-3 shadow-xl">
-      <div className="flex justify-between items-center">
-        <span className="font-semibold text-sm text-font-color-black dark:text-font-color-white">{getStageTitle()}</span>
-        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">{Math.round(progressPercent)}%</span>
+    <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 text-font-color-black dark:text-font-color-white flex flex-col gap-3 rounded-xl border p-5 shadow-xl">
+      <div className="flex items-center justify-between">
+        <span className="text-font-color-black dark:text-font-color-white text-sm font-semibold">
+          {getStageTitle()}
+        </span>
+        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
+          {Math.round(progressPercent)}%
+        </span>
       </div>
 
-      <div className="w-full h-2 bg-background-color-2 dark:bg-dark-background-color-2 rounded-full overflow-hidden relative">
+      <div className="bg-background-color-2 dark:bg-dark-background-color-2 relative h-2 w-full overflow-hidden rounded-full">
         <div
-          className="h-full bg-font-color-highlight dark:bg-dark-font-color-highlight rounded-full transition-all duration-300 ease-out"
+          className="bg-font-color-highlight dark:bg-dark-font-color-highlight h-full rounded-full transition-all duration-300 ease-out"
           style={{
             width: `${Math.min(100, Math.max(0, progressPercent))}%`
           }}
         />
       </div>
 
-      <div className="flex justify-between items-center">
-        <span className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed">{message}</span>
+      <div className="flex items-center justify-between">
+        <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
+          {message}
+        </span>
         {onCancel && stage !== 'completed' && stage !== 'cancelled' && (
           <button
             type="button"
             onClick={onCancel}
-            className="bg-font-color-crimson/15 border border-font-color-crimson/30 text-font-color-crimson rounded-md px-3 py-1 text-xs font-medium hover:bg-font-color-crimson/25 transition-colors cursor-pointer"
+            className="bg-font-color-crimson/15 border-font-color-crimson/30 text-font-color-crimson hover:bg-font-color-crimson/25 cursor-pointer rounded-md border px-3 py-1 text-xs font-medium transition-colors"
           >
             Cancel
           </button>
@@ -68,4 +75,3 @@ export const AutoTagProgressOverlay: React.FC<AutoTagProgressOverlayProps> = ({
     </div>
   );
 };
-

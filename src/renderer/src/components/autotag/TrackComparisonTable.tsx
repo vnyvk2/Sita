@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
+
 import { getTrackPreviewKey } from '../../../../common/metadata/preview';
+import type { MetadataFieldId, TrackMatchPreview } from '../../../../common/metadata/types';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
 import { MetadataDiffViewer } from './MetadataDiffViewer';
 
@@ -46,7 +47,8 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
   const [internalExpandedTrackId, setInternalExpandedTrackId] = useState<number | null>(null);
   const [showChangesOnly, setShowChangesOnly] = useState(true);
 
-  const effectiveExpandedId = expandedTrackId !== undefined ? expandedTrackId : internalExpandedTrackId;
+  const effectiveExpandedId =
+    expandedTrackId !== undefined ? expandedTrackId : internalExpandedTrackId;
 
   const toggleExpand = (songId: number) => {
     if (onToggleExpand) {
@@ -58,49 +60,71 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
 
   const getMatchStatusBadge = (match: TrackMatchPreview) => {
     const isExact = match.confidence >= 0.95 && !match.hasWarnings;
-    const isRename = match.confidence >= 0.85 && match.fieldDiffs.some((d) => d.fieldId === 'title' && d.status === 'changed');
+    const isRename =
+      match.confidence >= 0.85 &&
+      match.fieldDiffs.some((d) => d.fieldId === 'title' && d.status === 'changed');
     const isWarning = match.hasWarnings || match.confidence < 0.8;
 
     if (isWarning) {
-      return { label: '⚠ Warning', className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400' };
+      return {
+        label: '⚠ Warning',
+        className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
+      };
     }
     if (isRename) {
-      return { label: '✓ Rename', className: 'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight' };
+      return {
+        label: '✓ Rename',
+        className:
+          'bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/15 border-font-color-highlight/30 dark:border-dark-font-color-highlight/30 text-font-color-highlight dark:text-dark-font-color-highlight'
+      };
     }
     if (isExact) {
-      return { label: '✓ Match', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' };
+      return {
+        label: '✓ Match',
+        className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+      };
     }
-    return { label: '✓ Suggested', className: 'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight' };
+    return {
+      label: '✓ Suggested',
+      className:
+        'bg-background-color-3/30 dark:bg-dark-background-color-3/30 border-background-color-3/60 dark:border-dark-background-color-3/60 text-font-color-highlight dark:text-dark-font-color-highlight'
+    };
   };
 
   return (
     <div className="flex flex-col gap-2">
       {/* Table Header & Controls Bar */}
-      <div className="flex justify-between items-center px-1">
+      <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-wider text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase">
-            Tracks ({selectedTrackIds.size} / {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected{matches.length !== matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length ? ` · ${matches.length} on album` : ''})
+          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-semibold tracking-wider uppercase">
+            Tracks ({selectedTrackIds.size} /{' '}
+            {matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length} Selected
+            {matches.length !==
+            matches.filter((m) => !m.isMissingLocally && m.localSongId > 0).length
+              ? ` · ${matches.length} on album`
+              : ''}
+            )
           </span>
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onSelectAll}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={onSelectChanged}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
             >
               Changed Only
             </button>
             <button
               type="button"
               onClick={onClearSelections}
-              className="px-2.5 py-1 rounded-md bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white text-xs font-medium transition-colors cursor-pointer"
+              className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
             >
               Deselect All
             </button>
@@ -108,13 +132,13 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
         </div>
 
         {/* Filter & Sort & Changes Only Selectors */}
-        <div className="flex gap-2.5 items-center">
+        <div className="flex items-center gap-2.5">
           {/* Changes Only Toggle Pill */}
-          <div className="flex bg-background-color-2 dark:bg-dark-background-color-2 rounded-md p-0.5 border border-background-color-3/40 dark:border-dark-background-color-3/40">
+          <div className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 flex rounded-md border p-0.5">
             <button
               type="button"
               onClick={() => setShowChangesOnly(true)}
-              className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+              className={`cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-colors ${
                 showChangesOnly
                   ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
@@ -125,7 +149,7 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
             <button
               type="button"
               onClick={() => setShowChangesOnly(false)}
-              className={`px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+              className={`cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-colors ${
                 !showChangesOnly
                   ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-highlight dark:text-dark-font-color-highlight shadow-xs'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
@@ -135,12 +159,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
             </button>
           </div>
 
-          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 text-xs font-medium">
             Filter:
             <select
               value={filter}
               onChange={(e) => onFilterChange(e.target.value as PreviewFilterOption)}
-              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight cursor-pointer rounded border px-2 py-0.5 text-xs transition-colors outline-none"
             >
               <option value="all">All Tracks</option>
               <option value="changed">Changed Only</option>
@@ -149,12 +173,12 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
             </select>
           </label>
 
-          <label className="text-xs text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 font-medium">
+          <label className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex items-center gap-1.5 text-xs font-medium">
             Sort:
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as PreviewSortOption)}
-              className="bg-background-color-1 dark:bg-dark-background-color-2 border border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white rounded px-2 py-0.5 text-xs outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors"
+              className="bg-background-color-1 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 text-font-color-black dark:text-font-color-white focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight cursor-pointer rounded border px-2 py-0.5 text-xs transition-colors outline-none"
             >
               <option value="trackNumber">Track #</option>
               <option value="confidence">Confidence</option>
@@ -165,10 +189,10 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="border border-background-color-2 dark:border-dark-background-color-2 rounded-xl overflow-hidden bg-background-color-2/20 dark:bg-dark-background-color-2/30">
+      <div className="border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/20 dark:bg-dark-background-color-2/30 overflow-hidden rounded-xl border">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-b border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs uppercase tracking-wider">
+            <tr className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed border-b text-xs tracking-wider uppercase">
               <th className="w-9 px-2.5 py-2.5 text-center"></th>
               <th className="w-9 px-2 py-2.5 text-center">#</th>
               <th className="px-3 py-2.5">CURRENT TITLE</th>
@@ -187,23 +211,29 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
               const itemKey = getTrackPreviewKey(match, idx);
               const titleDiff = match.fieldDiffs.find((d) => d.fieldId === 'title');
               const artistDiff = match.fieldDiffs.find((d) => d.fieldId === 'artist');
-              const newTitle = isMissing ? (match.remoteTitle ?? '—') : (titleDiff?.suggestedValue ?? match.oldTitle);
-              const newArtist = isMissing ? (match.remoteArtist ?? '—') : (artistDiff?.suggestedValue ?? match.oldArtist ?? '—');
-              const trackNumFormatted = String(match.trackNumber ?? match.oldTrackNumber ?? idx + 1).padStart(2, '0');
+              const newTitle = isMissing
+                ? (match.remoteTitle ?? '—')
+                : (titleDiff?.suggestedValue ?? match.oldTitle);
+              const newArtist = isMissing
+                ? (match.remoteArtist ?? '—')
+                : (artistDiff?.suggestedValue ?? match.oldArtist ?? '—');
+              const trackNumFormatted = String(
+                match.trackNumber ?? match.oldTrackNumber ?? idx + 1
+              ).padStart(2, '0');
               const statusBadge = getMatchStatusBadge(match);
 
               return (
                 <React.Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => toggleExpand(match.localSongId)}
-                    className={`border-b border-background-color-2/40 dark:border-dark-background-color-2/40 transition-colors text-font-color-black dark:text-font-color-white ${
+                    className={`border-background-color-2/40 dark:border-dark-background-color-2/40 text-font-color-black dark:text-font-color-white border-b transition-colors ${
                       isMissing
-                        ? 'opacity-40 bg-background-color-2/10 dark:bg-dark-background-color-2/10 cursor-default'
+                        ? 'bg-background-color-2/10 dark:bg-dark-background-color-2/10 cursor-default opacity-40'
                         : isExpanded
-                        ? 'bg-background-color-2/40 dark:bg-dark-background-color-2/50 border-b-0 cursor-pointer'
-                        : isSelected
-                        ? 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50 cursor-pointer'
-                        : 'opacity-60 hover:bg-background-color-2/30 dark:hover:bg-dark-background-color-2/40 cursor-pointer'
+                          ? 'bg-background-color-2/40 dark:bg-dark-background-color-2/50 cursor-pointer border-b-0'
+                          : isSelected
+                            ? 'hover:bg-background-color-2/40 dark:hover:bg-dark-background-color-2/50 cursor-pointer'
+                            : 'hover:bg-background-color-2/30 dark:hover:bg-dark-background-color-2/40 cursor-pointer opacity-60'
                     }`}
                   >
                     {/* Track Checkbox */}
@@ -222,55 +252,63 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                     </td>
 
                     {/* Track Number */}
-                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-mono text-xs font-semibold">
+                    <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-2 py-2.5 text-center font-mono text-xs font-semibold">
                       {trackNumFormatted}
                     </td>
 
                     {/* Current Local Title */}
-                    <td className={`px-3 py-2.5 font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}>
+                    <td
+                      className={`px-3 py-2.5 font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
+                    >
                       {isMissing ? 'Not in library' : match.oldTitle}
                     </td>
 
                     {/* Arrow */}
-                    <td className="px-0 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed font-bold">
+                    <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-0 py-2.5 text-center font-bold">
                       →
                     </td>
 
                     {/* New Suggested Title */}
-                    <td className={`px-3 py-2.5 font-semibold ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold'}`}>
+                    <td
+                      className={`px-3 py-2.5 font-semibold ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-highlight dark:text-dark-font-color-highlight font-bold'}`}
+                    >
                       {newTitle}
                     </td>
 
                     {/* Artist */}
-                    <td className={`px-3 py-2.5 text-xs font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-black dark:text-font-color-white'}`}>
+                    <td
+                      className={`px-3 py-2.5 text-xs font-medium ${isMissing ? 'text-font-color-dimmed dark:text-dark-font-color-dimmed italic' : 'text-font-color-black dark:text-font-color-white'}`}
+                    >
                       {newArtist}
                     </td>
 
                     {/* Status Badge */}
                     <td className="px-3 py-2.5 text-center">
                       {isMissing ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-background-color-2 dark:bg-dark-background-color-2 border border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                        <span className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/30 dark:border-dark-background-color-3/30 text-font-color-dimmed dark:text-dark-font-color-dimmed rounded border px-2 py-0.5 text-xs font-medium">
                           Missing
                         </span>
                       ) : (
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${statusBadge.className}`}>
+                        <span
+                          className={`rounded border px-2 py-0.5 text-xs font-semibold ${statusBadge.className}`}
+                        >
                           {statusBadge.label}
                         </span>
                       )}
                     </td>
 
                     {/* Expand Chevron */}
-                    <td className="px-2 py-2.5 text-center text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
+                    <td className="text-font-color-dimmed dark:text-dark-font-color-dimmed px-2 py-2.5 text-center text-xs">
                       {!isMissing ? (isExpanded ? '▲' : '▶') : null}
                     </td>
                   </tr>
 
                   {/* Expanded Detailed Field Diff Drawer */}
                   {isExpanded && (
-                    <tr className="border-b border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/30 dark:bg-dark-background-color-2/40">
+                    <tr className="border-background-color-2 dark:border-dark-background-color-2 bg-background-color-2/30 dark:bg-dark-background-color-2/40 border-b">
                       <td colSpan={8} className="px-5 py-4 pl-12">
                         <div className="flex flex-col gap-2">
-                          <span className="text-xs font-semibold text-font-color-dimmed dark:text-dark-font-color-dimmed uppercase tracking-wider">
+                          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs font-semibold tracking-wider uppercase">
                             Track-Level Fields ({match.oldTitle})
                           </span>
                           <MetadataDiffViewer
@@ -279,7 +317,9 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
                             userEditedValues={userEditedValues}
                             showChangesOnly={showChangesOnly}
                             onToggleField={(fieldId) => onToggleField(match.localSongId, fieldId)}
-                            onFieldChanged={(fieldId, val) => onFieldChanged(match.localSongId, fieldId, val)}
+                            onFieldChanged={(fieldId, val) =>
+                              onFieldChanged(match.localSongId, fieldId, val)
+                            }
                             onResetField={(fieldId) => onResetField(match.localSongId, fieldId)}
                           />
                         </div>
@@ -295,4 +335,3 @@ export const TrackComparisonTable: React.FC<TrackComparisonTableProps> = ({
     </div>
   );
 };
-

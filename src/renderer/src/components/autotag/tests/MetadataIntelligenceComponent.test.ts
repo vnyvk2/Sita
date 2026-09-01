@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import type { AlbumTagPreview, TrackMatchPreview } from '../../../../../common/metadata/types';
 
 describe('Metadata Intelligence & Final UX Review Suite', () => {
@@ -19,8 +20,24 @@ describe('Metadata Intelligence & Final UX Review Suite', () => {
       hasWarnings: false,
       warningCount: 0,
       fieldDiffs: [
-        { fieldId: 'title', fieldName: 'Title', oldValue: 'brutal (audio)', suggestedValue: 'brutal', userValue: 'brutal', status: 'changed', applyField: true },
-        { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia Rodrigo', suggestedValue: 'Olivia Rodrigo', userValue: 'Olivia Rodrigo', status: 'unchanged', applyField: false }
+        {
+          fieldId: 'title',
+          fieldName: 'Title',
+          oldValue: 'brutal (audio)',
+          suggestedValue: 'brutal',
+          userValue: 'brutal',
+          status: 'changed',
+          applyField: true
+        },
+        {
+          fieldId: 'artist',
+          fieldName: 'Artist',
+          oldValue: 'Olivia Rodrigo',
+          suggestedValue: 'Olivia Rodrigo',
+          userValue: 'Olivia Rodrigo',
+          status: 'unchanged',
+          applyField: false
+        }
       ]
     },
     {
@@ -39,9 +56,33 @@ describe('Metadata Intelligence & Final UX Review Suite', () => {
       hasWarnings: true,
       warningCount: 1,
       fieldDiffs: [
-        { fieldId: 'title', fieldName: 'Title', oldValue: 'traitor', suggestedValue: 'traitor', userValue: 'traitor', status: 'unchanged', applyField: false },
-        { fieldId: 'artist', fieldName: 'Artist', oldValue: 'Olivia', suggestedValue: 'Olivia Rodrigo', userValue: 'Olivia Rodrigo', status: 'changed', applyField: true },
-        { fieldId: 'year', fieldName: 'Year', oldValue: 2020, suggestedValue: 2021, userValue: 2021, status: 'changed', applyField: true }
+        {
+          fieldId: 'title',
+          fieldName: 'Title',
+          oldValue: 'traitor',
+          suggestedValue: 'traitor',
+          userValue: 'traitor',
+          status: 'unchanged',
+          applyField: false
+        },
+        {
+          fieldId: 'artist',
+          fieldName: 'Artist',
+          oldValue: 'Olivia',
+          suggestedValue: 'Olivia Rodrigo',
+          userValue: 'Olivia Rodrigo',
+          status: 'changed',
+          applyField: true
+        },
+        {
+          fieldId: 'year',
+          fieldName: 'Year',
+          oldValue: 2020,
+          suggestedValue: 2021,
+          userValue: 2021,
+          status: 'changed',
+          applyField: true
+        }
       ]
     }
   ];

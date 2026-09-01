@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, type ChangeEvent } from 'react';
+
 import type {
   AvailableSearchProviderInfo,
   MetadataProviderId,
@@ -19,17 +20,61 @@ const RANKING_WEIGHT_MIN = -100;
 const RANKING_WEIGHT_MAX = 200;
 
 const RANKING_WEIGHT_FIELDS: RankingWeightField[] = [
-  { key: 'artistMatch', label: 'Artist similarity', description: 'Points added for how closely the release artist matches your search.' },
-  { key: 'titleMatch', label: 'Title similarity', description: 'Points added for how closely the release title matches your search.' },
-  { key: 'officialStatus', label: 'Official release bonus', description: 'Points added to official releases.' },
-  { key: 'bootlegPenalty', label: 'Bootleg penalty', description: 'Points removed from bootleg / pseudo-releases. Usually negative.' },
-  { key: 'primaryTypeAlbum', label: 'Album type bonus', description: 'Points added when the candidate is a studio album.' },
-  { key: 'primaryTypeEP', label: 'EP type bonus', description: 'Points added when the candidate is an EP.' },
-  { key: 'compilationPenalty', label: 'Compilation penalty', description: 'Points removed from compilations unless you searched for one. Usually negative.' },
-  { key: 'livePenalty', label: 'Live recording penalty', description: 'Points removed from live recordings. Usually negative.' },
-  { key: 'trackCountMatch', label: 'Track count match', description: 'Points added when the track count matches your files exactly.' },
-  { key: 'editionBoost', label: 'Deluxe edition boost', description: 'Points added to deluxe / special editions when your search mentions one.' },
-  { key: 'remasterBoost', label: 'Remaster boost', description: 'Points added to remasters when your search mentions one.' }
+  {
+    key: 'artistMatch',
+    label: 'Artist similarity',
+    description: 'Points added for how closely the release artist matches your search.'
+  },
+  {
+    key: 'titleMatch',
+    label: 'Title similarity',
+    description: 'Points added for how closely the release title matches your search.'
+  },
+  {
+    key: 'officialStatus',
+    label: 'Official release bonus',
+    description: 'Points added to official releases.'
+  },
+  {
+    key: 'bootlegPenalty',
+    label: 'Bootleg penalty',
+    description: 'Points removed from bootleg / pseudo-releases. Usually negative.'
+  },
+  {
+    key: 'primaryTypeAlbum',
+    label: 'Album type bonus',
+    description: 'Points added when the candidate is a studio album.'
+  },
+  {
+    key: 'primaryTypeEP',
+    label: 'EP type bonus',
+    description: 'Points added when the candidate is an EP.'
+  },
+  {
+    key: 'compilationPenalty',
+    label: 'Compilation penalty',
+    description: 'Points removed from compilations unless you searched for one. Usually negative.'
+  },
+  {
+    key: 'livePenalty',
+    label: 'Live recording penalty',
+    description: 'Points removed from live recordings. Usually negative.'
+  },
+  {
+    key: 'trackCountMatch',
+    label: 'Track count match',
+    description: 'Points added when the track count matches your files exactly.'
+  },
+  {
+    key: 'editionBoost',
+    label: 'Deluxe edition boost',
+    description: 'Points added to deluxe / special editions when your search mentions one.'
+  },
+  {
+    key: 'remasterBoost',
+    label: 'Remaster boost',
+    description: 'Points added to remasters when your search mentions one.'
+  }
 ];
 
 const GENRE_PROVIDER_OPTIONS: { id: MetadataProviderId; label: string }[] = [
@@ -61,10 +106,7 @@ const MetadataSettings: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([
-      metadataApi.getMetadataPreferences(),
-      metadataApi.getAvailableSearchProviders()
-    ])
+    Promise.all([metadataApi.getMetadataPreferences(), metadataApi.getAvailableSearchProviders()])
       .then(([prefs, providers]) => {
         if (!isMounted) return;
         if (prefs) {
@@ -76,10 +118,10 @@ const MetadataSettings: React.FC = () => {
         }
         if (providers && providers.length > 0) setAvailableProviders(providers);
       })
-        .finally(() => {
-          if (isMounted) setLoading(false);
-        })
-        .catch(() => undefined);
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      })
+      .catch(() => undefined);
 
     return () => {
       isMounted = false;
@@ -174,8 +216,7 @@ const MetadataSettings: React.FC = () => {
   const handleWeightChange = (key: keyof SearchRankingWeights, value: string) => {
     if (!preferences) return;
 
-    const base =
-      weightsLatestRef.current ??
+    const base = weightsLatestRef.current ??
       preferences.searchRankingWeights ?? { ...DEFAULT_SEARCH_RANKING_WEIGHTS };
 
     const parsed = value.trim() === '' ? 0 : Number(value);
@@ -231,33 +272,40 @@ const MetadataSettings: React.FC = () => {
   }
 
   return (
-    <li className="main-container metadata-settings-container mb-16" id="metadata-settings-container">
+    <li
+      className="main-container metadata-settings-container mb-16"
+      id="metadata-settings-container"
+    >
       <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
         <span className="material-icons-round-outlined mr-2">travel_explore</span>
         Metadata & AutoTag Sources
       </div>
 
-      <p className="text-font-color-dim text-sm mb-4">
-        Configure multi-source release discovery, Best Match ranking behavior, and specialized field enrichment providers.
+      <p className="text-font-color-dim mb-4 text-sm">
+        Configure multi-source release discovery, Best Match ranking behavior, and specialized field
+        enrichment providers.
       </p>
 
       <ul className="marker:bg-background-color-3 dark:marker:bg-dark-background-color-3 list-disc pl-6">
         {/* Search Providers & Priority */}
         <li className="mb-6">
           <div className="secondary-container mb-2">
-            <div className="font-semibold text-base mb-1">Release Discovery Sources & Priority</div>
-            <div className="description text-xs text-font-color-dim mb-3">
-              Enable providers to participate in &quot;Best Match&quot; searches. Candidates are ranked primarily by match
-              quality (Definitive &gt; Probable &gt; Weak); the list order below only decides ties between equally-matched
-              candidates — #1 is preferred first. Disabled sources sit at the bottom.
+            <div className="mb-1 text-base font-semibold">Release Discovery Sources & Priority</div>
+            <div className="description text-font-color-dim mb-3 text-xs">
+              Enable providers to participate in &quot;Best Match&quot; searches. Candidates are
+              ranked primarily by match quality (Definitive &gt; Probable &gt; Weak); the list order
+              below only decides ties between equally-matched candidates — #1 is preferred first.
+              Disabled sources sit at the bottom.
             </div>
 
-            <div className="flex flex-col gap-2 max-w-md">
+            <div className="flex max-w-md flex-col gap-2">
               {[
                 ...preferences.searchProviderPriority
                   .map((id) => availableProviders.find((p) => p.id === id))
                   .filter((p): p is AvailableSearchProviderInfo => Boolean(p)),
-                ...availableProviders.filter((p) => !preferences.searchProviderPriority.includes(p.id))
+                ...availableProviders.filter(
+                  (p) => !preferences.searchProviderPriority.includes(p.id)
+                )
               ].map((prov) => {
                 const isEnabled = preferences.enabledSearchProviders.includes(prov.id);
                 const priorityIndex = preferences.searchProviderPriority.indexOf(prov.id);
@@ -265,14 +313,14 @@ const MetadataSettings: React.FC = () => {
                 return (
                   <div
                     key={prov.id}
-                    className={`flex items-center justify-between p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20 transition-opacity ${
+                    className={`bg-background-color-2/50 border-font-color-dim/20 flex items-center justify-between rounded-lg border p-3 transition-opacity ${
                       isEnabled ? '' : 'opacity-60'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       {isEnabled && priorityIndex >= 0 && (
                         <span
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-full text-xs font-bold bg-background-color-3 text-font-color-highlight"
+                          className="bg-background-color-3 text-font-color-highlight flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                           title={`Tie-break priority ${priorityIndex + 1}`}
                         >
                           {priorityIndex + 1}
@@ -281,7 +329,9 @@ const MetadataSettings: React.FC = () => {
                       <Checkbox
                         id={`search-prov-${prov.id}`}
                         isChecked={isEnabled}
-                        checkedStateUpdateFunction={(checked) => handleToggleProvider(prov.id, checked)}
+                        checkedStateUpdateFunction={(checked) =>
+                          handleToggleProvider(prov.id, checked)
+                        }
                         labelContent={prov.displayName}
                       />
                     </div>
@@ -293,7 +343,7 @@ const MetadataSettings: React.FC = () => {
                             type="button"
                             disabled={priorityIndex === 0 || saving}
                             onClick={() => handleMovePriority(priorityIndex, 'up')}
-                            className="px-1.5 leading-none text-[0.6rem] rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
+                            className="hover:bg-background-color-3 cursor-pointer rounded px-1.5 text-[0.6rem] leading-none disabled:opacity-30"
                             title="Higher priority — wins ties against the provider below"
                             aria-label={`Raise ${prov.displayName} priority`}
                           >
@@ -301,9 +351,12 @@ const MetadataSettings: React.FC = () => {
                           </button>
                           <button
                             type="button"
-                            disabled={priorityIndex === preferences.searchProviderPriority.length - 1 || saving}
+                            disabled={
+                              priorityIndex === preferences.searchProviderPriority.length - 1 ||
+                              saving
+                            }
                             onClick={() => handleMovePriority(priorityIndex, 'down')}
-                            className="px-1.5 leading-none text-[0.6rem] rounded hover:bg-background-color-3 disabled:opacity-30 cursor-pointer"
+                            className="hover:bg-background-color-3 cursor-pointer rounded px-1.5 text-[0.6rem] leading-none disabled:opacity-30"
                             title="Lower priority — loses ties against the provider above"
                             aria-label={`Lower ${prov.displayName} priority`}
                           >
@@ -318,9 +371,9 @@ const MetadataSettings: React.FC = () => {
             </div>
 
             {!availableProviders.some((prov) => prov.id === 'discogs') && (
-              <div className="mt-2 text-xs text-font-color-dim max-w-md">
+              <div className="text-font-color-dim mt-2 max-w-md text-xs">
                 Discogs appears here once a personal access token is configured via{' '}
-                <code className="px-1 py-0.5 rounded bg-background-color-2 text-[0.7rem]">
+                <code className="bg-background-color-2 rounded px-1 py-0.5 text-[0.7rem]">
                   MAIN_VITE_DISCOGS_PERSONAL_ACCESS_TOKEN
                 </code>{' '}
                 in your .env file, followed by an app restart. See .env.example.
@@ -335,14 +388,14 @@ const MetadataSettings: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAdvancedScoring((prev) => !prev)}
-              className="w-full flex items-center gap-2 cursor-pointer text-left group"
+              className="group flex w-full cursor-pointer items-center gap-2 text-left"
             >
-              <span className="text-xs text-font-color-dim group-hover:text-font-color-black dark:group-hover:text-dark-font-color-white transition-colors">
+              <span className="text-font-color-dim group-hover:text-font-color-black dark:group-hover:text-dark-font-color-white text-xs transition-colors">
                 {showAdvancedScoring ? '▼' : '▶'}
               </span>
               <div>
-                <div className="font-semibold text-base">Best Match Scoring (Advanced)</div>
-                <div className="description text-xs text-font-color-dim mt-0.5">
+                <div className="text-base font-semibold">Best Match Scoring (Advanced)</div>
+                <div className="description text-font-color-dim mt-0.5 text-xs">
                   Tune how release candidates are scored. Changes apply to new searches immediately.
                 </div>
               </div>
@@ -350,14 +403,14 @@ const MetadataSettings: React.FC = () => {
 
             {showAdvancedScoring && weightsDraft && (
               <div className="mt-4">
-                <div className="flex flex-col gap-2 max-w-md">
+                <div className="flex max-w-md flex-col gap-2">
                   {RANKING_WEIGHT_FIELDS.map((field) => (
                     <div
                       key={field.key}
-                      className="flex items-center justify-between gap-4 p-2.5 rounded-lg bg-background-color-2/50 border border-font-color-dim/20"
+                      className="bg-background-color-2/50 border-font-color-dim/20 flex items-center justify-between gap-4 rounded-lg border p-2.5"
                     >
                       <span
-                        className="text-sm text-font-color-black dark:text-dark-font-color-white"
+                        className="text-font-color-black dark:text-dark-font-color-white text-sm"
                         title={field.description}
                       >
                         {field.label}
@@ -376,15 +429,15 @@ const MetadataSettings: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between mt-3 max-w-md">
-                  <span className="text-xs text-font-color-dim">
+                <div className="mt-3 flex max-w-md items-center justify-between">
+                  <span className="text-font-color-dim text-xs">
                     Quality bands: Definitive ≈ score ≥160 · Probable ≥120 · otherwise Weak.
                   </span>
                   <button
                     type="button"
                     disabled={saving}
                     onClick={() => void handleResetWeights()}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border border-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-dark-font-color-white disabled:opacity-50 cursor-pointer transition-colors"
+                    className="bg-background-color-2 hover:bg-background-color-3/40 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3/40 border-background-color-3/40 text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-dark-font-color-white cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
                   >
                     Reset to defaults
                   </button>
@@ -397,23 +450,27 @@ const MetadataSettings: React.FC = () => {
         {/* Enrichment Federation Strategy */}
         <li className="mb-4">
           <div className="secondary-container">
-            <div className="font-semibold text-base mb-1">Specialized Field Enrichment</div>
-            <div className="description text-xs text-font-color-dim mb-3">
+            <div className="mb-1 text-base font-semibold">Specialized Field Enrichment</div>
+            <div className="description text-font-color-dim mb-3 text-xs">
               Preferred federation sources for specialized fields during preview building.
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl text-sm">
-              <div className="p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20">
-                <div className="text-xs font-semibold text-font-color-dim uppercase tracking-wider">Cover Art</div>
-                <div className="font-medium mt-1">Cover Art Archive</div>
-                <div className="text-xs text-font-color-dim mt-0.5">Sole artwork source</div>
+            <div className="grid max-w-xl grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+              <div className="bg-background-color-2/50 border-font-color-dim/20 rounded-lg border p-3">
+                <div className="text-font-color-dim text-xs font-semibold tracking-wider uppercase">
+                  Cover Art
+                </div>
+                <div className="mt-1 font-medium">Cover Art Archive</div>
+                <div className="text-font-color-dim mt-0.5 text-xs">Sole artwork source</div>
               </div>
-              <div className="p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20">
-                <div className="text-xs font-semibold text-font-color-dim uppercase tracking-wider">Genres & Styles</div>
+              <div className="bg-background-color-2/50 border-font-color-dim/20 rounded-lg border p-3">
+                <div className="text-font-color-dim text-xs font-semibold tracking-wider uppercase">
+                  Genres & Styles
+                </div>
                 <select
                   value={preferences.defaultGenreProvider}
                   onChange={handleGenreProviderChange}
-                  className={`mt-1 w-full px-2 py-1 rounded-lg bg-background-color-1 dark:bg-dark-background-color-1 border border-background-color-3/50 dark:border-dark-background-color-2 text-sm outline-none cursor-pointer focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight transition-colors`}
+                  className={`bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-3/50 dark:border-dark-background-color-2 focus:border-font-color-highlight dark:focus:border-dark-font-color-highlight mt-1 w-full cursor-pointer rounded-lg border px-2 py-1 text-sm transition-colors outline-none`}
                   aria-label="Preferred genre provider"
                 >
                   {GENRE_PROVIDER_OPTIONS.map((opt) => (
@@ -423,10 +480,12 @@ const MetadataSettings: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="p-3 rounded-lg bg-background-color-2/50 border border-font-color-dim/20">
-                <div className="text-xs font-semibold text-font-color-dim uppercase tracking-wider">Lyrics</div>
-                <div className="font-medium mt-1">LRCLIB</div>
-                <div className="text-xs text-font-color-dim mt-0.5">Adapter pending</div>
+              <div className="bg-background-color-2/50 border-font-color-dim/20 rounded-lg border p-3">
+                <div className="text-font-color-dim text-xs font-semibold tracking-wider uppercase">
+                  Lyrics
+                </div>
+                <div className="mt-1 font-medium">LRCLIB</div>
+                <div className="text-font-color-dim mt-0.5 text-xs">Adapter pending</div>
               </div>
             </div>
           </div>
@@ -434,9 +493,7 @@ const MetadataSettings: React.FC = () => {
       </ul>
 
       {saveMessage && (
-        <div className="mt-3 text-xs font-medium text-font-color-highlight">
-          {saveMessage}
-        </div>
+        <div className="text-font-color-highlight mt-3 text-xs font-medium">{saveMessage}</div>
       )}
     </li>
   );

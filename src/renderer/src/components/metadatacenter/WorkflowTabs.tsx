@@ -1,5 +1,7 @@
 import React from 'react';
+
 import type { WorkflowType } from '../../hooks/useMetadataWorkflow';
+
 import styles from './MetadataCenter.module.css';
 
 export interface WorkflowTabsProps {
