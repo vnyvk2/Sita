@@ -215,3 +215,82 @@ GPU ~100-150 MB, so Nora-specific overhead is concentrated in Main (+200) and Re
   (cards render up to ~384 px). Correct fix is a third `medium` (~300px) artwork variant
   generated at scan time — deferred to a future upgrade pass (requires regeneration strategy
   for existing libraries), noted as the top renderer lever for later.
+## Phase 3 — Deep review of remaining subsystems
+
+### 3.1 Renderer bundle composition (1.96 MB index chunk, analyzed via source map)
+
+| Share | Size | Module |
+|---|---|---|
+| 12.0% | 523 KB | react-dom (core, unavoidable) |
+| 10.6% | 464 KB | **pinyin-pro** (Chinese romanization) |
+| 7.7% | 337 KB | app routes/main-player |
+| 6.1% | 266 KB | zod |
+| 4.9% | 213 KB | app SettingsPage |
+| 4.8% | 208 KB | @hello-pangea/dnd |
+| 3.7% | 159 KB | **@neos21/detect-chinese** |
+| 3.2% | 140 KB | @tanstack/router-core |
+| 3.1% | 136 KB | @tanstack/table-core |
+| ~7% | ~330 KB | app autotag / BatchSongTagsEditor / SongTagsEditingPage |
+
+- `pinyin-pro` + `@neos21/detect-chinese` + `kuroshiro` (~670 KB source) enter the renderer
+  bundle through `src/common/parseLyrics.ts`, which uses them ONLY for ja/zh/ko language
+  detection of lyrics.
+- **Attempted:** replace detection with Unicode-range heuristics. Rejected after reading the
+  libraries: `detect-chinese`'s Chinese-kanji test is a 159 KB *enumerated* character list;
+  a range approximation cannot guarantee byte-identical language labels for edge cases
+  (kanji sets, mixed scripts). Lyrics language drives romanization and display — feature risk.
+- **Deferred design (Phase-3 candidate, documented for a future pass):** keep the libraries
+  but move them to a lazily-imported chunk (`await import()` inside a cached promise +
+  background prefetch on idle). Behavior stays byte-identical; the main bundle sheds ~670 KB
+  of parse/JIT cost. Requires an async API or a load-gate in `parseLyrics` — a focused change
+  that should be verified against the full lyrics suite.
+- Parity baseline locked in NOW: `test/src/common/parseLyricsLanguage.test.ts` (4 tests:
+  zh / ja / ko / en) records current detection behavior so any future refactor is verifiable.
+
+### 3.2 Audio pipeline — verified clean
+
+- Waveform peaks are pre-computed at scan time and stored as small fixed-size raw files
+  (~2 KB); playback IPC reads those, never full audio files.
+- Playback streams through the `nora://` protocol handler (chunked, Range-capable); no
+  app-level whole-song buffering found.
+- Verdict: no change needed.
+
+### 3.3 Preload and persisted state — verified clean
+
+- Preload bundle is 32 KB. Persisted state is a single JSON blob in localStorage
+  (disk-backed, not a RAM driver). No V8 heap-limit flags are set anywhere.
+
+### 3.4 Repository hygiene notes (pre-existing, not introduced by this work)
+
+- `npm run typecheck:web` reports ~145 pre-existing errors (config scope picks up main-process
+  files; SongCard.tsx references an undefined `multipleSelectionsData`; two playlist routes
+  pass `SongData[]` where `number[]` is expected). `typecheck:node` is clean. None of these
+  were introduced or masked by this work; they are worth a dedicated cleanup pass.
+- One test fails in `test/integration/` (metadata diff suggestion) with and without this
+  work's changes — pre-existing.
+
+---
+
+## Final summary (this session)
+
+| Area | Before | After | Evidence |
+|---|---|---|---|
+| Songs scroll FPS | 32.4 (old) → 51.8 (HEAD start) | **54.5** | step0 harness ×2 runs per config |
+| Severe scroll stalls (>33 ms) | 29.7% old / 9-10% HEAD start | **1.9-2.6%** | step0 harness |
+| DOM after full-library scroll + GC | stuck at 52-61k (phantom: React DevTools) | **3,659, recovered** | find-detached-retainers2 + devtools-free runs |
+| Renderer settled WS | 603-647 MB | **465-595 MB** | step0 harness |
+| Total settled WS (4 processes) | 1,340-1,386 MB | **1,194-1,325 MB** | step0 harness |
+| Media worker at idle | resident for life | **self-terminates after 5 min idle** | workerIdleShutdown.test.ts (3/3) |
+| Blank-window production bug | present (chunk-dependent) | **fixed** | main.ts path probing |
+| Measurement validity | React DevTools polluted all dev benchmarks | **NORA_NO_DEVTOOLS=1 gate** | main.ts + harness |
+
+Commits: `daea6f2c` (Phase 1), `ed3f4421` (Phase 2), plus this worklog.
+
+**Deferred candidates (documented, not implemented):**
+1. Medium (300px) artwork variant for Home cards — top remaining renderer lever (~20-30 MB
+   decoded images + GPU textures); needs a regeneration strategy for existing libraries.
+2. Lazy romjanization chunk — sheds ~670 KB from the main bundle, byte-identical behavior;
+   needs a focused lyrics-suite verification.
+3. Pre-existing typecheck:web errors and the one pre-existing failing integration test.
+
+---
