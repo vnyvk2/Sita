@@ -7,7 +7,7 @@ import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
-import VirtualizedList from '@renderer/components/VirtualizedList';
+import VirtualizedList, { DEFAULT_SCROLL_SEEK_CONFIG } from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
@@ -732,6 +732,12 @@ function SongsPage() {
             scrollKey={scrollKey}
             itemContent={renderSong}
             onChange={onRangeChange}
+            scrollSeekConfiguration={DEFAULT_SCROLL_SEEK_CONFIG}
+            components={{
+              ScrollSeekPlaceholder: ({ height, index }) => (
+                <SongRowSkeleton height={height} index={index} />
+              )
+            }}
           />
         </div>
       )}

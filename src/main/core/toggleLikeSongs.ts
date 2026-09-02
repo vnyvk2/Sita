@@ -2,7 +2,6 @@ import { db } from '@main/db/db';
 import { insertScrobble } from '@main/db/queries/scrobble_queue';
 import { getUserSettings } from '@main/db/queries/settings';
 import {
-  getFlatSongsByIds,
   getSongById,
   invertSongFavoriteStatuses,
   updateSongFavoriteStatuses
@@ -16,7 +15,6 @@ import { convertToSongData } from '@main/utils/convert';
 
 import logger from '../logger';
 import { dataUpdateEvent } from '../main';
-import songMetadataCache from './songMetadataCache';
 
 const fetchSongBasicInfo = async (
   ids: number[]
@@ -24,37 +22,12 @@ const fetchSongBasicInfo = async (
   const map = new Map<number, { title: string; artistNames: string }>();
   if (ids.length === 0) return map;
 
-  const missingIds: number[] = [];
   for (const id of ids) {
-    const cached = songMetadataCache.get(id);
-    if (cached) {
-      const artistNames = cached.artists?.map((a) => a.name).join(', ') ?? '';
-      map.set(id, { title: cached.title, artistNames });
-    } else {
-      missingIds.push(id);
-    }
-  }
-
-  if (missingIds.length > 0) {
-    try {
-      const fetched = await getFlatSongsByIds(missingIds);
-      for (const song of fetched) {
-        const artistNames = song.artists?.map((a) => a.name).join(', ') ?? '';
-        map.set(song.songId, { title: song.title, artistNames });
-        songMetadataCache.set(song.songId, song);
-      }
-    } catch {
-      // Fallback to getSongById for any still missing
-      for (const id of missingIds) {
-        if (!map.has(id)) {
-          const raw = await getSongById(id).catch(() => null);
-          if (raw) {
-            const song = convertToSongData(raw);
-            const artistNames = song.artists?.map((a) => a.name).join(', ') ?? '';
-            map.set(id, { title: song.title, artistNames });
-          }
-        }
-      }
+    const raw = await getSongById(id).catch(() => null);
+    if (raw) {
+      const song = convertToSongData(raw);
+      const artistNames = song.artists?.map((a) => a.name).join(', ') ?? '';
+      map.set(id, { title: song.title, artistNames });
     }
   }
 
@@ -259,14 +232,6 @@ const toggleLikeSongs = async (songIds: number[], isLikeSong?: boolean) => {
       }
     }
   });
-
-  // Synchronously update in-memory SongMetadataCache
-  if (result.likes.length > 0) {
-    songMetadataCache.updateFavoriteMany(result.likes, true);
-  }
-  if (result.dislikes.length > 0) {
-    songMetadataCache.updateFavoriteMany(result.dislikes, false);
-  }
 
   dataUpdateEvent('songs/likes', [...result.likes, ...result.dislikes]);
 

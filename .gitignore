@@ -32,6 +32,8 @@ graphify-out/
 
 # Ignore text, patch, diff, and temp files
 *.txt
+*.tmp
+.tanstack/
 !LICENSE.txt
 !open_source_licenses.txt
 *.patch

@@ -215,7 +215,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
             }
       }
       data={data}
-      overscan={{ main: 1200, reverse: 600 }}
+      overscan={{ main: 300, reverse: 150 }}
       useWindowScroll={useWindowScroll}
       fixedItemHeight={fixedItemHeight}
       components={resolvedComponents}

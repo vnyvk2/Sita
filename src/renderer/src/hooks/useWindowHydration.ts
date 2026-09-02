@@ -1,5 +1,5 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { SONG_WINDOW_GC_TIME, SONG_WINDOW_SIZE, SONG_WINDOW_STALE_TIME } from '../queries/songs';
 
@@ -12,12 +12,6 @@ interface WindowBounds {
   firstWindow: number;
   lastWindow: number;
 }
-
-/**
- * Shared in-memory client metadata cache for ultra-fast (O(1) < 0.001ms) synchronous song lookup.
- * Prevents skeleton flash and IPC latency during high-velocity fling scrolling across large libraries.
- */
-export const songClientCache = new Map<number, SongData>();
 
 function computeWindowBounds(
   startIndex: number,
@@ -34,17 +28,6 @@ function computeWindowBounds(
   return { firstWindow, lastWindow };
 }
 
-/**
- * Hydrates SongData for the visible region of an ID-first list.
- *
- * Rows are fetched in aligned windows of SONG_WINDOW_SIZE; `getItem` returns undefined for indices
- * that are not hydrated yet so callers can render a layout-stable skeleton placeholder.
- *
- * Performance guarantee:
- * State is snapped strictly to window boundaries (firstWindow..lastWindow) rather than raw row
- * indices. When scrolling within already-loaded windows, `handleRangeChange` completely bails out
- * of React state updates, eliminating 99%+ of parent re-renders during high-velocity scrolling.
- */
 export function useWindowHydration(
   ids: readonly number[],
   idsVersion: number | string,
@@ -160,65 +143,6 @@ export function useWindowHydration(
     }))
   });
 
-  // Background bulk prefetch: progressively hydrate uncached library IDs in cooperative idle slices of 250
-  useEffect(() => {
-    if (!enabled || ids.length === 0) return;
-
-    let isCancelled = false;
-    const PREFETCH_BATCH_SIZE = 250;
-
-    const uncachedIds: number[] = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      const id = ids[i];
-      if (id !== undefined && !songClientCache.has(id)) {
-        uncachedIds.push(id);
-      }
-    }
-
-    if (uncachedIds.length === 0) return;
-
-    const prefetchNextBatch = async (offset: number) => {
-      if (isCancelled || offset >= uncachedIds.length) return;
-      const batch = uncachedIds.slice(offset, offset + PREFETCH_BATCH_SIZE);
-      try {
-        const batchResults = await window.api.audioLibraryControls.getSongInfo(
-          batch,
-          undefined,
-          undefined,
-          undefined,
-          true
-        );
-        if (!isCancelled && Array.isArray(batchResults) && batchResults.length > 0) {
-          for (const item of batchResults) {
-            const itemId = item.songId ?? (item as unknown as { id: number })?.id;
-            if (itemId !== undefined) {
-              songClientCache.set(itemId, item);
-            }
-          }
-        }
-      } catch {
-        // Non-critical background prefetch: ignore failures gracefully
-      }
-
-      if (!isCancelled && offset + PREFETCH_BATCH_SIZE < uncachedIds.length) {
-        if (typeof requestIdleCallback === 'function') {
-          requestIdleCallback(() => prefetchNextBatch(offset + PREFETCH_BATCH_SIZE));
-        } else {
-          setTimeout(() => prefetchNextBatch(offset + PREFETCH_BATCH_SIZE), 30);
-        }
-      }
-    };
-
-    const timer = setTimeout(() => {
-      prefetchNextBatch(0);
-    }, 40);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [ids, enabled]);
-
   const itemsByIndex = useMemo(() => {
     const map = new Map<number, SongData>();
     queries.forEach((query, i) => {
@@ -231,7 +155,6 @@ export function useWindowHydration(
         const itemId = item.songId ?? (item as unknown as { id: number }).id;
         if (itemId !== undefined) {
           responseById.set(itemId, item);
-          songClientCache.set(itemId, item);
         }
       }
 
@@ -258,7 +181,11 @@ export function useWindowHydration(
     (index: number) => {
       const targetId = idsRef.current[index];
 
-      // 1. Check synchronous queryClient cache for the window (reflects live optimistic updates immediately)
+      // 1. Fast path: check current itemsByIndex map in ref (O(1))
+      const direct = itemsByIndexRef.current.get(index);
+      if (direct) return direct;
+
+      // 2. Direct synchronous queryClient cache fallback across windows
       const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
       const cachedData = queryClient.getQueryData<SongData[]>([
         keyPrefix,
@@ -275,7 +202,6 @@ export function useWindowHydration(
           const candidateId = candidate?.songId ?? (candidate as unknown as { id: number })?.id;
           if (candidateId === targetId) {
             itemsByIndexRef.current.set(index, candidate);
-            songClientCache.set(candidateId, candidate);
             return candidate;
           }
           const found = cachedData.find(
@@ -283,23 +209,8 @@ export function useWindowHydration(
           );
           if (found) {
             itemsByIndexRef.current.set(index, found);
-            const foundId = found.songId ?? (found as unknown as { id: number }).id;
-            if (foundId !== undefined) songClientCache.set(foundId, found);
             return found;
           }
-        }
-      }
-
-      // 2. Fast path: check active window itemsByIndex map in ref (O(1))
-      const direct = itemsByIndexRef.current.get(index);
-      if (direct) return direct;
-
-      // 3. Fallback to global client cache for offscreen/prefetched items (O(1) < 0.001ms)
-      if (targetId !== undefined) {
-        const globalHit = songClientCache.get(targetId);
-        if (globalHit) {
-          itemsByIndexRef.current.set(index, globalHit);
-          return globalHit;
         }
       }
 

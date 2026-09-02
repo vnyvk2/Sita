@@ -12,7 +12,6 @@ import {
 } from '@db/schema';
 import type { SqliteEngine } from '@db/sqlite/engine';
 import { rawAll } from '@db/sqlite/raw';
-import songMetadataCache from '@main/core/songMetadataCache';
 import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
@@ -306,7 +305,6 @@ export const updateSongBasicFields = async (
   }
 
   const res = await trx.update(songs).set(updatePayload).where(eq(songs.id, songId)).returning();
-  songMetadataCache.invalidate(songId);
 
   return res[0];
 };
@@ -1093,9 +1091,6 @@ export const updateSongByPath = async (
   trx: DB | DBTransaction = db
 ) => {
   const updatedSong = await trx.update(songs).set(song).where(eq(songs.path, path)).returning();
-  if (updatedSong?.[0]?.id) {
-    songMetadataCache.invalidate(updatedSong[0].id);
-  }
   return updatedSong;
 };
 
@@ -1238,7 +1233,6 @@ export const updateSongFavoriteStatuses = async (
     .update(songs)
     .set({ isFavorite, isFavoriteUpdatedAt: new Date() })
     .where(inArray(songs.id, songIds));
-  songMetadataCache.updateFavoriteMany(songIds, isFavorite);
   return data;
 };
 
@@ -1255,9 +1249,6 @@ export const invertSongFavoriteStatuses = async (
     })
     .where(inArray(songs.id, songIds))
     .returning({ id: songs.id, isFavorite: songs.isFavorite });
-  for (let i = 0; i < data.length; i += 1) {
-    songMetadataCache.updateFavorite(data[i].id, Boolean(data[i].isFavorite));
-  }
   return data;
 };
 
@@ -1527,7 +1518,6 @@ export const getSongByIdForSongMetadata = async (songId: number, trx: DB | DBTra
 
 export const removeSongById = async (songId: number, trx: DB | DBTransaction = db) => {
   await trx.delete(songs).where(eq(songs.id, songId));
-  songMetadataCache.invalidate(songId);
 };
 
 export const updateSongModifiedAtByPath = async (
@@ -1535,12 +1525,5 @@ export const updateSongModifiedAtByPath = async (
   modifiedAt: Date,
   trx: DB | DBTransaction = db
 ) => {
-  const updated = await trx
-    .update(songs)
-    .set({ fileModifiedAt: modifiedAt })
-    .where(eq(songs.path, songPath))
-    .returning({ id: songs.id });
-  if (updated?.[0]?.id) {
-    songMetadataCache.invalidate(updated[0].id);
-  }
+  await trx.update(songs).set({ fileModifiedAt: modifiedAt }).where(eq(songs.path, songPath));
 };

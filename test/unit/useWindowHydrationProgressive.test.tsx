@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { songClientCache, useWindowHydration } from '../../src/renderer/src/hooks/useWindowHydration';
+import { useWindowHydration } from '../../src/renderer/src/hooks/useWindowHydration';
 import { SONG_WINDOW_SIZE, songCacheKeys, getSongListIdentity } from '../../src/renderer/src/queries/songs';
 import type { SongData } from '../../src/types/app';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -37,7 +37,6 @@ describe('useWindowHydrationProgressive — Tiers 1, 2 & 3 Validation Suite', ()
   let mockGetSongInfo: any;
 
   beforeEach(() => {
-    songClientCache.clear();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
