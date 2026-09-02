@@ -156,6 +156,14 @@ export class MediaWorkerBridge extends EventEmitter {
   private restartTimer: NodeJS.Timeout | null = null;
   private healthTimer: NodeJS.Timeout | null = null;
 
+  // Idle auto-shutdown: the utilityProcess costs ~140MB while resident. It is
+  // terminated after a period without any protocol traffic and restarted on
+  // demand by the next task; supervision and crash recovery are unaffected.
+  private lastWorkerActivityAt = Date.now();
+  private idleCheckTimer: NodeJS.Timeout | null = null;
+  private static readonly IDLE_CHECK_INTERVAL_MS = 30_000;
+  private static readonly DEFAULT_IDLE_SHUTDOWN_MS = 5 * 60_000;
+
   public getState(): MediaWorkerState {
     return this.state;
   }
@@ -170,6 +178,49 @@ export class MediaWorkerBridge extends EventEmitter {
 
   public getConsecutiveCrashCount(): number {
     return this.consecutiveCrashCount;
+  }
+
+  /**
+   * Terminates the utilityProcess once no protocol traffic has flowed for the idle window.
+   * `start()` is allowed again afterwards because the state is reset to UNINITIALIZED, so the
+   * next task transparently pays the respawn cost instead of every idle hour costing ~140MB.
+   */
+  private armIdleShutdownTimer(): void {
+    if (this.idleCheckTimer) return;
+    const idleShutdownMs = this.getIdleShutdownMs();
+    if (idleShutdownMs <= 0) return;
+    this.idleCheckTimer = setInterval(() => {
+      if (this.state !== 'READY') return;
+      if (Date.now() - this.lastWorkerActivityAt < idleShutdownMs) return;
+      logger.info('[MediaWorkerBridge] Worker idle past threshold; shutting down utilityProcess.', {
+        idleMs: Date.now() - this.lastWorkerActivityAt,
+        idleShutdownMs
+      });
+      this.disarmIdleShutdownTimer();
+      const child = this.childProcess;
+      // The exit event may fire after terminate() resolves and set TERMINATED; wait for both
+      // before allowing future start() calls, otherwise the worker could never restart.
+      const exited = child
+        ? new Promise<void>((resolve) => child.once('exit', () => resolve()))
+        : Promise.resolve();
+      void Promise.all([this.terminate(), exited]).then(() => {
+        if (this.state === 'TERMINATED') this.state = 'UNINITIALIZED';
+      });
+    }, MediaWorkerBridge.IDLE_CHECK_INTERVAL_MS);
+  }
+
+  private disarmIdleShutdownTimer(): void {
+    if (this.idleCheckTimer) {
+      clearInterval(this.idleCheckTimer);
+      this.idleCheckTimer = null;
+    }
+  }
+
+  private getIdleShutdownMs(): number {
+    const raw = Number(process.env.NORA_WORKER_IDLE_SHUTDOWN_MS);
+    return Number.isFinite(raw) && raw >= 0
+      ? raw
+      : MediaWorkerBridge.DEFAULT_IDLE_SHUTDOWN_MS;
   }
 
   public getCrashTimestamps(): number[] {
@@ -189,6 +240,7 @@ export class MediaWorkerBridge extends EventEmitter {
       clearTimeout(this.healthTimer);
       this.healthTimer = null;
     }
+    this.disarmIdleShutdownTimer();
     this.crashTimestamps = [];
     this.consecutiveCrashCount = 0;
   }
@@ -653,6 +705,7 @@ export class MediaWorkerBridge extends EventEmitter {
     if (!this.childProcess) {
       throw new Error('[MediaWorkerBridge] Cannot send command: worker process does not exist.');
     }
+    this.lastWorkerActivityAt = Date.now();
     this.childProcess.postMessage(cmd);
   }
 
@@ -663,6 +716,7 @@ export class MediaWorkerBridge extends EventEmitter {
     }
 
     const event = message as WorkerToMainEvent;
+    this.lastWorkerActivityAt = Date.now();
 
     switch (event.type) {
       case 'EVT_READY': {
@@ -673,6 +727,7 @@ export class MediaWorkerBridge extends EventEmitter {
         });
         if (onReadyCallback) onReadyCallback();
         this.emit('ready', event);
+        this.armIdleShutdownTimer();
 
         // Reset consecutiveCrashCount only once the worker maintains READY state stably for >= 10s
         if (this.healthTimer) clearTimeout(this.healthTimer);
@@ -999,6 +1054,7 @@ export class MediaWorkerBridge extends EventEmitter {
       clearTimeout(this.healthTimer);
       this.healthTimer = null;
     }
+    this.disarmIdleShutdownTimer();
 
     if (this.state === 'TERMINATED' || !this.childProcess) {
       this.state = 'TERMINATED';

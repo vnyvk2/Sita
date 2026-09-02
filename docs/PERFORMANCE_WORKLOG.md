@@ -111,4 +111,107 @@ polluting all developer-side RAM measurements.
 
 ## Phase 2 — Full-application RAM architecture review
 
-(pending — starts after Phase 1 is committed)
+Baseline (post-Phase-1, devtools-free, post-GC): total ~1,195 MB across
+Main ~340 + Renderer ~486-509 + GPU ~273-302 + Utility ~140.
+Reference: a bare Electron window baseline is roughly Main ~100-150 / Renderer ~150-200 /
+GPU ~100-150 MB, so Nora-specific overhead is concentrated in Main (+200) and Renderer (+300).
+
+### 2.1 Main process (~340 MB WS, measured with `scripts/main-process-memory.mjs`)
+
+- V8 heap: 77 MB used / ~101 MB committed; post-GC snapshot top retained constructors total
+  ~45 MB (largest: generic `(object elements)` 27.7 MB / 356k objects — no single app cache
+  dominates). **No app-level retention defect found.**
+- `process.memoryUsage().external` ≈ 180-200 MB with `arrayBuffers` ≈ 0 → the external memory
+  is not Buffer-backed app data; it is V8/Node/Electron native attribution.
+- Remaining RSS ≈ 165 MB native (node:sqlite, Electron main, JIT/code, runtime).
+- Verified: DB engine is `node:sqlite` (PGlite WASM already removed in a prior migration);
+  no custom page-cache PRAGMAs; no chokidar/fs.watch watchers.
+- **Decision:** treat Main ≈ 300-350 MB as current-architecture platform baseline. No change
+  (any reduction here would require architectural rework, e.g. moving DB access to a
+  separate process, out of scope for this pass).
+
+### 2.2 Utility process (~140 MB) — idle auto-shutdown implemented
+
+- Worker starts lazily on first task, but the library lifecycle gives it work at boot, after
+  which it stays resident for the app's lifetime.
+- **Change:** `MediaWorkerBridge` now tracks protocol activity (every `sendCommand` and
+  incoming event updates `lastWorkerActivityAt`) and terminates the utilityProcess after 5 min
+  of zero traffic (30s check interval). State is reset to `UNINITIALIZED` once `terminate()`
+  AND the process `exit` event both complete, so the next task transparently respawns it.
+  Streaming tasks keep protocol messages flowing, so a mid-task shutdown cannot occur while
+  work is in flight; supervision/crash-recovery paths are untouched.
+- Env override: `NORA_WORKER_IDLE_SHUTDOWN_MS` (0 disables).
+- Expected effect: −140 MB at idle; +respawn latency (~200-400 ms) on the first task after an
+  idle period. Trade accepted (RAM-conservative bias).
+
+### 2.3 GPU process (~273-302 MB) — row blur removal (measured experiment)
+
+- Found: every Song row carries `backdrop-blur-md` when the dynamic theme background is set
+  (Song.tsx row className). With 40-80 rows mounted, that is 40-80 composited blur surfaces.
+- Visual reasoning: rows sit adjacent in a flat list; the only content behind a row is the app
+  background, which under the dynamic theme is *already* blurred artwork — the per-row blur is
+  a double-blur with no perceptible effect; with a solid background it does nothing at all.
+- **Change:** removed `backdrop-blur-md` from both row states. Translucency (bg-*/70), shadows,
+  and all other styling kept.
+- Result (2 runs each side, same harness):
+
+  | Metric | With row blur (runs 1/2) | Without row blur (runs 1/2) |
+  |---|---|---|
+  | Renderer WS settled | 603 / 647 MB | **465 / 595 MB** |
+  | Total WS settled | 1,341 / 1,386 MB | **1,194 / 1,325 MB** |
+  | FPS | 55.2 / 53.8 | 54.5 / 54.5 |
+  | Janky >33 ms | 9.3 / 10.1 % | **1.9 / 2.6 %** |
+  | Janky >16 ms | 38.9 / 42.5 % | 66.9 / 59.2 % (many tiny hiccups, far fewer severe stalls) |
+  | GPU peak | 302 / 301 MB | 352 / 299 MB (unchanged within noise) |
+
+  Interpretation: the win lands in the RENDERER compositor (backdrop-filter forces per-row
+  layerization in the renderer, not the GPU process). Frame-time profile improved where it
+  matters: severe 2x-frame stalls collapsed ~4x while average FPS held at ~54.5.
+
+### 2.5 Utility idle-shutdown verification + measurement correction
+
+- **Measurement correction:** the harness's ~140 MB "utility" line is Chromium's built-in
+  utility services (audio/network/storage), NOT the media worker — the worker is spawned
+  lazily on first task and, with the library in *manual* scan mode (owner's real preference),
+  does not spawn at boot at all. The idle-shutdown change therefore does not (and should not)
+  move the harness numbers; it targets real sessions after scans/artwork/waveform/ReplayGain
+  work, where the worker previously stayed resident forever.
+- **Verification:** new unit tests `test/workers/workerIdleShutdown.test.ts` (3/3 pass):
+  stays READY under continuous traffic; shuts down after the idle window and returns to
+  `UNINITIALIZED` so the next task respawns transparently; env `=0` disables entirely.
+  Existing worker+integration suites: 81/82 pass — the single failure
+  (`adversarial-uncooperative-shutdown`-adjacent metadata diff test) reproduces with the
+  changes stashed, i.e. pre-existing and unrelated.
+- `resetSupervisionStateForTesting` now also clears the idle timer (no open handles).
+
+### 2.6 Phase 2 decision log
+
+| Decision | Rationale |
+|---|---|
+| Main process: no change | Retained heap ~45 MB, no dominant app cache; RSS is Electron/Node/SQLite platform baseline |
+| Utility idle auto-shutdown (5 min default, env-tunable) | Worker was resident-for-life after first task; respawn cost (~200-400 ms) only on first post-idle task; RAM-conservative bias |
+| Remove per-row backdrop-blur on Songs rows | −100-140 MB renderer settled, severe stalls 4x lower, no FPS loss; blur over an already-blurred dynamic theme is imperceptible |
+| Home 50px-optimized artwork switch: REJECTED | Cards render up to ~384 px; 50px source visibly degrades quality (feature loss) |
+| Home medium-variant artwork (300px): DEFERRED | Correct long-term fix but needs a regeneration strategy for existing libraries — future upgrade pass |
+| React DevTools kept gated for dev only (NORA_NO_DEVTOOLS=1 in benchmarks) | DevTools costs 120-180 MB inside the measured process; must never pollute baselines |
+
+### 2.7 Phase 2 net results (devtools-free, 1,297-song scripted scroll)
+
+- Total settled WS: ~1,340-1,386 MB → **~1,194-1,325 MB** (median ≈ −140 MB)
+- Renderer settled: ~603-647 MB → **~465-595 MB**
+- Severe scroll stalls (>33 ms): ~10% → **~2%**, FPS ~54.5 unchanged
+- DOM recovers to 3,659 after full-library scroll (no leak)
+- Idle sessions additionally save up to ~140 MB when the media worker self-terminates
+
+### 2.4 Home tab (+~230 MB renderer in first 7 s) — measured, deferred
+
+- Re-verified with devtools-free harness: Home jump is +230 MB renderer / +130 MB GPU
+  (383→613 renderer, 122→252 GPU) — and the OLD commit jumps MORE (+400 MB). Not a regression.
+- Verified artwork facts: optimized covers on disk are 50×50 px (~1 KB); full covers ~18-51 KB
+  (larger dims); Home requests 22 full-res, 0 optimized. Decoded cost of 22 covers ≈ 20-30 MB —
+  real but NOT the dominant part of the jump; most is Chromium runtime warming (fonts, Skia,
+  JIT, compositor tiles) that any content-heavy first page pays.
+- **Decision:** switching Home cards to the 50px optimized variant would be visibly blurry
+  (cards render up to ~384 px). Correct fix is a third `medium` (~300px) artwork variant
+  generated at scan time — deferred to a future upgrade pass (requires regeneration strategy
+  for existing libraries), noted as the top renderer lever for later.

@@ -708,10 +708,10 @@ const Song = memo(
         className={`song-item list-row [contain:layout] ${songId} group relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${
           isCurrentSong || isAMultipleSelection
             ? bodyBackgroundImage
-              ? `bg-background-color-3/70 text-font-color-black dark:bg-dark-background-color-3/70 shadow-lg backdrop-blur-md`
+              ? `bg-background-color-3/70 text-font-color-black dark:bg-dark-background-color-3/70 shadow-lg`
               : 'bg-background-color-3 text-font-color-black dark:bg-dark-background-color-3 shadow-lg'
             : bodyBackgroundImage
-              ? `bg-background-color-2/70 hover:bg-background-color-2! dark:bg-dark-background-color-2/70 dark:hover:bg-dark-background-color-2! backdrop-blur-md`
+              ? `bg-background-color-2/70 hover:bg-background-color-2! dark:bg-dark-background-color-2/70 dark:hover:bg-dark-background-color-2!`
               : `odd:bg-background-color-2/70 hover:!bg-background-color-2 dark:odd:bg-dark-background-color-2/50 dark:hover:!bg-dark-background-color-2 ${
                   (index + 1) % 2 === 1
                     ? 'bg-background-color-2/70! dark:bg-dark-background-color-2/50!'
