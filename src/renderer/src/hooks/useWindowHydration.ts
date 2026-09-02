@@ -72,12 +72,34 @@ export function useWindowHydration(
         ids.length
       );
 
-      // Aligned chunk lookahead prefetching: prefetch the next window ahead in the background (0 React re-renders)
+      // Aligned chunk lookahead prefetching: prefetch the next and previous windows ahead in the background (0 React re-renders)
       if (enabled && ids.length > 0 && idsVersion) {
         const maxWindow = Math.floor(Math.max(ids.length - 1, 0) / SONG_WINDOW_SIZE);
-        const lookaheadWindow = nextBounds.lastWindow + 1;
-        if (lookaheadWindow <= maxWindow) {
-          const lookaheadStart = lookaheadWindow * SONG_WINDOW_SIZE;
+        // Forward lookahead
+        const lookaheadForward = nextBounds.lastWindow + 1;
+        if (lookaheadForward <= maxWindow) {
+          const lookaheadStart = lookaheadForward * SONG_WINDOW_SIZE;
+          const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
+          if (lookaheadStart < lookaheadEnd) {
+            queryClient.prefetchQuery({
+              queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
+              queryFn: () =>
+                window.api.audioLibraryControls.getSongInfo(
+                  ids.slice(lookaheadStart, lookaheadEnd),
+                  undefined,
+                  undefined,
+                  undefined,
+                  true
+                ),
+              staleTime: SONG_WINDOW_STALE_TIME,
+              gcTime: SONG_WINDOW_GC_TIME
+            });
+          }
+        }
+        // Backward lookahead
+        const lookaheadBackward = nextBounds.firstWindow - 1;
+        if (lookaheadBackward >= 0) {
+          const lookaheadStart = lookaheadBackward * SONG_WINDOW_SIZE;
           const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
           if (lookaheadStart < lookaheadEnd) {
             queryClient.prefetchQuery({

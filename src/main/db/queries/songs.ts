@@ -38,6 +38,8 @@ export interface RawFlatSongRow {
   fileModifiedAt: number | string | null;
   album_json: string | null;
   artists_json: string | null;
+  album_artists_json: string | null;
+  genres_json: string | null;
   artworks_json: string | null;
   language_override: string | null;
 }
@@ -62,6 +64,34 @@ export const mapRawFlatRowToSongData = (row: RawFlatSongRow): SongData => {
       if (Array.isArray(parsed)) {
         artists = parsed.filter(
           (a) => a && typeof a.artistId === 'number' && typeof a.name === 'string'
+        );
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let albumArtists: { artistId: number; name: string }[] = [];
+  if (typeof row.album_artists_json === 'string' && row.album_artists_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.album_artists_json);
+      if (Array.isArray(parsed)) {
+        albumArtists = parsed.filter(
+          (a) => a && typeof a.artistId === 'number' && typeof a.name === 'string'
+        );
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let genres: { genreId: number; name: string }[] = [];
+  if (typeof row.genres_json === 'string' && row.genres_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.genres_json);
+      if (Array.isArray(parsed)) {
+        genres = parsed.filter(
+          (g) => g && typeof g.genreId === 'number' && typeof g.name === 'string'
         );
       }
     } catch {
@@ -124,8 +154,8 @@ export const mapRawFlatRowToSongData = (row: RawFlatSongRow): SongData => {
     path: String(row.path ?? ''),
     artists,
     album,
-    albumArtists: [],
-    genres: [],
+    albumArtists,
+    genres,
     artworkPaths,
     isArtworkAvailable,
     isAFavorite: Boolean(row.isAFavorite),
@@ -198,19 +228,52 @@ export const getFlatSongsByIds = async (
         ) AS album_json,
         (
           SELECT json_group_array(
-            json_object('artistId', ar.id, 'name', ar.name)
+            json_object('artistId', id, 'name', name)
           )
-          FROM artists_songs asg
-          JOIN artists ar ON ar.id = asg.artist_id
-          WHERE asg.song_id = s.id
+          FROM (
+            SELECT ar.id AS id, ar.name AS name
+            FROM artists_songs asg
+            JOIN artists ar ON ar.id = asg.artist_id
+            WHERE asg.song_id = s.id
+            ORDER BY asg.rowid ASC
+          )
         ) AS artists_json,
         (
           SELECT json_group_array(
-            json_object('id', art.id, 'path', art.path, 'isOptimized', art.is_optimized)
+            json_object('artistId', id, 'name', name)
           )
-          FROM artworks_songs arts
-          JOIN artworks art ON art.id = arts.artwork_id
-          WHERE arts.song_id = s.id
+          FROM (
+            SELECT ar.id AS id, ar.name AS name
+            FROM album_songs als
+            JOIN albums_artists aa ON aa.album_id = als.album_id
+            JOIN artists ar ON ar.id = aa.artist_id
+            WHERE als.song_id = s.id
+            ORDER BY aa.rowid ASC
+          )
+        ) AS album_artists_json,
+        (
+          SELECT json_group_array(
+            json_object('genreId', id, 'name', name)
+          )
+          FROM (
+            SELECT g.id AS id, g.name AS name
+            FROM genres_songs gs
+            JOIN genres g ON g.id = gs.genre_id
+            WHERE gs.song_id = s.id
+            ORDER BY gs.rowid ASC
+          )
+        ) AS genres_json,
+        (
+          SELECT json_group_array(
+            json_object('id', id, 'path', path, 'isOptimized', is_optimized)
+          )
+          FROM (
+            SELECT art.id AS id, art.path AS path, art.is_optimized AS is_optimized
+            FROM artworks_songs arts
+            JOIN artworks art ON art.id = arts.artwork_id
+            WHERE arts.song_id = s.id
+            ORDER BY arts.rowid ASC
+          )
         ) AS artworks_json,
         (
           SELECT mo.string_value
