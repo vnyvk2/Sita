@@ -381,7 +381,11 @@ const getPreloadPath = (): string => {
 };
 
 const createWindow = async () => {
-  if (IS_DEVELOPMENT && !memProfiler.enabled) await installExtensions();
+  // React DevTools hooks the renderer and mirrors the component tree, inflating
+  // renderer WS and Chromium's DOM-node metric; benchmarks set NORA_NO_DEVTOOLS=1
+  // to measure the application alone.
+  if (IS_DEVELOPMENT && !memProfiler.enabled && process.env.NORA_NO_DEVTOOLS !== '1')
+    await installExtensions();
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -408,10 +412,17 @@ const createWindow = async () => {
   if (IS_DEVELOPMENT && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    let rendererIndexPath = join(import.meta.dirname, '../renderer/index.html');
-    if (memProfiler.enabled && !fs.existsSync(rendererIndexPath)) {
-      rendererIndexPath = join(app.getAppPath(), 'out', 'renderer', 'index.html');
-    }
+    // import.meta.dirname points at out/main/chunks when this module is split
+    // into a chunk, and app.getAppPath() is the main-script directory when
+    // Electron is launched with a script path directly, so try every layout.
+    const rendererIndexPathCandidates = [
+      join(import.meta.dirname, '../renderer/index.html'),
+      join(import.meta.dirname, '../../renderer/index.html'),
+      join(app.getAppPath(), 'out', 'renderer', 'index.html')
+    ];
+    const rendererIndexPath =
+      rendererIndexPathCandidates.find((candidate) => fs.existsSync(candidate)) ??
+      rendererIndexPathCandidates[0];
     mainWindow.loadFile(rendererIndexPath);
   }
   mainWindow.once('ready-to-show', () => {

@@ -62,7 +62,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     onChange,
     onDebouncedScroll,
     onScrollingStateChange,
-    scrollSeekConfiguration = false
+    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG
   } = props;
 
   // Retrieve initial saved position for scrollKey if available
