@@ -1,10 +1,12 @@
+import type { PlaylistDto } from '@common/collections/dtos';
 import { SpecialPlaylists } from '@common/playlists.enum';
 import {
   DragDropContext,
   Droppable,
   Draggable,
   type DraggableProvided,
-  type DropResult
+  type DropResult,
+  type DragUpdate
 } from '@hello-pangea/dnd';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import { collectionKeys } from '@renderer/api/collectionKeys';
@@ -39,7 +41,18 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, memo, useCallback, useContext, useEffect, useMemo } from 'react';
+import {
+  type HTMLAttributes,
+  Suspense,
+  lazy,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SensitiveActionConfirmPrompt = lazy(
@@ -74,6 +87,55 @@ type PlaylistRowProps = {
   provided?: DraggableProvided;
   isDragging?: boolean;
   buildContextMenuItems: (item: PlaylistRowSong, index: number) => ContextMenuItem[];
+};
+
+type PlaylistVirtuosoContext = {
+  playlistData: PlaylistDto;
+  playlistSongs: PlaylistRowSong[];
+  filteredSongs: PlaylistRowSong[];
+  isDraggingActive: boolean;
+};
+
+const HeightPreservingItem = memo(function HeightPreservingItem({
+  children,
+  item,
+  context,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
+  'data-known-size'?: number;
+  item?: unknown;
+  context?: unknown;
+}) {
+  const size = props['data-known-size'] ?? 60;
+  return (
+    <div {...props} style={{ ...props.style, minHeight: size, boxSizing: 'border-box' }}>
+      {children}
+    </div>
+  );
+});
+HeightPreservingItem.displayName = 'HeightPreservingItem';
+
+const PlaylistHeader = memo(function PlaylistHeader({
+  context
+}: {
+  context?: PlaylistVirtuosoContext;
+}) {
+  if (!context) return null;
+  return (
+    <div className={context.isDraggingActive ? 'pointer-events-none select-none' : undefined}>
+      <PlaylistInfoAndImgContainer
+        playlist={context.playlistData}
+        songs={context.playlistSongs}
+        filteredSongs={context.filteredSongs}
+      />
+    </div>
+  );
+});
+PlaylistHeader.displayName = 'PlaylistHeader';
+
+const virtuosoComponents = {
+  Header: PlaylistHeader,
+  Item: HeightPreservingItem
 };
 
 /**
@@ -143,6 +205,8 @@ function PlaylistInfoPage() {
   const isFilteredView =
     Boolean(keyword?.trim()) || language !== 'all' || filteringOrder !== 'notSelected';
   const reorderEnabled = canReorder(sortingOrder) && !isFilteredView;
+  const [isDraggingActive, setIsDraggingActive] = useState(false);
+  const lastDestinationIndexRef = useRef<number | null>(null);
 
   const scrollKey = useMemo(
     () =>
@@ -280,6 +344,16 @@ function PlaylistInfoPage() {
 
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
 
+  const virtuosoContext = useMemo<PlaylistVirtuosoContext>(
+    () => ({
+      playlistData,
+      playlistSongs,
+      filteredSongs,
+      isDraggingActive
+    }),
+    [playlistData, playlistSongs, filteredSongs, isDraggingActive]
+  );
+
   const handleReorder = useCallback(
     async (entryId: number, targetPosition: number, sourceIndex?: number) => {
       if (!reorderEnabled || entryId <= 0) return;
@@ -291,7 +365,9 @@ function PlaylistInfoPage() {
         queryClient.setQueryData(entriesQuery.queryKey, (oldEntries) => {
           if (!oldEntries) return oldEntries;
           const next = [...oldEntries];
-          const [moved] = next.splice(sourceIndex, 1);
+          const realSourceIndex = next.findIndex((e) => e.id === entryId);
+          if (realSourceIndex === -1) return oldEntries;
+          const [moved] = next.splice(realSourceIndex, 1);
           next.splice(targetPosition, 0, moved);
           // Keep stored positions in sync with the visual order so nothing
           // downstream reads stale ranks before the refetch lands.
@@ -336,19 +412,58 @@ function PlaylistInfoPage() {
     [filteredSongs.length, handleReorder]
   );
 
+  const handleDragStart = useCallback(() => {
+    setIsDraggingActive(true);
+    lastDestinationIndexRef.current = null;
+  }, []);
+
+  const handleDragUpdate = useCallback((update: DragUpdate) => {
+    if (update.destination) {
+      lastDestinationIndexRef.current = update.destination.index;
+    }
+  }, []);
+
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      if (!result.destination || !reorderEnabled) return;
+      setIsDraggingActive(false);
+
+      if (!reorderEnabled) {
+        lastDestinationIndexRef.current = null;
+        return;
+      }
+
+      // Guard: Cancelled gestures (e.g. ESC key) must always abort without salvaging
+      if (result.reason !== 'DROP') {
+        lastDestinationIndexRef.current = null;
+        return;
+      }
+
+      const lastTracked = lastDestinationIndexRef.current;
+      lastDestinationIndexRef.current = null;
+
+      let destIndex: number | null = null;
+      if (result.destination) {
+        destIndex = result.destination.index;
+      } else if (lastTracked === 0) {
+        // Salvage drops at the extreme top edge (e.g. into the header or top scroller boundary)
+        destIndex = 0;
+      } else if (lastTracked !== null && lastTracked === filteredSongs.length - 1) {
+        // Salvage drops at the extreme bottom edge
+        destIndex = filteredSongs.length - 1;
+      }
+
+      // Mid-list out-of-bounds drop leaves destIndex null -> cleanly cancel
+      if (destIndex === null) return;
+
       const sourceIndex = result.source.index;
-      const destIndex = result.destination.index;
       if (sourceIndex === destIndex) return;
 
-      const draggedSong = filteredSongs[sourceIndex];
-      if (draggedSong && draggedSong.entryId > 0) {
-        moveSongAbsolute(draggedSong.entryId, destIndex, sourceIndex);
+      const entryId = Number(result.draggableId);
+      if (entryId > 0) {
+        moveSongAbsolute(entryId, destIndex, sourceIndex);
       }
     },
-    [filteredSongs, moveSongAbsolute, reorderEnabled]
+    [filteredSongs.length, moveSongAbsolute, reorderEnabled]
   );
 
   const getContextMenuItems = useCallback(
@@ -380,7 +495,7 @@ function PlaylistInfoPage() {
           items.push({
             label: t('playlist.moveToTop', 'Move to Top'),
             iconName: 'vertical_align_top',
-            handlerFunction: () => moveSongAbsolute(item.entryId, 0)
+            handlerFunction: () => moveSongAbsolute(item.entryId, 0, index)
           });
           items.push({
             label: t('playlist.moveUp', 'Move Up'),
@@ -397,7 +512,7 @@ function PlaylistInfoPage() {
           items.push({
             label: t('playlist.moveToBottom', 'Move to Bottom'),
             iconName: 'vertical_align_bottom',
-            handlerFunction: () => moveSongAbsolute(item.entryId, filteredSongs.length - 1)
+            handlerFunction: () => moveSongAbsolute(item.entryId, filteredSongs.length - 1, index)
           });
         }
       }
@@ -432,8 +547,42 @@ function PlaylistInfoPage() {
       const queueSongIds = filteredSongs
         .filter((song) => !song.isBlacklisted)
         .map((song) => song.songId);
+      const targetIndex = queueSongIds.indexOf(currSongId);
+      if (targetIndex === -1) return;
+
+      const manager = getQueuesManager();
+      const activeQueue = manager.getActiveQueue();
+      const activeMeta = activeQueue?.getMetadata();
+
+      // If this playlist is already the active queue, navigate within it instead of creating a new queue
+      if (activeMeta?.queueType === 'playlist' && activeMeta?.queueId === playlistData.id) {
+        const isQueueInSync =
+          activeQueue.songIds.length === queueSongIds.length &&
+          activeQueue.songIds.every((id, idx) => id === queueSongIds[idx]);
+
+        if (isQueueInSync) {
+          updateQueueData(targetIndex, undefined, false, true);
+        } else {
+          updateQueueData(targetIndex, queueSongIds, false, true);
+        }
+        return;
+      }
+
+      // If a queue for this playlist already exists in the queue tabs, switch to it
+      const existingQueueIndex = manager.queues.findIndex((q) => {
+        const meta = q.getMetadata();
+        return meta.queueType === 'playlist' && meta.queueId === playlistData.id;
+      });
+
+      if (existingQueueIndex !== -1) {
+        manager.switchQueue(existingQueueIndex);
+        updateQueueData(targetIndex, queueSongIds, false, true);
+        return;
+      }
+
+      // Otherwise create a new queue for this playlist
       createQueue(queueSongIds, 'playlist', false, playlistData.id, false, playlistData.name);
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      updateQueueData(targetIndex, undefined, false, true);
     },
     [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]
   );
@@ -482,31 +631,52 @@ function PlaylistInfoPage() {
     ]);
   }, [addNewNotifications, filteredSongs, t]);
 
-  const shuffleAndPlaySongs = useCallback(
-    () =>
-      createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-        'playlist',
-        true,
-        playlistData.id,
-        true,
-        playlistData.name
-      ),
-    [createQueue, playlistData.id, playlistData.name, filteredSongs]
-  );
+  const shuffleAndPlaySongs = useCallback(() => {
+    const queueSongIds = filteredSongs
+      .filter((song) => !song.isBlacklisted)
+      .map((song) => song.songId);
+    if (queueSongIds.length === 0) return;
 
-  const playAllSongs = useCallback(
-    () =>
-      createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
-        'playlist',
-        false,
-        playlistData.id,
-        true,
-        playlistData.name
-      ),
-    [createQueue, playlistData.id, playlistData.name, filteredSongs]
-  );
+    const manager = getQueuesManager();
+    const activeQueue = manager.getActiveQueue();
+    const activeMeta = activeQueue?.getMetadata();
+
+    if (activeMeta?.queueType === 'playlist' && activeMeta?.queueId === playlistData.id) {
+      updateQueueData(0, queueSongIds, true, true);
+      return;
+    }
+
+    createQueue(queueSongIds, 'playlist', true, playlistData.id, true, playlistData.name);
+  }, [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]);
+
+  const playAllSongs = useCallback(() => {
+    const queueSongIds = filteredSongs
+      .filter((song) => !song.isBlacklisted)
+      .map((song) => song.songId);
+    if (queueSongIds.length === 0) return;
+
+    const manager = getQueuesManager();
+    const activeQueue = manager.getActiveQueue();
+    const activeMeta = activeQueue?.getMetadata();
+
+    if (activeMeta?.queueType === 'playlist' && activeMeta?.queueId === playlistData.id) {
+      updateQueueData(0, queueSongIds, false, true);
+      return;
+    }
+
+    const existingQueueIndex = manager.queues.findIndex((q) => {
+      const meta = q.getMetadata();
+      return meta.queueType === 'playlist' && meta.queueId === playlistData.id;
+    });
+
+    if (existingQueueIndex !== -1) {
+      manager.switchQueue(existingQueueIndex);
+      updateQueueData(0, queueSongIds, false, true);
+      return;
+    }
+
+    createQueue(queueSongIds, 'playlist', false, playlistData.id, true, playlistData.name);
+  }, [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]);
 
   const openExportPrompt = useCallback(() => {
     changePromptMenuData(
@@ -694,12 +864,24 @@ function PlaylistInfoPage() {
       />
       {filteredSongs.length > 0 &&
         (reorderEnabled ? (
-          <DragDropContext onDragEnd={handleDragEnd}>
+          <DragDropContext
+            onDragStart={handleDragStart}
+            onDragUpdate={handleDragUpdate}
+            onDragEnd={handleDragEnd}
+            autoScrollerOptions={{
+              startFromPercentage: 0.15,
+              maxScrollAtPercentage: 0.05
+            }}
+          >
             <Droppable
               droppableId="playlist-droppable"
               mode="virtual"
+              ignoreContainerClipping={true}
               renderClone={(provided, renderCloneSnapshot, rubric) => {
-                const item = filteredSongs[rubric.source.index];
+                const entryId = Number(rubric.draggableId);
+                const item =
+                  filteredSongs.find((s) => s.entryId === entryId) ??
+                  filteredSongs[rubric.source.index];
                 if (!item) return null;
                 return (
                   <PlaylistRow
@@ -721,15 +903,13 @@ function PlaylistInfoPage() {
                   fixedItemHeight={60}
                   scrollerRef={droppableProvided.innerRef}
                   scrollKey={scrollKey}
-                  components={{
-                    Header: () => (
-                      <PlaylistInfoAndImgContainer
-                        playlist={playlistData}
-                        songs={playlistSongs}
-                        filteredSongs={filteredSongs}
-                      />
-                    )
-                  }}
+                  scrollSeekConfiguration={false}
+                  increaseViewportBy={{ top: 800, bottom: 800 }}
+                  context={virtuosoContext}
+                  components={virtuosoComponents}
+                  computeItemKey={(index, item) =>
+                    item?.entryId ? `entry-${item.entryId}` : `row-${index}`
+                  }
                   itemContent={(index, item) => (
                     <Draggable
                       key={item.entryId || item.songId}
@@ -762,15 +942,11 @@ function PlaylistInfoPage() {
             data={filteredSongs}
             fixedItemHeight={60}
             scrollKey={scrollKey}
-            components={{
-              Header: () => (
-                <PlaylistInfoAndImgContainer
-                  playlist={playlistData}
-                  songs={playlistSongs}
-                  filteredSongs={filteredSongs}
-                />
-              )
-            }}
+            context={virtuosoContext}
+            components={virtuosoComponents}
+            computeItemKey={(index, item) =>
+              item?.entryId ? `entry-${item.entryId}` : `row-${index}`
+            }
             itemContent={(index, item) => (
               <PlaylistRow
                 key={item.entryId || index}
