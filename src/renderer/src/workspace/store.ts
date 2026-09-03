@@ -110,5 +110,21 @@ export const workspaceActions = {
       ...state,
       maximizedPanelId: state.maximizedPanelId === panelId ? null : panelId
     }));
+  },
+
+  setDragState(drag: { panelId: PanelInstanceId; sourceNodeId?: NodeId } | null): void {
+    dndStore.setState((state) => ({
+      ...state,
+      isDragging: drag !== null,
+      currentDrag: drag,
+      hoveredDropTarget: drag === null ? null : state.hoveredDropTarget
+    }));
+  },
+
+  setHoveredDropTarget(target: DropTarget | null): void {
+    dndStore.setState((state) => ({
+      ...state,
+      hoveredDropTarget: target
+    }));
   }
 };

@@ -3,6 +3,8 @@ import { memo, type FC, type ReactNode } from 'react';
 
 import { dndStore, workspaceActions } from '../store';
 import type { PanelInstanceId, PanelType } from '../types';
+import { DropOverlay } from './DropOverlay';
+import { usePanelDragDrop } from './usePanelDragDrop';
 
 interface PanelFrameProps {
   panelId: PanelInstanceId;
@@ -17,6 +19,7 @@ interface PanelFrameProps {
 export const PanelFrame: FC<PanelFrameProps> = memo(
   ({ panelId, type, title, icon, canClose = true, showHeader = true, children }) => {
     const isMaximized = useStore(dndStore, (s) => s.maximizedPanelId === panelId);
+    const { handlePointerDown } = usePanelDragDrop(panelId);
 
     const handleHeaderDoubleClick = (): void => {
       workspaceActions.toggleMaximizePanel(panelId);
@@ -38,14 +41,18 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
       <div
         data-panel-id={panelId}
         data-panel-type={type}
+        data-node-id={panelId}
         className={`panel-frame bg-background-color-1 dark:bg-dark-background-color-1 relative flex h-full w-full flex-col overflow-hidden ${
           isMaximized ? 'z-40' : ''
         }`}
       >
+        <DropOverlay nodeId={panelId} />
+
         {showHeader && (
           <header
             onDoubleClick={handleHeaderDoubleClick}
-            className="panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-8 shrink-0 items-center justify-between border-b border-stone-200/60 px-3 select-none dark:border-stone-800/60"
+            onPointerDown={handlePointerDown}
+            className="panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-8 shrink-0 cursor-grab items-center justify-between border-b border-stone-200/60 px-3 select-none active:cursor-grabbing dark:border-stone-800/60"
           >
             <div className="flex items-center gap-2 overflow-hidden">
               <span className="material-symbols-rounded text-font-color-dimmed text-sm">
