@@ -51,6 +51,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     select: (data) => ({
       miniPlayerPinnedControls: data.miniPlayerPinnedControls,
       isMiniPlayerAlwaysOnTop: data.isMiniPlayerAlwaysOnTop,
+      isMiniPlayerTaskbarHidden: data.isMiniPlayerTaskbarHidden,
       miniPlayerMode: data.miniPlayerMode
     })
   });
@@ -73,6 +74,29 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       const newSettings = {
         ...prevSettings!,
         isMiniPlayerAlwaysOnTop: state
+      };
+      queryClient.setQueryData(settingsQuery.all.queryKey, newSettings);
+
+      return { prevSettings, newSettings };
+    },
+    onError: (_, __, onMutateResult) =>
+      queryClient.setQueryData(settingsQuery.all.queryKey, onMutateResult?.prevSettings),
+    onSettled: () => queryClient.invalidateQueries(settingsQuery.all)
+  });
+
+  const { mutate: toggleTaskbarHidden } = useMutation({
+    mutationKey: settingsMutation.toggleMiniPlayerTaskbarHidden.mutationKey,
+    mutationFn: async (state: boolean) => {
+      await window.api.miniPlayer.toggleMiniPlayerTaskbarHidden(state);
+    },
+    onMutate: async (state) => {
+      await queryClient.cancelQueries({ queryKey: settingsQuery.all.queryKey });
+
+      const prevSettings = queryClient.getQueryData(settingsQuery.all.queryKey);
+
+      const newSettings = {
+        ...prevSettings!,
+        isMiniPlayerTaskbarHidden: state
       };
       queryClient.setQueryData(settingsQuery.all.queryKey, newSettings);
 
@@ -462,6 +486,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           )
         },
         {
+          id: 'toggleTaskbarHide',
+          label: t(
+            `miniPlayer.${
+              settings?.isMiniPlayerTaskbarHidden ? 'taskbarHiddenDisabled' : 'taskbarHiddenEnabled'
+            }`,
+            settings?.isMiniPlayerTaskbarHidden ? 'Show on Taskbar' : 'Hide from Taskbar'
+          )
+        },
+        {
           id: 'resetMiniPlayer',
           label: t('miniPlayer.resetToDefault', 'Reset to Default Position')
         },
@@ -489,19 +522,19 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             },
             {
               id: 'pin_lyrics',
-              label: t('player.lyrics', 'Lyrics'),
+              label: t('player.lyrics', 'Show Lyrics'),
               type: 'checkbox',
               checked: pinnedControls.includes('lyrics')
             },
             {
               id: 'pin_volume',
-              label: t('player.muteUnmute', 'Volume'),
+              label: t('player.volume', 'Volume Control'),
               type: 'checkbox',
               checked: pinnedControls.includes('volume')
             },
             {
               id: 'pin_queue',
-              label: t('player.currentQueue', 'Queue'),
+              label: t('player.queue', 'Current Queue'),
               type: 'checkbox',
               checked: pinnedControls.includes('queue')
             },
@@ -530,12 +563,21 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               checked: pinnedControls.includes('stop')
             }
           ]
+        },
+        { type: 'separator' },
+        {
+          id: 'returnToMainPlayer',
+          label: t('miniPlayer.returnToMainPlayer', 'Return to Main Player')
         }
       ];
 
-      const clickedId = await window.api.miniPlayer.showContextMenu(template);
+      const chosenId = await window.api.miniPlayer.showContextMenu(template);
+      if (!chosenId) return;
 
-      switch (clickedId) {
+      switch (chosenId) {
+        case 'returnToMainPlayer':
+          updatePlayerType('normal');
+          break;
         case 'compactMode': {
           const nextMode = miniPlayerMode === 'compact' ? 'standard' : 'compact';
           setIsQueueVisible(false);
@@ -572,6 +614,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
           break;
         case 'toggleAlwaysOnTop':
           toggleAlwaysOnTop(!settings?.isMiniPlayerAlwaysOnTop);
+          break;
+        case 'toggleTaskbarHide':
+          toggleTaskbarHidden(!settings?.isMiniPlayerTaskbarHidden);
           break;
         case 'resetMiniPlayer':
           window.api.miniPlayer.resetToDefaultPosition();
@@ -621,6 +666,8 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       toggleShuffling,
       settings?.isMiniPlayerAlwaysOnTop,
       toggleAlwaysOnTop,
+      settings?.isMiniPlayerTaskbarHidden,
+      toggleTaskbarHidden,
       handleToggleQueue,
       handleToggleLyrics,
       handleToggleSearch,

@@ -14,6 +14,7 @@ export const settingsQuery = createQueryKeys('settings', {
 export const settingsMutation = createMutationKeys('settings', {
   changeAppTheme: null,
   toggleMiniPlayerAlwaysOnTop: null,
+  toggleMiniPlayerTaskbarHidden: null,
   toggleMiniPlayerPinnedControl: null,
   updateLibraryScanMode: null
 });

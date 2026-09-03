@@ -49,6 +49,9 @@ vi.mock('../../../../../../src/renderer/src/queries/settings', async (importOrig
     settingsMutation: {
       toggleMiniPlayerAlwaysOnTop: {
         mutationKey: ['toggleMiniPlayerAlwaysOnTop']
+      },
+      toggleMiniPlayerTaskbarHidden: {
+        mutationKey: ['toggleMiniPlayerTaskbarHidden']
       }
     }
   };

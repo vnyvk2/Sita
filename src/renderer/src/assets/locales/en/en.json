@@ -559,6 +559,8 @@
     "hideWindowOnClose": "Hide Nora to the System Tray when the close button is clicked.",
     "trayClickBehaviorDescription": "Configure how the system tray icon behaves when clicked.",
     "traySingleClickTogglesWindow": "Single-click tray icon toggles player window.",
+    "hideMiniPlayerFromTaskbarDescription": "Hide Nora from the Windows taskbar when switched to Mini Player mode.",
+    "hideMiniPlayerFromTaskbar": "Hide Mini Player from Taskbar",
 
     "libraryScanning": "Library Scanning",
     "libraryScanningDescription": "Configure when Nora scans and synchronizes your music library.",
@@ -810,6 +812,8 @@
   "miniPlayer": {
     "alwaysOnTopEnabled": "Always on top: ON",
     "alwaysOnTopDisabled": "Always on top: OFF",
+    "taskbarHiddenEnabled": "Hide from Taskbar: ON",
+    "taskbarHiddenDisabled": "Hide from Taskbar: OFF",
     "compactMode": "Compact Mode",
     "artwork": "Artwork",
     "trackInfo": "Track Info",

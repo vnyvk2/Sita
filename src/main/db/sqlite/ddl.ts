@@ -336,6 +336,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   open_window_maximized_on_start INTEGER NOT NULL DEFAULT 0 CHECK (open_window_maximized_on_start IN (0,1)),
   open_window_as_hidden_on_system_start INTEGER NOT NULL DEFAULT 0 CHECK (open_window_as_hidden_on_system_start IN (0,1)),
   is_mini_player_always_on_top INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_always_on_top IN (0,1)),
+  is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1)),
   is_musixmatch_lyrics_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_musixmatch_lyrics_enabled IN (0,1)),
   hide_window_on_close INTEGER NOT NULL DEFAULT 0 CHECK (hide_window_on_close IN (0,1)),
   tray_single_click_toggles_window INTEGER NOT NULL DEFAULT 0 CHECK (tray_single_click_toggles_window IN (0,1)),
@@ -576,5 +577,5 @@ END;`;
   .join('\n');
 
 export const BASELINE_DDL = BASELINE_TABLE_DDL + '\n' + ftsDDL;
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 void searchable;
