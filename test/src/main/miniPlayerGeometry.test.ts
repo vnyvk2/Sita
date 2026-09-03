@@ -7,7 +7,7 @@ import {
   MINI_PLAYER_MIN_SIZE_X,
   MINI_PLAYER_MIN_SIZE_Y
 } from '@common/miniPlayerConstants';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Track calls and mock state
 let persistedUserSettings: Record<string, unknown> = {};
@@ -154,6 +154,10 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
     })
   };
 
+  beforeAll(async () => {
+    mainModule = await import('../../../src/main/main');
+  }, 20000);
+
   beforeEach(async () => {
     vi.clearAllMocks();
     eventCallSequence.length = 0;
@@ -171,7 +175,6 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
       height: MINI_PLAYER_DEFAULT_SIZE_Y
     };
 
-    mainModule = await import('../../../src/main/main');
     // Attach mocked window
     mainModule.setMainWindowForTests(mockWindow);
     await mainModule.changePlayerType('normal');
