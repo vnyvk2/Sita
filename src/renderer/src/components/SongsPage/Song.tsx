@@ -289,7 +289,15 @@ const Song = memo(
             }
           ]);
         });
-    }, [addNewNotifications, isAFavorite, isCurrentSong, songId, t, toggleIsFavorite, triggerBurst]);
+    }, [
+      addNewNotifications,
+      isAFavorite,
+      isCurrentSong,
+      songId,
+      t,
+      toggleIsFavorite,
+      triggerBurst
+    ]);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => {
@@ -719,7 +727,7 @@ const Song = memo(
                 }`
         } ${!isAMultipleSelection && isBlacklisted && 'opacity-30!'} ${
           isDragging
-            ? 'ring-background-color-3 dark:ring-dark-background-color-3 z-50! opacity-90 shadow-2xl transition-none!'
+            ? 'ring-background-color-3 dark:ring-dark-background-color-3 z-50! opacity-90 shadow-2xl'
             : ''
         }`}
         onContextMenu={async (e) => {
