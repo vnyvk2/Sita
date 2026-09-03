@@ -1,4 +1,4 @@
-import type { ComponentType, LazyExoticComponent } from 'react';
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 
 import type { PanelInstance, PanelKind, PanelType } from './types';
 
@@ -37,7 +37,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     kind: 'widget',
     singleton: true,
     minSize: { w: 180 },
-    defaultWeight: 0.18
+    defaultWeight: 0.18,
+    component: lazy(() => import('./panels/NavigationPanel/NavigationPanel'))
   },
   'router-view': {
     type: 'router-view',
@@ -46,7 +47,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     kind: 'view',
     singleton: true,
     minSize: { w: 300 },
-    defaultWeight: 0.6
+    defaultWeight: 0.6,
+    component: lazy(() => import('./panels/RouterViewPanel/RouterViewPanel'))
   },
   queue: {
     type: 'queue',

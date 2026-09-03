@@ -1,0 +1,149 @@
+import LibraryDiagnosticsPanel from '@renderer/components/Sidebar/LibraryDiagnosticsPanel';
+import LibrarySchedulerStatus from '@renderer/components/Sidebar/LibrarySchedulerStatus';
+import SideBarItem from '@renderer/components/Sidebar/SideBarItem';
+import type { AppReducer } from '@renderer/other/appReducer';
+import { store } from '@renderer/store/store';
+import { linkOptions } from '@tanstack/react-router';
+import { useStore } from '@tanstack/react-store';
+import { memo, useMemo, type FC } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { PanelProps } from '../../registry';
+
+export const NavigationPanel: FC<PanelProps> = memo(() => {
+  const visibleSideTabs = useStore(
+    store,
+    (state: AppReducer) => state.localStorage.preferences?.visibleSideTabs
+  );
+
+  const { t } = useTranslation();
+
+  const linkData = useMemo(
+    () =>
+      linkOptions([
+        {
+          to: '/main-player/home',
+          id: 'Home',
+          parentClassName: 'home',
+          icon: 'home',
+          content: t('sideBar.home'),
+          isActive: true
+        },
+        {
+          to: '/main-player/search',
+          id: 'Search',
+          parentClassName: 'search',
+          icon: 'search',
+          content: t('sideBar.search'),
+          isActive: false
+        },
+        {
+          to: '/main-player/online',
+          id: 'Online',
+          parentClassName: 'online',
+          icon: 'cloud_download',
+          content: t('sideBar.online', { defaultValue: 'Online' }),
+          isActive: false
+        },
+        {
+          to: '/main-player/songs',
+          id: 'Songs',
+          parentClassName: 'songs',
+          icon: 'music_note',
+          content: t('common.song_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/playlists',
+          id: 'Playlists',
+          parentClassName: 'playlists',
+          icon: 'queue_music',
+          content: t('common.playlist_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/folders',
+          id: 'Folders',
+          parentClassName: 'folders',
+          icon: 'folder',
+          content: t('common.folder_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/artists',
+          id: 'Artists',
+          parentClassName: 'artists',
+          icon: 'people',
+          content: t('common.artist_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/albums',
+          id: 'Albums',
+          parentClassName: 'albums',
+          icon: 'album',
+          content: t('common.album_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/genres',
+          id: 'Genres',
+          parentClassName: 'genres',
+          icon: 'style',
+          content: t('common.genre_other'),
+          isActive: false
+        },
+        {
+          to: '/main-player/insights',
+          id: 'Insights',
+          parentClassName: 'insights',
+          icon: 'auto_graph',
+          content: t('sideBar.insights', { defaultValue: 'Insights' }),
+          isActive: false
+        },
+        {
+          to: '/main-player/settings',
+          id: 'Settings',
+          parentClassName: 'settings',
+          icon: 'settings',
+          content: t('settingsPage.settings'),
+          isActive: false
+        }
+      ]),
+    [t]
+  );
+
+  const filteredLinkData = useMemo(() => {
+    return linkData.filter((link) => {
+      if (link.id === 'Folders' && visibleSideTabs?.folders === false) return false;
+      if (link.id === 'Artists' && visibleSideTabs?.artists === false) return false;
+      if (link.id === 'Albums' && visibleSideTabs?.albums === false) return false;
+      if (link.id === 'Genres' && visibleSideTabs?.genres === false) return false;
+      if (link.id === 'Insights' && visibleSideTabs?.insights === false) return false;
+      return true;
+    });
+  }, [linkData, visibleSideTabs]);
+
+  return (
+    <nav className="navigation-panel bg-side-bar-background dark:bg-dark-background-color-2 flex h-full w-full flex-col overflow-hidden">
+      <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto px-2 py-3">
+        {filteredLinkData.map((link) => (
+          <SideBarItem
+            to={link.to}
+            key={link.id}
+            parentClassName={link.parentClassName}
+            icon={link.icon}
+            content={link.content}
+          />
+        ))}
+      </ul>
+      <div className="shrink-0 border-t border-stone-200/40 p-2 dark:border-stone-800/40">
+        <LibrarySchedulerStatus />
+        <LibraryDiagnosticsPanel />
+      </div>
+    </nav>
+  );
+});
+
+NavigationPanel.displayName = 'NavigationPanel';
+export default NavigationPanel;
