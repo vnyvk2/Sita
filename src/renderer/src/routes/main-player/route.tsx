@@ -6,6 +6,7 @@ import SongControlsContainer from '@renderer/components/SongsControlsContainer/S
 import TitleBar from '@renderer/components/TitleBar/TitleBar';
 import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 import { store } from '@renderer/store/store';
+import WorkspaceFrame from '@renderer/workspace/engine/WorkspaceFrame';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 
@@ -30,6 +31,10 @@ function RouteComponent() {
   );
   const { isDark } = useEffectiveAppearance();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
+  const isExperimentalWorkspace = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
 
   return (
     <div
@@ -60,7 +65,7 @@ function RouteComponent() {
       <ContextMenu />
       <PromptMenu />
       <TitleBar />
-      <BodyAndSideBarContainer />
+      {isExperimentalWorkspace ? <WorkspaceFrame /> : <BodyAndSideBarContainer />}
       <SongControlsContainer />
     </div>
   );

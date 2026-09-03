@@ -603,6 +603,7 @@ declare global {
     reduceVisualEffectsOnBattery?: boolean;
     ambientParticles?: boolean;
     isWaveformSeekbarEnabled?: boolean;
+    isExperimentalWorkspaceEnabled?: boolean;
     customThemeOverrides?: Record<string, Record<string, string>>;
   }
 
