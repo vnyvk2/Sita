@@ -56,7 +56,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     icon: 'queue_music',
     kind: 'widget',
     minSize: { w: 220 },
-    defaultWeight: 0.25
+    defaultWeight: 0.25,
+    component: lazy(() => import('./panels/QueuePanel/QueuePanel'))
   },
   lyrics: {
     type: 'lyrics',
@@ -65,7 +66,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     kind: 'widget',
     keepMounted: true,
     minSize: { w: 220 },
-    defaultWeight: 0.25
+    defaultWeight: 0.25,
+    component: lazy(() => import('./panels/LyricsPanel/LyricsPanel'))
   },
   'now-playing': {
     type: 'now-playing',
