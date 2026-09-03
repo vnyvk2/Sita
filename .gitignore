@@ -70,3 +70,10 @@ sqlite-poc/
 architecture/tiny-mini/
 architecture/b-fix-final-report.md
 architecture/b-data-layer-windowed-hydration-design.md
+
+# Memory benchmarks, audit runs & transient profiler logs
+audit_*.json
+scripts/step0-*.json
+scripts/step05-attribution*
+scripts/audit-home-images-and-allocators.mjs
+scripts/mem-profile/
