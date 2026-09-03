@@ -75,7 +75,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     icon: 'play_circle',
     kind: 'widget',
     minSize: { w: 200 },
-    defaultWeight: 0.22
+    defaultWeight: 0.22,
+    component: lazy(() => import('./panels/NowPlayingPanel/NowPlayingPanel'))
   },
   'track-info': {
     type: 'track-info',
@@ -83,7 +84,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     icon: 'info',
     kind: 'widget',
     minSize: { w: 200 },
-    defaultWeight: 0.2
+    defaultWeight: 0.2,
+    component: lazy(() => import('./panels/TrackInfoPanel/TrackInfoPanel'))
   },
   visualizer: {
     type: 'visualizer',
@@ -92,7 +94,8 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     kind: 'widget',
     duplicate: true,
     minSize: { w: 150, h: 100 },
-    defaultWeight: 0.2
+    defaultWeight: 0.2,
+    component: lazy(() => import('./panels/VisualizerPanel/VisualizerPanel'))
   },
   empty: {
     type: 'empty',
