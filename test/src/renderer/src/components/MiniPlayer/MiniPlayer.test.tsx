@@ -58,7 +58,7 @@ vi.mock('../../../../../../src/renderer/src/queries/settings', async (importOrig
 });
 
 vi.mock('../../../../../../src/renderer/src/components/Img', () => ({
-  default: ({ fallbackSrc, ...props }: any) => <img {...props} alt="Song Cover" />
+  default: ({ fallbackSrc, thumbnail, ...props }: any) => <img {...props} alt="Song Cover" />
 }));
 
 vi.mock(

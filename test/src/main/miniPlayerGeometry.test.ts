@@ -138,6 +138,7 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
     }),
     setMaximizable: vi.fn(),
     setAlwaysOnTop: vi.fn(),
+    setSkipTaskbar: vi.fn(),
     setFullScreen: vi.fn(),
     setAspectRatio: vi.fn(),
     webContents: {
@@ -345,6 +346,41 @@ describe('Mini Player Geometry Engine & Real main.ts Implementation Tests', () =
       expect(mockSaveUserSettings).not.toHaveBeenCalled();
       expect(persistedUserSettings.miniPlayerWidth).not.toBe(1920);
       expect(persistedUserSettings.miniPlayerHeight).not.toBe(1080);
+    });
+  });
+
+  describe('F8: Mini Player Taskbar Visibility Lifecycle & Persistence', () => {
+    it('sets skipTaskbar to true when isMiniPlayerTaskbarHidden is enabled in mini mode', async () => {
+      persistedUserSettings = { isMiniPlayerTaskbarHidden: true };
+      await mainModule.changePlayerType('mini');
+      expect(mockWindow.setSkipTaskbar).toHaveBeenCalledWith(true);
+    });
+
+    it('sets skipTaskbar to false when isMiniPlayerTaskbarHidden is disabled in mini mode', async () => {
+      persistedUserSettings = { isMiniPlayerTaskbarHidden: false };
+      await mainModule.changePlayerType('mini');
+      expect(mockWindow.setSkipTaskbar).toHaveBeenCalledWith(false);
+    });
+
+    it('restores taskbar visibility (skipTaskbar false) when returning to normal player mode', async () => {
+      persistedUserSettings = { isMiniPlayerTaskbarHidden: true };
+      await mainModule.changePlayerType('mini');
+      expect(mockWindow.setSkipTaskbar).toHaveBeenCalledWith(true);
+
+      mockWindow.setSkipTaskbar.mockClear();
+      await mainModule.changePlayerType('normal');
+      expect(mockWindow.setSkipTaskbar).toHaveBeenCalledWith(false);
+    });
+
+    it('toggles taskbar visibility dynamically and persists state', async () => {
+      mockSaveUserSettings.mockClear();
+      mockWindow.setSkipTaskbar.mockClear();
+
+      await mainModule.changePlayerType('mini');
+      await mainModule.toggleMiniPlayerTaskbarHidden(true);
+
+      expect(mockSaveUserSettings).toHaveBeenCalledWith({ isMiniPlayerTaskbarHidden: true });
+      expect(mockWindow.setSkipTaskbar).toHaveBeenCalledWith(true);
     });
   });
 });

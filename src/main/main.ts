@@ -1128,7 +1128,9 @@ export async function applyMiniPlayerTaskbarVisibility() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const { isMiniPlayerTaskbarHidden } = await getUserSettings();
   const shouldSkip = playerType === 'mini' && Boolean(isMiniPlayerTaskbarHidden);
-  mainWindow.setSkipTaskbar(shouldSkip);
+  if (typeof mainWindow.setSkipTaskbar === 'function') {
+    mainWindow.setSkipTaskbar(shouldSkip);
+  }
 }
 
 export async function toggleMiniPlayerTaskbarHidden(isMiniPlayerTaskbarHidden: boolean) {
