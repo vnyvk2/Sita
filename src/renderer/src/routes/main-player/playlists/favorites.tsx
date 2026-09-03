@@ -53,14 +53,14 @@ const playlistData: Playlist = {
  * @returns The React element representing the Favorites playlist info page.
  */
 function FavoritesPlaylistInfoPage() {
-  const playlistSortingState = useStore(
+  const favoritesSortingState = useStore(
     store,
-    (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
+    (state) => state.localStorage.sortingStates?.favoritesPage || 'addedOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { updateQueueData, addNewNotifications, createQueue } = useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState, language = 'all' } = Route.useSearch();
+  const { sortingOrder = favoritesSortingState, language = 'all' } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/favorites' });
 
   const scrollKey = useMemo(
@@ -69,7 +69,7 @@ function FavoritesPlaylistInfoPage() {
   );
 
   useEffect(() => {
-    storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
+    storage.sortingStates.setSortingStates('favoritesPage', sortingOrder);
   }, [sortingOrder]);
 
   const { data: favoriteSongs = [] } = useSuspenseQuery({

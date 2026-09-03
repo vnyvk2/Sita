@@ -70,9 +70,9 @@ function HistoryPlaylistInfoPage() {
     language = 'all'
   } = Route.useSearch();
 
-  const playlistSortingState = useStore(
+  const historySortingState = useStore(
     store,
-    (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
+    (state) => state.localStorage.sortingStates?.historyPage || 'addedOrder'
   );
   const storedPeriod = useStore(
     store,
@@ -87,7 +87,7 @@ function HistoryPlaylistInfoPage() {
   const { updateQueueData, addNewNotifications, createQueue, changePromptMenuData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState } = Route.useSearch();
+  const { sortingOrder = historySortingState } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/history' });
 
   const period = (searchPeriod as HistoryPeriod) || storedPeriod;
@@ -99,7 +99,7 @@ function HistoryPlaylistInfoPage() {
   );
 
   useEffect(() => {
-    storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
+    storage.sortingStates.setSortingStates('historyPage', sortingOrder);
   }, [sortingOrder]);
 
   useEffect(() => {
@@ -259,7 +259,7 @@ function HistoryPlaylistInfoPage() {
         options: songSortOptions,
         onChange: (e: ChangeEvent<HTMLSelectElement>) => {
           const order = e.currentTarget.value as SongSortTypes;
-          storage.sortingStates.setSortingStates('playlistDetailPage', order);
+          storage.sortingStates.setSortingStates('historyPage', order);
           navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
         }
       }

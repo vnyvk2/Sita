@@ -44,9 +44,9 @@ const playlistData: Playlist = {
 function RecentlyAddedPlaylistInfoPage() {
   const { period: searchPeriod, language = 'all' } = Route.useSearch();
 
-  const playlistSortingState = useStore(
+  const recentlyAddedSortingState = useStore(
     store,
-    (state) => state.localStorage.sortingStates?.playlistDetailPage || 'addedOrder'
+    (state) => state.localStorage.sortingStates?.recentlyAddedPage || 'addedOrder'
   );
   const storedPeriod = useStore(
     store,
@@ -57,7 +57,7 @@ function RecentlyAddedPlaylistInfoPage() {
   const { updateQueueData, addNewNotifications, createQueue, changePromptMenuData } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
-  const { sortingOrder = playlistSortingState } = Route.useSearch();
+  const { sortingOrder = recentlyAddedSortingState } = Route.useSearch();
   const navigate = useNavigate({ from: '/main-player/playlists/recently-added' });
 
   const period = (searchPeriod as RecentlyAddedPeriod) || storedPeriod;
@@ -68,7 +68,7 @@ function RecentlyAddedPlaylistInfoPage() {
   );
 
   useEffect(() => {
-    storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
+    storage.sortingStates.setSortingStates('recentlyAddedPage', sortingOrder);
   }, [sortingOrder]);
 
   const { data: recentlyAddedSongs = [] } = useSuspenseQuery({
@@ -221,7 +221,7 @@ function RecentlyAddedPlaylistInfoPage() {
         options: songSortOptions,
         onChange: (e: ChangeEvent<HTMLSelectElement>) => {
           const order = e.currentTarget.value as SongSortTypes;
-          storage.sortingStates.setSortingStates('playlistDetailPage', order);
+          storage.sortingStates.setSortingStates('recentlyAddedPage', order);
           navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
         }
       }

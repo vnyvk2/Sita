@@ -711,6 +711,9 @@ declare global {
     genresPage?: GenreSortTypes;
     musicFoldersPage?: FolderSortTypes;
     playlistDetailPage?: SongSortTypes;
+    favoritesPage?: SongSortTypes;
+    historyPage?: SongSortTypes;
+    recentlyAddedPage?: SongSortTypes;
     albumDetailPage?: SongSortTypes;
     genreDetailPage?: SongSortTypes;
     artistDetailPage?: SongSortTypes;
