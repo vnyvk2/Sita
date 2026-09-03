@@ -449,6 +449,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
     isWaveformSeekbarEnabled: true,
+    isExperimentalWorkspaceEnabled: false,
     customThemeOverrides: {}
   },
   playback: {
