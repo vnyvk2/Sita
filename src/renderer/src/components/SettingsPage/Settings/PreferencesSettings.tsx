@@ -98,6 +98,23 @@ const PreferencesSettings = () => {
         </li>
 
         <li className="checkbox-container">
+          <div className="secondary-container toggle-experimental-workspace mb-4">
+            <div className="description">
+              Enable the modular workspace system for customizable multi-column sidebars, docked
+              panels, and MusicBee layouts.
+            </div>
+            <Checkbox
+              id="isExperimentalWorkspaceEnabled"
+              isChecked={preferences?.isExperimentalWorkspaceEnabled ?? false}
+              checkedStateUpdateFunction={(state) =>
+                storage.preferences.setPreferences('isExperimentalWorkspaceEnabled', state)
+              }
+              labelContent="Enable Modular Workspace System (Experimental)"
+            />
+          </div>
+        </li>
+
+        <li className="checkbox-container">
           <div className="secondary-container enable-artwork-from-song-covers mb-4">
             <div className="description">{t('settingsPage.playlistArtworksDescription')}</div>
             <Checkbox

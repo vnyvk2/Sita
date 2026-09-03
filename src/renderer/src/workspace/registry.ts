@@ -121,3 +121,13 @@ export function shouldKeepMounted(type: PanelType): boolean {
 export function canDuplicate(type: PanelType): boolean {
   return Boolean(PANEL_DEFINITIONS[type]?.duplicate);
 }
+
+export function getMountedPanelTypes(ws: {
+  panels: Record<string, { type: PanelType }>;
+}): Set<PanelType> {
+  const types = new Set<PanelType>();
+  for (const instance of Object.values(ws.panels)) {
+    types.add(instance.type);
+  }
+  return types;
+}
