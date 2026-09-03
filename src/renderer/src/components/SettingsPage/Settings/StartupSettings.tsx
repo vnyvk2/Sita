@@ -33,6 +33,14 @@ const StartupSettings = () => {
     }
   });
 
+  const { mutate: updateHideMiniPlayerFromTaskbar } = useMutation({
+    mutationFn: (enable: boolean) =>
+      window.api.settings.updateHideMiniPlayerFromTaskbar(enable),
+    onSettled: () => {
+      queryClient.invalidateQueries(settingsQuery.all);
+    }
+  });
+
   return (
     <li className="main-container startup-settings-container mb-16" id="startup-settings-container">
       <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
@@ -72,7 +80,7 @@ const StartupSettings = () => {
             labelContent={t('settingsPage.hideWindowAtStart')}
           />
         </li>
-        <li className="hide-window-on-close-checkbox-container">
+        <li className="hide-window-on-close-checkbox-container mb-4">
           <div className="description">{t('settingsPage.hideWindowOnCloseDescription')}</div>
           <Checkbox
             id="hideWindowOnClose"
@@ -81,13 +89,22 @@ const StartupSettings = () => {
             labelContent={t('settingsPage.hideWindowOnClose')}
           />
         </li>
-        <li className="tray-click-behavior-checkbox-container mt-4">
+        <li className="tray-click-behavior-checkbox-container mb-4">
           <div className="description">{t('settingsPage.trayClickBehaviorDescription')}</div>
           <Checkbox
             id="trayClickBehavior"
             isChecked={userSettings ? userSettings.traySingleClickTogglesWindow : false}
             checkedStateUpdateFunction={(state) => updateTraySingleClickBehavior(state)}
             labelContent={t('settingsPage.traySingleClickTogglesWindow')}
+          />
+        </li>
+        <li className="hide-mini-player-from-taskbar-checkbox-container">
+          <div className="description">{t('settingsPage.hideMiniPlayerFromTaskbarDescription')}</div>
+          <Checkbox
+            id="hideMiniPlayerFromTaskbar"
+            isChecked={userSettings ? userSettings.isMiniPlayerTaskbarHidden : false}
+            checkedStateUpdateFunction={(state) => updateHideMiniPlayerFromTaskbar(state)}
+            labelContent={t('settingsPage.hideMiniPlayerFromTaskbar')}
           />
         </li>
       </ul>

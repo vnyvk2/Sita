@@ -27,6 +27,7 @@ const mockGetUserSettings = vi.fn(async () => ({
   miniPlayerX: 500,
   miniPlayerY: 500,
   isMiniPlayerAlwaysOnTop: false,
+  isMiniPlayerTaskbarHidden: false,
   ...persistedUserSettings
 }));
 

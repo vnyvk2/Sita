@@ -429,6 +429,7 @@ declare global {
     | 'windowState'
     | 'recentSearches'
     | 'preferences.isMiniPlayerAlwaysOnTop'
+    | 'preferences.isMiniPlayerTaskbarHidden'
     | 'preferences.autoLaunchApp'
     | 'preferences.isMusixmatchLyricsEnabled'
     | 'preferences.hideWindowOnClose'
@@ -471,6 +472,7 @@ declare global {
     openWindowMaximizedOnStart: boolean;
     openWindowAsHiddenOnSystemStart: boolean;
     isMiniPlayerAlwaysOnTop: boolean;
+    isMiniPlayerTaskbarHidden: boolean;
     isMusixmatchLyricsEnabled: boolean;
     hideWindowOnClose: boolean;
     traySingleClickTogglesWindow: boolean;

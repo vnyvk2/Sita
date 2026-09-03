@@ -678,6 +678,7 @@ export const USER_DATA_TEMPLATE: UserData = {
   language: 'en',
   autoLaunchApp: false,
   isMiniPlayerAlwaysOnTop: false,
+  isMiniPlayerTaskbarHidden: false,
   isMusixmatchLyricsEnabled: false,
   hideWindowOnClose: false,
   traySingleClickTogglesWindow: false,

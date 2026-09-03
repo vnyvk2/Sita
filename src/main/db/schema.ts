@@ -516,6 +516,9 @@ export const userSettings = sqliteTable(
     isMiniPlayerAlwaysOnTop: integer('is_mini_player_always_on_top', { mode: 'boolean' })
       .notNull()
       .default(false),
+    isMiniPlayerTaskbarHidden: integer('is_mini_player_taskbar_hidden', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     isMusixmatchLyricsEnabled: integer('is_musixmatch_lyrics_enabled', { mode: 'boolean' })
       .notNull()
       .default(true),

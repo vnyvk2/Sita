@@ -232,7 +232,20 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       );
     }
 
-    // Defensive check: ensure all required v2 columns exist on user_settings
+    if (currentVersion === 2) {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
+        PRAGMA user_version = 3;
+        COMMIT;
+      `);
+      currentVersion = 3;
+      logger.info(
+        `SQLite incremental schema migration applied (v2 -> v3) in ${Math.round(performance.now() - tDdl)}ms`
+      );
+    }
+
+    // Defensive check: ensure all required v2 and v3 columns exist on user_settings
     const userSettingsCols = new Set(
       (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
         (c) => c.name
@@ -248,6 +261,15 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
         ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
         ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
         PRAGMA user_version = 2;
+        COMMIT;
+      `);
+    }
+    if (!userSettingsCols.has('is_mini_player_taskbar_hidden')) {
+      logger.warn('Detected missing is_mini_player_taskbar_hidden column on user_settings; applying schema repair');
+      db.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
+        PRAGMA user_version = 3;
         COMMIT;
       `);
     }

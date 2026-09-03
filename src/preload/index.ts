@@ -451,6 +451,8 @@ const settings = {
     }),
   updateHideWindowOnCloseState: (enable: boolean): Promise<void> =>
     ipcRenderer.invoke('app/saveUserSettings', { hideWindowOnClose: enable }),
+  updateHideMiniPlayerFromTaskbar: (enable: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerTaskbarHidden', enable),
   updateTraySingleClickBehavior: (enable: boolean): Promise<void> =>
     ipcRenderer.invoke('app/updateTraySingleClickBehavior', enable),
   updateSaveVerboseLogs: (enable: boolean): Promise<void> =>
@@ -595,6 +597,8 @@ const log = {
 const miniPlayer = {
   toggleMiniPlayerAlwaysOnTop: (isMiniPlayerAlwaysOnTop: boolean): Promise<void> =>
     ipcRenderer.invoke('app/toggleMiniPlayerAlwaysOnTop', isMiniPlayerAlwaysOnTop),
+  toggleMiniPlayerTaskbarHidden: (isMiniPlayerTaskbarHidden: boolean): Promise<void> =>
+    ipcRenderer.invoke('app/toggleMiniPlayerTaskbarHidden', isMiniPlayerTaskbarHidden),
   toggleMiniPlayerQueue: (
     isExpanded: boolean,
     queueItemCount?: number

@@ -679,6 +679,8 @@ async function manageWindowFinishLoad() {
 
   logger.debug(`Starting up the renderer.`);
 
+  await applyMiniPlayerTaskbarVisibility();
+
   manageTaskbarPlaybackButtonControls(mainWindow, true, false);
 
   nativeTheme.addListener('updated', () => {
@@ -1107,6 +1109,18 @@ export function toggleMiniPlayerAlwaysOnTop(isMiniPlayerAlwaysOnTop: boolean) {
 
     saveUserSettings({ isMiniPlayerAlwaysOnTop });
   }
+}
+
+export async function applyMiniPlayerTaskbarVisibility() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { isMiniPlayerTaskbarHidden } = await getUserSettings();
+  const shouldSkip = playerType === 'mini' && Boolean(isMiniPlayerTaskbarHidden);
+  mainWindow.setSkipTaskbar(shouldSkip);
+}
+
+export async function toggleMiniPlayerTaskbarHidden(isMiniPlayerTaskbarHidden: boolean) {
+  await saveUserSettings({ isMiniPlayerTaskbarHidden });
+  await applyMiniPlayerTaskbarVisibility();
 }
 
 export async function getRendererLogs(
@@ -1562,6 +1576,7 @@ export async function changePlayerType(
         mainWindow.setFullScreen(true);
         playerType = type;
       }
+      await applyMiniPlayerTaskbarVisibility();
     } finally {
       isChangingPlayerType = false;
     }

@@ -119,6 +119,8 @@ import {
   toggleAudioPlayingState,
   toggleAutoLaunch,
   toggleMiniPlayerAlwaysOnTop,
+  toggleMiniPlayerTaskbarHidden,
+  applyMiniPlayerTaskbarVisibility,
   toggleOnBatteryPower
 } from './main';
 import { registerMetadataIPCHandlers } from './metadata/ipc/metadataIpc';
@@ -367,14 +369,18 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     // ipcMain.handle('app/saveUserData', (_, dataType: UserDataTypes, data: string) =>
     //   saveUserData(dataType, data)
     // );
-    ipcMain.handle('app/saveUserSettings', (_, settings: Partial<UserSettings>) => {
+    ipcMain.handle('app/saveUserSettings', async (_, settings: Partial<UserSettings>) => {
       const { lastScanTime, ...rest } = settings;
       const parsedLastScanTime =
         typeof lastScanTime === 'string' ? new Date(lastScanTime) : lastScanTime;
-      return saveUserSettings({
+      const result = await saveUserSettings({
         ...rest,
         ...(parsedLastScanTime !== undefined ? { lastScanTime: parsedLastScanTime } : {})
       });
+      if (settings.isMiniPlayerTaskbarHidden !== undefined) {
+        await applyMiniPlayerTaskbarVisibility();
+      }
+      return result;
     });
 
     // User Keyboard Shortcuts Handlers
@@ -962,6 +968,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/toggleMiniPlayerAlwaysOnTop', (_, isMiniPlayerAlwaysOnTop: boolean) =>
       toggleMiniPlayerAlwaysOnTop(isMiniPlayerAlwaysOnTop)
+    );
+
+    ipcMain.handle('app/toggleMiniPlayerTaskbarHidden', (_, isMiniPlayerTaskbarHidden: boolean) =>
+      toggleMiniPlayerTaskbarHidden(isMiniPlayerTaskbarHidden)
     );
 
     ipcMain.handle(
