@@ -1,11 +1,11 @@
-﻿import fs from 'fs';
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { addDefaultAppProtocolToFilePath } from '../../../src/main/fs/resolveFilePaths';
-import { handleFileProtocol } from '../../../src/main/handleFileProtocol';
+import { decodeNoraFilePath, handleFileProtocol } from '../../../src/main/handleFileProtocol';
 
 describe('Production handleFileProtocol Deterministic Tests', () => {
   let tempDir: string;
@@ -94,5 +94,63 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
     // Reading after cancellation yields done: true
     const chunkAfterCancel = await reader.read();
     expect(chunkAfterCancel.done).toBe(true);
+  });
+
+  it('generates ETag header and returns 304 Not Modified when If-None-Match matches', async () => {
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const stat = fs.statSync(sampleFilePath);
+    const expectedEtag = `"${stat.size}-${Math.trunc(stat.mtimeMs)}"`;
+
+    // First request without If-None-Match
+    const req1 = new Request(fileUrl, {
+      headers: { range: 'bytes=0-1023' }
+    });
+    const res1 = await handleFileProtocol(req1 as any);
+    expect(res1.headers.get('ETag')).toBe(expectedEtag);
+
+    // Second request with matching If-None-Match
+    const req2 = new Request(fileUrl, {
+      headers: { 'if-none-match': expectedEtag }
+    });
+    const res2 = await handleFileProtocol(req2 as any);
+    expect(res2.status).toBe(304);
+    expect(res2.headers.get('ETag')).toBe(expectedEtag);
+    expect(res2.headers.get('Cache-Control')).toBe('no-cache');
+  });
+
+  it('returns 200/206 with updated ETag when file is modified', async () => {
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const oldEtag = `"123-456"`;
+
+    const req = new Request(fileUrl, {
+      headers: {
+        'if-none-match': oldEtag,
+        range: 'bytes=0-1023'
+      }
+    });
+    const res = await handleFileProtocol(req as any);
+    expect(res.status).toBe(206);
+    expect(res.headers.get('ETag')).not.toBe(oldEtag);
+  });
+
+  it('correctly extracts filePath and host across different nora:// URL formats', () => {
+    const r1 = decodeNoraFilePath('nora://localfiles/C:/music/track.mp3');
+    expect(r1.host).toBe('localfiles');
+    expect(r1.filePath).toBe('C:/music/track.mp3');
+
+    const r2 = decodeNoraFilePath('nora://thumb/C:/covers/album.jpg');
+    expect(r2.host).toBe('thumb');
+    expect(r2.filePath).toBe('C:/covers/album.jpg');
+  });
+
+  it('falls back to serving full file when thumbnail is requested for non-image or disabled', async () => {
+    // sampleFilePath is audio_sample.mp3 (not an image, nativeImage will be empty)
+    const thumbUrl = `nora://thumb/${sampleFilePath.replace(/\\/g, '/')}`;
+    const req = new Request(thumbUrl);
+
+    const res = await handleFileProtocol(req as any);
+    // Should fallback to serving the file (200/206 depending on range)
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).toBeDefined();
   });
 });

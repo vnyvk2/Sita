@@ -668,6 +668,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       {miniPlayerMode !== 'compact' && (
         <div className="background-cover-img-container absolute inset-0 h-full w-full overflow-hidden">
           <Img
+            thumbnail
             src={currentSongData.artworkPath}
             fallbackSrc={DefaultSongCover}
             loading="eager"
@@ -807,6 +808,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                   {pinnedControls.includes('artwork') && (
                     <div className="mini-deck-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs">
                       <Img
+                        thumbnail
                         src={currentSongData.artworkPath}
                         fallbackSrc={DefaultSongCover}
                         loading="eager"

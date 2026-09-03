@@ -74,6 +74,7 @@ import { closeAllAbortControllers, saveAbortController } from './fs/controlAbort
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
+import { cleanThumbnailCache } from './thumbnails/thumbnailService';
 import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
@@ -532,6 +533,7 @@ app
 
     // protocol.registerFileProtocol('nora', registerFileProtocol);
     protocol.handle('nora', handleFileProtocol);
+    void cleanThumbnailCache();
 
     tray = new Tray(appIcon);
     const trayContextMenu = Menu.buildFromTemplate([

@@ -488,6 +488,7 @@ const SongCard = (props: SongCardProp) => {
     >
       <div className="h-full w-full">
         <Img
+          thumbnail
           src={artworkPath}
           loading="eager"
           alt="Song cover"

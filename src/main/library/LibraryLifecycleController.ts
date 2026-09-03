@@ -1,4 +1,6 @@
+import { db } from '@main/db/db';
 import { getUserSettings, saveUserSettings } from '@main/db/queries/settings';
+import { artworks } from '@main/db/schema';
 import { closeAllAbortControllers } from '@main/fs/controlAbortControllers';
 import { initializePassiveWatchers } from '@main/fs/initializePassiveWatchers';
 import libraryChangeTracker, {
@@ -6,6 +8,8 @@ import libraryChangeTracker, {
   type LibraryChangeState
 } from '@main/library/LibraryChangeTracker';
 import logger from '@main/logger';
+import { prewarmThumbnails } from '@main/thumbnails/thumbnailService';
+import { eq } from 'drizzle-orm';
 
 import libraryScanner, {
   type LibraryScanner,
@@ -276,6 +280,7 @@ export class LibraryLifecycleController {
       .then(async (summary) => {
         if (summary.status === 'COMPLETED') {
           await this.recordScanSuccess();
+          this.prewarmArtworkThumbnails();
         }
         return summary;
       })
@@ -340,6 +345,26 @@ export class LibraryLifecycleController {
     } catch (error) {
       logger.warn('[LibraryLifecycleController] Failed to record lastScanTime:', { error });
     }
+  }
+
+  private prewarmArtworkThumbnails(): void {
+    void (async () => {
+      try {
+        const rows = await db
+          .select({ path: artworks.path })
+          .from(artworks)
+          .where(eq(artworks.source, 'LOCAL'))
+          .limit(64);
+        const paths = rows.map((r) => r.path).filter(Boolean);
+        if (paths.length > 0) {
+          prewarmThumbnails(paths);
+        }
+      } catch (err) {
+        logger.debug('[LibraryLifecycleController] Failed to schedule thumbnail prewarming', {
+          err
+        });
+      }
+    })();
   }
 
   public async shutdown(): Promise<void> {

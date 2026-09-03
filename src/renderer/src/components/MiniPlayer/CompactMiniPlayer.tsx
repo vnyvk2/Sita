@@ -225,6 +225,7 @@ const CompactMiniPlayer = (props: Props) => {
           className="compact-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs [-webkit-app-region:no-drag]"
         >
           <Img
+            thumbnail
             src={currentSongData.artworkPath}
             fallbackSrc={DefaultSongCover}
             loading="eager"

@@ -3,6 +3,7 @@
 import { type MouseEvent as ReactMouseEvent, memo, useRef } from 'react';
 
 import DefaultImage from '../assets/images/webp/song_cover_default.webp';
+import { toThumbnailUrl } from '../utils/artwork';
 import log from '../utils/log';
 
 interface ImgProperties {
@@ -26,6 +27,7 @@ type ImgProps = {
   draggable?: boolean;
   enableImgFadeIns?: boolean;
   decoding?: 'async' | 'auto' | 'sync';
+  thumbnail?: boolean;
 };
 
 /* <picture
@@ -89,7 +91,8 @@ const Img = memo((props: ImgProps) => {
     showAltAsTooltipLabel = false,
     draggable = false,
     enableImgFadeIns = true,
-    decoding = 'async'
+    decoding = 'async',
+    thumbnail = false
   } = props;
 
   const imgRef = useRef<HTMLImageElement>(null);
@@ -97,10 +100,12 @@ const Img = memo((props: ImgProps) => {
   const errorCountRef = useRef(0);
   const isFirstTimeRef = useRef(true);
 
+  const resolvedSrc = thumbnail ? toThumbnailUrl(src) : src;
+
   return (
     // <div className="inline-block relative">
     <img
-      src={src || fallbackSrc}
+      src={resolvedSrc || fallbackSrc}
       alt={alt}
       ref={imgRef}
       decoding={decoding}
@@ -111,6 +116,10 @@ const Img = memo((props: ImgProps) => {
       } ${className}`}
       draggable={draggable}
       onError={(e) => {
+        if (thumbnail && src && e.currentTarget.src !== src) {
+          e.currentTarget.src = src;
+          return;
+        }
         if (errorCountRef.current < 3) {
           errorCountRef.current += 1;
           if (!noFallbacks && e.currentTarget.src !== fallbackSrc)
@@ -141,10 +150,9 @@ const Img = memo((props: ImgProps) => {
         }
         e.currentTarget.classList.add('opacity-100!');
         if (showImgPropsOnTooltip) {
-          const img = new Image();
-          img.onload = () => {
-            const width = img?.width;
-            const height = img?.height;
+          const width = e.currentTarget.naturalWidth;
+          const height = e.currentTarget.naturalHeight;
+          if (width > 0 && height > 0) {
             const imgProp: ImgProperties = {
               width,
               height,
@@ -162,8 +170,7 @@ const Img = memo((props: ImgProps) => {
               dataset.height = imgProp.height.toString();
               dataset.quality = imgProp.quality;
             }
-          };
-          img.src = e.currentTarget.src;
+          }
         }
       }}
       tabIndex={tabIndex}

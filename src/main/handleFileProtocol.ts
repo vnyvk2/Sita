@@ -1,33 +1,85 @@
-import { createReadStream, existsSync, statSync } from 'fs';
+import { createReadStream, existsSync, statSync, promises as fsp } from 'fs';
 import { pathToFileURL } from 'url';
 
 import { net } from 'electron';
 import mime from 'mime';
 
 import logger from './logger';
+import { getThumbnail, isThumbnailDisabled } from './thumbnails/thumbnailService';
+
+export const decodeNoraFilePath = (urlStr: string): { filePath: string; host: string } => {
+  const url = new URL(urlStr);
+  const decodedPath = decodeURIComponent(url.pathname);
+  const filePath =
+    process.platform === 'darwin' ? decodedPath : decodedPath.replace(/^[/\\]{1,2}/gm, '');
+  return { filePath, host: url.host };
+};
 
 export const handleFileProtocol = async (req: GlobalRequest) => {
   try {
-    const { pathname } = new URL(req.url);
-    const decodedPath = decodeURIComponent(pathname);
-    const filePath =
-      process.platform === 'darwin' ? decodedPath : decodedPath.replace(/^[/\\]{1,2}/gm, '');
+    const { filePath, host } = decodeNoraFilePath(req.url);
 
     if (!existsSync(filePath)) {
       logger.warn('File not found via nora:// protocol', { url: req.url, filePath });
       return new Response('File not found', { status: 404 });
     }
 
+    if (host === 'thumb' && !isThumbnailDisabled()) {
+      try {
+        const thumb = await getThumbnail(filePath);
+        if (thumb) {
+          const ifNoneMatch = req.headers.get('if-none-match');
+          if (ifNoneMatch && ifNoneMatch === thumb.etag) {
+            return new Response(null, {
+              status: 304,
+              headers: {
+                ETag: thumb.etag,
+                'Cache-Control': 'no-cache'
+              }
+            });
+          }
+
+          return new Response(new Uint8Array(thumb.buffer), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/jpeg',
+              'Cache-Control': 'no-cache',
+              'Accept-Ranges': 'bytes',
+              'Content-Length': thumb.buffer.length.toString(),
+              ETag: thumb.etag
+            }
+          });
+        }
+      } catch (thumbErr) {
+        logger.debug('Thumbnail generation fallback to full-res', { filePath, thumbErr });
+      }
+    }
+
     const mimeType = mime.getType(filePath) || 'application/octet-stream';
     const stat = statSync(filePath);
     const fileSize = stat.size;
+    const mtimeMs = Math.trunc(stat.mtimeMs);
+    const etag = `"${fileSize}-${mtimeMs}"`;
+
+    const ifNoneMatch = req.headers.get('if-none-match');
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ETag: etag,
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+
     const range = req.headers.get('range');
     logger.silly('Serving file from nora://', { url: req.url, range, filePath, mimeType });
 
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      ETag: etag
     };
 
     if (range) {
@@ -101,10 +153,33 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         status: 206,
         headers
       });
-    } else {
+    } else if (typeof net?.fetch === 'function') {
       const asFileUrl = pathToFileURL(filePath).toString();
       const response = await net.fetch(asFileUrl);
-      return response;
+      const resHeaders = new Headers(response.headers);
+      resHeaders.set('ETag', etag);
+      resHeaders.set('Cache-Control', 'no-cache');
+      resHeaders.set('Accept-Ranges', 'bytes');
+      if (mimeType) {
+        resHeaders.set('Content-Type', mimeType);
+      }
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: resHeaders
+      });
+    } else {
+      const fileData = await fsp.readFile(filePath);
+      return new Response(new Uint8Array(fileData), {
+        status: 200,
+        headers: {
+          'Content-Type': mimeType,
+          'Cache-Control': 'no-cache',
+          'Accept-Ranges': 'bytes',
+          'Content-Length': fileSize.toString(),
+          ETag: etag
+        }
+      });
     }
   } catch (error) {
     logger.error('Error handling media protocol:', { error }, error);

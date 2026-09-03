@@ -388,6 +388,7 @@ export const Artist = (props: ArtistProp) => {
         )}
         <div className="artist-cover-container relative h-full overflow-hidden rounded-full before:invisible before:absolute before:h-full before:w-full before:bg-linear-to-b before:from-[hsla(0,0%,0%,0%)] before:to-[hsla(0,0%,0%,50%)] before:opacity-0 before:transition-[visibility,opacity] before:duration-300 before:content-[''] group-focus-within:before:visible group-focus-within:before:opacity-100 group-hover:before:visible group-hover:before:opacity-100">
           <Img
+            thumbnail
             src={props?.onlineArtworkPaths?.picture_medium}
             fallbackSrc={props.artworkPaths.artworkPath}
             alt="Default song cover"
