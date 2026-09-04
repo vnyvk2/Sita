@@ -19,14 +19,14 @@ export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
   exit: (velocity) => Math.abs(velocity) < 300
 };
 
-type Props<T> = {
+type Props<T, C = unknown> = {
   data: readonly T[];
   fixedItemHeight: number;
   scrollKey?: string;
   scrollTopOffset?: number;
   initialItemCount?: number;
-  itemContent: (index: number, item: T) => ReactNode;
-  components?: Components<T>;
+  itemContent: (index: number, item: T, context: C) => ReactNode;
+  components?: Components<T, C>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scrollerRef?: any;
   useWindowScroll?: boolean;
@@ -35,6 +35,9 @@ type Props<T> = {
   onDebouncedScroll?: (range: ListRange) => void;
   onScrollingStateChange?: (isScrolling: boolean) => void;
   scrollSeekConfiguration?: false | ScrollSeekConfiguration;
+  context?: C;
+  increaseViewportBy?: number | { top: number; bottom: number };
+  computeItemKey?: (index: number, item: T, context: C) => React.Key;
 };
 
 const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
@@ -47,7 +50,7 @@ const DefaultScrollSeekPlaceholder = (props: ScrollSeekPlaceholderProps) => (
   />
 );
 
-const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
+const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<VirtuosoHandle>) => {
   const {
     data,
     fixedItemHeight,
@@ -62,7 +65,10 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
     onChange,
     onDebouncedScroll,
     onScrollingStateChange,
-    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG
+    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG,
+    context,
+    increaseViewportBy,
+    computeItemKey
   } = props;
 
   // Retrieve initial saved position for scrollKey if available
@@ -220,6 +226,7 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
       fixedItemHeight={fixedItemHeight}
       components={resolvedComponents}
       ref={setCombinedVirtuosoRef}
+      context={context}
       {...(scrollSeekConfiguration ? { scrollSeekConfiguration } : {})}
       {...(initialItemCount !== undefined ? { initialItemCount } : {})}
       {...(initialTopMost !== undefined ? { initialTopMostItemIndex: initialTopMost } : {})}
@@ -236,10 +243,12 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
           setScrollerElement(null);
         }
       }}
-      increaseViewportBy={{
-        top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,
-        bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
-      }}
+      increaseViewportBy={
+        increaseViewportBy ?? {
+          top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,
+          bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
+        }
+      }
       rangeChanged={(range) => {
         // Guard scroll registry updates while restoring so transient ranges don't overwrite saved position
         if (restorationStateRef.current === 'RESTORING') {
@@ -265,13 +274,14 @@ const List = <T,>(props: Props<T>, ref: React.ForwardedRef<VirtuosoHandle>) => {
         if (onChange) onChange(range);
         handleDebouncedScroll(range);
       }}
+      {...(computeItemKey ? { computeItemKey } : {})}
       itemContent={itemContent}
     />
   );
 };
 
-const VirtualizedList = forwardRef(List) as <T>(
-  props: Props<T> & { ref?: React.ForwardedRef<VirtuosoHandle> }
+const VirtualizedList = forwardRef(List) as <T, C = unknown>(
+  props: Props<T, C> & { ref?: React.ForwardedRef<VirtuosoHandle> }
 ) => ReturnType<typeof List>;
 
 export default VirtualizedList;
