@@ -1,13 +1,15 @@
 import { store } from '@renderer/store/store';
-import { linkOptions } from '@tanstack/react-router';
+import { linkOptions, useLocation } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
 import SideBarItem from './SideBarItem';
+import SidebarPlaylistsSection from './SidebarPlaylistsSection';
+import SidebarResizer from './SidebarResizer';
 
 const Sidebar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
@@ -17,6 +19,53 @@ const Sidebar = memo(() => {
   );
 
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+
+  const isPlaylistOpened = useMemo(() => {
+    return (
+      pathname.startsWith('/main-player/playlists/') &&
+      pathname !== '/main-player/playlists' &&
+      pathname !== '/main-player/playlists/'
+    );
+  }, [pathname]);
+
+  const [splitRatio, setSplitRatio] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nora:sidebar-playlist-split-ratio');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.2 && parsed <= 0.8) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return 0.5;
+  });
+
+  const [isMovableActive, setIsMovableActive] = useState<boolean>(false);
+  const navContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleResize = useCallback((newRatio: number) => {
+    setSplitRatio(newRatio);
+    try {
+      localStorage.setItem('nora:sidebar-playlist-split-ratio', newRatio.toFixed(3));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setSplitRatio(0.5);
+    try {
+      localStorage.setItem('nora:sidebar-playlist-split-ratio', '0.5');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleMovable = useCallback(() => {
+    setIsMovableActive((prev) => !prev);
+  }, []);
 
   const linkData = useMemo(
     () =>
@@ -148,9 +197,36 @@ const Sidebar = memo(() => {
       } delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`}
     >
       <ErrorBoundary>
-        <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden pt-4 pb-2">
-          {sideBarItems}
-        </ul>
+        {isPlaylistOpened ? (
+          <div
+            ref={navContainerRef}
+            className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            {/* Top Section: Navigation Buttons */}
+            <ul
+              style={{ flex: `0 0 ${splitRatio * 100}%` }}
+              className="relative flex min-h-0 flex-col gap-1 overflow-x-hidden overflow-y-auto pt-4 pb-1"
+            >
+              {sideBarItems}
+            </ul>
+
+            {/* Movable Divider (Diagram 3) */}
+            <SidebarResizer
+              containerRef={navContainerRef}
+              onResize={handleResize}
+              onReset={handleReset}
+              isMovableActive={isMovableActive}
+              onToggleMovable={toggleMovable}
+            />
+
+            {/* Bottom Section: Playlists (Diagram 2/3) */}
+            <SidebarPlaylistsSection className="min-h-0 flex-1" />
+          </div>
+        ) : (
+          <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden pt-4 pb-2">
+            {sideBarItems}
+          </ul>
+        )}
         <LibrarySchedulerStatus />
       </ErrorBoundary>
       <LibraryDiagnosticsPanel />
