@@ -25,6 +25,17 @@ vi.mock('../../NavLink', () => ({
   )
 }));
 
+// Mock @tanstack/react-router
+vi.mock('@tanstack/react-router', () => ({
+  useLocation: () => ({ pathname: '/main-player/home' }),
+  linkOptions: <T,>(opts: T): T => opts,
+  Link: ({ children, to, ...props }: { children?: React.ReactNode; to?: string; [key: string]: unknown }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  )
+}));
+
 // Mock react-i18next preserving initReactI18next for i18n initialization
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>();
@@ -63,7 +74,7 @@ describe('Sidebar Navigation & visibleSideTabs Filtering', () => {
   beforeEach(() => {
     store.setState((prev) => ({
       ...prev,
-      bodyBackgroundImage: false,
+      bodyBackgroundImage: '',
       localStorage: {
         ...prev.localStorage,
         preferences: {

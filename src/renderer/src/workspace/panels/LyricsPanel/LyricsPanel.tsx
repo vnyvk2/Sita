@@ -38,7 +38,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
     });
   };
 
-  const hasLyrics = Boolean(lyrics?.lyrics?.lines?.length);
+  const hasLyrics = lyricsComponents.length > 0;
 
   return (
     <div className="lyrics-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white relative flex h-full w-full flex-col overflow-hidden">
@@ -89,7 +89,14 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
           </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <NoLyrics isOfflineLyricsAvailable={false} />
+            <NoLyrics
+              iconName="release_alert"
+              title={t('lyricsPage.noLyrics', 'No lyrics available')}
+              description={t(
+                'lyricsPage.noLyricsDescription',
+                'Could not find lyrics for this track.'
+              )}
+            />
           </div>
         )}
       </div>

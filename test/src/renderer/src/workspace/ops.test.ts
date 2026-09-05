@@ -23,7 +23,6 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
       const invalidWs: Workspace = {
         ...DEFAULT_PRESET,
         panels: {
-          p_nav_default: DEFAULT_PRESET.panels.p_nav_default,
           p_main_default: {
             id: 'p_main_default',
             type: 'queue',
@@ -50,9 +49,8 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
           kind: 'split',
           id: 's_root_dup',
           axis: 'x',
-          weights: [0.18, 0.41, 0.41],
+          weights: [0.5, 0.5],
           children: [
-            { kind: 'panel', panel: 'p_nav_default' },
             { kind: 'panel', panel: 'p_main_default' },
             { kind: 'panel', panel: 'p_extra_main' }
           ]
@@ -66,6 +64,11 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
         ...DEFAULT_PRESET,
         panels: {
           ...DEFAULT_PRESET.panels,
+          p_nav_1: {
+            id: 'p_nav_1',
+            type: 'navigation',
+            local: {}
+          },
           p_nav_2: {
             id: 'p_nav_2',
             type: 'navigation',
@@ -76,9 +79,9 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
           kind: 'split',
           id: 's_root_nav_dup',
           axis: 'x',
-          weights: [0.18, 0.41, 0.41],
+          weights: [0.33, 0.33, 0.34],
           children: [
-            { kind: 'panel', panel: 'p_nav_default' },
+            { kind: 'panel', panel: 'p_nav_1' },
             { kind: 'panel', panel: 'p_main_default' },
             { kind: 'panel', panel: 'p_nav_2' }
           ]
@@ -235,43 +238,64 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
 
   describe('applyLayoutOp', () => {
     it('panel.insert: adds a panel to a split edge', () => {
-      const nextWs = applyLayoutOp(DEFAULT_PRESET, {
+      const nextWs = applyLayoutOp(MUSICBEE_PRESET, {
         t: 'panel.insert',
         type: 'queue',
-        at: { k: 'edge', splitId: 's_root_default', index: 2 }
+        at: { k: 'edge', splitId: 's_root_musicbee', index: 2 }
       });
 
-      expect(Object.keys(nextWs.panels)).toHaveLength(3);
-      const queuePanel = Object.values(nextWs.panels).find((p) => p.type === 'queue');
-      expect(queuePanel).toBeDefined();
+      expect(Object.keys(nextWs.panels)).toHaveLength(5);
+      const queuePanels = Object.values(nextWs.panels).filter((p) => p.type === 'queue');
+      expect(queuePanels.length).toBeGreaterThanOrEqual(2);
       expect(nextWs.root.kind).toBe('split');
       if (nextWs.root.kind === 'split') {
-        expect(nextWs.root.children).toHaveLength(3);
+        expect(nextWs.root.children).toHaveLength(4);
       }
       expect(() => assertWorkspaceInvariants(nextWs)).not.toThrow();
     });
 
     it('panel.insert: rejects duplicate insertion of singleton panel', () => {
+      const wsWithNav: Workspace = {
+        ...DEFAULT_PRESET,
+        panels: {
+          ...DEFAULT_PRESET.panels,
+          p_nav_test: {
+            id: 'p_nav_test',
+            type: 'navigation',
+            local: {}
+          }
+        },
+        root: {
+          kind: 'split',
+          id: 's_root_nav_test',
+          axis: 'x',
+          weights: [0.5, 0.5],
+          children: [
+            { kind: 'panel', panel: 'p_nav_test' },
+            { kind: 'panel', panel: 'p_main_default' }
+          ]
+        }
+      };
       expect(() =>
-        applyLayoutOp(DEFAULT_PRESET, {
+        applyLayoutOp(wsWithNav, {
           t: 'panel.insert',
           type: 'navigation',
-          at: { k: 'edge', splitId: 's_root_default', index: 0 }
+          at: { k: 'edge', splitId: 's_root_nav_test', index: 0 }
         })
       ).toThrow(/Cannot insert singleton panel type 'navigation'/);
     });
 
     it('panel.insert: allows duplicate insertion of visualizer', () => {
-      let ws = applyLayoutOp(DEFAULT_PRESET, {
+      let ws = applyLayoutOp(MUSICBEE_PRESET, {
         t: 'panel.insert',
         type: 'visualizer',
-        at: { k: 'edge', splitId: 's_root_default', index: 2 }
+        at: { k: 'edge', splitId: 's_root_musicbee', index: 3 }
       });
-      // Second visualizer into tabgroup or edge
+      // Second visualizer into tabgroup
       ws = applyLayoutOp(ws, {
         t: 'panel.insert',
         type: 'visualizer',
-        at: { k: 'edge', splitId: 's_root_default', index: 3 }
+        at: { k: 'tab-into', tabsId: 't_right_mb' }
       });
       const visualizers = Object.values(ws.panels).filter((p) => p.type === 'visualizer');
       expect(visualizers).toHaveLength(2);
@@ -279,33 +303,46 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
     });
 
     it('panel.close: closes a widget panel and collapses split when only 1 child remains', () => {
-      const wsWithQueue = applyLayoutOp(DEFAULT_PRESET, {
-        t: 'panel.insert',
-        type: 'queue',
-        at: { k: 'edge', splitId: 's_root_default', index: 2 }
-      });
-      const queueId = Object.values(wsWithQueue.panels).find((p) => p.type === 'queue')!.id;
+      const splitWs: Workspace = {
+        ...DEFAULT_PRESET,
+        panels: {
+          ...DEFAULT_PRESET.panels,
+          p_queue_test: { id: 'p_queue_test', type: 'queue', local: {} },
+          p_lyrics_test: { id: 'p_lyrics_test', type: 'lyrics', local: {} }
+        },
+        root: {
+          kind: 'split',
+          id: 's_test_collapse',
+          axis: 'x',
+          weights: [0.33, 0.33, 0.34],
+          children: [
+            { kind: 'panel', panel: 'p_main_default' },
+            { kind: 'panel', panel: 'p_queue_test' },
+            { kind: 'panel', panel: 'p_lyrics_test' }
+          ]
+        }
+      };
 
       // Close queue
-      const afterCloseQueue = applyLayoutOp(wsWithQueue, {
+      const afterCloseQueue = applyLayoutOp(splitWs, {
         t: 'panel.close',
-        panelId: queueId
+        panelId: 'p_queue_test'
       });
-      expect(afterCloseQueue.panels[queueId]).toBeUndefined();
+      expect(afterCloseQueue.panels.p_queue_test).toBeUndefined();
       expect(Object.keys(afterCloseQueue.panels)).toHaveLength(2);
       expect(() => assertWorkspaceInvariants(afterCloseQueue)).not.toThrow();
 
-      // Now close navigation -> only router-view remains -> split should collapse into a single panel root!
-      const afterCloseNav = applyLayoutOp(afterCloseQueue, {
+      // Now close lyrics -> only router-view remains -> split should collapse into a single panel root!
+      const afterCloseLyrics = applyLayoutOp(afterCloseQueue, {
         t: 'panel.close',
-        panelId: 'p_nav_default'
+        panelId: 'p_lyrics_test'
       });
-      expect(afterCloseNav.root.kind).toBe('panel');
-      if (afterCloseNav.root.kind === 'panel') {
-        expect(afterCloseNav.root.panel).toBe('p_main_default');
+      expect(afterCloseLyrics.root.kind).toBe('panel');
+      if (afterCloseLyrics.root.kind === 'panel') {
+        expect(afterCloseLyrics.root.panel).toBe('p_main_default');
       }
-      expect(Object.keys(afterCloseNav.panels)).toHaveLength(1);
-      expect(() => assertWorkspaceInvariants(afterCloseNav)).not.toThrow();
+      expect(Object.keys(afterCloseLyrics.panels)).toHaveLength(1);
+      expect(() => assertWorkspaceInvariants(afterCloseLyrics)).not.toThrow();
     });
 
     it('panel.close: throws when attempting to close router-view', () => {
@@ -318,31 +355,129 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
     });
 
     it('panel.move: preserves local state when moving a panel to a new split slot', () => {
-      // Modify local state of navigation
-      const wsWithLocal: Workspace = {
+      const splitWs: Workspace = {
         ...DEFAULT_PRESET,
         panels: {
           ...DEFAULT_PRESET.panels,
-          p_nav_default: {
-            ...DEFAULT_PRESET.panels.p_nav_default,
+          p_queue_test: {
+            id: 'p_queue_test',
+            type: 'queue',
             local: { scrollPos: 420, filter: 'heavy-metal' }
           }
+        },
+        root: {
+          kind: 'split',
+          id: 's_test_move',
+          axis: 'x',
+          weights: [0.5, 0.5],
+          children: [
+            { kind: 'panel', panel: 'p_queue_test' },
+            { kind: 'panel', panel: 'p_main_default' }
+          ]
         }
       };
 
-      // Move navigation to index 1 (after router-view)
-      const movedWs = applyLayoutOp(wsWithLocal, {
+      // Move queue after router-view
+      const movedWs = applyLayoutOp(splitWs, {
         t: 'panel.move',
-        panelId: 'p_nav_default',
-        at: { k: 'edge', splitId: 's_root_default', index: 1 }
+        panelId: 'p_queue_test',
+        at: { k: 'edge', splitId: 's_test_move', index: 1 }
       });
 
       // Assert local state survived!
-      expect(movedWs.panels.p_nav_default.local).toEqual({
+      expect(movedWs.panels.p_queue_test.local).toEqual({
         scrollPos: 420,
         filter: 'heavy-metal'
       });
       expect(() => assertWorkspaceInvariants(movedWs)).not.toThrow();
+    });
+
+    it('panel.move: drops panel to split left of a TabGroup without losing panels', () => {
+      const movedWs = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'panel.move',
+        panelId: 'p_playlists_mb',
+        at: {
+          k: 'split-into',
+          targetPanelId: 't_right_mb',
+          axis: 'x',
+          before: true
+        }
+      });
+
+      expect(movedWs.panels.p_playlists_mb).toBeDefined();
+      expect(movedWs.panels.p_lyrics_mb).toBeDefined();
+      expect(movedWs.panels.p_queue_mb).toBeDefined();
+      expect(movedWs.panels.p_main_mb).toBeDefined();
+      expect(Object.keys(movedWs.panels)).toHaveLength(4);
+      expect(() => assertWorkspaceInvariants(movedWs)).not.toThrow();
+    });
+
+    it('panel.move: drops panel to split top of an inner panel inside a TabGroup', () => {
+      const movedWs = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'panel.move',
+        panelId: 'p_playlists_mb',
+        at: {
+          k: 'split-into',
+          targetPanelId: 'p_queue_mb',
+          axis: 'y',
+          before: true
+        }
+      });
+
+      expect(movedWs.panels.p_playlists_mb).toBeDefined();
+      expect(movedWs.panels.p_queue_mb).toBeDefined();
+      expect(movedWs.panels.p_lyrics_mb).toBeDefined();
+      expect(Object.keys(movedWs.panels)).toHaveLength(4);
+      expect(() => assertWorkspaceInvariants(movedWs)).not.toThrow();
+    });
+
+    it('panel.move: extracts tab from TabGroup into split alongside it', () => {
+      const movedWs = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'panel.move',
+        panelId: 'p_queue_mb',
+        at: {
+          k: 'split-into',
+          targetPanelId: 't_right_mb',
+          axis: 'x',
+          before: true
+        }
+      });
+
+      expect(movedWs.panels.p_queue_mb).toBeDefined();
+      expect(movedWs.panels.p_lyrics_mb).toBeDefined();
+      expect(Object.keys(movedWs.panels)).toHaveLength(4);
+      expect(() => assertWorkspaceInvariants(movedWs)).not.toThrow();
+    });
+
+    it('panel.move: drops panel as tab onto a standalone panel converting it into a TabGroup', () => {
+      const wsWithTwoPanels = applyLayoutOp(DEFAULT_PRESET, {
+        t: 'panel.insert',
+        type: 'queue',
+        at: {
+          k: 'split-into',
+          targetPanelId: 'p_main_default',
+          axis: 'x',
+          before: false
+        }
+      });
+      const queuePanel = Object.values(wsWithTwoPanels.panels).find((p) => p.type === 'queue')!;
+
+      // Drop queue as tab onto router-view
+      const tabbedWs = applyLayoutOp(wsWithTwoPanels, {
+        t: 'panel.move',
+        panelId: queuePanel.id,
+        at: {
+          k: 'tab-into',
+          tabsId: 'p_main_default'
+        }
+      });
+
+      expect(tabbedWs.root.kind).toBe('tabs');
+      const tabsNode = tabbedWs.root as TabGroupNode;
+      expect(tabsNode.tabs).toContain('p_main_default');
+      expect(tabsNode.tabs).toContain(queuePanel.id);
+      expect(tabbedWs.panels[queuePanel.id]).toBeDefined();
+      expect(() => assertWorkspaceInvariants(tabbedWs)).not.toThrow();
     });
 
     it('tabs.activate: switches active tab in TabGroup', () => {

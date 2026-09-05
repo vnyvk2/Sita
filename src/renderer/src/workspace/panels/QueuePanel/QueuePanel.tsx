@@ -3,8 +3,9 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useContext, useEffect, useMemo, useState, type FC } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Virtuoso } from 'react-virtuoso';
 
 import type { PanelProps } from '../../registry';
 
@@ -20,54 +21,118 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   const { changeQueueCurrentSongIndex, updateQueueData } = useContext(AppUpdateContext);
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
-  const isCurrentSongPlaying = useStore(store, (state) => state.isCurrentSongPlaying);
+  const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const queueState = useStore(store, (state) => state.localStorage.queue);
 
   const activeQueueIndex = queueState?.currentQueueIndex ?? 0;
   const currentQueue = queueState?.queues?.[activeQueueIndex];
-  const songIds = useMemo(() => currentQueue?.songIds ?? [], [currentQueue?.songIds]);
-  const currentSongIndex = currentQueue?.currentSongIndex ?? 0;
+  const prevSongIdsRef = useRef<number[]>([]);
+  const songIds = useMemo(() => {
+    const nextIds = currentQueue?.songIds ?? [];
+    const prevIds = prevSongIdsRef.current;
+    if (prevIds.length === nextIds.length && prevIds.every((id, i) => id === nextIds[i])) {
+      return prevIds;
+    }
+    prevSongIdsRef.current = nextIds;
+    return nextIds;
+  }, [currentQueue?.songIds]);
+  const currentSongIndex = currentQueue?.position ?? 0;
 
   const manager = getQueuesManager();
 
   // Load song metadata for the visible queue songs
   const [songsMetadata, setSongsMetadata] = useState<Record<number, SongData>>({});
+  const songsMetadataRef = useRef(songsMetadata);
+  songsMetadataRef.current = songsMetadata;
+  const failedIdsRef = useRef<Set<number>>(new Set());
+
+  // Pre-seed metadata cache from currentSongData when available
+  useEffect(() => {
+    if (currentSongData?.songId) {
+      setSongsMetadata((prev) => {
+        if (prev[currentSongData.songId]) return prev;
+        const next = {
+          ...prev,
+          [currentSongData.songId]: currentSongData as unknown as SongData
+        };
+        songsMetadataRef.current = next;
+        return next;
+      });
+    }
+  }, [currentSongData]);
 
   useEffect(() => {
     let isCancelled = false;
     if (
       songIds.length === 0 ||
       typeof window === 'undefined' ||
-      !window.api?.audioLibraryControls?.getSongInfoFromId
+      !window.api?.audioLibraryControls?.getSongInfo
     ) {
       return;
     }
 
-    // Batch load missing metadata
-    const missingIds = songIds.filter((id) => !songsMetadata[id]);
+    // Batch load missing metadata (deduplicated to avoid redundant queries)
+    const missingIds = Array.from(
+      new Set(
+        songIds.filter((id) => !songsMetadataRef.current[id] && !failedIdsRef.current.has(id))
+      )
+    );
     if (missingIds.length === 0) return;
 
-    // Load up to first 50 songs for responsiveness in the panel
-    const idsToFetch = missingIds.slice(0, 50);
-    Promise.all(idsToFetch.map((id) => window.api.audioLibraryControls.getSongInfoFromId(id)))
-      .then((results) => {
-        if (isCancelled) return;
-        setSongsMetadata((prev) => {
-          const next = { ...prev };
-          results.forEach((res) => {
-            if (res && 'songId' in res) {
-              next[(res as SongData).songId] = res as SongData;
+    const fetchBatches = async () => {
+      // Load up to first 100 songs in a batch for responsiveness
+      for (let i = 0; i < missingIds.length; i += 100) {
+        if (isCancelled) break;
+        const idsToFetch = missingIds.slice(i, i + 100);
+        try {
+          const res = await window.api.audioLibraryControls.getSongInfo(idsToFetch);
+          if (isCancelled) return;
+
+          const songs = Array.isArray(res) ? res : [];
+          const returnedIds = new Set(
+            songs
+              .filter((s): s is SongData => Boolean(s && typeof s.songId === 'number'))
+              .map((s) => s.songId)
+          );
+          for (const id of idsToFetch) {
+            if (!returnedIds.has(id)) {
+              failedIdsRef.current.add(id);
             }
-          });
-          return next;
-        });
-      })
-      .catch((err) => console.error('[QueuePanel] Failed to fetch song info:', err));
+          }
+
+          if (songs.length > 0) {
+            setSongsMetadata((prev) => {
+              let changed = false;
+              const next = { ...prev };
+              for (const song of songs) {
+                if (song && typeof song.songId === 'number' && !prev[song.songId]) {
+                  next[song.songId] = song;
+                  changed = true;
+                }
+              }
+              if (changed) {
+                songsMetadataRef.current = next;
+                return next;
+              }
+              return prev;
+            });
+          }
+        } catch (err) {
+          console.error('[QueuePanel] Failed to fetch song info:', err);
+          for (const id of idsToFetch) {
+            failedIdsRef.current.add(id);
+          }
+          break;
+        }
+      }
+    };
+
+    fetchBatches();
 
     return () => {
       isCancelled = true;
     };
-  }, [songIds, songsMetadata]);
+  }, [songIds]);
 
   const handlePlayQueueTrack = useCallback(
     (index: number) => {
@@ -81,8 +146,9 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   const handleRemoveTrack = useCallback(
     (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
-      if (manager && manager.activeQueue) {
-        manager.activeQueue.removeSong(index);
+      const activeQueue = manager?.getActiveQueue();
+      if (activeQueue) {
+        activeQueue.removeSongAtPosition(index);
       } else {
         const nextIds = [...songIds];
         nextIds.splice(index, 1);
@@ -93,8 +159,9 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   );
 
   const handleClearQueue = useCallback(() => {
-    if (manager && manager.activeQueue) {
-      manager.activeQueue.clear();
+    const activeQueue = manager?.getActiveQueue();
+    if (activeQueue) {
+      activeQueue.clear();
     } else {
       updateQueueData(0, []);
     }
@@ -133,28 +200,36 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
       </div>
 
       {/* Song list */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto p-1">
+      <div className="flex-1 min-h-0 overflow-hidden p-1">
         {songIds.length === 0 ? (
           <div className="text-font-color-dimmed flex h-full w-full flex-col items-center justify-center p-6 text-center">
             <span className="material-symbols-rounded mb-2 text-3xl opacity-60">queue_music</span>
             <p className="text-xs">{t('currentQueuePage.emptyQueue', 'Queue is empty')}</p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-0.5">
-            {songIds.map((songId, index) => {
+          <Virtuoso
+            style={{ height: '100%' }}
+            data={songIds}
+            overscan={200}
+            computeItemKey={(index, songId) => `${songId}-${index}`}
+            itemContent={(index, songId) => {
               const isCurrent = index === currentSongIndex;
               const song = songsMetadata[songId];
               const title = isCurrent
-                ? currentSongData.title || song?.title || `Track ${songId}`
+                ? currentSongData?.title || song?.title || `Track ${songId}`
                 : song?.title || `Track ${songId}`;
               const artistNames = isCurrent
-                ? Array.isArray(currentSongData.artists)
+                ? Array.isArray(currentSongData?.artists) && currentSongData.artists.length > 0
                   ? currentSongData.artists.map((a) => a.name).join(', ')
-                  : ''
+                  : Array.isArray(song?.artists)
+                    ? song.artists.map((a) => a.name).join(', ')
+                    : ''
                 : Array.isArray(song?.artists)
                   ? song.artists.map((a) => a.name).join(', ')
                   : '';
-              const duration = isCurrent ? currentSongData.duration : (song?.duration ?? 0);
+              const duration = isCurrent
+                ? currentSongData?.duration || (song?.duration ?? 0)
+                : (song?.duration ?? 0);
 
               return (
                 <li
@@ -213,8 +288,8 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
                   </div>
                 </li>
               );
-            })}
-          </ul>
+            }}
+          />
         )}
       </div>
     </div>

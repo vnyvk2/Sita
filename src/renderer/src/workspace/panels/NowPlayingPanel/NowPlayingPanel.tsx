@@ -14,7 +14,7 @@ export const NowPlayingPanel: FC<PanelProps> = memo(() => {
   const navigate = useNavigate();
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
-  const isCurrentSongPlaying = useStore(store, (state) => state.isCurrentSongPlaying);
+  const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
 
   const { toggleSongPlayback, handleSkipBackwardClick, handleSkipForwardClick, toggleIsFavorite } =
     useContext(AppUpdateContext);
@@ -168,7 +168,7 @@ export const NowPlayingPanel: FC<PanelProps> = memo(() => {
         {/* Next */}
         <button
           type="button"
-          onClick={() => handleSkipForwardClick('user-skip')}
+          onClick={() => handleSkipForwardClick('USER_SKIP')}
           title={t('player.nextTrack', 'Next')}
           className="text-font-color-black dark:text-font-color-white flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-stone-200/60 dark:hover:bg-stone-800/60"
         >

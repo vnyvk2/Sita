@@ -65,7 +65,7 @@ describe('Workspace Store and Persistence', () => {
       workspaceActions.dispatchOp({
         t: 'panel.insert',
         type: 'queue',
-        at: { k: 'edge', splitId: 's_root_default', index: 2 }
+        at: { k: 'split-into', targetPanelId: 'p_main_default', axis: 'x', before: false }
       });
 
       const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
@@ -74,25 +74,25 @@ describe('Workspace Store and Persistence', () => {
     });
 
     it('updates panel local state reactively', () => {
-      workspaceActions.updatePanelLocal('p_nav_default', 'testScroll', 350);
+      workspaceActions.updatePanelLocal('p_main_default', 'testScroll', 350);
       const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
-      expect(activeWs.panels.p_nav_default.local.testScroll).toBe(350);
+      expect(activeWs.panels.p_main_default.local.testScroll).toBe(350);
 
       // Functional updater
       workspaceActions.updatePanelLocal<number>(
-        'p_nav_default',
+        'p_main_default',
         'testScroll',
         (prev) => (prev ?? 0) + 50
       );
       const updatedWs = workspaceStore.state.workspaces[workspaceStore.state.active];
-      expect(updatedWs.panels.p_nav_default.local.testScroll).toBe(400);
+      expect(updatedWs.panels.p_main_default.local.testScroll).toBe(400);
     });
 
     it('toggles maximized panel in dndStore', () => {
       expect(dndStore.state.maximizedPanelId).toBeNull();
-      workspaceActions.toggleMaximizePanel('p_nav_default');
-      expect(dndStore.state.maximizedPanelId).toBe('p_nav_default');
-      workspaceActions.toggleMaximizePanel('p_nav_default');
+      workspaceActions.toggleMaximizePanel('p_main_default');
+      expect(dndStore.state.maximizedPanelId).toBe('p_main_default');
+      workspaceActions.toggleMaximizePanel('p_main_default');
       expect(dndStore.state.maximizedPanelId).toBeNull();
     });
   });

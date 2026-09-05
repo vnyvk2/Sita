@@ -4,7 +4,7 @@ import { MUSICBEE_PRESET } from './presets/musicbee';
 import type { Workspace, WorkspaceState } from './types';
 
 export const WORKSPACE_STORAGE_KEY = 'nora.workspaces.v1';
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export function getInitialWorkspaceState(): WorkspaceState {
   return {
@@ -64,7 +64,13 @@ export function loadWorkspaceState(): WorkspaceState {
     for (const [id, ws] of Object.entries(parsed.workspaces)) {
       const sanitized = sanitizeWorkspace(ws);
       if (sanitized) {
-        sanitizedWorkspaces[id] = sanitized;
+        if (id === DEFAULT_PRESET.id && (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
+          sanitizedWorkspaces[id] = DEFAULT_PRESET;
+        } else if (id === MUSICBEE_PRESET.id && (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
+          sanitizedWorkspaces[id] = MUSICBEE_PRESET;
+        } else {
+          sanitizedWorkspaces[id] = sanitized;
+        }
       }
     }
 

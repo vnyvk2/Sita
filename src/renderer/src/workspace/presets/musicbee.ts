@@ -3,7 +3,7 @@ import type { Workspace } from '../types';
 export const MUSICBEE_PRESET: Workspace = {
   id: 'preset-musicbee',
   name: 'MusicBee',
-  schemaVersion: 1,
+  schemaVersion: 2,
   frame: {
     playerBar: 'bottom',
     playerBarCompact: false
@@ -12,11 +12,11 @@ export const MUSICBEE_PRESET: Workspace = {
     kind: 'split',
     id: 's_root_musicbee',
     axis: 'x',
-    weights: [0.15, 0.6, 0.25],
+    weights: [0.22, 0.53, 0.25],
     children: [
       {
         kind: 'panel',
-        panel: 'p_nav_mb'
+        panel: 'p_playlists_mb'
       },
       {
         kind: 'panel',
@@ -31,9 +31,9 @@ export const MUSICBEE_PRESET: Workspace = {
     ]
   },
   panels: {
-    p_nav_mb: {
-      id: 'p_nav_mb',
-      type: 'navigation',
+    p_playlists_mb: {
+      id: 'p_playlists_mb',
+      type: 'playlists',
       local: {}
     },
     p_main_mb: {

@@ -125,5 +125,23 @@ describe('Drag & Drop System', () => {
       expect(dndStore.state.isDragging).toBe(false);
       expect(dndStore.state.currentDrag).toBeNull();
     });
+
+    it('does not render DropOverlay or data-node-id when showHeader is false (hosted in TabGroup)', () => {
+      const { container } = render(
+        <PanelFrame
+          panelId="p_test_nohdr"
+          type="queue"
+          title="Inside Tab"
+          icon="queue_music"
+          showHeader={false}
+        >
+          <div>Tab Content</div>
+        </PanelFrame>
+      );
+
+      const panelEl = container.querySelector('.panel-frame');
+      expect(panelEl?.getAttribute('data-node-id')).toBeNull();
+      expect(container.querySelector('[data-testid="drop-overlay"]')).toBeNull();
+    });
   });
 });

@@ -2,7 +2,7 @@ import { useStore } from '@tanstack/react-store';
 import { memo, Suspense, useMemo, type FC } from 'react';
 
 import { getPanelDefinition } from '../registry';
-import type { PanelApi, PanelProps } from '../registry';
+import type { PanelApi } from '../registry';
 import { workspaceActions, workspaceStore } from '../store';
 import type { PanelInstanceId } from '../types';
 import { PanelErrorBoundary } from './PanelErrorBoundary';

@@ -4,6 +4,7 @@ export type PanelType =
   | 'navigation'
   | 'router-view'
   | 'queue'
+  | 'playlists'
   | 'lyrics'
   | 'now-playing'
   | 'track-info'
@@ -59,6 +60,14 @@ export interface Workspace {
 export interface WorkspaceState {
   active: string;
   workspaces: Record<string, Workspace>;
+}
+
+export type NodeId = string;
+export type DropEdge = 'left' | 'right' | 'top' | 'bottom' | 'center';
+
+export interface VisualDropTarget {
+  nodeId: NodeId;
+  edge: DropEdge;
 }
 
 export type DropTarget =

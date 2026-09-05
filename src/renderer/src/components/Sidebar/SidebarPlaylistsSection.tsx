@@ -2,7 +2,7 @@ import type { PlaylistDto } from '@common/collections/dtos';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useRootCollections } from '@renderer/hooks/collections/useCollectionQueries';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Suspense, lazy, memo, useCallback, useContext, useMemo } from 'react';
+import { lazy, memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';

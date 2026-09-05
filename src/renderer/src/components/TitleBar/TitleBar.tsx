@@ -1,11 +1,10 @@
 import { useLocation } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
+import { dndStore, workspaceActions, workspaceStore } from '@renderer/workspace/store';
 import { memo } from 'react';
 
-import { version } from '../../../../../package.json';
 import LightModeLogo from '../../assets/images/webp/logo_light_mode.webp';
 import { store } from '../../store/store';
-import { getVersionInfoFromString } from '../../utils/isLatestVersion';
 import Img from '../Img';
 import CurrentLocationContainer from './CurrentLocationContainer';
 import NetworkIndicator from './indicators/NetworkIndicator';
@@ -15,11 +14,18 @@ import ChangeThemeBtn from './special_controls/ChangeThemeBtn';
 import GoToMainPlayerBtn from './special_controls/GoToMainPlayerBtn';
 import WindowControlsContainer from './WindowControlsContainer';
 
-const appReleasePhase = getVersionInfoFromString(version)?.releasePhase || 'stable';
-
 const TitleBar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
   const isFullScreenPlayer = useStore(store, (state) => state.playerType === 'full');
+  const isExperimentalWorkspace = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
+  const isToolbarCollapsed = useStore(dndStore, (s) => s.isToolbarCollapsed);
+  const activeWorkspaceId = useStore(workspaceStore, (s) => s.active);
+  const workspaces = useStore(workspaceStore, (s) => s.workspaces);
+  const activeWorkspace = workspaces[activeWorkspaceId];
+
   const location = useLocation();
   const isDarwin = window.api.properties.platform === 'darwin';
 
@@ -42,7 +48,7 @@ const TitleBar = memo(() => {
               alt="Nora Logo"
             />
           </span>
-          <span className="app-name-container" title={`Sita v${version}`}>
+          <span className="app-name-container" title="Nora">
             <span className="font-medium tracking-wide">Sita</span>
           </span>
         </div>
@@ -55,6 +61,25 @@ const TitleBar = memo(() => {
       )}
       <div className="window-controls-and-special-controls-and-indicators-container flex h-full flex-row">
         <div className="special-controls-and-indicators-container mr-2 flex items-center justify-between py-1">
+          {isExperimentalWorkspace && isToolbarCollapsed && !isFullScreenPlayer && (
+            <button
+              type="button"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              onClick={() => workspaceActions.setToolbarCollapsed(false)}
+              title={`Show Workspace Toolbar (${activeWorkspace?.name ?? 'Workspace'})`}
+              className="workspace-toolbar-restore-btn app-region-no-drag hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-highlight !mr-2 flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-stone-200/60 px-2 py-0.5 text-xs font-semibold shadow-2xs backdrop-blur-md transition-all hover:scale-105 dark:border-stone-700/60"
+            >
+              <span className="material-symbols-rounded text-accent text-base leading-none">
+                view_quilt
+              </span>
+              <span className="max-w-[100px] truncate text-[11px]">
+                {activeWorkspace?.name ?? 'Workspace'}
+              </span>
+              <span className="material-symbols-rounded text-font-color-dimmed text-xs opacity-70">
+                expand_more
+              </span>
+            </button>
+          )}
           <div className="indicators-container flex flex-row">
             {/* <ThrottlingIndicator /> */}
             <NewUpdateIndicator />

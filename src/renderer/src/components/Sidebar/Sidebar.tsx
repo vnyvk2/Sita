@@ -4,6 +4,7 @@ import { useStore } from '@tanstack/react-store';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import ErrorBoundary from '../ErrorBoundary';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
@@ -17,6 +18,11 @@ const Sidebar = memo(() => {
     store,
     (state) => state.localStorage.preferences?.visibleSideTabs
   );
+  const isExperimentalWorkspace = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
+  const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
 
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -181,23 +187,29 @@ const Sidebar = memo(() => {
           key={link.id}
           parentClassName={link.parentClassName}
           icon={link.icon}
-          customIcon={'customIcon' in link ? link.customIcon : undefined}
+          customIcon={'customIcon' in link ? (link.customIcon as React.ReactNode) : undefined}
           content={link.content}
         />
       )),
     [filteredLinkData]
   );
 
+  const bgClass = bodyBackgroundImage
+    ? 'bg-side-bar-background/50 dark:bg-dark-background-color-2/50 backdrop-blur-md'
+    : 'bg-side-bar-background dark:bg-dark-background-color-2';
+
+  const navClassName = isExperimentalWorkspace
+    ? sidebarMode === 'hidden'
+      ? `side-bar relative z-20 order-first flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
+      : sidebarMode === 'compact'
+      ? `side-bar relative z-20 order-first flex !h-full w-14 min-w-[3.5rem] max-w-[3.5rem] shrink-0 grow-0 flex-col overflow-hidden rounded-tr-2xl transition-all duration-300 ${bgClass}`
+      : `side-bar relative z-20 order-first flex !h-full w-60 min-w-[15rem] max-w-[18rem] shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
+    : `side-bar relative z-20 order-1 flex !h-full w-[30%] !max-w-[18rem] grow flex-col rounded-tr-2xl transition-[width] ${bgClass} delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`;
+
   return (
-    <nav
-      className={`side-bar relative z-20 order-1 flex !h-full w-[30%] !max-w-[18rem] grow flex-col rounded-tr-2xl transition-[width] ${
-        bodyBackgroundImage
-          ? 'bg-side-bar-background/50 dark:bg-dark-background-color-2/50 backdrop-blur-md'
-          : 'bg-side-bar-background dark:bg-dark-background-color-2'
-      } delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`}
-    >
+    <nav className={navClassName}>
       <ErrorBoundary>
-        {isPlaylistOpened ? (
+        {isPlaylistOpened && sidebarMode !== 'compact' ? (
           <div
             ref={navContainerRef}
             className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -226,6 +238,29 @@ const Sidebar = memo(() => {
           <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden pt-4 pb-2">
             {sideBarItems}
           </ul>
+        )}
+        {isExperimentalWorkspace && sidebarMode !== 'hidden' && (
+          <div className="sidebar-collapse-control flex items-center justify-between border-t border-stone-200/40 px-2 py-1.5 dark:border-stone-800/40">
+            {sidebarMode === 'expanded' && (
+              <span className="text-font-color-dimmed px-2 text-[10px] font-bold tracking-wider uppercase">
+                Sidebar
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => workspaceActions.cycleSidebarMode()}
+              title={
+                sidebarMode === 'expanded'
+                  ? 'Collapse to icon rail'
+                  : 'Hide sidebar'
+              }
+              className="text-font-color-dimmed hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+            >
+              <span className="material-symbols-rounded text-lg">
+                {sidebarMode === 'expanded' ? 'chevron_left' : 'dock_to_left'}
+              </span>
+            </button>
+          </div>
         )}
         <LibrarySchedulerStatus />
       </ErrorBoundary>

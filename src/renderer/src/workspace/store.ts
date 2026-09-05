@@ -2,16 +2,47 @@ import { Store } from '@tanstack/store';
 
 import { applyLayoutOp } from './ops';
 import { loadWorkspaceState, saveWorkspaceStateDebounced } from './persistence';
-import type { LayoutOp, PanelInstanceId, Workspace, WorkspaceState } from './types';
+import type {
+  LayoutOp,
+  NodeId,
+  PanelInstanceId,
+  VisualDropTarget,
+  Workspace,
+  WorkspaceState
+} from './types';
+
+export type SidebarMode = 'expanded' | 'compact' | 'hidden';
+
+const initialToolbarCollapsed = (() => {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('nora:workspace-toolbar-collapsed') === 'true';
+  } catch {
+    return false;
+  }
+})();
+
+const initialSidebarMode: SidebarMode = (() => {
+  try {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-mode') : null;
+    if (saved === 'expanded' || saved === 'compact' || saved === 'hidden') {
+      return saved;
+    }
+  } catch {
+    // ignore
+  }
+  return 'expanded';
+})();
 
 export interface TransientWorkspaceState {
   isDragging: boolean;
   currentDrag: {
     panelId: PanelInstanceId;
-    sourceNodeId?: string;
+    sourceNodeId?: NodeId;
   } | null;
-  hoveredDropTarget: string | null;
+  hoveredDropTarget: VisualDropTarget | null;
   maximizedPanelId: PanelInstanceId | null;
+  isToolbarCollapsed: boolean;
+  sidebarMode: SidebarMode;
 }
 
 export const workspaceStore = new Store<WorkspaceState>(loadWorkspaceState());
@@ -20,7 +51,9 @@ export const dndStore = new Store<TransientWorkspaceState>({
   isDragging: false,
   currentDrag: null,
   hoveredDropTarget: null,
-  maximizedPanelId: null
+  maximizedPanelId: null,
+  isToolbarCollapsed: initialToolbarCollapsed,
+  sidebarMode: initialSidebarMode
 });
 
 // Auto-persist workspace changes to localStorage
@@ -121,10 +154,52 @@ export const workspaceActions = {
     }));
   },
 
-  setHoveredDropTarget(target: DropTarget | null): void {
+  setHoveredDropTarget(target: VisualDropTarget | null): void {
     dndStore.setState((state) => ({
       ...state,
       hoveredDropTarget: target
     }));
+  },
+
+  setToolbarCollapsed(collapsed: boolean): void {
+    try {
+      localStorage.setItem('nora:workspace-toolbar-collapsed', String(collapsed));
+    } catch {
+      // ignore
+    }
+    dndStore.setState((state) => ({
+      ...state,
+      isToolbarCollapsed: collapsed
+    }));
+  },
+
+  toggleToolbarCollapsed(): void {
+    const next = !dndStore.state.isToolbarCollapsed;
+    workspaceActions.setToolbarCollapsed(next);
+  },
+
+  setSidebarMode(mode: SidebarMode): void {
+    try {
+      localStorage.setItem('nora:sidebar-mode', mode);
+    } catch {
+      // ignore
+    }
+    dndStore.setState((state) => ({
+      ...state,
+      sidebarMode: mode
+    }));
+  },
+
+  cycleSidebarMode(): void {
+    const current = dndStore.state.sidebarMode;
+    const next: SidebarMode =
+      current === 'expanded' ? 'compact' : current === 'compact' ? 'hidden' : 'expanded';
+    workspaceActions.setSidebarMode(next);
+  },
+
+  toggleSidebar(): void {
+    const current = dndStore.state.sidebarMode;
+    const next: SidebarMode = current === 'hidden' ? 'expanded' : 'hidden';
+    workspaceActions.setSidebarMode(next);
   }
 };

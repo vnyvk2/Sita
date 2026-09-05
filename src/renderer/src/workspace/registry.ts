@@ -59,6 +59,15 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     defaultWeight: 0.25,
     component: lazy(() => import('./panels/QueuePanel/QueuePanel'))
   },
+  playlists: {
+    type: 'playlists',
+    title: 'Playlists',
+    icon: 'featured_play_list',
+    kind: 'widget',
+    minSize: { w: 200 },
+    defaultWeight: 0.22,
+    component: lazy(() => import('./panels/PlaylistsPanel/PlaylistsPanel'))
+  },
   lyrics: {
     type: 'lyrics',
     title: 'Lyrics',

@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, type FC } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, type FC } from 'react';
 
 import { normalizeWeights } from '../ops';
 import { workspaceActions } from '../store';
@@ -12,6 +12,17 @@ interface SplitViewProps {
 export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useLayoutEffect(() => {
+    slotRefs.current.length = node.children.length;
+  }, [node.children.length]);
+
+  useEffect(() => {
+    const slots = slotRefs.current;
+    return () => {
+      slots.length = 0;
+    };
+  }, []);
 
   const isHorizontal = node.axis === 'x';
 
@@ -108,9 +119,17 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
       {node.children.map((child, index) => {
         const isCollapsed = node.collapsed === index;
         const weight = node.weights[index] ?? 1 / node.children.length;
+        const childKey =
+          child.kind === 'panel'
+            ? child.panel
+            : child.kind === 'tabs'
+              ? child.id
+              : child.kind === 'split'
+                ? child.id
+                : `slot-${index}`;
 
         return (
-          <div key={index} className="contents">
+          <div key={childKey} className="contents">
             <div
               ref={(el) => {
                 slotRefs.current[index] = el;

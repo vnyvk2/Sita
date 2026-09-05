@@ -41,12 +41,12 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
       <div
         data-panel-id={panelId}
         data-panel-type={type}
-        data-node-id={panelId}
+        data-node-id={showHeader ? panelId : undefined}
         className={`panel-frame bg-background-color-1 dark:bg-dark-background-color-1 relative flex h-full w-full flex-col overflow-hidden ${
           isMaximized ? 'z-40' : ''
         }`}
       >
-        <DropOverlay nodeId={panelId} />
+        {showHeader && <DropOverlay nodeId={panelId} />}
 
         {showHeader && (
           <header

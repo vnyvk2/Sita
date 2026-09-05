@@ -5,18 +5,20 @@ import { useTranslation } from 'react-i18next';
 import { DEFAULT_PRESET } from '../presets/default';
 import { MUSICBEE_PRESET } from '../presets/musicbee';
 import { PANEL_DEFINITIONS, getMountedPanelTypes } from '../registry';
-import { workspaceActions, workspaceStore } from '../store';
+import { dndStore, workspaceActions, workspaceStore } from '../store';
 import type { PanelType } from '../types';
 
 export const WorkspaceToolbar: FC = memo(() => {
   const { t } = useTranslation();
   const [isPanelMenuOpen, setIsPanelMenuOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const activeId = useStore(workspaceStore, (s) => s.active);
   const workspaces = useStore(workspaceStore, (s) => s.workspaces);
+  const isToolbarCollapsed = useStore(dndStore, (s) => s.isToolbarCollapsed);
+  const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
   const activeWs = workspaces[activeId];
 
+  const [addPosition, setAddPosition] = useState<'left' | 'right' | 'tab'>('right');
   const mountedTypes = activeWs ? getMountedPanelTypes(activeWs) : new Set<PanelType>();
 
   const handleSwitchWorkspace = (id: string) => {
@@ -30,19 +32,30 @@ export const WorkspaceToolbar: FC = memo(() => {
       const routerPanel = Object.values(activeWs.panels).find((p) => p.type === 'router-view');
       const targetPanelId = routerPanel ? routerPanel.id : Object.keys(activeWs.panels)[0];
 
-      workspaceActions.dispatchOp({
-        t: 'panel.insert',
-        type,
-        at: {
-          k: 'split-into',
-          targetPanelId,
-          axis: 'x',
-          before: false
-        }
-      });
+      if (addPosition === 'tab') {
+        workspaceActions.dispatchOp({
+          t: 'panel.insert',
+          type,
+          at: {
+            k: 'tab-into',
+            tabsId: targetPanelId
+          }
+        });
+      } else {
+        workspaceActions.dispatchOp({
+          t: 'panel.insert',
+          type,
+          at: {
+            k: 'split-into',
+            targetPanelId,
+            axis: 'x',
+            before: addPosition === 'left'
+          }
+        });
+      }
       setIsPanelMenuOpen(false);
     },
-    [activeWs]
+    [activeWs, addPosition]
   );
 
   const handleResetLayout = useCallback(() => {
@@ -56,12 +69,12 @@ export const WorkspaceToolbar: FC = memo(() => {
 
   if (!activeWs) return null;
 
-  if (isCollapsed) {
+  if (isToolbarCollapsed) {
     return (
       <div className="absolute top-2 right-4 z-30">
         <button
           type="button"
-          onClick={() => setIsCollapsed(false)}
+          onClick={() => workspaceActions.setToolbarCollapsed(false)}
           title="Show Workspace Bar"
           className="bg-background-color-1/90 dark:bg-dark-background-color-1/90 text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-stone-200/80 px-2.5 py-1 text-xs font-semibold shadow-md backdrop-blur-md transition-all hover:scale-105 dark:border-stone-800/80"
         >
@@ -100,8 +113,25 @@ export const WorkspaceToolbar: FC = memo(() => {
         </div>
       </div>
 
-      {/* Actions: Add Panel, Reset, Collapse */}
+      {/* Actions: Sidebar Toggle, Add Panel, Reset, Collapse */}
       <div className="relative flex items-center gap-2">
+        {/* Quick Sidebar Toggle */}
+        <button
+          type="button"
+          onClick={() => workspaceActions.cycleSidebarMode()}
+          title={`Sidebar is ${sidebarMode}. Click to cycle (Expanded -> Compact -> Hidden).`}
+          className="text-font-color-dimmed hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-stone-200/60 px-2 text-xs transition-colors dark:border-stone-700/60"
+        >
+          <span className="material-symbols-rounded text-accent text-sm">
+            {sidebarMode === 'hidden'
+              ? 'dock_to_left'
+              : sidebarMode === 'compact'
+              ? 'left_panel_open'
+              : 'dock_to_left'}
+          </span>
+          <span className="text-[11px] font-medium capitalize hidden sm:inline">{sidebarMode}</span>
+        </button>
+
         {/* Add Panel Menu */}
         <div className="relative">
           <button
@@ -114,8 +144,47 @@ export const WorkspaceToolbar: FC = memo(() => {
           </button>
 
           {isPanelMenuOpen && (
-            <div className="bg-background-color-1 dark:bg-dark-background-color-1 absolute top-8 right-0 z-50 w-56 rounded-xl border border-stone-200 p-1.5 shadow-2xl backdrop-blur-xl dark:border-stone-700">
-              <div className="text-font-color-dimmed mb-1 border-b border-stone-200/40 px-2 py-1 text-[10px] font-bold tracking-wider uppercase dark:border-stone-800/40">
+            <div className="bg-background-color-1 dark:bg-dark-background-color-1 absolute top-8 right-0 z-50 w-60 rounded-xl border border-stone-200 p-2 shadow-2xl backdrop-blur-xl dark:border-stone-700">
+              <div className="text-font-color-dimmed mb-1 px-1 text-[10px] font-bold tracking-wider uppercase">
+                Target Position
+              </div>
+              <div className="mb-2 flex items-center justify-between rounded-lg bg-stone-100 p-0.5 dark:bg-stone-800">
+                <button
+                  type="button"
+                  onClick={() => setAddPosition('left')}
+                  className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    addPosition === 'left'
+                      ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                      : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                  }`}
+                >
+                  Left
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddPosition('right')}
+                  className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    addPosition === 'right'
+                      ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                      : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                  }`}
+                >
+                  Right
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddPosition('tab')}
+                  className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    addPosition === 'tab'
+                      ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                      : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                  }`}
+                >
+                  As Tab
+                </button>
+              </div>
+
+              <div className="text-font-color-dimmed mb-1 border-b border-stone-200/40 px-1 py-1 text-[10px] font-bold tracking-wider uppercase dark:border-stone-800/40">
                 Available Panels
               </div>
 
@@ -168,7 +237,7 @@ export const WorkspaceToolbar: FC = memo(() => {
         {/* Collapse Bar */}
         <button
           type="button"
-          onClick={() => setIsCollapsed(true)}
+          onClick={() => workspaceActions.setToolbarCollapsed(true)}
           title="Minimize toolbar"
           className="text-font-color-dimmed flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-800"
         >

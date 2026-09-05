@@ -119,6 +119,9 @@ export function assertWorkspaceInvariants(ws: Workspace): void {
   const singletonCounts = new Map<PanelType, number>();
 
   for (const [panelId, instance] of Object.entries(ws.panels)) {
+    if (!instance || typeof instance !== 'object') {
+      throw new WorkspaceInvariantError(`Panel instance '${panelId}' is undefined or invalid.`);
+    }
     const refs = panelRefCounts.get(panelId) ?? 0;
     if (refs === 0) {
       throw new WorkspaceInvariantError(
@@ -216,6 +219,51 @@ export function findTabGroupNode(root: LayoutNode, tabsId: string): TabGroupNode
   return null;
 }
 
+export function findTabGroupContainingPanel(root: LayoutNode, panelId: string): TabGroupNode | null {
+  if (root.kind === 'tabs') {
+    if (root.tabs.includes(panelId)) return root;
+  } else if (root.kind === 'split') {
+    for (const child of root.children) {
+      const found = findTabGroupContainingPanel(child, panelId);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+export function simplifyTree(node: LayoutNode): LayoutNode {
+  if (node.kind === 'panel' || node.kind === 'tabs') {
+    return node;
+  }
+
+  if (node.kind === 'split') {
+    const simplifiedChildren: LayoutNode[] = [];
+    const simplifiedWeights: number[] = [];
+
+    for (let i = 0; i < node.children.length; i++) {
+      const child = simplifyTree(node.children[i]);
+      simplifiedChildren.push(child);
+      simplifiedWeights.push(node.weights[i] ?? 1);
+    }
+
+    if (simplifiedChildren.length === 0) {
+      return node;
+    }
+
+    if (simplifiedChildren.length === 1) {
+      return simplifiedChildren[0];
+    }
+
+    return {
+      ...node,
+      children: simplifiedChildren,
+      weights: normalizeWeights(simplifiedWeights)
+    };
+  }
+
+  return node;
+}
+
 export function pruneOrphanPanels(ws: Workspace): Workspace {
   const referencedIds = collectAllPanelIds(ws.root);
   const nextPanels: Record<PanelInstanceId, (typeof ws.panels)[string]> = {};
@@ -253,7 +301,8 @@ function updateNodeRecursively(
 
 function removePanelFromTree(
   root: LayoutNode,
-  panelId: string
+  panelId: string,
+  simplify = true
 ): { nextRoot: LayoutNode | null; removed: boolean } {
   if (root.kind === 'panel') {
     if (root.panel === panelId) {
@@ -284,7 +333,7 @@ function removePanelFromTree(
 
     for (let i = 0; i < root.children.length; i++) {
       const child = root.children[i];
-      const result = removePanelFromTree(child, panelId);
+      const result = removePanelFromTree(child, panelId, simplify);
       if (result.removed) {
         removed = true;
         if (result.nextRoot !== null) {
@@ -306,8 +355,8 @@ function removePanelFromTree(
       return { nextRoot: null, removed: true };
     }
 
-    // Collapse split if only 1 child remains
-    if (nextChildren.length === 1) {
+    // Collapse split if only 1 child remains and simplify is enabled
+    if (nextChildren.length === 1 && simplify) {
       return { nextRoot: nextChildren[0], removed: true };
     }
 
@@ -359,48 +408,98 @@ function insertNodeAtTarget(
   }
 
   if (target.k === 'split-into') {
-    return updateNodeRecursively(
-      root,
-      (n) => n.kind === 'panel' && (n as PanelRefNode).panel === target.targetPanelId,
-      (node) => {
-        const targetPanelNode = node as PanelRefNode;
-        const children = target.before ? [newNode, targetPanelNode] : [targetPanelNode, newNode];
-        return {
-          kind: 'split',
-          id: generateRandomId('split'),
-          axis: target.axis,
-          children,
-          weights: [0.5, 0.5]
-        };
+    const matchesTarget = (n: LayoutNode): boolean => {
+      if (n.kind === 'panel') {
+        return n.panel === target.targetPanelId;
       }
-    );
+      if (n.kind === 'tabs') {
+        return n.id === target.targetPanelId || n.tabs.includes(target.targetPanelId);
+      }
+      if (n.kind === 'split') {
+        return n.id === target.targetPanelId;
+      }
+      return false;
+    };
+
+    return updateNodeRecursively(root, matchesTarget, (node) => {
+      if (
+        newNode.kind === 'panel' &&
+        node.kind === 'panel' &&
+        node.panel === (newNode as PanelRefNode).panel
+      ) {
+        return node;
+      }
+
+      const children = target.before ? [newNode, node] : [node, newNode];
+      return {
+        kind: 'split',
+        id: generateRandomId('split'),
+        axis: target.axis,
+        children,
+        weights: [0.5, 0.5]
+      };
+    });
   }
 
   if (target.k === 'tab-into') {
     if (newNode.kind !== 'panel') {
       throw new WorkspaceInvariantError(`Only panel references can be tabbed into a TabGroup.`);
     }
-    return updateNodeRecursively(
-      root,
-      (n) => n.kind === 'tabs' && (n as TabGroupNode).id === target.tabsId,
-      (node) => {
-        const tabsNode = node as TabGroupNode;
-        if (tabsNode.tabs.includes(newNode.panel)) {
-          return tabsNode;
-        }
-        const nextTabs = [...tabsNode.tabs];
-        const idx =
-          target.index !== undefined
-            ? Math.max(0, Math.min(target.index, nextTabs.length))
-            : nextTabs.length;
-        nextTabs.splice(idx, 0, newNode.panel);
+    const panelToAdd = (newNode as PanelRefNode).panel;
+
+    // 1. Check if an existing TabGroup matches by id or contains the target panel
+    const matchesTabGroup = (n: LayoutNode): boolean => {
+      return (
+        n.kind === 'tabs' &&
+        ((n as TabGroupNode).id === target.tabsId ||
+          (n as TabGroupNode).tabs.includes(target.tabsId))
+      );
+    };
+
+    let tabGroupUpdated = false;
+    const updatedWithTabGroup = updateNodeRecursively(root, matchesTabGroup, (node) => {
+      tabGroupUpdated = true;
+      const tabsNode = node as TabGroupNode;
+      if (tabsNode.tabs.includes(panelToAdd)) {
         return {
           ...tabsNode,
-          tabs: nextTabs,
-          active: newNode.panel
+          active: panelToAdd
         };
       }
-    );
+      const nextTabs = [...tabsNode.tabs];
+      const idx =
+        target.index !== undefined
+          ? Math.max(0, Math.min(target.index, nextTabs.length))
+          : nextTabs.length;
+      nextTabs.splice(idx, 0, panelToAdd);
+      return {
+        ...tabsNode,
+        tabs: nextTabs,
+        active: panelToAdd
+      };
+    });
+
+    if (tabGroupUpdated) {
+      return updatedWithTabGroup;
+    }
+
+    // 2. If no existing TabGroup matched, check if target is a standalone panel to convert into a TabGroup
+    const matchesPanel = (n: LayoutNode): boolean => {
+      return n.kind === 'panel' && (n as PanelRefNode).panel === target.tabsId;
+    };
+
+    return updateNodeRecursively(root, matchesPanel, (node) => {
+      const existingPanel = (node as PanelRefNode).panel;
+      if (existingPanel === panelToAdd) {
+        return node;
+      }
+      return {
+        kind: 'tabs',
+        id: generateRandomId('tabs'),
+        tabs: [existingPanel, panelToAdd],
+        active: panelToAdd
+      };
+    });
   }
 
   return root;
@@ -525,7 +624,9 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
 
       // Check for intra-tabgroup reorder
       if (op.at.k === 'tab-into') {
-        const targetTabs = findTabGroupNode(ws.root, op.at.tabsId);
+        const targetTabs =
+          findTabGroupNode(ws.root, op.at.tabsId) ??
+          findTabGroupContainingPanel(ws.root, op.at.tabsId);
         if (targetTabs && targetTabs.tabs.includes(op.panelId)) {
           const curIndex = targetTabs.tabs.indexOf(op.panelId);
           const newIndex =
@@ -540,9 +641,7 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
           nextTabs.splice(newIndex, 0, op.panelId);
           const nextRoot = updateNodeRecursively(
             ws.root,
-            (n) =>
-              n.kind === 'tabs' &&
-              (n as TabGroupNode).id === (op.at as { k: 'tab-into'; tabsId: string }).tabsId,
+            (n) => n.kind === 'tabs' && (n as TabGroupNode).id === targetTabs.id,
             (node) => ({
               ...(node as TabGroupNode),
               tabs: nextTabs,
@@ -555,8 +654,8 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
       }
 
       // Inter-node move
-      // Step 1: Remove from current location in tree (preserving instance in ws.panels)
-      const { nextRoot: intermediateRoot } = removePanelFromTree(ws.root, op.panelId);
+      // Step 1: Remove from current location in tree (preserve splits until final simplification)
+      const { nextRoot: intermediateRoot } = removePanelFromTree(ws.root, op.panelId, false);
       if (!intermediateRoot) {
         throw new WorkspaceInvariantError(
           `Cannot move panel '${op.panelId}' to target: intermediate tree is empty.`
@@ -756,6 +855,12 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
     default:
       nextWs = ws;
   }
+
+  // Simplify tree (e.g. collapse any split with only 1 child)
+  nextWs = {
+    ...nextWs,
+    root: simplifyTree(nextWs.root)
+  };
 
   // Prune any orphan panels that might have been disconnected
   nextWs = pruneOrphanPanels(nextWs);
