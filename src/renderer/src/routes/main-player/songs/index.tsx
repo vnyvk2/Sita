@@ -89,6 +89,12 @@ function SongsPage() {
     store,
     (state) => state.localStorage.preferences.isSongIndexingEnabled
   );
+  // Single parent-level subscription passed to all Song rows via prop,
+  // eliminating ~25 per-row store subscriptions in the hot scrolling path.
+  const hasBodyBackgroundImage = useStore(
+    store,
+    (state) => Boolean(state.bodyBackgroundImage)
+  );
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) =>
@@ -374,13 +380,14 @@ function SongsPage() {
             isIndexingSongs={isSongIndexingEnabled}
             onPlayClick={handleSongPlayBtnClick}
             selectAllHandler={selectAllHandler}
+            hasBodyBackgroundImage={hasBodyBackgroundImage}
             {...song}
           />
         );
       }
       return <SongRowSkeleton index={index} />;
     },
-    [getItem, isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler]
+    [getItem, isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler, hasBodyBackgroundImage]
   );
 
   const normalizedKeyword = keyword?.trim();

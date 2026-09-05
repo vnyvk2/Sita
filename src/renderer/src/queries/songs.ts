@@ -4,9 +4,25 @@ import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const SONG_WINDOW_SIZE = 200;
 export const SONG_WINDOW_STALE_TIME = 10 * 60 * 1000;
-export const SONG_WINDOW_GC_TIME = 2 * 60 * 1000;
+export const SONG_WINDOW_GC_TIME = 12 * 60 * 1000;
 export const SONG_IDS_STALE_TIME = 5 * 60 * 1000;
 export const SONG_IDS_GC_TIME = 30 * 60 * 1000;
+
+/**
+ * Fast numeric hash for generating compact, stable cache keys from song ID arrays.
+ * Produces a deterministic hex string from sorted IDs, replacing the O(n) join
+ * that generated proportionally-growing key strings for large playlists/albums.
+ */
+function hashSongIds(ids: readonly number[]): string {
+  const sorted = [...ids].sort((a, b) => a - b);
+  // FNV-1a inspired hash with good distribution for integer sequences
+  let h = 0x811c9dc5 | 0;
+  for (let i = 0; i < sorted.length; i++) {
+    h ^= sorted[i];
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
 
 export interface SongIdsParams {
   sortType: SongSortTypes;
@@ -122,8 +138,8 @@ export const songQuery = createQueryKeys('songs', {
     const { songIds, sortType, filterType } = data;
     return {
       queryKey: [
-        // Do NOT mutate the incoming array; copy before sort for cache key stability
-        `songIds=${[...songIds].sort().join(',')}`,
+        // Compact hash + count for cache key stability without generating large strings
+        `songIds:h=${hashSongIds(songIds)}:n=${songIds.length}`,
         `sortType=${sortType}`,
         `filterType=${filterType}`
       ],

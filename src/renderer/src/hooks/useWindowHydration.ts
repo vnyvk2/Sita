@@ -199,6 +199,16 @@ export function useWindowHydration(
   const idsRef = useRef(ids);
   idsRef.current = ids;
 
+  // Lazily-built Map<songId, SongData> per window for O(1) fallback lookups
+  // instead of linear Array.find scans in the hot render path.
+  const windowLookupCacheRef = useRef(new Map<number, Map<number, SongData>>());
+  const windowLookupVersionRef = useRef(idsVersion);
+  // Clear the lookup cache when the IDs version changes
+  if (windowLookupVersionRef.current !== idsVersion) {
+    windowLookupCacheRef.current.clear();
+    windowLookupVersionRef.current = idsVersion;
+  }
+
   const getItem = useCallback(
     (index: number) => {
       const targetId = idsRef.current[index];
@@ -226,9 +236,18 @@ export function useWindowHydration(
             itemsByIndexRef.current.set(index, candidate);
             return candidate;
           }
-          const found = cachedData.find(
-            (s) => (s.songId ?? (s as unknown as { id: number }).id) === targetId
-          );
+          // Lazily build a Map<songId, SongData> for this window on first miss,
+          // then use O(1) lookups for subsequent misses instead of O(n) Array.find.
+          let windowMap = windowLookupCacheRef.current.get(windowStart);
+          if (!windowMap) {
+            windowMap = new Map<number, SongData>();
+            for (const s of cachedData) {
+              const id = s.songId ?? (s as unknown as { id: number }).id;
+              if (id !== undefined) windowMap.set(id, s);
+            }
+            windowLookupCacheRef.current.set(windowStart, windowMap);
+          }
+          const found = windowMap.get(targetId);
           if (found) {
             itemsByIndexRef.current.set(index, found);
             return found;

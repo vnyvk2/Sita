@@ -69,6 +69,11 @@ interface SongProp {
   discNo?: number;
   /** When provided, highlights the matching portion of the title in search results */
   highlightText?: string;
+  /**
+   * When provided, skips the per-row store subscription for bodyBackgroundImage.
+   * Pass from the parent to avoid N store subscriptions in the hot scrolling path.
+   */
+  hasBodyBackgroundImage?: boolean;
 }
 
 const Song = memo(
@@ -95,7 +100,8 @@ const Song = memo(
       provided = {} as any,
       isDragging = false,
       onPlayClick,
-      highlightText
+      highlightText,
+      hasBodyBackgroundImage
     } = props;
 
     // Granular store subscriptions: only subscribe to primitives relevant to this specific song
@@ -108,7 +114,15 @@ const Song = memo(
     const currentSongFavorite = useStore(store, (state) =>
       state.currentSongData?.songId === songId ? state.currentSongData.isAFavorite : undefined
     );
-    const bodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
+    // When the parent provides hasBodyBackgroundImage, skip the per-row store subscription
+    // to avoid N redundant subscriptions in the hot scrolling path.
+    const bodyBackgroundImageFromStore = useStore(
+      store,
+      hasBodyBackgroundImage !== undefined
+        ? () => false // no-op selector; prop takes precedence
+        : (state) => Boolean(state.bodyBackgroundImage)
+    );
+    const bodyBackgroundImage = hasBodyBackgroundImage ?? bodyBackgroundImageFromStore;
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
     const showTrackNumberAsSongIndex = useStore(store, (state) =>
@@ -314,6 +328,14 @@ const Song = memo(
       };
     }, [duration]);
 
+    // Stable identity key based on artist IDs, not the array reference itself.
+    // The artists prop is a fresh array from IPC on every window refetch, which would
+    // invalidate useMemo even when the actual data is identical.
+    const artistsKey = useMemo(
+      () => artists?.map((a) => a.artistId).join(',') ?? '',
+      [artists]
+    );
+
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
         return artists
@@ -340,7 +362,8 @@ const Song = memo(
           .flat();
       }
       return <span className="text-xs font-normal">{t('common.unknownArtist')}</span>;
-    }, [artists, isCurrentSong, isAMultipleSelection, t]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [artistsKey, isCurrentSong, isAMultipleSelection, t]);
 
     const goToSongInfoPage = useCallback(
       () => navigate({ to: '/main-player/songs/$songId', params: { songId: String(songId) } }),

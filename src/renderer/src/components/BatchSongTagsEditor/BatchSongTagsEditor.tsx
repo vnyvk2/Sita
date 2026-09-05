@@ -1,7 +1,5 @@
-import { albumQuery } from '@renderer/queries/albums';
-import { artistQuery } from '@renderer/queries/artists';
-import { genreQuery } from '@renderer/queries/genres';
 import { songQuery } from '@renderer/queries/songs';
+import { invalidateWindowsContainingIds } from '@renderer/hooks/useDataSync';
 import { queryClient } from '@renderer/queryClient';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -314,11 +312,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
       );
 
       if (savedIds.size > 0) {
-        // Invalidate global React Query cache to ensure immediate view sync across app
-        void queryClient.invalidateQueries({ queryKey: songQuery.all.queryKey });
-        void queryClient.invalidateQueries({ queryKey: artistQuery.all.queryKey });
-        void queryClient.invalidateQueries({ queryKey: albumQuery.all.queryKey });
-        void queryClient.invalidateQueries({ queryKey: genreQuery.all.queryKey });
+        // Surgically invalidate only the hydration windows containing the edited songs.
+        // The IPC dataUpdateEvent (songs/updatedSong) will handle broader artist/album/genre
+        // invalidation via useDataSync, so we don't need nuclear cache clearing here.
+        invalidateWindowsContainingIds(queryClient, savedIds);
+        // Refresh IDs in case tag changes affected sort order or filter membership
+        void queryClient.invalidateQueries({ queryKey: songQuery.ids._def });
       }
 
       if (isMountedRef.current) {
